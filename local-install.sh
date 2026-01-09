@@ -1,7 +1,29 @@
 #!/bin/bash
 
-# Barista AI - Interactive Installer
-# Usage: ./local-install.sh
+################################################################################
+# MeticAI - Interactive Installer
+################################################################################
+# 
+# This script automates the installation of MeticAI, an autonomous AI agent
+# that controls a Meticulous Espresso Machine using Google Gemini 2.0 Flash.
+#
+# USAGE:
+#   ./local-install.sh
+#
+# WHAT IT DOES:
+#   1. Checks for prerequisites (Git, Docker)
+#   2. Interactively collects configuration (API keys, IP addresses)
+#   3. Creates .env file with your settings
+#   4. Clones the required Meticulous MCP source repository
+#   5. Builds and launches Docker containers
+#
+# REQUIREMENTS:
+#   - Git installed
+#   - Docker & Docker Compose installed
+#   - Google Gemini API key (get one at: https://aistudio.google.com/app/apikey)
+#   - Meticulous Espresso Machine with known local IP address
+#
+################################################################################
 
 # Text Colors
 GREEN='\033[0;32m'
@@ -212,11 +234,18 @@ echo -e "${GREEN}✓ All prerequisites satisfied.${NC}"
 echo ""
 
 # 2. Configure Environment Variables
+################################################################################
+# Collect user configuration and create .env file
+# - GEMINI_API_KEY: Your Google Gemini API key
+# - METICULOUS_IP: IP address of your espresso machine
+# - PI_IP: IP address of this server (auto-detected, can override)
+################################################################################
 echo -e "${YELLOW}[2/4] Configuration${NC}"
 echo "We need to create a .env file with your specific settings."
 echo ""
 
 # --- Gemini API Key ---
+# Get your free API key at: https://aistudio.google.com/app/apikey
 read -p "Enter your Google Gemini API Key: " GEMINI_KEY
 while [[ -z "$GEMINI_KEY" ]]; do
     echo -e "${RED}API Key cannot be empty.${NC}"
@@ -248,6 +277,10 @@ echo -e "${GREEN}✓ .env file created.${NC}"
 echo ""
 
 # 3. Setup Dependencies (The MCP Fork)
+################################################################################
+# Clone the Meticulous MCP server fork required for machine communication
+# Repository: https://github.com/manonstreet/meticulous-mcp.git
+################################################################################
 echo -e "${YELLOW}[3/4] Setting up Meticulous Source...${NC}"
 
 if [ -d "meticulous-source" ]; then
@@ -271,6 +304,12 @@ echo -e "${GREEN}✓ Source code ready.${NC}"
 echo ""
 
 # 4. Build and Launch
+################################################################################
+# Stop any existing containers, then build and start the Docker services
+# This includes:
+# - coffee-relay: FastAPI server for receiving requests
+# - gemini-client: AI brain using Google Gemini 2.0 Flash
+################################################################################
 echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
 echo "Note: Running with sudo permissions."
 

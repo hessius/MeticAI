@@ -21,7 +21,7 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 ### 1. Requirements
 * Server running Linux (Debian/Ubuntu, RHEL/Fedora/CentOS, or Arch-based)
 * Meticulous Espresso Machine (Local IP required)
-* Google Gemini API Key
+* **Google Gemini API Key** - [Get your free API key here](https://aistudio.google.com/app/apikey)
 
 **Note:** The installation script will automatically check for and offer to install the following prerequisites if they are missing:
 * Git
@@ -58,7 +58,7 @@ git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
 
 #### Manual Configuration
 
-Create a .env file in the root directory:
+Create a `.env` file in the root directory:
 ```
 GEMINI_API_KEY=your_key_here
 METICULOUS_IP=192.168.x.x  # IP of your Espresso Machine
@@ -92,3 +92,34 @@ POST http://<PI_IP>:8000/create_profile
 Form: coffee_info (Result of Step 2), user_prefs (Result of Step 3)
 
 Show Notification (Result)
+
+## Testing
+
+MeticAI includes a comprehensive test suite to ensure code quality and reliability.
+
+### Running Tests
+
+**Python Tests (FastAPI Application):**
+```bash
+cd coffee-relay
+pip install -r requirements-test.txt
+pytest test_main.py -v --cov=main
+```
+
+**Bash Tests (Installation Script):**
+```bash
+# Install BATS if not already installed
+# Ubuntu/Debian: sudo apt-get install bats
+# macOS: brew install bats-core
+
+bats tests/test_local_install.bats
+```
+
+### Test Coverage
+- **Python**: 100% code coverage (20 tests)
+- **Bash**: 20 critical functionality tests
+
+See [tests/README.md](tests/README.md) for detailed testing documentation and [TEST_COVERAGE.md](TEST_COVERAGE.md) for coverage metrics.
+
+### Continuous Integration
+All pull requests are automatically tested via GitHub Actions. Tests must pass before merging.

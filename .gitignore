@@ -20,3 +20,12 @@ Thumbs.db
 # Logs
 *.log
 meticulous-source/
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.cover
+.hypothesis/
+.tox/
