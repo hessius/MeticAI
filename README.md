@@ -19,11 +19,35 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 ## Installation
 
 ### 1. Requirements
-* Server (Git, Docker & Docker Compose installed)
+* Server running Linux (Debian/Ubuntu, RHEL/Fedora/CentOS, or Arch-based)
 * Meticulous Espresso Machine (Local IP required)
 * Google Gemini API Key
 
-### 2. Setup
+**Note:** The installation script will automatically check for and offer to install the following prerequisites if they are missing:
+* Git
+* Docker
+* Docker Compose
+
+### 2. Quick Setup
+Use the automated installer script:
+```bash
+# Clone this repository (if git is installed)
+git clone <your-repo-url> met-ai
+cd met-ai
+
+# Run the interactive installer
+./local-install.sh
+```
+
+The script will:
+1. Check for prerequisites (git, docker, docker-compose) and offer to install them if missing
+2. Guide you through configuration (API keys, IP addresses)
+3. Clone the required MCP source repository
+4. Build and launch all containers
+
+### 3. Manual Setup (Alternative)
+If you prefer to install dependencies manually or are running on an unsupported OS:
+
 Clone the repo and the required MCP source:
 ```bash
 git clone <your-repo-url> met-ai
@@ -32,7 +56,7 @@ cd met-ai
 git clone [https://github.com/manonstreet/meticulous-mcp.git](https://github.com/manonstreet/meticulous-mcp.git) meticulous-source
 ```
 
-### 3. Configure
+#### Manual Configuration
 
 Create a .env file in the root directory:
 ```
@@ -41,7 +65,7 @@ METICULOUS_IP=192.168.x.x  # IP of your Espresso Machine
 PI_IP=192.168.x.x          # IP of this Raspberry Pi
 ```
 
-## 4. Run
+#### Manual Run
 
 Note: Use sudo if your user does not have direct docker permissions
 ```bash

@@ -15,20 +15,169 @@ echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
+# Detect OS
+detect_os() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+        OS_VERSION=$VERSION_ID
+    elif [ -f /etc/redhat-release ]; then
+        OS="rhel"
+    else
+        OS="unknown"
+    fi
+    echo "$OS"
+}
+
+# Install git based on OS
+install_git() {
+    local os=$(detect_os)
+    echo -e "${YELLOW}Installing git...${NC}"
+    
+    case "$os" in
+        ubuntu|debian|raspbian)
+            sudo apt-get update && sudo apt-get install -y git
+            ;;
+        fedora|rhel|centos)
+            sudo dnf install -y git || sudo yum install -y git
+            ;;
+        arch|manjaro)
+            sudo pacman -Sy --noconfirm git
+            ;;
+        *)
+            echo -e "${RED}Unsupported OS for automatic installation. Please install git manually.${NC}"
+            echo "Visit: https://git-scm.com/downloads"
+            exit 1
+            ;;
+    esac
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Git installed successfully.${NC}"
+    else
+        echo -e "${RED}Failed to install git. Please install manually.${NC}"
+        exit 1
+    fi
+}
+
+# Install docker based on OS
+install_docker() {
+    local os=$(detect_os)
+    echo -e "${YELLOW}Installing Docker...${NC}"
+    
+    # Use Docker's official convenience script
+    if command -v curl &> /dev/null; then
+        curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+        sudo sh /tmp/get-docker.sh
+        rm /tmp/get-docker.sh
+        
+        # Add current user to docker group
+        sudo usermod -aG docker $USER || true
+        
+        # Start docker service
+        sudo systemctl enable docker || true
+        sudo systemctl start docker || true
+        
+        echo -e "${GREEN}✓ Docker installed successfully.${NC}"
+        echo -e "${YELLOW}Note: You may need to log out and back in for docker group changes to take effect.${NC}"
+    else
+        echo -e "${RED}curl is required to install Docker. Please install curl first.${NC}"
+        exit 1
+    fi
+}
+
+# Check if docker compose is available
+check_docker_compose() {
+    if docker compose version &> /dev/null; then
+        return 0
+    elif command -v docker-compose &> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Install docker compose plugin
+install_docker_compose() {
+    echo -e "${YELLOW}Installing Docker Compose...${NC}"
+    
+    # Try to install docker-compose-plugin (preferred method)
+    local os=$(detect_os)
+    
+    case "$os" in
+        ubuntu|debian|raspbian)
+            sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+            ;;
+        fedora|rhel|centos)
+            sudo dnf install -y docker-compose-plugin || sudo yum install -y docker-compose-plugin
+            ;;
+        *)
+            # Fallback to standalone docker-compose
+            echo -e "${YELLOW}Installing standalone docker-compose...${NC}"
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            ;;
+    esac
+    
+    if check_docker_compose; then
+        echo -e "${GREEN}✓ Docker Compose installed successfully.${NC}"
+    else
+        echo -e "${RED}Failed to install Docker Compose. Please install manually.${NC}"
+        exit 1
+    fi
+}
+
 # 1. Check for Prerequisites
-echo -e "${YELLOW}[1/4] Checking prerequisites...${NC}"
+echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
 
+# Check and install git
 if ! command -v git &> /dev/null; then
-    echo -e "${RED}Error: git is not installed.${NC}"
-    exit 1
+    echo -e "${YELLOW}Git is not installed.${NC}"
+    read -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT
+    INSTALL_GIT=${INSTALL_GIT:-y}
+    
+    if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
+        install_git
+    else
+        echo -e "${RED}Error: git is required. Please install it manually and run this script again.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✓ Git found.${NC}"
 fi
 
+# Check and install docker
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Error: docker is not installed.${NC}"
-    exit 1
+    echo -e "${YELLOW}Docker is not installed.${NC}"
+    read -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER
+    INSTALL_DOCKER=${INSTALL_DOCKER:-y}
+    
+    if [[ "$INSTALL_DOCKER" =~ ^[Yy]$ ]]; then
+        install_docker
+    else
+        echo -e "${RED}Error: Docker is required. Please install it manually and run this script again.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✓ Docker found.${NC}"
 fi
 
-echo -e "${GREEN}✓ Git and Docker found.${NC}"
+# Check and install docker compose
+if ! check_docker_compose; then
+    echo -e "${YELLOW}Docker Compose is not installed.${NC}"
+    read -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE
+    INSTALL_COMPOSE=${INSTALL_COMPOSE:-y}
+    
+    if [[ "$INSTALL_COMPOSE" =~ ^[Yy]$ ]]; then
+        install_docker_compose
+    else
+        echo -e "${RED}Error: Docker Compose is required. Please install it manually and run this script again.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✓ Docker Compose found.${NC}"
+fi
+
+echo -e "${GREEN}✓ All prerequisites satisfied.${NC}"
 echo ""
 
 # 2. Configure Environment Variables
