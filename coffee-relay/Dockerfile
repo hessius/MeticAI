@@ -5,8 +5,11 @@ RUN apt-get update && apt-get install -y docker.io
 
 WORKDIR /app
 
+# Copy requirements first for better caching
+COPY requirements.txt .
+
 # Install Python deps
-RUN pip install fastapi uvicorn google-generativeai pillow python-multipart
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 
