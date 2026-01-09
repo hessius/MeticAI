@@ -20,7 +20,7 @@
 # REQUIREMENTS:
 #   - Git installed
 #   - Docker & Docker Compose installed
-#   - Google Gemini API key (get one at: https://aistudio.google.com/app/apikey)
+#   - Google Gemini API key (get one at: https://aistudio.google.com/app/api-keys)
 #   - Meticulous Espresso Machine with known local IP address
 #
 ################################################################################
@@ -245,7 +245,8 @@ echo "We need to create a .env file with your specific settings."
 echo ""
 
 # --- Gemini API Key ---
-# Get your free API key at: https://aistudio.google.com/app/apikey
+# Get your free API key at: https://aistudio.google.com/app/api-keys
+echo "Get your free API key at: https://aistudio.google.com/app/api-keys"
 read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
 while [[ -z "$GEMINI_KEY" ]]; do
     echo -e "${RED}API Key cannot be empty.${NC}"
@@ -329,7 +330,7 @@ if sudo docker compose up -d --build; then
     echo -e "👉 **Meticulous:** http://$MET_IP (via Agent)"
     echo ""
     echo "To test the connection, copy/paste this command:"
-    echo -e "${BLUE}curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/create_profile${NC}"
+    echo -e "${BLUE}curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/analyze_and_profile${NC}"
     echo ""
 else
     echo ""
