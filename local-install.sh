@@ -20,7 +20,7 @@
 # REQUIREMENTS:
 #   - Git installed
 #   - Docker & Docker Compose installed
-#   - Google Gemini API key (get one at: https://aistudio.google.com/app/apikey)
+#   - Google Gemini API key (get one at: https://aistudio.google.com/app/api-keys)
 #   - Meticulous Espresso Machine with known local IP address
 #
 ################################################################################
