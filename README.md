@@ -123,3 +123,9 @@ See [tests/README.md](tests/README.md) for detailed testing documentation and [T
 
 ### Continuous Integration
 All pull requests are automatically tested via GitHub Actions. Tests must pass before merging.
+
+## Attribution & Credits
+
+This project builds upon the excellent work of **@manonstreet** and their [Meticulous MCP](https://github.com/manonstreet/meticulous-mcp) project. The Meticulous MCP server provides the essential interface for controlling the Meticulous Espresso Machine programmatically.
+
+We are grateful for their contribution to the community and for making their work available for others to build upon.
