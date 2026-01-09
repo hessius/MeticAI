@@ -130,6 +130,6 @@ async def analyze_and_profile(
     except Exception as e:
         return {
             "status": "error",
-            "analysis": coffee_analysis if 'coffee_analysis' in locals() else None,
+            "analysis": coffee_analysis if coffee_analysis else None,
             "message": str(e)
         }
