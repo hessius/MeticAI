@@ -39,7 +39,9 @@ echo ""
 
 # Detect OS
 detect_os() {
-    if [ -f /etc/os-release ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="macos"
+    elif [ -f /etc/os-release ]; then
         # shellcheck disable=SC1091
         . /etc/os-release
         OS=$ID
@@ -58,6 +60,26 @@ install_git() {
     echo -e "${YELLOW}Installing git...${NC}"
     
     case "$os" in
+        macos)
+            if command -v brew &> /dev/null; then
+                if brew install git; then
+                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                else
+                    echo -e "${RED}Failed to install git via Homebrew.${NC}"
+                    exit 1
+                fi
+            else
+                echo -e "${YELLOW}Homebrew not found. Installing Homebrew first...${NC}"
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                if brew install git; then
+                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                else
+                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    echo "Visit: https://git-scm.com/downloads"
+                    exit 1
+                fi
+            fi
+            ;;
         ubuntu|debian|raspbian)
             if sudo apt-get update && sudo apt-get install -y git; then
                 echo -e "${GREEN}✓ Git installed successfully.${NC}"
@@ -108,6 +130,13 @@ install_docker() {
     os=$(detect_os)
     echo -e "${YELLOW}Installing Docker...${NC}"
     
+    if [[ "$os" == "macos" ]]; then
+        echo -e "${YELLOW}On macOS, Docker Desktop must be installed manually.${NC}"
+        echo -e "${YELLOW}Please visit: https://www.docker.com/products/docker-desktop${NC}"
+        echo -e "${YELLOW}After installing Docker Desktop, make sure it's running and try again.${NC}"
+        exit 1
+    fi
+    
     # Use Docker's official convenience script
     if command -v curl &> /dev/null; then
         curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
@@ -142,12 +171,24 @@ check_docker_compose() {
 
 # Install docker compose plugin
 install_docker_compose() {
-    echo -e "${YELLOW}Installing Docker Compose...${NC}"
-    
-    # Try to install docker-compose-plugin (preferred method)
     local os
     os=$(detect_os)
+    echo -e "${YELLOW}Installing Docker Compose...${NC}"
     
+    if [[ "$os" == "macos" ]]; then
+        echo -e "${YELLOW}On macOS, Docker Compose comes bundled with Docker Desktop.${NC}"
+        echo -e "${YELLOW}If Docker Desktop is installed and running, Docker Compose should be available.${NC}"
+        if check_docker_compose; then
+            echo -e "${GREEN}✓ Docker Compose is available.${NC}"
+            return 0
+        else
+            echo -e "${RED}Docker Compose not found. Please make sure Docker Desktop is installed and running.${NC}"
+            echo -e "${YELLOW}Visit: https://www.docker.com/products/docker-desktop${NC}"
+            exit 1
+        fi
+    fi
+    
+    # Try to install docker-compose-plugin (preferred method)
     case "$os" in
         ubuntu|debian|raspbian)
             if sudo apt-get update; then
@@ -261,8 +302,32 @@ while [[ -z "$MET_IP" ]]; do
 done
 
 # --- Raspberry Pi IP (Auto-detect) ---
-# Try to detect the default route IP
-DETECTED_IP=$(hostname -I | awk '{print $1}')
+# Try to detect the default route IP (cross-platform)
+detect_ip() {
+    local detected_ip=""
+    
+    # Try macOS-specific methods first
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Try ipconfig getifaddr for common interfaces
+        for interface in en0 en1 en2; do
+            detected_ip=$(ipconfig getifaddr "$interface" 2>/dev/null)
+            if [ -n "$detected_ip" ]; then
+                echo "$detected_ip"
+                return
+            fi
+        done
+        
+        # Fallback: use ifconfig and parse
+        detected_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+    else
+        # Linux: use hostname -I
+        detected_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    
+    echo "$detected_ip"
+}
+
+DETECTED_IP=$(detect_ip)
 read -r -p "Enter the IP address of this Raspberry Pi [Default: $DETECTED_IP]: " PI_IP </dev/tty
 PI_IP=${PI_IP:-$DETECTED_IP} # Use default if empty
 
