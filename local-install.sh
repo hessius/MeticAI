@@ -31,18 +31,34 @@ detect_os() {
 
 # Install git based on OS
 install_git() {
-    local os=$(detect_os)
+    local os
+    os=$(detect_os)
     echo -e "${YELLOW}Installing git...${NC}"
     
     case "$os" in
         ubuntu|debian|raspbian)
-            sudo apt-get update && sudo apt-get install -y git
+            if sudo apt-get update && sudo apt-get install -y git; then
+                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+            else
+                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                exit 1
+            fi
             ;;
         fedora|rhel|centos)
-            sudo dnf install -y git || sudo yum install -y git
+            if sudo dnf install -y git || sudo yum install -y git; then
+                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+            else
+                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                exit 1
+            fi
             ;;
         arch|manjaro)
-            sudo pacman -Sy --noconfirm git
+            if sudo pacman -Sy --noconfirm git; then
+                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+            else
+                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                exit 1
+            fi
             ;;
         *)
             echo -e "${RED}Unsupported OS for automatic installation. Please install git manually.${NC}"
@@ -50,18 +66,12 @@ install_git() {
             exit 1
             ;;
     esac
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ Git installed successfully.${NC}"
-    else
-        echo -e "${RED}Failed to install git. Please install manually.${NC}"
-        exit 1
-    fi
 }
 
 # Install docker based on OS
 install_docker() {
-    local os=$(detect_os)
+    local os
+    os=$(detect_os)
     echo -e "${YELLOW}Installing Docker...${NC}"
     
     # Use Docker's official convenience script
@@ -71,7 +81,7 @@ install_docker() {
         rm /tmp/get-docker.sh
         
         # Add current user to docker group
-        sudo usermod -aG docker $USER || true
+        sudo usermod -aG docker "$USER" || true
         
         # Start docker service
         sudo systemctl enable docker || true
@@ -101,7 +111,8 @@ install_docker_compose() {
     echo -e "${YELLOW}Installing Docker Compose...${NC}"
     
     # Try to install docker-compose-plugin (preferred method)
-    local os=$(detect_os)
+    local os
+    os=$(detect_os)
     
     case "$os" in
         ubuntu|debian|raspbian)
