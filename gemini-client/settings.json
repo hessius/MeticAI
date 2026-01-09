@@ -1,0 +1,16 @@
+{
+  "theme": "GitHub",
+  "mcpServers": {
+    "meticulous": {
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "meticulous-mcp-server",
+        "python3",
+        "-m",
+        "meticulous_mcp.server"
+      ]
+    }
+  }
+}

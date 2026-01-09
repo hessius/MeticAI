@@ -1,0 +1,34 @@
+services:
+  # 1. The Target Tool (Meticulous)
+  # We build this so it's available as an image on your system
+  meticulous:
+#    build: https://github.com/manonstreet/meticulous-mcp.git#main
+    build: ./meticulous-source
+    image: meticulous-mcp:latest
+    # We don't actually "run" this service as a daemon; 
+    # Gemini will "run" it as a temporary command when needed.
+    entrypoint: ["tail", "-f", "/dev/null"] 
+
+  # 2. The Brain (Gemini CLI)
+  gemini-client:
+    build: ./gemini-client
+    container_name: gemini-client
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # CRITICAL: Allows it to run sibling containers
+      - ./gemini-client/settings.json:/root/.gemini/settings.json
+    env_file:
+      - .env
+    tty: true  # Keeps the container running so you can attach to it
+
+  # 3. The App (Coffee Relay)
+  coffee-relay:
+    build: ./coffee-relay
+    container_name: coffee-relay
+    ports:
+      - "8000:8000"
+    volumes:
+      # CRITICAL: Give it access to the host's Docker engine
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - .env
+    restart: unless-stopped

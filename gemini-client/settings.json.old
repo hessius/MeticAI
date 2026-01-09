@@ -1,0 +1,19 @@
+{
+  "theme": "GitHub",
+  "mcpServers": {
+    "meticulous": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "METICULOUS_API_URL=http://192.168.50.168",
+        "-e", "PYTHONPATH=/app/meticulous-mcp/src:/app/pyMeticulous:/app/python-sdk/src",
+        "meticulous-mcp:latest",
+        "python",
+        "-u",
+        "/app/meticulous-mcp/run_server.py"
+      ]
+    }
+  }
+}

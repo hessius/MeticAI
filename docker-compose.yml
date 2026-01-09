@@ -1,0 +1,43 @@
+services:
+  # 1. Meticulous MCP Server (The Tool)
+  # Runs the HTTP server, but we will connect via 'docker exec' for stdio
+  meticulous-mcp:
+    container_name: meticulous-mcp-server
+    build: ./meticulous-source
+    ports:
+      - "8090:8080"
+    environment:
+      - FASTMCP_HOST=0.0.0.0
+      - FASTMCP_PORT=8080
+      - METICULOUS_API_URL=http://${METICULOUS_IP}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket, sys; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(5); result = s.connect_ex(('localhost', 8080)); s.close(); sys.exit(result)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # 2. Gemini Client (The Brain) - Node.js Version
+  gemini-client:
+    build: ./gemini-client
+    container_name: gemini-client
+    volumes:
+      # Mount config to the standard Node CLI location
+      - ./gemini-client/settings.json:/root/.gemini/settings.json
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    restart: unless-stopped
+
+  # 3. Coffee Relay (The Bridge)
+  # Receives iPhone requests
+  coffee-relay:
+    build: ./coffee-relay
+    container_name: coffee-relay
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    restart: unless-stopped
