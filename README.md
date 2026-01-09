@@ -29,11 +29,27 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 * Docker Compose
 
 ### 2. Quick Setup
-Use the automated installer script:
+
+#### Option A: Remote Installation (Recommended)
+Install directly from the web without cloning the repository first:
 ```bash
-# Clone this repository (if git is installed)
-git clone <your-repo-url> met-ai
-cd met-ai
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash
+```
+
+This one-liner will:
+1. Download and execute the installation script
+2. Clone the MeticAI repository
+3. Check for prerequisites (git, docker, docker-compose) and offer to install them if missing
+4. Guide you through configuration (API keys, IP addresses)
+5. Clone the required MCP source repository
+6. Build and launch all containers
+
+#### Option B: Local Installation
+If you prefer to clone the repository first:
+```bash
+# Clone this repository
+git clone https://github.com/hessius/MeticAI.git
+cd MeticAI
 
 # Run the interactive installer
 ./local-install.sh
