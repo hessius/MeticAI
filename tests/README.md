@@ -22,7 +22,9 @@ Tests for the FastAPI coffee relay application:
 - `TestHealthAndStartup`: Application initialization tests
 - `TestEdgeCases`: Boundary conditions and edge cases
 
-### 2. Bash Tests (installation script)
+### 2. Bash Tests (installation scripts)
+
+#### Local Installation Script
 Location: `tests/test_local_install.bats`
 
 Tests for the `local-install.sh` installation script:
@@ -32,6 +34,17 @@ Tests for the `local-install.sh` installation script:
 - Git clone operations
 - User interaction handling
 - Error conditions
+
+#### Remote Installation Script
+Location: `tests/test_web_install.bats`
+
+Tests for the `web_install.sh` remote installation script:
+- Repository cloning functionality
+- Local vs remote mode detection
+- Git installation handling
+- Directory existence handling
+- Integration with local-install.sh
+- Error handling for network issues
 
 ## Running Tests
 
@@ -78,15 +91,23 @@ pytest test_main.py::TestAnalyzeCoffeeEndpoint::test_analyze_coffee_success -v
 ### Running Bash Tests
 
 ```bash
-# Run all bash tests
+# Run all bash tests for local installation
 cd tests
 bats test_local_install.bats
 
+# Run tests for remote installation
+bats test_web_install.bats
+
+# Run all bash tests
+bats test_*.bats
+
 # Run from repository root
 bats tests/test_local_install.bats
+bats tests/test_web_install.bats
 
 # Run with verbose output
 bats -t test_local_install.bats
+bats -t test_web_install.bats
 ```
 
 ## Test Results Interpretation
@@ -156,6 +177,7 @@ jobs:
       - name: Run Bash tests
         run: |
           bats tests/test_local_install.bats
+          bats tests/test_web_install.bats
 ```
 
 ## Writing New Tests
