@@ -57,9 +57,9 @@ echo ""
 # Detect OS
 detect_os() {
     if [ -f /etc/os-release ]; then
+        # shellcheck disable=SC1091
         . /etc/os-release
         OS=$ID
-        OS_VERSION=$VERSION_ID
     elif [ -f /etc/redhat-release ]; then
         OS="rhel"
     else
@@ -131,7 +131,7 @@ echo -e "${GREEN}✓ curl found.${NC}"
 # Check and install git if needed
 if ! command -v git &> /dev/null; then
     echo -e "${RED}Error: git is not installed.${NC}"
-    read -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT
+    read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT
     INSTALL_GIT=${INSTALL_GIT:-y}
     
     if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
@@ -149,7 +149,7 @@ echo ""
 # Check if directory already exists
 if [ -d "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}Warning: Directory '$INSTALL_DIR' already exists.${NC}"
-    read -p "Do you want to remove it and clone fresh? (y/n) [y]: " REMOVE_DIR
+    read -r -p "Do you want to remove it and clone fresh? (y/n) [y]: " REMOVE_DIR
     REMOVE_DIR=${REMOVE_DIR:-y}
     
     if [[ "$REMOVE_DIR" =~ ^[Yy]$ ]]; then
