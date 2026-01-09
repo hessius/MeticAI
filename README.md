@@ -155,7 +155,9 @@ curl -X POST http://<PI_IP>:8000/analyze_coffee \
 
 ## iOS Shortcut Setup
 
-MeticAI can be controlled directly from your iPhone using Apple Shortcuts. Choose the workflow that best fits your needs:
+MeticAI can be controlled directly from your iPhone using Apple Shortcuts. Choose the workflow that best fits your needs.
+
+**Note:** Throughout these instructions, `<PI_IP>` refers to your MeticAI server's IP address (e.g., `192.168.1.100`).
 
 ### Quick Start: Pre-Built Shortcut (Coming Soon)
 A ready-to-use shortcut will be available for download. Check back soon for the direct link!
@@ -183,7 +185,6 @@ This workflow lets you photograph your coffee bag and optionally add preferences
    **Action 3: Get Contents of URL**
    - Search for and add "Get Contents of URL"
    - Set URL: `http://<PI_IP>:8000/analyze_and_profile`
-     - Replace `<PI_IP>` with your server's IP address (e.g., `http://192.168.1.100:8000/analyze_and_profile`)
    - Set Method: **POST**
    - Add Request Body: **Form**
    - Add two form fields:
@@ -219,7 +220,7 @@ Fastest option - just snap a photo and let MeticAI create the perfect profile au
    - Add form field: Key = `file`, Value = `Photo` (from Action 1)
 
    **Action 3: Show Notification**
-   - Add "Show Notification"  
+   - Add "Show Notification"
    - Text: `Contents of URL` (from Action 2)
 
 4. Name and save your shortcut
