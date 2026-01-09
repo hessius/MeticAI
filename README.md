@@ -53,7 +53,7 @@ Clone the repo and the required MCP source:
 git clone <your-repo-url> met-ai
 cd met-ai
 # Clone the specific MCP fork
-git clone [https://github.com/manonstreet/meticulous-mcp.git](https://github.com/manonstreet/meticulous-mcp.git) meticulous-source
+git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
 ```
 
 #### Manual Configuration

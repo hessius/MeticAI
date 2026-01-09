@@ -45,10 +45,22 @@ install_git() {
             fi
             ;;
         fedora|rhel|centos)
-            if sudo dnf install -y git || sudo yum install -y git; then
-                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+            if command -v dnf &> /dev/null; then
+                if sudo dnf install -y git; then
+                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                else
+                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    exit 1
+                fi
+            elif command -v yum &> /dev/null; then
+                if sudo yum install -y git; then
+                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                else
+                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    exit 1
+                fi
             else
-                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                echo -e "${RED}No supported package manager found. Please install git manually.${NC}"
                 exit 1
             fi
             ;;
@@ -116,10 +128,18 @@ install_docker_compose() {
     
     case "$os" in
         ubuntu|debian|raspbian)
-            sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+            if sudo apt-get update; then
+                if sudo apt-get install -y docker-compose-plugin; then
+                    echo -e "${GREEN}✓ Docker Compose plugin installed.${NC}"
+                fi
+            fi
             ;;
         fedora|rhel|centos)
-            sudo dnf install -y docker-compose-plugin || sudo yum install -y docker-compose-plugin
+            if command -v dnf &> /dev/null; then
+                sudo dnf install -y docker-compose-plugin
+            elif command -v yum &> /dev/null; then
+                sudo yum install -y docker-compose-plugin
+            fi
             ;;
         *)
             # Fallback to standalone docker-compose
