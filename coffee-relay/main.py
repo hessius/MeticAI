@@ -47,9 +47,9 @@ async def analyze_and_profile(
             detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"
         )
     
+    coffee_analysis = None
+    
     try:
-        coffee_analysis = None
-        
         # If image is provided, analyze it first
         if file:
             contents = await file.read()
