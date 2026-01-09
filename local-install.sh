@@ -184,7 +184,7 @@ echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
 
 # Check and install git
 if ! command -v git &> /dev/null; then
-    echo -e "${YELLOW}Git is not installed.${NC}"
+    echo -e "${RED}Error: git is not installed.${NC}"
     read -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT
     INSTALL_GIT=${INSTALL_GIT:-y}
     
@@ -200,7 +200,7 @@ fi
 
 # Check and install docker
 if ! command -v docker &> /dev/null; then
-    echo -e "${YELLOW}Docker is not installed.${NC}"
+    echo -e "${RED}Error: docker is not installed.${NC}"
     read -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER
     INSTALL_DOCKER=${INSTALL_DOCKER:-y}
     
