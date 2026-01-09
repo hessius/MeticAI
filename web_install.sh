@@ -187,19 +187,6 @@ fi
 
 echo ""
 
-# Create parent directory if needed (for custom paths)
-PARENT_DIR=$(dirname "$INSTALL_DIR")
-if [ ! -d "$PARENT_DIR" ]; then
-    echo -e "${YELLOW}Creating parent directory: $PARENT_DIR${NC}"
-    if mkdir -p "$PARENT_DIR"; then
-        echo -e "${GREEN}✓ Parent directory created.${NC}"
-    else
-        echo -e "${RED}Error: Failed to create parent directory.${NC}"
-        echo "Please check permissions and try again."
-        exit 1
-    fi
-fi
-
 # Check if directory already exists
 if [ -d "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}Warning: Directory '$INSTALL_DIR' already exists.${NC}"
@@ -230,6 +217,19 @@ if [ -d "$INSTALL_DIR" ]; then
             echo -e "${RED}Error: local-install.sh not found in existing directory.${NC}"
             exit 1
         fi
+    fi
+fi
+
+# Create parent directory if needed (for custom paths)
+PARENT_DIR=$(dirname "$INSTALL_DIR")
+if [ ! -d "$PARENT_DIR" ]; then
+    echo -e "${YELLOW}Creating parent directory: $PARENT_DIR${NC}"
+    if mkdir -p "$PARENT_DIR"; then
+        echo -e "${GREEN}✓ Parent directory created.${NC}"
+    else
+        echo -e "${RED}Error: Failed to create parent directory.${NC}"
+        echo "Please check permissions and try again."
+        exit 1
     fi
 fi
 
