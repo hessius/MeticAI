@@ -72,26 +72,94 @@ Note: Use sudo if your user does not have direct docker permissions
 sudo docker compose up -d --build
 ```
 
+## Usage
+
+MeticAI provides two main endpoints:
+
+### 1. Unified Analysis & Profile Creation (Recommended)
+`POST http://<PI_IP>:8000/analyze_and_profile`
+
+This consolidated endpoint analyzes coffee and creates a profile in a single LLM pass.
+
+**Required**: At least ONE of the following:
+- `file`: Image of the coffee bag (multipart/form-data)
+- `user_prefs`: User preferences or specific instructions (form data)
+
+**Example with image only:**
+```bash
+curl -X POST http://<PI_IP>:8000/analyze_and_profile \
+  -F "file=@coffee_bag.jpg"
+```
+
+**Example with preferences only:**
+```bash
+curl -X POST http://<PI_IP>:8000/analyze_and_profile \
+  -F "user_prefs=Strong and intense espresso"
+```
+
+**Example with both:**
+```bash
+curl -X POST http://<PI_IP>:8000/analyze_and_profile \
+  -F "file=@coffee_bag.jpg" \
+  -F "user_prefs=Balanced extraction"
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "analysis": "Ethiopian Yirgacheffe, Light Roast, Floral and Citrus Notes",
+  "reply": "Profile uploaded"
+}
+```
+
+### 2. Quick Coffee Analysis (Standalone)
+`POST http://<PI_IP>:8000/analyze_coffee`
+
+For quick coffee bag analysis without profile creation.
+
+**Required**: 
+- `file`: Image of the coffee bag (multipart/form-data)
+
+**Example:**
+```bash
+curl -X POST http://<PI_IP>:8000/analyze_coffee \
+  -F "file=@coffee_bag.jpg"
+```
+
+**Response:**
+```json
+{
+  "analysis": "Ethiopian Yirgacheffe, Light Roast, Floral and Citrus Notes"
+}
+```
+
 ## iOS Shortcut Setup
+
+### Option 1: One-Step Unified Approach (Recommended)
 Create a shortcut with the following logic:
 
-Take Photo
+1. Take Photo
+2. Ask for Input (Preferences) - Optional
+3. Get Contents of URL
+   - POST http://<PI_IP>:8000/analyze_and_profile
+   - File: (Photo from Step 1)
+   - Form: user_prefs (Input from Step 2, if provided)
+4. Show Notification (Result)
 
-Get Contents of URL (Analyze)
+### Option 2: Two-Step Approach
+For users who want separate analysis first:
 
-POST http://<PI_IP>:8000/analyze_coffee
-
-File: (Photo)
-
-Ask for Input (Preferences)
-
-Get Contents of URL (Create)
-
-POST http://<PI_IP>:8000/create_profile
-
-Form: coffee_info (Result of Step 2), user_prefs (Result of Step 3)
-
-Show Notification (Result)
+1. Take Photo
+2. Get Contents of URL (Analyze)
+   - POST http://<PI_IP>:8000/analyze_coffee
+   - File: (Photo)
+3. Show Result (Analysis)
+4. Ask for Input (Preferences)
+5. Get Contents of URL (Create Profile)
+   - POST http://<PI_IP>:8000/analyze_and_profile
+   - Form: user_prefs (Input from Step 4)
+6. Show Notification (Result)
 
 ## Testing
 

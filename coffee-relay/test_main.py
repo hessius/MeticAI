@@ -3,7 +3,7 @@ Comprehensive tests for the Coffee Relay FastAPI application.
 
 Tests cover:
 - /analyze_coffee endpoint functionality
-- /create_profile endpoint functionality  
+- /analyze_and_profile endpoint functionality (consolidated endpoint)
 - Error handling and edge cases
 - Integration with Gemini AI (mocked)
 """
@@ -140,13 +140,19 @@ class TestAnalyzeCoffeeEndpoint:
             assert "analysis" in response.json()
 
 
-class TestCreateProfileEndpoint:
-    """Tests for the /create_profile endpoint."""
+class TestAnalyzeAndProfileEndpoint:
+    """Tests for the /analyze_and_profile endpoint (consolidated endpoint)."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    def test_create_profile_success(self, mock_subprocess, client):
-        """Test successful profile creation."""
+    @patch('main.vision_model')
+    def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test profile creation with only an image (no user preferences)."""
+        # Mock the Gemini vision response
+        mock_response = Mock()
+        mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
+        mock_vision_model.generate_content.return_value = mock_response
+        
         # Mock successful subprocess execution
         mock_result = Mock()
         mock_result.returncode = 0
@@ -155,58 +161,106 @@ class TestCreateProfileEndpoint:
         mock_subprocess.return_value = mock_result
 
         response = client.post(
-            "/create_profile",
-            data={
-                "coffee_info": "Ethiopian Yirgacheffe, Light Roast",
-                "user_prefs": "Balanced extraction"
-            }
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")}
         )
 
         assert response.status_code == 200
         assert response.json()["status"] == "success"
+        assert response.json()["analysis"] == "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
         assert "Profile uploaded" in response.json()["reply"]
+        
+        # Verify vision model was called
+        mock_vision_model.generate_content.assert_called_once()
         
         # Verify subprocess was called with correct arguments
         mock_subprocess.assert_called_once()
-        call_args = mock_subprocess.call_args
-        assert "docker" in call_args[0][0]
-        assert "exec" in call_args[0][0]
-        assert "gemini-client" in call_args[0][0]
-        assert "--allowed-tools" in call_args[0][0]
-        assert "create_profile" in call_args[0][0]
+        call_args = mock_subprocess.call_args[0][0]
+        assert "docker" in call_args
+        assert "gemini-client" in call_args
+        assert "--allowed-tools" in call_args
+        
+        # Verify the prompt contains the analysis
+        prompt = call_args[-1]
+        assert "Ethiopian Yirgacheffe, Light Roast, Floral Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    def test_create_profile_with_various_preferences(self, mock_subprocess, client):
-        """Test profile creation with different user preferences."""
+    def test_analyze_and_profile_with_prefs_only(self, mock_subprocess, client):
+        """Test profile creation with only user preferences (no image)."""
+        # Mock successful subprocess execution
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "Profile uploaded"
+        mock_result.stderr = ""
         mock_subprocess.return_value = mock_result
 
-        preferences = [
-            "Strong and intense",
-            "Mild and smooth",
-            "Default",
-            "Quick extraction"
-        ]
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Strong and intense espresso"}
+        )
 
-        for pref in preferences:
-            response = client.post(
-                "/create_profile",
-                data={
-                    "coffee_info": "Test Coffee",
-                    "user_prefs": pref
-                }
-            )
-            
-            assert response.status_code == 200
-            assert response.json()["status"] == "success"
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        assert response.json()["analysis"] is None  # No image, so no analysis
+        assert "Profile uploaded" in response.json()["reply"]
+        
+        # Verify subprocess was called with user preferences
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        assert "Strong and intense espresso" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    def test_create_profile_subprocess_error(self, mock_subprocess, client):
+    @patch('main.vision_model')
+    def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test profile creation with both image and user preferences."""
+        # Mock the Gemini vision response
+        mock_response = Mock()
+        mock_response.text = "Colombian Supremo, Medium Roast, Nutty"
+        mock_vision_model.generate_content.return_value = mock_response
+        
+        # Mock successful subprocess execution
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile uploaded"
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")},
+            data={"user_prefs": "Quick extraction"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        assert response.json()["analysis"] == "Colombian Supremo, Medium Roast, Nutty"
+        
+        # Verify subprocess was called with both coffee analysis and user preferences
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        assert "Colombian Supremo, Medium Roast, Nutty" in prompt
+        assert "Quick extraction" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_analyze_and_profile_missing_both(self, client):
+        """Test error when neither image nor preferences are provided."""
+        response = client.post("/analyze_and_profile")
+        
+        assert response.status_code == 400
+        assert "at least one" in response.json()["detail"].lower()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.vision_model')
+    def test_analyze_and_profile_subprocess_error(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test error handling when subprocess fails."""
+        # Mock the Gemini vision response
+        mock_response = Mock()
+        mock_response.text = "Test Coffee"
+        mock_vision_model.generate_content.return_value = mock_response
+        
         # Mock subprocess failure
         mock_result = Mock()
         mock_result.returncode = 1
@@ -215,30 +269,25 @@ class TestCreateProfileEndpoint:
         mock_subprocess.return_value = mock_result
 
         response = client.post(
-            "/create_profile",
-            data={
-                "coffee_info": "Test Coffee",
-                "user_prefs": "Default"
-            }
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")}
         )
 
         assert response.status_code == 200
         assert response.json()["status"] == "error"
+        assert response.json()["analysis"] == "Test Coffee"
         assert "Docker container not found" in response.json()["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    def test_create_profile_exception(self, mock_subprocess, client):
+    def test_analyze_and_profile_exception(self, mock_subprocess, client):
         """Test handling of unexpected exceptions."""
-        # Mock an exception
+        # Mock an exception in subprocess
         mock_subprocess.side_effect = Exception("Unexpected error occurred")
 
         response = client.post(
-            "/create_profile",
-            data={
-                "coffee_info": "Test Coffee",
-                "user_prefs": "Default"
-            }
+            "/analyze_and_profile",
+            data={"user_prefs": "Default"}
         )
 
         assert response.status_code == 200
@@ -246,70 +295,71 @@ class TestCreateProfileEndpoint:
         assert "Unexpected error" in response.json()["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    def test_create_profile_missing_coffee_info(self, client):
-        """Test error when coffee_info is missing."""
-        response = client.post(
-            "/create_profile",
-            data={"user_prefs": "Default"}
-        )
+    @patch('main.vision_model')
+    def test_analyze_and_profile_image_processing_error(self, mock_vision_model, client):
+        """Test error when image processing fails."""
+        # Mock an exception in vision model
+        mock_vision_model.generate_content.side_effect = Exception("Vision API error")
         
-        assert response.status_code == 422  # Unprocessable Entity
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    def test_create_profile_missing_user_prefs(self, client):
-        """Test error when user_prefs is missing."""
-        response = client.post(
-            "/create_profile",
-            data={"coffee_info": "Test Coffee"}
-        )
-        
-        assert response.status_code == 422  # Unprocessable Entity
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
-    def test_create_profile_prompt_construction(self, mock_subprocess, client):
-        """Test that the prompt is correctly constructed with coffee info and preferences."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Success"
-        mock_subprocess.return_value = mock_result
-
-        coffee_info = "Colombian Supremo, Medium Roast, Nutty"
-        user_prefs = "Strong and quick"
+        # Send invalid image data
+        invalid_data = BytesIO(b"not an image")
 
         response = client.post(
-            "/create_profile",
-            data={
-                "coffee_info": coffee_info,
-                "user_prefs": user_prefs
-            }
+            "/analyze_and_profile",
+            files={"file": ("test.txt", invalid_data, "text/plain")}
         )
 
         assert response.status_code == 200
-        
-        # Check that the subprocess was called with a command containing the info
-        call_args = mock_subprocess.call_args[0][0]
-        # The last argument should be the prompt
-        prompt = call_args[-1]
-        assert coffee_info in prompt
-        assert user_prefs in prompt
-        assert "create_profile" in prompt
+        assert response.json()["status"] == "error"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    def test_create_profile_allowed_tools(self, mock_subprocess, client):
+    @patch('main.vision_model')
+    def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test profile creation with different user preferences."""
+        mock_response = Mock()
+        mock_response.text = "Test Coffee"
+        mock_vision_model.generate_content.return_value = mock_response
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile uploaded"
+        mock_subprocess.return_value = mock_result
+
+        preferences = [
+            "Strong and intense",
+            "Mild and smooth",
+            "Default settings",
+            "Quick extraction"
+        ]
+
+        for pref in preferences:
+            response = client.post(
+                "/analyze_and_profile",
+                files={"file": ("test.png", sample_image, "image/png")},
+                data={"user_prefs": pref}
+            )
+            
+            assert response.status_code == 200
+            assert response.json()["status"] == "success"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.vision_model')
+    def test_analyze_and_profile_allowed_tools(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test that only safe tools are whitelisted."""
+        mock_response = Mock()
+        mock_response.text = "Test Coffee"
+        mock_vision_model.generate_content.return_value = mock_response
+        
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "Success"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
-            "/create_profile",
-            data={
-                "coffee_info": "Test",
-                "user_prefs": "Default"
-            }
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")}
         )
 
         call_args = mock_subprocess.call_args[0][0]
@@ -321,6 +371,24 @@ class TestCreateProfileEndpoint:
         allowed_tools_idx = call_args.index("--allowed-tools")
         assert "create_profile" == call_args[allowed_tools_idx + 1]
         assert "apply_profile" == call_args[allowed_tools_idx + 2]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_analyze_and_profile_special_characters(self, mock_subprocess, client):
+        """Test handling of special characters in input."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Extra-strong <intense> & 'special' \"roast\""}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
 
 
 class TestHealthAndStartup:
@@ -342,7 +410,7 @@ class TestHealthAndStartup:
         # Verify our endpoints are registered
         openapi_data = response.json()
         assert "/analyze_coffee" in openapi_data["paths"]
-        assert "/create_profile" in openapi_data["paths"]
+        assert "/analyze_and_profile" in openapi_data["paths"]
 
 
 class TestEdgeCases:
@@ -369,46 +437,6 @@ class TestEdgeCases:
 
         assert response.status_code == 200
         assert "analysis" in response.json()
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
-    def test_create_profile_special_characters(self, mock_subprocess, client):
-        """Test handling of special characters in input."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Success"
-        mock_subprocess.return_value = mock_result
-
-        response = client.post(
-            "/create_profile",
-            data={
-                "coffee_info": "Café 'Special' & Unique \"Roast\"",
-                "user_prefs": "Extra-strong <intense>"
-            }
-        )
-
-        assert response.status_code == 200
-        assert response.json()["status"] == "success"
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
-    def test_create_profile_very_short_strings(self, mock_subprocess, client):
-        """Test handling of very short string inputs."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Success"
-        mock_subprocess.return_value = mock_result
-
-        response = client.post(
-            "/create_profile",
-            data={
-                "coffee_info": "x",
-                "user_prefs": "y"
-            }
-        )
-
-        # Should process even with minimal input
-        assert response.status_code == 200
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.vision_model')
