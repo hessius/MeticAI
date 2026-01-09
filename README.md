@@ -286,11 +286,11 @@ Profile Created: "Warp Speed Espresso"
 Description: An ultra-fast turbo profile achieving full extraction in 15 seconds. 
 High flow rate with moderate pressure for a bright, intense shot.
 
-Preparation: 18g dose, medium-coarse grind (courser than traditional espresso), 
+Preparation: 18g dose, medium-coarse grind (coarser than traditional espresso), 
 93°C temperature. The quick extraction time is built into the profile.
 
 Why This Works: Turbo shots use increased flow (6-8ml/sec vs traditional 2ml/sec) 
-with a courser grind to achieve proper extraction in half the time. The result is 
+with a coarser grind to achieve proper extraction in half the time. The result is 
 bright acidity with lower bitterness due to reduced contact time.
 
 Special Notes: Requires flow control capability. May produce more crema than 
