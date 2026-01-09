@@ -453,3 +453,164 @@ class TestEdgeCases:
 
         assert response.status_code == 200
         assert len(response.json()["analysis"]) == 10000
+
+
+class TestEnhancedBaristaPersona:
+    """Tests for enhanced barista persona and profile creation features."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.vision_model')
+    def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test that the prompt includes the modern experimental barista persona."""
+        mock_response = Mock()
+        mock_response.text = "Ethiopian Coffee, Light Roast"
+        mock_vision_model.generate_content.return_value = mock_response
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")}
+        )
+
+        # Verify the prompt contains persona elements
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        assert "PERSONA:" in prompt
+        assert "modern, experimental barista" in prompt
+        assert "espresso profiling" in prompt
+        assert "creative" in prompt or "puns" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_includes_complex_profile_support(self, mock_subprocess, client):
+        """Test that the prompt includes instructions for complex profile creation."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test preferences"}
+        )
+
+        # Verify the prompt includes complex profile guidelines
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        assert "PROFILE CREATION GUIDELINES:" in prompt
+        assert "multi-stage extraction" in prompt
+        assert "pre-infusion" in prompt
+        assert "blooming" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_includes_naming_convention(self, mock_subprocess, client):
+        """Test that the prompt includes witty naming convention instructions."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Strong espresso"}
+        )
+
+        # Verify the prompt includes naming guidelines
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        assert "NAMING CONVENTION:" in prompt
+        assert "witty" in prompt or "pun" in prompt
+        assert "Examples:" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_includes_user_summary_instructions(self, mock_subprocess, client):
+        """Test that the prompt includes instructions for post-creation user summary."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test"}
+        )
+
+        # Verify the prompt includes user summary requirements
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        assert "user summary" in prompt
+        assert "Profile Name" in prompt or "Description" in prompt
+        assert "Preparation" in prompt
+        assert "Design Rationale" in prompt or "Why This Works" in prompt
+        assert "Special Requirements" in prompt or "Special Notes" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_includes_output_format(self, mock_subprocess, client):
+        """Test that the prompt includes the output format template."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test"}
+        )
+
+        # Verify the prompt includes output format
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        assert "OUTPUT FORMAT:" in prompt
+        assert "Profile Created:" in prompt
+        assert "Description:" in prompt
+        assert "Preparation:" in prompt
+        assert "Why This Works:" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.vision_model')
+    def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test enhanced prompt when both image and preferences are provided."""
+        mock_response = Mock()
+        mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
+        mock_vision_model.generate_content.return_value = mock_response
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: The Berry Express"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")},
+            data={"user_prefs": "Highlight berry notes"}
+        )
+
+        assert response.status_code == 200
+        
+        # Verify the prompt includes all elements for both inputs
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Should have coffee analysis
+        assert "Kenyan AA, Medium Roast, Berry notes" in prompt
+        # Should have user preferences
+        assert "Highlight berry notes" in prompt
+        # Should have all enhancement features
+        assert "PERSONA:" in prompt
+        assert "PROFILE CREATION GUIDELINES:" in prompt
+        assert "NAMING CONVENTION:" in prompt
+        assert "OUTPUT FORMAT:" in prompt

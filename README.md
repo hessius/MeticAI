@@ -7,9 +7,12 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 ## Features
 * **Vision Analysis:** Identifies roaster, origin, and notes from a photo.
 * **Intelligent Profiling:** Auto-generates flow/pressure profiles based on bean data.
+* **Modern Barista Persona:** Creates profiles with experimental techniques and witty, pun-heavy names.
+* **Detailed Guidance:** Post-creation summaries with preparation instructions and design rationale.
+* **Complex Recipe Support:** Multi-stage extraction, pre-infusion, blooming, and advanced profiling.
 * **Zero-Touch Control:** Uploads recipes directly to the Meticulous machine.
 * **iOS Integration:** One-tap brewing via Shortcuts.
-* **Curl Integration**: Any service capable of polling a url can use the service
+* **Curl Integration:** Any service capable of polling a url can use the service.
 
 ## Architecture
 1.  **Relay (FastAPI):** Receives images/requests from url calls.
@@ -177,6 +180,135 @@ For users who want separate analysis first:
    - Form: user_prefs (Input from Step 4)
 6. Show Notification (Result)
 
+## Enhanced Barista Experience
+
+MeticAI features a modern, experimental barista persona that creates sophisticated espresso profiles with personality and precision.
+
+### Profile Creation Features
+
+#### 🎯 Complex Recipe Support
+The barista can create advanced profiles including:
+- **Multi-stage extractions** with varying flow and pressure curves
+- **Multiple pre-infusion steps** for optimal bed preparation
+- **Blooming phases** to enhance flavor extraction
+- **Pressure ramping** and temperature surfing techniques
+- **Flow profiling** tailored to specific bean characteristics
+
+#### 🎨 Creative Profile Naming
+Every profile gets a witty, pun-heavy name that balances creativity with clarity:
+
+**Example Names:**
+- **"Slow-Mo Blossom"** - Gentle blooming profile for light roasts
+- **"Pressure Point"** - Aggressive pressure ramping for bold extractions
+- **"The Gusher"** - High-flow profile for fast, intense shots
+- **"Espresso Yourself"** - Expressive, artistic extraction
+- **"Bean There, Done That"** - Classic reliable profile
+- **"Grounds for Celebration"** - Special occasion profile
+- **"Extraction Traction"** - Balanced, controlled extraction
+
+**Naming Philosophy:**
+- Witty and fun, but never cryptic
+- Clear indication of profile characteristics
+- Memorable for quick selection
+- Professional barista humor
+
+#### 📋 Post-Creation Summary
+After creating a profile, you'll receive a detailed summary:
+
+**Profile Created:** [Clever Name]
+
+**Description:** What makes this profile special and unique
+
+**Preparation:**
+- Recommended dose (e.g., 20g)
+- Grind setting guidance
+- Temperature recommendations
+- Any pre-shot preparation steps
+
+**Why This Works:** Scientific reasoning behind the profile design, explaining how it extracts the best from your specific beans
+
+**Special Notes:** Any special equipment requirements (bottom filter, specific basket, etc.) or technique notes
+
+### Sample Dialogue Examples
+
+#### Example 1: Image Only
+```
+User: [Uploads photo of Ethiopian Yirgacheffe bag]
+
+MeticAI Response:
+Profile Created: "Floral Highness"
+
+Description: A delicate, multi-stage profile designed to showcase the floral and 
+citrus notes of this light Ethiopian roast. Features gentle pre-infusion, extended 
+blooming, and a gradual pressure ramp.
+
+Preparation: 18g dose, medium-fine grind, 93°C water temperature. Allow 30 seconds 
+for pre-warming. The profile handles the gentle extraction automatically.
+
+Why This Works: Light Ethiopian beans are dense and require careful extraction. 
+The extended bloom allows CO2 to escape while the gradual pressure ramp prevents 
+channeling and bitter compounds from overwhelming the delicate florals.
+
+Special Notes: Works best with a bottomless portafilter to monitor extraction. 
+Standard 18g VST basket recommended.
+```
+
+#### Example 2: With Preferences
+```
+User: [Uploads photo of Brazilian medium roast]
+Preferences: "I want something bold and chocolatey"
+
+MeticAI Response:
+Profile Created: "Choco-Lot Going On"
+
+Description: A bold, high-pressure profile that emphasizes the chocolate and nutty 
+notes in this Brazilian medium roast. Features minimal pre-infusion and sustained 
+high pressure for full-bodied extraction.
+
+Preparation: 20g dose, fine grind, 94°C water temperature. Tamp firmly with 30lbs 
+pressure. Profile duration: 28-30 seconds total.
+
+Why This Works: Brazilian beans at medium roast are less prone to over-extraction. 
+The aggressive pressure curve (9-10 bars sustained) maximizes body and chocolate 
+notes while the higher temperature brings out caramelization flavors.
+
+Special Notes: Requires precision basket (20g). If shots run too fast, grind finer 
+or increase dose to 20.5g.
+```
+
+#### Example 3: Custom Request
+```
+User: "Create a turbo shot profile"
+
+MeticAI Response:
+Profile Created: "Warp Speed Espresso"
+
+Description: An ultra-fast turbo profile achieving full extraction in 15 seconds. 
+High flow rate with moderate pressure for a bright, intense shot.
+
+Preparation: 18g dose, medium-coarse grind (courser than traditional espresso), 
+93°C temperature. The quick extraction time is built into the profile.
+
+Why This Works: Turbo shots use increased flow (6-8ml/sec vs traditional 2ml/sec) 
+with a courser grind to achieve proper extraction in half the time. The result is 
+bright acidity with lower bitterness due to reduced contact time.
+
+Special Notes: Requires flow control capability. May produce more crema than 
+traditional shots. Adjust grind to hit 2:1 ratio in 15 seconds. Not recommended 
+for very dark roasts.
+```
+
+### Profile Customization Tips
+
+When requesting profiles, you can specify:
+- **Extraction style:** turbo, traditional, allongé, ristretto
+- **Flavor focus:** brightness, sweetness, body, complexity
+- **Bean characteristics:** origin, roast level, processing method
+- **Special techniques:** blooming, pressure profiling, temperature steps
+- **Equipment constraints:** basket size, machine capabilities
+
+The barista persona understands modern espresso techniques and will create profiles that push the boundaries while remaining grounded in extraction science.
+
 ## Testing
 
 MeticAI includes a comprehensive test suite to ensure code quality and reliability.
@@ -200,7 +332,7 @@ bats tests/test_local_install.bats
 ```
 
 ### Test Coverage
-- **Python**: 100% code coverage (20 tests)
+- **Python**: 100% code coverage (26 tests)
 - **Bash**: 20 critical functionality tests
 
 See [tests/README.md](tests/README.md) for detailed testing documentation and [TEST_COVERAGE.md](TEST_COVERAGE.md) for coverage metrics.
