@@ -9,9 +9,6 @@
 # Test against the actual script location
 SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 
-# Test against the actual script location
-SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
-
 @test "Script file exists and is readable" {
     [ -f "$SCRIPT_PATH" ]
     [ -r "$SCRIPT_PATH" ]
