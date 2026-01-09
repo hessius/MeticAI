@@ -18,46 +18,45 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 
 ## Installation
 
-### Requirements
-* Server (Git, Docker & Docker Compose installed)
+### 1. Requirements
+* Server running Linux (Debian/Ubuntu, RHEL/Fedora/CentOS, or Arch-based)
 * Meticulous Espresso Machine (Local IP required)
 * **Google Gemini API Key** - [Get your free API key here](https://aistudio.google.com/app/apikey)
 
-### Option 1: Automatic Installation (Recommended)
+**Note:** The installation script will automatically check for and offer to install the following prerequisites if they are missing:
+* Git
+* Docker
+* Docker Compose
 
-The easiest way to get started is using the interactive installation script:
-
+### 2. Quick Setup
+Use the automated installer script:
 ```bash
+# Clone this repository (if git is installed)
 git clone <your-repo-url> met-ai
 cd met-ai
+
+# Run the interactive installer
 ./local-install.sh
 ```
 
 The script will:
-1. ✓ Check for required prerequisites (Git & Docker)
-2. ✓ Prompt you for configuration values (API key, machine IP, server IP)
-3. ✓ Create your `.env` file automatically
-4. ✓ Clone the required Meticulous MCP source
-5. ✓ Build and launch the Docker containers
+1. Check for prerequisites (git, docker, docker-compose) and offer to install them if missing
+2. Guide you through configuration (API keys, IP addresses)
+3. Clone the required MCP source repository
+4. Build and launch all containers
 
-After installation, the script will provide you with a test command to verify everything is working.
+### 3. Manual Setup (Alternative)
+If you prefer to install dependencies manually or are running on an unsupported OS:
 
-### Option 2: Manual Installation
-
-If you prefer to set up manually:
-
-#### 1. Clone the repository
+Clone the repo and the required MCP source:
 ```bash
 git clone <your-repo-url> met-ai
 cd met-ai
-```
-
-#### 2. Clone the required MCP source
-```bash
+# Clone the specific MCP fork
 git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
 ```
 
-#### 3. Configure environment
+#### Manual Configuration
 
 Create a `.env` file in the root directory:
 ```
@@ -66,7 +65,7 @@ METICULOUS_IP=192.168.x.x  # IP of your Espresso Machine
 PI_IP=192.168.x.x          # IP of this Raspberry Pi
 ```
 
-#### 4. Build and run
+#### Manual Run
 
 Note: Use sudo if your user does not have direct docker permissions
 ```bash
