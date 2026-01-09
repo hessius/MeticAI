@@ -19,7 +19,7 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 ## Installation
 
 ### 1. Requirements
-* Server running Linux (Debian/Ubuntu, RHEL/Fedora/CentOS, or Arch-based)
+* Server running UNIX terminal (MacOS, Debian/Ubuntu, RHEL/Fedora/CentOS, or Arch-based)
 * Meticulous Espresso Machine (Local IP required)
 * **Google Gemini API Key** - [Get your free API key here](https://aistudio.google.com/app/apikey)
 
