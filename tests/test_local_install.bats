@@ -89,7 +89,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 }
 
 @test "Script provides API key link to users" {
-    run grep -q "aistudio.google.com/app/apikey" "$SCRIPT_PATH"
+    run grep -q "aistudio.google.com/app/api-keys" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
@@ -100,6 +100,11 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 
 @test "Script provides test command after installation" {
     run grep -q "curl -X POST" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script test command uses analyze_and_profile endpoint" {
+    run grep -q "analyze_and_profile" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
