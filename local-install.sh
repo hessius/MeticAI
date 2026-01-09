@@ -185,7 +185,7 @@ echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
 # Check and install git
 if ! command -v git &> /dev/null; then
     echo -e "${RED}Error: git is not installed.${NC}"
-    read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT
+    read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
     INSTALL_GIT=${INSTALL_GIT:-y}
     
     if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
@@ -201,7 +201,7 @@ fi
 # Check and install docker
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}Error: docker is not installed.${NC}"
-    read -r -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER
+    read -r -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER </dev/tty
     INSTALL_DOCKER=${INSTALL_DOCKER:-y}
     
     if [[ "$INSTALL_DOCKER" =~ ^[Yy]$ ]]; then
@@ -217,7 +217,7 @@ fi
 # Check and install docker compose
 if ! check_docker_compose; then
     echo -e "${YELLOW}Docker Compose is not installed.${NC}"
-    read -r -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE
+    read -r -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE </dev/tty
     INSTALL_COMPOSE=${INSTALL_COMPOSE:-y}
     
     if [[ "$INSTALL_COMPOSE" =~ ^[Yy]$ ]]; then
@@ -246,23 +246,23 @@ echo ""
 
 # --- Gemini API Key ---
 # Get your free API key at: https://aistudio.google.com/app/apikey
-read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY
+read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
 while [[ -z "$GEMINI_KEY" ]]; do
     echo -e "${RED}API Key cannot be empty.${NC}"
-    read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY
+    read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
 done
 
 # --- Meticulous IP ---
-read -r -p "Enter the IP address of your Meticulous Machine (e.g., 192.168.50.168): " MET_IP
+read -r -p "Enter the IP address of your Meticulous Machine (e.g., 192.168.50.168): " MET_IP </dev/tty
 while [[ -z "$MET_IP" ]]; do
     echo -e "${RED}IP Address cannot be empty.${NC}"
-    read -r -p "Enter the IP address of your Meticulous Machine: " MET_IP
+    read -r -p "Enter the IP address of your Meticulous Machine: " MET_IP </dev/tty
 done
 
 # --- Raspberry Pi IP (Auto-detect) ---
 # Try to detect the default route IP
 DETECTED_IP=$(hostname -I | awk '{print $1}')
-read -r -p "Enter the IP address of this Raspberry Pi [Default: $DETECTED_IP]: " PI_IP
+read -r -p "Enter the IP address of this Raspberry Pi [Default: $DETECTED_IP]: " PI_IP </dev/tty
 PI_IP=${PI_IP:-$DETECTED_IP} # Use default if empty
 
 # --- Write .env ---
@@ -285,7 +285,7 @@ echo -e "${YELLOW}[3/4] Setting up Meticulous Source...${NC}"
 
 if [ -d "meticulous-source" ]; then
     echo "Directory 'meticulous-source' already exists."
-    read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " CLONE_CONFIRM
+    read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " CLONE_CONFIRM </dev/tty
     CLONE_CONFIRM=${CLONE_CONFIRM:-n}
     
     if [[ "$CLONE_CONFIRM" =~ ^[Yy]$ ]]; then
