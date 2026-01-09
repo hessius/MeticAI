@@ -58,28 +58,28 @@ echo -e "${YELLOW}Where would you like to install MeticAI?${NC}"
 echo "1) Current directory ($(pwd))"
 echo "2) Home directory ($HOME)"
 echo "3) Custom path"
-read -r -p "Enter your choice (1/2/3) [1]: " LOCATION_CHOICE
+read -r -p "Enter your choice (1/2/3) [1]: " LOCATION_CHOICE </dev/tty
 LOCATION_CHOICE=${LOCATION_CHOICE:-1}
 
 case "$LOCATION_CHOICE" in
     1)
         # Current directory - optionally allow subfolder name
-        read -r -p "Enter folder name [MeticAI]: " FOLDER_NAME
+        read -r -p "Enter folder name [MeticAI]: " FOLDER_NAME </dev/tty
         FOLDER_NAME=${FOLDER_NAME:-MeticAI}
         INSTALL_DIR="$(pwd)/$FOLDER_NAME"
         ;;
     2)
         # Home directory
-        read -r -p "Enter folder name [MeticAI]: " FOLDER_NAME
+        read -r -p "Enter folder name [MeticAI]: " FOLDER_NAME </dev/tty
         FOLDER_NAME=${FOLDER_NAME:-MeticAI}
         INSTALL_DIR="$HOME/$FOLDER_NAME"
         ;;
     3)
         # Custom path
-        read -r -p "Enter full path for installation: " CUSTOM_PATH
+        read -r -p "Enter full path for installation: " CUSTOM_PATH </dev/tty
         while [[ -z "$CUSTOM_PATH" ]]; do
             echo -e "${RED}Path cannot be empty.${NC}"
-            read -r -p "Enter full path for installation: " CUSTOM_PATH
+            read -r -p "Enter full path for installation: " CUSTOM_PATH </dev/tty
         done
         # Expand tilde if present
         CUSTOM_PATH="${CUSTOM_PATH/#\~/$HOME}"
@@ -172,7 +172,7 @@ echo -e "${GREEN}✓ curl found.${NC}"
 # Check and install git if needed
 if ! command -v git &> /dev/null; then
     echo -e "${RED}Error: git is not installed.${NC}"
-    read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT
+    read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
     INSTALL_GIT=${INSTALL_GIT:-y}
     
     if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
@@ -190,7 +190,7 @@ echo ""
 # Check if directory already exists
 if [ -d "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}Warning: Directory '$INSTALL_DIR' already exists.${NC}"
-    read -r -p "Do you want to remove it and clone fresh? (y/n) [y]: " REMOVE_DIR
+    read -r -p "Do you want to remove it and clone fresh? (y/n) [y]: " REMOVE_DIR </dev/tty
     REMOVE_DIR=${REMOVE_DIR:-y}
     
     if [[ "$REMOVE_DIR" =~ ^[Yy]$ ]]; then
