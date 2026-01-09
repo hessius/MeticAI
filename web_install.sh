@@ -46,7 +46,6 @@ if [ -f "./local-install.sh" ] && [ -d "./.git" ]; then
     echo -e "${YELLOW}Running local-install.sh directly...${NC}"
     echo ""
     exec ./local-install.sh
-    exit $?
 fi
 
 # From here on, we're running in remote/web installation mode
@@ -172,7 +171,6 @@ if [ -d "$INSTALL_DIR" ]; then
             echo -e "${GREEN}Starting local installer...${NC}"
             echo ""
             exec ./local-install.sh
-            exit $?
         else
             echo -e "${RED}Error: local-install.sh not found in existing directory.${NC}"
             exit 1
