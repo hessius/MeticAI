@@ -97,7 +97,9 @@ echo ""
 
 # Detect OS
 detect_os() {
-    if [ -f /etc/os-release ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="macos"
+    elif [ -f /etc/os-release ]; then
         # shellcheck disable=SC1091
         . /etc/os-release
         OS=$ID
@@ -116,6 +118,26 @@ install_git() {
     echo -e "${YELLOW}Installing git...${NC}"
     
     case "$os" in
+        macos)
+            if command -v brew &> /dev/null; then
+                if brew install git; then
+                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                else
+                    echo -e "${RED}Failed to install git via Homebrew.${NC}"
+                    exit 1
+                fi
+            else
+                echo -e "${YELLOW}Homebrew not found. Installing Homebrew first...${NC}"
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                if brew install git; then
+                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                else
+                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    echo "Visit: https://git-scm.com/downloads"
+                    exit 1
+                fi
+            fi
+            ;;
         ubuntu|debian|raspbian)
             if sudo apt-get update && sudo apt-get install -y git; then
                 echo -e "${GREEN}✓ Git installed successfully.${NC}"
