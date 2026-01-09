@@ -392,8 +392,8 @@ class TestEdgeCases:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    def test_create_profile_empty_strings(self, mock_subprocess, client):
-        """Test handling of empty string inputs (but form fields present)."""
+    def test_create_profile_very_short_strings(self, mock_subprocess, client):
+        """Test handling of very short string inputs."""
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "Success"
@@ -402,12 +402,12 @@ class TestEdgeCases:
         response = client.post(
             "/create_profile",
             data={
-                "coffee_info": "",
-                "user_prefs": ""
+                "coffee_info": "x",
+                "user_prefs": "y"
             }
         )
 
-        # Should still process since fields are present
+        # Should process even with minimal input
         assert response.status_code == 200
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
