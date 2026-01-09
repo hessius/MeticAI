@@ -93,3 +93,34 @@ POST http://<PI_IP>:8000/create_profile
 Form: coffee_info (Result of Step 2), user_prefs (Result of Step 3)
 
 Show Notification (Result)
+
+## Testing
+
+MeticAI includes a comprehensive test suite to ensure code quality and reliability.
+
+### Running Tests
+
+**Python Tests (FastAPI Application):**
+```bash
+cd coffee-relay
+pip install -r requirements-test.txt
+pytest test_main.py -v --cov=main
+```
+
+**Bash Tests (Installation Script):**
+```bash
+# Install BATS if not already installed
+# Ubuntu/Debian: sudo apt-get install bats
+# macOS: brew install bats-core
+
+bats tests/test_local_install.bats
+```
+
+### Test Coverage
+- **Python**: 100% code coverage (20 tests)
+- **Bash**: 20 critical functionality tests
+
+See [tests/README.md](tests/README.md) for detailed testing documentation and [TEST_COVERAGE.md](TEST_COVERAGE.md) for coverage metrics.
+
+### Continuous Integration
+All pull requests are automatically tested via GitHub Actions. Tests must pass before merging.
