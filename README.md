@@ -18,30 +18,55 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 
 ## Installation
 
-### 1. Requirements
+### Requirements
 * Server (Git, Docker & Docker Compose installed)
 * Meticulous Espresso Machine (Local IP required)
-* Google Gemini API Key
+* **Google Gemini API Key** - [Get your free API key here](https://aistudio.google.com/app/apikey)
 
-### 2. Setup
-Clone the repo and the required MCP source:
+### Option 1: Automatic Installation (Recommended)
+
+The easiest way to get started is using the interactive installation script:
+
 ```bash
 git clone <your-repo-url> met-ai
 cd met-ai
-# Clone the specific MCP fork
-git clone [https://github.com/manonstreet/meticulous-mcp.git](https://github.com/manonstreet/meticulous-mcp.git) meticulous-source
+./local-install.sh
 ```
 
-### 3. Configure
+The script will:
+1. ✓ Check for required prerequisites (Git & Docker)
+2. ✓ Prompt you for configuration values (API key, machine IP, server IP)
+3. ✓ Create your `.env` file automatically
+4. ✓ Clone the required Meticulous MCP source
+5. ✓ Build and launch the Docker containers
 
-Create a .env file in the root directory:
+After installation, the script will provide you with a test command to verify everything is working.
+
+### Option 2: Manual Installation
+
+If you prefer to set up manually:
+
+#### 1. Clone the repository
+```bash
+git clone <your-repo-url> met-ai
+cd met-ai
+```
+
+#### 2. Clone the required MCP source
+```bash
+git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+```
+
+#### 3. Configure environment
+
+Create a `.env` file in the root directory:
 ```
 GEMINI_API_KEY=your_key_here
 METICULOUS_IP=192.168.x.x  # IP of your Espresso Machine
 PI_IP=192.168.x.x          # IP of this Raspberry Pi
 ```
 
-## 4. Run
+#### 4. Build and run
 
 Note: Use sudo if your user does not have direct docker permissions
 ```bash
