@@ -129,7 +129,15 @@ install_git() {
             else
                 echo -e "${YELLOW}Homebrew not found. Installing Homebrew first...${NC}"
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-                if brew install git; then
+                
+                # Source Homebrew environment for both Intel and Apple Silicon Macs
+                if [ -f /opt/homebrew/bin/brew ]; then
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                elif [ -f /usr/local/bin/brew ]; then
+                    eval "$(/usr/local/bin/brew shellenv)"
+                fi
+                
+                if command -v brew &> /dev/null && brew install git; then
                     echo -e "${GREEN}✓ Git installed successfully.${NC}"
                 else
                     echo -e "${RED}Failed to install git. Please install manually.${NC}"
