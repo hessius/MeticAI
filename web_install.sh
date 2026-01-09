@@ -53,6 +53,48 @@ echo -e "${YELLOW}Remote installation mode detected.${NC}"
 echo "This will clone the MeticAI repository and run the installer."
 echo ""
 
+# Ask user for installation location
+echo -e "${YELLOW}Where would you like to install MeticAI?${NC}"
+echo "1) Current directory ($(pwd))"
+echo "2) Home directory ($HOME)"
+echo "3) Custom path"
+read -r -p "Enter your choice (1/2/3) [1]: " LOCATION_CHOICE
+LOCATION_CHOICE=${LOCATION_CHOICE:-1}
+
+case "$LOCATION_CHOICE" in
+    1)
+        # Current directory - optionally allow subfolder name
+        read -r -p "Enter folder name [MeticAI]: " FOLDER_NAME
+        FOLDER_NAME=${FOLDER_NAME:-MeticAI}
+        INSTALL_DIR="$(pwd)/$FOLDER_NAME"
+        ;;
+    2)
+        # Home directory
+        read -r -p "Enter folder name [MeticAI]: " FOLDER_NAME
+        FOLDER_NAME=${FOLDER_NAME:-MeticAI}
+        INSTALL_DIR="$HOME/$FOLDER_NAME"
+        ;;
+    3)
+        # Custom path
+        read -r -p "Enter full path for installation: " CUSTOM_PATH
+        while [[ -z "$CUSTOM_PATH" ]]; do
+            echo -e "${RED}Path cannot be empty.${NC}"
+            read -r -p "Enter full path for installation: " CUSTOM_PATH
+        done
+        # Expand tilde if present
+        CUSTOM_PATH="${CUSTOM_PATH/#\~/$HOME}"
+        INSTALL_DIR="$CUSTOM_PATH"
+        ;;
+    *)
+        echo -e "${YELLOW}Invalid choice, using current directory.${NC}"
+        INSTALL_DIR="$(pwd)/MeticAI"
+        ;;
+esac
+
+echo ""
+echo -e "${GREEN}Installation directory: $INSTALL_DIR${NC}"
+echo ""
+
 # Detect OS
 detect_os() {
     if [ -f /etc/os-release ]; then
@@ -175,6 +217,19 @@ if [ -d "$INSTALL_DIR" ]; then
             echo -e "${RED}Error: local-install.sh not found in existing directory.${NC}"
             exit 1
         fi
+    fi
+fi
+
+# Create parent directory if needed (for custom paths)
+PARENT_DIR=$(dirname "$INSTALL_DIR")
+if [ ! -d "$PARENT_DIR" ]; then
+    echo -e "${YELLOW}Creating parent directory: $PARENT_DIR${NC}"
+    if mkdir -p "$PARENT_DIR"; then
+        echo -e "${GREEN}✓ Parent directory created.${NC}"
+    else
+        echo -e "${RED}Error: Failed to create parent directory.${NC}"
+        echo "Please check permissions and try again."
+        exit 1
     fi
 fi
 
