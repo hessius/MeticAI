@@ -107,3 +107,38 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../web_install.sh"
     run grep -q "INSTALL_DIR=" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
+
+@test "Script asks for installation location choice" {
+    run grep -q "Where would you like to install MeticAI?" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script offers current directory option" {
+    run grep -q "Current directory" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script offers home directory option" {
+    run grep -q "Home directory" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script offers custom path option" {
+    run grep -q "Custom path" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script handles custom path with tilde expansion" {
+    run grep -q 'CUSTOM_PATH="\${CUSTOM_PATH/#\\~/$HOME}"' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script creates parent directory if needed" {
+    run grep -q "Creating parent directory" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script shows selected installation directory" {
+    run grep -q "Installation directory:" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
