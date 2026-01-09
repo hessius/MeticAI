@@ -71,7 +71,15 @@ install_git() {
             else
                 echo -e "${YELLOW}Homebrew not found. Installing Homebrew first...${NC}"
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-                if brew install git; then
+                
+                # Source Homebrew environment for both Intel and Apple Silicon Macs
+                if [ -f /opt/homebrew/bin/brew ]; then
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                elif [ -f /usr/local/bin/brew ]; then
+                    eval "$(/usr/local/bin/brew shellenv)"
+                fi
+                
+                if command -v brew &> /dev/null && brew install git; then
                     echo -e "${GREEN}✓ Git installed successfully.${NC}"
                 else
                     echo -e "${RED}Failed to install git. Please install manually.${NC}"
@@ -308,17 +316,24 @@ detect_ip() {
     
     # Try macOS-specific methods first
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        # Try ipconfig getifaddr for common interfaces
-        for interface in en0 en1 en2; do
-            detected_ip=$(ipconfig getifaddr "$interface" 2>/dev/null)
-            if [ -n "$detected_ip" ]; then
-                echo "$detected_ip"
-                return
-            fi
-        done
+        # Try to get IP from default route
+        detected_ip=$(route -n get default 2>/dev/null | grep 'interface:' | awk '{print $2}' | xargs ipconfig getifaddr 2>/dev/null)
         
-        # Fallback: use ifconfig and parse
-        detected_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+        if [ -z "$detected_ip" ]; then
+            # Fallback: Try ipconfig getifaddr for common interfaces
+            for interface in en0 en1 en2 en3 en4; do
+                detected_ip=$(ipconfig getifaddr "$interface" 2>/dev/null)
+                if [ -n "$detected_ip" ]; then
+                    echo "$detected_ip"
+                    return
+                fi
+            done
+        fi
+        
+        if [ -z "$detected_ip" ]; then
+            # Last resort: use ifconfig and parse
+            detected_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+        fi
     else
         # Linux: use hostname -I
         detected_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
