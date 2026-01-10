@@ -94,7 +94,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 }
 
 @test "Script auto-detects server IP" {
-    run grep -q "hostname -I" "$SCRIPT_PATH"
+    run grep -q "detect_ip" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
@@ -120,5 +120,20 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 
 @test "Script exits on docker not found" {
     run grep -q "Error: docker is not installed" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script supports macOS detection" {
+    run grep -q "darwin" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script has cross-platform IP detection" {
+    run grep -q "ipconfig getifaddr" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script handles macOS git installation" {
+    run grep -q "brew install git" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
