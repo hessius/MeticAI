@@ -614,3 +614,80 @@ class TestEnhancedBaristaPersona:
         assert "PROFILE CREATION GUIDELINES:" in prompt
         assert "NAMING CONVENTION:" in prompt
         assert "OUTPUT FORMAT:" in prompt
+
+
+class TestCORS:
+    """Tests for CORS middleware configuration."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.vision_model')
+    def test_cors_headers_on_analyze_coffee(self, mock_vision_model, client, sample_image):
+        """Test that CORS headers are present on /analyze_coffee responses."""
+        mock_response = Mock()
+        mock_response.text = "Test coffee"
+        mock_vision_model.generate_content.return_value = mock_response
+
+        response = client.post(
+            "/analyze_coffee",
+            files={"file": ("test.png", sample_image, "image/png")},
+            headers={"Origin": "http://localhost:3000"}
+        )
+
+        assert response.status_code == 200
+        # Check for CORS headers
+        assert "access-control-allow-origin" in response.headers
+        assert response.headers["access-control-allow-origin"] == "*"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_cors_headers_on_analyze_and_profile(self, mock_subprocess, client):
+        """Test that CORS headers are present on /analyze_and_profile responses."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test"},
+            headers={"Origin": "http://localhost:3000"}
+        )
+
+        assert response.status_code == 200
+        # Check for CORS headers
+        assert "access-control-allow-origin" in response.headers
+        assert response.headers["access-control-allow-origin"] == "*"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_cors_preflight_request(self, client):
+        """Test CORS preflight OPTIONS request."""
+        response = client.options(
+            "/analyze_coffee",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type"
+            }
+        )
+
+        # Preflight requests should return 200
+        assert response.status_code == 200
+        # Check CORS headers on preflight response
+        assert "access-control-allow-origin" in response.headers
+        assert "access-control-allow-methods" in response.headers
+        assert "access-control-allow-headers" in response.headers
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_cors_allows_credentials(self, client):
+        """Test that CORS allows credentials."""
+        response = client.options(
+            "/analyze_and_profile",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST"
+            }
+        )
+
+        assert response.status_code == 200
+        assert "access-control-allow-credentials" in response.headers
+        assert response.headers["access-control-allow-credentials"] == "true"
