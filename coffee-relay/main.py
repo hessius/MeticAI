@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import google.generativeai as genai
 from PIL import Image
@@ -7,6 +8,15 @@ import os
 import subprocess
 
 app = FastAPI()
+
+# Configure CORS middleware to allow web app interactions
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 1. Setup "The Eye"
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
