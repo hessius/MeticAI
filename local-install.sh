@@ -357,13 +357,16 @@ EOF
 echo -e "${GREEN}✓ .env file created.${NC}"
 echo ""
 
-# 3. Setup Dependencies (The MCP Fork)
+# 3. Setup Dependencies (The MCP Fork & Web App)
 ################################################################################
 # Clone the Meticulous MCP server fork required for machine communication
 # Repository: https://github.com/manonstreet/meticulous-mcp.git
+# And the MeticAI Web Interface
+# Repository: https://github.com/hessius/MeticAI-web.git
 ################################################################################
-echo -e "${YELLOW}[3/4] Setting up Meticulous Source...${NC}"
+echo -e "${YELLOW}[3/4] Setting up Meticulous Source and Web App...${NC}"
 
+# Clone MCP Source
 if [ -d "meticulous-source" ]; then
     echo "Directory 'meticulous-source' already exists."
     read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " CLONE_CONFIRM </dev/tty
@@ -381,7 +384,39 @@ else
     echo "Cloning Meticulous MCP fork..."
     git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
 fi
-echo -e "${GREEN}✓ Source code ready.${NC}"
+echo -e "${GREEN}✓ MCP source code ready.${NC}"
+
+# Clone Web App
+if [ -d "meticai-web" ]; then
+    echo "Directory 'meticai-web' already exists."
+    read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " WEB_CLONE_CONFIRM </dev/tty
+    WEB_CLONE_CONFIRM=${WEB_CLONE_CONFIRM:-n}
+    
+    if [[ "$WEB_CLONE_CONFIRM" =~ ^[Yy]$ ]]; then
+        echo "Removing old web app..."
+        rm -rf meticai-web
+        echo "Cloning fresh web app repository..."
+        git clone https://github.com/hessius/MeticAI-web.git meticai-web
+    else
+        echo "Skipping clone (using existing web app)."
+    fi
+else
+    echo "Cloning MeticAI Web Interface..."
+    git clone https://github.com/hessius/MeticAI-web.git meticai-web
+fi
+echo -e "${GREEN}✓ Web app source code ready.${NC}"
+
+# Create web app config directory if it doesn't exist
+mkdir -p meticai-web/public
+
+# Generate config.json for web app
+echo "Generating web app configuration..."
+cat <<WEBCONFIG > meticai-web/public/config.json
+{
+  "serverUrl": "http://$PI_IP:8000"
+}
+WEBCONFIG
+echo -e "${GREEN}✓ Web app configured.${NC}"
 echo ""
 
 # 4. Build and Launch
@@ -406,6 +441,7 @@ if sudo docker compose up -d --build; then
     echo ""
     echo "Your Barista Agent is running."
     echo ""
+    echo -e "👉 **Web Interface:** http://$PI_IP:3550"
     echo -e "👉 **Relay API:** http://$PI_IP:8000"
     echo -e "👉 **Meticulous:** http://$MET_IP (via Agent)"
     echo ""
