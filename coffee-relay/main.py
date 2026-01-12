@@ -18,9 +18,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. Setup "The Eye"
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-vision_model = genai.GenerativeModel('gemini-2.0-flash')
+# 1. Setup "The Eye" - lazily initialized
+_vision_model = None
+
+def get_vision_model():
+    """Lazily initialize and return the vision model."""
+    global _vision_model
+    if _vision_model is None:
+        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+        _vision_model = genai.GenerativeModel('gemini-2.0-flash')
+    return _vision_model
 
 # Common prompt sections for profile creation
 BARISTA_PERSONA = (
@@ -73,7 +80,7 @@ async def analyze_coffee(file: UploadFile = File(...)):
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
         
-        response = vision_model.generate_content([
+        response = get_vision_model().generate_content([
             "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
             "Return ONLY a single concise sentence describing the coffee.", 
             image
@@ -110,7 +117,7 @@ async def analyze_and_profile(
             image = Image.open(io.BytesIO(contents))
             
             # Analyze the coffee bag
-            analysis_response = vision_model.generate_content([
+            analysis_response = get_vision_model().generate_content([
                 "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
                 "Return ONLY a single concise sentence describing the coffee.", 
                 image
