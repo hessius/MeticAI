@@ -43,13 +43,13 @@ class TestAnalyzeCoffeeEndpoint:
     """Tests for the /analyze_coffee endpoint."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_coffee_success(self, mock_vision_model, client, sample_image):
         """Test successful coffee bag analysis."""
         # Mock the Gemini response
         mock_response = Mock()
         mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral and Citrus Notes"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
 
         # Send request
         response = client.post(
@@ -61,16 +61,16 @@ class TestAnalyzeCoffeeEndpoint:
         assert response.status_code == 200
         assert "analysis" in response.json()
         assert "Ethiopian" in response.json()["analysis"]
-        mock_vision_model.generate_content.assert_called_once()
+        mock_vision_model.return_value.generate_content.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_coffee_with_whitespace(self, mock_vision_model, client, sample_image):
         """Test that response text is properly stripped of whitespace."""
         # Mock response with extra whitespace
         mock_response = Mock()
         mock_response.text = "  Colombian Supremo, Medium Roast  \n"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
 
         response = client.post(
             "/analyze_coffee",
@@ -81,11 +81,11 @@ class TestAnalyzeCoffeeEndpoint:
         assert response.json()["analysis"] == "Colombian Supremo, Medium Roast"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_coffee_api_error(self, mock_vision_model, client, sample_image):
         """Test error handling when Gemini API fails."""
         # Mock an API error
-        mock_vision_model.generate_content.side_effect = Exception("API Error: Rate limit exceeded")
+        mock_vision_model.return_value.generate_content.side_effect = Exception("API Error: Rate limit exceeded")
 
         response = client.post(
             "/analyze_coffee",
@@ -118,12 +118,12 @@ class TestAnalyzeCoffeeEndpoint:
         assert response.status_code == 422  # Unprocessable Entity
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_coffee_different_image_formats(self, mock_vision_model, client):
         """Test analysis with different image formats (JPEG, PNG, etc.)."""
         mock_response = Mock()
         mock_response.text = "Test coffee analysis"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
 
         for format_type in ['PNG', 'JPEG']:
             img = Image.new('RGB', (100, 100), color='blue')
@@ -145,13 +145,13 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test profile creation with only an image (no user preferences)."""
         # Mock the Gemini vision response
         mock_response = Mock()
         mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
         
         # Mock successful subprocess execution
         mock_result = Mock()
@@ -171,7 +171,7 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Profile uploaded" in response.json()["reply"]
         
         # Verify vision model was called
-        mock_vision_model.generate_content.assert_called_once()
+        mock_vision_model.return_value.generate_content.assert_called_once()
         
         # Verify subprocess was called with correct arguments
         mock_subprocess.assert_called_once()
@@ -212,13 +212,13 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test profile creation with both image and user preferences."""
         # Mock the Gemini vision response
         mock_response = Mock()
         mock_response.text = "Colombian Supremo, Medium Roast, Nutty"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
         
         # Mock successful subprocess execution
         mock_result = Mock()
@@ -253,13 +253,13 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_and_profile_subprocess_error(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test error handling when subprocess fails."""
         # Mock the Gemini vision response
         mock_response = Mock()
         mock_response.text = "Test Coffee"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
         
         # Mock subprocess failure
         mock_result = Mock()
@@ -295,11 +295,11 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Unexpected error" in response.json()["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_and_profile_image_processing_error(self, mock_vision_model, client):
         """Test error when image processing fails."""
         # Mock an exception in vision model
-        mock_vision_model.generate_content.side_effect = Exception("Vision API error")
+        mock_vision_model.return_value.generate_content.side_effect = Exception("Vision API error")
         
         # Send invalid image data
         invalid_data = BytesIO(b"not an image")
@@ -314,12 +314,12 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test profile creation with different user preferences."""
         mock_response = Mock()
         mock_response.text = "Test Coffee"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -345,12 +345,12 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_and_profile_allowed_tools(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test that only safe tools are whitelisted."""
         mock_response = Mock()
         mock_response.text = "Test Coffee"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -417,12 +417,12 @@ class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_coffee_large_image(self, mock_vision_model, client):
         """Test handling of large images."""
         mock_response = Mock()
         mock_response.text = "Analysis result"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
 
         # Create a larger image
         img = Image.new('RGB', (4000, 3000), color='green')
@@ -439,12 +439,12 @@ class TestEdgeCases:
         assert "analysis" in response.json()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_analyze_coffee_very_long_response(self, mock_vision_model, client, sample_image):
         """Test handling of very long AI responses."""
         mock_response = Mock()
         mock_response.text = "A" * 10000  # Very long response
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
 
         response = client.post(
             "/analyze_coffee",
@@ -460,12 +460,12 @@ class TestEnhancedBaristaPersona:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test that the prompt includes the modern experimental barista persona."""
         mock_response = Mock()
         mock_response.text = "Ethiopian Coffee, Light Roast"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -581,12 +581,12 @@ class TestEnhancedBaristaPersona:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test enhanced prompt when both image and preferences are provided."""
         mock_response = Mock()
         mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -620,12 +620,12 @@ class TestCORS:
     """Tests for CORS middleware configuration."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.vision_model')
+    @patch('main.get_vision_model')
     def test_cors_headers_on_analyze_coffee(self, mock_vision_model, client, sample_image):
         """Test that CORS headers are present on /analyze_coffee responses."""
         mock_response = Mock()
         mock_response.text = "Test coffee"
-        mock_vision_model.generate_content.return_value = mock_response
+        mock_vision_model.return_value.generate_content.return_value = mock_response
 
         response = client.post(
             "/analyze_coffee",
