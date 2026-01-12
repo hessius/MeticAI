@@ -11,6 +11,7 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 * **Detailed Guidance:** Post-creation summaries with preparation instructions and design rationale.
 * **Complex Recipe Support:** Multi-stage extraction, pre-infusion, blooming, and advanced profiling.
 * **Zero-Touch Control:** Uploads recipes directly to the Meticulous machine.
+* **Web Interface:** Modern, user-friendly web application for easy control and management.
 * **iOS Integration:** One-tap brewing via Shortcuts.
 * **Curl Integration:** Any service capable of polling a url can use the service.
 
@@ -18,6 +19,7 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 1.  **Relay (FastAPI):** Receives images/requests from url calls.
 2.  **Brain (Gemini CLI):** Decides on the recipe and tool usage.
 3.  **Hands (MCP Server):** Communicates with the physical machine.
+4.  **Web Interface:** React-based web application for user-friendly control (port 3550).
 
 ## Installation
 
@@ -44,8 +46,8 @@ This one-liner will:
 2. Clone the MeticAI repository
 3. Check for prerequisites (git, docker, docker-compose) and offer to install them if missing
 4. Guide you through configuration (API keys, IP addresses)
-5. Clone the required MCP source repository
-6. Build and launch all containers
+5. Clone the required MCP source repository and web application
+6. Build and launch all containers (including web interface)
 
 #### Option B: Local Installation
 If you prefer to clone the repository first:
@@ -61,18 +63,20 @@ cd MeticAI
 The script will:
 1. Check for prerequisites (git, docker, docker-compose) and offer to install them if missing
 2. Guide you through configuration (API keys, IP addresses)
-3. Clone the required MCP source repository
-4. Build and launch all containers
+3. Clone the required MCP source repository and web application
+4. Build and launch all containers (including web interface)
 
 ### 3. Manual Setup (Alternative)
 If you prefer to install dependencies manually or are running on an unsupported OS:
 
-Clone the repo and the required MCP source:
+Clone the repo and the required dependencies:
 ```bash
 git clone <your-repo-url> met-ai
 cd met-ai
 # Clone the specific MCP fork
 git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+# Clone the web application
+git clone https://github.com/hessius/MeticAI-web.git meticai-web
 ```
 
 #### Manual Configuration
@@ -84,6 +88,17 @@ METICULOUS_IP=192.168.x.x  # IP of your Espresso Machine
 PI_IP=192.168.x.x          # IP of this Raspberry Pi
 ```
 
+Create the web app configuration file:
+```bash
+mkdir -p meticai-web/public
+cat > meticai-web/public/config.json << EOF
+{
+  "serverUrl": "http://YOUR_PI_IP:8000"
+}
+EOF
+```
+Replace `YOUR_PI_IP` with your actual server IP address.
+
 #### Manual Run
 
 Note: Use sudo if your user does not have direct docker permissions
@@ -93,9 +108,24 @@ sudo docker compose up -d --build
 
 ## Usage
 
-MeticAI provides two main endpoints:
+MeticAI can be controlled through multiple interfaces:
 
-### 1. Unified Analysis & Profile Creation (Recommended)
+### 1. Web Interface (Recommended)
+Access the modern web interface at `http://<PI_IP>:3550` in your browser.
+
+Features:
+- **Upload coffee bag images** for analysis and profile creation
+- **Add custom preferences** for personalized recipes
+- **View real-time status** and responses
+- **Clean, intuitive interface** built with React and shadcn/ui
+
+The web interface automatically connects to the relay API and provides the easiest way to interact with MeticAI.
+
+### 2. API Endpoints
+
+MeticAI provides two main API endpoints:
+
+#### 2.1. Unified Analysis & Profile Creation (Recommended)
 `POST http://<PI_IP>:8000/analyze_and_profile`
 
 This consolidated endpoint analyzes coffee and creates a profile in a single LLM pass.
@@ -132,7 +162,7 @@ curl -X POST http://<PI_IP>:8000/analyze_and_profile \
 }
 ```
 
-### 2. Quick Coffee Analysis (Standalone)
+#### 2.2. Quick Coffee Analysis (Standalone)
 `POST http://<PI_IP>:8000/analyze_coffee`
 
 For quick coffee bag analysis without profile creation.
@@ -153,7 +183,7 @@ curl -X POST http://<PI_IP>:8000/analyze_coffee \
 }
 ```
 
-## iOS Shortcut Setup
+### 3. iOS Shortcut Setup
 
 MeticAI can be controlled directly from your iPhone using Apple Shortcuts. Choose the workflow that best fits your needs.
 

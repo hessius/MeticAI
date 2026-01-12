@@ -41,3 +41,16 @@ services:
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     restart: unless-stopped
+
+  # 4. MeticAI Web Interface
+  # Web application for controlling coffee machine
+  meticai-web:
+    build: ./meticai-web
+    container_name: meticai-web
+    ports:
+      - "3550:80"
+    volumes:
+      - ./meticai-web/public/config.json:/usr/share/nginx/html/config.json:ro
+    restart: unless-stopped
+    depends_on:
+      - coffee-relay
