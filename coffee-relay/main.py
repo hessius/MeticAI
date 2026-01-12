@@ -25,7 +25,13 @@ def get_vision_model():
     """Lazily initialize and return the vision model."""
     global _vision_model
     if _vision_model is None:
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "GEMINI_API_KEY environment variable is required but not set. "
+                "Please set it before starting the server."
+            )
+        genai.configure(api_key=api_key)
         _vision_model = genai.GenerativeModel('gemini-2.0-flash')
     return _vision_model
 
