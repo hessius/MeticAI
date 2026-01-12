@@ -66,9 +66,9 @@ USER_SUMMARY_INSTRUCTIONS = (
     "   • Special Requirements: Any special gear needed (bottom filter, specific dosage, unique prep steps)\n\n"
 )
 
-# Add OPTIONS handler for CORS preflight requests
-@app.options("/analyze_and_profile")
-async def options_analyze_and_profile():
+@app.post("/analyze_coffee")
+async def analyze_coffee(file: UploadFile = File(...)):
+    """Phase 1: Look at the bag."""
     try:
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
@@ -96,21 +96,21 @@ async def analyze_and_profile(
     
     # Validate that at least one input is provided
     if not file and not user_prefs:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={"detail": "At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+            detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"
         )
     
     coffee_analysis = None
     
-    try:aise HTTPException(
-            status_code=400,
-            detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"nalysis_response = vision_model.generate_content([
+    try:
+        # If image is provided, analyze it first
+        if file:
+            contents = await file.read()
+            image = Image.open(io.BytesIO(contents))
+            
+            # Analyze the coffee bag
+            analysis_response = vision_model.generate_content([
                 "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
                 "Return ONLY a single concise sentence describing the coffee.", 
                 image
@@ -164,24 +164,7 @@ async def analyze_and_profile(
                 final_prompt
             ],
             input="y\n", 
-            captureJSONResponse(
-                content={
-                    "status": "error", 
-                    "analysis": coffee_analysis,
-                    "message": result.stderr
-                },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                }
-            )
-            
-        return JSONResponse(
-            content={
-                "status": "success",
-                "analysis": coffee_analysis,
-                "re_output=True,
+            capture_output=True,
             text=True
         )
         
@@ -198,4 +181,9 @@ async def analyze_and_profile(
             "reply": result.stdout
         }
 
-    excep
+    except Exception as e:
+        return {
+            "status": "error",
+            "analysis": coffee_analysis if coffee_analysis else None,
+            "message": str(e)
+        }
