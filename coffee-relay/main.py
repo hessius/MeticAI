@@ -1,6 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from typing import Optional
 import google.generativeai as genai
 from PIL import Image
@@ -11,14 +10,12 @@ import subprocess
 app = FastAPI()
 
 # Configure CORS middleware to allow web app interactions
-# IMPORTANT: This must be added BEFORE any routes are defined
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],  # Allow all headers to be exposed
 )
 
 # 1. Setup "The Eye"
@@ -72,18 +69,6 @@ USER_SUMMARY_INSTRUCTIONS = (
 # Add OPTIONS handler for CORS preflight requests
 @app.options("/analyze_and_profile")
 async def options_analyze_and_profile():
-    return JSONResponse(
-        content={},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
-    )
-
-@app.post("/analyze_coffee")
-async def analyze_coffee(file: UploadFile = File(...)):
-    """Phase 1: Look at the bag."""
     try:
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
@@ -123,14 +108,9 @@ async def analyze_and_profile(
     
     coffee_analysis = None
     
-    try:
-        # If image is provided, analyze it first
-        if file:
-            contents = await file.read()
-            image = Image.open(io.BytesIO(contents))
-            
-            # Analyze the coffee bag
-            analysis_response = vision_model.generate_content([
+    try:aise HTTPException(
+            status_code=400,
+            detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"nalysis_response = vision_model.generate_content([
                 "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
                 "Return ONLY a single concise sentence describing the coffee.", 
                 image
@@ -201,30 +181,21 @@ async def analyze_and_profile(
             content={
                 "status": "success",
                 "analysis": coffee_analysis,
-                "reply": result.stdout
-            },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
-            }
+                "re_output=True,
+            text=True
         )
-
-    except Exception as e:
-        return JSONResponse(
-            content={
-                "status": "error",
-                "analysis": coffee_analysis if coffee_analysis else None,
-                "message": str(e)
-            },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
+        
+        if result.returncode != 0:
+            return {
+                "status": "error", 
+                "analysis": coffee_analysis,
+                "message": result.stderr
             }
-        )t Exception as e:
+            
         return {
-            "status": "error",
-            "analysis": coffee_analysis if coffee_analysis else None,
-            "message": str(e)
+            "status": "success",
+            "analysis": coffee_analysis,
+            "reply": result.stdout
         }
+
+    excep
