@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from typing import Optional
 import google.generativeai as genai
 from PIL import Image
@@ -10,12 +11,14 @@ import subprocess
 app = FastAPI()
 
 # Configure CORS middleware to allow web app interactions
+# IMPORTANT: This must be added BEFORE any routes are defined
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # In production, specify exact origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Allow all headers to be exposed
 )
 
 # 1. Setup "The Eye"
@@ -66,6 +69,18 @@ USER_SUMMARY_INSTRUCTIONS = (
     "   • Special Requirements: Any special gear needed (bottom filter, specific dosage, unique prep steps)\n\n"
 )
 
+# Add OPTIONS handler for CORS preflight requests
+@app.options("/analyze_and_profile")
+async def options_analyze_and_profile():
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
 @app.post("/analyze_coffee")
 async def analyze_coffee(file: UploadFile = File(...)):
     """Phase 1: Look at the bag."""
@@ -96,9 +111,14 @@ async def analyze_and_profile(
     
     # Validate that at least one input is provided
     if not file and not user_prefs:
-        raise HTTPException(
+        return JSONResponse(
             status_code=400,
-            detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"
+            content={"detail": "At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
         )
     
     coffee_analysis = None
@@ -164,24 +184,45 @@ async def analyze_and_profile(
                 final_prompt
             ],
             input="y\n", 
-            capture_output=True,
-            text=True
-        )
-        
-        if result.returncode != 0:
-            return {
-                "status": "error", 
-                "analysis": coffee_analysis,
-                "message": result.stderr
-            }
+            captureJSONResponse(
+                content={
+                    "status": "error", 
+                    "analysis": coffee_analysis,
+                    "message": result.stderr
+                },
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
             
-        return {
-            "status": "success",
-            "analysis": coffee_analysis,
-            "reply": result.stdout
-        }
+        return JSONResponse(
+            content={
+                "status": "success",
+                "analysis": coffee_analysis,
+                "reply": result.stdout
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
 
     except Exception as e:
+        return JSONResponse(
+            content={
+                "status": "error",
+                "analysis": coffee_analysis if coffee_analysis else None,
+                "message": str(e)
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )t Exception as e:
         return {
             "status": "error",
             "analysis": coffee_analysis if coffee_analysis else None,
