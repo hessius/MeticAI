@@ -12,19 +12,25 @@
 # OPTIONS:
 #   --check-only        Check for updates without applying them
 #   --auto              Run non-interactively (auto-accept updates)
-#   --switch-mcp-repo   Switch meticulous-mcp between fork and main repo
+#   --switch-mcp-repo   Check and apply central repository configuration
 #   --help              Show this help message
 #
 # WHAT IT DOES:
 #   1. Checks for updates to MeticAI main repository
 #   2. Checks for updates to meticulous-mcp dependency
 #   3. Checks for updates to meticai-web dependency
-#   4. Optionally applies updates and rebuilds containers
-#   5. Can switch between fork and main MCP repository
+#   4. Automatically switches MCP repo based on central configuration
+#   5. Optionally applies updates and rebuilds containers
+#
+# REPOSITORY SWITCHING:
+#   The MCP repository URL is now controlled centrally via .update-config.json
+#   When maintainers update this file, all users will automatically switch to
+#   the new repository on their next update. No manual intervention required.
 #
 # DEPENDENCIES:
 #   - Git
 #   - Docker & Docker Compose
+#   - curl or wget (for fetching central config)
 #
 ################################################################################
 
@@ -38,6 +44,10 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION_FILE="$SCRIPT_DIR/.versions.json"
+CONFIG_URL="https://raw.githubusercontent.com/hessius/MeticAI/main/.update-config.json"
+LOCAL_CONFIG_FILE="$SCRIPT_DIR/.update-config.json"
+
+# Default URLs (used if config fetch fails)
 MCP_FORK_URL="https://github.com/manonstreet/meticulous-mcp.git"
 MCP_MAIN_URL="https://github.com/meticulous/meticulous-mcp.git"  # Placeholder for when fork merges
 WEB_APP_URL="https://github.com/hessius/MeticAI-web.git"
@@ -116,6 +126,114 @@ get_remote_url() {
         cd "$dir" && git remote get-url origin 2>/dev/null
     else
         echo "unknown"
+    fi
+}
+
+# Function to fetch central configuration
+fetch_central_config() {
+    # Try to fetch the central config file
+    if command -v curl &> /dev/null; then
+        curl -fsSL "$CONFIG_URL" -o "$LOCAL_CONFIG_FILE" 2>/dev/null
+        return $?
+    elif command -v wget &> /dev/null; then
+        wget -q -O "$LOCAL_CONFIG_FILE" "$CONFIG_URL" 2>/dev/null
+        return $?
+    else
+        return 1
+    fi
+}
+
+# Function to get preferred MCP repository URL from config
+get_preferred_mcp_url() {
+    # Try to fetch latest config
+    fetch_central_config 2>/dev/null
+    
+    # Try to read from local config file
+    if [ -f "$LOCAL_CONFIG_FILE" ]; then
+        # Extract mcp_repo_url using grep and sed (portable)
+        local preferred_url=$(grep '"mcp_repo_url"' "$LOCAL_CONFIG_FILE" | sed 's/.*"mcp_repo_url"[^"]*"\([^"]*\)".*/\1/')
+        if [ -n "$preferred_url" ] && [ "$preferred_url" != "mcp_repo_url" ]; then
+            echo "$preferred_url"
+            return 0
+        fi
+    fi
+    
+    # Fallback to fork URL if config not available
+    echo "$MCP_FORK_URL"
+    return 0
+}
+
+# Function to check if MCP repository needs switching
+check_and_switch_mcp_repo() {
+    if [ ! -d "$SCRIPT_DIR/meticulous-source" ]; then
+        # Not installed yet, will use preferred URL during installation
+        return 0
+    fi
+    
+    local current_url=$(get_remote_url "$SCRIPT_DIR/meticulous-source")
+    local preferred_url=$(get_preferred_mcp_url)
+    
+    # Normalize URLs for comparison (remove trailing slashes and .git)
+    current_url=$(echo "$current_url" | sed 's/\.git$//' | sed 's/\/$//')
+    preferred_url=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
+    
+    if [ "$current_url" != "$preferred_url" ]; then
+        echo -e "${YELLOW}Repository switch detected!${NC}"
+        echo "Current:  $current_url"
+        echo "Required: $preferred_url"
+        echo ""
+        
+        # Automatically switch in auto mode, or prompt in interactive mode
+        local should_switch=false
+        if [ "$AUTO_MODE" = true ]; then
+            should_switch=true
+            echo "Auto mode: switching automatically..."
+        else
+            read -r -p "Switch to required repository? (y/n) [y]: " SWITCH_CONFIRM </dev/tty
+            SWITCH_CONFIRM=${SWITCH_CONFIRM:-y}
+            if [[ "$SWITCH_CONFIRM" =~ ^[Yy]$ ]]; then
+                should_switch=true
+            fi
+        fi
+        
+        if [ "$should_switch" = true ]; then
+            perform_mcp_repo_switch "$preferred_url"
+            return $?
+        else
+            echo -e "${YELLOW}Keeping current repository${NC}"
+            return 0
+        fi
+    fi
+    
+    return 0
+}
+
+# Function to perform the actual repository switch
+perform_mcp_repo_switch() {
+    local new_url="$1"
+    
+    echo ""
+    echo -e "${YELLOW}Switching MCP repository to: $new_url${NC}"
+    
+    # Backup current state
+    echo "Backing up current installation..."
+    local backup_dir="$SCRIPT_DIR/meticulous-source.backup.$(date +%s)"
+    cp -r "$SCRIPT_DIR/meticulous-source" "$backup_dir"
+    
+    # Remove old and clone new
+    rm -rf "$SCRIPT_DIR/meticulous-source"
+    
+    if git clone "$new_url" "$SCRIPT_DIR/meticulous-source"; then
+        echo -e "${GREEN}✓ Repository switched successfully${NC}"
+        echo "Backup saved to: $backup_dir"
+        echo ""
+        echo -e "${YELLOW}Note: Containers will be rebuilt to apply changes${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Failed to clone new repository${NC}"
+        echo "Restoring backup..."
+        mv "$backup_dir" "$SCRIPT_DIR/meticulous-source"
+        return 1
     fi
 }
 
@@ -254,7 +372,11 @@ update_mcp() {
     else
         echo -e "${YELLOW}Installing Meticulous MCP...${NC}"
         cd "$SCRIPT_DIR"
-        if git clone "$MCP_FORK_URL" meticulous-source; then
+        
+        # Use preferred URL from central config
+        local preferred_url=$(get_preferred_mcp_url)
+        
+        if git clone "$preferred_url" meticulous-source; then
             echo -e "${GREEN}✓ Meticulous MCP installed successfully${NC}"
             return 0
         else
@@ -301,77 +423,6 @@ WEBCONFIG
             echo -e "${RED}✗ Failed to install MeticAI Web${NC}"
             return 1
         fi
-    fi
-}
-
-# Function to switch MCP repository
-switch_mcp_repository() {
-    echo -e "${YELLOW}MCP Repository Switcher${NC}"
-    echo ""
-    
-    if [ ! -d "$SCRIPT_DIR/meticulous-source" ]; then
-        echo -e "${RED}Error: meticulous-source directory not found${NC}"
-        echo "Please run the installer first."
-        return 1
-    fi
-    
-    local current_url=$(get_remote_url "$SCRIPT_DIR/meticulous-source")
-    echo "Current repository: $current_url"
-    echo ""
-    echo "Available options:"
-    echo "1) Fork: $MCP_FORK_URL"
-    echo "2) Main: $MCP_MAIN_URL (use when fork is merged upstream)"
-    echo ""
-    
-    if [ "$AUTO_MODE" = false ]; then
-        read -r -p "Choose repository (1/2) [1]: " REPO_CHOICE </dev/tty
-        REPO_CHOICE=${REPO_CHOICE:-1}
-    else
-        echo "Auto mode: keeping current repository"
-        return 0
-    fi
-    
-    local new_url=""
-    case "$REPO_CHOICE" in
-        1)
-            new_url="$MCP_FORK_URL"
-            ;;
-        2)
-            new_url="$MCP_MAIN_URL"
-            ;;
-        *)
-            echo -e "${RED}Invalid choice${NC}"
-            return 1
-            ;;
-    esac
-    
-    if [ "$current_url" = "$new_url" ]; then
-        echo -e "${GREEN}Already using selected repository${NC}"
-        return 0
-    fi
-    
-    echo ""
-    echo -e "${YELLOW}Switching to: $new_url${NC}"
-    
-    # Backup current state
-    echo "Backing up current installation..."
-    local backup_dir="$SCRIPT_DIR/meticulous-source.backup.$(date +%s)"
-    cp -r "$SCRIPT_DIR/meticulous-source" "$backup_dir"
-    
-    # Remove old and clone new
-    rm -rf "$SCRIPT_DIR/meticulous-source"
-    
-    if git clone "$new_url" "$SCRIPT_DIR/meticulous-source"; then
-        echo -e "${GREEN}✓ Repository switched successfully${NC}"
-        echo "Backup saved to: $backup_dir"
-        echo ""
-        echo -e "${YELLOW}Note: You should rebuild containers for changes to take effect${NC}"
-        return 0
-    else
-        echo -e "${RED}✗ Failed to clone new repository${NC}"
-        echo "Restoring backup..."
-        mv "$backup_dir" "$SCRIPT_DIR/meticulous-source"
-        return 1
     fi
 }
 
@@ -440,11 +491,17 @@ main() {
     # Initialize version tracking
     initialize_versions_file
     
-    # Handle MCP repository switch if requested
+    # Handle MCP repository switch if requested (deprecated - now automatic)
     if $SWITCH_MCP_REPO; then
-        switch_mcp_repository
+        echo -e "${YELLOW}Note: Repository switching is now automatic based on central configuration.${NC}"
+        echo -e "${YELLOW}Checking for required repository...${NC}"
+        echo ""
+        check_and_switch_mcp_repo
         exit $?
     fi
+    
+    # Check if MCP repository needs switching (automatic based on central config)
+    check_and_switch_mcp_repo
     
     # Check for updates
     if check_for_updates; then

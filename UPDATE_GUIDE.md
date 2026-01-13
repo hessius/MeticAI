@@ -35,9 +35,16 @@ The update system manages three components:
 - Automatically clones missing dependencies
 - Updates existing dependencies to latest version
 - Preserves your `.env` configuration
-- Handles repository switches (fork → main)
+- **Automatic repository switching** based on central configuration
 
-### 3. Container Management
+### 3. Automatic Repository Switching
+- Repository URLs controlled centrally via `.update-config.json`
+- Maintainers can switch all users to new repositories without manual intervention
+- Automatic detection and switching during updates
+- Backups created before switching
+- Works seamlessly in both interactive and auto mode
+
+### 4. Container Management
 - Optionally rebuilds Docker containers after updates
 - Restarts services with updated code
 - Handles docker compose versions automatically
@@ -62,8 +69,10 @@ The update system manages three components:
 |--------|-------------|
 | `--check-only` | Check for updates without applying them |
 | `--auto` | Run non-interactively (auto-accept all prompts) |
-| `--switch-mcp-repo` | Switch between MCP fork and main repository |
+| `--switch-mcp-repo` | Check and apply central repository configuration |
 | `--help` | Show help message |
+
+**Note on Repository Switching:** The `--switch-mcp-repo` option is now primarily for manual checking. Repository switching happens **automatically** based on the central `.update-config.json` file when you run normal updates.
 
 ### Examples
 
@@ -84,15 +93,61 @@ The update system manages three components:
 ```bash
 ./update.sh --auto
 # No prompts, applies all updates and rebuilds
+# Automatically switches repositories based on central config
 ```
 
-**Switch MCP repository:**
+**Check repository configuration:**
 ```bash
 ./update.sh --switch-mcp-repo
-# Choose between:
-# 1. Fork (current)
-# 2. Main (when fork is merged upstream)
+# Checks and applies central repository configuration
+# Note: This happens automatically during normal updates
 ```
+
+## Automatic Repository Switching
+
+### For Users
+
+Repository switching is now **fully automatic**. When you run `./update.sh`, the script:
+
+1. Fetches the central configuration from `.update-config.json`
+2. Compares your current repository URL with the preferred one
+3. Automatically switches if they differ (with confirmation in interactive mode)
+4. Rebuilds containers with the new repository
+
+You don't need to do anything special - just run your regular updates!
+
+### For Maintainers
+
+To switch all users to a different MCP repository (e.g., when the fork merges upstream):
+
+1. **Edit `.update-config.json` in the main repository:**
+```json
+{
+  "version": "1.0",
+  "mcp_repo_url": "https://github.com/meticulous/meticulous-mcp.git",
+  "description": "Central configuration for MeticAI update script",
+  "last_updated": "2026-01-13T20:47:00Z"
+}
+```
+
+2. **Commit and push the change:**
+```bash
+git add .update-config.json
+git commit -m "Switch to main MCP repository"
+git push
+```
+
+3. **That's it!** When users run `./update.sh` or `./update.sh --auto`, they will:
+   - Fetch the updated configuration
+   - See a notification about the repository change
+   - Automatically switch to the new repository (with confirmation in interactive mode)
+   - Have their containers rebuilt with the new dependency
+
+**Benefits:**
+- No user intervention required (in auto mode)
+- Centralized control
+- Safe backups created automatically
+- Works with CI/CD pipelines
 
 ## API Endpoint
 
