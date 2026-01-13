@@ -108,7 +108,7 @@ sudo docker compose up -d --build
 
 ## Updating MeticAI
 
-MeticAI includes an automated update script to keep all components up to date.
+MeticAI includes an automated update script to keep all components up to date. See [UPDATE_GUIDE.md](UPDATE_GUIDE.md) for comprehensive documentation.
 
 ### Quick Update
 
