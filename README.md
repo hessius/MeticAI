@@ -106,6 +106,151 @@ Note: Use sudo if your user does not have direct docker permissions
 sudo docker compose up -d --build
 ```
 
+## Updating MeticAI
+
+MeticAI includes an automated update script to keep all components up to date. See [UPDATE_GUIDE.md](UPDATE_GUIDE.md) for comprehensive documentation.
+
+### Quick Update
+
+To check for and install updates:
+
+```bash
+./update.sh
+```
+
+This will:
+1. Check for updates to MeticAI, meticulous-mcp, and meticai-web
+2. Show you what updates are available
+3. Prompt you to apply them
+4. Optionally rebuild and restart containers
+
+### Update Options
+
+**Check for updates without installing:**
+```bash
+./update.sh --check-only
+```
+
+**Automatic update (non-interactive):**
+```bash
+./update.sh --auto
+```
+
+**Check repository configuration:**
+```bash
+./update.sh --switch-mcp-repo
+```
+**Note:** Repository switching is now **automatic** based on central configuration. When maintainers update `.update-config.json`, all users will automatically switch to the new repository on their next update. The `--switch-mcp-repo` flag can be used to manually check and apply the central configuration.
+
+**Show help:**
+```bash
+./update.sh --help
+```
+
+### Automatic Repository Switching
+
+All repository URLs are controlled centrally via `.update-config.json` in the main repository. This allows maintainers to switch all users to different repositories without requiring manual intervention from each user.
+
+**How it works:**
+1. Maintainers update `.update-config.json` with the new repository URLs
+2. Users run `./update.sh` (or `./update.sh --auto`)
+3. The script automatically detects repository changes and switches
+4. Containers are rebuilt with the new dependencies
+
+**For maintainers:**
+To switch all users to different repositories, update the repository URLs in `.update-config.json`:
+```json
+{
+  "version": "1.1",
+  "description": "Central configuration for MeticAI update script",
+  "repositories": {
+    "meticulous-mcp": {
+      "url": "https://github.com/meticulous/meticulous-mcp.git",
+      "description": "Meticulous MCP server for machine control"
+    },
+    "meticai-web": {
+      "url": "https://github.com/your-org/MeticAI-web.git",
+      "description": "MeticAI web interface"
+    }
+  }
+}
+```
+
+### Update Status API
+
+Check for updates programmatically via the API:
+
+```bash
+curl http://<PI_IP>:8000/status
+```
+
+Returns:
+```json
+{
+  "update_available": true/false,
+  "last_check": "2026-01-13T19:45:00Z",
+  "repositories": {
+    "meticai": { "current_hash": "abc123...", "last_updated": "..." },
+    "meticulous-mcp": { "current_hash": "def456...", "repo_url": "...", "last_updated": "..." },
+    "meticai-web": { "current_hash": "ghi789...", "last_updated": "..." }
+  }
+}
+```
+
+The web interface can use this endpoint to show update notifications to users.
+
+### Automatic Update Notifications
+
+When you start the containers with `docker compose up` or run the install script, MeticAI automatically checks for updates and displays a notification if updates are available.
+
+### Update Workflow Example
+
+Here's a typical update workflow:
+
+```bash
+# 1. Check for updates
+./update.sh --check-only
+
+# Output shows which components have updates:
+# 📦 MeticAI Main Repository
+#    ✓ Up to date
+# 📦 Meticulous MCP
+#    ⚠ Update available
+#    Current: abc123
+#    Latest:  def456
+# 📦 MeticAI Web Interface
+#    ✓ Up to date
+
+# 2. Apply updates (interactive)
+./update.sh
+# You'll be prompted to confirm and optionally rebuild containers
+
+# 3. Or apply updates automatically (non-interactive)
+./update.sh --auto
+# Updates and rebuilds without prompts - great for automation
+
+# 4. Switch MCP repository when fork merges upstream
+./update.sh --switch-mcp-repo
+# Choose between fork and main repository
+```
+
+### Integration with Web Applications
+
+Web applications can poll the `/status` endpoint to check for updates and display notifications:
+
+```javascript
+// Example: Check for updates every hour
+setInterval(async () => {
+  const response = await fetch('http://YOUR_PI_IP:8000/status');
+  const data = await response.json();
+  
+  if (data.update_available) {
+    // Show notification to user
+    showUpdateNotification('Updates available for MeticAI!');
+  }
+}, 3600000); // 1 hour
+```
+
 ## Usage
 
 MeticAI can be controlled through multiple interfaces:
@@ -490,9 +635,19 @@ pytest test_main.py -v --cov=main
 bats tests/test_local_install.bats
 ```
 
+**Update Script Tests:**
+```bash
+bats tests/test_update.bats
+```
+
 ### Test Coverage
-- **Python**: 100% code coverage (26 tests)
-- **Bash**: 20 critical functionality tests
+- **Python**: 100% code coverage (38 tests)
+  - 26 core functionality tests
+  - 8 status endpoint tests
+  - 4 CORS tests
+- **Bash**: 38 critical functionality tests
+  - 20 installation script tests
+  - 18 update script tests
 
 See [tests/README.md](tests/README.md) for detailed testing documentation and [TEST_COVERAGE.md](TEST_COVERAGE.md) for coverage metrics.
 

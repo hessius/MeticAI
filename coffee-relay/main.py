@@ -6,6 +6,8 @@ from PIL import Image
 import io
 import os
 import subprocess
+import json
+from pathlib import Path
 
 app = FastAPI()
 
@@ -199,4 +201,53 @@ async def analyze_and_profile(
             "status": "error",
             "analysis": coffee_analysis if coffee_analysis else None,
             "message": str(e)
+        }
+
+@app.get("/status")
+async def get_status():
+    """Get system status including update availability.
+    
+    Returns:
+        - update_available: Whether updates are available for any component
+        - last_check: Timestamp of last update check
+        - repositories: Status of each repository (main, mcp, web)
+    """
+    try:
+        # Run update check script
+        result = subprocess.run(
+            ["bash", "/app/../update.sh", "--check-only"],
+            capture_output=True,
+            text=True,
+            cwd="/app/.."
+        )
+        
+        # Read version file to get detailed status
+        version_file_path = Path("/app/../.versions.json")
+        update_status = {
+            "update_available": False,
+            "last_check": None,
+            "repositories": {}
+        }
+        
+        if version_file_path.exists():
+            with open(version_file_path, 'r') as f:
+                version_data = json.load(f)
+                update_status["last_check"] = version_data.get("last_check")
+                update_status["repositories"] = version_data.get("repositories", {})
+        
+        # Check if updates are mentioned in output
+        if "Update available" in result.stdout or "⚠" in result.stdout:
+            update_status["update_available"] = True
+        
+        # Check individual repositories by examining output
+        if "Not installed" in result.stdout or "✗" in result.stdout:
+            update_status["update_available"] = True
+        
+        return update_status
+        
+    except Exception as e:
+        return {
+            "update_available": False,
+            "error": str(e),
+            "message": "Could not check for updates"
         }
