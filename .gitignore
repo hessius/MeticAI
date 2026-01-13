@@ -29,3 +29,9 @@ htmlcov/
 *.cover
 .hypothesis/
 .tox/
+
+# Update tracking
+.versions.json
+
+# Web app (cloned dependency)
+meticai-web/

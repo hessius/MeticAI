@@ -691,3 +691,134 @@ class TestCORS:
         assert response.status_code == 200
         assert "access-control-allow-credentials" in response.headers
         assert response.headers["access-control-allow-credentials"] == "true"
+
+
+class TestStatusEndpoint:
+    """Tests for the /status endpoint."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_status_endpoint_exists(self, mock_subprocess, client):
+        """Test that /status endpoint exists and is accessible."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "✓ Everything is up to date!"
+        mock_subprocess.return_value = mock_result
+
+        response = client.get("/status")
+        assert response.status_code == 200
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.Path')
+    def test_status_returns_json_structure(self, mock_path, mock_subprocess, client):
+        """Test that /status returns expected JSON structure."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "✓ Up to date"
+        mock_subprocess.return_value = mock_result
+
+        # Mock version file
+        mock_version_file = Mock()
+        mock_version_file.exists.return_value = True
+        mock_path.return_value = mock_version_file
+        
+        with patch('builtins.open', create=True) as mock_open:
+            mock_open.return_value.__enter__.return_value.read.return_value = '{"last_check": "2026-01-13T00:00:00Z", "repositories": {}}'
+            
+            response = client.get("/status")
+            
+        assert response.status_code == 200
+        data = response.json()
+        assert "update_available" in data
+        assert "last_check" in data or "error" in data
+        assert isinstance(data.get("update_available"), bool) or "error" in data
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_status_detects_updates_available(self, mock_subprocess, client):
+        """Test that /status correctly identifies when updates are available."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "⚠ Update available\nMeticulous MCP needs update"
+        mock_subprocess.return_value = mock_result
+
+        response = client.get("/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("update_available") == True
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_status_detects_missing_dependencies(self, mock_subprocess, client):
+        """Test that /status identifies missing dependencies as requiring updates."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "✗ Not installed\nMeticulous MCP not found"
+        mock_subprocess.return_value = mock_result
+
+        response = client.get("/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("update_available") == True
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.Path')
+    def test_status_handles_missing_version_file(self, mock_path, mock_subprocess, client):
+        """Test that /status handles missing version file gracefully."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Checking..."
+        mock_subprocess.return_value = mock_result
+
+        # Mock version file as not existing
+        mock_version_file = Mock()
+        mock_version_file.exists.return_value = False
+        mock_path.return_value = mock_version_file
+
+        response = client.get("/status")
+        assert response.status_code == 200
+        data = response.json()
+        # Should still return a valid response
+        assert "update_available" in data
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_status_handles_script_error(self, mock_subprocess, client):
+        """Test that /status handles update script errors gracefully."""
+        # Simulate script error
+        mock_subprocess.side_effect = Exception("Script not found")
+
+        response = client.get("/status")
+        assert response.status_code == 200
+        data = response.json()
+        # Should return error information
+        assert "error" in data or "message" in data
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_status_endpoint_cors_enabled(self, mock_subprocess, client):
+        """Test that /status endpoint has CORS enabled for web app."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Up to date"
+        mock_subprocess.return_value = mock_result
+
+        response = client.get(
+            "/status",
+            headers={"Origin": "http://localhost:3550"}
+        )
+
+        assert response.status_code == 200
+        assert "access-control-allow-origin" in response.headers
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_status_in_openapi_schema(self, client):
+        """Test that /status endpoint is registered in OpenAPI schema."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        
+        openapi_data = response.json()
+        assert "/status" in openapi_data["paths"]
+        assert "get" in openapi_data["paths"]["/status"]

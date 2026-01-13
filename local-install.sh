@@ -448,6 +448,13 @@ if sudo docker compose up -d --build; then
     echo "To test the connection, copy/paste this command:"
     echo -e "${BLUE}curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/analyze_and_profile${NC}"
     echo ""
+    echo -e "${YELLOW}💡 Tip: Run './update.sh' anytime to check for updates to MeticAI and dependencies${NC}"
+    echo ""
+    
+    # Run startup update check
+    if [ -f "./check-updates-on-start.sh" ]; then
+        ./check-updates-on-start.sh
+    fi
 else
     echo ""
     echo -e "${RED}❌ Installation failed during Docker build.${NC}"
