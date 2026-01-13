@@ -174,6 +174,54 @@ The web interface can use this endpoint to show update notifications to users.
 
 When you start the containers with `docker compose up` or run the install script, MeticAI automatically checks for updates and displays a notification if updates are available.
 
+### Update Workflow Example
+
+Here's a typical update workflow:
+
+```bash
+# 1. Check for updates
+./update.sh --check-only
+
+# Output shows which components have updates:
+# 📦 MeticAI Main Repository
+#    ✓ Up to date
+# 📦 Meticulous MCP
+#    ⚠ Update available
+#    Current: abc123
+#    Latest:  def456
+# 📦 MeticAI Web Interface
+#    ✓ Up to date
+
+# 2. Apply updates (interactive)
+./update.sh
+# You'll be prompted to confirm and optionally rebuild containers
+
+# 3. Or apply updates automatically (non-interactive)
+./update.sh --auto
+# Updates and rebuilds without prompts - great for automation
+
+# 4. Switch MCP repository when fork merges upstream
+./update.sh --switch-mcp-repo
+# Choose between fork and main repository
+```
+
+### Integration with Web Applications
+
+Web applications can poll the `/status` endpoint to check for updates and display notifications:
+
+```javascript
+// Example: Check for updates every hour
+setInterval(async () => {
+  const response = await fetch('http://YOUR_PI_IP:8000/status');
+  const data = await response.json();
+  
+  if (data.update_available) {
+    // Show notification to user
+    showUpdateNotification('Updates available for MeticAI!');
+  }
+}, 3600000); // 1 hour
+```
+
 ## Usage
 
 MeticAI can be controlled through multiple interfaces:
@@ -558,9 +606,19 @@ pytest test_main.py -v --cov=main
 bats tests/test_local_install.bats
 ```
 
+**Update Script Tests:**
+```bash
+bats tests/test_update.bats
+```
+
 ### Test Coverage
-- **Python**: 100% code coverage (26 tests)
-- **Bash**: 20 critical functionality tests
+- **Python**: 100% code coverage (38 tests)
+  - 26 core functionality tests
+  - 8 status endpoint tests
+  - 4 CORS tests
+- **Bash**: 38 critical functionality tests
+  - 20 installation script tests
+  - 18 update script tests
 
 See [tests/README.md](tests/README.md) for detailed testing documentation and [TEST_COVERAGE.md](TEST_COVERAGE.md) for coverage metrics.
 
