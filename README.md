@@ -149,21 +149,30 @@ This will:
 
 ### Automatic Repository Switching
 
-The MCP repository URL is controlled centrally via `.update-config.json` in the main repository. This allows maintainers to switch all users from the fork to the main repository (or any other repository) without requiring manual intervention from each user.
+All repository URLs are controlled centrally via `.update-config.json` in the main repository. This allows maintainers to switch all users to different repositories without requiring manual intervention from each user.
 
 **How it works:**
-1. Maintainers update `.update-config.json` with the new repository URL
+1. Maintainers update `.update-config.json` with the new repository URLs
 2. Users run `./update.sh` (or `./update.sh --auto`)
-3. The script automatically detects the repository change and switches
-4. Containers are rebuilt with the new dependency
+3. The script automatically detects repository changes and switches
+4. Containers are rebuilt with the new dependencies
 
 **For maintainers:**
-To switch all users to a different MCP repository, update the `mcp_repo_url` field in `.update-config.json`:
+To switch all users to different repositories, update the repository URLs in `.update-config.json`:
 ```json
 {
-  "version": "1.0",
-  "mcp_repo_url": "https://github.com/meticulous/meticulous-mcp.git",
-  "description": "Central configuration for MeticAI update script"
+  "version": "1.1",
+  "description": "Central configuration for MeticAI update script",
+  "repositories": {
+    "meticulous-mcp": {
+      "url": "https://github.com/meticulous/meticulous-mcp.git",
+      "description": "Meticulous MCP server for machine control"
+    },
+    "meticai-web": {
+      "url": "https://github.com/your-org/MeticAI-web.git",
+      "description": "MeticAI web interface"
+    }
+  }
 }
 ```
 

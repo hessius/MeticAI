@@ -1,6 +1,15 @@
 {
-  "version": "1.0",
-  "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp.git",
-  "description": "Central configuration for MeticAI update script. Change mcp_repo_url to switch all users to a different repository.",
-  "last_updated": "2026-01-13T20:47:00Z"
+  "version": "1.1",
+  "description": "Central configuration for MeticAI update script. Maintainers can update repository URLs to switch all users to different repositories.",
+  "last_updated": "2026-01-13T21:38:00Z",
+  "repositories": {
+    "meticulous-mcp": {
+      "url": "https://github.com/manonstreet/meticulous-mcp.git",
+      "description": "Meticulous MCP server for machine control"
+    },
+    "meticai-web": {
+      "url": "https://github.com/hessius/MeticAI-web.git",
+      "description": "MeticAI web interface"
+    }
+  }
 }

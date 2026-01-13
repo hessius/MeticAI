@@ -107,47 +107,57 @@ The update system manages three components:
 
 ### For Users
 
-Repository switching is now **fully automatic**. When you run `./update.sh`, the script:
+Repository switching is now **fully automatic** for all dependencies. When you run `./update.sh`, the script:
 
 1. Fetches the central configuration from `.update-config.json`
-2. Compares your current repository URL with the preferred one
+2. Compares your current repository URLs with the preferred ones
 3. Automatically switches if they differ (with confirmation in interactive mode)
-4. Rebuilds containers with the new repository
+4. Rebuilds containers with the new repositories
 
 You don't need to do anything special - just run your regular updates!
 
 ### For Maintainers
 
-To switch all users to a different MCP repository (e.g., when the fork merges upstream):
+To switch all users to different repositories (e.g., when the fork merges upstream or dependencies change):
 
 1. **Edit `.update-config.json` in the main repository:**
 ```json
 {
-  "version": "1.0",
-  "mcp_repo_url": "https://github.com/meticulous/meticulous-mcp.git",
+  "version": "1.1",
   "description": "Central configuration for MeticAI update script",
-  "last_updated": "2026-01-13T20:47:00Z"
+  "last_updated": "2026-01-13T21:38:00Z",
+  "repositories": {
+    "meticulous-mcp": {
+      "url": "https://github.com/meticulous/meticulous-mcp.git",
+      "description": "Meticulous MCP server for machine control"
+    },
+    "meticai-web": {
+      "url": "https://github.com/your-org/MeticAI-web.git",
+      "description": "MeticAI web interface"
+    }
+  }
 }
 ```
 
 2. **Commit and push the change:**
 ```bash
 git add .update-config.json
-git commit -m "Switch to main MCP repository"
+git commit -m "Switch to new repository URLs"
 git push
 ```
 
 3. **That's it!** When users run `./update.sh` or `./update.sh --auto`, they will:
    - Fetch the updated configuration
-   - See a notification about the repository change
-   - Automatically switch to the new repository (with confirmation in interactive mode)
-   - Have their containers rebuilt with the new dependency
+   - See notifications about any repository changes
+   - Automatically switch to the new repositories (with confirmation in interactive mode)
+   - Have their containers rebuilt with the new dependencies
 
 **Benefits:**
+- Control all dependency repositories centrally
 - No user intervention required (in auto mode)
-- Centralized control
 - Safe backups created automatically
 - Works with CI/CD pipelines
+- Backward compatible with v1.0 config format
 
 ## API Endpoint
 

@@ -150,9 +150,15 @@ get_preferred_mcp_url() {
     
     # Try to read from local config file
     if [ -f "$LOCAL_CONFIG_FILE" ]; then
-        # Extract mcp_repo_url using grep and sed (portable)
-        local preferred_url=$(grep '"mcp_repo_url"' "$LOCAL_CONFIG_FILE" | sed 's/.*"mcp_repo_url"[^"]*"\([^"]*\)".*/\1/')
-        if [ -n "$preferred_url" ] && [ "$preferred_url" != "mcp_repo_url" ]; then
+        # Try new JSON structure first (v1.1+)
+        local preferred_url=$(grep -A 1 '"meticulous-mcp"' "$LOCAL_CONFIG_FILE" | grep '"url"' | sed 's/.*"url"[^"]*"\([^"]*\)".*/\1/')
+        
+        # Fallback to old structure (v1.0)
+        if [ -z "$preferred_url" ] || [ "$preferred_url" = "url" ]; then
+            preferred_url=$(grep '"mcp_repo_url"' "$LOCAL_CONFIG_FILE" | sed 's/.*"mcp_repo_url"[^"]*"\([^"]*\)".*/\1/')
+        fi
+        
+        if [ -n "$preferred_url" ] && [ "$preferred_url" != "url" ] && [ "$preferred_url" != "mcp_repo_url" ]; then
             echo "$preferred_url"
             return 0
         fi
@@ -160,6 +166,27 @@ get_preferred_mcp_url() {
     
     # Fallback to fork URL if config not available
     echo "$MCP_FORK_URL"
+    return 0
+}
+
+# Function to get preferred Web App repository URL from config
+get_preferred_web_url() {
+    # Try to fetch latest config
+    fetch_central_config 2>/dev/null
+    
+    # Try to read from local config file
+    if [ -f "$LOCAL_CONFIG_FILE" ]; then
+        # Extract web app URL from new JSON structure (v1.1+)
+        local preferred_url=$(grep -A 1 '"meticai-web"' "$LOCAL_CONFIG_FILE" | grep '"url"' | sed 's/.*"url"[^"]*"\([^"]*\)".*/\1/')
+        
+        if [ -n "$preferred_url" ] && [ "$preferred_url" != "url" ]; then
+            echo "$preferred_url"
+            return 0
+        fi
+    fi
+    
+    # Fallback to default URL if config not available
+    echo "$WEB_APP_URL"
     return 0
 }
 
@@ -233,6 +260,94 @@ perform_mcp_repo_switch() {
         echo -e "${RED}✗ Failed to clone new repository${NC}"
         echo "Restoring backup..."
         mv "$backup_dir" "$SCRIPT_DIR/meticulous-source"
+        return 1
+    fi
+}
+
+# Function to check if Web App repository needs switching
+check_and_switch_web_repo() {
+    if [ ! -d "$SCRIPT_DIR/meticai-web" ]; then
+        # Not installed yet, will use preferred URL during installation
+        return 0
+    fi
+    
+    local current_url=$(get_remote_url "$SCRIPT_DIR/meticai-web")
+    local preferred_url=$(get_preferred_web_url)
+    
+    # Normalize URLs for comparison (remove trailing slashes and .git)
+    current_url=$(echo "$current_url" | sed 's/\.git$//' | sed 's/\/$//')
+    preferred_url=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
+    
+    if [ "$current_url" != "$preferred_url" ]; then
+        echo -e "${YELLOW}Web App repository switch detected!${NC}"
+        echo "Current:  $current_url"
+        echo "Required: $preferred_url"
+        echo ""
+        
+        # Automatically switch in auto mode, or prompt in interactive mode
+        local should_switch=false
+        if [ "$AUTO_MODE" = true ]; then
+            should_switch=true
+            echo "Auto mode: switching automatically..."
+        else
+            read -r -p "Switch to required repository? (y/n) [y]: " SWITCH_CONFIRM </dev/tty
+            SWITCH_CONFIRM=${SWITCH_CONFIRM:-y}
+            if [[ "$SWITCH_CONFIRM" =~ ^[Yy]$ ]]; then
+                should_switch=true
+            fi
+        fi
+        
+        if [ "$should_switch" = true ]; then
+            perform_web_repo_switch "$preferred_url"
+            return $?
+        else
+            echo -e "${YELLOW}Keeping current repository${NC}"
+            return 0
+        fi
+    fi
+    
+    return 0
+}
+
+# Function to perform the actual Web App repository switch
+perform_web_repo_switch() {
+    local new_url="$1"
+    
+    echo ""
+    echo -e "${YELLOW}Switching Web App repository to: $new_url${NC}"
+    
+    # Backup current state
+    echo "Backing up current installation..."
+    local backup_dir="$SCRIPT_DIR/meticai-web.backup.$(date +%s)"
+    cp -r "$SCRIPT_DIR/meticai-web" "$backup_dir"
+    
+    # Remove old and clone new
+    rm -rf "$SCRIPT_DIR/meticai-web"
+    
+    if git clone "$new_url" "$SCRIPT_DIR/meticai-web"; then
+        echo -e "${GREEN}✓ Repository switched successfully${NC}"
+        echo "Backup saved to: $backup_dir"
+        
+        # Regenerate config.json if .env exists
+        if [ -f "$SCRIPT_DIR/.env" ]; then
+            # shellcheck disable=SC1091
+            source "$SCRIPT_DIR/.env"
+            mkdir -p meticai-web/public
+            cat > meticai-web/public/config.json <<WEBCONFIG
+{
+  "serverUrl": "http://$PI_IP:8000"
+}
+WEBCONFIG
+            echo -e "${GREEN}✓ Web app configured${NC}"
+        fi
+        
+        echo ""
+        echo -e "${YELLOW}Note: Containers will be rebuilt to apply changes${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Failed to clone new repository${NC}"
+        echo "Restoring backup..."
+        mv "$backup_dir" "$SCRIPT_DIR/meticai-web"
         return 1
     fi
 }
@@ -403,7 +518,11 @@ update_web() {
     else
         echo -e "${YELLOW}Installing MeticAI Web Interface...${NC}"
         cd "$SCRIPT_DIR"
-        if git clone "$WEB_APP_URL" meticai-web; then
+        
+        # Use preferred URL from central config
+        local preferred_url=$(get_preferred_web_url)
+        
+        if git clone "$preferred_url" meticai-web; then
             echo -e "${GREEN}✓ MeticAI Web installed successfully${NC}"
             
             # Generate config.json if needed
@@ -494,14 +613,16 @@ main() {
     # Handle MCP repository switch if requested (deprecated - now automatic)
     if $SWITCH_MCP_REPO; then
         echo -e "${YELLOW}Note: Repository switching is now automatic based on central configuration.${NC}"
-        echo -e "${YELLOW}Checking for required repository...${NC}"
+        echo -e "${YELLOW}Checking for required repositories...${NC}"
         echo ""
         check_and_switch_mcp_repo
+        check_and_switch_web_repo
         exit $?
     fi
     
-    # Check if MCP repository needs switching (automatic based on central config)
+    # Check if repositories need switching (automatic based on central config)
     check_and_switch_mcp_repo
+    check_and_switch_web_repo
     
     # Check for updates
     if check_for_updates; then
