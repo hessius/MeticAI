@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp.git",
+  "description": "Central configuration for MeticAI update script. Change mcp_repo_url to switch all users to a different repository.",
+  "last_updated": "2026-01-13T20:47:00Z"
+}

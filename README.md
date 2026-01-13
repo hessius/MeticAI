@@ -136,15 +136,35 @@ This will:
 ./update.sh --auto
 ```
 
-**Switch MCP repository (fork ↔ main):**
+**Check repository configuration:**
 ```bash
 ./update.sh --switch-mcp-repo
 ```
-This is useful when the meticulous-mcp fork gets merged into the main repository.
+**Note:** Repository switching is now **automatic** based on central configuration. When maintainers update `.update-config.json`, all users will automatically switch to the new repository on their next update. The `--switch-mcp-repo` flag can be used to manually check and apply the central configuration.
 
 **Show help:**
 ```bash
 ./update.sh --help
+```
+
+### Automatic Repository Switching
+
+The MCP repository URL is controlled centrally via `.update-config.json` in the main repository. This allows maintainers to switch all users from the fork to the main repository (or any other repository) without requiring manual intervention from each user.
+
+**How it works:**
+1. Maintainers update `.update-config.json` with the new repository URL
+2. Users run `./update.sh` (or `./update.sh --auto`)
+3. The script automatically detects the repository change and switches
+4. Containers are rebuilt with the new dependency
+
+**For maintainers:**
+To switch all users to a different MCP repository, update the `mcp_repo_url` field in `.update-config.json`:
+```json
+{
+  "version": "1.0",
+  "mcp_repo_url": "https://github.com/meticulous/meticulous-mcp.git",
+  "description": "Central configuration for MeticAI update script"
+}
 ```
 
 ### Update Status API
