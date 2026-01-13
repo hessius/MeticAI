@@ -106,6 +106,74 @@ Note: Use sudo if your user does not have direct docker permissions
 sudo docker compose up -d --build
 ```
 
+## Updating MeticAI
+
+MeticAI includes an automated update script to keep all components up to date.
+
+### Quick Update
+
+To check for and install updates:
+
+```bash
+./update.sh
+```
+
+This will:
+1. Check for updates to MeticAI, meticulous-mcp, and meticai-web
+2. Show you what updates are available
+3. Prompt you to apply them
+4. Optionally rebuild and restart containers
+
+### Update Options
+
+**Check for updates without installing:**
+```bash
+./update.sh --check-only
+```
+
+**Automatic update (non-interactive):**
+```bash
+./update.sh --auto
+```
+
+**Switch MCP repository (fork ↔ main):**
+```bash
+./update.sh --switch-mcp-repo
+```
+This is useful when the meticulous-mcp fork gets merged into the main repository.
+
+**Show help:**
+```bash
+./update.sh --help
+```
+
+### Update Status API
+
+Check for updates programmatically via the API:
+
+```bash
+curl http://<PI_IP>:8000/status
+```
+
+Returns:
+```json
+{
+  "update_available": true/false,
+  "last_check": "2026-01-13T19:45:00Z",
+  "repositories": {
+    "meticai": { "current_hash": "abc123...", "last_updated": "..." },
+    "meticulous-mcp": { "current_hash": "def456...", "repo_url": "...", "last_updated": "..." },
+    "meticai-web": { "current_hash": "ghi789...", "last_updated": "..." }
+  }
+}
+```
+
+The web interface can use this endpoint to show update notifications to users.
+
+### Automatic Update Notifications
+
+When you start the containers with `docker compose up` or run the install script, MeticAI automatically checks for updates and displays a notification if updates are available.
+
 ## Usage
 
 MeticAI can be controlled through multiple interfaces:
