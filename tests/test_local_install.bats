@@ -118,6 +118,31 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "Script contains macOS dock shortcut creation function" {
+    run grep -q "create_macos_dock_shortcut" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script prompts for dock shortcut on macOS" {
+    run grep -q "Would you like to add a MeticAI shortcut" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script creates .app bundle structure for macOS" {
+    run grep -q "Applications/.*\.app" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script creates Info.plist for macOS app" {
+    run grep -q "Info.plist" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script only offers dock shortcut on macOS" {
+    run grep -q 'if \[\[ "$OSTYPE" == "darwin"\* \]\]; then' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
 @test "Script exits on docker not found" {
     run grep -q "Error: docker is not installed" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
