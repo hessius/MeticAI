@@ -265,12 +265,17 @@ async def trigger_update():
         - error: stderr from the update script (if any)
     """
     try:
+        # Resolve script path to prevent path traversal attacks
+        script_path = Path("/app/../update.sh").resolve()
+        
         # Run update script with --auto flag for non-interactive mode
+        # Timeout set to 10 minutes to prevent hanging processes
         result = subprocess.run(
-            ["bash", "/app/../update.sh", "--auto"],
+            ["bash", str(script_path), "--auto"],
             capture_output=True,
             text=True,
-            cwd="/app/.."
+            cwd=script_path.parent,
+            timeout=600  # 10 minutes timeout
         )
         
         if result.returncode == 0:
@@ -289,6 +294,15 @@ async def trigger_update():
                     "message": "Update script failed"
                 }
             )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "error": "Update script timed out after 10 minutes",
+                "message": "Update script execution exceeded timeout"
+            }
+        )
     except subprocess.SubprocessError as e:
         raise HTTPException(
             status_code=500,

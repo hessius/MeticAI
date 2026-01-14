@@ -850,7 +850,7 @@ class TestTriggerUpdateEndpoint:
         mock_subprocess.assert_called_once()
         call_args = mock_subprocess.call_args[0][0]
         assert "bash" in call_args
-        assert "/app/../update.sh" in call_args
+        assert "update.sh" in call_args[1]  # Resolved path contains update.sh
         assert "--auto" in call_args
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
@@ -988,3 +988,39 @@ Checking for updates...
         assert "detail" in data
         assert "status" in str(data["detail"])
         assert "error" in str(data["detail"])
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_timeout(self, mock_subprocess, client):
+        """Test handling when update script times out."""
+        mock_subprocess.side_effect = subprocess.TimeoutExpired(
+            cmd=["bash", "update.sh", "--auto"],
+            timeout=600
+        )
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        assert "timeout" in str(data["detail"]).lower()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_path_resolution(self, mock_subprocess, client):
+        """Test that script path is properly resolved."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 200
+        # Verify subprocess was called with resolved path
+        call_args = mock_subprocess.call_args
+        # First positional argument should be the command list
+        cmd_list = call_args[0][0]
+        # The script path should not contain '..'
+        assert ".." not in cmd_list[1]
