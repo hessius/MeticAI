@@ -265,8 +265,9 @@ async def trigger_update():
         - error: stderr from the update script (if any)
     """
     try:
-        # Resolve script path to prevent path traversal attacks
-        script_path = Path("/app/../update.sh").resolve()
+        # Construct and resolve the absolute path to the update script
+        # The script is in the parent directory of the coffee-relay app
+        script_path = (Path(__file__).parent.parent / "update.sh").resolve()
         
         # Run update script with --auto flag for non-interactive mode
         # Timeout set to 10 minutes to prevent hanging processes
