@@ -48,6 +48,7 @@ This one-liner will:
 4. Guide you through configuration (API keys, IP addresses)
 5. Clone the required MCP source repository and web application
 6. Build and launch all containers (including web interface)
+7. **Display a QR code** for easy mobile access to the web interface
 
 #### Option B: Local Installation
 If you prefer to clone the repository first:
@@ -65,6 +66,9 @@ The script will:
 2. Guide you through configuration (API keys, IP addresses)
 3. Clone the required MCP source repository and web application
 4. Build and launch all containers (including web interface)
+5. **Display a QR code** for easy mobile access to the web interface
+
+**Note:** After successful installation, you'll see a QR code that links directly to the web interface. Scan it with your mobile device for instant access! The QR code feature uses `qrencode` if available, or shows a helpful fallback with the URL if not.
 
 ### 3. Manual Setup (Alternative)
 If you prefer to install dependencies manually or are running on an unsupported OS:
