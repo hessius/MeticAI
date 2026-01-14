@@ -111,16 +111,12 @@ create_macos_dock_shortcut() {
     mkdir -p "${app_path}/Contents/MacOS"
     mkdir -p "${app_path}/Contents/Resources"
     
-    # Create the executable script
-    cat > "${app_path}/Contents/MacOS/${app_name}" << 'SCRIPT_EOF'
+    # Create the executable script with URL directly embedded
+    cat > "${app_path}/Contents/MacOS/${app_name}" << SCRIPT_EOF
 #!/bin/bash
 # MeticAI Web App Launcher
-URL="URL_PLACEHOLDER"
-open "$URL"
+open "${url}"
 SCRIPT_EOF
-    
-    # Replace placeholder with actual URL
-    sed -i '' "s|URL_PLACEHOLDER|${url}|g" "${app_path}/Contents/MacOS/${app_name}"
     
     # Make the script executable
     chmod +x "${app_path}/Contents/MacOS/${app_name}"
@@ -152,9 +148,6 @@ SCRIPT_EOF
 </dict>
 </plist>
 PLIST_EOF
-    
-    # Create a simple icon using iconutil if available
-    # For now, we'll skip custom icon - macOS will use default
     
     echo -e "${GREEN}✓ Dock shortcut created at: ${app_path}${NC}"
     echo -e "${YELLOW}  The MeticAI app will appear in your Applications folder.${NC}"
