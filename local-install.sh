@@ -37,6 +37,67 @@ echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
+# Generate and display ASCII QR code for a URL
+generate_qr_code() {
+    local url="$1"
+    
+    echo ""
+    echo -e "${GREEN}=========================================${NC}"
+    echo -e "${GREEN}     📱 Scan to Access Web App 📱      ${NC}"
+    echo -e "${GREEN}=========================================${NC}"
+    echo ""
+    
+    # Try to use qrencode if available (common on many Linux systems)
+    if command -v qrencode &> /dev/null; then
+        qrencode -t ansiutf8 "$url" 2>/dev/null
+        echo ""
+        echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
+        echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
+        echo ""
+        return
+    fi
+    
+    # Try Python with qrcode library (if available)
+    if command -v python3 &> /dev/null; then
+        local python_result
+        python_result=$(python3 -c "
+try:
+    import qrcode
+    qr = qrcode.QRCode()
+    qr.add_data('$url')
+    qr.print_ascii()
+    print('SUCCESS')
+except:
+    print('FAILED')
+" 2>/dev/null)
+        
+        if echo "$python_result" | grep -q "SUCCESS"; then
+            echo "$python_result" | grep -v "SUCCESS"
+            echo ""
+            echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
+            echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
+            echo ""
+            return
+        fi
+    fi
+    
+    # Fallback: Show a simple box with the URL
+    echo -e "${YELLOW}┌──────────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│                                              │${NC}"
+    echo -e "${YELLOW}│  ${GREEN}✓${YELLOW} QR Code generation not available       │${NC}"
+    echo -e "${YELLOW}│                                              │${NC}"
+    echo -e "${YELLOW}│  Open this URL on your mobile device:       │${NC}"
+    echo -e "${YELLOW}│                                              │${NC}"
+    echo -e "${YELLOW}│  ${BLUE}${url}${YELLOW}│${NC}"
+    echo -e "${YELLOW}│                                              │${NC}"
+    echo -e "${YELLOW}│  💡 Tip: Install qrencode for QR codes:     │${NC}"
+    echo -e "${YELLOW}│     apt install qrencode  (Debian/Ubuntu)    │${NC}"
+    echo -e "${YELLOW}│     brew install qrencode (macOS)            │${NC}"
+    echo -e "${YELLOW}│                                              │${NC}"
+    echo -e "${YELLOW}└──────────────────────────────────────────────┘${NC}"
+    echo ""
+}
+
 # Detect OS
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -445,6 +506,10 @@ if sudo docker compose up -d --build; then
     echo -e "👉 **Relay API:** http://$PI_IP:8000"
     echo -e "👉 **Meticulous:** http://$MET_IP (via Agent)"
     echo ""
+    
+    # Display QR code for easy mobile access
+    generate_qr_code "http://$PI_IP:3550"
+    
     echo "To test the connection, copy/paste this command:"
     echo -e "${BLUE}curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/analyze_and_profile${NC}"
     echo ""
