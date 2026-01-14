@@ -73,7 +73,7 @@ The script will:
 
 **Note:** After successful installation, you'll see a QR code that links directly to the web interface. Scan it with your mobile device for instant access! The QR code feature uses `qrencode` if available, or shows a helpful fallback with the URL if not.
 
-**macOS Users:** During installation, you'll be prompted to create an application shortcut that opens MeticAI in your default browser. This creates a `.app` bundle in your Applications folder that you can add to your Dock for quick access.
+**macOS Users:** During installation, you'll be prompted to create an application shortcut that opens MeticAI in your default browser. This creates a `.app` bundle in your Applications folder that you can add to your Dock for quick access. To skip this prompt in automated installations, set the environment variable `SKIP_DOCK_SHORTCUT=true`.
 
 ### 3. Manual Setup (Alternative)
 If you prefer to install dependencies manually or are running on an unsupported OS:

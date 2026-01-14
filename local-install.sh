@@ -104,6 +104,12 @@ create_macos_dock_shortcut() {
     local app_name="MeticAI"
     local app_path="$HOME/Applications/${app_name}.app"
     
+    # Validate URL format (basic check for http/https)
+    if [[ ! "$url" =~ ^https?:// ]]; then
+        echo -e "${RED}Error: Invalid URL format. Skipping dock shortcut creation.${NC}"
+        return 1
+    fi
+    
     echo ""
     echo -e "${YELLOW}Creating macOS dock shortcut...${NC}"
     
@@ -111,12 +117,13 @@ create_macos_dock_shortcut() {
     mkdir -p "${app_path}/Contents/MacOS"
     mkdir -p "${app_path}/Contents/Resources"
     
-    # Create the executable script with URL directly embedded
-    cat > "${app_path}/Contents/MacOS/${app_name}" << SCRIPT_EOF
+    # Create the executable script with properly escaped URL
+    # Using printf to avoid shell expansion issues
+    cat > "${app_path}/Contents/MacOS/${app_name}" << 'SCRIPT_EOF'
 #!/bin/bash
 # MeticAI Web App Launcher
-open "${url}"
 SCRIPT_EOF
+    printf 'open "%s"\n' "$url" >> "${app_path}/Contents/MacOS/${app_name}"
     
     # Make the script executable
     chmod +x "${app_path}/Contents/MacOS/${app_name}"
@@ -142,7 +149,7 @@ SCRIPT_EOF
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.10</string>
+    <string>10.15</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>
@@ -566,16 +573,19 @@ if sudo docker compose up -d --build; then
     # Display QR code for easy mobile access
     generate_qr_code "http://$PI_IP:3550"
     
-    # Offer macOS dock shortcut creation
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo ""
-        read -r -p "Would you like to add a MeticAI shortcut to your Applications folder? (y/n) [y]: " CREATE_DOCK_SHORTCUT </dev/tty
-        CREATE_DOCK_SHORTCUT=${CREATE_DOCK_SHORTCUT:-y}
-        
-        if [[ "$CREATE_DOCK_SHORTCUT" =~ ^[Yy]$ ]]; then
-            create_macos_dock_shortcut "http://$PI_IP:3550"
-        else
-            echo -e "${YELLOW}Skipping dock shortcut creation.${NC}"
+    # Offer macOS dock shortcut creation (only in interactive mode)
+    if [[ "$OSTYPE" == "darwin"* ]] && [[ -t 0 ]]; then
+        # Check if user wants to skip via environment variable
+        if [[ "${SKIP_DOCK_SHORTCUT}" != "true" ]]; then
+            echo ""
+            read -r -p "Would you like to add a MeticAI shortcut to your Applications folder? (y/n) [y]: " CREATE_DOCK_SHORTCUT </dev/tty
+            CREATE_DOCK_SHORTCUT=${CREATE_DOCK_SHORTCUT:-y}
+            
+            if [[ "$CREATE_DOCK_SHORTCUT" =~ ^[Yy]$ ]]; then
+                create_macos_dock_shortcut "http://$PI_IP:3550"
+            else
+                echo -e "${YELLOW}Skipping dock shortcut creation.${NC}"
+            fi
         fi
     fi
     
