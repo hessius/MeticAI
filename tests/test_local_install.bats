@@ -137,3 +137,42 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     run grep -q "brew install git" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
+
+@test "Script contains QR code generation function" {
+    run grep -q "generate_qr_code()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "QR code function tries qrencode first" {
+    run grep -q "command -v qrencode" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "QR code function has Python fallback" {
+    run grep -q "command -v python3" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "QR code function displays web app message" {
+    run grep -q "Scan to Access Web App" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "QR code function shows fallback message when unavailable" {
+    run grep -q "QR Code generation not available" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "QR code function is called after successful installation" {
+    run grep -q "generate_qr_code \"http://\$PI_IP:3550\"" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "QR code generation is optional and non-blocking" {
+    # Verify function doesn't use 'exit' commands which would block installation
+    run grep "generate_qr_code" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+    # Check that the function doesn't contain 'exit 1' which would block installation
+    run bash -c "grep -A 50 'generate_qr_code()' '$SCRIPT_PATH' | grep -c 'exit 1'"
+    [ "$output" -eq 0 ]
+}
