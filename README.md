@@ -203,6 +203,63 @@ Returns:
 
 The web interface can use this endpoint to show update notifications to users.
 
+### Trigger Update Endpoint
+
+Programmatically trigger backend updates via the API:
+
+**`POST /api/trigger-update`**
+
+**Description:** Triggers the backend update process by running `update.sh --auto` on the server. This runs the update script in non-interactive mode.
+
+**Request:** No body needed.
+
+**Response:**
+- `200 OK` with JSON containing script output if successful:
+  ```json
+  {
+    "status": "success",
+    "output": "... script output ...",
+    "message": "Update script completed successfully"
+  }
+  ```
+- `500 Internal Server Error` with error details if failed:
+  ```json
+  {
+    "detail": {
+      "status": "error",
+      "output": "... partial output ...",
+      "error": "... error message ...",
+      "message": "Update script failed"
+    }
+  }
+  ```
+
+**Example (curl):**
+```bash
+curl -X POST http://<PI_IP>:8000/api/trigger-update
+```
+
+**Example (JavaScript):**
+```javascript
+fetch('http://YOUR_PI_IP:8000/api/trigger-update', { method: 'POST' })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'success') {
+      console.log('Update completed:', data.output);
+    } else {
+      console.error('Update failed:', data.error);
+    }
+  });
+```
+
+**Security Note:**  
+This endpoint is open to anyone with access to the backend API. Ensure your backend is not publicly exposed or restrict access at the network level if necessary. The update process will:
+- Pull latest code from all repositories
+- Rebuild Docker containers
+- Restart services automatically
+
+Consider the implications before exposing this endpoint publicly.
+
 ### Automatic Update Notifications
 
 When you start the containers with `docker compose up` or run the install script, MeticAI automatically checks for updates and displays a notification if updates are available.
