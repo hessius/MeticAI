@@ -98,6 +98,69 @@ except:
     echo ""
 }
 
+# Create macOS .app bundle for dock shortcut
+create_macos_dock_shortcut() {
+    local url="$1"
+    local app_name="MeticAI"
+    local app_path="$HOME/Applications/${app_name}.app"
+    
+    echo ""
+    echo -e "${YELLOW}Creating macOS dock shortcut...${NC}"
+    
+    # Create application bundle structure
+    mkdir -p "${app_path}/Contents/MacOS"
+    mkdir -p "${app_path}/Contents/Resources"
+    
+    # Create the executable script
+    cat > "${app_path}/Contents/MacOS/${app_name}" << 'SCRIPT_EOF'
+#!/bin/bash
+# MeticAI Web App Launcher
+URL="URL_PLACEHOLDER"
+open "$URL"
+SCRIPT_EOF
+    
+    # Replace placeholder with actual URL
+    sed -i '' "s|URL_PLACEHOLDER|${url}|g" "${app_path}/Contents/MacOS/${app_name}"
+    
+    # Make the script executable
+    chmod +x "${app_path}/Contents/MacOS/${app_name}"
+    
+    # Create Info.plist
+    cat > "${app_path}/Contents/Info.plist" << PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>${app_name}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.meticai.webapp</string>
+    <key>CFBundleName</key>
+    <string>${app_name}</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.10</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+PLIST_EOF
+    
+    # Create a simple icon using iconutil if available
+    # For now, we'll skip custom icon - macOS will use default
+    
+    echo -e "${GREEN}✓ Dock shortcut created at: ${app_path}${NC}"
+    echo -e "${YELLOW}  The MeticAI app will appear in your Applications folder.${NC}"
+    echo -e "${YELLOW}  You can drag it to your Dock for quick access.${NC}"
+}
+
 # Detect OS
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -509,6 +572,19 @@ if sudo docker compose up -d --build; then
     
     # Display QR code for easy mobile access
     generate_qr_code "http://$PI_IP:3550"
+    
+    # Offer macOS dock shortcut creation
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo ""
+        read -r -p "Would you like to add a MeticAI shortcut to your Applications folder? (y/n) [y]: " CREATE_DOCK_SHORTCUT </dev/tty
+        CREATE_DOCK_SHORTCUT=${CREATE_DOCK_SHORTCUT:-y}
+        
+        if [[ "$CREATE_DOCK_SHORTCUT" =~ ^[Yy]$ ]]; then
+            create_macos_dock_shortcut "http://$PI_IP:3550"
+        else
+            echo -e "${YELLOW}Skipping dock shortcut creation.${NC}"
+        fi
+    fi
     
     echo "To test the connection, copy/paste this command:"
     echo -e "${BLUE}curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/analyze_and_profile${NC}"
