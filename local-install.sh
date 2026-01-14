@@ -129,6 +129,8 @@ SCRIPT_EOF
     chmod +x "${app_path}/Contents/MacOS/${app_name}"
     
     # Create Info.plist
+    # Note: CFBundleIconFile is omitted as we don't provide a custom icon.
+    # macOS will use the default application icon.
     cat > "${app_path}/Contents/Info.plist" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -136,8 +138,6 @@ SCRIPT_EOF
 <dict>
     <key>CFBundleExecutable</key>
     <string>${app_name}</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.meticai.webapp</string>
     <key>CFBundleName</key>
@@ -159,6 +159,7 @@ PLIST_EOF
     echo -e "${GREEN}✓ Dock shortcut created at: ${app_path}${NC}"
     echo -e "${YELLOW}  The MeticAI app will appear in your Applications folder.${NC}"
     echo -e "${YELLOW}  You can drag it to your Dock for quick access.${NC}"
+    echo -e "${YELLOW}  Note: The app will use the default macOS application icon.${NC}"
 }
 
 # Detect OS
