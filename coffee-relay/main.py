@@ -251,3 +251,59 @@ async def get_status():
             "error": str(e),
             "message": "Could not check for updates"
         }
+
+@app.post("/api/trigger-update")
+async def trigger_update():
+    """Trigger the backend update process by running update.sh --auto.
+    
+    This endpoint executes the update script in non-interactive mode.
+    No authentication is required - restrict API access at the network level if needed.
+    
+    Returns:
+        - status: "success" or "error"
+        - output: stdout from the update script
+        - error: stderr from the update script (if any)
+    """
+    try:
+        # Run update script with --auto flag for non-interactive mode
+        result = subprocess.run(
+            ["bash", "/app/../update.sh", "--auto"],
+            capture_output=True,
+            text=True,
+            cwd="/app/.."
+        )
+        
+        if result.returncode == 0:
+            return {
+                "status": "success",
+                "output": result.stdout,
+                "message": "Update script completed successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "status": "error",
+                    "output": result.stdout,
+                    "error": result.stderr,
+                    "message": "Update script failed"
+                }
+            )
+    except subprocess.SubprocessError as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to execute update script"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "An unexpected error occurred"
+            }
+        )

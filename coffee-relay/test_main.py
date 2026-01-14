@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch, MagicMock
 from io import BytesIO
 from PIL import Image
 import os
+import subprocess
 
 
 # Import the app
@@ -822,3 +823,168 @@ class TestStatusEndpoint:
         openapi_data = response.json()
         assert "/status" in openapi_data["paths"]
         assert "get" in openapi_data["paths"]["/status"]
+
+
+class TestTriggerUpdateEndpoint:
+    """Tests for the /api/trigger-update endpoint."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_success(self, mock_subprocess, client):
+        """Test successful update trigger."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "✓ All updates applied successfully\n✓ Containers rebuilt and started"
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "output" in data
+        assert "All updates applied successfully" in data["output"]
+        
+        # Verify subprocess was called with correct arguments
+        mock_subprocess.assert_called_once()
+        call_args = mock_subprocess.call_args[0][0]
+        assert "bash" in call_args
+        assert "/app/../update.sh" in call_args
+        assert "--auto" in call_args
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_script_failure(self, mock_subprocess, client):
+        """Test handling of update script failure."""
+        mock_result = Mock()
+        mock_result.returncode = 1
+        mock_result.stdout = "Checking for updates..."
+        mock_result.stderr = "Error: Failed to pull repository"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        assert data["detail"]["status"] == "error"
+        assert "Failed to pull repository" in data["detail"]["error"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_subprocess_error(self, mock_subprocess, client):
+        """Test handling of subprocess errors."""
+        mock_subprocess.side_effect = subprocess.SubprocessError("Script not found")
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        assert data["detail"]["status"] == "error"
+        assert "Failed to execute update script" in data["detail"]["message"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_unexpected_error(self, mock_subprocess, client):
+        """Test handling of unexpected errors."""
+        mock_subprocess.side_effect = Exception("Unexpected error")
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        assert data["detail"]["status"] == "error"
+        assert "unexpected error" in data["detail"]["message"].lower()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_cors_enabled(self, mock_subprocess, client):
+        """Test that /api/trigger-update has CORS enabled."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Success"
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/api/trigger-update",
+            headers={"Origin": "http://localhost:3550"}
+        )
+
+        assert response.status_code == 200
+        assert "access-control-allow-origin" in response.headers
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_trigger_update_in_openapi_schema(self, client):
+        """Test that /api/trigger-update endpoint is registered in OpenAPI schema."""
+        response = client.get("/openapi.json")
+        assert response.status_code == 200
+        
+        openapi_data = response.json()
+        assert "/api/trigger-update" in openapi_data["paths"]
+        assert "post" in openapi_data["paths"]["/api/trigger-update"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_no_body_required(self, mock_subprocess, client):
+        """Test that endpoint works without request body."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Update complete"
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        # Test without any body
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_includes_stdout(self, mock_subprocess, client):
+        """Test that successful response includes script output."""
+        expected_output = """
+========================================
+      ☕️ MeticAI Update Manager 🔄
+========================================
+
+Checking for updates...
+✓ All updates applied successfully
+✓ Containers rebuilt and started
+"""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = expected_output
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "output" in data
+        assert "MeticAI Update Manager" in data["output"]
+        assert "All updates applied successfully" in data["output"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_trigger_update_partial_failure(self, mock_subprocess, client):
+        """Test handling when script returns error with partial output."""
+        mock_result = Mock()
+        mock_result.returncode = 1
+        mock_result.stdout = "Updating MeticAI...\n✓ MeticAI updated\nUpdating MCP..."
+        mock_result.stderr = "Error: git pull failed"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post("/api/trigger-update")
+        
+        assert response.status_code == 500
+        data = response.json()
+        # The detail is nested in the response
+        assert "detail" in data
+        assert "status" in str(data["detail"])
+        assert "error" in str(data["detail"])
