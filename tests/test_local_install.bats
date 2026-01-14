@@ -143,6 +143,21 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "Script validates URL format in dock shortcut" {
+    run grep -q "Invalid URL format" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script checks for interactive mode before prompting" {
+    run grep -q "\[\[ -t 0 \]\]" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script supports SKIP_DOCK_SHORTCUT environment variable" {
+    run grep -q "SKIP_DOCK_SHORTCUT" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
 @test "Script exits on docker not found" {
     run grep -q "Error: docker is not installed" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
