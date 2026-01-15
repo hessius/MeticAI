@@ -60,6 +60,68 @@ else
     SKIP_ENV_CREATION=false
 fi
 
+# Install qrencode based on OS
+install_qrencode() {
+    local os
+    os=$(detect_os)
+    
+    case "$os" in
+        macos)
+            if command -v brew &> /dev/null; then
+                echo -e "${YELLOW}Installing qrencode...${NC}"
+                if brew install qrencode &> /dev/null; then
+                    echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                    return 0
+                else
+                    echo -e "${YELLOW}Failed to install qrencode via Homebrew.${NC}"
+                    return 1
+                fi
+            else
+                return 1
+            fi
+            ;;
+        ubuntu|debian|raspbian)
+            echo -e "${YELLOW}Installing qrencode...${NC}"
+            if sudo apt-get update &> /dev/null && sudo apt-get install -y qrencode &> /dev/null; then
+                echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                return 0
+            else
+                echo -e "${YELLOW}Failed to install qrencode.${NC}"
+                return 1
+            fi
+            ;;
+        fedora|rhel|centos)
+            echo -e "${YELLOW}Installing qrencode...${NC}"
+            if command -v dnf &> /dev/null; then
+                if sudo dnf install -y qrencode &> /dev/null; then
+                    echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                    return 0
+                fi
+            elif command -v yum &> /dev/null; then
+                if sudo yum install -y qrencode &> /dev/null; then
+                    echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                    return 0
+                fi
+            fi
+            echo -e "${YELLOW}Failed to install qrencode.${NC}"
+            return 1
+            ;;
+        arch|manjaro)
+            echo -e "${YELLOW}Installing qrencode...${NC}"
+            if sudo pacman -Sy --noconfirm qrencode &> /dev/null; then
+                echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                return 0
+            else
+                echo -e "${YELLOW}Failed to install qrencode.${NC}"
+                return 1
+            fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # Generate and display ASCII QR code for a URL
 generate_qr_code() {
     local url="$1"
@@ -78,6 +140,20 @@ generate_qr_code() {
         echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
         echo ""
         return
+    fi
+    
+    # If qrencode not found, try to install it automatically
+    echo -e "${YELLOW}QR code generator not found. Attempting to install...${NC}"
+    if install_qrencode; then
+        # Try again after installation
+        if command -v qrencode &> /dev/null; then
+            qrencode -t ansiutf8 "$url" 2>/dev/null
+            echo ""
+            echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
+            echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
+            echo ""
+            return
+        fi
     fi
     
     # Try Python with qrcode library (if available)
@@ -107,15 +183,11 @@ except:
     # Fallback: Show a simple box with the URL
     echo -e "${YELLOW}┌──────────────────────────────────────────────┐${NC}"
     echo -e "${YELLOW}│                                              │${NC}"
-    echo -e "${YELLOW}│  ${GREEN}✓${YELLOW} QR Code generation not available       │${NC}"
-    echo -e "${YELLOW}│                                              │${NC}"
     echo -e "${YELLOW}│  Open this URL on your mobile device:       │${NC}"
     echo -e "${YELLOW}│                                              │${NC}"
     echo -e "${YELLOW}│  ${BLUE}${url}${YELLOW}│${NC}"
     echo -e "${YELLOW}│                                              │${NC}"
-    echo -e "${YELLOW}│  💡 Tip: Install qrencode for QR codes:     │${NC}"
-    echo -e "${YELLOW}│     apt install qrencode  (Debian/Ubuntu)    │${NC}"
-    echo -e "${YELLOW}│     brew install qrencode (macOS)            │${NC}"
+    echo -e "${YELLOW}│  💡 QR code not available on this system    │${NC}"
     echo -e "${YELLOW}│                                              │${NC}"
     echo -e "${YELLOW}└──────────────────────────────────────────────┘${NC}"
     echo ""
