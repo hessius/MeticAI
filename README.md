@@ -260,10 +260,50 @@ fetch('http://YOUR_PI_IP:8000/api/trigger-update', { method: 'POST' })
 **Security Note:**  
 This endpoint is open to anyone with access to the backend API. Ensure your backend is not publicly exposed or restrict access at the network level if necessary. The update process will:
 - Pull latest code from all repositories
-- Rebuild Docker containers
+- Rebuild Docker containers (where possible from inside container)
 - Restart services automatically
 
 Consider the implications before exposing this endpoint publicly.
+
+### Fully Automatic Updates from Web UI (macOS)
+
+On macOS, Docker Desktop security restrictions prevent containers from fully rebuilding themselves. To enable completely automatic updates triggered from the web interface, the **rebuild watcher** service is installed automatically during installation.
+
+If you need to reinstall or manage the service manually:
+
+```bash
+# Install the launchd service
+./rebuild-watcher.sh --install
+
+# Uninstall the service
+./rebuild-watcher.sh --uninstall
+```
+
+This service watches for update requests from the web UI and automatically completes the container rebuild on the host system.
+
+**How it works:**
+1. User triggers update from web UI (calls `/api/trigger-update`)
+2. Backend pulls latest code and rebuilds what it can
+3. Backend creates `.rebuild-needed` flag file
+4. Host-side watcher detects the flag and runs `docker compose up -d --build`
+5. All containers are rebuilt and restarted
+
+**Rebuild watcher commands:**
+```bash
+# Run once to check and rebuild if needed
+./rebuild-watcher.sh
+
+# Check if rebuild is pending
+./rebuild-watcher.sh --status
+
+# Install as background service (macOS launchd)
+./rebuild-watcher.sh --install
+
+# Remove the service
+./rebuild-watcher.sh --uninstall
+```
+
+**Without the watcher:** Updates from the web UI will still pull the latest code, but you'll need to run `docker compose up -d --build` manually to apply changes to containers with host volume mounts.
 
 ### Automatic Update Notifications
 

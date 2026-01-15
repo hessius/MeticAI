@@ -1,7 +1,20 @@
 FROM python:3.11-slim
 
-# Install Docker CLI (to talk to the sibling container)
-RUN apt-get update && apt-get install -y docker.io
+# Install Docker CLI, Docker Compose plugin, buildx, and git (for update functionality)
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    # Create cli-plugins directory
+    && mkdir -p /usr/local/lib/docker/cli-plugins \
+    # Install Docker Compose plugin
+    && curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose \
+    && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose \
+    # Install Docker Buildx plugin (note: filename format is different)
+    && BUILDX_ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
+    && curl -SL "https://github.com/docker/buildx/releases/download/v0.20.1/buildx-v0.20.1.linux-${BUILDX_ARCH}" -o /usr/local/lib/docker/cli-plugins/docker-buildx \
+    && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
 WORKDIR /app
 
