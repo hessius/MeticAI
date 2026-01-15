@@ -585,22 +585,84 @@ rebuild_containers() {
         return 1
     fi
     
-    # Stop containers
-    echo "Stopping containers..."
-    if sudo $COMPOSE_CMD down; then
-        echo -e "${GREEN}✓ Containers stopped${NC}"
-    else
-        echo -e "${YELLOW}Warning: Failed to stop containers (they may not be running)${NC}"
+    # Determine if we need sudo (not needed inside containers or if user has docker access)
+    SUDO_PREFIX=""
+    if ! docker info &> /dev/null; then
+        # Docker not accessible, try with sudo
+        if command -v sudo &> /dev/null && sudo docker info &> /dev/null; then
+            SUDO_PREFIX="sudo"
+        else
+            echo -e "${RED}Error: Cannot access Docker daemon${NC}"
+            return 1
+        fi
     fi
     
-    # Rebuild and start
-    echo "Building and starting containers..."
-    if sudo $COMPOSE_CMD up -d --build; then
-        echo -e "${GREEN}✓ Containers rebuilt and started${NC}"
+    # Check if we're running inside a container (to avoid stopping ourselves)
+    INSIDE_CONTAINER=false
+    if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+        INSIDE_CONTAINER=true
+        echo -e "${YELLOW}Running inside container - will rebuild without stopping self${NC}"
+    fi
+    
+    if [ "$INSIDE_CONTAINER" = true ]; then
+        # When inside container, we can only rebuild containers that don't have
+        # host filesystem mounts (due to Docker Desktop path restrictions on macOS).
+        # Use explicit project name to match the host-started containers.
+        local PROJECT_NAME="meticai"
+        echo "Rebuilding containers..."
+        
+        # Note: gemini-client and meticai-web have volume mounts that reference
+        # host paths. When running docker compose from inside a container, these
+        # paths resolve incorrectly. Only meticulous-mcp can be rebuilt this way.
+        
+        # Build and restart meticulous-mcp (no problematic mounts)
+        echo "  Building meticulous-mcp..."
+        if $SUDO_PREFIX $COMPOSE_CMD -p "$PROJECT_NAME" up -d --build --force-recreate --no-deps meticulous-mcp 2>&1; then
+            echo -e "${GREEN}  ✓ meticulous-mcp rebuilt${NC}"
+        else
+            echo -e "${YELLOW}  Warning: Failed to rebuild meticulous-mcp${NC}"
+        fi
+        
+        # Create a flag file to signal the host-side rebuild watcher
+        # The rebuild-watcher.sh script on the host will pick this up
+        local REBUILD_FLAG="$SCRIPT_DIR/.rebuild-needed"
+        cat > "$REBUILD_FLAG" <<REBUILD_EOF
+{
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "reason": "Container update triggered from web UI",
+  "containers": ["coffee-relay", "gemini-client", "meticai-web"]
+}
+REBUILD_EOF
+        
+        echo ""
+        echo -e "${YELLOW}Note: Some containers require host-side rebuild.${NC}"
+        echo -e "${YELLOW}Rebuild flag created at: $REBUILD_FLAG${NC}"
+        echo ""
+        echo -e "${BLUE}Options to complete the update:${NC}"
+        echo -e "  1. If rebuild-watcher is installed, it will auto-rebuild"
+        echo -e "  2. Run on host: ./rebuild-watcher.sh"
+        echo -e "  3. Run on host: docker compose up -d --build"
+        echo ""
+        echo -e "${GREEN}✓ Available containers rebuilt${NC}"
         return 0
     else
-        echo -e "${RED}✗ Failed to rebuild containers${NC}"
-        return 1
+        # Standard rebuild when running on host
+        echo "Stopping containers..."
+        if $SUDO_PREFIX $COMPOSE_CMD down --remove-orphans 2>/dev/null; then
+            echo -e "${GREEN}✓ Containers stopped${NC}"
+        else
+            echo -e "${YELLOW}Warning: Failed to stop containers (they may not be running)${NC}"
+        fi
+        
+        # Rebuild and start
+        echo "Building and starting containers..."
+        if $SUDO_PREFIX $COMPOSE_CMD up -d --build; then
+            echo -e "${GREEN}✓ Containers rebuilt and started${NC}"
+            return 0
+        else
+            echo -e "${RED}✗ Failed to rebuild containers${NC}"
+            return 1
+        fi
     fi
 }
 

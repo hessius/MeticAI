@@ -193,6 +193,37 @@ except:
     echo ""
 }
 
+# Install the rebuild watcher service on macOS for automatic web UI updates
+install_rebuild_watcher() {
+    local script_dir="$1"
+    local watcher_script="${script_dir}/rebuild-watcher.sh"
+    
+    if [ ! -f "$watcher_script" ]; then
+        echo -e "${YELLOW}Warning: rebuild-watcher.sh not found, skipping.${NC}"
+        return 1
+    fi
+    
+    echo -e "${YELLOW}Installing rebuild watcher service...${NC}"
+    echo -e "${BLUE}This enables fully automatic updates from the web interface.${NC}"
+    
+    # Ensure the script is executable
+    chmod +x "$watcher_script"
+    
+    # Create empty rebuild-needed file for Docker mount
+    touch "${script_dir}/.rebuild-needed"
+    
+    # Run the install command
+    if "$watcher_script" --install; then
+        echo -e "${GREEN}✓ Rebuild watcher installed successfully${NC}"
+        echo -e "${BLUE}  Updates triggered from the web UI will now automatically rebuild containers.${NC}"
+        return 0
+    else
+        echo -e "${YELLOW}Warning: Failed to install rebuild watcher service.${NC}"
+        echo -e "${YELLOW}  You can install it manually later with: ./rebuild-watcher.sh --install${NC}"
+        return 1
+    fi
+}
+
 # Create macOS .app bundle for dock shortcut
 create_macos_dock_shortcut() {
     local url="$1"
@@ -960,6 +991,12 @@ if sudo docker compose up -d --build; then
             else
                 echo -e "${YELLOW}Skipping dock shortcut creation.${NC}"
             fi
+        fi
+        
+        # Install rebuild watcher for automatic web UI updates
+        if [[ "${SKIP_REBUILD_WATCHER}" != "true" ]]; then
+            echo ""
+            install_rebuild_watcher "$(pwd)"
         fi
     fi
     

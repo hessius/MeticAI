@@ -271,9 +271,18 @@ async def trigger_update():
         - error: stderr from the update script (if any)
     """
     try:
-        # Construct and resolve the absolute path to the update script
-        # The script is in the parent directory of the coffee-relay app
-        script_path = (Path(__file__).parent.parent / "update.sh").resolve()
+        # The update script is mounted at /app/update.sh
+        script_path = Path("/app/update.sh")
+        
+        if not script_path.exists():
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "status": "error",
+                    "error": "Update script not found at /app/update.sh",
+                    "message": "Update script is not mounted in the container"
+                }
+            )
         
         # Run update script with --auto flag for non-interactive mode
         # Timeout set to 10 minutes to prevent hanging processes
@@ -281,7 +290,7 @@ async def trigger_update():
             ["bash", str(script_path), "--auto"],
             capture_output=True,
             text=True,
-            cwd=script_path.parent,
+            cwd="/app",
             timeout=600  # 10 minutes timeout
         )
         

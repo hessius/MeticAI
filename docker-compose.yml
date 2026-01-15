@@ -38,7 +38,21 @@ services:
       - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./.versions.json:/app/.versions.json:ro
+      - ./.versions.json:/app/.versions.json
+      # Mount update infrastructure for trigger-update endpoint
+      - ./update.sh:/app/update.sh:ro
+      - ./.env:/app/.env:ro
+      - ./.update-config.json:/app/.update-config.json:ro
+      - ./meticulous-source:/app/meticulous-source
+      - ./meticai-web:/app/meticai-web
+      - ./.git:/app/.git
+      # Mount docker-compose and Dockerfiles for container rebuild
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
+      - ./coffee-relay:/app/coffee-relay:ro
+      - ./gemini-client:/app/gemini-client:ro
+      # Mount rebuild flag for host-side watcher
+      - ./.rebuild-needed:/app/.rebuild-needed
+    working_dir: /app
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     restart: unless-stopped
