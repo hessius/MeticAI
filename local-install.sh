@@ -408,16 +408,112 @@ detect_ip() {
     echo "$detected_ip"
 }
 
+# Portable timeout function that works on both macOS and Linux
+# Usage: run_with_timeout <seconds> <command> [args...]
+run_with_timeout() {
+    local timeout_secs="$1"
+    shift
+    
+    # Try GNU timeout first (works on Linux, available as gtimeout on macOS with coreutils)
+    if command -v timeout &>/dev/null; then
+        timeout "$timeout_secs" "$@" 2>/dev/null
+        return $?
+    elif command -v gtimeout &>/dev/null; then
+        gtimeout "$timeout_secs" "$@" 2>/dev/null
+        return $?
+    else
+        # Fallback: use perl alarm (available on macOS by default)
+        perl -e 'alarm shift; exec @ARGV' "$timeout_secs" "$@" 2>/dev/null
+        return $?
+    fi
+}
+
+# Resolve .local hostname to IP address (cross-platform)
+resolve_local_hostname() {
+    local hostname="$1"
+    local resolved_ip=""
+    
+    # Ensure hostname ends with .local
+    if [[ ! "$hostname" =~ \.local$ ]]; then
+        hostname="${hostname}.local"
+    fi
+    
+    # Method 1: macOS dscacheutil (most reliable for .local on macOS)
+    if command -v dscacheutil &>/dev/null; then
+        resolved_ip=$(dscacheutil -q host -a name "$hostname" 2>/dev/null | grep "^ip_address:" | head -1 | awk '{print $2}')
+        if [[ -n "$resolved_ip" ]]; then
+            echo "$resolved_ip"
+            return 0
+        fi
+    fi
+    
+    # Method 2: getent (Linux)
+    if command -v getent &>/dev/null; then
+        resolved_ip=$(getent hosts "$hostname" 2>/dev/null | awk '{print $1}' | head -1)
+        if [[ -n "$resolved_ip" ]]; then
+            echo "$resolved_ip"
+            return 0
+        fi
+    fi
+    
+    # Method 3: ping (works on both, but slower)
+    if command -v ping &>/dev/null; then
+        # macOS ping uses -t for timeout, Linux uses -W
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            resolved_ip=$(ping -c 1 -t 2 "$hostname" 2>/dev/null | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | head -1 | tr -d '()')
+        else
+            resolved_ip=$(ping -c 1 -W 2 "$hostname" 2>/dev/null | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | head -1 | tr -d '()')
+        fi
+        if [[ -n "$resolved_ip" ]]; then
+            echo "$resolved_ip"
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
 # Scan network for Meticulous machines
 # Returns list of "hostname,ip" pairs
 scan_for_meticulous() {
     local devices=()
     
-    # Method 1: Try avahi-browse (Linux mDNS/Bonjour)
-    if command -v avahi-browse &>/dev/null; then
+    # Method 1: macOS dns-sd (Bonjour) - most reliable on macOS
+    if [[ "$OSTYPE" == "darwin"* ]] && command -v dns-sd &>/dev/null; then
+        # Browse for _http._tcp services and capture meticulous devices
+        local dns_sd_output
+        dns_sd_output=$(run_with_timeout 4 dns-sd -B _http._tcp local 2>/dev/null || true)
+        
+        # Parse dns-sd output to find meticulous devices
+        # Format: "Timestamp  A/R  Flags  if Domain  Service Type  Instance Name"
+        if [ -n "$dns_sd_output" ]; then
+            while IFS= read -r line; do
+                # Look for lines containing "meticulous" (case insensitive)
+                if echo "$line" | grep -qi "meticulous"; then
+                    # Extract the instance name (last field, may contain spaces)
+                    # The format is: timestamp Add/Remove flags interface domain type instancename
+                    local instance_name
+                    instance_name=$(echo "$line" | awk '{for(i=7;i<=NF;i++) printf "%s", (i>7?" ":"") $i; print ""}')
+                    
+                    if [[ -n "$instance_name" ]]; then
+                        # Resolve the hostname to IP using dscacheutil
+                        local resolved_ip
+                        resolved_ip=$(resolve_local_hostname "$instance_name")
+                        
+                        if [[ -n "$resolved_ip" ]]; then
+                            devices+=("${instance_name}.local,$resolved_ip")
+                        fi
+                    fi
+                fi
+            done <<< "$dns_sd_output"
+        fi
+    fi
+    
+    # Method 2: Try avahi-browse (Linux mDNS/Bonjour)
+    if command -v avahi-browse &>/dev/null && [[ ${#devices[@]} -eq 0 ]]; then
         # Scan for _http._tcp services with a timeout
         local avahi_results
-        avahi_results=$(timeout 5 avahi-browse -a -t -r -p 2>/dev/null | grep -i meticulous || true)
+        avahi_results=$(run_with_timeout 5 avahi-browse -a -t -r -p 2>/dev/null | grep -i meticulous || true)
         
         if [ -n "$avahi_results" ]; then
             # Parse avahi output: format is =;interface;protocol;name;type;domain;hostname;address;port;txt
@@ -433,63 +529,51 @@ scan_for_meticulous() {
         fi
     fi
     
-    # Method 2: Try dns-sd (macOS Bonjour)
-    if command -v dns-sd &>/dev/null && [[ ${#devices[@]} -eq 0 ]]; then
-        # Run dns-sd in background and capture results
-        local dns_sd_output
-        dns_sd_output=$(timeout 5 dns-sd -B _http._tcp 2>/dev/null || true)
-        
-        # Try to find meticulous devices in mDNS
-        # Note: dns-sd requires more complex parsing, using simpler approach
-        if [[ "$dns_sd_output" =~ meticulous ]]; then
-            # For macOS, we can also try using arp and ping sweep
-            # This is a fallback method
-            :
-        fi
-    fi
-    
     # Method 3: Try ARP cache (works on both Linux and macOS)
     if [[ ${#devices[@]} -eq 0 ]]; then
         if command -v arp &>/dev/null; then
             # Get all IPs from ARP cache and try to resolve hostnames
             local arp_ips
-            arp_ips=$(arp -a 2>/dev/null | grep -oE '\([0-9.]+\)' | tr -d '()' || true)
+            arp_ips=$(arp -a 2>/dev/null | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | tr -d '()' || true)
             
             for ip in $arp_ips; do
-                # Try to get hostname via nslookup, host, or dig
+                # Try to get hostname via various methods
                 local hostname=""
                 
-                if command -v getent &>/dev/null; then
+                # macOS: try dscacheutil reverse lookup
+                if [[ "$OSTYPE" == "darwin"* ]] && command -v dscacheutil &>/dev/null; then
+                    hostname=$(dscacheutil -q host -a ip_address "$ip" 2>/dev/null | grep "^name:" | head -1 | awk '{print $2}' || true)
+                fi
+                
+                # Linux: try getent
+                if [[ -z "$hostname" ]] && command -v getent &>/dev/null; then
                     hostname=$(getent hosts "$ip" 2>/dev/null | awk '{print $2}' || true)
-                elif command -v nslookup &>/dev/null; then
+                fi
+                
+                # Fallback: nslookup
+                if [[ -z "$hostname" ]] && command -v nslookup &>/dev/null; then
                     hostname=$(nslookup "$ip" 2>/dev/null | grep 'name =' | awk '{print $4}' | sed 's/\.$//' || true)
-                elif command -v host &>/dev/null; then
+                fi
+                
+                # Fallback: host command
+                if [[ -z "$hostname" ]] && command -v host &>/dev/null; then
                     hostname=$(host "$ip" 2>/dev/null | grep 'domain name pointer' | awk '{print $5}' | sed 's/\.$//' || true)
                 fi
                 
                 # Check if hostname contains "meticulous"
-                if [[ -n "$hostname" ]] && [[ "$hostname" =~ meticulous ]]; then
+                if [[ -n "$hostname" ]] && echo "$hostname" | grep -qi "meticulous"; then
                     devices+=("$hostname,$ip")
                 fi
             done
         fi
     fi
     
-    # Method 4: Try scanning .local mDNS domain (macOS and Linux with avahi)
+    # Method 4: Try scanning .local mDNS domain directly
     if [[ ${#devices[@]} -eq 0 ]]; then
-        # Try common meticulous hostnames
-        for name in meticulous meticulousmodelalmondmilklatte; do
-            local resolved_ip=""
-            
-            # Try to resolve .local domain
-            if command -v getent &>/dev/null; then
-                resolved_ip=$(getent hosts "${name}.local" 2>/dev/null | awk '{print $1}' || true)
-            elif command -v ping &>/dev/null; then
-                # Try to ping .local address with short timeout
-                if ping -c 1 -W 1 "${name}.local" &>/dev/null; then
-                    resolved_ip=$(ping -c 1 "${name}.local" 2>/dev/null | grep -oE '\([0-9.]+\)' | head -1 | tr -d '()' || true)
-                fi
-            fi
+        # Try common meticulous hostnames patterns
+        for name in meticulous meticulousmodelalmondmilklatte meticulousInspiringCoffeeGeek; do
+            local resolved_ip
+            resolved_ip=$(resolve_local_hostname "$name")
             
             if [[ -n "$resolved_ip" ]]; then
                 devices+=("${name}.local,$resolved_ip")
