@@ -14,6 +14,7 @@ A collection of docker containers enabling an autonomous AI Agent running on a l
 * **Web Interface:** Modern, user-friendly web application for easy control and management.
 * **iOS Integration:** One-tap brewing via Shortcuts.
 * **Curl Integration:** Any service capable of polling a url can use the service.
+* **macOS Dock Shortcut:** Optional dock icon for quick access to the web interface (macOS only).
 
 ## Architecture
 1.  **Relay (FastAPI):** Receives images/requests from url calls.
@@ -49,6 +50,7 @@ This one-liner will:
 5. Clone the required MCP source repository and web application
 6. Build and launch all containers (including web interface)
 7. **Display a QR code** for easy mobile access to the web interface
+8. **[macOS only]** Offer to create a dock shortcut for easy access to the web app
 
 #### Option B: Local Installation
 If you prefer to clone the repository first:
@@ -67,8 +69,11 @@ The script will:
 3. Clone the required MCP source repository and web application
 4. Build and launch all containers (including web interface)
 5. **Display a QR code** for easy mobile access to the web interface
+6. **[macOS only]** Offer to create a dock shortcut for easy access to the web app
 
 **Note:** After successful installation, you'll see a QR code that links directly to the web interface. Scan it with your mobile device for instant access! The QR code feature uses `qrencode` if available, or shows a helpful fallback with the URL if not.
+
+**macOS Users:** During installation, you'll be prompted to create an application shortcut that opens MeticAI in your default browser. This creates a `.app` bundle in your Applications folder that you can add to your Dock for quick access. To skip this prompt in automated installations, set the environment variable `SKIP_DOCK_SHORTCUT=true`.
 
 ### 3. Manual Setup (Alternative)
 If you prefer to install dependencies manually or are running on an unsupported OS:
