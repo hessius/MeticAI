@@ -37,6 +37,29 @@ echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
+# Check for existing .env file at the very beginning
+if [ -f ".env" ]; then
+    echo -e "${YELLOW}Found existing .env file.${NC}"
+    echo ""
+    cat .env
+    echo ""
+    read -r -p "Do you want to use this existing configuration? (y/n) [y]: " USE_EXISTING_ENV </dev/tty
+    USE_EXISTING_ENV=${USE_EXISTING_ENV:-y}
+    
+    if [[ "$USE_EXISTING_ENV" =~ ^[Yy]$ ]]; then
+        echo -e "${GREEN}✓ Using existing .env file.${NC}"
+        echo -e "${YELLOW}Skipping configuration step...${NC}"
+        echo ""
+        SKIP_ENV_CREATION=true
+    else
+        echo -e "${YELLOW}Will create new .env file during configuration.${NC}"
+        echo ""
+        SKIP_ENV_CREATION=false
+    fi
+else
+    SKIP_ENV_CREATION=false
+fi
+
 # Generate and display ASCII QR code for a URL
 generate_qr_code() {
     local url="$1"
@@ -353,6 +376,133 @@ install_docker_compose() {
     fi
 }
 
+# Detect server IP address (cross-platform)
+detect_ip() {
+    local detected_ip=""
+    
+    # Try macOS-specific methods first
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Try to get IP from default route
+        detected_ip=$(route -n get default 2>/dev/null | grep 'interface:' | awk '{print $2}' | xargs ipconfig getifaddr 2>/dev/null)
+        
+        if [ -z "$detected_ip" ]; then
+            # Fallback: Try ipconfig getifaddr for common interfaces
+            for interface in en0 en1 en2 en3 en4; do
+                detected_ip=$(ipconfig getifaddr "$interface" 2>/dev/null)
+                if [ -n "$detected_ip" ]; then
+                    echo "$detected_ip"
+                    return
+                fi
+            done
+        fi
+        
+        if [ -z "$detected_ip" ]; then
+            # Last resort: use ifconfig and parse
+            detected_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+        fi
+    else
+        # Linux: use hostname -I
+        detected_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    
+    echo "$detected_ip"
+}
+
+# Scan network for Meticulous machines
+# Returns list of "hostname,ip" pairs
+scan_for_meticulous() {
+    local devices=()
+    
+    # Method 1: Try avahi-browse (Linux mDNS/Bonjour)
+    if command -v avahi-browse &>/dev/null; then
+        # Scan for _http._tcp services with a timeout
+        local avahi_results
+        avahi_results=$(timeout 5 avahi-browse -a -t -r -p 2>/dev/null | grep -i meticulous || true)
+        
+        if [ -n "$avahi_results" ]; then
+            # Parse avahi output: format is =;interface;protocol;name;type;domain;hostname;address;port;txt
+            while IFS= read -r line; do
+                if [[ "$line" == =* ]]; then
+                    local hostname=$(echo "$line" | cut -d';' -f7)
+                    local ip=$(echo "$line" | cut -d';' -f8)
+                    if [[ "$hostname" =~ meticulous ]] && [[ -n "$ip" ]]; then
+                        devices+=("$hostname,$ip")
+                    fi
+                fi
+            done <<< "$avahi_results"
+        fi
+    fi
+    
+    # Method 2: Try dns-sd (macOS Bonjour)
+    if command -v dns-sd &>/dev/null && [[ ${#devices[@]} -eq 0 ]]; then
+        # Run dns-sd in background and capture results
+        local dns_sd_output
+        dns_sd_output=$(timeout 5 dns-sd -B _http._tcp 2>/dev/null || true)
+        
+        # Try to find meticulous devices in mDNS
+        # Note: dns-sd requires more complex parsing, using simpler approach
+        if [[ "$dns_sd_output" =~ meticulous ]]; then
+            # For macOS, we can also try using arp and ping sweep
+            # This is a fallback method
+            :
+        fi
+    fi
+    
+    # Method 3: Try ARP cache (works on both Linux and macOS)
+    if [[ ${#devices[@]} -eq 0 ]]; then
+        if command -v arp &>/dev/null; then
+            # Get all IPs from ARP cache and try to resolve hostnames
+            local arp_ips
+            arp_ips=$(arp -a 2>/dev/null | grep -oE '\([0-9.]+\)' | tr -d '()' || true)
+            
+            for ip in $arp_ips; do
+                # Try to get hostname via nslookup, host, or dig
+                local hostname=""
+                
+                if command -v getent &>/dev/null; then
+                    hostname=$(getent hosts "$ip" 2>/dev/null | awk '{print $2}' || true)
+                elif command -v nslookup &>/dev/null; then
+                    hostname=$(nslookup "$ip" 2>/dev/null | grep 'name =' | awk '{print $4}' | sed 's/\.$//' || true)
+                elif command -v host &>/dev/null; then
+                    hostname=$(host "$ip" 2>/dev/null | grep 'domain name pointer' | awk '{print $5}' | sed 's/\.$//' || true)
+                fi
+                
+                # Check if hostname contains "meticulous"
+                if [[ -n "$hostname" ]] && [[ "$hostname" =~ meticulous ]]; then
+                    devices+=("$hostname,$ip")
+                fi
+            done
+        fi
+    fi
+    
+    # Method 4: Try scanning .local mDNS domain (macOS and Linux with avahi)
+    if [[ ${#devices[@]} -eq 0 ]]; then
+        # Try common meticulous hostnames
+        for name in meticulous meticulousmodelalmondmilklatte; do
+            local resolved_ip=""
+            
+            # Try to resolve .local domain
+            if command -v getent &>/dev/null; then
+                resolved_ip=$(getent hosts "${name}.local" 2>/dev/null | awk '{print $1}' || true)
+            elif command -v ping &>/dev/null; then
+                # Try to ping .local address with short timeout
+                if ping -c 1 -W 1 "${name}.local" &>/dev/null; then
+                    resolved_ip=$(ping -c 1 "${name}.local" 2>/dev/null | grep -oE '\([0-9.]+\)' | head -1 | tr -d '()' || true)
+                fi
+            fi
+            
+            if [[ -n "$resolved_ip" ]]; then
+                devices+=("${name}.local,$resolved_ip")
+            fi
+        done
+    fi
+    
+    # Return unique devices
+    if [ ${#devices[@]} -gt 0 ]; then
+        printf '%s\n' "${devices[@]}" | sort -u
+    fi
+}
+
 # 1. Check for Prerequisites
 echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
 
@@ -414,73 +564,124 @@ echo ""
 # - METICULOUS_IP: IP address of your espresso machine
 # - PI_IP: IP address of this server (auto-detected, can override)
 ################################################################################
-echo -e "${YELLOW}[2/4] Configuration${NC}"
-echo "We need to create a .env file with your specific settings."
-echo ""
 
-# --- Gemini API Key ---
-# Get your free API key at: https://aistudio.google.com/app/api-keys
-echo "Get your free API key at: https://aistudio.google.com/app/api-keys"
-read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
-while [[ -z "$GEMINI_KEY" ]]; do
-    echo -e "${RED}API Key cannot be empty.${NC}"
+# Skip configuration if using existing .env file
+if [ "$SKIP_ENV_CREATION" = true ]; then
+    echo -e "${YELLOW}[2/4] Configuration${NC}"
+    echo -e "${GREEN}✓ Using existing .env configuration.${NC}"
+    echo ""
+else
+    echo -e "${YELLOW}[2/4] Configuration${NC}"
+    echo "We need to create a .env file with your specific settings."
+    echo ""
+
+    # --- Gemini API Key ---
+    # Get your free API key at: https://aistudio.google.com/app/api-keys
+    echo "Get your free API key at: https://aistudio.google.com/app/api-keys"
     read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
-done
+    while [[ -z "$GEMINI_KEY" ]]; do
+        echo -e "${RED}API Key cannot be empty.${NC}"
+        read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
+    done
 
-# --- Meticulous IP ---
-read -r -p "Enter the IP address of your Meticulous Machine (e.g., 192.168.50.168): " MET_IP </dev/tty
-while [[ -z "$MET_IP" ]]; do
-    echo -e "${RED}IP Address cannot be empty.${NC}"
-    read -r -p "Enter the IP address of your Meticulous Machine: " MET_IP </dev/tty
-done
-
-# --- Raspberry Pi IP (Auto-detect) ---
-# Try to detect the default route IP (cross-platform)
-detect_ip() {
-    local detected_ip=""
+    # --- Meticulous IP (Auto-detect) ---
+    echo ""
+    echo -e "${YELLOW}Scanning network for Meticulous machines...${NC}"
     
-    # Try macOS-specific methods first
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # Try to get IP from default route
-        detected_ip=$(route -n get default 2>/dev/null | grep 'interface:' | awk '{print $2}' | xargs ipconfig getifaddr 2>/dev/null)
+    # Scan for Meticulous devices
+    mapfile -t METICULOUS_DEVICES < <(scan_for_meticulous)
+    
+    MET_IP=""
+    
+    if [ ${#METICULOUS_DEVICES[@]} -gt 0 ]; then
+        echo -e "${GREEN}Found ${#METICULOUS_DEVICES[@]} Meticulous device(s):${NC}"
+        echo ""
         
-        if [ -z "$detected_ip" ]; then
-            # Fallback: Try ipconfig getifaddr for common interfaces
-            for interface in en0 en1 en2 en3 en4; do
-                detected_ip=$(ipconfig getifaddr "$interface" 2>/dev/null)
-                if [ -n "$detected_ip" ]; then
-                    echo "$detected_ip"
-                    return
-                fi
+        # Present choices if multiple devices found
+        if [ ${#METICULOUS_DEVICES[@]} -gt 1 ]; then
+            local index=1
+            for device in "${METICULOUS_DEVICES[@]}"; do
+                local hostname=$(echo "$device" | cut -d',' -f1)
+                local ip=$(echo "$device" | cut -d',' -f2)
+                echo "  $index) $hostname ($ip)"
+                ((index++))
             done
-        fi
-        
-        if [ -z "$detected_ip" ]; then
-            # Last resort: use ifconfig and parse
-            detected_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+            echo ""
+            
+            read -r -p "Select device (1-${#METICULOUS_DEVICES[@]}) or press Enter to input manually: " DEVICE_CHOICE </dev/tty
+            
+            if [[ "$DEVICE_CHOICE" =~ ^[0-9]+$ ]] && [ "$DEVICE_CHOICE" -ge 1 ] && [ "$DEVICE_CHOICE" -le ${#METICULOUS_DEVICES[@]} ]; then
+                local selected_device="${METICULOUS_DEVICES[$((DEVICE_CHOICE-1))]}"
+                MET_IP=$(echo "$selected_device" | cut -d',' -f2)
+                local selected_hostname=$(echo "$selected_device" | cut -d',' -f1)
+                echo -e "${GREEN}✓ Selected: $selected_hostname ($MET_IP)${NC}"
+            fi
+        else
+            # Only one device found
+            local hostname=$(echo "${METICULOUS_DEVICES[0]}" | cut -d',' -f1)
+            local ip=$(echo "${METICULOUS_DEVICES[0]}" | cut -d',' -f2)
+            echo "  1) $hostname ($ip)"
+            echo ""
+            
+            read -r -p "Use this device? (y/n) [y]: " USE_DETECTED </dev/tty
+            USE_DETECTED=${USE_DETECTED:-y}
+            
+            if [[ "$USE_DETECTED" =~ ^[Yy]$ ]]; then
+                MET_IP="$ip"
+                echo -e "${GREEN}✓ Using: $hostname ($MET_IP)${NC}"
+            fi
         fi
     else
-        # Linux: use hostname -I
-        detected_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        echo -e "${YELLOW}No Meticulous devices found automatically.${NC}"
     fi
     
-    echo "$detected_ip"
-}
+    # Fallback to manual input if not detected or not selected
+    if [[ -z "$MET_IP" ]]; then
+        echo ""
+        read -r -p "Enter the IP address of your Meticulous Machine (e.g., 192.168.50.168): " MET_IP </dev/tty
+        while [[ -z "$MET_IP" ]]; do
+            echo -e "${RED}IP Address cannot be empty.${NC}"
+            read -r -p "Enter the IP address of your Meticulous Machine: " MET_IP </dev/tty
+        done
+    fi
 
-DETECTED_IP=$(detect_ip)
-read -r -p "Enter the IP address of this Raspberry Pi [Default: $DETECTED_IP]: " PI_IP </dev/tty
-PI_IP=${PI_IP:-$DETECTED_IP} # Use default if empty
+    # --- Raspberry Pi IP (Auto-detect) ---
+    echo ""
+    DETECTED_IP=$(detect_ip)
+    
+    if [[ -n "$DETECTED_IP" ]]; then
+        echo -e "${GREEN}Detected server IP: $DETECTED_IP${NC}"
+        read -r -p "Use this IP address? (y/n) [y]: " USE_DETECTED_IP </dev/tty
+        USE_DETECTED_IP=${USE_DETECTED_IP:-y}
+        
+        if [[ "$USE_DETECTED_IP" =~ ^[Yy]$ ]]; then
+            PI_IP="$DETECTED_IP"
+        else
+            read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
+            while [[ -z "$PI_IP" ]]; do
+                echo -e "${RED}IP Address cannot be empty.${NC}"
+                read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
+            done
+        fi
+    else
+        read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
+        while [[ -z "$PI_IP" ]]; do
+            echo -e "${RED}IP Address cannot be empty.${NC}"
+            read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
+        done
+    fi
 
-# --- Write .env ---
-echo ""
-echo -e "Writing settings to .env..."
-cat <<EOF > .env
+    # --- Write .env ---
+    echo ""
+    echo -e "Writing settings to .env..."
+    cat <<EOF > .env
 GEMINI_API_KEY=$GEMINI_KEY
 METICULOUS_IP=$MET_IP
 PI_IP=$PI_IP
 EOF
-echo -e "${GREEN}✓ .env file created.${NC}"
-echo ""
+    echo -e "${GREEN}✓ .env file created.${NC}"
+    echo ""
+fi
 
 # 3. Setup Dependencies (The MCP Fork & Web App)
 ################################################################################
@@ -551,6 +752,19 @@ echo ""
 # - coffee-relay: FastAPI server for receiving requests
 # - gemini-client: AI brain using Google Gemini 2.0 Flash
 ################################################################################
+
+# Load .env values for display and web config generation
+if [ -f ".env" ]; then
+    # Source the .env file to get the values
+    set -a  # automatically export all variables
+    source .env
+    set +a
+    
+    # Ensure variables are set (fallback for any issues)
+    : ${PI_IP:="localhost"}
+    : ${MET_IP:="localhost"}
+fi
+
 echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
 echo "Note: Running with sudo permissions."
 

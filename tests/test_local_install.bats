@@ -98,6 +98,56 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "Script scans for Meticulous machines on network" {
+    run grep -q "scan_for_meticulous" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script checks for existing .env file at start" {
+    run grep -q "Found existing .env file" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script asks to use existing .env configuration" {
+    run grep -q "Do you want to use this existing configuration" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script can skip configuration if .env exists" {
+    run grep -q "SKIP_ENV_CREATION" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script presents multiple Meticulous devices as choices" {
+    run grep -q "Select device" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script displays found Meticulous devices with hostname and IP" {
+    run grep -q "Scanning network for Meticulous machines" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script falls back to manual IP input if auto-detection fails" {
+    run grep -q "No Meticulous devices found automatically" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script uses avahi-browse for network scanning on Linux" {
+    run grep -q "avahi-browse" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script uses ARP cache for network scanning" {
+    run grep -q "arp -a" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script tries to resolve .local mDNS domains" {
+    run grep -q ".local" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
 @test "Script provides test command after installation" {
     run grep -q "curl -X POST" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
