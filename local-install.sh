@@ -588,8 +588,11 @@ else
     echo ""
     echo -e "${YELLOW}Scanning network for Meticulous machines...${NC}"
     
-    # Scan for Meticulous devices
-    mapfile -t METICULOUS_DEVICES < <(scan_for_meticulous)
+    # Scan for Meticulous devices (using portable while-read loop instead of mapfile for Bash 3.2 compatibility)
+    METICULOUS_DEVICES=()
+    while IFS= read -r line; do
+        METICULOUS_DEVICES+=("$line")
+    done < <(scan_for_meticulous)
     
     MET_IP=""
     
@@ -599,10 +602,10 @@ else
         
         # Present choices if multiple devices found
         if [ ${#METICULOUS_DEVICES[@]} -gt 1 ]; then
-            local index=1
+            index=1
             for device in "${METICULOUS_DEVICES[@]}"; do
-                local hostname=$(echo "$device" | cut -d',' -f1)
-                local ip=$(echo "$device" | cut -d',' -f2)
+                hostname=$(echo "$device" | cut -d',' -f1)
+                ip=$(echo "$device" | cut -d',' -f2)
                 echo "  $index) $hostname ($ip)"
                 ((index++))
             done
@@ -611,15 +614,15 @@ else
             read -r -p "Select device (1-${#METICULOUS_DEVICES[@]}) or press Enter to input manually: " DEVICE_CHOICE </dev/tty
             
             if [[ "$DEVICE_CHOICE" =~ ^[0-9]+$ ]] && [ "$DEVICE_CHOICE" -ge 1 ] && [ "$DEVICE_CHOICE" -le ${#METICULOUS_DEVICES[@]} ]; then
-                local selected_device="${METICULOUS_DEVICES[$((DEVICE_CHOICE-1))]}"
+                selected_device="${METICULOUS_DEVICES[$((DEVICE_CHOICE-1))]}"
                 MET_IP=$(echo "$selected_device" | cut -d',' -f2)
-                local selected_hostname=$(echo "$selected_device" | cut -d',' -f1)
+                selected_hostname=$(echo "$selected_device" | cut -d',' -f1)
                 echo -e "${GREEN}✓ Selected: $selected_hostname ($MET_IP)${NC}"
             fi
         else
             # Only one device found
-            local hostname=$(echo "${METICULOUS_DEVICES[0]}" | cut -d',' -f1)
-            local ip=$(echo "${METICULOUS_DEVICES[0]}" | cut -d',' -f2)
+            hostname=$(echo "${METICULOUS_DEVICES[0]}" | cut -d',' -f1)
+            ip=$(echo "${METICULOUS_DEVICES[0]}" | cut -d',' -f2)
             echo "  1) $hostname ($ip)"
             echo ""
             
