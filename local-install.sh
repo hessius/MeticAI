@@ -228,7 +228,9 @@ install_rebuild_watcher() {
 create_macos_dock_shortcut() {
     local url="$1"
     local app_name="MeticAI"
-    local app_path="$HOME/Applications/${app_name}.app"
+    local app_path="/Applications/${app_name}.app"
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local icon_source="${script_dir}/resources/MeticAI.icns"
     
     # Validate URL format (basic check for http/https)
     if [[ ! "$url" =~ ^https?:// ]]; then
@@ -237,33 +239,54 @@ create_macos_dock_shortcut() {
     fi
     
     echo ""
-    echo -e "${YELLOW}Creating macOS dock shortcut...${NC}"
+    echo -e "${YELLOW}Creating macOS application and adding to Dock...${NC}"
     
-    # Create application bundle structure
-    mkdir -p "${app_path}/Contents/MacOS"
-    mkdir -p "${app_path}/Contents/Resources"
+    # Create application bundle structure (may need sudo for /Applications)
+    if ! mkdir -p "${app_path}/Contents/MacOS" 2>/dev/null; then
+        # Try with sudo
+        sudo mkdir -p "${app_path}/Contents/MacOS"
+        sudo mkdir -p "${app_path}/Contents/Resources"
+        NEED_SUDO=true
+    else
+        mkdir -p "${app_path}/Contents/Resources"
+        NEED_SUDO=false
+    fi
+    
+    # Copy the icon if it exists
+    if [ -f "$icon_source" ]; then
+        if [ "$NEED_SUDO" = true ]; then
+            sudo cp "$icon_source" "${app_path}/Contents/Resources/MeticAI.icns"
+        else
+            cp "$icon_source" "${app_path}/Contents/Resources/MeticAI.icns"
+        fi
+        local icon_key="<key>CFBundleIconFile</key>
+    <string>MeticAI</string>"
+    else
+        local icon_key=""
+    fi
     
     # Create the executable script with properly escaped URL
     # Using printf to avoid shell expansion issues
-    cat > "${app_path}/Contents/MacOS/${app_name}" << 'SCRIPT_EOF'
-#!/bin/bash
+    local script_content="#!/bin/bash
 # MeticAI Web App Launcher
-SCRIPT_EOF
-    printf 'open "%s"\n' "$url" >> "${app_path}/Contents/MacOS/${app_name}"
+open \"${url}\"
+"
+    if [ "$NEED_SUDO" = true ]; then
+        echo "$script_content" | sudo tee "${app_path}/Contents/MacOS/${app_name}" > /dev/null
+        sudo chmod +x "${app_path}/Contents/MacOS/${app_name}"
+    else
+        echo "$script_content" > "${app_path}/Contents/MacOS/${app_name}"
+        chmod +x "${app_path}/Contents/MacOS/${app_name}"
+    fi
     
-    # Make the script executable
-    chmod +x "${app_path}/Contents/MacOS/${app_name}"
-    
-    # Create Info.plist
-    # Note: CFBundleIconFile is omitted as we don't provide a custom icon.
-    # macOS will use the default application icon.
-    cat > "${app_path}/Contents/Info.plist" << PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
+    # Create Info.plist with icon reference if available
+    local plist_content="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
 <dict>
     <key>CFBundleExecutable</key>
     <string>${app_name}</string>
+    ${icon_key}
     <key>CFBundleIdentifier</key>
     <string>com.meticai.webapp</string>
     <key>CFBundleName</key>
@@ -279,13 +302,41 @@ SCRIPT_EOF
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>
-</plist>
-PLIST_EOF
+</plist>"
     
-    echo -e "${GREEN}✓ Dock shortcut created at: ${app_path}${NC}"
-    echo -e "${YELLOW}  The MeticAI app will appear in your Applications folder.${NC}"
-    echo -e "${YELLOW}  You can drag it to your Dock for quick access.${NC}"
-    echo -e "${YELLOW}  Note: The app will use the default macOS application icon.${NC}"
+    if [ "$NEED_SUDO" = true ]; then
+        echo "$plist_content" | sudo tee "${app_path}/Contents/Info.plist" > /dev/null
+    else
+        echo "$plist_content" > "${app_path}/Contents/Info.plist"
+    fi
+    
+    echo -e "${GREEN}✓ Application created at: ${app_path}${NC}"
+    
+    # Add to Dock using defaults command
+    # First check if it's already in the Dock
+    local dock_plist="$HOME/Library/Preferences/com.apple.dock.plist"
+    if ! /usr/libexec/PlistBuddy -c "Print :persistent-apps" "$dock_plist" 2>/dev/null | grep -q "MeticAI"; then
+        # Add the app to the Dock
+        defaults write com.apple.dock persistent-apps -array-add "<dict>
+            <key>tile-data</key>
+            <dict>
+                <key>file-data</key>
+                <dict>
+                    <key>_CFURLString</key>
+                    <string>file://${app_path}/</string>
+                    <key>_CFURLStringType</key>
+                    <integer>15</integer>
+                </dict>
+            </dict>
+        </dict>"
+        
+        # Restart the Dock to apply changes
+        killall Dock
+        
+        echo -e "${GREEN}✓ MeticAI added to your Dock${NC}"
+    else
+        echo -e "${YELLOW}  MeticAI is already in your Dock${NC}"
+    fi
 }
 
 # Detect OS
@@ -983,13 +1034,13 @@ if sudo docker compose up -d --build; then
         # Check if user wants to skip via environment variable
         if [[ "${SKIP_DOCK_SHORTCUT}" != "true" ]]; then
             echo ""
-            read -r -p "Would you like to add a MeticAI shortcut to your Applications folder? (y/n) [y]: " CREATE_DOCK_SHORTCUT </dev/tty
+            read -r -p "Would you like to add MeticAI to your Dock? (y/n) [y]: " CREATE_DOCK_SHORTCUT </dev/tty
             CREATE_DOCK_SHORTCUT=${CREATE_DOCK_SHORTCUT:-y}
             
             if [[ "$CREATE_DOCK_SHORTCUT" =~ ^[Yy]$ ]]; then
                 create_macos_dock_shortcut "http://$PI_IP:3550"
             else
-                echo -e "${YELLOW}Skipping dock shortcut creation.${NC}"
+                echo -e "${YELLOW}Skipping Dock shortcut creation.${NC}"
             fi
         fi
         
