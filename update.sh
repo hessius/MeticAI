@@ -52,6 +52,15 @@ MCP_FORK_URL="https://github.com/manonstreet/meticulous-mcp.git"
 MCP_MAIN_URL="https://github.com/meticulous/meticulous-mcp.git"  # Placeholder for when fork merges
 WEB_APP_URL="https://github.com/hessius/MeticAI-web.git"
 
+# Global variables for update status (populated by check_for_updates)
+UPDATE_AVAILABLE=false
+METICAI_UPDATE_AVAILABLE=false
+MCP_UPDATE_AVAILABLE=false
+WEB_UPDATE_AVAILABLE=false
+METICAI_REMOTE_HASH=""
+MCP_REMOTE_HASH=""
+WEB_REMOTE_HASH=""
+
 # Parse command line arguments
 CHECK_ONLY=false
 AUTO_MODE=false
@@ -391,14 +400,17 @@ check_for_updates() {
     echo "📦 MeticAI Main Repository"
     local meticai_current=$(get_commit_hash "$SCRIPT_DIR")
     local meticai_remote=$(get_remote_hash "$SCRIPT_DIR" "$(get_current_branch "$SCRIPT_DIR")")
+    METICAI_REMOTE_HASH="$meticai_remote"
     
     if [ "$meticai_current" != "$meticai_remote" ] && [ "$meticai_remote" != "not-a-git-repo" ]; then
         echo -e "   ${YELLOW}⚠ Update available${NC}"
         echo "   Current: ${meticai_current:0:8}"
         echo "   Latest:  ${meticai_remote:0:8}"
         has_updates=true
+        METICAI_UPDATE_AVAILABLE=true
     else
         echo -e "   ${GREEN}✓ Up to date${NC}"
+        METICAI_UPDATE_AVAILABLE=false
     fi
     echo ""
     
@@ -409,6 +421,7 @@ check_for_updates() {
         local mcp_branch=$(get_current_branch "$SCRIPT_DIR/meticulous-source")
         local mcp_remote=$(get_remote_hash "$SCRIPT_DIR/meticulous-source" "$mcp_branch")
         local mcp_url=$(get_remote_url "$SCRIPT_DIR/meticulous-source")
+        MCP_REMOTE_HASH="$mcp_remote"
         
         echo "   Repository: $mcp_url"
         if [ "$mcp_current" != "$mcp_remote" ] && [ "$mcp_remote" != "not-a-git-repo" ]; then
@@ -416,13 +429,17 @@ check_for_updates() {
             echo "   Current: ${mcp_current:0:8}"
             echo "   Latest:  ${mcp_remote:0:8}"
             has_updates=true
+            MCP_UPDATE_AVAILABLE=true
         else
             echo -e "   ${GREEN}✓ Up to date${NC}"
+            MCP_UPDATE_AVAILABLE=false
         fi
     else
         echo "📦 Meticulous MCP"
         echo -e "   ${RED}✗ Not installed${NC}"
         has_updates=true
+        MCP_UPDATE_AVAILABLE=true
+        MCP_REMOTE_HASH="not-installed"
     fi
     echo ""
     
@@ -432,21 +449,29 @@ check_for_updates() {
         local web_current=$(get_commit_hash "$SCRIPT_DIR/meticai-web")
         local web_branch=$(get_current_branch "$SCRIPT_DIR/meticai-web")
         local web_remote=$(get_remote_hash "$SCRIPT_DIR/meticai-web" "$web_branch")
+        WEB_REMOTE_HASH="$web_remote"
         
         if [ "$web_current" != "$web_remote" ] && [ "$web_remote" != "not-a-git-repo" ]; then
             echo -e "   ${YELLOW}⚠ Update available${NC}"
             echo "   Current: ${web_current:0:8}"
             echo "   Latest:  ${web_remote:0:8}"
             has_updates=true
+            WEB_UPDATE_AVAILABLE=true
         else
             echo -e "   ${GREEN}✓ Up to date${NC}"
+            WEB_UPDATE_AVAILABLE=false
         fi
     else
         echo "📦 MeticAI Web Interface"
         echo -e "   ${RED}✗ Not installed${NC}"
         has_updates=true
+        WEB_UPDATE_AVAILABLE=true
+        WEB_REMOTE_HASH="not-installed"
     fi
     echo ""
+    
+    # Store overall update status in global variable
+    UPDATE_AVAILABLE=$has_updates
     
     if $has_updates; then
         return 0  # Updates available
@@ -584,18 +609,25 @@ update_version_file() {
     cat > "$VERSION_FILE" <<EOF
 {
   "last_check": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "update_available": $UPDATE_AVAILABLE,
   "repositories": {
     "meticai": {
       "current_hash": "$(get_commit_hash "$SCRIPT_DIR")",
+      "remote_hash": "$METICAI_REMOTE_HASH",
+      "update_available": $METICAI_UPDATE_AVAILABLE,
       "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     },
     "meticulous-mcp": {
       "current_hash": "$(get_commit_hash "$SCRIPT_DIR/meticulous-source")",
+      "remote_hash": "$MCP_REMOTE_HASH",
+      "update_available": $MCP_UPDATE_AVAILABLE,
       "repo_url": "$(get_remote_url "$SCRIPT_DIR/meticulous-source")",
       "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     },
     "meticai-web": {
       "current_hash": "$(get_commit_hash "$SCRIPT_DIR/meticai-web")",
+      "remote_hash": "$WEB_REMOTE_HASH",
+      "update_available": $WEB_UPDATE_AVAILABLE,
       "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     }
   }
@@ -626,7 +658,9 @@ main() {
     
     # Check for updates
     if check_for_updates; then
-        # Updates are available
+        # Updates are available - always save status to version file
+        update_version_file
+        
         if $CHECK_ONLY; then
             echo -e "${YELLOW}Updates are available. Run without --check-only to apply them.${NC}"
             exit 0
@@ -657,7 +691,9 @@ main() {
         update_mcp || update_success=false
         update_web || update_success=false
         
-        # Update version file
+        # Update version file again after applying updates (to clear update_available flags)
+        # Re-check to update the global variables
+        check_for_updates >/dev/null 2>&1 || true
         update_version_file
         
         if $update_success; then

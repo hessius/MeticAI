@@ -223,18 +223,15 @@ async def get_status():
         - update_available: Whether updates are available for any component
         - last_check: Timestamp of last update check
         - repositories: Status of each repository (main, mcp, web)
+    
+    Note: This reads from .versions.json which is populated by the update.sh
+    script running on the host. The file is mounted into the container.
+    Run './update.sh --check-only' on the host to refresh update status.
     """
     try:
-        # Run update check script
-        result = subprocess.run(
-            ["bash", "/app/../update.sh", "--check-only"],
-            capture_output=True,
-            text=True,
-            cwd="/app/.."
-        )
-        
-        # Read version file to get detailed status
-        version_file_path = Path("/app/../.versions.json")
+        # Read version file directly (mounted from host)
+        # The file is updated by update.sh --check-only running on the host
+        version_file_path = Path("/app/.versions.json")
         update_status = {
             "update_available": False,
             "last_check": None,
@@ -244,16 +241,13 @@ async def get_status():
         if version_file_path.exists():
             with open(version_file_path, 'r') as f:
                 version_data = json.load(f)
+                # Read update_available directly from file (new format)
+                update_status["update_available"] = version_data.get("update_available", False)
                 update_status["last_check"] = version_data.get("last_check")
                 update_status["repositories"] = version_data.get("repositories", {})
-        
-        # Check if updates are mentioned in output
-        if "Update available" in result.stdout or "⚠" in result.stdout:
-            update_status["update_available"] = True
-        
-        # Check individual repositories by examining output
-        if "Not installed" in result.stdout or "✗" in result.stdout:
-            update_status["update_available"] = True
+        else:
+            # File doesn't exist yet - suggest running update check
+            update_status["message"] = "Version file not found. Run './update.sh --check-only' on the host to check for updates."
         
         return update_status
         
@@ -261,7 +255,7 @@ async def get_status():
         return {
             "update_available": False,
             "error": str(e),
-            "message": "Could not check for updates"
+            "message": "Could not read update status"
         }
 
 @app.post("/api/trigger-update")
