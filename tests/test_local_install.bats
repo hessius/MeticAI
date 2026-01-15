@@ -249,7 +249,17 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 }
 
 @test "QR code function shows fallback message when unavailable" {
-    run grep -q "QR Code generation not available" "$SCRIPT_PATH"
+    run grep -q "QR code not available on this system" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script contains qrencode installation function" {
+    run grep -q "install_qrencode()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script attempts to install qrencode when missing" {
+    run grep -q "Attempting to install" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
