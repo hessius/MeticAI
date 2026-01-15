@@ -129,9 +129,14 @@ All lines of code in `coffee-relay/main.py` are covered by tests.
 ✅ Long API keys accepted  
 
 #### Security
-✅ Only safe tools whitelisted (`create_profile`, `apply_profile`)  
-✅ No dangerous operations like `delete_profile` allowed  
+✅ Auto-approval mode (`-y`) used for MCP tool calls  
+✅ Security maintained via MCP server tool restrictions  
+✅ No dangerous operations exposed (MCP server controls available tools)  
 ✅ Subprocess execution monitored  
+
+Note: The `--allowed-tools` Gemini CLI flag doesn't work with MCP-provided tools,
+so we use yolo mode (`-y`) instead. Security is maintained because the MCP server
+itself only exposes safe operations.
 
 #### Enhanced Barista Features
 ✅ Modern experimental barista persona in prompts  

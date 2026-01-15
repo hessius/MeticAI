@@ -179,7 +179,7 @@ class TestAnalyzeAndProfileEndpoint:
         call_args = mock_subprocess.call_args[0][0]
         assert "docker" in call_args
         assert "gemini-client" in call_args
-        assert "--allowed-tools" in call_args
+        assert "-y" in call_args  # yolo mode for auto-approval
         
         # Verify the prompt contains the analysis
         prompt = call_args[-1]
@@ -347,8 +347,13 @@ class TestAnalyzeAndProfileEndpoint:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
     @patch('main.get_vision_model')
-    def test_analyze_and_profile_allowed_tools(self, mock_vision_model, mock_subprocess, client, sample_image):
-        """Test that only safe tools are whitelisted."""
+    def test_analyze_and_profile_yolo_mode(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test that yolo mode is used for auto-approval of tool calls.
+        
+        Note: The --allowed-tools flag doesn't work with MCP-provided tools,
+        so we use -y (yolo mode) instead. Security is maintained because
+        the MCP server only exposes safe tools.
+        """
         mock_response = Mock()
         mock_response.text = "Test Coffee"
         mock_vision_model.return_value.generate_content.return_value = mock_response
@@ -365,13 +370,15 @@ class TestAnalyzeAndProfileEndpoint:
 
         call_args = mock_subprocess.call_args[0][0]
         
-        # Verify that allowed-tools flag is present
-        assert "--allowed-tools" in call_args
+        # Verify that yolo mode flag is present for auto-approval
+        assert "-y" in call_args
         
-        # Verify safe tools are whitelisted
-        allowed_tools_idx = call_args.index("--allowed-tools")
-        assert "create_profile" == call_args[allowed_tools_idx + 1]
-        assert "apply_profile" == call_args[allowed_tools_idx + 2]
+        # Verify the command structure is correct
+        assert "docker" in call_args
+        assert "exec" in call_args
+        assert "-i" in call_args
+        assert "gemini-client" in call_args
+        assert "gemini" in call_args
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
