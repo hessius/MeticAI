@@ -82,7 +82,8 @@ install_qrencode() {
             ;;
         ubuntu|debian|raspbian)
             echo -e "${YELLOW}Installing qrencode...${NC}"
-            if sudo apt-get update &> /dev/null && sudo apt-get install -y qrencode &> /dev/null; then
+            # Skip update to avoid slowness - qrencode is widely available
+            if sudo apt-get install -y qrencode &> /dev/null; then
                 echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
                 return 0
             else
@@ -108,7 +109,8 @@ install_qrencode() {
             ;;
         arch|manjaro)
             echo -e "${YELLOW}Installing qrencode...${NC}"
-            if sudo pacman -Sy --noconfirm qrencode &> /dev/null; then
+            # Use -S instead of -Sy to avoid slow database sync
+            if sudo pacman -S --noconfirm qrencode &> /dev/null; then
                 echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
                 return 0
             else
@@ -144,16 +146,14 @@ generate_qr_code() {
     
     # If qrencode not found, try to install it automatically
     echo -e "${YELLOW}QR code generator not found. Attempting to install...${NC}"
-    if install_qrencode; then
-        # Try again after installation
-        if command -v qrencode &> /dev/null; then
-            qrencode -t ansiutf8 "$url" 2>/dev/null
-            echo ""
-            echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
-            echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
-            echo ""
-            return
-        fi
+    if install_qrencode && command -v qrencode &> /dev/null; then
+        # Installation succeeded, generate QR code
+        qrencode -t ansiutf8 "$url" 2>/dev/null
+        echo ""
+        echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
+        echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
+        echo ""
+        return
     fi
     
     # Try Python with qrcode library (if available)
