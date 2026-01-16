@@ -213,10 +213,10 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
                 ((REMOVED_MACOS++))
             fi
             
-            # Remove from Dock
-            defaults delete com.apple.dock persistent-apps 2>/dev/null || true
-            killall Dock 2>/dev/null || true
-            echo -e "${GREEN}✓ Removed from Dock${NC}"
+            # Note: Removing the app from Dock programmatically is complex and risky
+            # The Dock will automatically remove the icon when it detects the app is missing
+            # User can also manually remove it by dragging the icon out of the Dock
+            echo -e "${YELLOW}Note: MeticAI icon will disappear from Dock automatically or can be removed manually${NC}"
         else
             echo -e "${YELLOW}Keeping MeticAI.app${NC}"
             KEPT_ITEMS+=("macOS Dock shortcut (user choice)")
