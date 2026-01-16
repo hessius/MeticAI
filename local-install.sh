@@ -82,8 +82,8 @@ install_qrencode() {
             ;;
         ubuntu|debian|raspbian)
             echo -e "${YELLOW}Installing qrencode...${NC}"
-            # Skip update to avoid slowness - qrencode is widely available
-            if sudo apt-get install -y qrencode &> /dev/null; then
+            # Update package cache for more reliable installation
+            if sudo apt-get update &> /dev/null && sudo apt-get install -y qrencode &> /dev/null; then
                 echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
                 return 0
             else
@@ -790,6 +790,24 @@ if ! check_docker_compose; then
     fi
 else
     echo -e "${GREEN}✓ Docker Compose found.${NC}"
+fi
+
+# Check and install qrencode (optional, for QR code generation)
+if ! command -v qrencode &> /dev/null; then
+    echo -e "${YELLOW}qrencode is not installed (used for QR code generation).${NC}"
+    read -r -p "Would you like to install qrencode now? (y/n) [y]: " INSTALL_QRENCODE </dev/tty
+    INSTALL_QRENCODE=${INSTALL_QRENCODE:-y}
+    
+    if [[ "$INSTALL_QRENCODE" =~ ^[Yy]$ ]]; then
+        if ! install_qrencode; then
+            echo -e "${YELLOW}Warning: qrencode installation failed. QR code may not be available at the end.${NC}"
+            echo -e "${YELLOW}Installation will continue - you can still access the web interface via URL.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Skipping qrencode installation. QR code will not be available.${NC}"
+    fi
+else
+    echo -e "${GREEN}✓ qrencode found.${NC}"
 fi
 
 echo -e "${GREEN}✓ All prerequisites satisfied.${NC}"
