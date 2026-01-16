@@ -67,6 +67,8 @@ curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh
 
 That's it! The installer will:
 - ✅ Check for and install prerequisites (git, docker, docker-compose)
+- ✅ Detect and handle any existing MeticAI installations
+- ✅ Stop and remove running MeticAI containers if found
 - ✅ Guide you through setup (just paste your API key and machine IP)
 - ✅ Download and start all services
 - ✅ Show a QR code to access the web interface from your phone
@@ -80,6 +82,15 @@ cd MeticAI
 ```
 
 After installation completes, scan the QR code with your phone or visit `http://YOUR_SERVER_IP:3550` in a browser!
+
+**Reinstalling or Upgrading?**
+
+If you already have MeticAI installed, the installer will:
+- Detect existing containers and installation artifacts
+- Offer to run the uninstall script first for a clean installation
+- Allow you to continue anyway if you prefer to reuse existing configuration
+
+For a clean reinstall, it's recommended to run `./uninstall.sh` first.
 
 ### Need Help?
 - 📖 [Detailed installation guide](TECHNICAL.md#manual-setup-alternative)

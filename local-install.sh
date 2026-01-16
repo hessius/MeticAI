@@ -37,6 +37,154 @@ echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
+# Detect running MeticAI containers
+detect_running_containers() {
+    if ! command -v docker &> /dev/null; then
+        return 1  # Docker not installed, no containers to detect
+    fi
+    
+    # Check for MeticAI-related containers (running or stopped)
+    local containers
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    
+    if [ -n "$containers" ]; then
+        echo "$containers"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Stop and remove MeticAI containers
+stop_and_remove_containers() {
+    echo -e "${YELLOW}Stopping and removing running MeticAI containers...${NC}"
+    
+    # Try docker compose down first (cleaner approach)
+    if [ -f "docker-compose.yml" ]; then
+        if docker compose down 2>/dev/null || docker-compose down 2>/dev/null; then
+            echo -e "${GREEN}✓ Containers stopped and removed via docker compose${NC}"
+            return 0
+        fi
+    fi
+    
+    # Fallback: Remove containers individually
+    local containers
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    
+    if [ -n "$containers" ]; then
+        echo "$containers" | while read -r container; do
+            echo -e "${YELLOW}  Stopping and removing: $container${NC}"
+            docker stop "$container" 2>/dev/null || true
+            docker rm "$container" 2>/dev/null || true
+        done
+        echo -e "${GREEN}✓ Individual containers stopped and removed${NC}"
+    fi
+}
+
+# Detect previous MeticAI installation artifacts
+detect_previous_installation() {
+    local found_items=()
+    
+    # Check for typical MeticAI installation artifacts
+    [ -f ".env" ] && found_items+=(".env file")
+    [ -d "meticulous-source" ] && found_items+=("meticulous-source directory")
+    [ -d "meticai-web" ] && found_items+=("meticai-web directory")
+    [ -f ".versions.json" ] && found_items+=(".versions.json file")
+    [ -f ".update-config.json" ] && found_items+=(".update-config.json file")
+    [ -f ".rebuild-needed" ] && found_items+=(".rebuild-needed file")
+    
+    # Check for macOS-specific installations
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        [ -d "/Applications/MeticAI.app" ] && found_items+=("macOS Dock shortcut")
+        [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ] && found_items+=("rebuild watcher service")
+    fi
+    
+    if [ ${#found_items[@]} -gt 0 ]; then
+        echo "${found_items[@]}"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check for running containers and previous installations
+echo -e "${YELLOW}Checking for existing MeticAI installations...${NC}"
+echo ""
+
+CONTAINERS_FOUND=""
+PREVIOUS_INSTALL_FOUND=""
+
+# Detect running containers
+if CONTAINERS_FOUND=$(detect_running_containers); then
+    echo -e "${YELLOW}Found running MeticAI containers:${NC}"
+    echo "$CONTAINERS_FOUND" | sed 's/^/  - /'
+    echo ""
+fi
+
+# Detect previous installation artifacts
+if PREVIOUS_INSTALL_FOUND=$(detect_previous_installation); then
+    echo -e "${YELLOW}Found existing MeticAI installation artifacts:${NC}"
+    # Convert space-separated list to newlines
+    echo "$PREVIOUS_INSTALL_FOUND" | tr ' ' '\n' | sed 's/^/  - /'
+    echo ""
+fi
+
+# If we found either containers or previous installation, offer uninstall
+if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
+    echo -e "${YELLOW}=========================================${NC}"
+    echo -e "${YELLOW}  Previous Installation Detected${NC}"
+    echo -e "${YELLOW}=========================================${NC}"
+    echo ""
+    echo -e "${BLUE}It looks like MeticAI may already be installed or partially installed.${NC}"
+    echo ""
+    echo -e "${YELLOW}Recommended actions:${NC}"
+    echo "  1) Run the uninstall script first to clean up: ${BLUE}./uninstall.sh${NC}"
+    echo "  2) Then run this installer again for a fresh installation"
+    echo ""
+    echo -e "${YELLOW}Or:${NC}"
+    echo "  3) Continue anyway (may cause conflicts or use existing configuration)"
+    echo ""
+    
+    # Check if uninstall script exists
+    if [ -f "./uninstall.sh" ]; then
+        read -r -p "Would you like to run the uninstall script now? (y/n) [y]: " RUN_UNINSTALL </dev/tty
+        RUN_UNINSTALL=${RUN_UNINSTALL:-y}
+        
+        if [[ "$RUN_UNINSTALL" =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${GREEN}Starting uninstallation...${NC}"
+            echo ""
+            chmod +x ./uninstall.sh
+            exec ./uninstall.sh
+        fi
+    else
+        echo -e "${YELLOW}Note: uninstall.sh not found in current directory.${NC}"
+        echo -e "${YELLOW}You can download it from: https://github.com/hessius/MeticAI${NC}"
+        echo ""
+    fi
+    
+    read -r -p "Continue with installation anyway? (y/n) [n]: " CONTINUE_ANYWAY </dev/tty
+    CONTINUE_ANYWAY=${CONTINUE_ANYWAY:-n}
+    
+    if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
+        echo -e "${GREEN}Installation cancelled. Please clean up first and try again.${NC}"
+        exit 0
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}Continuing with installation...${NC}"
+    
+    # If user chose to continue, stop and remove containers now
+    if [ -n "$CONTAINERS_FOUND" ]; then
+        echo ""
+        stop_and_remove_containers
+    fi
+    
+    echo ""
+fi
+
+
+
 # Check for existing .env file at the very beginning
 if [ -f ".env" ]; then
     echo -e "${YELLOW}Found existing .env file.${NC}"
@@ -1027,8 +1175,8 @@ fi
 echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
 echo "Note: Running with sudo permissions."
 
-# Stop existing containers if running
-sudo docker compose down 2>/dev/null
+# Stop existing containers if running (in case any were missed earlier)
+sudo docker compose down 2>/dev/null || true
 
 # Build and start
 if sudo docker compose up -d --build; then
