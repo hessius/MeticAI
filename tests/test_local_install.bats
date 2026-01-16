@@ -38,6 +38,26 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "Script contains prerequisite checks for qrencode" {
+    run grep -q "command -v qrencode" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script prompts to install qrencode in prerequisites section" {
+    run grep -q "Would you like to install qrencode now?" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script marks qrencode as optional dependency" {
+    run grep -q "qrencode is not installed (used for QR code generation)" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script continues installation if qrencode install fails" {
+    run grep -q "Warning: qrencode installation failed. QR code may not be available" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
 @test "Script validates API key is not empty" {
     run grep -q "API Key cannot be empty" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
@@ -260,6 +280,12 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 
 @test "Script attempts to install qrencode when missing" {
     run grep -q "Attempting to install" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script runs apt-get update before installing qrencode on Debian systems" {
+    # Verify that apt-get update is part of qrencode installation for ubuntu/debian/raspbian
+    run bash -c "sed -n '/ubuntu|debian|raspbian)/,/;;/p' '$SCRIPT_PATH' | grep -q 'apt-get update.*&&.*apt-get install.*qrencode'"
     [ "$status" -eq 0 ]
 }
 
