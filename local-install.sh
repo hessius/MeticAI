@@ -37,7 +37,223 @@ echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
-# Check for existing .env file at the very beginning
+# Detect running MeticAI containers
+detect_running_containers() {
+    if ! command -v docker &> /dev/null; then
+        return 1  # Docker not installed, no containers to detect
+    fi
+    
+    # Check for MeticAI-related containers (running or stopped)
+    local containers
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    
+    if [ -n "$containers" ]; then
+        echo "$containers"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Stop and remove MeticAI containers
+stop_and_remove_containers() {
+    echo -e "${YELLOW}Stopping and removing running MeticAI containers...${NC}"
+    
+    # Try docker compose down first (cleaner approach)
+    if [ -f "docker-compose.yml" ]; then
+        if docker compose down 2>/dev/null || docker-compose down 2>/dev/null; then
+            echo -e "${GREEN}✓ Containers stopped and removed via docker compose${NC}"
+            return 0
+        fi
+    fi
+    
+    # Fallback: Remove containers individually
+    local containers
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    
+    if [ -n "$containers" ]; then
+        while IFS= read -r container; do
+            echo -e "${YELLOW}  Stopping and removing: $container${NC}"
+            docker stop "$container" 2>/dev/null || true
+            docker rm "$container" 2>/dev/null || true
+        done < <(echo "$containers")
+        echo -e "${GREEN}✓ Individual containers stopped and removed${NC}"
+    fi
+}
+
+# Detect previous MeticAI installation artifacts
+detect_previous_installation() {
+    local found_items=()
+    
+    # Check for typical MeticAI installation artifacts
+    [ -f ".env" ] && found_items+=(".env file")
+    [ -d "meticulous-source" ] && found_items+=("meticulous-source directory")
+    [ -d "meticai-web" ] && found_items+=("meticai-web directory")
+    [ -f ".versions.json" ] && found_items+=(".versions.json file")
+    [ -f ".update-config.json" ] && found_items+=(".update-config.json file")
+    [ -f ".rebuild-needed" ] && found_items+=(".rebuild-needed file")
+    
+    # Check for macOS-specific installations
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        [ -d "/Applications/MeticAI.app" ] && found_items+=("macOS Dock shortcut")
+        [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ] && found_items+=("rebuild watcher service")
+    fi
+    
+    if [ ${#found_items[@]} -gt 0 ]; then
+        # Return items line-separated to handle items with spaces
+        printf '%s\n' "${found_items[@]}"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check for running containers and previous installations
+echo -e "${YELLOW}Checking for existing MeticAI installations...${NC}"
+echo ""
+
+CONTAINERS_FOUND=""
+PREVIOUS_INSTALL_FOUND=""
+
+# Detect running containers
+if CONTAINERS_FOUND=$(detect_running_containers); then
+    echo -e "${YELLOW}Found running MeticAI containers:${NC}"
+    echo "$CONTAINERS_FOUND" | sed 's/^/  - /'
+    echo ""
+fi
+
+# Detect previous installation artifacts
+if PREVIOUS_INSTALL_FOUND=$(detect_previous_installation); then
+    echo -e "${YELLOW}Found existing MeticAI installation artifacts:${NC}"
+    # Items are returned line-separated, so we can process them directly
+    echo "$PREVIOUS_INSTALL_FOUND" | while IFS= read -r item; do
+        echo "  - $item"
+    done
+    echo ""
+fi
+
+# If we found either containers or previous installation, offer uninstall
+if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
+    echo -e "${YELLOW}=========================================${NC}"
+    echo -e "${YELLOW}  Previous Installation Detected${NC}"
+    echo -e "${YELLOW}=========================================${NC}"
+    echo ""
+    echo -e "${BLUE}It looks like MeticAI may already be installed or partially installed.${NC}"
+    echo ""
+    echo -e "${YELLOW}Recommended actions:${NC}"
+    echo "  1) Run the uninstall script first to clean up: ${BLUE}./uninstall.sh${NC}"
+    echo "  2) Then run this installer again for a fresh installation"
+    echo ""
+    echo -e "${YELLOW}Or:${NC}"
+    echo "  3) Continue anyway (may cause conflicts or use existing configuration)"
+    echo ""
+    
+    # Check if uninstall script exists
+    if [ -f "./uninstall.sh" ]; then
+        read -r -p "Would you like to run the uninstall script now? (y/n) [y]: " RUN_UNINSTALL </dev/tty
+        RUN_UNINSTALL=${RUN_UNINSTALL:-y}
+        
+        if [[ "$RUN_UNINSTALL" =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${GREEN}Starting uninstallation...${NC}"
+            echo ""
+            chmod +x ./uninstall.sh
+            exec ./uninstall.sh
+        fi
+    else
+        # Handle older installations that don't have uninstall.sh
+        echo -e "${YELLOW}=========================================${NC}"
+        echo -e "${YELLOW}  Uninstall Script Not Found${NC}"
+        echo -e "${YELLOW}=========================================${NC}"
+        echo ""
+        echo -e "${BLUE}This appears to be an older MeticAI installation without the uninstall script.${NC}"
+        echo ""
+        echo -e "${YELLOW}Options for cleanup:${NC}"
+        echo ""
+        echo -e "${GREEN}1) Automatic cleanup (recommended):${NC}"
+        echo "   - Stop and remove running containers"
+        echo "   - Remove cloned repositories (meticulous-source, meticai-web)"
+        echo "   - Keep your .env configuration file for reuse"
+        echo ""
+        echo -e "${GREEN}2) Manual cleanup:${NC}"
+        echo "   - Download the latest uninstall script from:"
+        echo "     ${BLUE}https://raw.githubusercontent.com/hessius/MeticAI/main/uninstall.sh${NC}"
+        echo "   - Or manually remove: meticulous-source/, meticai-web/, .env"
+        echo ""
+        echo -e "${GREEN}3) Continue without cleanup:${NC}"
+        echo "   - Containers will be stopped automatically"
+        echo "   - Existing configuration will be reused if available"
+        echo ""
+        
+        read -r -p "Would you like automatic cleanup? (y/n) [y]: " AUTO_CLEANUP </dev/tty
+        AUTO_CLEANUP=${AUTO_CLEANUP:-y}
+        
+        if [[ "$AUTO_CLEANUP" =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${GREEN}Performing automatic cleanup...${NC}"
+            echo ""
+            
+            # Stop and remove containers
+            if [ -n "$CONTAINERS_FOUND" ]; then
+                stop_and_remove_containers
+                echo ""
+            fi
+            
+            # Remove cloned repositories
+            if [ -d "meticulous-source" ]; then
+                echo -e "${YELLOW}Removing meticulous-source directory...${NC}"
+                rm -rf meticulous-source
+                echo -e "${GREEN}✓ Removed meticulous-source${NC}"
+            fi
+            
+            if [ -d "meticai-web" ]; then
+                echo -e "${YELLOW}Removing meticai-web directory...${NC}"
+                rm -rf meticai-web
+                echo -e "${GREEN}✓ Removed meticai-web${NC}"
+            fi
+            
+            # Keep .env file for configuration reuse
+            if [ -f ".env" ]; then
+                echo -e "${BLUE}ℹ Keeping .env file for configuration reuse${NC}"
+            fi
+            
+            echo ""
+            echo -e "${GREEN}Cleanup complete! Proceeding with fresh installation...${NC}"
+            echo ""
+            
+            # Skip the "continue anyway" prompt since we've cleaned up
+            CONTINUE_ANYWAY="y"
+        fi
+    fi
+    
+    # Only prompt to continue if user hasn't already chosen automatic cleanup
+    if [[ "$CONTINUE_ANYWAY" != "y" ]]; then
+        read -r -p "Continue with installation anyway? (y/n) [n]: " CONTINUE_ANYWAY </dev/tty
+        CONTINUE_ANYWAY=${CONTINUE_ANYWAY:-n}
+        
+        if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
+            echo -e "${GREEN}Installation cancelled. Please clean up first and try again.${NC}"
+            exit 0
+        fi
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}Continuing with installation...${NC}"
+    
+    # If user chose to continue, stop and remove containers now
+    if [ -n "$CONTAINERS_FOUND" ]; then
+        echo ""
+        stop_and_remove_containers
+    fi
+    
+    echo ""
+fi
+
+
+
+# Configuration Step: Check for existing .env file
+# Note: We reach here only if user chose to continue with existing installation
+# or if no previous installation was detected
 if [ -f ".env" ]; then
     echo -e "${YELLOW}Found existing .env file.${NC}"
     echo ""
@@ -1027,8 +1243,9 @@ fi
 echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
 echo "Note: Running with sudo permissions."
 
-# Stop existing containers if running
-sudo docker compose down 2>/dev/null
+# Stop existing containers if running (safety net in case any were missed earlier)
+# This handles edge cases where containers might have been started after detection
+sudo docker compose down 2>/dev/null || true
 
 # Build and start
 if sudo docker compose up -d --build; then

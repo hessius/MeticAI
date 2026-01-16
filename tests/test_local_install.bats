@@ -302,3 +302,185 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     run bash -c "grep -A 50 'generate_qr_code()' '$SCRIPT_PATH' | grep -c 'exit 1'"
     [ "$output" -eq 0 ]
 }
+
+@test "Script contains function to detect running containers" {
+    run grep -q "detect_running_containers()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script contains function to stop and remove containers" {
+    run grep -q "stop_and_remove_containers()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script contains function to detect previous installation" {
+    run grep -q "detect_previous_installation()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script checks for running MeticAI containers early in installation" {
+    run grep -q "Checking for existing MeticAI installations" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects meticulous-mcp-server container" {
+    run grep -q "meticulous-mcp-server" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects gemini-client container" {
+    run grep -q "gemini-client" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects coffee-relay container" {
+    run grep -q "coffee-relay" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects meticai-web container" {
+    run grep -q "meticai-web" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script prompts to run uninstall script when previous installation found" {
+    run grep -q "Would you like to run the uninstall script now?" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script offers to continue anyway if previous installation found" {
+    run grep -q "Continue with installation anyway?" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script defaults to cancelling installation when previous install detected" {
+    run grep -q 'CONTINUE_ANYWAY=\${CONTINUE_ANYWAY:-n}' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script recommends running uninstall script first" {
+    run grep -q "Run the uninstall script first to clean up" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects .env file as installation artifact" {
+    run bash -c "grep -A 20 'detect_previous_installation()' '$SCRIPT_PATH' | grep -q '\\.env'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects meticulous-source directory as installation artifact" {
+    run bash -c "grep -A 20 'detect_previous_installation()' '$SCRIPT_PATH' | grep -q 'meticulous-source'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects meticai-web directory as installation artifact" {
+    run bash -c "grep -A 20 'detect_previous_installation()' '$SCRIPT_PATH' | grep -q 'meticai-web'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects macOS Dock shortcut as installation artifact" {
+    run bash -c "grep -A 30 'detect_previous_installation()' '$SCRIPT_PATH' | grep -q 'Applications/MeticAI.app'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script detects rebuild watcher service as installation artifact" {
+    run bash -c "grep -A 30 'detect_previous_installation()' '$SCRIPT_PATH' | grep -q 'com.meticai.rebuild-watcher.plist'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script stops containers before proceeding if user chooses to continue" {
+    run grep -q "stop_and_remove_containers" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script uses docker compose down to stop containers" {
+    run bash -c "grep -A 10 'stop_and_remove_containers()' '$SCRIPT_PATH' | grep -q 'docker compose down'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script has fallback to stop containers individually" {
+    run bash -c "grep -A 20 'stop_and_remove_containers()' '$SCRIPT_PATH' | grep -q 'docker stop'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script checks for uninstall.sh existence before offering to run it" {
+    run grep -q 'if \[ -f "./uninstall.sh" \]; then' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script makes uninstall.sh executable before running it" {
+    run grep -q 'chmod +x ./uninstall.sh' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script provides GitHub URL if uninstall.sh is missing" {
+    run grep -q "https://raw.githubusercontent.com/hessius/MeticAI/main/uninstall.sh" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script exits gracefully when user declines to continue" {
+    run grep -q "Installation cancelled. Please clean up first and try again" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script displays found containers with formatting" {
+    run grep -q "Found running MeticAI containers:" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script displays found installation artifacts with formatting" {
+    run grep -q "Found existing MeticAI installation artifacts:" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script checks for previous installations before prerequisites" {
+    # Verify that the previous installation check comes before prerequisite checks
+    local check_line=$(grep -n "Checking for existing MeticAI installations" "$SCRIPT_PATH" | cut -d: -f1)
+    local prereq_line=$(grep -n "\[1/4\] Checking and installing prerequisites" "$SCRIPT_PATH" | cut -d: -f1)
+    [ "$check_line" -lt "$prereq_line" ]
+}
+
+@test "Script offers automatic cleanup when uninstall.sh is missing" {
+    run grep -q "Would you like automatic cleanup?" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script explains automatic cleanup option clearly" {
+    run grep -q "Automatic cleanup (recommended):" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script provides manual cleanup instructions when uninstall.sh missing" {
+    run grep -q "Manual cleanup:" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script handles older installations without uninstall.sh" {
+    run grep -q "This appears to be an older MeticAI installation without the uninstall script" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script automatic cleanup removes meticulous-source directory" {
+    run bash -c "grep -A 50 'AUTO_CLEANUP.*=~.*Yy' '$SCRIPT_PATH' | grep -q 'rm -rf meticulous-source'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script automatic cleanup removes meticai-web directory" {
+    run bash -c "grep -A 50 'AUTO_CLEANUP.*=~.*Yy' '$SCRIPT_PATH' | grep -q 'rm -rf meticai-web'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script automatic cleanup preserves .env file" {
+    run bash -c "grep -A 50 'AUTO_CLEANUP.*=~.*Yy' '$SCRIPT_PATH' | grep -q 'Keeping .env file for configuration reuse'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script provides direct download link for uninstall script" {
+    run grep -q "https://raw.githubusercontent.com/hessius/MeticAI/main/uninstall.sh" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script skips continue prompt after automatic cleanup" {
+    run grep -q 'if \[\[ "$CONTINUE_ANYWAY" != "y" \]\]; then' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
