@@ -74,16 +74,19 @@ jobs:
         run: |
           chmod +x local-install.sh
           chmod +x web_install.sh
+          chmod +x uninstall.sh
       
       - name: Run Bash tests
         run: |
           bats tests/test_local_install.bats
           bats tests/test_web_install.bats
+          bats tests/test_uninstall.bats
       
       - name: Verify script syntax
         run: |
           bash -n local-install.sh
           bash -n web_install.sh
+          bash -n uninstall.sh
 
   integration-check:
     name: Integration Tests
