@@ -50,6 +50,49 @@ Note: Use sudo if your user does not have direct docker permissions
 sudo docker compose up -d --build
 ```
 
+## Installation Process Details
+
+### Automated Installer Features
+
+The `local-install.sh` script includes several safety features to ensure a clean installation:
+
+#### Previous Installation Detection
+
+Before starting the installation, the script automatically checks for:
+- Running MeticAI containers (`meticulous-mcp-server`, `gemini-client`, `coffee-relay`, `meticai-web`)
+- Existing installation artifacts (`.env`, `meticulous-source/`, `meticai-web/`, etc.)
+- macOS-specific integrations (Dock shortcuts, rebuild watcher service)
+
+If any previous installation is detected, you'll be prompted with options:
+1. **Run uninstall script first** (recommended for clean reinstall)
+2. **Continue anyway** (reuses existing configuration if available)
+
+#### Container Cleanup
+
+The installer automatically:
+- Detects running MeticAI containers
+- Stops and removes them gracefully before proceeding
+- Uses `docker compose down` when possible for clean shutdown
+- Falls back to individual container removal if needed
+
+This ensures:
+- No port conflicts during installation
+- Fresh container builds with latest changes
+- Proper cleanup of orphaned containers
+
+#### Safe Reinstallation Workflow
+
+For the cleanest reinstallation experience:
+```bash
+# 1. Run the uninstaller
+./uninstall.sh
+
+# 2. Run the installer
+./local-install.sh
+```
+
+Alternatively, the installer will offer to run the uninstaller automatically when previous installations are detected.
+
 ## Testing
 
 MeticAI includes a comprehensive test suite to ensure code quality and reliability.
