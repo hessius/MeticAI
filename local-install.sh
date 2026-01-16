@@ -1073,6 +1073,7 @@ if sudo docker compose up -d --build; then
     echo -e "${BLUE}curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/analyze_and_profile${NC}"
     echo ""
     echo -e "${YELLOW}💡 Tip: Run './update.sh' anytime to check for updates to MeticAI and dependencies${NC}"
+    echo -e "${YELLOW}💡 To uninstall MeticAI later, run './uninstall.sh'${NC}"
     echo ""
     
     # Run startup update check
