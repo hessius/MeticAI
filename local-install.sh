@@ -100,7 +100,8 @@ detect_previous_installation() {
     fi
     
     if [ ${#found_items[@]} -gt 0 ]; then
-        echo "${found_items[@]}"
+        # Return items line-separated to handle items with spaces
+        printf '%s\n' "${found_items[@]}"
         return 0
     else
         return 1
@@ -124,11 +125,9 @@ fi
 # Detect previous installation artifacts
 if PREVIOUS_INSTALL_FOUND=$(detect_previous_installation); then
     echo -e "${YELLOW}Found existing MeticAI installation artifacts:${NC}"
-    # Convert array output to properly formatted list
-    # Use printf to properly handle items with spaces
-    echo "$PREVIOUS_INSTALL_FOUND" | tr ' ' '\n' | while IFS= read -r item; do
-        # Only print if item is not empty
-        [ -n "$item" ] && echo "  - $item"
+    # Items are returned line-separated, so we can process them directly
+    echo "$PREVIOUS_INSTALL_FOUND" | while IFS= read -r item; do
+        echo "  - $item"
     done
     echo ""
 fi
@@ -1181,7 +1180,8 @@ fi
 echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
 echo "Note: Running with sudo permissions."
 
-# Stop existing containers if running (in case any were missed earlier)
+# Stop existing containers if running (safety net in case any were missed earlier)
+# This handles edge cases where containers might have been started after detection
 sudo docker compose down 2>/dev/null || true
 
 # Build and start
