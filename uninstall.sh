@@ -430,5 +430,6 @@ echo -e "${BLUE}Thank you for using MeticAI! ☕️${NC}"
 echo ""
 echo -e "${YELLOW}Note: This directory ($(pwd)) still contains the MeticAI source code.${NC}"
 echo -e "${YELLOW}You can safely delete it if you no longer need it:${NC}"
-echo -e "${BLUE}  cd .. && rm -rf $(basename "$(pwd)")${NC}"
+CURRENT_DIR_NAME=$(basename "$(pwd)")
+echo -e "${BLUE}  cd .. && rm -rf \"$CURRENT_DIR_NAME\"${NC}"
 echo ""
