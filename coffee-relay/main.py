@@ -1,5 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from typing import Optional
 import google.generativeai as genai
 from PIL import Image
@@ -8,8 +9,83 @@ import os
 import subprocess
 import json
 from pathlib import Path
+import uuid
+import time
+from logging_config import setup_logging, get_logger
+
+# Initialize logging system
+logger = setup_logging()
 
 app = FastAPI()
+
+# Middleware for request logging and tracking
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all requests with context and timing."""
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+    
+    # Extract request metadata
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    # Log incoming request
+    logger.info(
+        f"Incoming request: {request.method} {request.url.path}",
+        extra={
+            "request_id": request_id,
+            "endpoint": request.url.path,
+            "method": request.method,
+            "client_ip": client_ip,
+            "user_agent": user_agent
+        }
+    )
+    
+    # Store request_id in request state for use in endpoints
+    request.state.request_id = request_id
+    
+    try:
+        response = await call_next(request)
+        
+        # Calculate duration
+        duration_ms = int((time.time() - start_time) * 1000)
+        
+        # Log response
+        logger.info(
+            f"Request completed: {request.method} {request.url.path} - {response.status_code}",
+            extra={
+                "request_id": request_id,
+                "endpoint": request.url.path,
+                "method": request.method,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+                "client_ip": client_ip,
+                "user_agent": user_agent
+            }
+        )
+        
+        return response
+    except Exception as e:
+        # Calculate duration even for errors
+        duration_ms = int((time.time() - start_time) * 1000)
+        
+        # Log error with full context
+        logger.error(
+            f"Request failed: {request.method} {request.url.path} - {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "endpoint": request.url.path,
+                "method": request.method,
+                "client_ip": client_ip,
+                "user_agent": user_agent,
+                "duration_ms": duration_ms,
+                "error_type": type(e).__name__
+            }
+        )
+        
+        # Re-raise to let FastAPI handle it
+        raise
 
 # Configure CORS middleware to allow web app interactions
 app.add_middleware(
@@ -90,23 +166,66 @@ USER_SUMMARY_INSTRUCTIONS = (
 )
 
 @app.post("/analyze_coffee")
-async def analyze_coffee(file: UploadFile = File(...)):
+async def analyze_coffee(file: UploadFile = File(...), request: Request = None):
     """Phase 1: Look at the bag."""
+    request_id = request.state.request_id if request else "unknown"
+    
     try:
+        logger.info(
+            "Starting coffee analysis",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_coffee",
+                "filename": file.filename,
+                "content_type": file.content_type
+            }
+        )
+        
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
+        
+        logger.debug(
+            "Image loaded successfully",
+            extra={
+                "request_id": request_id,
+                "image_size": f"{image.width}x{image.height}",
+                "image_format": image.format
+            }
+        )
         
         response = get_vision_model().generate_content([
             "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
             "Return ONLY a single concise sentence describing the coffee.", 
             image
         ])
-        return {"analysis": response.text.strip()}
+        
+        analysis = response.text.strip()
+        
+        logger.info(
+            "Coffee analysis completed successfully",
+            extra={
+                "request_id": request_id,
+                "analysis_preview": analysis[:100] if len(analysis) > 100 else analysis
+            }
+        )
+        
+        return {"analysis": analysis}
     except Exception as e:
+        logger.error(
+            f"Coffee analysis failed: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_coffee",
+                "error_type": type(e).__name__,
+                "filename": file.filename if file else None
+            }
+        )
         return {"error": str(e)}
 
 @app.post("/analyze_and_profile")
 async def analyze_and_profile(
+    request: Request,
     file: Optional[UploadFile] = File(None),
     user_prefs: Optional[str] = Form(None)
 ):
@@ -116,9 +235,17 @@ async def analyze_and_profile(
     - file: Image of the coffee bag
     - user_prefs: User preferences or specific instructions
     """
+    request_id = request.state.request_id if request else "unknown"
     
     # Validate that at least one input is provided
     if not file and not user_prefs:
+        logger.warning(
+            "Request missing both file and user preferences",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_and_profile"
+            }
+        )
         raise HTTPException(
             status_code=400,
             detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"
@@ -127,8 +254,21 @@ async def analyze_and_profile(
     coffee_analysis = None
     
     try:
+        logger.info(
+            "Starting profile creation",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_and_profile",
+                "has_image": file is not None,
+                "has_preferences": user_prefs is not None,
+                "filename": file.filename if file else None,
+                "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs
+            }
+        )
+        
         # If image is provided, analyze it first
         if file:
+            logger.debug("Reading and analyzing image", extra={"request_id": request_id})
             contents = await file.read()
             image = Image.open(io.BytesIO(contents))
             
@@ -139,6 +279,14 @@ async def analyze_and_profile(
                 image
             ])
             coffee_analysis = analysis_response.text.strip()
+            
+            logger.info(
+                "Coffee analysis completed",
+                extra={
+                    "request_id": request_id,
+                    "analysis": coffee_analysis
+                }
+            )
         
         # Construct the profile creation prompt
         if coffee_analysis and user_prefs:
@@ -181,6 +329,14 @@ async def analyze_and_profile(
                 OUTPUT_FORMAT
             )
         
+        logger.debug(
+            "Executing profile creation via Gemini",
+            extra={
+                "request_id": request_id,
+                "prompt_length": len(final_prompt)
+            }
+        )
+        
         # Execute profile creation via docker
         # Note: Using -y (yolo mode) to auto-approve tool calls.
         # The --allowed-tools flag doesn't work with MCP-provided tools.
@@ -196,11 +352,29 @@ async def analyze_and_profile(
         )
         
         if result.returncode != 0:
+            logger.error(
+                "Profile creation subprocess failed",
+                extra={
+                    "request_id": request_id,
+                    "returncode": result.returncode,
+                    "stderr": result.stderr,
+                    "stdout": result.stdout
+                }
+            )
             return {
                 "status": "error", 
                 "analysis": coffee_analysis,
                 "message": result.stderr
             }
+        
+        logger.info(
+            "Profile creation completed successfully",
+            extra={
+                "request_id": request_id,
+                "analysis": coffee_analysis,
+                "output_preview": result.stdout[:200] if len(result.stdout) > 200 else result.stdout
+            }
+        )
             
         return {
             "status": "success",
@@ -209,6 +383,18 @@ async def analyze_and_profile(
         }
 
     except Exception as e:
+        logger.error(
+            f"Profile creation failed: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_and_profile",
+                "error_type": type(e).__name__,
+                "coffee_analysis": coffee_analysis,
+                "has_image": file is not None,
+                "has_preferences": user_prefs is not None
+            }
+        )
         return {
             "status": "error",
             "analysis": coffee_analysis if coffee_analysis else None,
@@ -216,7 +402,7 @@ async def analyze_and_profile(
         }
 
 @app.get("/status")
-async def get_status():
+async def get_status(request: Request):
     """Get system status including update availability.
     
     Returns:
@@ -228,7 +414,11 @@ async def get_status():
     script running on the host. The file is mounted into the container.
     Run './update.sh --check-only' on the host to refresh update status.
     """
+    request_id = request.state.request_id if request else "unknown"
+    
     try:
+        logger.debug("Checking system status", extra={"request_id": request_id})
+        
         # Read version file directly (mounted from host)
         # The file is updated by update.sh --check-only running on the host
         version_file_path = Path("/app/.versions.json")
@@ -248,10 +438,23 @@ async def get_status():
         else:
             # File doesn't exist yet - suggest running update check
             update_status["message"] = "Version file not found. Run './update.sh --check-only' on the host to check for updates."
+            logger.warning(
+                "Version file not found",
+                extra={"request_id": request_id, "version_file": str(version_file_path)}
+            )
         
         return update_status
         
     except Exception as e:
+        logger.error(
+            f"Failed to read system status: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "endpoint": "/status",
+                "error_type": type(e).__name__
+            }
+        )
         return {
             "update_available": False,
             "error": str(e),
@@ -259,7 +462,7 @@ async def get_status():
         }
 
 @app.post("/api/trigger-update")
-async def trigger_update():
+async def trigger_update(request: Request):
     """Trigger the backend update process by running update.sh --auto.
     
     This endpoint executes the update script in non-interactive mode.
@@ -270,11 +473,25 @@ async def trigger_update():
         - output: stdout from the update script
         - error: stderr from the update script (if any)
     """
+    request_id = request.state.request_id if request else "unknown"
+    
     try:
+        logger.info(
+            "Triggering system update",
+            extra={"request_id": request_id, "endpoint": "/api/trigger-update"}
+        )
+        
         # The update script is mounted at /app/update.sh
         script_path = Path("/app/update.sh")
         
         if not script_path.exists():
+            logger.error(
+                "Update script not found",
+                extra={
+                    "request_id": request_id,
+                    "script_path": str(script_path)
+                }
+            )
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -286,6 +503,14 @@ async def trigger_update():
         
         # Run update script with --auto flag for non-interactive mode
         # Timeout set to 10 minutes to prevent hanging processes
+        logger.debug(
+            "Executing update script",
+            extra={
+                "request_id": request_id,
+                "script_path": str(script_path)
+            }
+        )
+        
         result = subprocess.run(
             ["bash", str(script_path), "--auto"],
             capture_output=True,
@@ -295,12 +520,28 @@ async def trigger_update():
         )
         
         if result.returncode == 0:
+            logger.info(
+                "Update completed successfully",
+                extra={
+                    "request_id": request_id,
+                    "output": result.stdout[:500]  # Log first 500 chars
+                }
+            )
             return {
                 "status": "success",
                 "output": result.stdout,
                 "message": "Update script completed successfully"
             }
         else:
+            logger.error(
+                "Update script failed",
+                extra={
+                    "request_id": request_id,
+                    "returncode": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr
+                }
+            )
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -311,6 +552,11 @@ async def trigger_update():
                 }
             )
     except subprocess.TimeoutExpired:
+        logger.error(
+            "Update script timed out",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -320,6 +566,14 @@ async def trigger_update():
             }
         )
     except subprocess.SubprocessError as e:
+        logger.error(
+            f"Update subprocess error: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "error_type": type(e).__name__
+            }
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -329,11 +583,128 @@ async def trigger_update():
             }
         )
     except Exception as e:
+        logger.error(
+            f"Unexpected error during update: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "error_type": type(e).__name__
+            }
+        )
         raise HTTPException(
             status_code=500,
             detail={
                 "status": "error",
                 "error": str(e),
                 "message": "An unexpected error occurred"
+            }
+        )
+
+
+@app.get("/api/logs")
+async def get_logs(
+    request: Request,
+    lines: int = 100,
+    level: Optional[str] = None,
+    log_type: str = "all"
+):
+    """Retrieve recent log entries for debugging and diagnostics.
+    
+    Args:
+        lines: Number of lines to retrieve (default: 100, max: 1000)
+        level: Filter by log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_type: Type of logs to retrieve - "all" or "errors" (default: "all")
+    
+    Returns:
+        - logs: List of log entries (most recent first)
+        - total_lines: Total number of log lines returned
+        - log_file: Path to the log file
+    """
+    request_id = request.state.request_id if request else "unknown"
+    
+    try:
+        logger.info(
+            "Log retrieval requested",
+            extra={
+                "request_id": request_id,
+                "lines": lines,
+                "level": level,
+                "log_type": log_type
+            }
+        )
+        
+        # Limit lines to prevent overwhelming responses
+        lines = min(lines, 1000)
+        
+        # Determine which log file to read
+        log_dir = Path("/app/logs")
+        if log_type == "errors":
+            log_file = log_dir / "coffee-relay-errors.log"
+        else:
+            log_file = log_dir / "coffee-relay.log"
+        
+        if not log_file.exists():
+            logger.warning(
+                f"Log file not found: {log_file}",
+                extra={"request_id": request_id, "log_file": str(log_file)}
+            )
+            return {
+                "logs": [],
+                "total_lines": 0,
+                "log_file": str(log_file),
+                "message": "Log file not found - logging may not be initialized yet"
+            }
+        
+        # Read log file (last N lines)
+        with open(log_file, 'r', encoding='utf-8') as f:
+            all_lines = f.readlines()
+            recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+        
+        # Parse JSON log entries
+        log_entries = []
+        for line in reversed(recent_lines):  # Most recent first
+            try:
+                log_entry = json.loads(line.strip())
+                
+                # Filter by level if specified
+                if level and log_entry.get("level") != level.upper():
+                    continue
+                
+                log_entries.append(log_entry)
+            except json.JSONDecodeError:
+                # Skip malformed lines
+                continue
+        
+        logger.debug(
+            f"Retrieved {len(log_entries)} log entries",
+            extra={"request_id": request_id, "log_file": str(log_file)}
+        )
+        
+        return {
+            "logs": log_entries,
+            "total_lines": len(log_entries),
+            "log_file": str(log_file),
+            "filters": {
+                "lines_requested": lines,
+                "level": level,
+                "log_type": log_type
+            }
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to retrieve logs: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "error_type": type(e).__name__
+            }
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to retrieve logs"
             }
         )
