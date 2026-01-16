@@ -284,7 +284,8 @@ fi
 
 # Make sure local-install.sh is executable
 chmod +x ./local-install.sh
-chmod +x ./uninstall.sh 2>/dev/null || true
+# Also make uninstall.sh executable for later use
+chmod +x ./uninstall.sh
 
 # Execute the local installer
 echo ""
