@@ -222,6 +222,7 @@ Supports advanced espresso methods:
 ### For Users
 - 📱 [iOS Shortcuts Setup Guide](IOS_SHORTCUTS.md)
 - 🔄 [Update System Guide](UPDATE_GUIDE.md)
+- 📊 [Logging & Diagnostics](LOGGING.md)
 - 🔧 [Troubleshooting](#troubleshooting)
 
 ### For Developers
@@ -265,7 +266,21 @@ Supports advanced espresso methods:
 
 ### Getting Help
 
-**Check logs:**
+**Check detailed logs:**
+```bash
+# View structured error logs
+tail -f logs/coffee-relay-errors.log | jq .
+
+# View all logs
+tail -f logs/coffee-relay.log | jq .
+
+# Or via API
+curl "http://localhost:8000/api/logs?level=ERROR&lines=100"
+
+# See LOGGING.md for more details
+```
+
+**Check container logs:**
 ```bash
 # All services
 docker compose logs -f
@@ -286,6 +301,8 @@ docker compose restart
 docker compose down
 docker compose up -d --build
 ```
+
+For comprehensive troubleshooting and log analysis, see [LOGGING.md](LOGGING.md).
 
 ---
 
