@@ -151,6 +151,30 @@ The system automatically:
 
 [→ Full update system documentation](UPDATE_GUIDE.md)
 
+## 🗑️ Uninstalling MeticAI
+
+Need to remove MeticAI? We've got you covered with a clean uninstallation process.
+
+**Run the uninstaller:**
+```bash
+./uninstall.sh
+```
+
+The uninstaller will:
+- ✅ Stop and remove all Docker containers
+- ✅ Remove Docker images built by MeticAI
+- ✅ Remove cloned repositories (meticulous-source, meticai-web)
+- ✅ Remove configuration files (.env, settings)
+- ✅ Remove macOS integrations (Dock shortcut, rebuild watcher)
+- ✅ Ask about external dependencies (Docker, git, qrencode)
+
+**Safe by default:**
+- External dependencies are **NOT** automatically removed
+- You'll be asked to confirm before removing anything
+- Summary shows what was removed and what was kept
+
+**Note:** The uninstaller doesn't remove Docker, git, or other tools unless you explicitly choose to do so. This is safe if you use these tools for other projects.
+
 ---
 
 ## 🎨 What Makes MeticAI Special
