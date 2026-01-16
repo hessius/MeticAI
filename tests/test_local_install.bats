@@ -414,7 +414,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 }
 
 @test "Script provides GitHub URL if uninstall.sh is missing" {
-    run grep -q "You can download it from: https://github.com/hessius/MeticAI" "$SCRIPT_PATH"
+    run grep -q "https://raw.githubusercontent.com/hessius/MeticAI/main/uninstall.sh" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
@@ -438,4 +438,49 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     local check_line=$(grep -n "Checking for existing MeticAI installations" "$SCRIPT_PATH" | cut -d: -f1)
     local prereq_line=$(grep -n "\[1/4\] Checking and installing prerequisites" "$SCRIPT_PATH" | cut -d: -f1)
     [ "$check_line" -lt "$prereq_line" ]
+}
+
+@test "Script offers automatic cleanup when uninstall.sh is missing" {
+    run grep -q "Would you like automatic cleanup?" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script explains automatic cleanup option clearly" {
+    run grep -q "Automatic cleanup (recommended):" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script provides manual cleanup instructions when uninstall.sh missing" {
+    run grep -q "Manual cleanup:" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script handles older installations without uninstall.sh" {
+    run grep -q "This appears to be an older MeticAI installation without the uninstall script" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script automatic cleanup removes meticulous-source directory" {
+    run bash -c "grep -A 50 'AUTO_CLEANUP.*=~.*Yy' '$SCRIPT_PATH' | grep -q 'rm -rf meticulous-source'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script automatic cleanup removes meticai-web directory" {
+    run bash -c "grep -A 50 'AUTO_CLEANUP.*=~.*Yy' '$SCRIPT_PATH' | grep -q 'rm -rf meticai-web'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script automatic cleanup preserves .env file" {
+    run bash -c "grep -A 50 'AUTO_CLEANUP.*=~.*Yy' '$SCRIPT_PATH' | grep -q 'Keeping .env file for configuration reuse'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script provides direct download link for uninstall script" {
+    run grep -q "https://raw.githubusercontent.com/hessius/MeticAI/main/uninstall.sh" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script skips continue prompt after automatic cleanup" {
+    run grep -q 'if \[\[ "$CONTINUE_ANYWAY" != "y" \]\]; then' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
 }

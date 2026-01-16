@@ -161,17 +161,80 @@ if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
             exec ./uninstall.sh
         fi
     else
-        echo -e "${YELLOW}Note: uninstall.sh not found in current directory.${NC}"
-        echo -e "${YELLOW}You can download it from: https://github.com/hessius/MeticAI${NC}"
+        # Handle older installations that don't have uninstall.sh
+        echo -e "${YELLOW}=========================================${NC}"
+        echo -e "${YELLOW}  Uninstall Script Not Found${NC}"
+        echo -e "${YELLOW}=========================================${NC}"
         echo ""
+        echo -e "${BLUE}This appears to be an older MeticAI installation without the uninstall script.${NC}"
+        echo ""
+        echo -e "${YELLOW}Options for cleanup:${NC}"
+        echo ""
+        echo -e "${GREEN}1) Automatic cleanup (recommended):${NC}"
+        echo "   - Stop and remove running containers"
+        echo "   - Remove cloned repositories (meticulous-source, meticai-web)"
+        echo "   - Keep your .env configuration file for reuse"
+        echo ""
+        echo -e "${GREEN}2) Manual cleanup:${NC}"
+        echo "   - Download the latest uninstall script from:"
+        echo "     ${BLUE}https://raw.githubusercontent.com/hessius/MeticAI/main/uninstall.sh${NC}"
+        echo "   - Or manually remove: meticulous-source/, meticai-web/, .env"
+        echo ""
+        echo -e "${GREEN}3) Continue without cleanup:${NC}"
+        echo "   - Containers will be stopped automatically"
+        echo "   - Existing configuration will be reused if available"
+        echo ""
+        
+        read -r -p "Would you like automatic cleanup? (y/n) [y]: " AUTO_CLEANUP </dev/tty
+        AUTO_CLEANUP=${AUTO_CLEANUP:-y}
+        
+        if [[ "$AUTO_CLEANUP" =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${GREEN}Performing automatic cleanup...${NC}"
+            echo ""
+            
+            # Stop and remove containers
+            if [ -n "$CONTAINERS_FOUND" ]; then
+                stop_and_remove_containers
+                echo ""
+            fi
+            
+            # Remove cloned repositories
+            if [ -d "meticulous-source" ]; then
+                echo -e "${YELLOW}Removing meticulous-source directory...${NC}"
+                rm -rf meticulous-source
+                echo -e "${GREEN}✓ Removed meticulous-source${NC}"
+            fi
+            
+            if [ -d "meticai-web" ]; then
+                echo -e "${YELLOW}Removing meticai-web directory...${NC}"
+                rm -rf meticai-web
+                echo -e "${GREEN}✓ Removed meticai-web${NC}"
+            fi
+            
+            # Keep .env file for configuration reuse
+            if [ -f ".env" ]; then
+                echo -e "${BLUE}ℹ Keeping .env file for configuration reuse${NC}"
+            fi
+            
+            echo ""
+            echo -e "${GREEN}Cleanup complete! Proceeding with fresh installation...${NC}"
+            echo ""
+            
+            # Skip the "continue anyway" prompt since we've cleaned up
+            CONTINUE_ANYWAY="y"
+        fi
     fi
     
-    read -r -p "Continue with installation anyway? (y/n) [n]: " CONTINUE_ANYWAY </dev/tty
-    CONTINUE_ANYWAY=${CONTINUE_ANYWAY:-n}
-    
-    if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}Installation cancelled. Please clean up first and try again.${NC}"
-        exit 0
+    # Only prompt to continue if user hasn't already chosen automatic cleanup
+    if [[ "$CONTINUE_ANYWAY" != "y" ]]; then
+        read -r -p "Continue with installation anyway? (y/n) [n]: " CONTINUE_ANYWAY </dev/tty
+        CONTINUE_ANYWAY=${CONTINUE_ANYWAY:-n}
+        
+        if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
+            echo -e "${GREEN}Installation cancelled. Please clean up first and try again.${NC}"
+            exit 0
+        fi
     fi
     
     echo ""
