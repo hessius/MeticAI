@@ -4,9 +4,9 @@
 
 ### Your AI Barista for the Meticulous Espresso Machine
 
-*Describe your coffee or preferences. Get a perfect espresso recipe. Automatically.*
+*Take a photo or describe your coffee. Get a perfect espresso recipe. Automatically.*
 
-[Get Started](#-quick-start) • [Features](#-what-it-does) • [iOS Shortcuts](IOS_SHORTCUTS.md) • [Web Interface](#-using-meticai) • [Updates](UPDATE_GUIDE.md)
+[Get Started](#-quick-start) • [Features](#-what-it-does) • [Web Interface](#-using-meticai) • [Updates](UPDATE_GUIDE.md)
 
 </div>
 
@@ -14,10 +14,10 @@
 
 ## 🎯 What is MeticAI?
 
-MeticAI transforms your Meticulous Espresso Machine into an AI-powered coffee expert. Describe your preferences using natural language, optionally add a photo of your coffee bag, and MeticAI uses Google's Gemini AI to:
+MeticAI transforms your Meticulous Espresso Machine into an AI-powered coffee expert. Take a photo of your coffee bag or describe what you want, and MeticAI uses Google's Gemini AI to:
 
-1. 🧠 **Create a custom recipe** - Tailored extraction profile based on your preferences
-2. 📸 **Identify your coffee** (optional) - Roaster, origin, roast level from a photo
+1. 🧠 **Create a custom recipe** - Tailored extraction profile for your beans
+2. 📸 **Analyze your coffee** - Identify roaster, origin, and roast level
 3. ☕️ **Upload it to your machine** - Ready to brew in seconds
 
 No manual recipe tweaking. No guesswork. Just consistently great espresso.
@@ -25,11 +25,11 @@ No manual recipe tweaking. No guesswork. Just consistently great espresso.
 ## ✨ What It Does
 
 ### For Everyone
-- 📱 **One-Tap iOS Shortcuts** - Describe preferences, optionally add photo, get recipe, brew
-- 🌐 **Beautiful Web Interface** - Control everything from your phone or computer
+- 🌐 **Beautiful Web Interface** - Upload photos or describe preferences from any device
+- 📱 **Mobile Friendly** - Works perfectly on your phone's browser
 - 🎨 **Creative Recipe Names** - Like "Slow-Mo Blossom" and "Choco-Lot Going On"
-- 💬 **Natural Language** - "Fruity, Traditional, Acidic" or "bold and chocolatey"
-- 🤖 **Fully Automatic** - From description to machine, no steps in between
+- 💬 **Natural Language** - Just describe what you want in plain English
+- 🤖 **Fully Automatic** - From input to machine, no steps in between
 
 ### For Coffee Enthusiasts
 - 🎯 **Advanced Profiling** - Multi-stage extraction, blooming, pressure ramping
@@ -87,54 +87,47 @@ After installation completes, scan the QR code with your phone or visit `http://
 
 ## 📱 Using MeticAI
 
-### Web Interface (Easiest)
+### Web Interface (Recommended)
 
-Open `http://YOUR_SERVER_IP:3550` in any browser.
+The web interface is the easiest and most powerful way to use MeticAI. Simply open `http://YOUR_SERVER_IP:3550` in any browser.
 
-1. **Add preferences** - like "Fruity, Traditional" or "bold and chocolatey"
-2. **Upload a photo** (optional) - of your coffee bag for more details
-3. **Click Create Profile**
-4. ✨ Done! The recipe is now on your machine
+**Create a profile in 3 steps:**
+1. **Upload a photo** of your coffee bag, or **describe what you want** - like "bold and chocolatey" or "light and fruity"
+2. **Click Create Profile**
+3. ✨ Done! The recipe is now on your machine
 
-The web interface shows real-time status, analysis results, and generated profiles with full details.
+The web interface shows real-time status, analysis results, and generated profiles with full details. It works perfectly on mobile browsers too!
 
-### iOS Shortcuts (One-Tap Brewing)
+### API Examples
 
-Create an iPhone shortcut to go from description to profile in one tap!
+For automation and integration:
 
-**Quick setup:**
-1. Open the Shortcuts app
-2. Add "Ask for Input" action → Question: "How do you want this brewed?"
-3. Add "Get Contents of URL" → Set to `http://YOUR_IP:8000/analyze_and_profile`
-4. Set method to POST, Request Body: Form
-5. Add form field: `user_prefs` = Provided Input (from step 2)
-6. Add "Get Dictionary Value" → Key: `reply`, Dictionary: Contents of URL
-7. Add "Show Notification" → Show Dictionary Value
-
-[→ Detailed iOS setup guide with all options](IOS_SHORTCUTS.md)
-
-### Examples
-
-**Text preferences (most common):**
-```bash
-curl -X POST http://YOUR_IP:8000/analyze_and_profile \
-  -F "user_prefs=Fruity, Traditional, Acidic"
-```
-
-**With photo for more details:**
-```bash
-curl -X POST http://YOUR_IP:8000/analyze_and_profile \
-  -F "file=@coffee_bag.jpg" \
-  -F "user_prefs=Make it bold and chocolatey"
-```
-
-**Photo only:**
+**With a photo:**
 ```bash
 curl -X POST http://YOUR_IP:8000/analyze_and_profile \
   -F "file=@coffee_bag.jpg"
 ```
 
+**With text preferences:**
+```bash
+curl -X POST http://YOUR_IP:8000/analyze_and_profile \
+  -F "user_prefs=Bold and chocolatey"
+```
+
+**With both:**
+```bash
+curl -X POST http://YOUR_IP:8000/analyze_and_profile \
+  -F "file=@coffee_bag.jpg" \
+  -F "user_prefs=Traditional extraction"
+```
+
 [→ Full API documentation](API.md)
+
+### Advanced: iOS Shortcuts
+
+For power users who want one-tap brewing from their iPhone, you can create custom shortcuts.
+
+[→ iOS Shortcuts setup guide](IOS_SHORTCUTS.md)
 
 ## 🔄 Keeping MeticAI Updated
 
