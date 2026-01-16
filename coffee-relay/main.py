@@ -13,8 +13,15 @@ import uuid
 import time
 from logging_config import setup_logging, get_logger
 
-# Initialize logging system
-logger = setup_logging()
+# Initialize logging system with environment-aware defaults
+log_dir = os.environ.get("LOG_DIR", "/app/logs")
+try:
+    logger = setup_logging(log_dir=log_dir)
+except (PermissionError, OSError):
+    # Fallback to temp directory for testing
+    import tempfile
+    log_dir = tempfile.mkdtemp()
+    logger = setup_logging(log_dir=log_dir)
 
 app = FastAPI()
 
@@ -176,7 +183,7 @@ async def analyze_coffee(file: UploadFile = File(...), request: Request = None):
             extra={
                 "request_id": request_id,
                 "endpoint": "/analyze_coffee",
-                "filename": file.filename,
+                "upload_filename": file.filename,
                 "content_type": file.content_type
             }
         )
@@ -218,7 +225,7 @@ async def analyze_coffee(file: UploadFile = File(...), request: Request = None):
                 "request_id": request_id,
                 "endpoint": "/analyze_coffee",
                 "error_type": type(e).__name__,
-                "filename": file.filename if file else None
+                "upload_filename": file.filename if file else None
             }
         )
         return {"error": str(e)}
@@ -261,7 +268,7 @@ async def analyze_and_profile(
                 "endpoint": "/analyze_and_profile",
                 "has_image": file is not None,
                 "has_preferences": user_prefs is not None,
-                "filename": file.filename if file else None,
+                "upload_filename": file.filename if file else None,
                 "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs
             }
         )

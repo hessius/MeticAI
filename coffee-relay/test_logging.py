@@ -202,16 +202,22 @@ class TestLogRetrieval:
     """Tests for the /api/logs endpoint."""
     
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
-    def test_get_logs_endpoint_exists(self, mock_path, client):
+    def test_get_logs_endpoint_exists(self, client):
         """Test that /api/logs endpoint is accessible."""
-        # Mock log file as not existing for simplicity
-        mock_log_file = Mock()
-        mock_log_file.exists.return_value = False
-        mock_path.return_value = mock_log_file
-        
-        response = client.get("/api/logs")
-        assert response.status_code == 200
+        # Create a temporary log directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Mock the log directory path
+            with patch('main.Path') as mock_path_class:
+                # Setup mock to return temp dir path
+                def path_side_effect(arg):
+                    if arg == "/app/logs":
+                        return Path(tmpdir)
+                    return Path(arg)
+                
+                mock_path_class.side_effect = path_side_effect
+                
+                response = client.get("/api/logs")
+                assert response.status_code == 200
     
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_get_logs_returns_json_structure(self, client, temp_log_dir):
