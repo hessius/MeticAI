@@ -4,7 +4,7 @@
 
 ### Your AI Barista for the Meticulous Espresso Machine
 
-*Snap a photo of your coffee bag. Get a perfect espresso recipe. Automatically.*
+*Describe your coffee or preferences. Get a perfect espresso recipe. Automatically.*
 
 [Get Started](#-quick-start) • [Features](#-what-it-does) • [iOS Shortcuts](IOS_SHORTCUTS.md) • [Web Interface](#-using-meticai) • [Updates](UPDATE_GUIDE.md)
 
@@ -14,10 +14,10 @@
 
 ## 🎯 What is MeticAI?
 
-MeticAI transforms your Meticulous Espresso Machine into an AI-powered coffee expert. Simply take a photo of your coffee bag, and MeticAI uses Google's Gemini vision AI to:
+MeticAI transforms your Meticulous Espresso Machine into an AI-powered coffee expert. Describe your preferences using natural language, optionally add a photo of your coffee bag, and MeticAI uses Google's Gemini AI to:
 
-1. 📸 **Identify your coffee** - Roaster, origin, roast level, and tasting notes
-2. 🧠 **Create a custom recipe** - Tailored extraction profile based on the beans
+1. 🧠 **Create a custom recipe** - Tailored extraction profile based on your preferences
+2. 📸 **Identify your coffee** (optional) - Roaster, origin, roast level from a photo
 3. ☕️ **Upload it to your machine** - Ready to brew in seconds
 
 No manual recipe tweaking. No guesswork. Just consistently great espresso.
@@ -25,11 +25,11 @@ No manual recipe tweaking. No guesswork. Just consistently great espresso.
 ## ✨ What It Does
 
 ### For Everyone
-- 📱 **One-Tap iOS Shortcuts** - Take photo, get recipe, brew
+- 📱 **One-Tap iOS Shortcuts** - Describe preferences, optionally add photo, get recipe, brew
 - 🌐 **Beautiful Web Interface** - Control everything from your phone or computer
 - 🎨 **Creative Recipe Names** - Like "Slow-Mo Blossom" and "Choco-Lot Going On"
-- 💬 **Natural Language** - "Make it bold and chocolatey" or "turbo shot"
-- 🤖 **Fully Automatic** - From photo to machine, no steps in between
+- 💬 **Natural Language** - "Fruity, Traditional, Acidic" or "bold and chocolatey"
+- 🤖 **Fully Automatic** - From description to machine, no steps in between
 
 ### For Coffee Enthusiasts
 - 🎯 **Advanced Profiling** - Multi-stage extraction, blooming, pressure ramping
@@ -91,8 +91,8 @@ After installation completes, scan the QR code with your phone or visit `http://
 
 Open `http://YOUR_SERVER_IP:3550` in any browser.
 
-1. **Upload a photo** of your coffee bag
-2. **Add preferences** (optional) - like "bold and intense" or "turbo shot"
+1. **Add preferences** - like "Fruity, Traditional" or "bold and chocolatey"
+2. **Upload a photo** (optional) - of your coffee bag for more details
 3. **Click Create Profile**
 4. ✨ Done! The recipe is now on your machine
 
@@ -100,36 +100,38 @@ The web interface shows real-time status, analysis results, and generated profil
 
 ### iOS Shortcuts (One-Tap Brewing)
 
-Create an iPhone shortcut to go from photo to profile in one tap!
+Create an iPhone shortcut to go from description to profile in one tap!
 
 **Quick setup:**
 1. Open the Shortcuts app
-2. Create new shortcut → Add "Take Photo" action
+2. Add "Ask for Input" action → Question: "How do you want this brewed?"
 3. Add "Get Contents of URL" → Set to `http://YOUR_IP:8000/analyze_and_profile`
-4. Set method to POST, add form field: `file` = Photo
-5. Add "Show Notification" to see the result
+4. Set method to POST, Request Body: Form
+5. Add form field: `user_prefs` = Provided Input (from step 2)
+6. Add "Get Dictionary Value" → Key: `reply`, Dictionary: Contents of URL
+7. Add "Show Notification" → Show Dictionary Value
 
 [→ Detailed iOS setup guide with all options](IOS_SHORTCUTS.md)
 
 ### Examples
 
-**Photo only:**
+**Text preferences (most common):**
 ```bash
 curl -X POST http://YOUR_IP:8000/analyze_and_profile \
-  -F "file=@coffee_bag.jpg"
+  -F "user_prefs=Fruity, Traditional, Acidic"
 ```
 
-**With preferences:**
+**With photo for more details:**
 ```bash
 curl -X POST http://YOUR_IP:8000/analyze_and_profile \
   -F "file=@coffee_bag.jpg" \
   -F "user_prefs=Make it bold and chocolatey"
 ```
 
-**Text only (no photo):**
+**Photo only:**
 ```bash
 curl -X POST http://YOUR_IP:8000/analyze_and_profile \
-  -F "user_prefs=Create a turbo shot profile"
+  -F "file=@coffee_bag.jpg"
 ```
 
 [→ Full API documentation](API.md)
