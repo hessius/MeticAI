@@ -72,11 +72,11 @@ stop_and_remove_containers() {
     containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
     
     if [ -n "$containers" ]; then
-        echo "$containers" | while read -r container; do
+        while IFS= read -r container; do
             echo -e "${YELLOW}  Stopping and removing: $container${NC}"
             docker stop "$container" 2>/dev/null || true
             docker rm "$container" 2>/dev/null || true
-        done
+        done < <(echo "$containers")
         echo -e "${GREEN}✓ Individual containers stopped and removed${NC}"
     fi
 }
@@ -124,8 +124,12 @@ fi
 # Detect previous installation artifacts
 if PREVIOUS_INSTALL_FOUND=$(detect_previous_installation); then
     echo -e "${YELLOW}Found existing MeticAI installation artifacts:${NC}"
-    # Convert space-separated list to newlines
-    echo "$PREVIOUS_INSTALL_FOUND" | tr ' ' '\n' | sed 's/^/  - /'
+    # Convert array output to properly formatted list
+    # Use printf to properly handle items with spaces
+    echo "$PREVIOUS_INSTALL_FOUND" | tr ' ' '\n' | while IFS= read -r item; do
+        # Only print if item is not empty
+        [ -n "$item" ] && echo "  - $item"
+    done
     echo ""
 fi
 
@@ -185,7 +189,9 @@ fi
 
 
 
-# Check for existing .env file at the very beginning
+# Configuration Step: Check for existing .env file
+# Note: We reach here only if user chose to continue with existing installation
+# or if no previous installation was detected
 if [ -f ".env" ]; then
     echo -e "${YELLOW}Found existing .env file.${NC}"
     echo ""
