@@ -17,11 +17,16 @@ from logging_config import setup_logging, get_logger
 log_dir = os.environ.get("LOG_DIR", "/app/logs")
 try:
     logger = setup_logging(log_dir=log_dir)
-except (PermissionError, OSError):
+except (PermissionError, OSError) as e:
     # Fallback to temp directory for testing
     import tempfile
     log_dir = tempfile.mkdtemp()
     logger = setup_logging(log_dir=log_dir)
+    logger.warning(
+        f"Failed to create log directory at {os.environ.get('LOG_DIR', '/app/logs')}, "
+        f"using temporary directory: {log_dir}",
+        extra={"original_error": str(e)}
+    )
 
 app = FastAPI()
 
@@ -173,9 +178,9 @@ USER_SUMMARY_INSTRUCTIONS = (
 )
 
 @app.post("/analyze_coffee")
-async def analyze_coffee(file: UploadFile = File(...), request: Request = None):
+async def analyze_coffee(request: Request, file: UploadFile = File(...)):
     """Phase 1: Look at the bag."""
-    request_id = request.state.request_id if request else "unknown"
+    request_id = request.state.request_id
     
     try:
         logger.info(
@@ -242,7 +247,7 @@ async def analyze_and_profile(
     - file: Image of the coffee bag
     - user_prefs: User preferences or specific instructions
     """
-    request_id = request.state.request_id if request else "unknown"
+    request_id = request.state.request_id
     
     # Validate that at least one input is provided
     if not file and not user_prefs:
@@ -421,7 +426,7 @@ async def get_status(request: Request):
     script running on the host. The file is mounted into the container.
     Run './update.sh --check-only' on the host to refresh update status.
     """
-    request_id = request.state.request_id if request else "unknown"
+    request_id = request.state.request_id
     
     try:
         logger.debug("Checking system status", extra={"request_id": request_id})
@@ -480,7 +485,7 @@ async def trigger_update(request: Request):
         - output: stdout from the update script
         - error: stderr from the update script (if any)
     """
-    request_id = request.state.request_id if request else "unknown"
+    request_id = request.state.request_id
     
     try:
         logger.info(
@@ -627,7 +632,7 @@ async def get_logs(
         - total_lines: Total number of log lines returned
         - log_file: Path to the log file
     """
-    request_id = request.state.request_id if request else "unknown"
+    request_id = request.state.request_id
     
     try:
         logger.info(
