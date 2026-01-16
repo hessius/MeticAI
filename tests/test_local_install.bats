@@ -174,7 +174,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 }
 
 @test "Script prompts for dock shortcut on macOS" {
-    run grep -q "Would you like to add a MeticAI shortcut" "$SCRIPT_PATH"
+    run grep -q "Would you like to add MeticAI to your Dock?" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
