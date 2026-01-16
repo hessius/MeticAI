@@ -284,9 +284,12 @@ fi
 
 # Make sure local-install.sh is executable
 chmod +x ./local-install.sh
+# Also make uninstall.sh executable for later use
+chmod +x ./uninstall.sh
 
 # Execute the local installer
 echo ""
 echo -e "${GREEN}Starting local installer...${NC}"
+echo -e "${BLUE}Note: To uninstall MeticAI later, run './uninstall.sh' from $INSTALL_DIR${NC}"
 echo ""
 exec ./local-install.sh
