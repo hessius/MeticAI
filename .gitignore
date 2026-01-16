@@ -19,6 +19,7 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 meticulous-source/
 
 # Testing
