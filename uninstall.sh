@@ -254,6 +254,36 @@ else
     KEPT_ITEMS+=("macOS integrations (not macOS)")
 fi
 
+# Linux-specific (systemd) service cleanup
+if [[ "$OSTYPE" == "linux"* ]]; then
+    echo -e "${YELLOW}Checking for Linux systemd integrations...${NC}"
+    REMOVED_LINUX=0
+    
+    # Check for systemd path unit
+    if [ -f "/etc/systemd/system/meticai-rebuild-watcher.path" ]; then
+        echo -e "${YELLOW}Found rebuild watcher systemd service${NC}"
+        read -r -p "Remove rebuild watcher service? (y/n) [y]: " REMOVE_WATCHER </dev/tty
+        REMOVE_WATCHER=${REMOVE_WATCHER:-y}
+        
+        if [[ "$REMOVE_WATCHER" =~ ^[Yy]$ ]]; then
+            sudo systemctl stop meticai-rebuild-watcher.path 2>/dev/null || true
+            sudo systemctl disable meticai-rebuild-watcher.path 2>/dev/null || true
+            sudo rm -f /etc/systemd/system/meticai-rebuild-watcher.path
+            sudo rm -f /etc/systemd/system/meticai-rebuild-watcher.service
+            sudo systemctl daemon-reload
+            echo -e "${GREEN}✓ Removed rebuild watcher systemd service${NC}"
+            ((REMOVED_LINUX++))
+        else
+            echo -e "${YELLOW}Keeping rebuild watcher service${NC}"
+            KEPT_ITEMS+=("Rebuild watcher service (user choice)")
+        fi
+    fi
+    
+    if [ $REMOVED_LINUX -gt 0 ]; then
+        UNINSTALLED_ITEMS+=("Linux integrations ($REMOVED_LINUX)")
+    fi
+fi
+
 echo ""
 
 # 6. Ask about external dependencies
