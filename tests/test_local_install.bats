@@ -219,7 +219,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 }
 
 @test "Script checks for interactive mode before prompting" {
-    run grep -q "\[\[ -t 0 \]\]" "$SCRIPT_PATH"
+    run grep -q "\[\[ -c /dev/tty \]\]" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
