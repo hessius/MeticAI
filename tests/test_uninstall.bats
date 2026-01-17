@@ -212,3 +212,52 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
     run grep -q "RED=.*033" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
+
+@test "Script checks for METICAI_CALLED_FROM_INSTALLER environment variable" {
+    run grep -q 'METICAI_CALLED_FROM_INSTALLER.*==.*true' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script prompts to restart installation when called from installer" {
+    run grep -q "Restart Installation Flow" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+    run grep -q "Would you like to restart the installation process now?" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script uses METICAI_INSTALL_METHOD to determine which script to run" {
+    run grep -q 'METICAI_INSTALL_METHOD.*==.*web_install.sh' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script defaults install script to local-install.sh" {
+    run grep -q 'INSTALL_SCRIPT=.*local-install.sh' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script unsets environment variables before restarting installer" {
+    run grep -q 'unset METICAI_CALLED_FROM_INSTALLER' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+    run grep -q 'unset METICAI_INSTALL_METHOD' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script uses exec to restart installer" {
+    run grep -q 'exec.*INSTALL_SCRIPT' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script shows directory cleanup message only for standalone uninstall" {
+    run grep -q "This directory.*still contains the MeticAI source code" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script provides option not to restart installation" {
+    run grep -q "Installation not restarted" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script defaults to YES for restarting installation" {
+    run grep -q 'RESTART_INSTALL=\${RESTART_INSTALL:-y}' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}

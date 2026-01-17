@@ -428,8 +428,48 @@ fi
 
 echo -e "${BLUE}Thank you for using MeticAI! ☕️${NC}"
 echo ""
-echo -e "${YELLOW}Note: This directory ($(pwd)) still contains the MeticAI source code.${NC}"
-echo -e "${YELLOW}You can safely delete it if you no longer need it:${NC}"
-CURRENT_DIR_NAME=$(basename "$(pwd)")
-echo -e "${BLUE}  cd .. && rm -rf \"$CURRENT_DIR_NAME\"${NC}"
-echo ""
+
+# Check if uninstall was called from an installer script
+if [[ "$METICAI_CALLED_FROM_INSTALLER" == "true" ]]; then
+    echo -e "${GREEN}=========================================${NC}"
+    echo -e "${GREEN}    Restart Installation Flow?          ${NC}"
+    echo -e "${GREEN}=========================================${NC}"
+    echo ""
+    echo -e "${YELLOW}The uninstallation is complete.${NC}"
+    echo ""
+    
+    # Determine which install script to use
+    INSTALL_SCRIPT="./local-install.sh"
+    if [[ "$METICAI_INSTALL_METHOD" == "web_install.sh" ]]; then
+        INSTALL_SCRIPT="./web_install.sh"
+    fi
+    
+    echo -e "${BLUE}Would you like to restart the installation process now?${NC}"
+    echo -e "  This will run: ${GREEN}$INSTALL_SCRIPT${NC}"
+    echo ""
+    read -r -p "Restart installation? (y/n) [y]: " RESTART_INSTALL </dev/tty
+    RESTART_INSTALL=${RESTART_INSTALL:-y}
+    
+    if [[ "$RESTART_INSTALL" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo -e "${GREEN}Restarting installation flow...${NC}"
+        echo ""
+        # Clear the installer flag to avoid infinite loop
+        unset METICAI_CALLED_FROM_INSTALLER
+        unset METICAI_INSTALL_METHOD
+        exec "$INSTALL_SCRIPT"
+    else
+        echo ""
+        echo -e "${YELLOW}Installation not restarted.${NC}"
+        echo -e "${YELLOW}You can run the installer manually later:${NC}"
+        echo -e "${BLUE}  $INSTALL_SCRIPT${NC}"
+        echo ""
+    fi
+else
+    # Standalone uninstall - show directory cleanup message
+    echo -e "${YELLOW}Note: This directory ($(pwd)) still contains the MeticAI source code.${NC}"
+    echo -e "${YELLOW}You can safely delete it if you no longer need it:${NC}"
+    CURRENT_DIR_NAME=$(basename "$(pwd)")
+    echo -e "${BLUE}  cd .. && rm -rf \"$CURRENT_DIR_NAME\"${NC}"
+    echo ""
+fi
