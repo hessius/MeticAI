@@ -596,6 +596,16 @@ rebuild_containers() {
     echo -e "${YELLOW}Rebuilding and restarting containers...${NC}"
     cd "$SCRIPT_DIR"
     
+    # Ensure .versions.json exists as a file (not directory) before Docker mounts it
+    # Docker will create a directory if the file doesn't exist, causing mount errors
+    if [ -d "$SCRIPT_DIR/.versions.json" ]; then
+        echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+        rm -rf "$SCRIPT_DIR/.versions.json"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.versions.json" ]; then
+        echo '{}' > "$SCRIPT_DIR/.versions.json"
+    fi
+    
     # Check if docker compose is available
     if docker compose version &> /dev/null; then
         COMPOSE_CMD="docker compose"
