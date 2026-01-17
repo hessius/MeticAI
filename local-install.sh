@@ -1243,6 +1243,16 @@ fi
 echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
 echo "Note: Running with sudo permissions."
 
+# Ensure .versions.json exists as a file (not directory) before Docker mounts it
+# Docker will create a directory if the file doesn't exist, causing mount errors
+if [ -d ".versions.json" ]; then
+    echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+    rm -rf .versions.json
+fi
+if [ ! -f ".versions.json" ]; then
+    echo '{}' > .versions.json
+fi
+
 # Stop existing containers if running (safety net in case any were missed earlier)
 # This handles edge cases where containers might have been started after detection
 sudo docker compose down 2>/dev/null || true
