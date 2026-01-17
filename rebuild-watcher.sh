@@ -32,6 +32,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REBUILD_FLAG="$SCRIPT_DIR/.rebuild-needed"
 LOG_FILE="$SCRIPT_DIR/.rebuild-watcher.log"
 
+# Set up PATH for launchd environment (needed for Docker credential helpers)
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+# Docker Desktop credential helper location
+if [ -d "/Applications/Docker.app/Contents/Resources/bin" ]; then
+    export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+fi
+
 log() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
 }
@@ -41,15 +49,29 @@ do_rebuild() {
     
     cd "$SCRIPT_DIR"
     
-    # Check if docker compose is available
-    if docker compose version &> /dev/null; then
-        COMPOSE_CMD="docker compose"
-    elif command -v docker-compose &> /dev/null; then
-        COMPOSE_CMD="docker-compose"
-    else
-        log "${RED}Error: Docker Compose not found${NC}"
+    # Check if docker compose is available (use full paths for launchd compatibility)
+    # Common Docker paths on macOS
+    DOCKER_PATHS="/usr/local/bin/docker /opt/homebrew/bin/docker /Applications/Docker.app/Contents/Resources/bin/docker"
+    DOCKER_CMD=""
+    
+    for path in $DOCKER_PATHS; do
+        if [ -x "$path" ]; then
+            DOCKER_CMD="$path"
+            break
+        fi
+    done
+    
+    if [ -z "$DOCKER_CMD" ]; then
+        # Fallback to PATH lookup
+        DOCKER_CMD=$(command -v docker 2>/dev/null)
+    fi
+    
+    if [ -z "$DOCKER_CMD" ] || ! "$DOCKER_CMD" compose version &> /dev/null; then
+        log "${RED}Error: Docker Compose not found (tried: $DOCKER_PATHS)${NC}"
         return 1
     fi
+    
+    COMPOSE_CMD="$DOCKER_CMD compose"
     
     # Rebuild containers
     log "Rebuilding containers..."
