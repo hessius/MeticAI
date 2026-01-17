@@ -261,3 +261,23 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
     run grep -q 'RESTART_INSTALL=\${RESTART_INSTALL:-y}' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
+
+@test "Script validates install script exists before executing it" {
+    run grep -q 'if \[ ! -f "$INSTALL_SCRIPT" \]; then' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script checks if install script is executable" {
+    run grep -q 'if \[ ! -x "$INSTALL_SCRIPT" \]; then' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script makes install script executable if needed" {
+    run grep -q 'chmod +x "$INSTALL_SCRIPT"' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script provides web install curl command when web method used" {
+    run grep -q 'curl -fsSL.*web_install.sh | bash' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}

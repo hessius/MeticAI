@@ -451,6 +451,27 @@ if [[ "$METICAI_CALLED_FROM_INSTALLER" == "true" ]]; then
     RESTART_INSTALL=${RESTART_INSTALL:-y}
     
     if [[ "$RESTART_INSTALL" =~ ^[Yy]$ ]]; then
+        # Validate that the install script exists and is executable
+        if [ ! -f "$INSTALL_SCRIPT" ]; then
+            echo ""
+            echo -e "${RED}Error: $INSTALL_SCRIPT not found.${NC}"
+            echo -e "${YELLOW}Please run the installer manually:${NC}"
+            
+            # For web install method, provide the curl command
+            if [[ "$METICAI_INSTALL_METHOD" == "web_install.sh" ]]; then
+                echo -e "${BLUE}  curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash${NC}"
+            else
+                echo -e "${BLUE}  ./local-install.sh${NC}"
+            fi
+            echo ""
+            exit 1
+        fi
+        
+        if [ ! -x "$INSTALL_SCRIPT" ]; then
+            echo -e "${YELLOW}Making $INSTALL_SCRIPT executable...${NC}"
+            chmod +x "$INSTALL_SCRIPT"
+        fi
+        
         echo ""
         echo -e "${GREEN}Restarting installation flow...${NC}"
         echo ""
@@ -462,7 +483,13 @@ if [[ "$METICAI_CALLED_FROM_INSTALLER" == "true" ]]; then
         echo ""
         echo -e "${YELLOW}Installation not restarted.${NC}"
         echo -e "${YELLOW}You can run the installer manually later:${NC}"
-        echo -e "${BLUE}  $INSTALL_SCRIPT${NC}"
+        
+        # For web install method, provide the curl command
+        if [[ "$METICAI_INSTALL_METHOD" == "web_install.sh" ]]; then
+            echo -e "${BLUE}  curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash${NC}"
+        else
+            echo -e "${BLUE}  $INSTALL_SCRIPT${NC}"
+        fi
         echo ""
     fi
 else
