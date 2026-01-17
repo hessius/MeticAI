@@ -159,7 +159,10 @@ if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
             echo ""
             chmod +x ./uninstall.sh
             # Set environment variable to indicate we're calling from install script
-            export METICAI_INSTALL_METHOD="local-install.sh"
+            # Only set METICAI_INSTALL_METHOD if not already set (e.g., by web_install.sh)
+            if [[ -z "$METICAI_INSTALL_METHOD" ]]; then
+                export METICAI_INSTALL_METHOD="local-install.sh"
+            fi
             export METICAI_CALLED_FROM_INSTALLER="true"
             exec ./uninstall.sh
         fi
