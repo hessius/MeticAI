@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="resources/Favicons/Logo-black-transparent.svg" alt="MeticAI Logo" width="200" />
+<img src="resources/logo.png" alt="MeticAI Logo" width="200" />
 
 # MeticAI
 
