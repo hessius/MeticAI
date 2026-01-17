@@ -31,6 +31,9 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Constants
+WEB_INSTALL_URL="https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh"
+
 echo -e "${RED}=========================================${NC}"
 echo -e "${RED}      ☕️ MeticAI Uninstaller 🗑️       ${NC}"
 echo -e "${RED}=========================================${NC}"
@@ -459,7 +462,7 @@ if [[ "$METICAI_CALLED_FROM_INSTALLER" == "true" ]]; then
             
             # For web install method, provide the curl command
             if [[ "$METICAI_INSTALL_METHOD" == "web_install.sh" ]]; then
-                echo -e "${BLUE}  curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash${NC}"
+                echo -e "${BLUE}  curl -fsSL $WEB_INSTALL_URL | bash${NC}"
             else
                 echo -e "${BLUE}  ./local-install.sh${NC}"
             fi
@@ -486,7 +489,7 @@ if [[ "$METICAI_CALLED_FROM_INSTALLER" == "true" ]]; then
         
         # For web install method, provide the curl command
         if [[ "$METICAI_INSTALL_METHOD" == "web_install.sh" ]]; then
-            echo -e "${BLUE}  curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash${NC}"
+            echo -e "${BLUE}  curl -fsSL $WEB_INSTALL_URL | bash${NC}"
         else
             echo -e "${BLUE}  $INSTALL_SCRIPT${NC}"
         fi

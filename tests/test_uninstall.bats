@@ -278,6 +278,11 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
 }
 
 @test "Script provides web install curl command when web method used" {
-    run grep -q 'curl -fsSL.*web_install.sh | bash' "$SCRIPT_PATH"
+    run grep -q 'curl -fsSL.*WEB_INSTALL_URL.*bash' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script defines WEB_INSTALL_URL constant" {
+    run grep -q 'WEB_INSTALL_URL="https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh"' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
