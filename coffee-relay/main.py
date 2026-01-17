@@ -550,128 +550,48 @@ async def get_status(request: Request):
 
 @app.post("/api/trigger-update")
 async def trigger_update(request: Request):
-    """Trigger the backend update process by running update.sh --auto.
+    """Trigger the backend update process by signaling the host.
     
-    This endpoint executes the update script in non-interactive mode.
-    No authentication is required - restrict API access at the network level if needed.
+    This endpoint writes a timestamp to /app/.rebuild-needed which is mounted
+    from the host. The host's launchd service (rebuild-watcher) monitors this
+    file and runs update.sh when it changes.
+    
+    The update cannot run inside the container because:
+    1. Docker mounts create git conflicts (files appear modified)
+    2. The container cannot rebuild itself
     
     Returns:
         - status: "success" or "error"
-        - output: stdout from the update script
-        - error: stderr from the update script (if any)
+        - message: Description of what happened
     """
     request_id = request.state.request_id
     
     try:
         logger.info(
-            "Triggering system update",
+            "Triggering system update via host signal",
             extra={"request_id": request_id, "endpoint": "/api/trigger-update"}
         )
         
-        # The update script is mounted at /app/update.sh
-        script_path = Path("/app/update.sh")
+        # Signal the host to perform the update by touching .rebuild-needed
+        # This file is watched by launchd on the host (rebuild-watcher.sh)
+        rebuild_signal = Path("/app/.rebuild-needed")
         
-        if not script_path.exists():
-            logger.error(
-                "Update script not found",
-                extra={
-                    "request_id": request_id,
-                    "script_path": str(script_path)
-                }
-            )
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "status": "error",
-                    "error": "Update script not found at /app/update.sh",
-                    "message": "Update script is not mounted in the container"
-                }
-            )
+        # Write a timestamp to trigger the file change
+        import time
+        rebuild_signal.write_text(f"update-requested:{time.time()}\n")
         
-        # Run update script with --auto flag for non-interactive mode
-        # Timeout set to 10 minutes to prevent hanging processes
-        logger.debug(
-            "Executing update script",
-            extra={
-                "request_id": request_id,
-                "script_path": str(script_path)
-            }
-        )
-        
-        result = subprocess.run(
-            ["bash", str(script_path), "--auto"],
-            capture_output=True,
-            text=True,
-            cwd="/app",
-            timeout=600  # 10 minutes timeout
-        )
-        
-        if result.returncode == 0:
-            logger.info(
-                "Update completed successfully",
-                extra={
-                    "request_id": request_id,
-                    "output": result.stdout[:500]  # Log first 500 chars
-                }
-            )
-            return {
-                "status": "success",
-                "output": result.stdout,
-                "message": "Update script completed successfully"
-            }
-        else:
-            logger.error(
-                "Update script failed",
-                extra={
-                    "request_id": request_id,
-                    "returncode": result.returncode,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr
-                }
-            )
-            raise HTTPException(
-                status_code=500,
-                detail={
-                    "status": "error",
-                    "output": result.stdout,
-                    "error": result.stderr,
-                    "message": "Update script failed"
-                }
-            )
-    except subprocess.TimeoutExpired:
-        logger.error(
-            "Update script timed out",
-            exc_info=True,
+        logger.info(
+            "Update triggered - signaled host via .rebuild-needed",
             extra={"request_id": request_id}
         )
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status": "error",
-                "error": "Update script timed out after 10 minutes",
-                "message": "Update script execution exceeded timeout"
-            }
-        )
-    except subprocess.SubprocessError as e:
-        logger.error(
-            f"Update subprocess error: {str(e)}",
-            exc_info=True,
-            extra={
-                "request_id": request_id,
-                "error_type": type(e).__name__
-            }
-        )
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status": "error",
-                "error": str(e),
-                "message": "Failed to execute update script"
-            }
-        )
+        
+        return {
+            "status": "success",
+            "message": "Update triggered. The host will perform the update and restart containers."
+        }
     except Exception as e:
         logger.error(
-            f"Unexpected error during update: {str(e)}",
+            f"Failed to trigger update: {str(e)}",
             exc_info=True,
             extra={
                 "request_id": request_id,
@@ -683,7 +603,7 @@ async def trigger_update(request: Request):
             detail={
                 "status": "error",
                 "error": str(e),
-                "message": "An unexpected error occurred"
+                "message": "Failed to signal update"
             }
         )
 
