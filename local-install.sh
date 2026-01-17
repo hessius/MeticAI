@@ -141,11 +141,11 @@ if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
     echo -e "${BLUE}It looks like MeticAI may already be installed or partially installed.${NC}"
     echo ""
     echo -e "${YELLOW}Recommended actions:${NC}"
-    echo "  1) Run the uninstall script first to clean up: ${BLUE}./uninstall.sh${NC}"
-    echo "  2) Then run this installer again for a fresh installation"
+    echo -e "  1) Run the uninstall script first to clean up: ${BLUE}./uninstall.sh${NC}"
+    echo -e "  2) Then run this installer again for a fresh installation"
     echo ""
     echo -e "${YELLOW}Or:${NC}"
-    echo "  3) Continue anyway (may cause conflicts or use existing configuration)"
+    echo -e "  3) Continue anyway (may cause conflicts or use existing configuration)"
     echo ""
     
     # Check if uninstall script exists
@@ -1243,6 +1243,16 @@ fi
 echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
 echo "Note: Running with sudo permissions."
 
+# Ensure .versions.json exists as a file (not directory) before Docker mounts it
+# Docker will create a directory if the file doesn't exist, causing mount errors
+if [ -d ".versions.json" ]; then
+    echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+    rm -rf .versions.json
+fi
+if [ ! -f ".versions.json" ]; then
+    echo '{}' > .versions.json
+fi
+
 # Stop existing containers if running (safety net in case any were missed earlier)
 # This handles edge cases where containers might have been started after detection
 sudo docker compose down 2>/dev/null || true
@@ -1264,8 +1274,8 @@ if sudo docker compose up -d --build; then
     # Display QR code for easy mobile access
     generate_qr_code "http://$PI_IP:3550"
     
-    # Offer macOS dock shortcut creation (only in interactive mode)
-    if [[ "$OSTYPE" == "darwin"* ]] && [[ -t 0 ]]; then
+    # Offer macOS dock shortcut creation (check if /dev/tty is available for input)
+    if [[ "$OSTYPE" == "darwin"* ]] && [[ -c /dev/tty ]]; then
         # Check if user wants to skip via environment variable
         if [[ "${SKIP_DOCK_SHORTCUT}" != "true" ]]; then
             echo ""
