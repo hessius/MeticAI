@@ -158,6 +158,119 @@ uninstall_launchd() {
     fi
 }
 
+################################################################################
+# Linux (systemd) Installation - For Raspberry Pi and other Linux systems
+################################################################################
+
+install_systemd() {
+    local service_dir="/etc/systemd/system"
+    local path_unit="$service_dir/meticai-rebuild-watcher.path"
+    local service_unit="$service_dir/meticai-rebuild-watcher.service"
+    local script_path="$SCRIPT_DIR/rebuild-watcher.sh"
+    
+    echo -e "${BLUE}Installing systemd service...${NC}"
+    
+    # Check if we have sudo access
+    if ! sudo -n true 2>/dev/null; then
+        echo -e "${YELLOW}This requires sudo access. You may be prompted for your password.${NC}"
+    fi
+    
+    # Create the path unit (watches the file)
+    sudo tee "$path_unit" > /dev/null <<EOF
+[Unit]
+Description=MeticAI Rebuild Watcher Path
+Documentation=https://github.com/hessius/MeticAI
+
+[Path]
+PathModified=$REBUILD_FLAG
+Unit=meticai-rebuild-watcher.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Create the service unit (runs the rebuild)
+    sudo tee "$service_unit" > /dev/null <<EOF
+[Unit]
+Description=MeticAI Rebuild Watcher Service
+Documentation=https://github.com/hessius/MeticAI
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=$script_path
+WorkingDirectory=$SCRIPT_DIR
+StandardOutput=append:$LOG_FILE
+StandardError=append:$LOG_FILE
+User=$USER
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Make sure the script is executable
+    chmod +x "$script_path"
+    
+    # Reload systemd and enable the path unit
+    sudo systemctl daemon-reload
+    sudo systemctl enable meticai-rebuild-watcher.path
+    sudo systemctl start meticai-rebuild-watcher.path
+    
+    echo -e "${GREEN}✓ Systemd service installed${NC}"
+    echo -e "  Service will automatically rebuild containers when updates are triggered."
+    echo -e "  Log file: $LOG_FILE"
+    echo ""
+    echo -e "  To check status: sudo systemctl status meticai-rebuild-watcher.path"
+    echo -e "  To uninstall: $0 --uninstall"
+}
+
+uninstall_systemd() {
+    local service_dir="/etc/systemd/system"
+    local path_unit="$service_dir/meticai-rebuild-watcher.path"
+    local service_unit="$service_dir/meticai-rebuild-watcher.service"
+    
+    echo -e "${BLUE}Uninstalling systemd service...${NC}"
+    
+    # Stop and disable
+    sudo systemctl stop meticai-rebuild-watcher.path 2>/dev/null
+    sudo systemctl disable meticai-rebuild-watcher.path 2>/dev/null
+    sudo systemctl stop meticai-rebuild-watcher.service 2>/dev/null
+    
+    # Remove unit files
+    if [ -f "$path_unit" ] || [ -f "$service_unit" ]; then
+        sudo rm -f "$path_unit" "$service_unit"
+        sudo systemctl daemon-reload
+        echo -e "${GREEN}✓ Systemd service uninstalled${NC}"
+    else
+        echo -e "${YELLOW}Service not installed${NC}"
+    fi
+}
+
+# Detect OS and call appropriate install/uninstall function
+install_service() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        install_launchd
+    elif [[ "$OSTYPE" == "linux"* ]]; then
+        install_systemd
+    else
+        echo -e "${RED}Unsupported OS: $OSTYPE${NC}"
+        echo "Supported: macOS (darwin), Linux"
+        exit 1
+    fi
+}
+
+uninstall_service() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        uninstall_launchd
+    elif [[ "$OSTYPE" == "linux"* ]]; then
+        uninstall_systemd
+    else
+        echo -e "${RED}Unsupported OS: $OSTYPE${NC}"
+        exit 1
+    fi
+}
+
 show_help() {
     echo "MeticAI Rebuild Watcher"
     echo ""
@@ -166,8 +279,8 @@ show_help() {
     echo "Options:"
     echo "  (no args)     Check once and rebuild if needed"
     echo "  --watch       Continuously watch for rebuild requests"
-    echo "  --install     Install as macOS launchd service (auto-watches)"
-    echo "  --uninstall   Remove launchd service"
+    echo "  --install     Install as system service (launchd on macOS, systemd on Linux)"
+    echo "  --uninstall   Remove system service"
     echo "  --status      Check if rebuild is needed"
     echo "  --help        Show this help message"
     echo ""
@@ -188,10 +301,10 @@ case "${1:-}" in
         done
         ;;
     --install)
-        install_launchd
+        install_service
         ;;
     --uninstall)
-        uninstall_launchd
+        uninstall_service
         ;;
     --status)
         if check_rebuild_needed; then

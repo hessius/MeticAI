@@ -96,7 +96,12 @@ detect_previous_installation() {
     # Check for macOS-specific installations
     if [[ "$OSTYPE" == "darwin"* ]]; then
         [ -d "/Applications/MeticAI.app" ] && found_items+=("macOS Dock shortcut")
-        [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ] && found_items+=("rebuild watcher service")
+        [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ] && found_items+=("rebuild watcher service (launchd)")
+    fi
+    
+    # Check for Linux-specific installations (Raspberry Pi, etc.)
+    if [[ "$OSTYPE" == "linux"* ]]; then
+        [ -f "/etc/systemd/system/meticai-rebuild-watcher.path" ] && found_items+=("rebuild watcher service (systemd)")
     fi
     
     if [ ${#found_items[@]} -gt 0 ]; then
