@@ -1,6 +1,8 @@
 <div align="center">
 
-# ☕️ MeticAI 🤖
+<img src="resources/Favicons/Logo-black-transparent.svg" alt="MeticAI Logo" width="200" />
+
+# MeticAI
 
 ### Your AI Barista for the Meticulous Espresso Machine
 
