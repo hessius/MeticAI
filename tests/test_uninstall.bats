@@ -103,6 +103,21 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "Script removes rebuild watcher service on Linux" {
+    run grep -q "meticai-rebuild-watcher.path" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script uses systemctl to stop Linux service" {
+    run grep -q "systemctl stop meticai-rebuild-watcher" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script removes systemd service file on Linux" {
+    run grep -q "meticai-rebuild-watcher.service" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
 @test "Script asks before removing Docker" {
     run grep -q "Do you want to remove Docker?" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]

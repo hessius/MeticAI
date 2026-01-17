@@ -388,6 +388,11 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "Script detects Linux systemd rebuild watcher as installation artifact" {
+    run bash -c "grep -A 35 'detect_previous_installation()' '$SCRIPT_PATH' | grep -q 'meticai-rebuild-watcher.path'"
+    [ "$status" -eq 0 ]
+}
+
 @test "Script stops containers before proceeding if user chooses to continue" {
     run grep -q "stop_and_remove_containers" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
