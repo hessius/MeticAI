@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 from typing import Optional
 import google.generativeai as genai
 from PIL import Image
@@ -8,6 +9,8 @@ import io
 import os
 import subprocess
 import json
+import asyncio
+import logging
 from pathlib import Path
 import uuid
 import time
@@ -27,8 +30,80 @@ except (PermissionError, OSError) as e:
         f"using temporary directory: {log_dir}",
         extra={"original_error": str(e)}
     )
+from datetime import datetime, timezone
 
-app = FastAPI()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Update check interval: 2 hours in seconds
+UPDATE_CHECK_INTERVAL = 7200
+
+
+async def check_for_updates_task():
+    """Background task to check for updates by running update.sh --check-only."""
+    script_path = Path("/app/update.sh")
+    
+    if not script_path.exists():
+        logger.warning("Update script not found at /app/update.sh - skipping update check")
+        return
+    
+    try:
+        logger.info("Running scheduled update check...")
+        # Run update script with --check-only flag
+        # Use asyncio.to_thread to avoid blocking the event loop
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ["bash", str(script_path), "--check-only"],
+            capture_output=True,
+            text=True,
+            cwd="/app",
+            timeout=120  # 2 minutes timeout for check
+        )
+        
+        if result.returncode == 0:
+            logger.info("Update check completed successfully")
+        else:
+            logger.warning(f"Update check returned non-zero exit code: {result.returncode}")
+            if result.stderr:
+                logger.warning(f"stderr: {result.stderr}")
+                
+    except subprocess.TimeoutExpired:
+        logger.error("Update check timed out after 2 minutes")
+    except Exception as e:
+        logger.error(f"Error running update check: {e}")
+
+
+async def periodic_update_checker():
+    """Periodically check for updates in the background."""
+    # Initial check on startup (with small delay to let app fully start)
+    await asyncio.sleep(10)
+    await check_for_updates_task()
+    
+    # Then check periodically
+    while True:
+        await asyncio.sleep(UPDATE_CHECK_INTERVAL)
+        await check_for_updates_task()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan - start background tasks on startup."""
+    # Start the periodic update checker
+    logger.info("Starting periodic update checker (runs on startup and every 24 hours)")
+    update_task = asyncio.create_task(periodic_update_checker())
+    
+    yield
+    
+    # Cleanup on shutdown
+    update_task.cancel()
+    try:
+        await update_task
+    except asyncio.CancelledError:
+        logger.info("Periodic update checker stopped")
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Middleware for request logging and tracking
 @app.middleware("http")

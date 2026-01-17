@@ -486,11 +486,32 @@ update_main_repo() {
     cd "$SCRIPT_DIR"
     
     local current_branch=$(get_current_branch "$SCRIPT_DIR")
-    if git pull origin "$current_branch"; then
+    
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+        echo -e "${YELLOW}Warning: You have uncommitted changes. Stashing them...${NC}"
+        git stash push -m "Auto-stash before MeticAI update $(date +%Y-%m-%d_%H:%M:%S)"
+        local stashed=true
+    fi
+    
+    # Try fast-forward first, then rebase if needed
+    if git pull --ff-only origin "$current_branch" 2>/dev/null; then
         echo -e "${GREEN}✓ MeticAI updated successfully${NC}"
+        [ "$stashed" = true ] && git stash pop 2>/dev/null || true
+        return 0
+    fi
+    
+    # Fast-forward failed, try rebase
+    echo -e "${YELLOW}Fast-forward not possible, attempting rebase...${NC}"
+    if git pull --rebase origin "$current_branch"; then
+        echo -e "${GREEN}✓ MeticAI updated successfully (with rebase)${NC}"
+        [ "$stashed" = true ] && git stash pop 2>/dev/null || true
         return 0
     else
         echo -e "${RED}✗ Failed to update MeticAI${NC}"
+        echo -e "${YELLOW}You may have local changes that conflict with remote.${NC}"
+        echo -e "${YELLOW}Please resolve manually: git pull --rebase origin $current_branch${NC}"
+        [ "$stashed" = true ] && git stash pop 2>/dev/null || true
         return 1
     fi
 }
@@ -574,6 +595,16 @@ WEBCONFIG
 rebuild_containers() {
     echo -e "${YELLOW}Rebuilding and restarting containers...${NC}"
     cd "$SCRIPT_DIR"
+    
+    # Ensure .versions.json exists as a file (not directory) before Docker mounts it
+    # Docker will create a directory if the file doesn't exist, causing mount errors
+    if [ -d "$SCRIPT_DIR/.versions.json" ]; then
+        echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+        rm -rf "$SCRIPT_DIR/.versions.json"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.versions.json" ]; then
+        echo '{}' > "$SCRIPT_DIR/.versions.json"
+    fi
     
     # Check if docker compose is available
     if docker compose version &> /dev/null; then
@@ -747,8 +778,10 @@ main() {
         # Update each component
         local update_success=true
         
-        # Note: We don't update main repo automatically as user might have local changes
-        # update_main_repo || update_success=false
+        # Update main repo first (contains update script, docker-compose, etc.)
+        if [ "$METICAI_UPDATE_AVAILABLE" = true ]; then
+            update_main_repo || update_success=false
+        fi
         
         update_mcp || update_success=false
         update_web || update_success=false
