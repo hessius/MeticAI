@@ -84,24 +84,25 @@ stop_and_remove_containers() {
 # Detect previous MeticAI installation artifacts
 detect_previous_installation() {
     local found_items=()
+    local current_dir="$(pwd)"
     
     # Check for typical MeticAI installation artifacts
-    [ -f ".env" ] && found_items+=(".env file")
-    [ -d "meticulous-source" ] && found_items+=("meticulous-source directory")
-    [ -d "meticai-web" ] && found_items+=("meticai-web directory")
-    [ -f ".versions.json" ] && found_items+=(".versions.json file")
-    [ -f ".update-config.json" ] && found_items+=(".update-config.json file")
-    [ -f ".rebuild-needed" ] && found_items+=(".rebuild-needed file")
+    # Note: .update-config.json is a source file and NOT an installation artifact
+    [ -f ".env" ] && found_items+=(".env file at $current_dir/.env")
+    [ -d "meticulous-source" ] && found_items+=("meticulous-source directory at $current_dir/meticulous-source")
+    [ -d "meticai-web" ] && found_items+=("meticai-web directory at $current_dir/meticai-web")
+    [ -f ".versions.json" ] && found_items+=(".versions.json file at $current_dir/.versions.json")
+    [ -f ".rebuild-needed" ] && found_items+=(".rebuild-needed file at $current_dir/.rebuild-needed")
     
     # Check for macOS-specific installations
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        [ -d "/Applications/MeticAI.app" ] && found_items+=("macOS Dock shortcut")
-        [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ] && found_items+=("rebuild watcher service (launchd)")
+        [ -d "/Applications/MeticAI.app" ] && found_items+=("macOS Dock shortcut at /Applications/MeticAI.app")
+        [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ] && found_items+=("rebuild watcher service (launchd) at $HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist")
     fi
     
     # Check for Linux-specific installations (Raspberry Pi, etc.)
     if [[ "$OSTYPE" == "linux"* ]]; then
-        [ -f "/etc/systemd/system/meticai-rebuild-watcher.path" ] && found_items+=("rebuild watcher service (systemd)")
+        [ -f "/etc/systemd/system/meticai-rebuild-watcher.path" ] && found_items+=("rebuild watcher service (systemd) at /etc/systemd/system/meticai-rebuild-watcher.path")
     fi
     
     if [ ${#found_items[@]} -gt 0 ]; then
