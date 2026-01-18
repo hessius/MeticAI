@@ -54,6 +54,8 @@ services:
       - ./.rebuild-needed:/app/.rebuild-needed
       # Mount logs directory for persistent log storage
       - ./logs:/app/logs
+      # Mount data directory for profile history
+      - ./data:/app/data
     working_dir: /app
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}

@@ -238,7 +238,13 @@ OUTPUT_FORMAT = (
     "Description: [What makes this profile special]\n"
     "Preparation: [Dose, grind, temp, and any pre-shot steps]\n"
     "Why This Works: [Science and reasoning behind the profile design]\n"
-    "Special Notes: [Any equipment or technique requirements, or 'None' if standard setup]"
+    "Special Notes: [Any equipment or technique requirements, or 'None' if standard setup]\n\n"
+    "PROFILE JSON:\n"
+    "```json\n"
+    "[Include the EXACT JSON that was sent to create_profile tool here, formatted as valid JSON]\n"
+    "```\n\n"
+    "IMPORTANT: You MUST include the complete profile JSON above exactly as it was passed to the create_profile tool. "
+    "This allows users to download and share their profiles."
 )
 
 USER_SUMMARY_INSTRUCTIONS = (
@@ -462,11 +468,19 @@ async def analyze_and_profile(
                 "output_preview": result.stdout[:200] if len(result.stdout) > 200 else result.stdout
             }
         )
+        
+        # Save to history
+        history_entry = save_to_history(
+            coffee_analysis=coffee_analysis,
+            user_prefs=user_prefs,
+            reply=result.stdout
+        )
             
         return {
             "status": "success",
             "analysis": coffee_analysis,
-            "reply": result.stdout
+            "reply": result.stdout,
+            "history_id": history_entry.get("id")
         }
 
     except Exception as e:
@@ -714,4 +728,360 @@ async def get_logs(
                 "error": str(e),
                 "message": "Failed to retrieve logs"
             }
+        )
+
+
+# ============================================
+# Profile History Management
+# ============================================
+
+HISTORY_FILE = Path("/app/data/profile_history.json")
+
+
+def _ensure_history_file():
+    """Ensure the history file and directory exist."""
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not HISTORY_FILE.exists():
+        HISTORY_FILE.write_text("[]")
+
+
+def _load_history() -> list:
+    """Load history from file."""
+    _ensure_history_file()
+    try:
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return []
+
+
+def _save_history(history: list):
+    """Save history to file."""
+    _ensure_history_file()
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=2)
+
+
+def _extract_profile_json(reply: str) -> Optional[dict]:
+    """Extract the profile JSON from the LLM reply.
+    
+    Searches for JSON blocks in the reply, trying different patterns.
+    """
+    import re
+    
+    # Try to find JSON in a code block first
+    json_block_pattern = r'```json\s*([\s\S]*?)```'
+    matches = re.findall(json_block_pattern, reply, re.IGNORECASE)
+    
+    for match in matches:
+        try:
+            parsed = json.loads(match.strip())
+            # Check if it looks like a profile (has name, stages, etc.)
+            if isinstance(parsed, dict) and ('name' in parsed or 'stages' in parsed):
+                return parsed
+        except json.JSONDecodeError:
+            continue
+    
+    # Try to find a generic code block
+    code_block_pattern = r'```\s*([\s\S]*?)```'
+    matches = re.findall(code_block_pattern, reply)
+    
+    for match in matches:
+        try:
+            parsed = json.loads(match.strip())
+            if isinstance(parsed, dict) and ('name' in parsed or 'stages' in parsed):
+                return parsed
+        except json.JSONDecodeError:
+            continue
+    
+    return None
+
+
+def _extract_profile_name(reply: str) -> str:
+    """Extract the profile name from the LLM reply."""
+    import re
+    match = re.search(r'Profile Created:\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return "Untitled Profile"
+
+
+def save_to_history(
+    coffee_analysis: Optional[str],
+    user_prefs: Optional[str],
+    reply: str,
+    image_preview: Optional[str] = None
+) -> dict:
+    """Save a generated profile to history.
+    
+    Args:
+        coffee_analysis: The coffee bag analysis text
+        user_prefs: User preferences provided
+        reply: The full LLM reply
+        image_preview: Optional base64 image preview (thumbnail)
+        
+    Returns:
+        The saved history entry
+    """
+    history = _load_history()
+    
+    # Generate a unique ID
+    entry_id = str(uuid.uuid4())
+    
+    # Extract profile JSON and name
+    profile_json = _extract_profile_json(reply)
+    profile_name = _extract_profile_name(reply)
+    
+    # Create history entry
+    entry = {
+        "id": entry_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "profile_name": profile_name,
+        "coffee_analysis": coffee_analysis,
+        "user_preferences": user_prefs,
+        "reply": reply,
+        "profile_json": profile_json,
+        "image_preview": image_preview  # Optional thumbnail
+    }
+    
+    # Add to beginning of list (most recent first)
+    history.insert(0, entry)
+    
+    # Keep only last 100 entries to prevent file from growing too large
+    history = history[:100]
+    
+    _save_history(history)
+    
+    logger.info(
+        f"Saved profile to history: {profile_name}",
+        extra={"entry_id": entry_id, "has_json": profile_json is not None}
+    )
+    
+    return entry
+
+
+@app.get("/api/history")
+async def get_history(
+    request: Request,
+    limit: int = 50,
+    offset: int = 0
+):
+    """Get profile history.
+    
+    Args:
+        limit: Maximum number of entries to return (default: 50)
+        offset: Number of entries to skip (default: 0)
+    
+    Returns:
+        - entries: List of history entries
+        - total: Total number of entries
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.debug(
+            "Fetching profile history",
+            extra={"request_id": request_id, "limit": limit, "offset": offset}
+        )
+        
+        history = _load_history()
+        total = len(history)
+        
+        # Apply pagination
+        entries = history[offset:offset + limit]
+        
+        # Remove large fields from list view (keep image_preview small or remove)
+        for entry in entries:
+            if 'image_preview' in entry:
+                entry['image_preview'] = None  # Remove for list view to save bandwidth
+        
+        return {
+            "entries": entries,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to retrieve history: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to retrieve history"}
+        )
+
+
+@app.get("/api/history/{entry_id}")
+async def get_history_entry(request: Request, entry_id: str):
+    """Get a specific history entry by ID.
+    
+    Args:
+        entry_id: The unique ID of the history entry
+    
+    Returns:
+        The full history entry including profile JSON
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.debug(
+            "Fetching history entry",
+            extra={"request_id": request_id, "entry_id": entry_id}
+        )
+        
+        history = _load_history()
+        
+        for entry in history:
+            if entry.get("id") == entry_id:
+                return entry
+        
+        raise HTTPException(status_code=404, detail="History entry not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to retrieve history entry: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "entry_id": entry_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to retrieve history entry"}
+        )
+
+
+@app.delete("/api/history/{entry_id}")
+async def delete_history_entry(request: Request, entry_id: str):
+    """Delete a specific history entry.
+    
+    Args:
+        entry_id: The unique ID of the history entry to delete
+    
+    Returns:
+        Success status
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Deleting history entry",
+            extra={"request_id": request_id, "entry_id": entry_id}
+        )
+        
+        history = _load_history()
+        original_length = len(history)
+        
+        history = [entry for entry in history if entry.get("id") != entry_id]
+        
+        if len(history) == original_length:
+            raise HTTPException(status_code=404, detail="History entry not found")
+        
+        _save_history(history)
+        
+        return {"status": "success", "message": "History entry deleted"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to delete history entry: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "entry_id": entry_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to delete history entry"}
+        )
+
+
+@app.delete("/api/history")
+async def clear_history(request: Request):
+    """Clear all profile history.
+    
+    Returns:
+        Success status
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.warning(
+            "Clearing all history",
+            extra={"request_id": request_id}
+        )
+        
+        _save_history([])
+        
+        return {"status": "success", "message": "All history cleared"}
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to clear history: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to clear history"}
+        )
+
+
+@app.get("/api/history/{entry_id}/json")
+async def get_profile_json(request: Request, entry_id: str):
+    """Get the profile JSON for download.
+    
+    Args:
+        entry_id: The unique ID of the history entry
+    
+    Returns:
+        The profile JSON with proper Content-Disposition header for download
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.debug(
+            "Fetching profile JSON for download",
+            extra={"request_id": request_id, "entry_id": entry_id}
+        )
+        
+        history = _load_history()
+        
+        for entry in history:
+            if entry.get("id") == entry_id:
+                if not entry.get("profile_json"):
+                    raise HTTPException(
+                        status_code=404, 
+                        detail="Profile JSON not available for this entry"
+                    )
+                
+                # Create filename from profile name
+                profile_name = entry.get("profile_name", "profile")
+                safe_filename = "".join(
+                    c if c.isalnum() or c in (' ', '-', '_') else ''
+                    for c in profile_name
+                ).strip().replace(' ', '-').lower()
+                
+                return JSONResponse(
+                    content=entry["profile_json"],
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{safe_filename}.json"'
+                    }
+                )
+        
+        raise HTTPException(status_code=404, detail="History entry not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get profile JSON: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "entry_id": entry_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to get profile JSON"}
         )
