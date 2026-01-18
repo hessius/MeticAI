@@ -34,5 +34,8 @@ htmlcov/
 # Update tracking
 .versions.json
 
+# Runtime markers
+.rebuild-needed
+
 # Web app (cloned dependency)
 meticai-web/

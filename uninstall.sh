@@ -163,11 +163,7 @@ if [ -f ".versions.json" ]; then
     ((REMOVED_CONFIGS++))
 fi
 
-if [ -f ".update-config.json" ]; then
-    rm -f .update-config.json
-    echo -e "${GREEN}✓ Removed .update-config.json file${NC}"
-    ((REMOVED_CONFIGS++))
-fi
+# Note: .update-config.json is a source file and should not be removed
 
 if [ -f ".rebuild-needed" ]; then
     rm -f .rebuild-needed
