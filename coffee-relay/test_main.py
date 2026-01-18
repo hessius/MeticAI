@@ -959,10 +959,11 @@ class TestTriggerUpdateEndpoint:
         data = response.json()
         assert data["status"] == "success"
         
-        # Verify write_text was called with a timestamp
+        # Verify write_text was called with a timestamp string
         mock_rebuild_file.write_text.assert_called_once()
         call_args = mock_rebuild_file.write_text.call_args[0][0]
-        assert "update-requested:" in call_args
+        # Verify the update signal format (flexible to allow timestamp changes)
+        assert call_args.startswith("update-requested:")
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
@@ -996,7 +997,7 @@ class TestTriggerUpdateEndpoint:
         assert response.status_code == 500
         data = response.json()
         assert "detail" in data
-        # Check the error field contains timeout/timed message
+        # Check the error field contains the timeout-related message
         assert "timed" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
