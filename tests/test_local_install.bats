@@ -489,3 +489,24 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     run grep -q 'if \[\[ "$CONTINUE_ANYWAY" != "y" \]\]; then' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
+
+@test "Script sets METICAI_INSTALL_METHOD environment variable when calling uninstall" {
+    run grep -q 'export METICAI_INSTALL_METHOD="local-install.sh"' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script only sets METICAI_INSTALL_METHOD if not already set" {
+    run grep -q 'if \[\[ -z "$METICAI_INSTALL_METHOD" \]\]; then' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script preserves METICAI_INSTALL_METHOD from web_install.sh" {
+    # Check that the conditional logic exists to preserve the value
+    run bash -c "grep -A2 'if \[\[ -z \"\$METICAI_INSTALL_METHOD\" \]\]; then' '$SCRIPT_PATH' | grep -q 'export METICAI_INSTALL_METHOD=\"local-install.sh\"'"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script sets METICAI_CALLED_FROM_INSTALLER environment variable when calling uninstall" {
+    run grep -q 'export METICAI_CALLED_FROM_INSTALLER="true"' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}

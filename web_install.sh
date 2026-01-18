@@ -292,4 +292,6 @@ echo ""
 echo -e "${GREEN}Starting local installer...${NC}"
 echo -e "${BLUE}Note: To uninstall MeticAI later, run './uninstall.sh' from $INSTALL_DIR${NC}"
 echo ""
+# Set environment variable to indicate we're in web install mode
+export METICAI_INSTALL_METHOD="web_install.sh"
 exec ./local-install.sh
