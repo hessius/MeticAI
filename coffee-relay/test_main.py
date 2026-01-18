@@ -836,47 +836,32 @@ class TestTriggerUpdateEndpoint:
     """Tests for the /api/trigger-update endpoint."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
     @patch('main.Path')
-    def test_trigger_update_success(self, mock_path_class, mock_subprocess, client):
+    def test_trigger_update_success(self, mock_path_class, client):
         """Test successful update trigger."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path_class.return_value = mock_script_path
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "✓ All updates applied successfully\n✓ Containers rebuilt and started"
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        # Mock the rebuild signal file
+        mock_rebuild_file = Mock()
+        mock_path_class.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert "output" in data
-        assert "All updates applied successfully" in data["output"]
+        assert "message" in data
+        assert "host will perform the update" in data["message"].lower()
         
-        # Verify subprocess was called (checking exact args is tricky with mocked Path)
-        mock_subprocess.assert_called_once()
+        # Verify write_text was called to signal the update
+        mock_rebuild_file.write_text.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_script_failure(self, mock_subprocess, mock_path, client):
-        """Test handling of update script failure."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        mock_result = Mock()
-        mock_result.returncode = 1
-        mock_result.stdout = "Checking for updates..."
-        mock_result.stderr = "Error: Failed to pull repository"
-        mock_subprocess.return_value = mock_result
+    def test_trigger_update_write_failure(self, mock_path, client):
+        """Test handling of file write failure."""
+        # Mock the rebuild signal file to raise an exception on write
+        mock_rebuild_file = Mock()
+        mock_rebuild_file.write_text.side_effect = OSError("Permission denied")
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
@@ -884,19 +869,16 @@ class TestTriggerUpdateEndpoint:
         data = response.json()
         assert "detail" in data
         assert data["detail"]["status"] == "error"
-        assert "Failed to pull repository" in data["detail"]["error"]
+        assert "Permission denied" in data["detail"]["error"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_subprocess_error(self, mock_subprocess, mock_path, client):
-        """Test handling of subprocess errors."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        mock_subprocess.side_effect = subprocess.SubprocessError("Script not found")
+    def test_trigger_update_io_error(self, mock_path, client):
+        """Test handling of IO errors."""
+        # Mock the rebuild signal file to raise an IO exception
+        mock_rebuild_file = Mock()
+        mock_rebuild_file.write_text.side_effect = IOError("Disk full")
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
@@ -904,19 +886,16 @@ class TestTriggerUpdateEndpoint:
         data = response.json()
         assert "detail" in data
         assert data["detail"]["status"] == "error"
-        assert "Failed to execute update script" in data["detail"]["message"]
+        assert "Disk full" in data["detail"]["error"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_unexpected_error(self, mock_subprocess, mock_path, client):
+    def test_trigger_update_unexpected_error(self, mock_path, client):
         """Test handling of unexpected errors."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        mock_subprocess.side_effect = Exception("Unexpected error")
+        # Mock the rebuild signal file to raise an unexpected exception
+        mock_rebuild_file = Mock()
+        mock_rebuild_file.write_text.side_effect = Exception("Unexpected error")
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
@@ -924,23 +903,15 @@ class TestTriggerUpdateEndpoint:
         data = response.json()
         assert "detail" in data
         assert data["detail"]["status"] == "error"
-        assert "unexpected error" in data["detail"]["message"].lower()
+        assert "unexpected error" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_cors_enabled(self, mock_subprocess, mock_path, client):
+    def test_trigger_update_cors_enabled(self, mock_path, client):
         """Test that /api/trigger-update has CORS enabled."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Success"
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        # Mock the rebuild signal file
+        mock_rebuild_file = Mock()
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post(
             "/api/trigger-update",
@@ -962,19 +933,11 @@ class TestTriggerUpdateEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_no_body_required(self, mock_subprocess, mock_path, client):
+    def test_trigger_update_no_body_required(self, mock_path, client):
         """Test that endpoint works without request body."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Update complete"
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        # Mock the rebuild signal file
+        mock_rebuild_file = Mock()
+        mock_path.return_value = mock_rebuild_file
 
         # Test without any body
         response = client.post("/api/trigger-update")
@@ -984,46 +947,32 @@ class TestTriggerUpdateEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_includes_stdout(self, mock_subprocess, mock_path, client):
-        """Test that successful response includes script output."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        expected_output = """
-========================================
-      ☕️ MeticAI Update Manager 🔄
-========================================
-
-Checking for updates...
-✓ All updates applied successfully
-✓ Containers rebuilt and started
-"""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = expected_output
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+    def test_trigger_update_signal_written(self, mock_path, client):
+        """Test that timestamp is written to signal file."""
+        # Mock the rebuild signal file
+        mock_rebuild_file = Mock()
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 200
         data = response.json()
-        assert "output" in data
-        assert "MeticAI Update Manager" in data["output"]
-        assert "All updates applied successfully" in data["output"]
+        assert data["status"] == "success"
+        
+        # Verify write_text was called with a timestamp string
+        mock_rebuild_file.write_text.assert_called_once()
+        call_args = mock_rebuild_file.write_text.call_args[0][0]
+        # Verify the update signal format (flexible to allow timestamp changes)
+        assert call_args.startswith("update-requested:")
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
-    def test_trigger_update_partial_failure(self, mock_subprocess, client):
-        """Test handling when script returns error with partial output."""
-        mock_result = Mock()
-        mock_result.returncode = 1
-        mock_result.stdout = "Updating MeticAI...\n✓ MeticAI updated\nUpdating MCP..."
-        mock_result.stderr = "Error: git pull failed"
-        mock_subprocess.return_value = mock_result
+    @patch('main.Path')
+    def test_trigger_update_partial_failure(self, mock_path, client):
+        """Test handling when file write operation encounters an error."""
+        # Mock the rebuild signal file to raise an error
+        mock_rebuild_file = Mock()
+        mock_rebuild_file.write_text.side_effect = PermissionError("Cannot write to file")
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
@@ -1036,48 +985,33 @@ Checking for updates...
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_timeout(self, mock_subprocess, mock_path, client):
-        """Test handling when update script times out."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        mock_subprocess.side_effect = subprocess.TimeoutExpired(
-            cmd=["bash", "update.sh", "--auto"],
-            timeout=600
-        )
+    def test_trigger_update_timeout(self, mock_path, client):
+        """Test handling when file write operation times out or hangs."""
+        # Mock the rebuild signal file to raise a timeout-related error
+        mock_rebuild_file = Mock()
+        mock_rebuild_file.write_text.side_effect = TimeoutError("File operation timed out")
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 500
         data = response.json()
         assert "detail" in data
-        assert "timeout" in str(data["detail"]).lower()
+        # Check the error field contains the timeout-related message
+        assert "timed" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
-    @patch('main.subprocess.run')
-    def test_trigger_update_path_resolution(self, mock_subprocess, mock_path, client):
-        """Test that script path is properly resolved."""
-        # Mock script path as existing
-        mock_script_path = Mock()
-        mock_script_path.exists.return_value = True
-        mock_path.return_value = mock_script_path
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Success"
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+    def test_trigger_update_path_resolution(self, mock_path, client):
+        """Test that file path is properly resolved."""
+        # Mock the rebuild signal file
+        mock_rebuild_file = Mock()
+        mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 200
-        # Verify subprocess was called with resolved path
-        call_args = mock_subprocess.call_args
-        # First positional argument should be the command list
-        cmd_list = call_args[0][0]
-        # The script path should not contain '..'
-        assert ".." not in cmd_list[1]
+        # Verify Path was called with the correct path
+        mock_path.assert_called_once_with("/app/.rebuild-needed")
+        # Verify write_text was called
+        mock_rebuild_file.write_text.assert_called_once()
