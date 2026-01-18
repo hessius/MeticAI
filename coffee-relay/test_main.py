@@ -1015,3 +1015,348 @@ class TestTriggerUpdateEndpoint:
         mock_path.assert_called_once_with("/app/.rebuild-needed")
         # Verify write_text was called
         mock_rebuild_file.write_text.assert_called_once()
+
+
+class TestHistoryAPI:
+    """Tests for the profile history API endpoints."""
+
+    @pytest.fixture
+    def mock_history_file(self, tmp_path):
+        """Create a temporary history file."""
+        history_file = tmp_path / "profile_history.json"
+        history_file.write_text("[]")
+        return history_file
+
+    @pytest.fixture
+    def sample_history_entry(self):
+        """Create a sample history entry."""
+        return {
+            "id": "test-entry-123",
+            "created_at": "2026-01-18T10:00:00+00:00",
+            "profile_name": "Ethiopian Sunrise",
+            "coffee_analysis": "Light roast with floral notes",
+            "user_preferences": "Light Body with Florals",
+            "reply": "Profile Created: Ethiopian Sunrise\n\nDescription: A bright and floral profile...",
+            "profile_json": {"name": "Ethiopian Sunrise", "stages": []},
+            "image_preview": None
+        }
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_history_empty(self, mock_load, client):
+        """Test getting history when it's empty."""
+        mock_load.return_value = []
+
+        response = client.get("/api/history")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["entries"] == []
+        assert data["total"] == 0
+        assert data["limit"] == 50
+        assert data["offset"] == 0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_history_with_entries(self, mock_load, client, sample_history_entry):
+        """Test getting history with existing entries."""
+        mock_load.return_value = [sample_history_entry]
+
+        response = client.get("/api/history")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["entries"]) == 1
+        assert data["entries"][0]["profile_name"] == "Ethiopian Sunrise"
+        assert data["total"] == 1
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_history_pagination(self, mock_load, client, sample_history_entry):
+        """Test history pagination with limit and offset."""
+        # Create multiple entries
+        entries = []
+        for i in range(10):
+            entry = sample_history_entry.copy()
+            entry["id"] = f"entry-{i}"
+            entry["profile_name"] = f"Profile {i}"
+            entries.append(entry)
+        mock_load.return_value = entries
+
+        # Test with custom limit and offset
+        response = client.get("/api/history?limit=3&offset=2")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["entries"]) == 3
+        assert data["total"] == 10
+        assert data["limit"] == 3
+        assert data["offset"] == 2
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_history_removes_image_preview(self, mock_load, client, sample_history_entry):
+        """Test that image_preview is removed from list view."""
+        entry = sample_history_entry.copy()
+        entry["image_preview"] = "base64-thumbnail-data"
+        mock_load.return_value = [entry]
+
+        response = client.get("/api/history")
+        
+        assert response.status_code == 200
+        data = response.json()
+        # image_preview should be None in list view
+        assert data["entries"][0]["image_preview"] is None
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_history_entry_by_id(self, mock_load, client, sample_history_entry):
+        """Test getting a specific history entry by ID."""
+        mock_load.return_value = [sample_history_entry]
+
+        response = client.get(f"/api/history/{sample_history_entry['id']}")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == sample_history_entry["id"]
+        assert data["profile_name"] == "Ethiopian Sunrise"
+        assert data["profile_json"] is not None
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_history_entry_not_found(self, mock_load, client):
+        """Test 404 when history entry doesn't exist."""
+        mock_load.return_value = []
+
+        response = client.get("/api/history/non-existent-id")
+        
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_delete_history_entry(self, mock_load, mock_save, client, sample_history_entry):
+        """Test deleting a specific history entry."""
+        mock_load.return_value = [sample_history_entry]
+
+        response = client.delete(f"/api/history/{sample_history_entry['id']}")
+        
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        # Verify save was called with empty list
+        mock_save.assert_called_once_with([])
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_delete_history_entry_not_found(self, mock_load, client):
+        """Test 404 when deleting non-existent entry."""
+        mock_load.return_value = []
+
+        response = client.delete("/api/history/non-existent-id")
+        
+        assert response.status_code == 404
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_clear_history(self, mock_load, mock_save, client, sample_history_entry):
+        """Test clearing all history."""
+        mock_load.return_value = [sample_history_entry]
+
+        response = client.delete("/api/history")
+        
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        assert "cleared" in response.json()["message"].lower()
+        mock_save.assert_called_once_with([])
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_profile_json(self, mock_load, client, sample_history_entry):
+        """Test getting profile JSON for download."""
+        mock_load.return_value = [sample_history_entry]
+
+        response = client.get(f"/api/history/{sample_history_entry['id']}/json")
+        
+        assert response.status_code == 200
+        assert response.json()["name"] == "Ethiopian Sunrise"
+        assert "content-disposition" in response.headers
+        assert "ethiopian-sunrise.json" in response.headers["content-disposition"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_profile_json_not_available(self, mock_load, client, sample_history_entry):
+        """Test 404 when profile JSON is not available."""
+        entry = sample_history_entry.copy()
+        entry["profile_json"] = None
+        mock_load.return_value = [entry]
+
+        response = client.get(f"/api/history/{sample_history_entry['id']}/json")
+        
+        assert response.status_code == 404
+        assert "not available" in response.json()["detail"].lower()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_get_profile_json_entry_not_found(self, mock_load, client):
+        """Test 404 when entry doesn't exist for JSON download."""
+        mock_load.return_value = []
+
+        response = client.get("/api/history/non-existent-id/json")
+        
+        assert response.status_code == 404
+
+
+class TestHistoryHelperFunctions:
+    """Tests for history helper functions."""
+
+    def test_extract_profile_json_from_code_block(self):
+        """Test extracting profile JSON from markdown code block."""
+        from main import _extract_profile_json
+        
+        reply = '''Profile Created: Test Profile
+        
+Description: A test profile
+
+```json
+{"name": "Test Profile", "stages": [{"name": "stage1"}]}
+```
+'''
+        result = _extract_profile_json(reply)
+        
+        assert result is not None
+        assert result["name"] == "Test Profile"
+        assert len(result["stages"]) == 1
+
+    def test_extract_profile_json_no_json(self):
+        """Test extracting when no JSON is present."""
+        from main import _extract_profile_json
+        
+        reply = "Profile Created: Test Profile\n\nNo JSON here"
+        result = _extract_profile_json(reply)
+        
+        assert result is None
+
+    def test_extract_profile_json_invalid_json(self):
+        """Test extracting when JSON is invalid."""
+        from main import _extract_profile_json
+        
+        reply = '''Profile Created: Test Profile
+        
+```json
+{not valid json}
+```
+'''
+        result = _extract_profile_json(reply)
+        
+        assert result is None
+
+    def test_extract_profile_name(self):
+        """Test extracting profile name from reply."""
+        from main import _extract_profile_name
+        
+        reply = "Profile Created: Ethiopian Sunrise\n\nDescription: ..."
+        result = _extract_profile_name(reply)
+        
+        assert result == "Ethiopian Sunrise"
+
+    def test_extract_profile_name_not_found(self):
+        """Test default name when pattern not found."""
+        from main import _extract_profile_name
+        
+        reply = "Some reply without profile name"
+        result = _extract_profile_name(reply)
+        
+        assert result == "Untitled Profile"
+
+    def test_extract_profile_name_case_insensitive(self):
+        """Test that extraction is case-insensitive."""
+        from main import _extract_profile_name
+        
+        reply = "profile created: lowercase Name\n\nDescription: ..."
+        result = _extract_profile_name(reply)
+        
+        assert result == "lowercase Name"
+
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_save_to_history(self, mock_load, mock_save):
+        """Test saving a profile to history."""
+        from main import save_to_history
+        
+        mock_load.return_value = []
+        
+        reply = '''Profile Created: Test Profile
+
+Description: A test profile
+
+```json
+{"name": "Test Profile", "stages": []}
+```
+'''
+        entry = save_to_history(
+            coffee_analysis="Test analysis",
+            user_prefs="Light Body",
+            reply=reply
+        )
+        
+        assert entry["profile_name"] == "Test Profile"
+        assert entry["coffee_analysis"] == "Test analysis"
+        assert entry["user_preferences"] == "Light Body"
+        assert entry["profile_json"] is not None
+        assert "id" in entry
+        assert "created_at" in entry
+        
+        # Verify save was called with the new entry
+        mock_save.assert_called_once()
+        saved_history = mock_save.call_args[0][0]
+        assert len(saved_history) == 1
+        assert saved_history[0]["id"] == entry["id"]
+
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_save_to_history_limits_entries(self, mock_load, mock_save):
+        """Test that history is limited to 100 entries."""
+        from main import save_to_history
+        
+        # Create 100 existing entries
+        existing_entries = [{"id": f"entry-{i}"} for i in range(100)]
+        mock_load.return_value = existing_entries
+        
+        save_to_history(
+            coffee_analysis=None,
+            user_prefs="Test",
+            reply="Profile Created: New Profile"
+        )
+        
+        # Verify save was called
+        mock_save.assert_called_once()
+        saved_history = mock_save.call_args[0][0]
+        
+        # Should still be 100 entries (oldest removed)
+        assert len(saved_history) == 100
+        # New entry should be first
+        assert saved_history[0]["profile_name"] == "New Profile"
+
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_save_to_history_new_entry_first(self, mock_load, mock_save):
+        """Test that new entries are added at the beginning."""
+        from main import save_to_history
+        
+        existing = [{"id": "old-entry", "profile_name": "Old Profile"}]
+        mock_load.return_value = existing
+        
+        save_to_history(
+            coffee_analysis=None,
+            user_prefs=None,
+            reply="Profile Created: New Profile"
+        )
+        
+        mock_save.assert_called_once()
+        saved_history = mock_save.call_args[0][0]
+        
+        assert len(saved_history) == 2
+        assert saved_history[0]["profile_name"] == "New Profile"
+        assert saved_history[1]["id"] == "old-entry"
