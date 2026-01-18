@@ -313,6 +313,8 @@ teardown() {
     
     # Create a bare repo to act as remote
     REMOTE_DIR="$(mktemp -d)"
+    trap "rm -rf '$REMOTE_DIR'" EXIT
+    
     git clone --bare . "$REMOTE_DIR/repo.git"
     git remote add origin "$REMOTE_DIR/repo.git"
     
@@ -320,9 +322,6 @@ teardown() {
     REMOTE_URL=$(git config --get remote.origin.url)
     [ -n "$REMOTE_URL" ]
     [[ "$REMOTE_URL" == *"repo.git" ]]
-    
-    # Cleanup
-    rm -rf "$REMOTE_DIR"
 }
 
 @test "update.sh: does not show false repository switch for existing repos" {
