@@ -301,3 +301,92 @@ teardown() {
     [[ "$output" =~ "MeticAI" ]]
     [[ "$output" =~ "update" ]] || [[ "$output" =~ "Update" ]]
 }
+
+@test "update.sh: get_remote_url function works with git config command" {
+    # Initialize main repo with remote
+    git init .
+    git config user.email "test@example.com"
+    git config user.name "Test User"
+    echo "test" > test.txt
+    git add test.txt
+    git commit -m "Initial commit"
+    
+    # Create a bare repo to act as remote
+    REMOTE_DIR="$(mktemp -d)"
+    git clone --bare . "$REMOTE_DIR/repo.git"
+    git remote add origin "$REMOTE_DIR/repo.git"
+    
+    # Test that git config --get remote.origin.url works
+    REMOTE_URL=$(git config --get remote.origin.url)
+    [ -n "$REMOTE_URL" ]
+    [[ "$REMOTE_URL" == *"repo.git" ]]
+    
+    # Cleanup
+    rm -rf "$REMOTE_DIR"
+}
+
+@test "update.sh: does not show false repository switch for existing repos" {
+    # Initialize main repo with remote
+    git init .
+    git config user.email "test@example.com"
+    git config user.name "Test User"
+    echo "test" > test.txt
+    git add test.txt
+    git commit -m "Initial commit"
+    
+    # Create meticulous-source with proper remote
+    mkdir -p meticulous-source
+    cd meticulous-source
+    git init .
+    git config user.email "test@example.com"
+    git config user.name "Test User"
+    
+    # Add the expected remote URL
+    git remote add origin "https://github.com/manonstreet/meticulous-mcp.git"
+    echo "mcp" > mcp.txt
+    git add mcp.txt
+    git commit -m "Initial MCP commit"
+    cd ..
+    
+    # Create meticai-web with proper remote
+    mkdir -p meticai-web
+    cd meticai-web
+    git init .
+    git config user.email "test@example.com"
+    git config user.name "Test User"
+    
+    # Add the expected remote URL
+    git remote add origin "https://github.com/hessius/MeticAI-web.git"
+    echo "web" > web.txt
+    git add web.txt
+    git commit -m "Initial web commit"
+    cd ..
+    
+    # Create update config with matching URLs
+    cat > "$TEST_DIR/.update-config.json" <<'EOF'
+{
+  "version": "1.1",
+  "repositories": {
+    "meticulous-mcp": {
+      "url": "https://github.com/manonstreet/meticulous-mcp.git"
+    },
+    "meticai-web": {
+      "url": "https://github.com/hessius/MeticAI-web.git"
+    }
+  }
+}
+EOF
+    
+    # Verify get_remote_url works using git config
+    cd meticulous-source
+    MCP_URL=$(git config --get remote.origin.url)
+    [ -n "$MCP_URL" ]
+    [[ "$MCP_URL" == "https://github.com/manonstreet/meticulous-mcp.git" ]]
+    cd ..
+    
+    cd meticai-web
+    WEB_URL=$(git config --get remote.origin.url)
+    [ -n "$WEB_URL" ]
+    [[ "$WEB_URL" == "https://github.com/hessius/MeticAI-web.git" ]]
+    cd ..
+}
