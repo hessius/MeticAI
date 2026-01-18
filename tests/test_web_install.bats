@@ -142,3 +142,8 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../web_install.sh"
     run grep -q "Installation directory:" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
+
+@test "Script sets METICAI_INSTALL_METHOD environment variable for web install" {
+    run grep -q 'export METICAI_INSTALL_METHOD="web_install.sh"' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
