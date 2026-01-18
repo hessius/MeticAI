@@ -73,8 +73,10 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "Script removes .update-config.json file" {
-    run grep -q 'rm.*\.update-config\.json' "$SCRIPT_PATH"
+@test "Script does NOT remove .update-config.json (it's a source file)" {
+    # .update-config.json is a source file committed to the repository
+    # and should NOT be removed during uninstallation
+    run grep -q 'update-config.json is a source file' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
