@@ -132,7 +132,7 @@ get_current_branch() {
 get_remote_url() {
     local dir="$1"
     if [ -d "$dir/.git" ]; then
-        cd "$dir" && git remote get-url origin 2>/dev/null
+        cd "$dir" && git config --get remote.origin.url 2>/dev/null
     else
         echo "unknown"
     fi
