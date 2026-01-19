@@ -159,6 +159,9 @@ main() {
     # Create a temporary script that will handle the installation
     TEMP_SCRIPT=$(mktemp)
     
+    # Set up cleanup trap
+    trap 'rm -f "$TEMP_SCRIPT"' EXIT INT TERM
+    
     cat > "$TEMP_SCRIPT" <<'INSTALLER_SCRIPT'
 #!/bin/bash
 
@@ -175,6 +178,10 @@ export SKIP_REBUILD_WATCHER="false"  # Allow rebuild watcher installation
 # Download the web installer
 echo "Downloading MeticAI installer..."
 TEMP_INSTALLER=$(mktemp)
+
+# Cleanup trap for installer script
+trap 'rm -f "$TEMP_INSTALLER"' EXIT INT TERM
+
 if ! curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh -o "$TEMP_INSTALLER"; then
     echo "ERROR: Failed to download installer"
     exit 1
@@ -182,10 +189,15 @@ fi
 
 chmod +x "$TEMP_INSTALLER"
 
-# Set installation directory by pre-answering prompts
-# The web installer will ask for location - we'll provide non-interactive answers
-export LOCATION_CHOICE="3"
-export CUSTOM_PATH="$INSTALL_DIR"
+# Note: The web installer will interactively prompt for:
+# 1. Installation location (we handle this by changing to the target directory)
+# 2. API key (must be provided by user for security)
+# 3. IP addresses (auto-detected, user can override)
+# This approach ensures the web installer's logic remains intact while
+# pre-configuring what we can safely set.
+
+# Change to parent directory and let the installer handle directory creation
+cd "$(dirname "$INSTALL_DIR")" || exit 1
 
 echo "Starting MeticAI installation..."
 echo "Installation directory: $INSTALL_DIR"

@@ -33,6 +33,8 @@ BUNDLE_ID="com.meticai.installer"
 VERSION="1.0.0"
 OUTPUT_DIR="$SCRIPT_DIR/build"
 APP_PATH="$OUTPUT_DIR/${APP_NAME}.app"
+# Executable name without spaces for compatibility
+EXEC_NAME="MeticAI-Installer"
 
 # Script and resources
 WRAPPER_SCRIPT="$SCRIPT_DIR/install-wrapper.sh"
@@ -107,8 +109,8 @@ else
     mkdir -p "$APP_PATH/Contents/Resources"
     
     # Copy wrapper script as executable
-    cp "$WRAPPER_SCRIPT" "$APP_PATH/Contents/MacOS/${APP_NAME}"
-    chmod +x "$APP_PATH/Contents/MacOS/${APP_NAME}"
+    cp "$WRAPPER_SCRIPT" "$APP_PATH/Contents/MacOS/${EXEC_NAME}"
+    chmod +x "$APP_PATH/Contents/MacOS/${EXEC_NAME}"
     
     # Copy icon if available
     if [ -n "$ICON_FILE" ]; then
@@ -126,7 +128,7 @@ else
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>${APP_NAME}</string>
+    <string>${EXEC_NAME}</string>
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
     <key>CFBundleName</key>
@@ -158,7 +160,7 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 
 # Make the app executable
-chmod +x "$APP_PATH/Contents/MacOS/${APP_NAME}" 2>/dev/null || true
+chmod +x "$APP_PATH/Contents/MacOS/${EXEC_NAME}" 2>/dev/null || true
 
 echo ""
 echo -e "${GREEN}=========================================${NC}"
