@@ -12,17 +12,17 @@ This is a quick reference for building and using the MeticAI macOS installer app
 
 3. **Launch** the app from Applications
 
-4. **Follow** the guided installation:
+4. **Follow** the fully graphical installation:
    - Click OK on the welcome screen
-   - If prompted, install Git and Docker Desktop
+   - If prompted, install Git and Docker Desktop (links provided)
    - Choose where to install MeticAI (default: ~/MeticAI)
-   - Terminal will open for configuration
-   - Enter your Google Gemini API key when prompted
-   - Confirm or enter your Meticulous machine's IP address
+   - Enter your Google Gemini API key in the dialog
+   - Enter your Meticulous machine's IP address
    - Confirm or enter your server's IP address
-   - Wait for installation to complete
+   - Wait while installation runs in the background
+   - **NO Terminal window!** Everything is GUI-based
 
-5. **Access** MeticAI via the web interface shown in Terminal
+5. **Access** MeticAI - the web interface opens automatically when complete!
 
 ### Troubleshooting
 

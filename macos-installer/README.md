@@ -1,17 +1,20 @@
 # MeticAI macOS Installer App
 
-This directory contains the scripts and resources needed to build a standalone macOS installer application for MeticAI. The installer provides a graphical user interface for users who prefer not to use the command line.
+This directory contains the scripts and resources needed to build a standalone macOS installer application for MeticAI. The installer provides a **fully graphical user interface** with **NO Terminal window** - everything runs in the background with GUI dialogs for input and progress feedback.
 
 ## Overview
 
-The macOS installer app wraps the existing `web_install.sh` script with a user-friendly GUI that:
+The macOS installer app provides a completely GUI-based installation experience:
 
-- ✅ Shows welcome dialog explaining the installation process
-- ✅ Checks for prerequisites (Git, Docker) with helpful installation instructions
-- ✅ Allows users to choose installation location via dialog or folder picker
-- ✅ Downloads and executes the MeticAI installer
-- ✅ Opens Terminal for interactive configuration (API key, IP addresses)
-- ✅ Provides clear guidance throughout the process
+- ✅ **Welcome dialog** explaining the installation process
+- ✅ **Prerequisite checking** for Git and Docker with helpful installation instructions
+- ✅ **Installation location picker** via dialog or folder browser
+- ✅ **API key input** via secure dialog
+- ✅ **IP address configuration** via dialogs with auto-detection
+- ✅ **Background installation** - no Terminal window shown to user
+- ✅ **Progress feedback** via GUI dialogs
+- ✅ **Success/error dialogs** with clear next steps
+- ✅ **Auto-opens web interface** when installation completes
 
 ## Building the Installer App
 
@@ -55,8 +58,13 @@ The app will:
 1. Show a welcome dialog
 2. Check for Git and Docker
 3. Ask for installation location
-4. Download and run the installer in Terminal
-5. Guide you through configuration
+4. Collect Google Gemini API key via secure dialog
+5. Collect Meticulous machine IP address
+6. Collect or auto-detect server IP address
+7. Run installation in the background (NO Terminal window)
+8. Show progress via dialogs
+9. Display success message with web interface URL
+10. Auto-open the web interface in your browser
 
 ## Distribution
 
@@ -107,28 +115,35 @@ MeticAI Installer.app
 3. **Location Selection** - User chooses where to install MeticAI
    - Default: `~/MeticAI`
    - Options: Use default, choose custom folder
-4. **Download & Execute** - Downloads `web_install.sh` from GitHub
-5. **Terminal Launch** - Opens Terminal window for interactive installation
-   - User enters Google Gemini API key
-   - User confirms or enters Meticulous machine IP
-   - User confirms or enters server IP
-6. **Completion** - Terminal shows QR code and success message
+4. **Configuration Collection** - All via GUI dialogs:
+   - Google Gemini API key (secure text input)
+   - Meticulous machine IP address
+   - Server IP address (with auto-detection)
+5. **Background Installation** - Runs silently in the background
+   - Clones repository
+   - Creates configuration files
+   - Builds and starts Docker containers
+   - Progress shown via GUI dialogs
+6. **Completion** - Success dialog with web interface URL
+   - Auto-opens web interface in browser
+   - No QR code scanning needed!
 
 ### User Experience
 
-The app provides a hybrid GUI/Terminal experience:
+The app provides a **100% GUI experience** with NO Terminal window:
 
-- **GUI Dialogs**: For simple choices and prerequisite checks
-- **Terminal**: For the main installation with real-time progress
-  - Shows all installation steps
-  - Allows interactive input for sensitive data (API keys)
-  - Displays QR code for web interface access
+- **All inputs** collected via AppleScript dialogs
+- **Installation runs in background** - user never sees command line
+- **Progress feedback** via non-blocking GUI dialogs  
+- **Error handling** with clear, actionable error messages in dialogs
+- **Success confirmation** with direct link to web interface
+- **Auto-launch** of web interface when installation completes
 
-This approach balances ease of use with transparency and control.
+This approach provides maximum ease of use for non-technical users while maintaining security and proper error handling.
 
 ## Files
 
-- `install-wrapper.sh` - Main wrapper script that shows dialogs and launches installation
+- `install-wrapper.sh` - Main wrapper script with fully GUI installation flow
 - `build-macos-app.sh` - Build script that creates the .app bundle
 - `README.md` - This file
 

@@ -66,17 +66,20 @@ No manual recipe tweaking. No guesswork. Just consistently great espresso.
 
 **Option 1: macOS Installer App** (Easiest for Mac users)
 
-Download and run the standalone installer app - no terminal required!
+Download and run the standalone installer app - **completely GUI-based, no terminal at all!**
 
 1. Download the installer: [MeticAI-Installer.dmg](https://github.com/hessius/MeticAI/releases/latest) *(coming soon)*
 2. Open the DMG and drag "MeticAI Installer" to Applications
 3. Launch the app and follow the graphical prompts
 
-The app will guide you through:
+The app will guide you through everything via dialogs:
 - ✅ Checking prerequisites (with helpful install links)
 - ✅ Choosing installation location
-- ✅ Configuration (API key, machine IP)
-- ✅ Complete setup with visual progress
+- ✅ Entering API key and IP addresses
+- ✅ Background installation with progress feedback
+- ✅ Auto-opens web interface when complete
+
+**No Terminal window - 100% graphical!**
 
 [→ Learn more about the macOS installer](macos-installer/README.md)
 

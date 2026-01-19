@@ -1,12 +1,12 @@
 #!/bin/bash
 
 ################################################################################
-# MeticAI - macOS Installer Wrapper Script
+# MeticAI - macOS Installer Wrapper Script (Fully GUI)
 ################################################################################
 # 
-# This script provides a GUI-based installation experience for macOS users
-# by wrapping the web_install.sh script with AppleScript dialogs for input
-# collection and progress display.
+# This script provides a completely GUI-based installation experience for macOS
+# users with NO Terminal window. All inputs are collected via AppleScript dialogs,
+# and installation runs in the background with progress feedback via GUI.
 #
 # This script is designed to be packaged with Platypus to create a standalone
 # macOS .app bundle.
@@ -23,6 +23,12 @@ log_message() {
 
 log_error() {
     echo "ERROR: $1" >&2
+}
+
+# Show progress dialog (non-blocking)
+show_progress() {
+    local message="$1"
+    echo "PROGRESS: $message"
 }
 
 # Display welcome dialog
@@ -121,9 +127,156 @@ EOF
     echo "$install_dir"
 }
 
+# Get Gemini API key from user
+get_api_key() {
+    local api_key=$(osascript <<'EOF'
+tell application "System Events"
+    activate
+    set apiKey to text returned of (display dialog "Google Gemini API Key
+
+Please enter your Google Gemini API Key.
+
+Get your free API key at:
+https://aistudio.google.com/app/apikey
+
+This key is required for MeticAI to function." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with title "MeticAI Installer" with icon note)
+    
+    return apiKey
+end tell
+EOF
+)
+    
+    # Validate not empty
+    if [ -z "$api_key" ]; then
+        osascript <<'EOF'
+tell application "System Events"
+    activate
+    display dialog "API Key Required
+
+You must provide a Google Gemini API Key to continue.
+
+Please try again." buttons {"OK"} default button "OK" with icon stop with title "MeticAI Installer"
+end tell
+EOF
+        exit 1
+    fi
+    
+    echo "$api_key"
+}
+
+# Get Meticulous machine IP address
+get_meticulous_ip() {
+    local met_ip=$(osascript <<'EOF'
+tell application "System Events"
+    activate
+    set metIP to text returned of (display dialog "Meticulous Machine IP Address
+
+Please enter the IP address of your Meticulous Espresso Machine.
+
+Example: 192.168.1.100
+
+You can find this in your machine's network settings or router." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with title "MeticAI Installer" with icon note)
+    
+    return metIP
+end tell
+EOF
+)
+    
+    # Validate not empty and looks like an IP
+    if [ -z "$met_ip" ]; then
+        osascript <<'EOF'
+tell application "System Events"
+    activate
+    display dialog "IP Address Required
+
+You must provide the IP address of your Meticulous machine.
+
+Please try again." buttons {"OK"} default button "OK" with icon stop with title "MeticAI Installer"
+end tell
+EOF
+        exit 1
+    fi
+    
+    echo "$met_ip"
+}
+
+# Get server IP address (with auto-detection)
+get_server_ip() {
+    # Try to auto-detect
+    local detected_ip=""
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        detected_ip=$(route -n get default 2>/dev/null | grep 'interface:' | awk '{print $2}' | xargs ipconfig getifaddr 2>/dev/null || echo "")
+        
+        if [ -z "$detected_ip" ]; then
+            for interface in en0 en1 en2 en3 en4; do
+                detected_ip=$(ipconfig getifaddr "$interface" 2>/dev/null || echo "")
+                if [ -n "$detected_ip" ]; then
+                    break
+                fi
+            done
+        fi
+    fi
+    
+    # If detected, offer to use it
+    if [ -n "$detected_ip" ]; then
+        local response=$(osascript <<EOF
+tell application "System Events"
+    activate
+    set buttonReturned to button returned of (display dialog "Server IP Address Detected
+
+Your server IP address appears to be:
+$detected_ip
+
+Would you like to use this address?" buttons {"Use Different", "Use This"} default button "Use This" with title "MeticAI Installer" with icon note)
+    
+    return buttonReturned
+end tell
+EOF
+)
+        
+        if [ "$response" = "Use This" ]; then
+            echo "$detected_ip"
+            return
+        fi
+    fi
+    
+    # Ask user to input
+    local server_ip=$(osascript <<'EOF'
+tell application "System Events"
+    activate
+    set serverIP to text returned of (display dialog "Server IP Address
+
+Please enter the IP address of this server (the computer running MeticAI).
+
+Example: 192.168.1.50
+
+This is needed so you can access the MeticAI web interface." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with title "MeticAI Installer" with icon note)
+    
+    return serverIP
+end tell
+EOF
+)
+    
+    if [ -z "$server_ip" ]; then
+        osascript <<'EOF'
+tell application "System Events"
+    activate
+    display dialog "IP Address Required
+
+You must provide the server IP address.
+
+Please try again." buttons {"OK"} default button "OK" with icon stop with title "MeticAI Installer"
+end tell
+EOF
+        exit 1
+    fi
+    
+    echo "$server_ip"
+}
+
 # Main installation flow
 main() {
-    log_message "Starting MeticAI macOS Installer"
+    log_message "Starting MeticAI macOS Installer (Fully GUI mode)"
     
     # Show welcome dialog
     if ! show_welcome; then
@@ -137,6 +290,7 @@ main() {
     
     # Get installation directory
     log_message "Getting installation directory..."
+    show_progress "Getting installation location..."
     INSTALL_DIR=$(get_install_directory)
     
     if [ -z "$INSTALL_DIR" ]; then
@@ -146,6 +300,39 @@ main() {
     
     log_message "Installation directory: $INSTALL_DIR"
     
+    # Get API key
+    show_progress "Collecting configuration..."
+    GEMINI_API_KEY=$(get_api_key)
+    log_message "API key collected"
+    
+    # Get Meticulous IP
+    METICULOUS_IP=$(get_meticulous_ip)
+    log_message "Meticulous IP: $METICULOUS_IP"
+    
+    # Get Server IP
+    SERVER_IP=$(get_server_ip)
+    log_message "Server IP: $SERVER_IP"
+    
+    # Show installation starting dialog
+    osascript <<EOF &
+tell application "System Events"
+    activate
+    display dialog "Starting Installation
+
+MeticAI will now be installed with the following configuration:
+
+Location: $INSTALL_DIR
+Server IP: $SERVER_IP
+Meticulous IP: $METICULOUS_IP
+
+The installation will run in the background and may take several minutes.
+
+Please click OK and wait for the installation to complete." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer" giving up after 10
+end tell
+EOF
+    
+    sleep 2
+    
     # Create parent directory if needed
     PARENT_DIR=$(dirname "$INSTALL_DIR")
     if [ ! -d "$PARENT_DIR" ]; then
@@ -153,102 +340,165 @@ main() {
         mkdir -p "$PARENT_DIR"
     fi
     
-    # Download and execute the web installer
-    log_message "Downloading and executing web installer..."
+    # Run installation in background
+    log_message "Running installation..."
+    show_progress "Installing MeticAI..."
     
-    # Create a temporary script that will handle the installation
-    TEMP_SCRIPT=$(mktemp)
+    # Create temporary directory for installation logs
+    INSTALL_LOG=$(mktemp)
+    trap 'rm -f "$INSTALL_LOG"' EXIT INT TERM
     
-    # Set up cleanup trap
-    trap 'rm -f "$TEMP_SCRIPT"' EXIT INT TERM
-    
-    cat > "$TEMP_SCRIPT" <<'INSTALLER_SCRIPT'
-#!/bin/bash
-
-# This script runs the web installer with pre-configured settings
-set -e
-
-INSTALL_DIR="$1"
-
-# Export environment variables to control web installer behavior
-# These variables are read by the web_install.sh and local-install.sh scripts:
-# - METICAI_INSTALL_METHOD: Identifies installation method for logging and behavior customization
-# - SKIP_DOCK_SHORTCUT: Set to "false" to allow macOS Dock shortcut creation (default behavior)
-# - SKIP_REBUILD_WATCHER: Set to "false" to allow rebuild watcher service installation (default behavior)
-#
-# The web installer uses these to skip certain interactive prompts and customize behavior
-# for GUI-initiated installations while maintaining the same installation logic.
-export METICAI_INSTALL_METHOD="macos_installer"
-export SKIP_DOCK_SHORTCUT="false"  # Allow dock shortcut creation
-export SKIP_REBUILD_WATCHER="false"  # Allow rebuild watcher installation
-
-# Download the web installer from official GitHub repository
-# NOTE: Downloads from 'main' branch. Future enhancement: verify checksum or use specific commit hash
-echo "Downloading MeticAI installer..."
-TEMP_INSTALLER=$(mktemp)
-
-# Cleanup trap for installer script
-trap 'rm -f "$TEMP_INSTALLER"' EXIT INT TERM
-
-if ! curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh -o "$TEMP_INSTALLER"; then
-    echo "ERROR: Failed to download installer"
-    exit 1
-fi
-
-chmod +x "$TEMP_INSTALLER"
-
-# Note: The web installer will interactively prompt for:
-# 1. Installation location (we handle this by changing to the target directory)
-# 2. API key (must be provided by user for security)
-# 3. IP addresses (auto-detected, user can override)
-# This approach ensures the web installer's logic remains intact while
-# pre-configuring what we can safely set.
-
-# Change to parent directory and let the installer handle directory creation
-cd "$(dirname "$INSTALL_DIR")" || exit 1
-
-echo "Starting MeticAI installation..."
-echo "Installation directory: $INSTALL_DIR"
-echo ""
-
-# Execute the installer
-# Note: The installer will still be interactive for API key and IP addresses
-# as these are sensitive/variable inputs that should be user-provided
-exec "$TEMP_INSTALLER"
-INSTALLER_SCRIPT
-    
-    chmod +x "$TEMP_SCRIPT"
-    
-    # Execute in a new Terminal window so users can see the installation progress
-    # and provide inputs (API key, IP addresses, etc.)
-    osascript <<EOF
-tell application "Terminal"
-    activate
-    do script "$TEMP_SCRIPT \"$INSTALL_DIR\""
-end tell
-EOF
-    
-    # Show completion message
-    osascript <<EOF
+    # Run the installation silently
+    if run_installation "$INSTALL_DIR" "$GEMINI_API_KEY" "$METICULOUS_IP" "$SERVER_IP" > "$INSTALL_LOG" 2>&1; then
+        log_message "Installation completed successfully"
+        
+        # Show success dialog with QR code info
+        osascript <<EOF
 tell application "System Events"
     activate
-    display dialog "MeticAI Installer
+    display dialog "Installation Complete! ✓
 
-The installation will continue in Terminal.
+MeticAI has been successfully installed!
 
-Please follow the prompts in the Terminal window to:
-• Enter your Google Gemini API Key
-• Configure your Meticulous machine IP address
-• Configure your server IP address
+🌐 Web Interface:
+   http://$SERVER_IP:3550
 
-The Terminal window will show the installation progress.
+📱 You can access this from any device on your network.
 
-When installation is complete, you'll see a QR code to access the MeticAI web interface." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer"
+☕️ Start using MeticAI:
+   1. Open the web interface in your browser
+   2. Upload a photo of your coffee bag
+   3. Let AI create the perfect espresso profile!
+
+The web interface should open automatically in a moment." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer"
 end tell
 EOF
+        
+        # Open web interface
+        sleep 2
+        open "http://$SERVER_IP:3550" 2>/dev/null || true
+        
+    else
+        log_error "Installation failed"
+        
+        # Show error dialog
+        local error_details=$(tail -20 "$INSTALL_LOG" | sed 's/"/\\"/g')
+        osascript <<EOF
+tell application "System Events"
+    activate
+    display dialog "Installation Failed
+
+An error occurred during installation.
+
+Please check the installation log for details:
+$INSTALL_LOG
+
+You can try:
+• Ensuring Docker Desktop is running
+• Checking your internet connection
+• Running the installer again
+
+Last error lines:
+${error_details:0:200}
+
+Would you like to view the full log?" buttons {"Close", "View Log"} default button "View Log" with icon stop with title "MeticAI Installer"
     
-    log_message "Installation script launched in Terminal"
-    log_message "macOS Installer wrapper completed successfully"
+    if button returned of result is "View Log" then
+        do shell script "open -a Console '$INSTALL_LOG'"
+    end if
+end tell
+EOF
+        exit 1
+    fi
+    
+    log_message "macOS Installer completed successfully"
+}
+
+# Run the actual installation
+run_installation() {
+    local install_dir="$1"
+    local api_key="$2"
+    local meticulous_ip="$3"
+    local server_ip="$4"
+    
+    show_progress "Downloading installer..."
+    
+    # Download the web installer
+    TEMP_INSTALLER=$(mktemp)
+    trap 'rm -f "$TEMP_INSTALLER"' EXIT INT TERM
+    
+    if ! curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh -o "$TEMP_INSTALLER"; then
+        echo "ERROR: Failed to download installer"
+        return 1
+    fi
+    
+    chmod +x "$TEMP_INSTALLER"
+    
+    show_progress "Cloning repository..."
+    
+    # Clone the repository
+    if [ -d "$install_dir" ]; then
+        rm -rf "$install_dir"
+    fi
+    
+    if ! git clone -b main https://github.com/hessius/MeticAI.git "$install_dir"; then
+        echo "ERROR: Failed to clone repository"
+        return 1
+    fi
+    
+    cd "$install_dir" || return 1
+    
+    show_progress "Creating configuration..."
+    
+    # Create .env file with collected configuration
+    cat > .env <<ENVFILE
+GEMINI_API_KEY=$api_key
+METICULOUS_IP=$meticulous_ip
+PI_IP=$server_ip
+ENVFILE
+    
+    show_progress "Setting up dependencies..."
+    
+    # Clone meticulous-source
+    if [ ! -d "meticulous-source" ]; then
+        git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+    fi
+    
+    # Clone web app
+    if [ ! -d "meticai-web" ]; then
+        git clone https://github.com/hessius/MeticAI-web.git meticai-web
+    fi
+    
+    # Generate web app config
+    mkdir -p meticai-web/public
+    cat > meticai-web/public/config.json <<WEBCONFIG
+{
+  "serverUrl": "http://$server_ip:8000"
+}
+WEBCONFIG
+    
+    show_progress "Building and starting containers..."
+    
+    # Ensure .versions.json exists as a file
+    if [ -d ".versions.json" ]; then
+        rm -rf .versions.json
+    fi
+    if [ ! -f ".versions.json" ]; then
+        echo '{}' > .versions.json
+    fi
+    
+    # Stop any existing containers
+    docker compose down 2>/dev/null || true
+    
+    # Build and start containers
+    if ! docker compose up -d --build; then
+        echo "ERROR: Failed to build and start containers"
+        return 1
+    fi
+    
+    show_progress "Installation complete!"
+    
+    return 0
 }
 
 # Run main function
