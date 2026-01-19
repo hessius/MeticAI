@@ -170,12 +170,20 @@ set -e
 
 INSTALL_DIR="$1"
 
-# Export environment variables to skip interactive prompts where possible
+# Export environment variables to control web installer behavior
+# These variables are read by the web_install.sh and local-install.sh scripts:
+# - METICAI_INSTALL_METHOD: Identifies installation method for logging and behavior customization
+# - SKIP_DOCK_SHORTCUT: Set to "false" to allow macOS Dock shortcut creation (default behavior)
+# - SKIP_REBUILD_WATCHER: Set to "false" to allow rebuild watcher service installation (default behavior)
+#
+# The web installer uses these to skip certain interactive prompts and customize behavior
+# for GUI-initiated installations while maintaining the same installation logic.
 export METICAI_INSTALL_METHOD="macos_installer"
 export SKIP_DOCK_SHORTCUT="false"  # Allow dock shortcut creation
 export SKIP_REBUILD_WATCHER="false"  # Allow rebuild watcher installation
 
-# Download the web installer
+# Download the web installer from official GitHub repository
+# NOTE: Downloads from 'main' branch. Future enhancement: verify checksum or use specific commit hash
 echo "Downloading MeticAI installer..."
 TEMP_INSTALLER=$(mktemp)
 
