@@ -145,10 +145,14 @@ class TestAnalyzeAndProfileEndpoint:
     """Tests for the /analyze_and_profile endpoint (consolidated endpoint)."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.save_to_history')
     @patch('main.subprocess.run')
     @patch('main.get_vision_model')
-    def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with only an image (no user preferences)."""
+        # Mock history saving
+        mock_save_history.return_value = {"id": "test-123"}
+        
         # Mock the Gemini vision response
         mock_response = Mock()
         mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
@@ -186,9 +190,13 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Ethiopian Yirgacheffe, Light Roast, Floral Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.save_to_history')
     @patch('main.subprocess.run')
-    def test_analyze_and_profile_with_prefs_only(self, mock_subprocess, client):
+    def test_analyze_and_profile_with_prefs_only(self, mock_subprocess, mock_save_history, client):
         """Test profile creation with only user preferences (no image)."""
+        # Mock history saving
+        mock_save_history.return_value = {"id": "test-456"}
+        
         # Mock successful subprocess execution
         mock_result = Mock()
         mock_result.returncode = 0
@@ -212,10 +220,14 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Strong and intense espresso" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.save_to_history')
     @patch('main.subprocess.run')
     @patch('main.get_vision_model')
-    def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with both image and user preferences."""
+        # Mock history saving
+        mock_save_history.return_value = {"id": "test-789"}
+        
         # Mock the Gemini vision response
         mock_response = Mock()
         mock_response.text = "Colombian Supremo, Medium Roast, Nutty"
@@ -314,10 +326,14 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.json()["status"] == "error"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.save_to_history')
     @patch('main.subprocess.run')
     @patch('main.get_vision_model')
-    def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with different user preferences."""
+        # Mock history saving
+        mock_save_history.return_value = {"id": "test-multi"}
+        
         mock_response = Mock()
         mock_response.text = "Test Coffee"
         mock_vision_model.return_value.generate_content.return_value = mock_response
@@ -381,9 +397,13 @@ class TestAnalyzeAndProfileEndpoint:
         assert "gemini" in call_args
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.save_to_history')
     @patch('main.subprocess.run')
-    def test_analyze_and_profile_special_characters(self, mock_subprocess, client):
+    def test_analyze_and_profile_special_characters(self, mock_subprocess, mock_save_history, client):
         """Test handling of special characters in input."""
+        # Mock history saving
+        mock_save_history.return_value = {"id": "test-special"}
+        
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "Success"
