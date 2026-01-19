@@ -39,3 +39,6 @@ htmlcov/
 
 # Web app (cloned dependency)
 meticai-web/
+
+# User data
+data/profile_history.json
