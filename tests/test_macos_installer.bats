@@ -59,13 +59,23 @@ README_FILE="$INSTALLER_DIR/README.md"
     [ "$status" -eq 0 ]
 }
 
-@test "install-wrapper.sh downloads from correct URL" {
-    run grep -q "https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh" "$WRAPPER_SCRIPT"
+@test "install-wrapper.sh clones repository directly (not via web_install.sh)" {
+    run grep -q "git clone.*github.com/hessius/MeticAI" "$WRAPPER_SCRIPT"
     [ "$status" -eq 0 ]
 }
 
-@test "install-wrapper.sh sets METICAI_INSTALL_METHOD" {
-    run grep -q "METICAI_INSTALL_METHOD.*macos_installer" "$WRAPPER_SCRIPT"
+@test "install-wrapper.sh collects API key via dialog" {
+    run grep -q "get_api_key()" "$WRAPPER_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "install-wrapper.sh collects Meticulous IP via dialog" {
+    run grep -q "get_meticulous_ip()" "$WRAPPER_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "install-wrapper.sh collects Server IP via dialog" {
+    run grep -q "get_server_ip()" "$WRAPPER_SCRIPT"
     [ "$status" -eq 0 ]
 }
 
@@ -76,9 +86,12 @@ README_FILE="$INSTALLER_DIR/README.md"
     [ "$status" -eq 0 ]
 }
 
-@test "install-wrapper.sh opens Terminal for installation" {
-    run grep -q 'tell application "Terminal"' "$WRAPPER_SCRIPT"
+@test "install-wrapper.sh runs installation in background (no Terminal)" {
+    run grep -q "run_installation" "$WRAPPER_SCRIPT"
     [ "$status" -eq 0 ]
+    # Verify it does NOT open Terminal
+    run grep -q 'tell application "Terminal"' "$WRAPPER_SCRIPT"
+    [ "$status" -ne 0 ]
 }
 
 # --- Build Script Tests ---
