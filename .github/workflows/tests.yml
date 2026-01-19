@@ -81,12 +81,15 @@ jobs:
           bats tests/test_local_install.bats
           bats tests/test_web_install.bats
           bats tests/test_uninstall.bats
+          bats tests/test_macos_installer.bats
       
       - name: Verify script syntax
         run: |
           bash -n local-install.sh
           bash -n web_install.sh
           bash -n uninstall.sh
+          bash -n macos-installer/install-wrapper.sh
+          bash -n macos-installer/build-macos-app.sh
 
   integration-check:
     name: Integration Tests
@@ -142,3 +145,5 @@ jobs:
           sudo apt-get install -y shellcheck
           shellcheck local-install.sh || true
           shellcheck web_install.sh || true
+          shellcheck macos-installer/install-wrapper.sh || true
+          shellcheck macos-installer/build-macos-app.sh || true
