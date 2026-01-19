@@ -159,8 +159,12 @@ if [ ! -d "$APP_PATH" ]; then
     exit 1
 fi
 
-# Make the app executable
-chmod +x "$APP_PATH/Contents/MacOS/${EXEC_NAME}" 2>/dev/null || true
+# Make the app executable (verify file exists first for better error handling)
+if [ -f "$APP_PATH/Contents/MacOS/${EXEC_NAME}" ]; then
+    chmod +x "$APP_PATH/Contents/MacOS/${EXEC_NAME}"
+else
+    echo -e "${YELLOW}Warning: Executable file not found at expected location${NC}"
+fi
 
 echo ""
 echo -e "${GREEN}=========================================${NC}"
