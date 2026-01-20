@@ -16,6 +16,10 @@
 # Exit on error
 set -e
 
+# Set PATH to ensure we can find Docker and other tools
+# Docker Desktop installs to /Applications/Docker.app
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
+
 # Logging functions
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
@@ -60,21 +64,35 @@ check_prerequisites() {
     local missing_tools=()
     local docker_not_running=false
     
+    log_message "Checking prerequisites..."
+    log_message "PATH: $PATH"
+    
     # Check for git
     if ! command -v git &> /dev/null; then
+        log_message "Git not found"
         missing_tools+=("Git")
+    else
+        log_message "Git found at: $(command -v git)"
     fi
     
     # Check for docker - both installed AND running
     if ! command -v docker &> /dev/null; then
+        log_message "Docker command not found in PATH"
         missing_tools+=("Docker Desktop")
     else
+        local docker_path=$(command -v docker)
+        log_message "Docker found at: $docker_path"
+        
         # Docker command exists, but check if daemon is running
-        if ! docker info &> /dev/null; then
+        if ! docker info &> /dev/null 2>&1; then
+            log_message "Docker daemon not responding to 'docker info'"
             docker_not_running=true
+        else
+            log_message "Docker daemon is running"
         fi
     fi
     
+    log_message "Prerequisite check complete. Missing tools: ${missing_tools[*]:-none}, Docker not running: $docker_not_running"
     if [ ${#missing_tools[@]} -gt 0 ] || [ "$docker_not_running" = true ]; then
         local missing_list=$(IFS=", "; echo "${missing_tools[*]}")
         
