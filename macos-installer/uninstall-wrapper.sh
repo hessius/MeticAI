@@ -17,6 +17,10 @@
 # Exit on error
 set -e
 
+# Set PATH to ensure we can find Docker and other tools
+# Docker Desktop installs to /Applications/Docker.app
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
+
 # Logging functions
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
@@ -110,21 +114,40 @@ run_uninstallation() {
     if command -v docker &> /dev/null; then
         # Check if Docker daemon is running
         if docker info &> /dev/null 2>&1; then
+            log_message "Docker daemon is running, proceeding with container cleanup..."
+            
             # Stop containers using docker-compose if file exists
             if [ -f "docker-compose.yml" ]; then
                 log_message "Found docker-compose.yml, stopping containers..."
-                docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true
+                docker compose down --volumes --remove-orphans 2>/dev/null || docker-compose down --volumes --remove-orphans 2>/dev/null || true
                 
                 # Also try to stop by project name
-                docker compose -p meticai down 2>/dev/null || true
+                docker compose -p meticai down --volumes --remove-orphans 2>/dev/null || true
             fi
             
-            # Find and stop any running MeticAI containers directly
-            local running_containers=$(docker ps -q --filter "name=meticai" --filter "name=coffee-relay" --filter "name=gemini-client" --filter "name=meticulous-mcp" 2>/dev/null || true)
-            if [ -n "$running_containers" ]; then
-                log_message "Stopping running MeticAI containers..."
-                echo "$running_containers" | xargs docker stop 2>/dev/null || true
-                echo "$running_containers" | xargs docker rm 2>/dev/null || true
+            # Find ALL containers (running or stopped) related to MeticAI
+            log_message "Searching for all MeticAI-related containers..."
+            local all_containers=$(docker ps -aq --filter "name=meticai" --filter "name=coffee-relay" --filter "name=gemini-client" --filter "name=meticulous-mcp" 2>/dev/null || true)
+            
+            if [ -n "$all_containers" ]; then
+                log_message "Found containers to remove: $(echo $all_containers | tr '\n' ' ')"
+                echo "$all_containers" | xargs docker stop 2>/dev/null || true
+                echo "$all_containers" | xargs docker rm -f 2>/dev/null || true
+                log_message "Containers stopped and removed"
+            else
+                log_message "No MeticAI containers found by name filter"
+            fi
+            
+            # Also check for containers in the current directory's compose project
+            local dir_name=$(basename "$install_dir" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]_-')
+            log_message "Checking for containers with project name: $dir_name"
+            local project_containers=$(docker ps -aq --filter "label=com.docker.compose.project=$dir_name" 2>/dev/null || true)
+            
+            if [ -n "$project_containers" ]; then
+                log_message "Found project containers: $(echo $project_containers | tr '\n' ' ')"
+                echo "$project_containers" | xargs docker stop 2>/dev/null || true
+                echo "$project_containers" | xargs docker rm -f 2>/dev/null || true
+                log_message "Project containers stopped and removed"
             fi
             
             # Remove images
@@ -134,12 +157,18 @@ run_uninstallation() {
             if [ -n "$images" ]; then
                 log_message "Removing Docker images: $images"
                 echo "$images" | xargs docker rmi -f 2>/dev/null || true
+            else
+                log_message "No MeticAI images found"
             fi
+            
+            log_message "Docker cleanup completed"
         else
             log_message "Docker daemon not running, skipping container cleanup"
+            show_progress "Docker not running - skipping container cleanup"
         fi
     else
         log_message "Docker not found, skipping container cleanup"
+        show_progress "Docker not installed - skipping container cleanup"
     fi
     
     # Remove cloned repositories
