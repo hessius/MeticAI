@@ -82,6 +82,7 @@ jobs:
           bats tests/test_web_install.bats
           bats tests/test_uninstall.bats
           bats tests/test_macos_installer.bats
+          bats tests/test_macos_uninstaller.bats
       
       - name: Verify script syntax
         run: |
@@ -90,6 +91,8 @@ jobs:
           bash -n uninstall.sh
           bash -n macos-installer/install-wrapper.sh
           bash -n macos-installer/build-macos-app.sh
+          bash -n macos-installer/uninstall-wrapper.sh
+          bash -n macos-installer/build-uninstaller-app.sh
 
   integration-check:
     name: Integration Tests

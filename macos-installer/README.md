@@ -1,22 +1,44 @@
-# MeticAI macOS Installer App
+# MeticAI macOS Apps
 
-This directory contains the scripts and resources needed to build a standalone macOS installer application for MeticAI. The installer provides a **fully graphical user interface** with **NO Terminal window** - everything runs in the background with GUI dialogs for input and progress feedback.
+This directory contains the scripts and resources needed to build standalone macOS applications for MeticAI. Two apps are available:
 
-## Overview
+1. **MeticAI Installer** - GUI-based installation app
+2. **MeticAI Uninstaller** - GUI-based uninstallation app
 
-The macOS installer app provides a completely GUI-based installation experience:
+Both apps provide a **fully graphical user interface** with **NO Terminal window** - everything runs in the background with GUI dialogs for input and progress feedback.
+
+## MeticAI Installer
+
+The installer app provides a completely GUI-based installation experience:
 
 - ✅ **Welcome dialog** explaining the installation process
 - ✅ **Prerequisite checking** for Git and Docker with helpful installation instructions
 - ✅ **Installation location picker** via dialog or folder browser
-- ✅ **API key input** via secure dialog
+- ✅ **API key input** via secure dialog with clickable link to get API key
 - ✅ **IP address configuration** via dialogs with auto-detection
 - ✅ **Background installation** - no Terminal window shown to user
 - ✅ **Progress feedback** via GUI dialogs
 - ✅ **Success/error dialogs** with clear next steps
 - ✅ **Auto-opens web interface** when installation completes
+- ✅ **Uses MeticAI branding** - app icon shows MeticAI logo
 
-## Building the Installer App
+## MeticAI Uninstaller
+
+The uninstaller app provides a GUI-based uninstallation experience:
+
+- ✅ **Confirmation dialog** before uninstalling
+- ✅ **Auto-detects installation** location
+- ✅ **Background uninstallation** - no Terminal window
+- ✅ **Removes all components**:
+  - Docker containers and images
+  - Cloned repositories
+  - Configuration files
+  - macOS integrations (Dock shortcuts, services)
+- ✅ **Optional directory removal** - asks before deleting installation folder
+- ✅ **Success/error dialogs** with clear feedback
+- ✅ **Uses MeticAI branding** - app icon shows MeticAI logo
+
+## Building the Apps
 
 ### Prerequisites
 
@@ -66,12 +88,38 @@ The app will:
 9. Display success message with web interface URL
 10. Auto-open the web interface in your browser
 
+### Building the Uninstaller
+
+To build the uninstaller app:
+
+```bash
+cd macos-installer
+chmod +x build-uninstaller-app.sh
+./build-uninstaller-app.sh
+```
+
+The app will be created in `macos-installer/build/MeticAI Uninstaller.app`
+
+Test it:
+```bash
+open "build/MeticAI Uninstaller.app"
+```
+
+The uninstaller will:
+1. Show a confirmation dialog
+2. Auto-detect MeticAI installation (or ask user to locate it)
+3. Run uninstallation in the background (NO Terminal window)
+4. Remove Docker containers, images, repositories, and config files
+5. Ask about removing the installation directory
+6. Show success message
+
 ## Distribution
 
-### Creating a DMG for Distribution
+### Creating DMG files for Distribution
 
-Once you've built and tested the app, create a distributable DMG file:
+Create distributable DMG files for both apps:
 
+**Installer DMG:**
 ```bash
 hdiutil create -volname "MeticAI Installer" \
   -srcfolder "build/MeticAI Installer.app" \
@@ -79,18 +127,27 @@ hdiutil create -volname "MeticAI Installer" \
   "build/MeticAI-Installer.dmg"
 ```
 
+**Uninstaller DMG:**
+```bash
+hdiutil create -volname "MeticAI Uninstaller" \
+  -srcfolder "build/MeticAI Uninstaller.app" \
+  -ov -format UDZO \
+  "build/MeticAI-Uninstaller.dmg"
+```
+
 Users can then:
-1. Download the DMG file
-2. Open it and drag "MeticAI Installer.app" to Applications
-3. Launch the app from Applications folder
+1. Download the DMG files
+2. Open them and drag apps to Applications
+3. Launch the apps from Applications folder
 
-### Creating a ZIP Archive
+### Creating ZIP Archives
 
-Alternatively, create a ZIP file:
+Alternatively, create ZIP files:
 
 ```bash
 cd build
 zip -r "MeticAI-Installer.zip" "MeticAI Installer.app"
+zip -r "MeticAI-Uninstaller.zip" "MeticAI Uninstaller.app"
 ```
 
 ## How It Works
