@@ -108,17 +108,38 @@ run_uninstallation() {
     show_progress "Stopping Docker containers..."
     
     if command -v docker &> /dev/null; then
-        if [ -f "docker-compose.yml" ]; then
-            docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true
+        # Check if Docker daemon is running
+        if docker info &> /dev/null 2>&1; then
+            # Stop containers using docker-compose if file exists
+            if [ -f "docker-compose.yml" ]; then
+                log_message "Found docker-compose.yml, stopping containers..."
+                docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true
+                
+                # Also try to stop by project name
+                docker compose -p meticai down 2>/dev/null || true
+            fi
+            
+            # Find and stop any running MeticAI containers directly
+            local running_containers=$(docker ps -q --filter "name=meticai" --filter "name=coffee-relay" --filter "name=gemini-client" --filter "name=meticulous-mcp" 2>/dev/null || true)
+            if [ -n "$running_containers" ]; then
+                log_message "Stopping running MeticAI containers..."
+                echo "$running_containers" | xargs docker stop 2>/dev/null || true
+                echo "$running_containers" | xargs docker rm 2>/dev/null || true
+            fi
+            
+            # Remove images
+            show_progress "Removing Docker images..."
+            local images=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|coffee-relay|gemini-client|meticulous-mcp)" 2>/dev/null || true)
+            
+            if [ -n "$images" ]; then
+                log_message "Removing Docker images: $images"
+                echo "$images" | xargs docker rmi -f 2>/dev/null || true
+            fi
+        else
+            log_message "Docker daemon not running, skipping container cleanup"
         fi
-        
-        # Remove images
-        show_progress "Removing Docker images..."
-        local images=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|coffee-relay|gemini-client|meticulous-mcp)" || true)
-        
-        if [ -n "$images" ]; then
-            echo "$images" | xargs -r docker rmi -f 2>/dev/null || true
-        fi
+    else
+        log_message "Docker not found, skipping container cleanup"
     fi
     
     # Remove cloned repositories

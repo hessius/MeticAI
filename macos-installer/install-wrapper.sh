@@ -58,46 +58,99 @@ EOF
 # Check for prerequisites and offer to install if missing
 check_prerequisites() {
     local missing_tools=()
+    local docker_not_running=false
     
     # Check for git
     if ! command -v git &> /dev/null; then
         missing_tools+=("Git")
     fi
     
-    # Check for docker
+    # Check for docker - both installed AND running
     if ! command -v docker &> /dev/null; then
-        missing_tools+=("Docker")
+        missing_tools+=("Docker Desktop")
+    else
+        # Docker command exists, but check if daemon is running
+        if ! docker info &> /dev/null; then
+            docker_not_running=true
+        fi
     fi
     
-    if [ ${#missing_tools[@]} -gt 0 ]; then
+    if [ ${#missing_tools[@]} -gt 0 ] || [ "$docker_not_running" = true ]; then
         local missing_list=$(IFS=", "; echo "${missing_tools[*]}")
         
-        osascript <<EOF
+        if [ "$docker_not_running" = true ] && [ ${#missing_tools[@]} -eq 0 ]; then
+            # Docker is installed but not running
+            osascript <<'EOF'
 tell application "System Events"
     activate
-    display dialog "Missing Prerequisites
+    display dialog "Docker Desktop Not Running
+
+Docker Desktop is installed but not running.
+
+Please start Docker Desktop before continuing with the installation.
+
+You can find Docker Desktop in your Applications folder." buttons {"Cancel", "OK"} default button "OK" with icon caution with title "MeticAI Installer"
+end tell
+EOF
+            exit 1
+        else
+            # Some tools are missing
+            local dialog_result=$(osascript <<EOF
+tell application "System Events"
+    activate
+    set dialogResult to display dialog "Missing Prerequisites
 
 The following required tools are not installed:
 ${missing_list}
 
-Installation Instructions:
+Choose what to do:
+• Install Docker Desktop: Download from Docker website
+• Install Git: Via Xcode Command Line Tools
 
-• Docker Desktop: Download from https://www.docker.com/products/docker-desktop
-  - Install and make sure Docker Desktop is running before continuing
-
-• Git: Install via Xcode Command Line Tools:
-  - Open Terminal and run: xcode-select --install
-
-Would you like to open the installation links?" buttons {"Cancel", "Open Links"} default button "Open Links" with icon caution with title "MeticAI Installer"
+Click a button to open the installation page:" buttons {"Cancel", "Install Docker Desktop", "Install Git"} default button "Install Docker Desktop" with icon caution with title "MeticAI Installer"
     
-    if button returned of result is "Open Links" then
-        do shell script "open 'https://www.docker.com/products/docker-desktop'"
-    end if
-    
-    error number -128
+    return button returned of dialogResult
 end tell
 EOF
-        exit 1
+)
+            
+            if [ "$dialog_result" = "Install Docker Desktop" ]; then
+                open "https://www.docker.com/products/docker-desktop"
+                osascript <<'EOF'
+tell application "System Events"
+    activate
+    display dialog "Opening Docker Desktop Download Page
+
+After installing Docker Desktop:
+1. Launch Docker Desktop
+2. Wait for it to start (whale icon in menu bar)
+3. Run MeticAI Installer again
+
+Click OK to exit installer." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer"
+end tell
+EOF
+                exit 0
+            elif [ "$dialog_result" = "Install Git" ]; then
+                # For Git, we need to explain the process since it's via xcode-select
+                osascript <<'EOF'
+tell application "System Events"
+    activate
+    display dialog "Installing Git via Xcode Command Line Tools
+
+To install Git:
+1. Open Terminal
+2. Run: xcode-select --install
+3. Follow the installation prompts
+4. After installation, run MeticAI Installer again
+
+Click OK to exit installer." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer"
+end tell
+EOF
+                exit 0
+            else
+                exit 0
+            fi
+        fi
     fi
 }
 
