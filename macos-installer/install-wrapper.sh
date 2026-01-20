@@ -129,26 +129,43 @@ EOF
 
 # Get Gemini API key from user
 get_api_key() {
-    local api_key=$(osascript <<'EOF'
+    local api_key=""
+    local continue_input=false
+    
+    while [ -z "$api_key" ]; do
+        local result=$(osascript <<'EOF'
 tell application "System Events"
     activate
-    set apiKey to text returned of (display dialog "Google Gemini API Key
+    set dialogResult to display dialog "Google Gemini API Key
 
 Please enter your Google Gemini API Key.
 
-Get your free API key at:
-https://aistudio.google.com/app/apikey
+This key is required for MeticAI to function.
 
-This key is required for MeticAI to function." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with title "MeticAI Installer" with icon note)
+Click 'Get API Key' to open the Google AI Studio page in your browser." default answer "" buttons {"Cancel", "Get API Key", "Continue"} default button "Continue" with title "MeticAI Installer" with icon note
     
-    return apiKey
+    set buttonPressed to button returned of dialogResult
+    set apiKey to text returned of dialogResult
+    
+    return buttonPressed & "|" & apiKey
 end tell
 EOF
 )
-    
-    # Validate not empty
-    if [ -z "$api_key" ]; then
-        osascript <<'EOF'
+        
+        local button=$(echo "$result" | cut -d'|' -f1)
+        local key=$(echo "$result" | cut -d'|' -f2-)
+        
+        if [ "$button" = "Get API Key" ]; then
+            # Open the Google AI Studio page
+            open "https://aistudio.google.com/app/apikey"
+            # Continue the loop to show dialog again
+            continue
+        elif [ "$button" = "Cancel" ]; then
+            exit 0
+        else
+            # Continue button pressed
+            if [ -z "$key" ]; then
+                osascript <<'EOF'
 tell application "System Events"
     activate
     display dialog "API Key Required
@@ -158,8 +175,11 @@ You must provide a Google Gemini API Key to continue.
 Please try again." buttons {"OK"} default button "OK" with icon stop with title "MeticAI Installer"
 end tell
 EOF
-        exit 1
-    fi
+            else
+                api_key="$key"
+            fi
+        fi
+    done
     
     echo "$api_key"
 }

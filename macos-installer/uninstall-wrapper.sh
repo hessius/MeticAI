@@ -1,0 +1,294 @@
+#!/bin/bash
+
+################################################################################
+# MeticAI - macOS Uninstaller Wrapper Script (Fully GUI)
+################################################################################
+# 
+# This script provides a completely GUI-based uninstallation experience for
+# macOS users with NO Terminal window. All confirmations are collected via
+# AppleScript dialogs, and uninstallation runs in the background with progress
+# feedback via GUI.
+#
+# This script is designed to be packaged with Platypus to create a standalone
+# macOS .app bundle.
+#
+################################################################################
+
+# Exit on error
+set -e
+
+# Logging functions
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+log_error() {
+    echo "ERROR: $1" >&2
+}
+
+# Show progress dialog (non-blocking)
+show_progress() {
+    local message="$1"
+    echo "PROGRESS: $message"
+}
+
+# Display welcome/confirmation dialog
+show_welcome() {
+    osascript <<EOF
+tell application "System Events"
+    activate
+    set buttonReturned to button returned of (display dialog "MeticAI Uninstaller
+
+This will remove MeticAI from your system, including:
+
+• Docker containers and images
+• Cloned repositories
+• Configuration files
+• macOS integrations (if installed)
+
+Your Docker, Git, and other tools will be kept.
+
+Are you sure you want to uninstall MeticAI?" buttons {"Cancel", "Uninstall"} default button "Cancel" with icon caution with title "MeticAI Uninstaller")
+    
+    if buttonReturned is "Cancel" then
+        error number -128
+    end if
+end tell
+EOF
+}
+
+# Find MeticAI installation directory
+find_installation_dir() {
+    local possible_locations=(
+        "$HOME/MeticAI"
+        "$HOME/Documents/MeticAI"
+        "/Applications/MeticAI"
+        "$(pwd)"
+    )
+    
+    for dir in "${possible_locations[@]}"; do
+        if [ -d "$dir" ] && [ -f "$dir/docker-compose.yml" ]; then
+            echo "$dir"
+            return
+        fi
+    done
+    
+    # Ask user to locate it
+    local install_dir=$(osascript <<'EOF'
+tell application "System Events"
+    activate
+    set installPath to POSIX path of (choose folder with prompt "Please locate your MeticAI installation folder:")
+    return installPath
+end tell
+EOF
+)
+    
+    if [ -n "$install_dir" ] && [ -d "$install_dir" ]; then
+        echo "$install_dir"
+    else
+        echo ""
+    fi
+}
+
+# Run the actual uninstallation
+run_uninstallation() {
+    local install_dir="$1"
+    
+    show_progress "Finding MeticAI installation..."
+    
+    if [ -z "$install_dir" ] || [ ! -d "$install_dir" ]; then
+        echo "ERROR: MeticAI installation directory not found"
+        return 1
+    fi
+    
+    log_message "Uninstalling from: $install_dir"
+    cd "$install_dir" || return 1
+    
+    # Stop and remove containers
+    show_progress "Stopping Docker containers..."
+    
+    if command -v docker &> /dev/null; then
+        if [ -f "docker-compose.yml" ]; then
+            docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true
+        fi
+        
+        # Remove images
+        show_progress "Removing Docker images..."
+        local images=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|coffee-relay|gemini-client|meticulous-mcp)" || true)
+        
+        if [ -n "$images" ]; then
+            echo "$images" | xargs -r docker rmi -f 2>/dev/null || true
+        fi
+    fi
+    
+    # Remove cloned repositories
+    show_progress "Removing cloned repositories..."
+    
+    [ -d "meticulous-source" ] && rm -rf meticulous-source
+    [ -d "meticai-web" ] && rm -rf meticai-web
+    
+    # Remove configuration files
+    show_progress "Removing configuration files..."
+    
+    [ -f ".env" ] && rm -f .env
+    [ -f ".versions.json" ] && rm -f .versions.json
+    [ -f ".rebuild-needed" ] && rm -f .rebuild-needed
+    [ -f ".rebuild-watcher.log" ] && rm -f .rebuild-watcher.log
+    
+    # Remove macOS integrations
+    show_progress "Removing macOS integrations..."
+    
+    # Remove Dock shortcut if it exists
+    if [ -f "$HOME/Applications/MeticAI.app" ]; then
+        rm -rf "$HOME/Applications/MeticAI.app"
+    fi
+    
+    # Remove rebuild watcher service (macOS)
+    if [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ]; then
+        launchctl unload "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" 2>/dev/null || true
+        rm -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist"
+    fi
+    
+    # Ask about removing the installation directory
+    show_progress "Finalizing uninstallation..."
+    
+    local remove_dir=$(osascript <<EOF
+tell application "System Events"
+    activate
+    set buttonReturned to button returned of (display dialog "Remove Installation Directory?
+
+Do you want to remove the MeticAI installation directory?
+
+$install_dir
+
+This will delete all files in this directory." buttons {"Keep Directory", "Remove Directory"} default button "Keep Directory" with icon caution with title "MeticAI Uninstaller")
+    
+    return buttonReturned
+end tell
+EOF
+)
+    
+    if [ "$remove_dir" = "Remove Directory" ]; then
+        cd "$HOME" || cd /
+        rm -rf "$install_dir"
+        log_message "Removed installation directory: $install_dir"
+    else
+        log_message "Kept installation directory: $install_dir"
+    fi
+    
+    show_progress "Uninstallation complete!"
+    
+    return 0
+}
+
+# Main uninstallation flow
+main() {
+    log_message "Starting MeticAI macOS Uninstaller (Fully GUI mode)"
+    
+    # Show welcome/confirmation dialog
+    if ! show_welcome; then
+        log_message "Uninstallation cancelled by user"
+        exit 0
+    fi
+    
+    # Find installation directory
+    log_message "Finding MeticAI installation..."
+    show_progress "Locating MeticAI installation..."
+    INSTALL_DIR=$(find_installation_dir)
+    
+    if [ -z "$INSTALL_DIR" ]; then
+        log_error "Could not find MeticAI installation"
+        osascript <<'EOF'
+tell application "System Events"
+    activate
+    display dialog "Installation Not Found
+
+Could not locate MeticAI installation directory.
+
+Please make sure MeticAI is installed before running the uninstaller." buttons {"OK"} default button "OK" with icon stop with title "MeticAI Uninstaller"
+end tell
+EOF
+        exit 1
+    fi
+    
+    log_message "Installation directory: $INSTALL_DIR"
+    
+    # Show starting dialog
+    osascript <<EOF &
+tell application "System Events"
+    activate
+    display dialog "Starting Uninstallation
+
+MeticAI will now be uninstalled from:
+$INSTALL_DIR
+
+The uninstallation will run in the background.
+
+Please wait for completion..." buttons {"OK"} default button "OK" with icon note with title "MeticAI Uninstaller" giving up after 5
+end tell
+EOF
+    
+    sleep 1
+    
+    # Create temporary directory for uninstallation logs
+    UNINSTALL_LOG=$(mktemp)
+    trap 'rm -f "$UNINSTALL_LOG"' EXIT INT TERM
+    
+    # Run the uninstallation
+    log_message "Running uninstallation..."
+    show_progress "Uninstalling MeticAI..."
+    
+    if run_uninstallation "$INSTALL_DIR" > "$UNINSTALL_LOG" 2>&1; then
+        log_message "Uninstallation completed successfully"
+        
+        # Show success dialog
+        osascript <<'EOF'
+tell application "System Events"
+    activate
+    display dialog "Uninstallation Complete! ✓
+
+MeticAI has been successfully uninstalled.
+
+• Docker containers removed
+• Docker images removed
+• Repositories removed
+• Configuration files removed
+• macOS integrations removed
+
+Docker, Git, and other tools have been kept on your system." buttons {"OK"} default button "OK" with icon note with title "MeticAI Uninstaller"
+end tell
+EOF
+        
+    else
+        log_error "Uninstallation failed"
+        
+        # Show error dialog
+        local error_details=$(tail -20 "$UNINSTALL_LOG" | sed 's/"/\\"/g')
+        osascript <<EOF
+tell application "System Events"
+    activate
+    display dialog "Uninstallation Failed
+
+An error occurred during uninstallation.
+
+Please check the uninstallation log for details:
+$UNINSTALL_LOG
+
+Last error lines:
+${error_details:0:200}
+
+Would you like to view the full log?" buttons {"Close", "View Log"} default button "View Log" with icon stop with title "MeticAI Uninstaller"
+    
+    if button returned of result is "View Log" then
+        do shell script "open -a Console '$UNINSTALL_LOG'"
+    end if
+end tell
+EOF
+        exit 1
+    fi
+    
+    log_message "macOS Uninstaller completed successfully"
+}
+
+# Run main function
+main
