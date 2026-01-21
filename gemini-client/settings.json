@@ -11,6 +11,11 @@
         "-m",
         "meticulous_mcp.server"
       ]
+    },
+    "nanobanana": {
+      "command": "node",
+      "args": ["/opt/nanobanana/mcp-server/dist/index.js"],
+      "env": {}
     }
   }
 }

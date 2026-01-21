@@ -1171,3 +1171,1059 @@ async def get_profile_json(request: Request, entry_id: str):
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "Failed to get profile JSON"}
         )
+
+
+# ============================================
+# Shot History from Meticulous Machine
+# ============================================
+
+# Lazy-loaded Meticulous API client
+_meticulous_api = None
+
+
+def get_meticulous_api():
+    """Lazily initialize and return the Meticulous API client."""
+    global _meticulous_api
+    if _meticulous_api is None:
+        from meticulous.api import Api
+        meticulous_ip = os.environ.get("METICULOUS_IP", "meticulousmodelalmondmilklatte.local")
+        # Ensure we use http:// prefix
+        if not meticulous_ip.startswith("http"):
+            meticulous_ip = f"http://{meticulous_ip}"
+        _meticulous_api = Api(base_url=meticulous_ip)
+    return _meticulous_api
+
+
+def decompress_shot_data(compressed_data: bytes) -> dict:
+    """Decompress zstandard-compressed shot data."""
+    import zstandard as zstd
+    dctx = zstd.ZstdDecompressor()
+    decompressed = dctx.decompress(compressed_data)
+    return json.loads(decompressed.decode('utf-8'))
+
+
+async def fetch_shot_data(date_str: str, filename: str) -> dict:
+    """Fetch and decompress shot data from the Meticulous machine."""
+    import httpx
+    
+    api = get_meticulous_api()
+    url = f"{api.base_url}/api/v1/history/files/{date_str}/{filename}"
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        
+        # Check if it's compressed (zstd)
+        if filename.endswith('.zst'):
+            return decompress_shot_data(response.content)
+        else:
+            return response.json()
+
+
+@app.get("/api/shots/dates")
+async def get_shot_dates(request: Request):
+    """Get all available shot dates from the machine.
+    
+    Returns:
+        List of dates with available shot history
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Fetching shot history dates",
+            extra={"request_id": request_id}
+        )
+        
+        api = get_meticulous_api()
+        result = api.get_history_dates()
+        
+        # Check for API error
+        if hasattr(result, 'error') and result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {result.error}"
+            )
+        
+        # Extract date names
+        dates = [d.name for d in result] if result else []
+        
+        return {"dates": sorted(dates, reverse=True)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch shot dates: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to fetch shot dates from machine"}
+        )
+
+
+@app.get("/api/shots/files/{date}")
+async def get_shot_files(request: Request, date: str):
+    """Get shot files for a specific date.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        
+    Returns:
+        List of shot filenames for that date
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Fetching shot files for date",
+            extra={"request_id": request_id, "date": date}
+        )
+        
+        api = get_meticulous_api()
+        result = api.get_shot_files(date)
+        
+        # Check for API error
+        if hasattr(result, 'error') and result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {result.error}"
+            )
+        
+        # Extract filenames
+        files = [f.name for f in result] if result else []
+        
+        return {"date": date, "files": files}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch shot files: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "date": date, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to fetch shot files from machine"}
+        )
+
+
+@app.get("/api/shots/data/{date}/{filename:path}")
+async def get_shot_data(request: Request, date: str, filename: str):
+    """Get the actual shot data for a specific shot.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        filename: Shot filename (e.g., HH:MM:SS.shot.json.zst)
+        
+    Returns:
+        Decompressed shot data with telemetry
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Fetching shot data",
+            extra={"request_id": request_id, "date": date, "shot_file": filename}
+        )
+        
+        shot_data = await fetch_shot_data(date, filename)
+        
+        return {
+            "date": date,
+            "filename": filename,
+            "data": shot_data
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch shot data: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "date": date, "shot_file": filename, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to fetch shot data from machine"}
+        )
+
+
+@app.get("/api/shots/by-profile/{profile_name}")
+async def get_shots_by_profile(
+    request: Request, 
+    profile_name: str,
+    limit: int = 20,
+    include_data: bool = False
+):
+    """Get all shots that used a specific profile.
+    
+    This endpoint scans shot history to find all shots that match the given profile name.
+    
+    Args:
+        profile_name: Name of the profile to search for
+        limit: Maximum number of shots to return (default: 20)
+        include_data: Whether to include full telemetry data (default: False for performance)
+        
+    Returns:
+        List of shots matching the profile, with optional full telemetry data
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Searching for shots by profile",
+            extra={"request_id": request_id, "profile_name": profile_name, "limit": limit}
+        )
+        
+        api = get_meticulous_api()
+        
+        # Get all available dates
+        dates_result = api.get_history_dates()
+        if hasattr(dates_result, 'error') and dates_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {dates_result.error}"
+            )
+        
+        dates = [d.name for d in dates_result] if dates_result else []
+        matching_shots = []
+        
+        # Search through dates (most recent first)
+        for date in sorted(dates, reverse=True):
+            if len(matching_shots) >= limit:
+                break
+                
+            # Get files for this date
+            files_result = api.get_shot_files(date)
+            if hasattr(files_result, 'error') and files_result.error:
+                logger.warning(f"Could not get files for {date}: {files_result.error}")
+                continue
+            
+            files = [f.name for f in files_result] if files_result else []
+            
+            # Check each shot file
+            for filename in files:
+                if len(matching_shots) >= limit:
+                    break
+                    
+                try:
+                    shot_data = await fetch_shot_data(date, filename)
+                    
+                    # Extract profile name from shot data
+                    # Can be in "profile_name" or "profile.name" depending on firmware
+                    shot_profile_name = shot_data.get("profile_name", "")
+                    if not shot_profile_name and isinstance(shot_data.get("profile"), dict):
+                        shot_profile_name = shot_data.get("profile", {}).get("name", "")
+                    
+                    # Case-insensitive match
+                    if shot_profile_name.lower() == profile_name.lower():
+                        # Extract final weight and time from the data array
+                        data_entries = shot_data.get("data", [])
+                        final_weight = None
+                        total_time_ms = None
+                        
+                        if data_entries:
+                            last_entry = data_entries[-1]
+                            # Weight is in shot.weight
+                            if isinstance(last_entry.get("shot"), dict):
+                                final_weight = last_entry["shot"].get("weight")
+                            # Time is in milliseconds
+                            total_time_ms = last_entry.get("time")
+                        
+                        shot_info = {
+                            "date": date,
+                            "filename": filename,
+                            "timestamp": shot_data.get("time"),  # Unix timestamp
+                            "profile_name": shot_profile_name,
+                            "final_weight": final_weight,
+                            "total_time": total_time_ms / 1000 if total_time_ms else None,  # Convert to seconds
+                        }
+                        
+                        if include_data:
+                            shot_info["data"] = shot_data
+                        
+                        matching_shots.append(shot_info)
+                        
+                except Exception as e:
+                    logger.warning(
+                        f"Could not process shot {date}/{filename}: {str(e)}",
+                        extra={"request_id": request_id}
+                    )
+                    continue
+        
+        logger.info(
+            f"Found {len(matching_shots)} shots for profile '{profile_name}'",
+            extra={"request_id": request_id, "count": len(matching_shots)}
+        )
+        
+        return {
+            "profile_name": profile_name,
+            "shots": matching_shots,
+            "count": len(matching_shots),
+            "limit": limit
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to search shots by profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to search shots by profile"}
+        )
+
+
+def process_image_for_profile(image_data: bytes, content_type: str = "image/png") -> str:
+    """Process an image for profile upload: crop to square, resize to 512x512, convert to base64 data URI.
+    
+    Args:
+        image_data: Raw image bytes
+        content_type: MIME type of the image
+        
+    Returns:
+        Base64 data URI string (e.g., "data:image/png;base64,...")
+    """
+    from PIL import Image as PILImage
+    import io
+    import base64
+    
+    # Open image with PIL
+    img = PILImage.open(io.BytesIO(image_data))
+    
+    # Convert to RGB if necessary (for PNG with alpha channel)
+    if img.mode in ('RGBA', 'LA', 'P'):
+        # Create white background for transparency
+        background = PILImage.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        if img.mode in ('RGBA', 'LA'):
+            background.paste(img, mask=img.split()[-1])  # Use alpha channel as mask
+            img = background
+        else:
+            img = img.convert('RGB')
+    elif img.mode != 'RGB':
+        img = img.convert('RGB')
+    
+    # Crop to square (center crop)
+    width, height = img.size
+    min_dim = min(width, height)
+    left = (width - min_dim) // 2
+    top = (height - min_dim) // 2
+    right = left + min_dim
+    bottom = top + min_dim
+    img = img.crop((left, top, right, bottom))
+    
+    # Resize to 512x512
+    img = img.resize((512, 512), PILImage.Resampling.LANCZOS)
+    
+    # Convert to PNG bytes
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG', optimize=True)
+    buffer.seek(0)
+    
+    # Encode to base64 data URI
+    b64_data = base64.b64encode(buffer.read()).decode('utf-8')
+    return f"data:image/png;base64,{b64_data}"
+
+
+@app.post("/api/profile/{profile_name}/image")
+async def upload_profile_image(
+    profile_name: str,
+    request: Request,
+    file: UploadFile = File(...)
+):
+    """Upload an image for a profile.
+    
+    The image will be:
+    - Center-cropped to square aspect ratio
+    - Resized to 512x512
+    - Converted to base64 data URI
+    - Saved to the profile on the Meticulous machine
+    
+    Args:
+        profile_name: Name of the profile to update
+        file: Image file to upload
+        
+    Returns:
+        Success status with profile info
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            f"Uploading image for profile: {profile_name}",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=400,
+                detail="File must be an image"
+            )
+        
+        # Read image data
+        image_data = await file.read()
+        
+        # Process image: crop, resize, encode
+        image_data_uri = process_image_for_profile(image_data, file.content_type)
+        
+        logger.info(
+            f"Processed image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        
+        # Find the profile by name
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}"
+            )
+        
+        # Find matching profile
+        matching_profile = None
+        for partial_profile in profiles_result:
+            if partial_profile.name == profile_name:
+                # Get full profile
+                full_profile = api.get_profile(partial_profile.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+                matching_profile = full_profile
+                break
+        
+        if not matching_profile:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile '{profile_name}' not found on machine"
+            )
+        
+        # Update the profile with the new image
+        from meticulous.profile import Display
+        
+        # Preserve existing accent color if present
+        existing_accent = None
+        if matching_profile.display:
+            existing_accent = matching_profile.display.accentColor
+        
+        matching_profile.display = Display(
+            image=image_data_uri,
+            accentColor=existing_accent
+        )
+        
+        # Save the updated profile
+        save_result = api.save_profile(matching_profile)
+        
+        if hasattr(save_result, 'error') and save_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to save profile: {save_result.error}"
+            )
+        
+        logger.info(
+            f"Successfully updated profile image: {profile_name}",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Image uploaded for profile '{profile_name}'",
+            "profile_id": matching_profile.id,
+            "image_size": len(image_data_uri)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to upload profile image: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to upload profile image"}
+        )
+
+
+# Image generation styles that work well for coffee/espresso profiles
+IMAGE_GEN_STYLES = [
+    "abstract",
+    "minimalist", 
+    "pixel-art",
+    "watercolor",
+    "modern",
+    "vintage"
+]
+
+
+@app.post("/api/profile/{profile_name}/generate-image")
+async def generate_profile_image(
+    profile_name: str,
+    request: Request,
+    style: str = "abstract",
+    tags: str = "",
+    preview: bool = False
+):
+    """Generate an AI image for a profile using the nanobanana extension.
+    
+    This uses the Gemini CLI with the nanobanana extension to generate
+    a square image based on the profile name and optional tags.
+    
+    IMPORTANT: This feature requires a paid Gemini API key.
+    
+    Args:
+        profile_name: Name of the profile
+        style: Image style (abstract, minimalist, pixel-art, watercolor, modern, vintage)
+        tags: Comma-separated tags to include in the prompt
+        preview: If true, return the image as base64 without saving to profile
+        
+    Returns:
+        Success status with generated image info (and image data if preview=true)
+    
+    Args:
+        profile_name: Name of the profile
+        style: Image style (abstract, minimalist, pixel-art, watercolor, modern, vintage)
+        tags: Comma-separated tags to include in the prompt
+        
+    Returns:
+        Success status with generated image info
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            f"Generating image for profile: {profile_name}",
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "style": style,
+                "tags": tags
+            }
+        )
+        
+        # Validate style
+        if style not in IMAGE_GEN_STYLES:
+            style = "abstract"
+        
+        # Parse tags
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+        
+        # Build the prompt using the advanced prompt builder
+        from prompt_builder import build_image_prompt_with_metadata
+        
+        prompt_result = build_image_prompt_with_metadata(
+            profile_name=profile_name,
+            style=style,
+            tags=tag_list
+        )
+        
+        full_prompt = prompt_result["prompt"]
+        prompt_metadata = prompt_result["metadata"]
+        
+        logger.info(
+            f"Built image generation prompt",
+            extra={
+                "request_id": request_id,
+                "prompt": full_prompt[:200],
+                "influences_found": prompt_metadata.get("influences_found", 0),
+                "selected_colors": prompt_metadata.get("selected_colors", []),
+                "selected_moods": prompt_metadata.get("selected_moods", [])
+            }
+        )
+        
+        # Create a temporary directory for the output
+        import tempfile
+        import shutil
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Execute nanobanana via gemini CLI
+            result = subprocess.run(
+                [
+                    "docker", "exec", "-i", "gemini-client",
+                    "gemini", "-y",
+                    f'/generate "{full_prompt}"'
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120  # 2 minute timeout for image generation
+            )
+            
+            if result.returncode != 0:
+                logger.error(
+                    f"Image generation failed",
+                    extra={
+                        "request_id": request_id,
+                        "returncode": result.returncode,
+                        "stderr": result.stderr,
+                        "stdout": result.stdout
+                    }
+                )
+                
+                # Check for common errors
+                error_output = result.stderr or result.stdout or ""
+                if "API key" in error_output.lower() or "authentication" in error_output.lower():
+                    raise HTTPException(
+                        status_code=402,
+                        detail="Image generation requires a paid Gemini API key. Please set GEMINI_API_KEY in your environment."
+                    )
+                
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Image generation failed: {error_output[:200]}"
+                )
+            
+            # Find the generated image in nanobanana-output
+            # The output path is typically mentioned in the result like:
+            # "saved it to `/root/nanobanana-output/filename.png`"
+            output = result.stdout
+            logger.info(f"Nanobanana output: {output}", extra={"request_id": request_id})
+            
+            # Try to find the image path in the output
+            # nanobanana saves to /root/nanobanana-output/
+            image_path = None
+            
+            # Look for paths in backticks first (common format)
+            import re
+            backtick_matches = re.findall(r'`([^`]+\.png)`', output)
+            if backtick_matches:
+                for match in backtick_matches:
+                    # The path is already absolute
+                    check_result = subprocess.run(
+                        ["docker", "exec", "gemini-client", "test", "-f", match],
+                        capture_output=True
+                    )
+                    if check_result.returncode == 0:
+                        image_path = match
+                        logger.info(f"Found image at: {image_path}", extra={"request_id": request_id})
+                        break
+            
+            # Fallback: Look for any .png file path
+            if not image_path:
+                png_matches = re.findall(r'(/[\w\-/\.]+\.png)', output)
+                for match in png_matches:
+                    check_result = subprocess.run(
+                        ["docker", "exec", "gemini-client", "test", "-f", match],
+                        capture_output=True
+                    )
+                    if check_result.returncode == 0:
+                        image_path = match
+                        logger.info(f"Found image at: {image_path}", extra={"request_id": request_id})
+                        break
+            
+            # If no path found, try to list the output directory
+            if not image_path:
+                list_result = subprocess.run(
+                    ["docker", "exec", "gemini-client", "ls", "-t", "/root/nanobanana-output/"],
+                    capture_output=True,
+                    text=True
+                )
+                if list_result.returncode == 0 and list_result.stdout.strip():
+                    newest_file = list_result.stdout.strip().split('\n')[0]
+                    image_path = f"/root/nanobanana-output/{newest_file}"
+            
+            if not image_path:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Image generation completed but could not find output file"
+                )
+            
+            # Read the image from the container
+            cat_result = subprocess.run(
+                ["docker", "exec", "gemini-client", "cat", image_path],
+                capture_output=True
+            )
+            
+            if cat_result.returncode != 0:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to read generated image"
+                )
+            
+            image_data = cat_result.stdout
+            
+            # Process the image (crop/resize) and upload to profile
+            image_data_uri = process_image_for_profile(image_data, "image/png")
+            
+            logger.info(
+                f"Processed generated image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
+                extra={"request_id": request_id}
+            )
+            
+            # If preview mode, return the image without saving
+            if preview:
+                logger.info(
+                    f"Returning preview image for profile: {profile_name}",
+                    extra={"request_id": request_id, "style": style}
+                )
+                return {
+                    "status": "preview",
+                    "message": f"Preview image generated for profile '{profile_name}'",
+                    "style": style,
+                    "prompt": full_prompt,
+                    "prompt_metadata": prompt_metadata,
+                    "image_data": image_data_uri
+                }
+            
+            # Find the profile and update it
+            api = get_meticulous_api()
+            profiles_result = api.list_profiles()
+            
+            if hasattr(profiles_result, 'error') and profiles_result.error:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Machine API error: {profiles_result.error}"
+                )
+            
+            matching_profile = None
+            for partial_profile in profiles_result:
+                if partial_profile.name == profile_name:
+                    full_profile = api.get_profile(partial_profile.id)
+                    if hasattr(full_profile, 'error') and full_profile.error:
+                        continue
+                    matching_profile = full_profile
+                    break
+            
+            if not matching_profile:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Profile '{profile_name}' not found on machine"
+                )
+            
+            # Update the display image
+            from meticulous.profile import Display
+            
+            existing_accent = None
+            if matching_profile.display:
+                existing_accent = matching_profile.display.accentColor
+            
+            matching_profile.display = Display(
+                image=image_data_uri,
+                accentColor=existing_accent
+            )
+            
+            save_result = api.save_profile(matching_profile)
+            
+            if hasattr(save_result, 'error') and save_result.error:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to save profile: {save_result.error}"
+                )
+            
+            logger.info(
+                f"Successfully generated and saved profile image: {profile_name}",
+                extra={"request_id": request_id, "style": style}
+            )
+            
+            return {
+                "status": "success",
+                "message": f"Image generated for profile '{profile_name}'",
+                "profile_id": matching_profile.id,
+                "style": style,
+                "prompt": full_prompt,
+                "prompt_metadata": prompt_metadata
+            }
+            
+    except subprocess.TimeoutExpired:
+        logger.error(
+            f"Image generation timed out",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        raise HTTPException(
+            status_code=504,
+            detail="Image generation timed out. Please try again."
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to generate profile image: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to generate profile image"}
+        )
+
+
+from pydantic import BaseModel
+
+class ApplyImageRequest(BaseModel):
+    image_data: str  # Base64 data URI
+
+
+@app.post("/api/profile/{profile_name}/apply-image")
+async def apply_profile_image(
+    profile_name: str,
+    request: Request,
+    body: ApplyImageRequest
+):
+    """Apply a previously generated (previewed) image to a profile.
+    
+    This endpoint saves a base64 image data URI to the profile's display.
+    Used after previewing a generated image and choosing to keep it.
+    
+    Args:
+        profile_name: Name of the profile
+        body: Request body containing image_data (base64 data URI)
+        
+    Returns:
+        Success status with profile info
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            f"Applying image to profile: {profile_name}",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        
+        image_data_uri = body.image_data
+        
+        # Validate it looks like a data URI
+        if not image_data_uri.startswith("data:image/"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image data - must be a data URI"
+            )
+        
+        # Find the profile and update it
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}"
+            )
+        
+        matching_profile = None
+        for partial_profile in profiles_result:
+            if partial_profile.name == profile_name:
+                full_profile = api.get_profile(partial_profile.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+                matching_profile = full_profile
+                break
+        
+        if not matching_profile:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile '{profile_name}' not found on machine"
+            )
+        
+        # Update the display image
+        from meticulous.profile import Display
+        
+        existing_accent = None
+        if matching_profile.display:
+            existing_accent = matching_profile.display.accentColor
+        
+        matching_profile.display = Display(
+            image=image_data_uri,
+            accentColor=existing_accent
+        )
+        
+        save_result = api.save_profile(matching_profile)
+        
+        if hasattr(save_result, 'error') and save_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to save profile: {save_result.error}"
+            )
+        
+        logger.info(
+            f"Successfully applied image to profile: {profile_name}",
+            extra={"request_id": request_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Image applied to profile '{profile_name}'",
+            "profile_id": matching_profile.id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to apply profile image: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to apply profile image"}
+        )
+
+
+@app.get("/api/profile/{profile_name}/image-proxy")
+async def proxy_profile_image(
+    profile_name: str,
+    request: Request
+):
+    """Proxy endpoint to fetch profile image from the Meticulous machine.
+    
+    This fetches the image from the machine and returns it directly,
+    so the frontend doesn't need to know the machine IP.
+    
+    Args:
+        profile_name: Name of the profile
+        
+    Returns:
+        The profile image as PNG, or 404 if not found
+    """
+    request_id = request.state.request_id
+    
+    try:
+        # First get the profile to find the image path
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}"
+            )
+        
+        # Find matching profile
+        for partial_profile in profiles_result:
+            if partial_profile.name == profile_name:
+                full_profile = api.get_profile(partial_profile.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+                
+                if not full_profile.display or not full_profile.display.image:
+                    raise HTTPException(status_code=404, detail="Profile has no image")
+                
+                image_path = full_profile.display.image
+                
+                # Construct full URL to the machine
+                meticulous_ip = os.getenv("METICULOUS_IP")
+                if not meticulous_ip:
+                    raise HTTPException(status_code=500, detail="METICULOUS_IP not configured")
+                
+                image_url = f"http://{meticulous_ip}{image_path}"
+                
+                # Fetch the image from the machine
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(image_url, timeout=10.0)
+                    
+                    if response.status_code != 200:
+                        raise HTTPException(
+                            status_code=response.status_code,
+                            detail="Failed to fetch image from machine"
+                        )
+                    
+                    # Return the image with appropriate content type
+                    from fastapi.responses import Response
+                    return Response(
+                        content=response.content,
+                        media_type="image/png"
+                    )
+        
+        raise HTTPException(
+            status_code=404,
+            detail=f"Profile '{profile_name}' not found"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to proxy profile image: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch profile image: {str(e)}"
+        )
+
+
+@app.get("/api/profile/{profile_name}")
+async def get_profile_info(
+    profile_name: str,
+    request: Request
+):
+    """Get profile information from the Meticulous machine.
+    
+    Args:
+        profile_name: Name of the profile to fetch
+        
+    Returns:
+        Profile information including image if set
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            f"Fetching profile info: {profile_name}",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}"
+            )
+        
+        # Find matching profile
+        for partial_profile in profiles_result:
+            if partial_profile.name == profile_name:
+                # Get full profile
+                full_profile = api.get_profile(partial_profile.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+                
+                # Extract image from display if present
+                image = None
+                accent_color = None
+                if full_profile.display:
+                    image = full_profile.display.image
+                    accent_color = full_profile.display.accentColor
+                
+                return {
+                    "status": "success",
+                    "profile": {
+                        "id": full_profile.id,
+                        "name": full_profile.name,
+                        "author": full_profile.author,
+                        "temperature": full_profile.temperature,
+                        "final_weight": full_profile.final_weight,
+                        "image": image,
+                        "accent_color": accent_color
+                    }
+                }
+        
+        raise HTTPException(
+            status_code=404,
+            detail=f"Profile '{profile_name}' not found on machine"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get profile info: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to get profile info"}
+        )
+

@@ -59,6 +59,7 @@ services:
     working_dir: /app
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - METICULOUS_IP=${METICULOUS_IP}
     restart: unless-stopped
 
   # 4. MeticAI Web Interface
