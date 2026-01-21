@@ -848,6 +848,123 @@ def _save_history(history: list):
         json.dump(history, f, indent=2)
 
 
+# ============================================
+# Shot History Cache Management
+# ============================================
+
+SHOT_CACHE_FILE = Path("/app/data/shot_cache.json")
+SHOT_CACHE_STALE_SECONDS = 3600  # 60 minutes - after this, data is stale but still returned
+
+
+def _ensure_shot_cache_file():
+    """Ensure the shot cache file and directory exist."""
+    SHOT_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not SHOT_CACHE_FILE.exists():
+        SHOT_CACHE_FILE.write_text("{}")
+
+
+def _load_shot_cache() -> dict:
+    """Load shot cache from file."""
+    _ensure_shot_cache_file()
+    try:
+        with open(SHOT_CACHE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
+
+
+def _save_shot_cache(cache: dict):
+    """Save shot cache to file."""
+    _ensure_shot_cache_file()
+    with open(SHOT_CACHE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(cache, f, indent=2)
+
+
+def _get_cached_shots(profile_name: str, limit: int) -> tuple[Optional[dict], bool, Optional[float]]:
+    """Get cached shots for a profile.
+    
+    Returns a tuple of (cached_data, is_stale, cached_at_timestamp).
+    - cached_data: The cached response data, or None if no cache exists
+    - is_stale: True if cache is older than SHOT_CACHE_STALE_SECONDS
+    - cached_at: Unix timestamp of when cache was created
+    
+    Cache is stored indefinitely but marked stale after 60 minutes.
+    """
+    cache = _load_shot_cache()
+    cache_key = profile_name.lower()
+    
+    if cache_key not in cache:
+        return None, False, None
+    
+    cached_entry = cache[cache_key]
+    cached_time = cached_entry.get("cached_at", 0)
+    cached_limit = cached_entry.get("limit", 0)
+    
+    # Check if limit matches (requesting more than cached = cache miss)
+    if limit > cached_limit:
+        return None, False, None
+    
+    # Check if cache is stale (older than 60 minutes)
+    is_stale = time.time() - cached_time > SHOT_CACHE_STALE_SECONDS
+    
+    return cached_entry.get("data"), is_stale, cached_time
+
+
+def _set_cached_shots(profile_name: str, data: dict, limit: int):
+    """Store shots in cache for a profile."""
+    cache = _load_shot_cache()
+    cache_key = profile_name.lower()
+    
+    cache[cache_key] = {
+        "cached_at": time.time(),
+        "limit": limit,
+        "data": data
+    }
+    
+    _save_shot_cache(cache)
+
+
+# ============================================
+# Profile Image Cache Management
+# ============================================
+
+IMAGE_CACHE_DIR = Path("/app/data/image_cache")
+
+
+def _ensure_image_cache_dir():
+    """Ensure the image cache directory exists."""
+    IMAGE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _get_cached_image(profile_name: str) -> Optional[bytes]:
+    """Get cached image for a profile if it exists.
+    
+    Returns the image bytes or None if not cached.
+    """
+    _ensure_image_cache_dir()
+    cache_file = IMAGE_CACHE_DIR / f"{profile_name.lower().replace('/', '_').replace(' ', '_')}.png"
+    
+    if cache_file.exists():
+        try:
+            return cache_file.read_bytes()
+        except Exception as e:
+            logger.warning(f"Failed to read cached image for {profile_name}: {e}")
+            return None
+    return None
+
+
+def _set_cached_image(profile_name: str, image_data: bytes):
+    """Store image in cache for a profile."""
+    _ensure_image_cache_dir()
+    cache_file = IMAGE_CACHE_DIR / f"{profile_name.lower().replace('/', '_').replace(' ', '_')}.png"
+    
+    try:
+        cache_file.write_bytes(image_data)
+        logger.info(f"Cached image for profile: {profile_name} ({len(image_data)} bytes)")
+    except Exception as e:
+        logger.warning(f"Failed to cache image for {profile_name}: {e}")
+
+
 def _extract_profile_json(reply: str) -> Optional[dict]:
     """Extract the profile JSON from the LLM reply.
     
@@ -1355,27 +1472,45 @@ async def get_shots_by_profile(
     request: Request, 
     profile_name: str,
     limit: int = 20,
-    include_data: bool = False
+    include_data: bool = False,
+    force_refresh: bool = False
 ):
     """Get all shots that used a specific profile.
     
     This endpoint scans shot history to find all shots that match the given profile name.
+    Results are cached server-side indefinitely, but marked stale after 60 minutes.
+    When stale, cached data is still returned with is_stale=true so client can show it
+    while fetching fresh data in the background.
     
     Args:
         profile_name: Name of the profile to search for
         limit: Maximum number of shots to return (default: 20)
         include_data: Whether to include full telemetry data (default: False for performance)
+        force_refresh: Skip cache and fetch fresh data (default: False)
         
     Returns:
-        List of shots matching the profile, with optional full telemetry data
+        List of shots matching the profile, with cache metadata (cached_at, is_stale)
     """
     request_id = request.state.request_id
     
     try:
         logger.info(
             "Searching for shots by profile",
-            extra={"request_id": request_id, "profile_name": profile_name, "limit": limit}
+            extra={"request_id": request_id, "profile_name": profile_name, "limit": limit, "force_refresh": force_refresh}
         )
+        
+        # Check server-side cache first (unless forcing refresh or requesting data)
+        if not force_refresh and not include_data:
+            cached_data, is_stale, cached_at = _get_cached_shots(profile_name, limit)
+            if cached_data:
+                logger.info(
+                    f"Returning cached shots for profile '{profile_name}' (stale={is_stale})",
+                    extra={"request_id": request_id, "count": cached_data.get("count", 0), "from_cache": True, "is_stale": is_stale}
+                )
+                # Add cache metadata to response
+                cached_data["cached_at"] = cached_at
+                cached_data["is_stale"] = is_stale
+                return cached_data
         
         api = get_meticulous_api()
         
@@ -1458,12 +1593,21 @@ async def get_shots_by_profile(
             extra={"request_id": request_id, "count": len(matching_shots)}
         )
         
-        return {
+        current_time = time.time()
+        response_data = {
             "profile_name": profile_name,
             "shots": matching_shots,
             "count": len(matching_shots),
-            "limit": limit
+            "limit": limit,
+            "cached_at": current_time,
+            "is_stale": False
         }
+        
+        # Cache the result (only if not including full data, which is too large)
+        if not include_data:
+            _set_cached_shots(profile_name, response_data, limit)
+        
+        return response_data
         
     except HTTPException:
         raise
@@ -1479,7 +1623,7 @@ async def get_shots_by_profile(
         )
 
 
-def process_image_for_profile(image_data: bytes, content_type: str = "image/png") -> str:
+def process_image_for_profile(image_data: bytes, content_type: str = "image/png") -> tuple[str, bytes]:
     """Process an image for profile upload: crop to square, resize to 512x512, convert to base64 data URI.
     
     Args:
@@ -1487,7 +1631,7 @@ def process_image_for_profile(image_data: bytes, content_type: str = "image/png"
         content_type: MIME type of the image
         
     Returns:
-        Base64 data URI string (e.g., "data:image/png;base64,...")
+        Tuple of (base64 data URI string, PNG bytes for caching)
     """
     from PIL import Image as PILImage
     import io
@@ -1525,11 +1669,11 @@ def process_image_for_profile(image_data: bytes, content_type: str = "image/png"
     # Convert to PNG bytes
     buffer = io.BytesIO()
     img.save(buffer, format='PNG', optimize=True)
-    buffer.seek(0)
+    png_bytes = buffer.getvalue()
     
     # Encode to base64 data URI
-    b64_data = base64.b64encode(buffer.read()).decode('utf-8')
-    return f"data:image/png;base64,{b64_data}"
+    b64_data = base64.b64encode(png_bytes).decode('utf-8')
+    return f"data:image/png;base64,{b64_data}", png_bytes
 
 
 @app.post("/api/profile/{profile_name}/image")
@@ -1572,7 +1716,10 @@ async def upload_profile_image(
         image_data = await file.read()
         
         # Process image: crop, resize, encode
-        image_data_uri = process_image_for_profile(image_data, file.content_type)
+        image_data_uri, png_bytes = process_image_for_profile(image_data, file.content_type)
+        
+        # Cache the processed image for fast retrieval
+        _set_cached_image(profile_name, png_bytes)
         
         logger.info(
             f"Processed image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
@@ -1851,7 +1998,10 @@ async def generate_profile_image(
             image_data = cat_result.stdout
             
             # Process the image (crop/resize) and upload to profile
-            image_data_uri = process_image_for_profile(image_data, "image/png")
+            image_data_uri, png_bytes = process_image_for_profile(image_data, "image/png")
+            
+            # Cache the processed image for fast retrieval
+            _set_cached_image(profile_name, png_bytes)
             
             logger.info(
                 f"Processed generated image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
@@ -1996,6 +2146,16 @@ async def apply_profile_image(
                 detail="Invalid image data - must be a data URI"
             )
         
+        # Extract and cache the PNG bytes from the data URI
+        import base64
+        try:
+            # Format: data:image/png;base64,<data>
+            header, b64_data = image_data_uri.split(',', 1)
+            png_bytes = base64.b64decode(b64_data)
+            _set_cached_image(profile_name, png_bytes)
+        except Exception as e:
+            logger.warning(f"Failed to cache image from apply-image: {e}")
+        
         # Find the profile and update it
         api = get_meticulous_api()
         profiles_result = api.list_profiles()
@@ -2069,20 +2229,37 @@ async def apply_profile_image(
 @app.get("/api/profile/{profile_name}/image-proxy")
 async def proxy_profile_image(
     profile_name: str,
-    request: Request
+    request: Request,
+    force_refresh: bool = False
 ):
     """Proxy endpoint to fetch profile image from the Meticulous machine.
     
     This fetches the image from the machine and returns it directly,
     so the frontend doesn't need to know the machine IP.
+    Images are cached indefinitely on the server for fast loading.
     
     Args:
         profile_name: Name of the profile
+        force_refresh: If true, bypass cache and fetch from machine
         
     Returns:
         The profile image as PNG, or 404 if not found
     """
     request_id = request.state.request_id
+    from fastapi.responses import Response
+    
+    # Check cache first (unless forcing refresh)
+    if not force_refresh:
+        cached_image = _get_cached_image(profile_name)
+        if cached_image:
+            logger.info(
+                f"Returning cached image for profile: {profile_name}",
+                extra={"request_id": request_id, "from_cache": True, "size": len(cached_image)}
+            )
+            return Response(
+                content=cached_image,
+                media_type="image/png"
+            )
     
     try:
         # First get the profile to find the image path
@@ -2125,8 +2302,10 @@ async def proxy_profile_image(
                             detail="Failed to fetch image from machine"
                         )
                     
+                    # Cache the image for future requests
+                    _set_cached_image(profile_name, response.content)
+                    
                     # Return the image with appropriate content type
-                    from fastapi.responses import Response
                     return Response(
                         content=response.content,
                         media_type="image/png"
