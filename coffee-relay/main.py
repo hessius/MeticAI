@@ -3340,11 +3340,11 @@ async def import_profile(request: Request):
         
         # Create history entry
         entry_id = str(uuid.uuid4())
-        timestamp = datetime.now().isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
         
         new_entry = {
             "id": entry_id,
-            "timestamp": timestamp,
+            "created_at": created_at,
             "profile_name": profile_name,
             "user_preferences": f"Imported from {source}",
             "reply": reply,
