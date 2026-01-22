@@ -2406,3 +2406,695 @@ async def get_profile_info(
             detail={"status": "error", "error": str(e), "message": "Failed to get profile info"}
         )
 
+
+# ============================================
+# Shot Analysis (Local)
+# ============================================
+
+# Keywords indicating pre-infusion stages
+PREINFUSION_KEYWORDS = ['bloom', 'soak', 'preinfusion', 'pre-infusion', 'pre infusion', 'wet', 'fill', 'landing']
+
+
+def _format_dynamics_description(stage: dict) -> str:
+    """Format a human-readable description of the stage dynamics."""
+    stage_type = stage.get("type", "unknown")
+    dynamics_points = stage.get("dynamics_points", [])
+    dynamics_over = stage.get("dynamics_over", "time")
+    
+    if not dynamics_points:
+        return f"{stage_type} stage (no dynamics data)"
+    
+    unit = "bar" if stage_type == "pressure" else "ml/s"
+    over_unit = "s" if dynamics_over == "time" else "g"
+    
+    if len(dynamics_points) == 1:
+        # Constant value
+        value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+        return f"Constant {stage_type} at {value} {unit}"
+    elif len(dynamics_points) == 2:
+        start_x, start_y = dynamics_points[0][0], dynamics_points[0][1]
+        end_x, end_y = dynamics_points[1][0], dynamics_points[1][1]
+        if start_y == end_y:
+            return f"Constant {stage_type} at {start_y} {unit} for {end_x}{over_unit}"
+        else:
+            direction = "ramp up" if end_y > start_y else "ramp down"
+            return f"{stage_type.capitalize()} {direction} from {start_y} to {end_y} {unit} over {end_x}{over_unit}"
+    else:
+        # Multiple points - describe curve
+        values = [p[1] for p in dynamics_points if len(p) > 1]
+        if values:
+            return f"{stage_type.capitalize()} curve: {' → '.join(str(v) for v in values)} {unit}"
+        return f"Multi-point {stage_type} curve"
+
+
+def _format_exit_triggers(exit_triggers: list) -> list[dict]:
+    """Format exit triggers into structured descriptions."""
+    formatted = []
+    for trigger in exit_triggers:
+        trigger_type = trigger.get("type", "unknown")
+        value = trigger.get("value", 0)
+        comparison = trigger.get("comparison", ">=")
+        
+        comp_text = {
+            ">=": "≥",
+            "<=": "≤",
+            ">": ">",
+            "<": "<",
+            "==": "="
+        }.get(comparison, comparison)
+        
+        unit = {
+            "time": "s",
+            "weight": "g",
+            "pressure": "bar",
+            "flow": "ml/s"
+        }.get(trigger_type, "")
+        
+        formatted.append({
+            "type": trigger_type,
+            "value": value,
+            "comparison": comparison,
+            "description": f"{trigger_type} {comp_text} {value}{unit}"
+        })
+    
+    return formatted
+
+
+def _format_limits(limits: list) -> list[dict]:
+    """Format stage limits into structured descriptions."""
+    formatted = []
+    for limit in limits:
+        limit_type = limit.get("type", "unknown")
+        value = limit.get("value", 0)
+        
+        unit = {
+            "time": "s",
+            "weight": "g",
+            "pressure": "bar",
+            "flow": "ml/s"
+        }.get(limit_type, "")
+        
+        formatted.append({
+            "type": limit_type,
+            "value": value,
+            "description": f"Limit {limit_type} to {value}{unit}"
+        })
+    
+    return formatted
+
+
+def _determine_exit_trigger_hit(
+    stage_data: dict,
+    exit_triggers: list,
+    next_stage_start: float | None = None
+) -> dict:
+    """Determine which exit trigger caused the stage to end.
+    
+    Returns:
+        Dict with 'triggered' (the exit that fired) and 'not_triggered' (exits that didn't fire)
+    """
+    duration = stage_data.get("duration", 0)
+    end_weight = stage_data.get("end_weight", 0)
+    max_pressure = stage_data.get("max_pressure", 0)
+    max_flow = stage_data.get("max_flow", 0)
+    
+    triggered = None
+    not_triggered = []
+    
+    for trigger in exit_triggers:
+        trigger_type = trigger.get("type", "")
+        value = trigger.get("value", 0)
+        comparison = trigger.get("comparison", ">=")
+        
+        # Check if this trigger was satisfied
+        actual_value = 0
+        if trigger_type == "time":
+            actual_value = duration
+        elif trigger_type == "weight":
+            actual_value = end_weight
+        elif trigger_type == "pressure":
+            actual_value = max_pressure
+        elif trigger_type == "flow":
+            actual_value = max_flow
+        
+        # Evaluate comparison with small tolerance
+        tolerance = 0.5 if trigger_type in ["time", "weight"] else 0.2
+        was_hit = False
+        
+        if comparison == ">=":
+            was_hit = actual_value >= (value - tolerance)
+        elif comparison == ">":
+            was_hit = actual_value > value
+        elif comparison == "<=":
+            was_hit = actual_value <= (value + tolerance)
+        elif comparison == "<":
+            was_hit = actual_value < value
+        elif comparison == "==":
+            was_hit = abs(actual_value - value) < tolerance
+        
+        trigger_info = {
+            "type": trigger_type,
+            "target": value,
+            "actual": round(actual_value, 1),
+            "description": trigger.get("description", f"{trigger_type} {comparison} {value}")
+        }
+        
+        if was_hit:
+            if triggered is None:  # First trigger that was hit
+                triggered = trigger_info
+        else:
+            not_triggered.append(trigger_info)
+    
+    return {
+        "triggered": triggered,
+        "not_triggered": not_triggered
+    }
+
+
+def _analyze_stage_execution(
+    profile_stage: dict,
+    shot_stage_data: dict | None,
+    total_shot_duration: float
+) -> dict:
+    """Analyze how a single stage executed compared to its profile definition."""
+    stage_name = profile_stage.get("name", "Unknown")
+    stage_type = profile_stage.get("type", "unknown")
+    stage_key = profile_stage.get("key", "")
+    
+    # Build profile target description
+    dynamics_desc = _format_dynamics_description(profile_stage)
+    exit_triggers = _format_exit_triggers(profile_stage.get("exit_triggers", []))
+    limits = _format_limits(profile_stage.get("limits", []))
+    
+    result = {
+        "stage_name": stage_name,
+        "stage_key": stage_key,
+        "stage_type": stage_type,
+        "profile_target": dynamics_desc,
+        "exit_triggers": exit_triggers,
+        "limits": limits,
+        "executed": shot_stage_data is not None,
+        "execution_data": None,
+        "exit_trigger_result": None,
+        "limit_hit": None,
+        "assessment": None
+    }
+    
+    if shot_stage_data is None:
+        result["assessment"] = {
+            "status": "not_reached",
+            "message": "This stage was never executed during the shot"
+        }
+        return result
+    
+    # Stage was executed - analyze it
+    duration = shot_stage_data.get("duration", 0)
+    start_weight = shot_stage_data.get("start_weight", 0)
+    end_weight = shot_stage_data.get("end_weight", 0)
+    weight_gain = end_weight - start_weight
+    avg_pressure = shot_stage_data.get("avg_pressure", 0)
+    max_pressure = shot_stage_data.get("max_pressure", 0)
+    min_pressure = shot_stage_data.get("min_pressure", 0)
+    avg_flow = shot_stage_data.get("avg_flow", 0)
+    max_flow = shot_stage_data.get("max_flow", 0)
+    
+    result["execution_data"] = {
+        "duration": round(duration, 1),
+        "weight_gain": round(weight_gain, 1),
+        "start_weight": round(start_weight, 1),
+        "end_weight": round(end_weight, 1),
+        "avg_pressure": round(avg_pressure, 1),
+        "max_pressure": round(max_pressure, 1),
+        "min_pressure": round(min_pressure, 1),
+        "avg_flow": round(avg_flow, 1),
+        "max_flow": round(max_flow, 1)
+    }
+    
+    # Determine which exit trigger was hit
+    if profile_stage.get("exit_triggers"):
+        exit_result = _determine_exit_trigger_hit(
+            shot_stage_data,
+            profile_stage.get("exit_triggers", [])
+        )
+        result["exit_trigger_result"] = exit_result
+    
+    # Check if any limits were hit
+    stage_limits = profile_stage.get("limits", [])
+    for limit in stage_limits:
+        limit_type = limit.get("type", "")
+        limit_value = limit.get("value", 0)
+        
+        actual = 0
+        if limit_type == "flow":
+            actual = max_flow
+        elif limit_type == "pressure":
+            actual = max_pressure
+        elif limit_type == "time":
+            actual = duration
+        elif limit_type == "weight":
+            actual = end_weight
+        
+        # Check if limit was hit (within small tolerance)
+        if actual >= limit_value - 0.2:
+            result["limit_hit"] = {
+                "type": limit_type,
+                "limit_value": limit_value,
+                "actual_value": round(actual, 1),
+                "description": f"Hit {limit_type} limit of {limit_value}"
+            }
+            break
+    
+    # Generate assessment
+    if result["exit_trigger_result"] and result["exit_trigger_result"]["triggered"]:
+        if result["limit_hit"]:
+            result["assessment"] = {
+                "status": "hit_limit",
+                "message": f"Stage exited but hit a limit ({result['limit_hit']['description']})"
+            }
+        else:
+            result["assessment"] = {
+                "status": "reached_goal",
+                "message": f"Exited via: {result['exit_trigger_result']['triggered']['description']}"
+            }
+    elif result["exit_trigger_result"] and result["exit_trigger_result"]["not_triggered"]:
+        # No trigger was hit - stage ended prematurely, this is a failure
+        # Check if the dynamics goal was reached (e.g., target pressure)
+        goal_reached = False
+        goal_message = ""
+        
+        dynamics_points = profile_stage.get("dynamics_points", [])
+        if dynamics_points and len(dynamics_points) >= 1:
+            # Get the target value (last point in dynamics)
+            target_value = dynamics_points[-1][1] if len(dynamics_points[-1]) > 1 else dynamics_points[-1][0]
+            
+            if stage_type == "pressure":
+                # Check if we reached target pressure
+                if max_pressure >= target_value * 0.95:  # Within 5%
+                    goal_reached = True
+                    goal_message = f"Target pressure of {target_value} bar was reached ({max_pressure:.1f} bar achieved)"
+                else:
+                    goal_message = f"Target pressure of {target_value} bar was NOT reached (only {max_pressure:.1f} bar achieved)"
+            elif stage_type == "flow":
+                if max_flow >= target_value * 0.95:
+                    goal_reached = True
+                    goal_message = f"Target flow of {target_value} ml/s was reached ({max_flow:.1f} ml/s achieved)"
+                else:
+                    goal_message = f"Target flow of {target_value} ml/s was NOT reached (only {max_flow:.1f} ml/s achieved)"
+        
+        if goal_reached:
+            result["assessment"] = {
+                "status": "incomplete",
+                "message": f"Stage ended before exit triggers were satisfied, but {goal_message.lower()}"
+            }
+        else:
+            result["assessment"] = {
+                "status": "failed",
+                "message": f"Stage ended before exit triggers were satisfied. {goal_message}" if goal_message else "Stage ended before exit triggers were satisfied"
+            }
+    else:
+        result["assessment"] = {
+            "status": "executed",
+            "message": "Stage executed (no exit triggers defined)"
+        }
+    
+    return result
+
+
+def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
+    """Extract per-stage telemetry from shot data.
+    
+    Returns a dict mapping stage names to their execution data.
+    """
+    data_entries = shot_data.get("data", [])
+    if not data_entries:
+        return {}
+    
+    # Group data by stage
+    stage_data = {}
+    current_stage = None
+    stage_entries = []
+    
+    for entry in data_entries:
+        status = entry.get("status", "")
+        
+        # Skip retracting - it's machine cleanup
+        if status.lower().strip() == "retracting":
+            continue
+        
+        if status and status != current_stage:
+            # Save previous stage data
+            if current_stage and stage_entries:
+                stage_data[current_stage] = _compute_stage_stats(stage_entries)
+            
+            current_stage = status
+            stage_entries = []
+        
+        if current_stage:
+            stage_entries.append(entry)
+    
+    # Save final stage
+    if current_stage and stage_entries:
+        stage_data[current_stage] = _compute_stage_stats(stage_entries)
+    
+    return stage_data
+
+
+def _compute_stage_stats(entries: list) -> dict:
+    """Compute statistics for a stage from its telemetry entries."""
+    if not entries:
+        return {}
+    
+    times = []
+    pressures = []
+    flows = []
+    weights = []
+    
+    for entry in entries:
+        t = entry.get("time", 0) / 1000  # Convert to seconds
+        times.append(t)
+        
+        shot = entry.get("shot", {})
+        pressures.append(shot.get("pressure", 0))
+        flows.append(shot.get("flow", 0) or shot.get("gravimetric_flow", 0))
+        weights.append(shot.get("weight", 0))
+    
+    start_time = min(times) if times else 0
+    end_time = max(times) if times else 0
+    
+    return {
+        "start_time": start_time,
+        "end_time": end_time,
+        "duration": end_time - start_time,
+        "start_weight": weights[0] if weights else 0,
+        "end_weight": weights[-1] if weights else 0,
+        "min_pressure": min(pressures) if pressures else 0,
+        "max_pressure": max(pressures) if pressures else 0,
+        "avg_pressure": sum(pressures) / len(pressures) if pressures else 0,
+        "min_flow": min(flows) if flows else 0,
+        "max_flow": max(flows) if flows else 0,
+        "avg_flow": sum(flows) / len(flows) if flows else 0,
+        "entry_count": len(entries)
+    }
+
+
+def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
+    """Perform complete local analysis of shot vs profile.
+    
+    This is a purely algorithmic analysis - no LLM involved.
+    """
+    # Extract overall shot metrics
+    data_entries = shot_data.get("data", [])
+    
+    final_weight = 0
+    total_time = 0
+    max_pressure = 0
+    max_flow = 0
+    
+    for entry in data_entries:
+        shot = entry.get("shot", {})
+        weight = shot.get("weight", 0)
+        pressure = shot.get("pressure", 0)
+        flow = shot.get("flow", 0) or shot.get("gravimetric_flow", 0)
+        t = entry.get("time", 0) / 1000
+        
+        final_weight = max(final_weight, weight)
+        total_time = max(total_time, t)
+        max_pressure = max(max_pressure, pressure)
+        max_flow = max(max_flow, flow)
+    
+    target_weight = profile_data.get("final_weight", 0) or 0
+    
+    # Weight analysis
+    weight_deviation = 0
+    weight_status = "on_target"
+    if target_weight > 0:
+        weight_deviation = ((final_weight - target_weight) / target_weight) * 100
+        if final_weight < target_weight * 0.95:  # More than 5% under
+            weight_status = "under"
+        elif final_weight > target_weight * 1.1:  # More than 10% over
+            weight_status = "over"
+    
+    # Extract shot stage data
+    shot_stages = _extract_shot_stage_data(shot_data)
+    
+    # Profile stages
+    profile_stages = profile_data.get("stages", [])
+    
+    # Analyze each profile stage
+    stage_analyses = []
+    executed_stages = set()
+    unreached_stages = []
+    preinfusion_time = 0
+    preinfusion_stages = []
+    
+    for profile_stage in profile_stages:
+        stage_name = profile_stage.get("name", "")
+        stage_key = profile_stage.get("key", "").lower()
+        
+        # Find matching shot stage (by name, case-insensitive)
+        shot_stage_data = None
+        for shot_stage_name, data in shot_stages.items():
+            if shot_stage_name.lower().strip() == stage_name.lower().strip():
+                shot_stage_data = data
+                executed_stages.add(stage_name)
+                break
+        
+        analysis = _analyze_stage_execution(profile_stage, shot_stage_data, total_time)
+        stage_analyses.append(analysis)
+        
+        # Track unreached
+        if not analysis["executed"]:
+            unreached_stages.append(stage_name)
+        
+        # Track preinfusion time
+        name_lower = stage_name.lower()
+        is_preinfusion = any(kw in name_lower for kw in PREINFUSION_KEYWORDS) or \
+                         any(kw in stage_key for kw in ['preinfusion', 'bloom', 'soak', 'fill'])
+        
+        if is_preinfusion and shot_stage_data:
+            preinfusion_time += shot_stage_data.get("duration", 0)
+            preinfusion_stages.append({
+                "name": stage_name,
+                "duration": shot_stage_data.get("duration", 0),
+                "start_weight": shot_stage_data.get("start_weight", 0),
+                "end_weight": shot_stage_data.get("end_weight", 0),
+                "max_flow": shot_stage_data.get("max_flow", 0),
+                "avg_flow": shot_stage_data.get("avg_flow", 0),
+                "exit_triggers": profile_stage.get("exit_triggers", [])
+            })
+    
+    # Preinfusion analysis
+    preinfusion_proportion = (preinfusion_time / total_time * 100) if total_time > 0 else 0
+    
+    # Calculate total weight accumulated during preinfusion
+    preinfusion_weight = 0
+    for pi_stage in preinfusion_stages:
+        # Weight gained in this stage
+        stage_weight_gain = pi_stage["end_weight"] - pi_stage["start_weight"]
+        preinfusion_weight += max(0, stage_weight_gain)
+    
+    # Preinfusion weight analysis
+    preinfusion_weight_percent = (preinfusion_weight / final_weight * 100) if final_weight > 0 else 0
+    preinfusion_issues = []
+    preinfusion_recommendations = []
+    
+    if preinfusion_weight_percent > 10:
+        preinfusion_issues.append({
+            "type": "excessive_preinfusion_volume",
+            "severity": "warning" if preinfusion_weight_percent <= 15 else "concern",
+            "message": f"Pre-infusion accounted for {preinfusion_weight_percent:.1f}% of total shot volume (target: ≤10%)",
+            "detail": f"{preinfusion_weight:.1f}g of {final_weight:.1f}g total"
+        })
+        
+        # Check for high flow during preinfusion
+        max_preinfusion_flow = max((s["max_flow"] for s in preinfusion_stages), default=0)
+        avg_preinfusion_flow = sum(s["avg_flow"] for s in preinfusion_stages) / len(preinfusion_stages) if preinfusion_stages else 0
+        
+        if max_preinfusion_flow > 2.0 or avg_preinfusion_flow > 1.0:
+            preinfusion_issues.append({
+                "type": "high_preinfusion_flow",
+                "severity": "warning",
+                "message": f"High flow during pre-infusion (max: {max_preinfusion_flow:.1f} ml/s, avg: {avg_preinfusion_flow:.1f} ml/s)",
+                "detail": "May indicate grind is too coarse"
+            })
+            preinfusion_recommendations.append("Consider using a finer grind to slow early flow")
+        
+        # Check if exit triggers include weight/flow protection
+        has_weight_exit = False
+        has_flow_exit = False
+        for pi_stage in preinfusion_stages:
+            for trigger in pi_stage.get("exit_triggers", []):
+                trigger_type = trigger.get("type", "") if isinstance(trigger, dict) else ""
+                if "weight" in trigger_type.lower():
+                    has_weight_exit = True
+                if "flow" in trigger_type.lower():
+                    has_flow_exit = True
+        
+        if not has_weight_exit and not has_flow_exit:
+            preinfusion_recommendations.append("Consider adding a weight or flow exit trigger to pre-infusion stages to prevent excessive early volume")
+        elif not has_weight_exit:
+            preinfusion_recommendations.append("Consider adding a weight-based exit trigger to limit pre-infusion volume")
+    
+    return {
+        "shot_summary": {
+            "final_weight": round(final_weight, 1),
+            "target_weight": round(target_weight, 1) if target_weight else None,
+            "total_time": round(total_time, 1),
+            "max_pressure": round(max_pressure, 1),
+            "max_flow": round(max_flow, 1)
+        },
+        "weight_analysis": {
+            "status": weight_status,
+            "target": round(target_weight, 1) if target_weight else None,
+            "actual": round(final_weight, 1),
+            "deviation_percent": round(weight_deviation, 1)
+        },
+        "stage_analyses": stage_analyses,
+        "unreached_stages": unreached_stages,
+        "preinfusion_summary": {
+            "stages": [s["name"] for s in preinfusion_stages],
+            "total_time": round(preinfusion_time, 1),
+            "proportion_of_shot": round(preinfusion_proportion, 1),
+            "weight_accumulated": round(preinfusion_weight, 1),
+            "weight_percent_of_total": round(preinfusion_weight_percent, 1),
+            "issues": preinfusion_issues,
+            "recommendations": preinfusion_recommendations
+        },
+        "profile_info": {
+            "name": profile_data.get("name", "Unknown"),
+            "temperature": profile_data.get("temperature"),
+            "stage_count": len(profile_stages)
+        }
+    }
+
+
+@app.post("/api/shots/analyze")
+async def analyze_shot(
+    request: Request,
+    profile_name: str = Form(...),
+    shot_date: str = Form(...),
+    shot_filename: str = Form(...),
+    profile_description: Optional[str] = Form(None)
+):
+    """Analyze a shot against its profile using local algorithmic analysis.
+    
+    This endpoint fetches the shot data and profile information, then performs
+    a detailed comparison of actual execution vs profile intent.
+    
+    Args:
+        profile_name: Name of the profile used for the shot
+        shot_date: Date of the shot (YYYY-MM-DD)
+        shot_filename: Filename of the shot
+        profile_description: Optional description of the profile's intent (for future AI use)
+        
+    Returns:
+        Detailed analysis of shot performance against profile
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Starting shot analysis",
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "shot_date": shot_date,
+                "shot_filename": shot_filename
+            }
+        )
+        
+        # Fetch shot data
+        shot_data = await fetch_shot_data(shot_date, shot_filename)
+        
+        # Fetch profile from machine
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        profile_data = None
+        for partial_profile in profiles_result:
+            if partial_profile.name.lower() == profile_name.lower():
+                full_profile = api.get_profile(partial_profile.id)
+                if not (hasattr(full_profile, 'error') and full_profile.error):
+                    # Convert profile object to dict
+                    profile_data = {
+                        "name": full_profile.name,
+                        "temperature": getattr(full_profile, 'temperature', None),
+                        "final_weight": getattr(full_profile, 'final_weight', None),
+                        "stages": []
+                    }
+                    
+                    # Extract full stage data including dynamics and triggers
+                    if hasattr(full_profile, 'stages') and full_profile.stages:
+                        for stage in full_profile.stages:
+                            stage_dict = {
+                                "name": getattr(stage, 'name', 'Unknown'),
+                                "key": getattr(stage, 'key', ''),
+                                "type": getattr(stage, 'type', 'unknown'),
+                            }
+                            # Add dynamics
+                            for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation']:
+                                val = getattr(stage, attr, None)
+                                if val is not None:
+                                    stage_dict[attr] = val
+                            # Add exit triggers and limits
+                            for attr in ['exit_triggers', 'limits']:
+                                val = getattr(stage, attr, None)
+                                if val is not None:
+                                    # Convert to list of dicts if needed
+                                    if isinstance(val, list):
+                                        stage_dict[attr] = [
+                                            dict(item) if hasattr(item, '__dict__') else item
+                                            for item in val
+                                        ]
+                                    else:
+                                        stage_dict[attr] = val
+                            profile_data["stages"].append(stage_dict)
+                break
+        
+        if not profile_data:
+            # Fallback: try to get profile from shot data itself
+            shot_profile = shot_data.get("profile", {})
+            if shot_profile:
+                profile_data = shot_profile
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Profile '{profile_name}' not found on machine or in shot data"
+                )
+        
+        # Perform local analysis
+        analysis = _perform_local_shot_analysis(shot_data, profile_data)
+        
+        logger.info(
+            "Shot analysis completed successfully",
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "stages_analyzed": len(analysis.get("stage_analyses", [])),
+                "unreached_stages": len(analysis.get("unreached_stages", []))
+            }
+        )
+        
+        return {
+            "status": "success",
+            "analysis": analysis
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Shot analysis failed: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "shot_date": shot_date,
+                "shot_filename": shot_filename,
+                "error_type": type(e).__name__
+            }
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Shot analysis failed"}
+        )

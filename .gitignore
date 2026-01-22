@@ -41,4 +41,5 @@ htmlcov/
 meticai-web/
 
 # User data
-data/profile_history.json
+data/
+data/shot_cache.json
