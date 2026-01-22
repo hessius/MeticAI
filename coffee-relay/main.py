@@ -3098,3 +3098,443 @@ async def analyze_shot(
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "Shot analysis failed"}
         )
+
+
+# ============================================================================
+# Profile Import Endpoints
+# ============================================================================
+
+@app.get("/api/machine/profiles")
+async def list_machine_profiles(request: Request):
+    """List all profiles from the Meticulous machine with full details.
+    
+    Returns profiles that are on the machine but may not be in the MeticAI history.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Fetching all profiles from machine",
+            extra={"request_id": request_id}
+        )
+        
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}"
+            )
+        
+        profiles = []
+        for partial_profile in profiles_result:
+            try:
+                full_profile = api.get_profile(partial_profile.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+                
+                # Check if this profile exists in our history
+                in_history = False
+                try:
+                    if HISTORY_FILE.exists():
+                        with open(HISTORY_FILE, 'r') as f:
+                            history = json.load(f)
+                            # History is a list, not a dict
+                            entries = history if isinstance(history, list) else history.get("entries", [])
+                            in_history = any(
+                                entry.get("profile_name") == full_profile.name 
+                                for entry in entries
+                            )
+                except Exception:
+                    pass
+                
+                # Convert profile to dict
+                profile_dict = {
+                    "id": full_profile.id,
+                    "name": full_profile.name,
+                    "author": getattr(full_profile, 'author', None),
+                    "temperature": getattr(full_profile, 'temperature', None),
+                    "final_weight": getattr(full_profile, 'final_weight', None),
+                    "in_history": in_history,
+                    "has_description": False,
+                    "description": None
+                }
+                
+                # Check for existing description in history
+                if in_history:
+                    try:
+                        with open(HISTORY_FILE, 'r') as f:
+                            history = json.load(f)
+                            entries = history if isinstance(history, list) else history.get("entries", [])
+                            for entry in entries:
+                                if entry.get("profile_name") == full_profile.name:
+                                    if entry.get("reply"):
+                                        profile_dict["has_description"] = True
+                                    break
+                    except Exception:
+                        pass
+                
+                profiles.append(profile_dict)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch profile {partial_profile.name}: {e}",
+                    extra={"request_id": request_id}
+                )
+        
+        logger.info(
+            f"Found {len(profiles)} profiles on machine",
+            extra={"request_id": request_id, "profile_count": len(profiles)}
+        )
+        
+        return {
+            "status": "success",
+            "profiles": profiles,
+            "total": len(profiles)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to list machine profiles: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.get("/api/machine/profile/{profile_id}/json")
+async def get_machine_profile_json(profile_id: str, request: Request):
+    """Get the full profile JSON from the Meticulous machine.
+    
+    Args:
+        profile_id: The profile ID to fetch
+        
+    Returns:
+        Full profile JSON suitable for export/import
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            f"Fetching profile JSON: {profile_id}",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        api = get_meticulous_api()
+        profile = api.get_profile(profile_id)
+        
+        if hasattr(profile, 'error') and profile.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profile.error}"
+            )
+        
+        # Convert to dict for JSON serialization
+        profile_json = {}
+        for attr in ['id', 'name', 'author', 'temperature', 'final_weight', 'stages', 
+                     'variables', 'display', 'isDefault', 'source', 'beverage_type',
+                     'tank_temperature']:
+            if hasattr(profile, attr):
+                val = getattr(profile, attr)
+                if val is not None:
+                    # Handle nested objects
+                    if hasattr(val, '__dict__'):
+                        profile_json[attr] = val.__dict__
+                    elif isinstance(val, list):
+                        profile_json[attr] = [
+                            item.__dict__ if hasattr(item, '__dict__') else item 
+                            for item in val
+                        ]
+                    else:
+                        profile_json[attr] = val
+        
+        return {
+            "status": "success",
+            "profile": profile_json
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get profile JSON: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/profile/import")
+async def import_profile(request: Request):
+    """Import a profile into the MeticAI history.
+    
+    The profile can come from:
+    - A JSON file upload
+    - A profile already on the machine (by ID)
+    
+    If the profile has no description, it will be sent to the LLM for analysis.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        profile_json = body.get("profile")
+        generate_description = body.get("generate_description", True)
+        source = body.get("source", "file")  # "file" or "machine"
+        
+        if not profile_json:
+            raise HTTPException(status_code=400, detail="No profile JSON provided")
+        
+        profile_name = profile_json.get("name", "Imported Profile")
+        
+        logger.info(
+            f"Importing profile: {profile_name}",
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "source": source,
+                "generate_description": generate_description
+            }
+        )
+        
+        # Check if profile already exists in history
+        existing_entry = None
+        if HISTORY_FILE.exists():
+            with open(HISTORY_FILE, 'r') as f:
+                history = json.load(f)
+                # History is a list, not a dict
+                entries = history if isinstance(history, list) else history.get("entries", [])
+                for entry in entries:
+                    if entry.get("profile_name") == profile_name:
+                        existing_entry = entry
+                        break
+        
+        if existing_entry:
+            return {
+                "status": "exists",
+                "message": f"Profile '{profile_name}' already exists in history",
+                "entry_id": existing_entry.get("id")
+            }
+        
+        # Generate description if requested
+        reply = None
+        if generate_description:
+            try:
+                reply = await _generate_profile_description(profile_json, request_id)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to generate description: {e}",
+                    extra={"request_id": request_id}
+                )
+                reply = f"Profile imported from {source}. Description generation failed."
+        else:
+            reply = f"Profile imported from {source}."
+        
+        # Create history entry
+        entry_id = str(uuid.uuid4())
+        timestamp = datetime.now().isoformat()
+        
+        new_entry = {
+            "id": entry_id,
+            "timestamp": timestamp,
+            "profile_name": profile_name,
+            "user_preferences": f"Imported from {source}",
+            "reply": reply,
+            "profile_json": profile_json,
+            "imported": True,
+            "import_source": source
+        }
+        
+        # Save to history - history is a list
+        if HISTORY_FILE.exists():
+            with open(HISTORY_FILE, 'r') as f:
+                history = json.load(f)
+                # Ensure it's a list
+                if not isinstance(history, list):
+                    history = history.get("entries", [])
+        else:
+            history = []
+        
+        history.insert(0, new_entry)
+        
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(history, f, indent=2)
+        
+        logger.info(
+            f"Profile imported successfully: {profile_name}",
+            extra={"request_id": request_id, "entry_id": entry_id}
+        )
+        
+        return {
+            "status": "success",
+            "entry_id": entry_id,
+            "profile_name": profile_name,
+            "has_description": reply is not None and "Description generation failed" not in reply
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to import profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+async def _generate_profile_description(profile_json: dict, request_id: str) -> str:
+    """Generate a description for a profile using the LLM."""
+    
+    profile_name = profile_json.get("name", "Unknown Profile")
+    
+    # Build a prompt with the profile details
+    prompt = f"""Analyze this Meticulous Espresso profile and generate a description in the standard MeticAI format.
+
+PROFILE JSON:
+```json
+{json.dumps(profile_json, indent=2)}
+```
+
+Generate a response in this exact format:
+
+Profile Created: {profile_name}
+
+Description:
+[Describe what makes this profile unique and what flavor characteristics it targets. Be specific about the extraction approach.]
+
+Preparation:
+• Dose: [Recommended dose based on profile settings]
+• Grind: [Grind recommendation based on flow rates and pressure curves]
+• Temperature: [From profile or recommendation]
+• Target Yield: [From profile final_weight or recommendation]
+• Expected Time: [Based on stage durations]
+
+Why This Works:
+[Explain the science behind the profile design - why the pressure curves, flow rates, and staging work together]
+
+Special Notes:
+[Any specific requirements or tips for using this profile]
+
+Be concise but informative. Focus on actionable barista guidance."""
+
+    model = get_vision_model()
+    response = model.generate_content(prompt)
+    
+    return response.text.strip()
+
+
+@app.post("/api/profile/convert-description")
+async def convert_profile_description(request: Request):
+    """Convert an existing profile description to the standard MeticAI format.
+    
+    Takes a profile with an existing description and reformats it while
+    preserving all original information.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        profile_json = body.get("profile")
+        existing_description = body.get("description", "")
+        
+        if not profile_json:
+            raise HTTPException(status_code=400, detail="No profile JSON provided")
+        
+        profile_name = profile_json.get("name", "Unknown Profile")
+        
+        logger.info(
+            f"Converting description for profile: {profile_name}",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        
+        prompt = f"""Analyze this Meticulous Espresso profile and convert its description to the standard MeticAI format.
+
+IMPORTANT: Preserve ALL information from the original description. Do not lose any details - only reformat them.
+
+PROFILE JSON:
+```json
+{json.dumps(profile_json, indent=2)}
+```
+
+ORIGINAL DESCRIPTION:
+{existing_description}
+
+Convert to this exact format while preserving all original information:
+
+Profile Created: {profile_name}
+
+Description:
+[Preserve the original description's key points and add technical insights from the profile JSON]
+
+Preparation:
+• Dose: [From original or profile settings]
+• Grind: [From original or recommend based on profile]
+• Temperature: [From profile: {profile_json.get('temperature', 'Not specified')}°C]
+• Target Yield: [From profile: {profile_json.get('final_weight', 'Not specified')}g]
+• Expected Time: [Calculate from stages if possible]
+
+Why This Works:
+[Combine original explanation with technical analysis of the profile stages]
+
+Special Notes:
+[Preserve any special notes from original, add any additional insights]
+
+Remember: NO information should be lost in this conversion!"""
+
+        model = get_vision_model()
+        response = model.generate_content(prompt)
+        converted_description = response.text.strip()
+        
+        # Update the history entry if it exists
+        entry_id = body.get("entry_id")
+        if entry_id:
+            if HISTORY_FILE.exists():
+                with open(HISTORY_FILE, 'r') as f:
+                    history = json.load(f)
+                
+                # History is a list, not a dict
+                entries = history if isinstance(history, list) else history.get("entries", [])
+                for entry in entries:
+                    if entry.get("id") == entry_id:
+                        entry["reply"] = converted_description
+                        entry["description_converted"] = True
+                        break
+                
+                with open(HISTORY_FILE, 'w') as f:
+                    json.dump(history, f, indent=2)
+        
+        logger.info(
+            f"Description converted successfully for: {profile_name}",
+            extra={"request_id": request_id}
+        )
+        
+        return {
+            "status": "success",
+            "converted_description": converted_description
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to convert description: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
