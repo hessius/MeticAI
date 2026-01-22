@@ -2447,13 +2447,49 @@ def _format_dynamics_description(stage: dict) -> str:
         return f"Multi-point {stage_type} curve"
 
 
-def _format_exit_triggers(exit_triggers: list) -> list[dict]:
+def _safe_float(val, default: float = 0.0) -> float:
+    """Safely convert a value to float, handling strings and None."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _resolve_variable(value, variables: list) -> tuple[any, str | None]:
+    """Resolve a variable reference like '$flow_hold limit' to its actual value.
+    
+    Returns:
+        Tuple of (resolved_value, variable_name or None if not a variable)
+    """
+    if not isinstance(value, str) or not value.startswith('$'):
+        return value, None
+    
+    # Extract variable key (remove the $)
+    var_key = value[1:]
+    
+    # Search for matching variable
+    for var in variables:
+        if var.get("key") == var_key:
+            return var.get("value", value), var.get("name", var_key)
+    
+    # Variable not found - return original
+    return value, var_key
+
+
+def _format_exit_triggers(exit_triggers: list, variables: list | None = None) -> list[dict]:
     """Format exit triggers into structured descriptions."""
+    variables = variables or []
     formatted = []
     for trigger in exit_triggers:
         trigger_type = trigger.get("type", "unknown")
-        value = trigger.get("value", 0)
+        raw_value = trigger.get("value", 0)
         comparison = trigger.get("comparison", ">=")
+        
+        # Resolve variable reference if present
+        resolved_value, var_name = _resolve_variable(raw_value, variables)
+        display_value = _safe_float(resolved_value, 0)
         
         comp_text = {
             ">=": "≥",
@@ -2472,20 +2508,25 @@ def _format_exit_triggers(exit_triggers: list) -> list[dict]:
         
         formatted.append({
             "type": trigger_type,
-            "value": value,
+            "value": display_value,
             "comparison": comparison,
-            "description": f"{trigger_type} {comp_text} {value}{unit}"
+            "description": f"{trigger_type} {comp_text} {display_value}{unit}"
         })
     
     return formatted
 
 
-def _format_limits(limits: list) -> list[dict]:
+def _format_limits(limits: list, variables: list | None = None) -> list[dict]:
     """Format stage limits into structured descriptions."""
+    variables = variables or []
     formatted = []
     for limit in limits:
         limit_type = limit.get("type", "unknown")
-        value = limit.get("value", 0)
+        raw_value = limit.get("value", 0)
+        
+        # Resolve variable reference if present
+        resolved_value, var_name = _resolve_variable(raw_value, variables)
+        display_value = _safe_float(resolved_value, 0)
         
         unit = {
             "time": "s",
@@ -2496,8 +2537,8 @@ def _format_limits(limits: list) -> list[dict]:
         
         formatted.append({
             "type": limit_type,
-            "value": value,
-            "description": f"Limit {limit_type} to {value}{unit}"
+            "value": display_value,
+            "description": f"Limit {limit_type} to {display_value}{unit}"
         })
     
     return formatted
@@ -2506,28 +2547,34 @@ def _format_limits(limits: list) -> list[dict]:
 def _determine_exit_trigger_hit(
     stage_data: dict,
     exit_triggers: list,
-    next_stage_start: float | None = None
+    next_stage_start: float | None = None,
+    variables: list | None = None
 ) -> dict:
     """Determine which exit trigger caused the stage to end.
     
     Returns:
         Dict with 'triggered' (the exit that fired) and 'not_triggered' (exits that didn't fire)
     """
-    duration = stage_data.get("duration", 0)
-    end_weight = stage_data.get("end_weight", 0)
-    max_pressure = stage_data.get("max_pressure", 0)
-    max_flow = stage_data.get("max_flow", 0)
+    variables = variables or []
+    duration = _safe_float(stage_data.get("duration", 0))
+    end_weight = _safe_float(stage_data.get("end_weight", 0))
+    max_pressure = _safe_float(stage_data.get("max_pressure", 0))
+    max_flow = _safe_float(stage_data.get("max_flow", 0))
     
     triggered = None
     not_triggered = []
     
     for trigger in exit_triggers:
         trigger_type = trigger.get("type", "")
-        value = trigger.get("value", 0)
+        raw_value = trigger.get("value", 0)
         comparison = trigger.get("comparison", ">=")
         
+        # Resolve variable reference if present
+        resolved_value, _ = _resolve_variable(raw_value, variables)
+        value = _safe_float(resolved_value)
+        
         # Check if this trigger was satisfied
-        actual_value = 0
+        actual_value = 0.0
         if trigger_type == "time":
             actual_value = duration
         elif trigger_type == "weight":
@@ -2552,11 +2599,13 @@ def _determine_exit_trigger_hit(
         elif comparison == "==":
             was_hit = abs(actual_value - value) < tolerance
         
+        # Build a proper description with the resolved value
+        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s"}.get(trigger_type, "")
         trigger_info = {
             "type": trigger_type,
             "target": value,
             "actual": round(actual_value, 1),
-            "description": trigger.get("description", f"{trigger_type} {comparison} {value}")
+            "description": f"{trigger_type} >= {value}{unit}"
         }
         
         if was_hit:
@@ -2574,17 +2623,19 @@ def _determine_exit_trigger_hit(
 def _analyze_stage_execution(
     profile_stage: dict,
     shot_stage_data: dict | None,
-    total_shot_duration: float
+    total_shot_duration: float,
+    variables: list | None = None
 ) -> dict:
     """Analyze how a single stage executed compared to its profile definition."""
+    variables = variables or []
     stage_name = profile_stage.get("name", "Unknown")
     stage_type = profile_stage.get("type", "unknown")
     stage_key = profile_stage.get("key", "")
     
     # Build profile target description
     dynamics_desc = _format_dynamics_description(profile_stage)
-    exit_triggers = _format_exit_triggers(profile_stage.get("exit_triggers", []))
-    limits = _format_limits(profile_stage.get("limits", []))
+    exit_triggers = _format_exit_triggers(profile_stage.get("exit_triggers", []), variables)
+    limits = _format_limits(profile_stage.get("limits", []), variables)
     
     result = {
         "stage_name": stage_name,
@@ -2608,15 +2659,15 @@ def _analyze_stage_execution(
         return result
     
     # Stage was executed - analyze it
-    duration = shot_stage_data.get("duration", 0)
-    start_weight = shot_stage_data.get("start_weight", 0)
-    end_weight = shot_stage_data.get("end_weight", 0)
+    duration = _safe_float(shot_stage_data.get("duration", 0))
+    start_weight = _safe_float(shot_stage_data.get("start_weight", 0))
+    end_weight = _safe_float(shot_stage_data.get("end_weight", 0))
     weight_gain = end_weight - start_weight
-    avg_pressure = shot_stage_data.get("avg_pressure", 0)
-    max_pressure = shot_stage_data.get("max_pressure", 0)
-    min_pressure = shot_stage_data.get("min_pressure", 0)
-    avg_flow = shot_stage_data.get("avg_flow", 0)
-    max_flow = shot_stage_data.get("max_flow", 0)
+    avg_pressure = _safe_float(shot_stage_data.get("avg_pressure", 0))
+    max_pressure = _safe_float(shot_stage_data.get("max_pressure", 0))
+    min_pressure = _safe_float(shot_stage_data.get("min_pressure", 0))
+    avg_flow = _safe_float(shot_stage_data.get("avg_flow", 0))
+    max_flow = _safe_float(shot_stage_data.get("max_flow", 0))
     
     result["execution_data"] = {
         "duration": round(duration, 1),
@@ -2634,7 +2685,8 @@ def _analyze_stage_execution(
     if profile_stage.get("exit_triggers"):
         exit_result = _determine_exit_trigger_hit(
             shot_stage_data,
-            profile_stage.get("exit_triggers", [])
+            profile_stage.get("exit_triggers", []),
+            variables=variables
         )
         result["exit_trigger_result"] = exit_result
     
@@ -2642,9 +2694,13 @@ def _analyze_stage_execution(
     stage_limits = profile_stage.get("limits", [])
     for limit in stage_limits:
         limit_type = limit.get("type", "")
-        limit_value = limit.get("value", 0)
+        raw_limit_value = limit.get("value", 0)
         
-        actual = 0
+        # Resolve variable reference if present
+        resolved_limit_value, _ = _resolve_variable(raw_limit_value, variables)
+        limit_value = _safe_float(resolved_limit_value)
+        
+        actual = 0.0
         if limit_type == "flow":
             actual = max_flow
         elif limit_type == "pressure":
@@ -2655,12 +2711,13 @@ def _analyze_stage_execution(
             actual = end_weight
         
         # Check if limit was hit (within small tolerance)
+        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s"}.get(limit_type, "")
         if actual >= limit_value - 0.2:
             result["limit_hit"] = {
                 "type": limit_type,
                 "limit_value": limit_value,
                 "actual_value": round(actual, 1),
-                "description": f"Hit {limit_type} limit of {limit_value}"
+                "description": f"Hit {limit_type} limit of {limit_value}{unit}"
             }
             break
     
@@ -2839,6 +2896,7 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
     
     # Profile stages
     profile_stages = profile_data.get("stages", [])
+    profile_variables = profile_data.get("variables", [])
     
     # Analyze each profile stage
     stage_analyses = []
@@ -2859,7 +2917,7 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
                 executed_stages.add(stage_name)
                 break
         
-        analysis = _analyze_stage_execution(profile_stage, shot_stage_data, total_time)
+        analysis = _analyze_stage_execution(profile_stage, shot_stage_data, total_time, profile_variables)
         stage_analyses.append(analysis)
         
         # Track unreached
@@ -2872,14 +2930,14 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
                          any(kw in stage_key for kw in ['preinfusion', 'bloom', 'soak', 'fill'])
         
         if is_preinfusion and shot_stage_data:
-            preinfusion_time += shot_stage_data.get("duration", 0)
+            preinfusion_time += _safe_float(shot_stage_data.get("duration", 0))
             preinfusion_stages.append({
                 "name": stage_name,
-                "duration": shot_stage_data.get("duration", 0),
-                "start_weight": shot_stage_data.get("start_weight", 0),
-                "end_weight": shot_stage_data.get("end_weight", 0),
-                "max_flow": shot_stage_data.get("max_flow", 0),
-                "avg_flow": shot_stage_data.get("avg_flow", 0),
+                "duration": _safe_float(shot_stage_data.get("duration", 0)),
+                "start_weight": _safe_float(shot_stage_data.get("start_weight", 0)),
+                "end_weight": _safe_float(shot_stage_data.get("end_weight", 0)),
+                "max_flow": _safe_float(shot_stage_data.get("max_flow", 0)),
+                "avg_flow": _safe_float(shot_stage_data.get("avg_flow", 0)),
                 "exit_triggers": profile_stage.get("exit_triggers", [])
             })
     
@@ -3020,8 +3078,20 @@ async def analyze_shot(
                         "name": full_profile.name,
                         "temperature": getattr(full_profile, 'temperature', None),
                         "final_weight": getattr(full_profile, 'final_weight', None),
+                        "variables": [],
                         "stages": []
                     }
+                    
+                    # Extract variables if present
+                    if hasattr(full_profile, 'variables') and full_profile.variables:
+                        for var in full_profile.variables:
+                            var_dict = {
+                                "key": getattr(var, 'key', ''),
+                                "name": getattr(var, 'name', ''),
+                                "type": getattr(var, 'type', ''),
+                                "value": getattr(var, 'value', 0)
+                            }
+                            profile_data["variables"].append(var_dict)
                     
                     # Extract full stage data including dynamics and triggers
                     if hasattr(full_profile, 'stages') and full_profile.stages:
