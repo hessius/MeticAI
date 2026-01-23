@@ -30,6 +30,7 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REBUILD_FLAG="$SCRIPT_DIR/.rebuild-needed"
+UPDATE_CHECK_FLAG="$SCRIPT_DIR/.update-check-requested"
 LOG_FILE="$SCRIPT_DIR/.rebuild-watcher.log"
 
 # Set up PATH for launchd environment (needed for Docker credential helpers)
@@ -49,7 +50,7 @@ prepare_for_docker() {
     cd "$SCRIPT_DIR"
     
     # Ensure required files exist as files (not directories)
-    for file in ".versions.json" ".rebuild-needed"; do
+    for file in ".versions.json" ".rebuild-needed" ".update-check-requested"; do
         if [ -d "$SCRIPT_DIR/$file" ]; then
             rm -rf "$SCRIPT_DIR/$file"
         fi
@@ -57,6 +58,7 @@ prepare_for_docker() {
     
     [ ! -f "$SCRIPT_DIR/.versions.json" ] && echo '{}' > "$SCRIPT_DIR/.versions.json"
     [ ! -f "$SCRIPT_DIR/.rebuild-needed" ] && touch "$SCRIPT_DIR/.rebuild-needed"
+    [ ! -f "$SCRIPT_DIR/.update-check-requested" ] && touch "$SCRIPT_DIR/.update-check-requested"
     
     # Pre-create directories so Docker doesn't create them as root
     mkdir -p "$SCRIPT_DIR/data" "$SCRIPT_DIR/logs"
@@ -72,12 +74,40 @@ fix_permissions() {
     
     if [ -n "$dir_owner" ]; then
         # Fix ownership of files that Docker might have created as root
-        for item in data logs .versions.json .rebuild-needed meticulous-source meticai-web; do
+        for item in data logs .versions.json .rebuild-needed .update-check-requested meticulous-source meticai-web; do
             if [ -e "$SCRIPT_DIR/$item" ]; then
                 sudo chown -R "$dir_owner" "$SCRIPT_DIR/$item" 2>/dev/null || true
             fi
         done
     fi
+}
+
+# Handle update check request (triggered by API endpoint)
+do_update_check() {
+    log "${BLUE}Update check requested by API...${NC}"
+    
+    cd "$SCRIPT_DIR"
+    
+    if [ -x "$SCRIPT_DIR/update.sh" ]; then
+        if "$SCRIPT_DIR/update.sh" --check-only 2>&1 | tee -a "$LOG_FILE"; then
+            log "${GREEN}✓ Update check completed${NC}"
+        else
+            log "${YELLOW}Update check had issues but may have succeeded${NC}"
+        fi
+    else
+        log "${RED}update.sh not found or not executable${NC}"
+    fi
+    
+    # Clear the signal file
+    echo "" > "$UPDATE_CHECK_FLAG"
+}
+
+check_update_check_needed() {
+    if [ -f "$UPDATE_CHECK_FLAG" ] && [ -s "$UPDATE_CHECK_FLAG" ]; then
+        # File exists and is not empty
+        return 0
+    fi
+    return 1
 }
 
 do_rebuild() {
@@ -167,6 +197,7 @@ install_launchd() {
     <key>WatchPaths</key>
     <array>
         <string>$REBUILD_FLAG</string>
+        <string>$UPDATE_CHECK_FLAG</string>
     </array>
     <key>RunAtLoad</key>
     <false/>
@@ -218,7 +249,7 @@ install_systemd() {
         echo -e "${YELLOW}This requires sudo access. You may be prompted for your password.${NC}"
     fi
     
-    # Create the path unit (watches the file)
+    # Create the path unit (watches the files)
     sudo tee "$path_unit" > /dev/null <<EOF
 [Unit]
 Description=MeticAI Rebuild Watcher Path
@@ -226,6 +257,7 @@ Documentation=https://github.com/hessius/MeticAI
 
 [Path]
 PathModified=$REBUILD_FLAG
+PathModified=$UPDATE_CHECK_FLAG
 Unit=meticai-rebuild-watcher.service
 
 [Install]
@@ -337,10 +369,13 @@ case "${1:-}" in
     --watch)
         log "Starting rebuild watcher (continuous mode)..."
         while true; do
+            if check_update_check_needed; then
+                do_update_check
+            fi
             if check_rebuild_needed; then
                 do_rebuild
             fi
-            sleep 10
+            sleep 2
         done
         ;;
     --install)
@@ -363,7 +398,10 @@ case "${1:-}" in
         show_help
         ;;
     *)
-        # Default: check once
+        # Default: check once for both signals
+        if check_update_check_needed; then
+            do_update_check
+        fi
         if check_rebuild_needed; then
             do_rebuild
         else

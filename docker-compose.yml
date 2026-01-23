@@ -52,6 +52,8 @@ services:
       - ./gemini-client:/app/gemini-client:ro
       # Mount rebuild flag for host-side watcher
       - ./.rebuild-needed:/app/.rebuild-needed
+      # Mount update check signal file for host-side watcher
+      - ./.update-check-requested:/app/.update-check-requested
       # Mount logs directory for persistent log storage
       - ./logs:/app/logs
       # Mount data directory for profile history
