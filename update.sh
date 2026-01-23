@@ -112,7 +112,23 @@ get_remote_hash() {
     local dir="$1"
     local branch="${2:-main}"
     if [ -d "$dir/.git" ]; then
-        cd "$dir" && git fetch origin "$branch" 2>/dev/null && git rev-parse "origin/$branch" 2>/dev/null
+        # Try to fetch first (may fail due to permissions)
+        local fetch_result
+        fetch_result=$(cd "$dir" && git fetch origin "$branch" 2>&1)
+        
+        # If fetch failed due to permissions, try ls-remote as fallback
+        if echo "$fetch_result" | grep -q "Permission denied"; then
+            local remote_url
+            remote_url=$(cd "$dir" && git config --get remote.origin.url 2>/dev/null)
+            if [ -n "$remote_url" ] && [ "$remote_url" != "unknown" ]; then
+                # Use ls-remote which doesn't require write access
+                git ls-remote "$remote_url" "refs/heads/$branch" 2>/dev/null | awk '{print $1}'
+                return
+            fi
+        fi
+        
+        # Try to get the remote hash
+        cd "$dir" && git rev-parse "origin/$branch" 2>/dev/null
     else
         echo "not-a-git-repo"
     fi
@@ -132,7 +148,13 @@ get_current_branch() {
 get_remote_url() {
     local dir="$1"
     if [ -d "$dir/.git" ]; then
-        cd "$dir" && git config --get remote.origin.url 2>/dev/null
+        local url
+        url=$(cd "$dir" && git config --get remote.origin.url 2>/dev/null)
+        if [ -n "$url" ]; then
+            echo "$url"
+        else
+            echo "unknown"
+        fi
     else
         echo "unknown"
     fi
@@ -209,11 +231,25 @@ check_and_switch_mcp_repo() {
     local current_url=$(get_remote_url "$SCRIPT_DIR/meticulous-source")
     local preferred_url=$(get_preferred_mcp_url)
     
-    # Normalize URLs for comparison (remove trailing slashes and .git)
-    current_url=$(echo "$current_url" | sed 's/\.git$//' | sed 's/\/$//')
-    preferred_url=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
+    # Handle case where remote is not configured (unknown)
+    if [ "$current_url" = "unknown" ]; then
+        echo -e "${YELLOW}MCP repository has no remote configured. Setting up remote...${NC}"
+        if cd "$SCRIPT_DIR/meticulous-source" && git remote add origin "$preferred_url" 2>/dev/null; then
+            echo -e "${GREEN}✓ Remote 'origin' configured to: $preferred_url${NC}"
+            git fetch origin 2>/dev/null || true
+        elif cd "$SCRIPT_DIR/meticulous-source" && git remote set-url origin "$preferred_url" 2>/dev/null; then
+            echo -e "${GREEN}✓ Remote 'origin' updated to: $preferred_url${NC}"
+            git fetch origin 2>/dev/null || true
+        fi
+        cd "$SCRIPT_DIR"
+        return 0
+    fi
     
-    if [ "$current_url" != "$preferred_url" ]; then
+    # Normalize URLs for comparison (remove trailing slashes and .git)
+    local current_normalized=$(echo "$current_url" | sed 's/\.git$//' | sed 's/\/$//')
+    local preferred_normalized=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
+    
+    if [ "$current_normalized" != "$preferred_normalized" ]; then
         echo -e "${YELLOW}Repository switch detected!${NC}"
         echo "Current:  $current_url"
         echo "Required: $preferred_url"
@@ -283,11 +319,25 @@ check_and_switch_web_repo() {
     local current_url=$(get_remote_url "$SCRIPT_DIR/meticai-web")
     local preferred_url=$(get_preferred_web_url)
     
-    # Normalize URLs for comparison (remove trailing slashes and .git)
-    current_url=$(echo "$current_url" | sed 's/\.git$//' | sed 's/\/$//')
-    preferred_url=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
+    # Handle case where remote is not configured (unknown)
+    if [ "$current_url" = "unknown" ]; then
+        echo -e "${YELLOW}Web App repository has no remote configured. Setting up remote...${NC}"
+        if cd "$SCRIPT_DIR/meticai-web" && git remote add origin "$preferred_url" 2>/dev/null; then
+            echo -e "${GREEN}✓ Remote 'origin' configured to: $preferred_url${NC}"
+            git fetch origin 2>/dev/null || true
+        elif cd "$SCRIPT_DIR/meticai-web" && git remote set-url origin "$preferred_url" 2>/dev/null; then
+            echo -e "${GREEN}✓ Remote 'origin' updated to: $preferred_url${NC}"
+            git fetch origin 2>/dev/null || true
+        fi
+        cd "$SCRIPT_DIR"
+        return 0
+    fi
     
-    if [ "$current_url" != "$preferred_url" ]; then
+    # Normalize URLs for comparison (remove trailing slashes and .git)
+    local current_normalized=$(echo "$current_url" | sed 's/\.git$//' | sed 's/\/$//')
+    local preferred_normalized=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
+    
+    if [ "$current_normalized" != "$preferred_normalized" ]; then
         echo -e "${YELLOW}Web App repository switch detected!${NC}"
         echo "Current:  $current_url"
         echo "Required: $preferred_url"
@@ -606,6 +656,15 @@ rebuild_containers() {
         echo '{}' > "$SCRIPT_DIR/.versions.json"
     fi
     
+    # Ensure .rebuild-needed exists as a file for the trigger-update endpoint
+    if [ -d "$SCRIPT_DIR/.rebuild-needed" ]; then
+        echo -e "${YELLOW}Fixing .rebuild-needed (was directory, converting to file)...${NC}"
+        rm -rf "$SCRIPT_DIR/.rebuild-needed"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.rebuild-needed" ]; then
+        touch "$SCRIPT_DIR/.rebuild-needed"
+    fi
+    
     # Check if docker compose is available
     if docker compose version &> /dev/null; then
         COMPOSE_CMD="docker compose"
@@ -731,6 +790,37 @@ EOF
 # Main execution flow
 main() {
     cd "$SCRIPT_DIR"
+    
+    # Ensure required files exist as files (not directories) before any operations
+    # This prevents Docker from creating directories when mounting
+    if [ -d "$SCRIPT_DIR/.versions.json" ]; then
+        rm -rf "$SCRIPT_DIR/.versions.json"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.versions.json" ]; then
+        echo '{}' > "$SCRIPT_DIR/.versions.json"
+    fi
+    if [ -d "$SCRIPT_DIR/.rebuild-needed" ]; then
+        rm -rf "$SCRIPT_DIR/.rebuild-needed"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.rebuild-needed" ]; then
+        touch "$SCRIPT_DIR/.rebuild-needed"
+    fi
+    
+    # Fix common permission issues with git directories
+    # This can happen when docker or sudo operations create files as root
+    for subdir in "meticulous-source" "meticai-web"; do
+        if [ -d "$SCRIPT_DIR/$subdir/.git" ]; then
+            # Check if current user can write to .git directory
+            if ! touch "$SCRIPT_DIR/$subdir/.git/.permission-test" 2>/dev/null; then
+                echo -e "${YELLOW}Fixing permissions for $subdir...${NC}"
+                if command -v sudo &>/dev/null; then
+                    sudo chown -R "$(id -u):$(id -g)" "$SCRIPT_DIR/$subdir" 2>/dev/null || true
+                fi
+            else
+                rm -f "$SCRIPT_DIR/$subdir/.git/.permission-test" 2>/dev/null
+            fi
+        fi
+    done
     
     # Initialize version tracking
     initialize_versions_file
