@@ -298,10 +298,17 @@ docker logs meticulous-mcp -f
 docker compose restart
 ```
 
-**Full reset:**
+**Full reset (recommended - uses wrapper script for correct permissions):**
+```bash
+./docker-up.sh
+```
+
+**Full reset (manual - may require permission fix on Linux):**
 ```bash
 docker compose down
 docker compose up -d --build
+# If you used sudo, fix permissions:
+sudo chown -R $(id -u):$(id -g) data logs meticulous-source meticai-web
 ```
 
 For comprehensive troubleshooting and log analysis, see [LOGGING.md](LOGGING.md).
