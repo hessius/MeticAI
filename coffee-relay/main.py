@@ -3171,6 +3171,401 @@ async def analyze_shot(
 
 
 # ============================================================================
+# LLM Shot Analysis
+# ============================================================================
+
+# Espresso profiling knowledge for LLM context
+PROFILING_KNOWLEDGE = """# Espresso Profiling Expert Knowledge
+
+## Core Variables
+- **Flow Rate (ml/s)**: Controls extraction speed. Higher = more acidity/clarity, Lower = more body/sweetness
+- **Pressure (bar)**: Result of flow vs resistance. Creates texture and crema. 6-9 bar typical.
+- **Temperature (°C)**: Lighter roasts need higher temps (92-96°C), darker need lower (82-90°C)
+
+## Shot Phases
+1. **Pre-infusion**: Gently saturate puck (2-4 ml/s, <2 bar). Prevents channeling.
+2. **Bloom** (optional): Rest at low pressure to release CO2 (5-30s for fresh coffee)
+3. **Infusion**: Main extraction (6-9 bar or 1.5-3 ml/s). Most critical for flavor.
+4. **Taper**: Gradual decline to minimize bitterness (drop to 4-5 bar)
+
+## Troubleshooting Guide
+- **Sour/thin/acidic**: Under-extracted. Increase pressure, extend infusion, raise temp
+- **Bitter/harsh/astringent**: Over-extracted. Lower pressure, taper earlier, lower temp
+- **Gushing/fast shot**: Grind too coarse, or pre-infusion too aggressive
+- **Choking/slow shot**: Grind too fine, add bloom phase, or increase initial pressure
+
+## Equipment Factors
+- **Grind setting**: Primary extraction control. Fine = slower, more extraction
+- **Basket type**: VST/IMS precision baskets vs stock baskets affect flow distribution
+- **Bottom filter**: Paper filters reduce sediment but also oils (cleaner but thinner)
+- **Puck prep**: WDT, leveling, and tamp consistency affect channeling risk
+"""
+
+
+def _prepare_shot_summary_for_llm(shot_data: dict, profile_data: dict, local_analysis: dict) -> dict:
+    """Prepare a token-efficient summary of shot data for LLM analysis.
+    
+    Extracts only key data points to minimize token usage while providing
+    enough context for meaningful analysis.
+    """
+    # Basic shot metrics
+    overall = local_analysis.get("overall_metrics", {})
+    weight_analysis = local_analysis.get("weight_analysis", {})
+    preinfusion = local_analysis.get("preinfusion_summary", {})
+    
+    # Stage summary (compact format)
+    stage_summaries = []
+    total_time = overall.get("total_time", 0)
+    
+    for stage in local_analysis.get("stage_analyses", []):
+        exec_data = stage.get("execution_data")
+        if exec_data:
+            duration = exec_data.get("duration", 0)
+            pct_of_shot = round((duration / total_time * 100) if total_time > 0 else 0, 1)
+            # Safely extract exit trigger and limit hit descriptions
+            exit_trigger_desc = None
+            exit_trigger_result = stage.get("exit_trigger_result")
+            if exit_trigger_result:
+                triggered = exit_trigger_result.get("triggered")
+                if triggered and isinstance(triggered, dict):
+                    exit_trigger_desc = triggered.get("description")
+            
+            limit_hit_desc = None
+            limit_hit = stage.get("limit_hit")
+            if limit_hit and isinstance(limit_hit, dict):
+                limit_hit_desc = limit_hit.get("description")
+            
+            stage_summaries.append({
+                "name": stage.get("stage_name"),
+                "duration_s": round(duration, 1),
+                "percent_of_shot": pct_of_shot,
+                "avg_pressure": exec_data.get("avg_pressure"),
+                "avg_flow": exec_data.get("avg_flow"),
+                "weight_gain": exec_data.get("weight_gain"),
+                "cumulative_weight_at_end": exec_data.get("end_weight"),  # Added: cumulative weight when stage ended
+                "exit_trigger": exit_trigger_desc,
+                "limit_hit": limit_hit_desc
+            })
+        else:
+            stage_summaries.append({
+                "name": stage.get("stage_name"),
+                "status": "NOT REACHED"
+            })
+    
+    # Profile variables (resolved values)
+    variables = []
+    for var in profile_data.get("variables", []):
+        variables.append({
+            "name": var.get("name"),
+            "type": var.get("type"),
+            "value": var.get("value")
+        })
+    
+    # Simplified graph data - sample key points from the shot
+    data_entries = shot_data.get("data", [])
+    graph_summary = []
+    
+    if data_entries:
+        # Sample at key points: start, 25%, 50%, 75%, end, and any stage transitions
+        sample_indices = [0]
+        n = len(data_entries)
+        for pct in [0.25, 0.5, 0.75]:
+            idx = int(n * pct)
+            if idx not in sample_indices:
+                sample_indices.append(idx)
+        sample_indices.append(n - 1)
+        
+        for idx in sorted(set(sample_indices)):
+            entry = data_entries[idx]
+            shot = entry.get("shot", {})
+            graph_summary.append({
+                "time_s": round(entry.get("time", 0) / 1000, 1),
+                "pressure": round(shot.get("pressure", 0), 1),
+                "flow": round(shot.get("flow", 0) or shot.get("gravimetric_flow", 0), 1),
+                "weight": round(shot.get("weight", 0), 1),
+                "stage": entry.get("status", "")
+            })
+    
+    return {
+        "shot_summary": {
+            "total_time_s": overall.get("total_time"),
+            "final_weight_g": weight_analysis.get("actual"),
+            "target_weight_g": weight_analysis.get("target"),
+            "weight_deviation_pct": weight_analysis.get("deviation_percent"),
+            "max_pressure_bar": overall.get("max_pressure"),
+            "max_flow_mls": overall.get("max_flow"),
+            "temperature_c": profile_data.get("temperature")
+        },
+        "stages": stage_summaries,
+        "unreached_stages": local_analysis.get("unreached_stages", []),
+        "preinfusion": {
+            "total_time_s": preinfusion.get("total_time"),
+            "percent_of_shot": preinfusion.get("proportion_of_shot"),
+            "weight_accumulated_g": preinfusion.get("weight_accumulated")
+        },
+        "variables": variables,
+        "graph_samples": graph_summary
+    }
+
+
+def _prepare_profile_for_llm(profile_data: dict, description: str | None) -> dict:
+    """Prepare profile data for LLM, removing image and limiting description."""
+    # Build clean profile without image
+    clean_profile = {
+        "name": profile_data.get("name"),
+        "temperature": profile_data.get("temperature"),
+        "final_weight": profile_data.get("final_weight"),
+        "variables": profile_data.get("variables", []),
+        "stages": []
+    }
+    
+    # Include stage structure but not full dynamics data
+    for stage in profile_data.get("stages", []):
+        clean_stage = {
+            "name": stage.get("name"),
+            "type": stage.get("type"),
+            "exit_triggers": stage.get("exit_triggers", []),
+            "limits": stage.get("limits", [])
+        }
+        # Add a summary of dynamics
+        dynamics = stage.get("dynamics_points", [])
+        if dynamics:
+            if len(dynamics) == 1:
+                clean_stage["target"] = f"Constant at {dynamics[0][1] if len(dynamics[0]) > 1 else dynamics[0][0]}"
+            elif len(dynamics) >= 2:
+                start = dynamics[0][1] if len(dynamics[0]) > 1 else dynamics[0][0]
+                end = dynamics[-1][1] if len(dynamics[-1]) > 1 else dynamics[-1][0]
+                clean_stage["target"] = f"{start} → {end}"
+        clean_profile["stages"].append(clean_stage)
+    
+    return clean_profile
+
+
+@app.post("/api/shots/analyze-llm")
+async def analyze_shot_with_llm(
+    request: Request,
+    profile_name: str = Form(...),
+    shot_date: str = Form(...),
+    shot_filename: str = Form(...),
+    profile_description: Optional[str] = Form(None)
+):
+    """Analyze a shot using LLM with expert profiling knowledge.
+    
+    This endpoint performs a deep analysis of shot execution, combining:
+    - Local algorithmic analysis for data extraction
+    - Expert espresso profiling knowledge
+    - LLM reasoning for actionable recommendations
+    
+    Returns structured analysis answering:
+    1. How did the shot go and why?
+    2. What should change about the setup (grind, filter, basket, prep)?
+    3. What should change about the profile?
+    4. Any issues found in the profile design itself?
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Starting LLM shot analysis",
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "shot_date": shot_date,
+                "shot_filename": shot_filename
+            }
+        )
+        
+        # Fetch shot data
+        shot_data = await fetch_shot_data(shot_date, shot_filename)
+        
+        # Fetch profile from machine (with variables)
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        profile_data = None
+        for partial_profile in profiles_result:
+            if partial_profile.name.lower() == profile_name.lower():
+                full_profile = api.get_profile(partial_profile.id)
+                if not (hasattr(full_profile, 'error') and full_profile.error):
+                    profile_data = {
+                        "name": full_profile.name,
+                        "temperature": getattr(full_profile, 'temperature', None),
+                        "final_weight": getattr(full_profile, 'final_weight', None),
+                        "variables": [],
+                        "stages": []
+                    }
+                    
+                    # Extract variables
+                    if hasattr(full_profile, 'variables') and full_profile.variables:
+                        for var in full_profile.variables:
+                            profile_data["variables"].append({
+                                "key": getattr(var, 'key', ''),
+                                "name": getattr(var, 'name', ''),
+                                "type": getattr(var, 'type', ''),
+                                "value": getattr(var, 'value', 0)
+                            })
+                    
+                    # Extract stages with full details
+                    if hasattr(full_profile, 'stages') and full_profile.stages:
+                        for stage in full_profile.stages:
+                            stage_dict = {
+                                "name": getattr(stage, 'name', 'Unknown'),
+                                "key": getattr(stage, 'key', ''),
+                                "type": getattr(stage, 'type', 'unknown'),
+                            }
+                            for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation', 'exit_triggers', 'limits']:
+                                val = getattr(stage, attr, None)
+                                if val is not None:
+                                    if isinstance(val, list):
+                                        stage_dict[attr] = [dict(item) if hasattr(item, '__dict__') else item for item in val]
+                                    else:
+                                        stage_dict[attr] = val
+                            profile_data["stages"].append(stage_dict)
+                break
+        
+        if not profile_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile '{profile_name}' not found on machine"
+            )
+        
+        # Run local analysis first to extract data
+        local_analysis = _perform_local_shot_analysis(shot_data, profile_data)
+        
+        # Prepare profile data (clean, no image)
+        clean_profile = _prepare_profile_for_llm(profile_data, profile_description)
+        
+        # Build the LLM prompt with FULL local analysis
+        prompt = f"""You are an expert espresso barista and profiling specialist analyzing a shot from a Meticulous Espresso Machine.
+
+## Expert Knowledge
+{PROFILING_KNOWLEDGE}
+
+## Profile Being Used
+Name: {clean_profile['name']}
+Temperature: {clean_profile.get('temperature', 'Not set')}°C
+Target Weight: {clean_profile.get('final_weight', 'Not set')}g
+
+### Profile Description
+{profile_description or 'No description provided - analyze the profile structure to understand intent.'}
+
+### Profile Variables
+{json.dumps(clean_profile.get('variables', []), indent=2)}
+
+### Profile Stages
+{json.dumps(clean_profile.get('stages', []), indent=2)}
+
+## Full Local Analysis
+This is the complete algorithmic analysis of the shot. Use this data to inform your expert analysis.
+
+IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total weight when that stage ended.
+If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated 
+correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
+A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
+
+{json.dumps(local_analysis, indent=2)}
+
+---
+
+Based on this data, provide a detailed expert analysis.
+
+CRITICAL FORMATTING RULES:
+1. You MUST use EXACTLY these 5 section headers with the exact format shown (## followed by number, period, space, then title)
+2. Each section MUST have the subsection headers shown (bold text with colon, like **What Happened:**)
+3. ALL content under subsections MUST be bullet points starting with "- "
+4. Keep bullet points concise (1-2 sentences max per bullet)
+5. Do NOT add extra sections or subsections beyond what's specified
+
+## 1. Shot Performance
+
+**What Happened:**
+- [Stage-by-stage description of the extraction]
+- [Notable events: pressure spikes, flow restrictions, early/late stage exits]
+- [Final weight accuracy relative to target]
+
+**Assessment:** [Choose exactly one: Good / Acceptable / Needs Improvement / Problematic]
+
+## 2. Root Cause Analysis
+
+**Primary Factors:**
+- [Most likely cause with brief explanation]
+- [Second most likely cause if applicable]
+
+**Secondary Considerations:**
+- [Other contributing factors]
+- [Environmental or equipment factors if relevant]
+
+## 3. Setup Recommendations
+
+**Priority Changes:**
+- [Most important change - be specific with numbers when possible]
+- [Second priority change]
+
+**Additional Suggestions:**
+- [Other tweaks to consider]
+
+## 4. Profile Recommendations
+
+**Recommended Adjustments:**
+- [Specific profile changes: timing, triggers, targets]
+- [Variable value changes if applicable]
+
+**Reasoning:**
+- [Why these changes would improve the shot]
+
+## 5. Profile Design Observations
+
+**Strengths:**
+- [Well-designed aspects of this profile]
+
+**Potential Improvements:**
+- [Exit trigger or safety limit suggestions]
+- [Robustness improvements]
+
+Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
+"""
+        
+        # Call LLM
+        model = get_vision_model()
+        response = model.generate_content(prompt)
+        
+        llm_analysis = response.text if response else "Analysis generation failed"
+        
+        logger.info(
+            "LLM shot analysis completed",
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "response_length": len(llm_analysis)
+            }
+        )
+        
+        return {
+            "status": "success",
+            "profile_name": profile_name,
+            "shot_date": shot_date,
+            "shot_filename": shot_filename,
+            "llm_analysis": llm_analysis
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"LLM shot analysis failed: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name
+            }
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "LLM shot analysis failed"}
+        )
+
+
+# ============================================================================
 # Profile Import Endpoints
 # ============================================================================
 
