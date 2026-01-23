@@ -1273,6 +1273,14 @@ if [ ! -f ".rebuild-needed" ]; then
     touch .rebuild-needed
 fi
 
+# Ensure .update-check-requested exists as a file for the check-updates endpoint
+if [ -d ".update-check-requested" ]; then
+    rm -rf .update-check-requested
+fi
+if [ ! -f ".update-check-requested" ]; then
+    touch .update-check-requested
+fi
+
 # Pre-create directories that Docker would otherwise create as root
 # This ensures proper ownership for the current user
 mkdir -p data logs
@@ -1287,7 +1295,7 @@ if sudo docker compose up -d --build; then
     # Fix ownership of any files created by Docker running as root
     # This is needed because sudo docker compose creates files as root
     echo "Fixing file ownership..."
-    sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed 2>/dev/null || true
+    sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed .update-check-requested 2>/dev/null || true
     # Also fix git directories in case they were affected
     sudo chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
     

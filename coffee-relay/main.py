@@ -590,74 +590,97 @@ async def analyze_and_profile(
 
 @app.post("/api/check-updates")
 async def check_updates(request: Request):
-    """Trigger a fresh update check by running update.sh --check-only.
+    """Trigger a fresh update check by signaling the host-side watcher.
     
-    This endpoint runs the update check script and returns the fresh results.
-    Unlike GET /status which reads cached data, this performs an actual git fetch.
+    This endpoint creates a flag file that the host-side watcher script detects
+    and runs the actual git fetch. Since git operations can't run properly inside
+    the container (no access to sub-repo .git directories), we delegate to the host.
     
     Returns:
         - update_available: Whether updates are available for any component
         - last_check: Timestamp of this check
         - repositories: Status of each repository (main, mcp, web)
+        - fresh_check: True if this was a fresh check
     """
     request_id = request.state.request_id
     
     try:
         logger.info(
-            "Triggering fresh update check",
+            "Triggering fresh update check via host signal",
             extra={"request_id": request_id, "endpoint": "/api/check-updates"}
         )
         
-        script_path = Path("/app/update.sh")
+        # Get the current timestamp from .versions.json before signaling
+        version_file_path = Path("/app/.versions.json")
+        old_check_time = None
+        if version_file_path.exists():
+            try:
+                with open(version_file_path, 'r') as f:
+                    old_data = json.load(f)
+                    old_check_time = old_data.get("last_check")
+            except Exception:
+                pass
         
-        if not script_path.exists():
-            return {
-                "update_available": False,
-                "error": "Update script not found",
-                "message": "update.sh not mounted in container"
-            }
+        # Create signal file for host-side watcher
+        signal_path = Path("/app/.update-check-requested")
+        signal_path.write_text(f"requested_at: {datetime.utcnow().isoformat()}\n")
         
-        # Run update script with --check-only flag
-        result = await asyncio.to_thread(
-            subprocess.run,
-            ["bash", str(script_path), "--check-only"],
-            capture_output=True,
-            text=True,
-            cwd="/app",
-            timeout=120  # 2 minutes timeout
+        logger.info(
+            "Update check signal created, waiting for host to process",
+            extra={"request_id": request_id}
         )
         
-        if result.returncode != 0:
-            logger.warning(
-                f"Update check returned non-zero: {result.returncode}",
-                extra={"request_id": request_id, "stderr": result.stderr}
-            )
+        # Wait for host to process the signal (poll for up to 30 seconds)
+        max_wait = 30
+        poll_interval = 0.5
+        waited = 0
         
-        # Read the freshly updated versions file
-        version_file_path = Path("/app/.versions.json")
+        while waited < max_wait:
+            await asyncio.sleep(poll_interval)
+            waited += poll_interval
+            
+            # Check if signal file was removed (host processed it)
+            if not signal_path.exists():
+                break
+            
+            # Check if .versions.json was updated
+            if version_file_path.exists():
+                try:
+                    with open(version_file_path, 'r') as f:
+                        current_data = json.load(f)
+                        new_check_time = current_data.get("last_check")
+                        if new_check_time and new_check_time != old_check_time:
+                            # Versions file was updated
+                            break
+                except Exception:
+                    pass
+        
+        # Clean up signal file if it still exists
+        try:
+            signal_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        
+        # Read the versions file
         if version_file_path.exists():
             with open(version_file_path, 'r') as f:
                 version_data = json.load(f)
+                new_check_time = version_data.get("last_check")
+                was_updated = new_check_time != old_check_time
+                
                 return {
                     "update_available": version_data.get("update_available", False),
-                    "last_check": version_data.get("last_check"),
+                    "last_check": new_check_time,
                     "repositories": version_data.get("repositories", {}),
-                    "fresh_check": True
+                    "fresh_check": was_updated
                 }
         else:
             return {
                 "update_available": False,
-                "error": "Version file not created",
-                "message": "Update check ran but no version file was created"
+                "error": "Version file not found",
+                "message": "No version information available"
             }
             
-    except subprocess.TimeoutExpired:
-        logger.error("Update check timed out", extra={"request_id": request_id})
-        return {
-            "update_available": False,
-            "error": "Update check timed out",
-            "message": "The update check took too long"
-        }
     except Exception as e:
         logger.error(
             f"Failed to check for updates: {str(e)}",
