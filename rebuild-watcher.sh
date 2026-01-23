@@ -44,10 +44,49 @@ log() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
 }
 
+# Ensure required files exist and have correct permissions before Docker operations
+prepare_for_docker() {
+    cd "$SCRIPT_DIR"
+    
+    # Ensure required files exist as files (not directories)
+    for file in ".versions.json" ".rebuild-needed"; do
+        if [ -d "$SCRIPT_DIR/$file" ]; then
+            rm -rf "$SCRIPT_DIR/$file"
+        fi
+    done
+    
+    [ ! -f "$SCRIPT_DIR/.versions.json" ] && echo '{}' > "$SCRIPT_DIR/.versions.json"
+    [ ! -f "$SCRIPT_DIR/.rebuild-needed" ] && touch "$SCRIPT_DIR/.rebuild-needed"
+    
+    # Pre-create directories so Docker doesn't create them as root
+    mkdir -p "$SCRIPT_DIR/data" "$SCRIPT_DIR/logs"
+}
+
+# Fix permissions after Docker operations (needed when using sudo)
+fix_permissions() {
+    cd "$SCRIPT_DIR"
+    
+    # Get the owner of the script directory (should be the real user)
+    local dir_owner
+    dir_owner=$(stat -c '%u:%g' "$SCRIPT_DIR" 2>/dev/null || stat -f '%u:%g' "$SCRIPT_DIR" 2>/dev/null)
+    
+    if [ -n "$dir_owner" ]; then
+        # Fix ownership of files that Docker might have created as root
+        for item in data logs .versions.json .rebuild-needed meticulous-source meticai-web; do
+            if [ -e "$SCRIPT_DIR/$item" ]; then
+                sudo chown -R "$dir_owner" "$SCRIPT_DIR/$item" 2>/dev/null || true
+            fi
+        done
+    fi
+}
+
 do_rebuild() {
     log "${YELLOW}Rebuild requested - starting container rebuild...${NC}"
     
     cd "$SCRIPT_DIR"
+    
+    # Prepare files before Docker runs
+    prepare_for_docker
     
     # Check if docker compose is available (use full paths for launchd compatibility)
     # Common Docker paths on macOS
@@ -77,6 +116,10 @@ do_rebuild() {
     log "Rebuilding containers..."
     if $COMPOSE_CMD up -d --build 2>&1 | tee -a "$LOG_FILE"; then
         log "${GREEN}✓ Containers rebuilt successfully${NC}"
+        
+        # Fix permissions after Docker operations
+        fix_permissions
+        
         # Clear the file contents but keep the file (Docker needs it to exist for mount)
         echo "" > "$REBUILD_FLAG"
         

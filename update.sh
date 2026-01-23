@@ -744,10 +744,22 @@ REBUILD_EOF
             echo -e "${YELLOW}Warning: Failed to stop containers (they may not be running)${NC}"
         fi
         
+        # Pre-create directories so Docker doesn't create them as root
+        mkdir -p "$SCRIPT_DIR/data" "$SCRIPT_DIR/logs"
+        
         # Rebuild and start
         echo "Building and starting containers..."
         if $SUDO_PREFIX $COMPOSE_CMD up -d --build; then
             echo -e "${GREEN}✓ Containers rebuilt and started${NC}"
+            
+            # Fix permissions if we used sudo
+            if [ -n "$SUDO_PREFIX" ]; then
+                echo "Fixing file ownership..."
+                sudo chown -R "$(id -u):$(id -g)" "$SCRIPT_DIR/data" "$SCRIPT_DIR/logs" \
+                    "$SCRIPT_DIR/.versions.json" "$SCRIPT_DIR/.rebuild-needed" \
+                    "$SCRIPT_DIR/meticulous-source" "$SCRIPT_DIR/meticai-web" 2>/dev/null || true
+            fi
+            
             return 0
         else
             echo -e "${RED}✗ Failed to rebuild containers${NC}"
