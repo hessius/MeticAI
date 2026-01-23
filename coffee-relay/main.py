@@ -588,6 +588,89 @@ async def analyze_and_profile(
             "message": str(e)
         }
 
+@app.post("/api/check-updates")
+async def check_updates(request: Request):
+    """Trigger a fresh update check by running update.sh --check-only.
+    
+    This endpoint runs the update check script and returns the fresh results.
+    Unlike GET /status which reads cached data, this performs an actual git fetch.
+    
+    Returns:
+        - update_available: Whether updates are available for any component
+        - last_check: Timestamp of this check
+        - repositories: Status of each repository (main, mcp, web)
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Triggering fresh update check",
+            extra={"request_id": request_id, "endpoint": "/api/check-updates"}
+        )
+        
+        script_path = Path("/app/update.sh")
+        
+        if not script_path.exists():
+            return {
+                "update_available": False,
+                "error": "Update script not found",
+                "message": "update.sh not mounted in container"
+            }
+        
+        # Run update script with --check-only flag
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ["bash", str(script_path), "--check-only"],
+            capture_output=True,
+            text=True,
+            cwd="/app",
+            timeout=120  # 2 minutes timeout
+        )
+        
+        if result.returncode != 0:
+            logger.warning(
+                f"Update check returned non-zero: {result.returncode}",
+                extra={"request_id": request_id, "stderr": result.stderr}
+            )
+        
+        # Read the freshly updated versions file
+        version_file_path = Path("/app/.versions.json")
+        if version_file_path.exists():
+            with open(version_file_path, 'r') as f:
+                version_data = json.load(f)
+                return {
+                    "update_available": version_data.get("update_available", False),
+                    "last_check": version_data.get("last_check"),
+                    "repositories": version_data.get("repositories", {}),
+                    "fresh_check": True
+                }
+        else:
+            return {
+                "update_available": False,
+                "error": "Version file not created",
+                "message": "Update check ran but no version file was created"
+            }
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Update check timed out", extra={"request_id": request_id})
+        return {
+            "update_available": False,
+            "error": "Update check timed out",
+            "message": "The update check took too long"
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to check for updates: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        return {
+            "update_available": False,
+            "error": str(e),
+            "message": "Failed to check for updates"
+        }
+
+
 @app.get("/status")
 async def get_status(request: Request):
     """Get system status including update availability.
