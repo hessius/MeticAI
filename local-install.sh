@@ -1265,12 +1265,32 @@ if [ ! -f ".versions.json" ]; then
     echo '{}' > .versions.json
 fi
 
+# Ensure .rebuild-needed exists as a file for the trigger-update endpoint
+if [ -d ".rebuild-needed" ]; then
+    rm -rf .rebuild-needed
+fi
+if [ ! -f ".rebuild-needed" ]; then
+    touch .rebuild-needed
+fi
+
+# Pre-create directories that Docker would otherwise create as root
+# This ensures proper ownership for the current user
+mkdir -p data logs
+echo -e "${GREEN}✓ Data directories created with correct ownership${NC}"
+
 # Stop existing containers if running (safety net in case any were missed earlier)
 # This handles edge cases where containers might have been started after detection
 sudo docker compose down 2>/dev/null || true
 
 # Build and start
 if sudo docker compose up -d --build; then
+    # Fix ownership of any files created by Docker running as root
+    # This is needed because sudo docker compose creates files as root
+    echo "Fixing file ownership..."
+    sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed 2>/dev/null || true
+    # Also fix git directories in case they were affected
+    sudo chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
+    
     echo ""
     echo -e "${GREEN}=========================================${NC}"
     echo -e "${GREEN}      🎉 Installation Complete! 🎉       ${NC}"
