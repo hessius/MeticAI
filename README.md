@@ -6,7 +6,9 @@
 
 ### Your AI Barista Coach for the Meticulous Espresso Machine
 
-*Create, profile and understand your espresso. Take a photo or describe your coffee. Get a perfect espresso recipe. Automatically.*
+*Create, profile and understand your espresso.*
+*1. Take a photo or describe your coffee. Get a perfect espresso profile. Automatically.*
+*2. Understand your profiles, shot graphs by enabling shot comparison, analysis and AI-coaching*
 
 [Get Started](#-quick-start) • [Features](#-what-it-does) • [Web Interface](#-using-meticai) • [Updates](UPDATE_GUIDE.md)
 
