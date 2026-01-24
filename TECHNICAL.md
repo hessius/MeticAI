@@ -265,6 +265,4 @@ The barista persona understands modern espresso techniques and will create profi
 
 ## Attribution & Credits
 
-This project builds upon the excellent work of **@manonstreet** and their [Meticulous MCP](https://github.com/manonstreet/meticulous-mcp) project. The Meticulous MCP server provides the essential interface for controlling the Meticulous Espresso Machine programmatically.
-
-We are grateful for their contribution to the community and for making their work available for others to build upon.
+MeticAI is built on the excellent Meticulous MCP project by twchad and its containerized fork by @manonstreet, which provides the essential interface for controlling the Meticulous Espresso Machine.
