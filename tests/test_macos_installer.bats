@@ -173,7 +173,7 @@ README_FILE="$INSTALLER_DIR/README.md"
 }
 
 @test "README contains distribution instructions" {
-    run grep -q "Creating a DMG for Distribution" "$README_FILE"
+    run grep -q "Creating DMG files for Distribution" "$README_FILE"
     [ "$status" -eq 0 ]
 }
 
@@ -229,9 +229,9 @@ README_FILE="$INSTALLER_DIR/README.md"
 
 # --- Configuration Validation Tests ---
 
-@test "wrapper script uses correct web_install.sh URL" {
-    # Verify it uses the main branch
-    run grep -q "main/web_install.sh" "$WRAPPER_SCRIPT"
+@test "wrapper script uses local-install.sh for installation" {
+    # Verify it delegates to local-install.sh with non-interactive mode
+    run grep -q "local-install.sh" "$WRAPPER_SCRIPT"
     [ "$status" -eq 0 ]
 }
 
