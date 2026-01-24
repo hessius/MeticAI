@@ -140,7 +140,15 @@ do_rebuild() {
         return 1
     fi
     
-    COMPOSE_CMD="$DOCKER_CMD compose"
+    # On Linux, we may need sudo for docker commands
+    SUDO_PREFIX=""
+    if [[ "$OSTYPE" == "linux"* ]]; then
+        if ! "$DOCKER_CMD" info &> /dev/null; then
+            SUDO_PREFIX="sudo"
+        fi
+    fi
+    
+    COMPOSE_CMD="$SUDO_PREFIX $DOCKER_CMD compose"
     
     # Rebuild containers
     log "Rebuilding containers..."
