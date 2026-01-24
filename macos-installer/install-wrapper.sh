@@ -16,6 +16,20 @@
 # Exit on error
 set -e
 
+# Debug log file - persistent for troubleshooting
+DEBUG_LOG="$HOME/Desktop/MeticAI_Installer_Debug.log"
+echo "=== MeticAI Installer Debug Log ===" > "$DEBUG_LOG"
+echo "Started at: $(date)" >> "$DEBUG_LOG"
+echo "Script: $0" >> "$DEBUG_LOG"
+echo "" >> "$DEBUG_LOG"
+
+# Debug function
+debug_log() {
+    echo "[$(date '+%H:%M:%S')] $1" >> "$DEBUG_LOG"
+}
+
+debug_log "Script starting..."
+
 # Set PATH to ensure we can find Docker and other tools
 # Docker Desktop installs to /Applications/Docker.app
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
@@ -583,24 +597,33 @@ EOF
 
 # Main installation flow
 main() {
+    debug_log "main() started"
     log_message "Starting MeticAI macOS Installer (Fully GUI mode)"
     
     # Show welcome dialog
+    debug_log "Calling show_welcome()"
     if ! show_welcome; then
+        debug_log "show_welcome() returned false - user cancelled"
         log_message "Installation cancelled by user"
         exit 0
     fi
+    debug_log "show_welcome() completed successfully"
     
     # Check prerequisites
+    debug_log "Calling check_prerequisites()"
     log_message "Checking prerequisites..."
     check_prerequisites
+    debug_log "check_prerequisites() completed"
     
     # Get installation directory
+    debug_log "Calling get_install_directory()"
     log_message "Getting installation directory..."
     show_progress "Getting installation location..."
     INSTALL_DIR=$(get_install_directory)
+    debug_log "get_install_directory() returned: $INSTALL_DIR"
     
     if [ -z "$INSTALL_DIR" ]; then
+        debug_log "ERROR: No installation directory selected"
         log_error "No installation directory selected"
         exit 1
     fi
@@ -608,37 +631,30 @@ main() {
     log_message "Installation directory: $INSTALL_DIR"
     
     # Get API key
+    debug_log "Calling get_api_key()"
     show_progress "Collecting configuration..."
     GEMINI_API_KEY=$(get_api_key)
+    debug_log "get_api_key() returned (length: ${#GEMINI_API_KEY})"
     log_message "API key collected"
     
     # Get Meticulous IP
+    debug_log "Calling get_meticulous_ip()"
     METICULOUS_IP=$(get_meticulous_ip)
+    debug_log "get_meticulous_ip() returned: $METICULOUS_IP"
     log_message "Meticulous IP: $METICULOUS_IP"
     
     # Get Server IP
+    debug_log "Calling get_server_ip()"
     SERVER_IP=$(get_server_ip)
+    debug_log "get_server_ip() returned: $SERVER_IP"
     log_message "Server IP: $SERVER_IP"
     
-    # Show installation starting dialog
-    osascript <<EOF &
-tell application "System Events"
-    activate
-    display dialog "Starting Installation
-
-MeticAI will now be installed with the following configuration:
-
-Location: $INSTALL_DIR
-Server IP: $SERVER_IP
-Meticulous IP: $METICULOUS_IP
-
-The installation will run in the background and may take several minutes.
-
-Please click OK and wait for the installation to complete." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer" giving up after 10
-end tell
-EOF
+    # Show installation starting dialog - use simple text to avoid variable issues
+    debug_log "Showing 'Starting Installation' dialog"
+    osascript -e 'tell application "System Events" to display dialog "Starting Installation\n\nMeticAI is now being installed. This may take several minutes.\n\nPlease wait..." buttons {"OK"} default button "OK" with icon note giving up after 5' &
     
     sleep 2
+    debug_log "Creating parent directory..."
     
     # Create parent directory if needed
     PARENT_DIR=$(dirname "$INSTALL_DIR")
@@ -646,102 +662,53 @@ EOF
         log_message "Creating parent directory: $PARENT_DIR"
         mkdir -p "$PARENT_DIR"
     fi
+    debug_log "Parent directory ready: $PARENT_DIR"
     
     # Run installation in background
+    debug_log "Starting run_installation..."
     log_message "Running installation..."
     show_progress "Installing MeticAI..."
     
     # Create temporary directory for installation logs
     INSTALL_LOG=$(mktemp)
+    debug_log "Install log: $INSTALL_LOG"
     trap 'rm -f "$INSTALL_LOG"' EXIT INT TERM
     
-    # Run the installation silently
-    if run_installation "$INSTALL_DIR" "$GEMINI_API_KEY" "$METICULOUS_IP" "$SERVER_IP" > "$INSTALL_LOG" 2>&1; then
+    # Run the installation - capture output AND show it in debug log
+    debug_log "Calling run_installation with:"
+    debug_log "  install_dir: $INSTALL_DIR"
+    debug_log "  api_key length: ${#GEMINI_API_KEY}"
+    debug_log "  meticulous_ip: $METICULOUS_IP"
+    debug_log "  server_ip: $SERVER_IP"
+    
+    if run_installation "$INSTALL_DIR" "$GEMINI_API_KEY" "$METICULOUS_IP" "$SERVER_IP" 2>&1 | tee "$INSTALL_LOG" | while read line; do debug_log "INSTALL: $line"; done; then
+        debug_log "run_installation completed successfully"
         log_message "Installation completed successfully"
         
-        # Show success dialog with custom icon
-        if [ -n "$ICON_PATH" ]; then
-            osascript <<EOF
-tell application "System Events"
-    activate
-    set iconPath to POSIX file "$ICON_PATH"
-    display dialog "Installation Complete! ✓
-
-MeticAI has been successfully installed!
-
-🌐 Web Interface:
-   http://$SERVER_IP:3550
-
-📱 You can access this from any device on your network.
-
-☕️ Start using MeticAI:
-   1. Open the web interface in your browser
-   2. Upload a photo of your coffee bag
-   3. Let AI create the perfect espresso profile!
-
-The web interface should open automatically in a moment." buttons {"OK"} default button "OK" with icon file iconPath with title "MeticAI Installer"
-end tell
-EOF
-        else
-            osascript <<EOF
-tell application "System Events"
-    activate
-    display dialog "Installation Complete! ✓
-
-MeticAI has been successfully installed!
-
-🌐 Web Interface:
-   http://$SERVER_IP:3550
-
-📱 You can access this from any device on your network.
-
-☕️ Start using MeticAI:
-   1. Open the web interface in your browser
-   2. Upload a photo of your coffee bag
-   3. Let AI create the perfect espresso profile!
-
-The web interface should open automatically in a moment." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer"
-end tell
-EOF
-        fi
+        # Show simple success dialog to avoid variable interpolation issues
+        debug_log "Showing success dialog"
+        osascript -e 'tell application "System Events" to display dialog "Installation Complete!\n\nMeticAI has been successfully installed.\n\nThe web interface will open in your browser." buttons {"OK"} default button "OK" with icon note'
         
         # Open web interface
+        debug_log "Opening web interface: http://$SERVER_IP:3550"
         sleep 2
         open "http://$SERVER_IP:3550" 2>/dev/null || true
         
     else
+        debug_log "run_installation FAILED"
         log_error "Installation failed"
         
-        # Show error dialog
-        local error_details=$(tail -20 "$INSTALL_LOG" | sed 's/"/\\"/g')
-        osascript <<EOF
-tell application "System Events"
-    activate
-    display dialog "Installation Failed
-
-An error occurred during installation.
-
-Please check the installation log for details:
-$INSTALL_LOG
-
-You can try:
-• Ensuring Docker Desktop is running
-• Checking your internet connection
-• Running the installer again
-
-Last error lines:
-${error_details:0:200}
-
-Would you like to view the full log?" buttons {"Close", "View Log"} default button "View Log" with icon stop with title "MeticAI Installer"
-    
-    if button returned of result is "View Log" then
-        do shell script "open -a Console '$INSTALL_LOG'"
-    end if
-end tell
-EOF
+        # Copy install log to debug log
+        debug_log "=== INSTALL LOG CONTENTS ==="
+        cat "$INSTALL_LOG" >> "$DEBUG_LOG" 2>/dev/null || true
+        debug_log "=== END INSTALL LOG ==="
+        
+        # Show simple error dialog
+        osascript -e 'tell application "System Events" to display dialog "Installation Failed\n\nPlease check ~/Desktop/MeticAI_Installer_Debug.log for details." buttons {"OK"} default button "OK" with icon stop'
         exit 1
     fi
     
+    debug_log "Installation completed successfully"
     log_message "macOS Installer completed successfully"
 }
 
