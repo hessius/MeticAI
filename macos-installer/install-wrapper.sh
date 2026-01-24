@@ -23,8 +23,19 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/Docker.a
 # Get icon path for dialogs - set globally at startup
 get_icon_path() {
     # Try to find the app bundle we're running from
-    if [[ "$0" == *"/Contents/MacOS/"* ]]; then
-        # We're running from inside an app bundle
+    # Platypus bundles script in Contents/Resources/script
+    # Manual bundles put it in Contents/MacOS/
+    if [[ "$0" == *"/Contents/Resources/"* ]]; then
+        # Platypus bundle - script is in Contents/Resources/script
+        local bundle_path=$(echo "$0" | sed 's|/Contents/Resources/.*||')
+        local icon_path="$bundle_path/Contents/Resources/AppIcon.icns"
+        
+        if [ -f "$icon_path" ]; then
+            echo "$icon_path"
+            return
+        fi
+    elif [[ "$0" == *"/Contents/MacOS/"* ]]; then
+        # Manual bundle - script is in Contents/MacOS/
         local bundle_path=$(echo "$0" | sed 's|/Contents/MacOS/.*||')
         local icon_path="$bundle_path/Contents/Resources/AppIcon.icns"
         
@@ -40,6 +51,22 @@ get_icon_path() {
 
 # Set global icon path at startup
 ICON_PATH=$(get_icon_path)
+
+# Get the Resources directory for bundled files (Platypus bundles files there)
+get_resource_dir() {
+    if [[ "$0" == *"/Contents/Resources/"* ]]; then
+        # Platypus bundle - bundled files are in Contents/Resources/
+        echo "$0" | sed 's|/Contents/Resources/.*|/Contents/Resources|'
+    elif [[ "$0" == *"/Contents/MacOS/"* ]]; then
+        # Manual bundle - bundled files would be in Contents/Resources/
+        echo "$0" | sed 's|/Contents/MacOS/.*|/Contents/Resources|'
+    else
+        echo ""
+    fi
+}
+
+# Set global resource directory at startup
+SCRIPT_RESOURCE_DIR=$(get_resource_dir)
 
 # Logging functions - use >&2 to avoid capturing in command substitution
 log_message() {
@@ -221,14 +248,17 @@ EOF
 get_install_directory() {
     local default_dir="$HOME/MeticAI"
     
-    local install_dir=$(osascript <<EOF
+    local install_dir
+    if [ -n "$ICON_PATH" ]; then
+        install_dir=$(osascript <<EOF
 tell application "System Events"
     activate
+    set iconPath to POSIX file "$ICON_PATH"
     set dialogResult to display dialog "Choose Installation Location
 
 Where would you like to install MeticAI?
 
-Default: $default_dir" default answer "$default_dir" buttons {"Cancel", "Choose Folder", "Use Default"} default button "Use Default" with title "MeticAI Installer"
+Default: $default_dir" default answer "$default_dir" buttons {"Cancel", "Choose Folder", "Use Default"} default button "Use Default" with icon file iconPath with title "MeticAI Installer"
     
     set installPath to text returned of dialogResult
     set buttonPressed to button returned of dialogResult
@@ -242,6 +272,29 @@ Default: $default_dir" default answer "$default_dir" buttons {"Cancel", "Choose 
 end tell
 EOF
 )
+    else
+        install_dir=$(osascript <<EOF
+tell application "System Events"
+    activate
+    set dialogResult to display dialog "Choose Installation Location
+
+Where would you like to install MeticAI?
+
+Default: $default_dir" default answer "$default_dir" buttons {"Cancel", "Choose Folder", "Use Default"} default button "Use Default" with icon note with title "MeticAI Installer"
+    
+    set installPath to text returned of dialogResult
+    set buttonPressed to button returned of dialogResult
+    
+    if buttonPressed is "Choose Folder" then
+        set selectedFolder to POSIX path of (choose folder with prompt "Select installation folder:")
+        set installPath to selectedFolder & "MeticAI"
+    end if
+    
+    return installPath
+end tell
+EOF
+)
+    fi
     
     echo "$install_dir"
 }
@@ -252,16 +305,19 @@ get_api_key() {
     local continue_input=false
     
     while [ -z "$api_key" ]; do
-        local result=$(osascript <<EOF
+        local result
+        if [ -n "$ICON_PATH" ]; then
+            result=$(osascript <<EOF
 tell application "System Events"
     activate
+    set iconPath to POSIX file "$ICON_PATH"
     set dialogResult to display dialog "Google Gemini API Key
 
 Please enter your Google Gemini API Key.
 
 This key is required for MeticAI to function.
 
-Click 'Get API Key' to open the Google AI Studio page in your browser." default answer "" buttons {"Cancel", "Get API Key", "Continue"} default button "Continue" with title "MeticAI Installer" with hidden answer
+Click 'Get API Key' to open the Google AI Studio page in your browser." default answer "" buttons {"Cancel", "Get API Key", "Continue"} default button "Continue" with icon file iconPath with title "MeticAI Installer" with hidden answer
     
     set buttonPressed to button returned of dialogResult
     set apiKey to text returned of dialogResult
@@ -270,6 +326,26 @@ Click 'Get API Key' to open the Google AI Studio page in your browser." default 
 end tell
 EOF
 )
+        else
+            result=$(osascript <<'EOF'
+tell application "System Events"
+    activate
+    set dialogResult to display dialog "Google Gemini API Key
+
+Please enter your Google Gemini API Key.
+
+This key is required for MeticAI to function.
+
+Click 'Get API Key' to open the Google AI Studio page in your browser." default answer "" buttons {"Cancel", "Get API Key", "Continue"} default button "Continue" with icon note with title "MeticAI Installer" with hidden answer
+    
+    set buttonPressed to button returned of dialogResult
+    set apiKey to text returned of dialogResult
+    
+    return buttonPressed & "|" & apiKey
+end tell
+EOF
+)
+        fi
         
         local button=$(echo "$result" | cut -d'|' -f1)
         local key=$(echo "$result" | cut -d'|' -f2-)
@@ -308,12 +384,26 @@ scan_for_meticulous() {
     local devices=()
     
     # Use dns-sd to discover Meticulous devices (timeout after 3 seconds)
+    # Note: macOS doesn't have 'timeout' command, so we use background + sleep + kill
     if command -v dns-sd &>/dev/null; then
         log_message "Scanning for Meticulous devices via Bonjour..." >&2
         
         # Run dns-sd in background and capture output
-        local dns_output
-        dns_output=$(timeout 3 dns-sd -B _http._tcp local 2>/dev/null || true)
+        local dns_output=""
+        local tmpfile=$(mktemp)
+        
+        # Start dns-sd in background, writing to temp file
+        dns-sd -B _http._tcp local > "$tmpfile" 2>/dev/null &
+        local dns_pid=$!
+        
+        # Wait 3 seconds then kill
+        sleep 3
+        kill $dns_pid 2>/dev/null || true
+        wait $dns_pid 2>/dev/null || true
+        
+        # Read the output
+        dns_output=$(cat "$tmpfile" 2>/dev/null || true)
+        rm -f "$tmpfile"
         
         # Look for meticulous in the output
         if echo "$dns_output" | grep -qi "meticulous"; then
@@ -347,21 +437,15 @@ get_meticulous_ip() {
         local hostname=$(echo "$detected_device" | cut -d',' -f1)
         local ip=$(echo "$detected_device" | cut -d',' -f2)
         
-        # Ask user if they want to use the detected device
-        local response=$(osascript <<EOF
-tell application "System Events"
-    activate
-    set buttonReturned to button returned of (display dialog "Meticulous Machine Found!
-
-Detected: $hostname
-IP Address: $ip
-
-Would you like to use this machine?" buttons {"Use Different", "Use This"} default button "Use This" with title "MeticAI Installer")
-    
-    return buttonReturned
-end tell
-EOF
-)
+        # Ask user if they want to use the detected device - use static hostname/ip to avoid AppleScript issues
+        local dialog_hostname="$hostname"
+        local dialog_ip="$ip"
+        local response
+        if [ -n "$ICON_PATH" ]; then
+            response=$(osascript -e "tell application \"System Events\"" -e "activate" -e "set iconPath to POSIX file \"$ICON_PATH\"" -e "set buttonReturned to button returned of (display dialog \"Meticulous Machine Found!\n\nDetected: $dialog_hostname\nIP Address: $dialog_ip\n\nWould you like to use this machine?\" buttons {\"Use Different\", \"Use This\"} default button \"Use This\" with icon file iconPath with title \"MeticAI Installer\")" -e "return buttonReturned" -e "end tell")
+        else
+            response=$(osascript -e "tell application \"System Events\"" -e "activate" -e "set buttonReturned to button returned of (display dialog \"Meticulous Machine Found!\n\nDetected: $dialog_hostname\nIP Address: $dialog_ip\n\nWould you like to use this machine?\" buttons {\"Use Different\", \"Use This\"} default button \"Use This\" with icon note with title \"MeticAI Installer\")" -e "return buttonReturned" -e "end tell")
+        fi
         
         if [ "$response" = "Use This" ]; then
             echo "$ip"
@@ -370,7 +454,25 @@ EOF
     fi
     
     # Manual input if not auto-detected or user chose different
-    met_ip=$(osascript <<EOF
+    if [ -n "$ICON_PATH" ]; then
+        met_ip=$(osascript <<EOF
+tell application "System Events"
+    activate
+    set iconPath to POSIX file "$ICON_PATH"
+    set metIP to text returned of (display dialog "Meticulous Machine IP Address
+
+Please enter the IP address of your Meticulous Espresso Machine.
+
+Example: 192.168.1.100
+
+You can find this in your machine's network settings or router." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with icon file iconPath with title "MeticAI Installer")
+    
+    return metIP
+end tell
+EOF
+)
+    else
+        met_ip=$(osascript <<EOF
 tell application "System Events"
     activate
     set metIP to text returned of (display dialog "Meticulous Machine IP Address
@@ -379,12 +481,13 @@ Please enter the IP address of your Meticulous Espresso Machine.
 
 Example: 192.168.1.100
 
-You can find this in your machine's network settings or router." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with title "MeticAI Installer")
+You can find this in your machine's network settings or router." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with icon note with title "MeticAI Installer")
     
     return metIP
 end tell
 EOF
 )
+    fi
     
     # Validate not empty
     if [ -z "$met_ip" ]; then
@@ -666,6 +769,13 @@ run_installation() {
     
     echo "PROGRESS:15"
     echo "Running installer..."
+    
+    # Use bundled local-install.sh if available (has non-interactive fixes)
+    if [ -n "$SCRIPT_RESOURCE_DIR" ] && [ -f "$SCRIPT_RESOURCE_DIR/local-install.sh" ]; then
+        echo "Using bundled installer script from $SCRIPT_RESOURCE_DIR"
+        cp "$SCRIPT_RESOURCE_DIR/local-install.sh" "$install_dir/local-install.sh"
+        chmod +x "$install_dir/local-install.sh"
+    fi
     
     # Export environment variables for non-interactive mode
     export METICAI_NON_INTERACTIVE=true
