@@ -223,15 +223,18 @@ get_install_directory() {
     local install_dir=$(osascript <<EOF
 tell application "System Events"
     activate
-    set installPath to text returned of (display dialog "Choose Installation Location
+    set dialogResult to display dialog "Choose Installation Location
 
 Where would you like to install MeticAI?
 
-Default: $default_dir" default answer "$default_dir" buttons {"Cancel", "Choose Folder", "Use Default"} default button "Use Default" with title "MeticAI Installer")
+Default: $default_dir" default answer "$default_dir" buttons {"Cancel", "Choose Folder", "Use Default"} default button "Use Default" with title "MeticAI Installer"
     
-    if button returned of result is "Choose Folder" then
-        set installPath to POSIX path of (choose folder with prompt "Select installation folder:")
-        set installPath to installPath & "MeticAI"
+    set installPath to text returned of dialogResult
+    set buttonPressed to button returned of dialogResult
+    
+    if buttonPressed is "Choose Folder" then
+        set selectedFolder to POSIX path of (choose folder with prompt "Select installation folder:")
+        set installPath to selectedFolder & "MeticAI"
     end if
     
     return installPath
