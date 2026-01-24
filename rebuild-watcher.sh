@@ -103,9 +103,11 @@ do_update_check() {
 }
 
 check_update_check_needed() {
-    if [ -f "$UPDATE_CHECK_FLAG" ] && [ -s "$UPDATE_CHECK_FLAG" ]; then
-        # File exists and is not empty
-        return 0
+    if [ -f "$UPDATE_CHECK_FLAG" ]; then
+        # File exists - check if it has non-whitespace content
+        if grep -q '[^[:space:]]' "$UPDATE_CHECK_FLAG" 2>/dev/null; then
+            return 0
+        fi
     fi
     return 1
 }
@@ -174,9 +176,11 @@ do_rebuild() {
 }
 
 check_rebuild_needed() {
-    if [ -f "$REBUILD_FLAG" ] && [ -s "$REBUILD_FLAG" ]; then
-        # File exists and is not empty
-        return 0
+    if [ -f "$REBUILD_FLAG" ]; then
+        # File exists - check if it has non-whitespace content
+        if grep -q '[^[:space:]]' "$REBUILD_FLAG" 2>/dev/null; then
+            return 0
+        fi
     fi
     return 1
 }
