@@ -54,6 +54,8 @@ services:
       - ./.rebuild-needed:/app/.rebuild-needed
       # Mount update check signal file for host-side watcher
       - ./.update-check-requested:/app/.update-check-requested
+      # Mount full update signal file for host-side watcher
+      - ./.update-requested:/app/.update-requested
       # Mount logs directory for persistent log storage
       - ./logs:/app/logs
       # Mount data directory for profile history
