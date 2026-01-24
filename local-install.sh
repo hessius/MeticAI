@@ -437,8 +437,16 @@ install_rebuild_watcher() {
     # Ensure the script is executable
     chmod +x "$watcher_script"
     
-    # Create empty rebuild-needed file for Docker mount
+    # Create empty signal files for Docker mount
     touch "${script_dir}/.rebuild-needed"
+    touch "${script_dir}/.update-check-requested"
+    
+    # Configure git safe.directory for root (needed when systemd runs as root)
+    # This prevents "dubious ownership" errors
+    echo -e "${BLUE}Configuring git safe directories for systemd...${NC}"
+    sudo git config --global --add safe.directory "${script_dir}" 2>/dev/null || true
+    sudo git config --global --add safe.directory "${script_dir}/meticulous-source" 2>/dev/null || true
+    sudo git config --global --add safe.directory "${script_dir}/meticai-web" 2>/dev/null || true
     
     # Run the install command
     if "$watcher_script" --install; then
