@@ -758,9 +758,9 @@ async def get_status(request: Request):
 async def trigger_update(request: Request):
     """Trigger the backend update process by signaling the host.
     
-    This endpoint writes a timestamp to /app/.rebuild-needed which is mounted
-    from the host. The host's launchd service (rebuild-watcher) monitors this
-    file and runs update.sh when it changes.
+    This endpoint writes a timestamp to /app/.update-requested which is mounted
+    from the host. The host's systemd/launchd service (rebuild-watcher) monitors this
+    file and runs update.sh --auto when it changes, which pulls updates AND rebuilds.
     
     The update cannot run inside the container because:
     1. Docker mounts create git conflicts (files appear modified)
@@ -778,22 +778,22 @@ async def trigger_update(request: Request):
             extra={"request_id": request_id, "endpoint": "/api/trigger-update"}
         )
         
-        # Signal the host to perform the update by touching .rebuild-needed
-        # This file is watched by launchd on the host (rebuild-watcher.sh)
-        rebuild_signal = Path("/app/.rebuild-needed")
+        # Signal the host to perform the full update (git pull + rebuild)
+        # This file is watched by systemd/launchd on the host (rebuild-watcher.sh)
+        update_signal = Path("/app/.update-requested")
         
         # Write a timestamp to trigger the file change
         import time
-        rebuild_signal.write_text(f"update-requested:{time.time()}\n")
+        update_signal.write_text(f"update-requested:{time.time()}\n")
         
         logger.info(
-            "Update triggered - signaled host via .rebuild-needed",
+            "Update triggered - signaled host via .update-requested",
             extra={"request_id": request_id}
         )
         
         return {
             "status": "success",
-            "message": "Update triggered. The host will perform the update and restart containers."
+            "message": "Update triggered. The host will pull updates and restart containers."
         }
     except Exception as e:
         logger.error(

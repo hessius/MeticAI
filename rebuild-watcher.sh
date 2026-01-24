@@ -31,6 +31,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REBUILD_FLAG="$SCRIPT_DIR/.rebuild-needed"
 UPDATE_CHECK_FLAG="$SCRIPT_DIR/.update-check-requested"
+UPDATE_REQUESTED_FLAG="$SCRIPT_DIR/.update-requested"
 LOG_FILE="$SCRIPT_DIR/.rebuild-watcher.log"
 
 # Set up PATH for launchd environment (needed for Docker credential helpers)
@@ -50,7 +51,7 @@ prepare_for_docker() {
     cd "$SCRIPT_DIR"
     
     # Ensure required files exist as files (not directories)
-    for file in ".versions.json" ".rebuild-needed" ".update-check-requested"; do
+    for file in ".versions.json" ".rebuild-needed" ".update-check-requested" ".update-requested"; do
         if [ -d "$SCRIPT_DIR/$file" ]; then
             rm -rf "$SCRIPT_DIR/$file"
         fi
@@ -59,6 +60,7 @@ prepare_for_docker() {
     [ ! -f "$SCRIPT_DIR/.versions.json" ] && echo '{}' > "$SCRIPT_DIR/.versions.json"
     [ ! -f "$SCRIPT_DIR/.rebuild-needed" ] && touch "$SCRIPT_DIR/.rebuild-needed"
     [ ! -f "$SCRIPT_DIR/.update-check-requested" ] && touch "$SCRIPT_DIR/.update-check-requested"
+    [ ! -f "$SCRIPT_DIR/.update-requested" ] && touch "$SCRIPT_DIR/.update-requested"
     
     # Pre-create directories so Docker doesn't create them as root
     mkdir -p "$SCRIPT_DIR/data" "$SCRIPT_DIR/logs"
@@ -74,12 +76,42 @@ fix_permissions() {
     
     if [ -n "$dir_owner" ]; then
         # Fix ownership of files that Docker might have created as root
-        for item in data logs .versions.json .rebuild-needed .update-check-requested meticulous-source meticai-web; do
+        for item in data logs .versions.json .rebuild-needed .update-check-requested .update-requested meticulous-source meticai-web; do
             if [ -e "$SCRIPT_DIR/$item" ]; then
                 sudo chown -R "$dir_owner" "$SCRIPT_DIR/$item" 2>/dev/null || true
             fi
         done
     fi
+}
+
+# Handle full update request (triggered by trigger-update API endpoint)
+do_full_update() {
+    log "${YELLOW}Full update requested by UI - pulling updates and rebuilding...${NC}"
+    
+    cd "$SCRIPT_DIR"
+    
+    if [ -x "$SCRIPT_DIR/update.sh" ]; then
+        if "$SCRIPT_DIR/update.sh" --auto 2>&1 | tee -a "$LOG_FILE"; then
+            log "${GREEN}✓ Full update completed${NC}"
+        else
+            log "${YELLOW}Update completed with warnings${NC}"
+        fi
+    else
+        log "${RED}update.sh not found or not executable${NC}"
+    fi
+    
+    # Clear the signal file
+    echo "" > "$UPDATE_REQUESTED_FLAG"
+}
+
+check_full_update_needed() {
+    if [ -f "$UPDATE_REQUESTED_FLAG" ]; then
+        # File exists - check if it has non-whitespace content
+        if grep -q '[^[:space:]]' "$UPDATE_REQUESTED_FLAG" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    return 1
 }
 
 # Handle update check request (triggered by API endpoint)
@@ -270,6 +302,7 @@ Documentation=https://github.com/hessius/MeticAI
 [Path]
 PathModified=$REBUILD_FLAG
 PathModified=$UPDATE_CHECK_FLAG
+PathModified=$UPDATE_REQUESTED_FLAG
 Unit=meticai-rebuild-watcher.service
 
 [Install]
@@ -381,6 +414,9 @@ case "${1:-}" in
     --watch)
         log "Starting rebuild watcher (continuous mode)..."
         while true; do
+            if check_full_update_needed; then
+                do_full_update
+            fi
             if check_update_check_needed; then
                 do_update_check
             fi
@@ -410,14 +446,15 @@ case "${1:-}" in
         show_help
         ;;
     *)
-        # Default: check once for both signals
-        if check_update_check_needed; then
+        # Default: check once for all signals
+        if check_full_update_needed; then
+            do_full_update
+        elif check_update_check_needed; then
             do_update_check
-        fi
-        if check_rebuild_needed; then
+        elif check_rebuild_needed; then
             do_rebuild
         else
-            echo -e "${GREEN}No rebuild needed${NC}"
+            echo -e "${GREEN}No action needed${NC}"
         fi
         ;;
 esac
