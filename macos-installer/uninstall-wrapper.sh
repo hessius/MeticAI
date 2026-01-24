@@ -36,9 +36,53 @@ show_progress() {
     echo "PROGRESS: $message"
 }
 
+# Get icon path for dialogs
+get_icon_path() {
+    # Try to find the app bundle we're running from
+    if [[ "$0" == *"/Contents/MacOS/"* ]]; then
+        # We're running from inside an app bundle
+        local bundle_path=$(echo "$0" | sed 's|/Contents/MacOS/.*||')
+        local icon_path="$bundle_path/Contents/Resources/AppIcon.icns"
+        
+        if [ -f "$icon_path" ]; then
+            echo "$icon_path"
+            return
+        fi
+    fi
+    
+    # Fallback to empty (use system icon)
+    echo ""
+}
+
 # Display welcome/confirmation dialog
 show_welcome() {
-    osascript <<EOF
+    local icon_path=$(get_icon_path)
+    
+    if [ -n "$icon_path" ]; then
+        osascript <<EOF
+tell application "System Events"
+    activate
+    set iconPath to POSIX file "$icon_path"
+    set buttonReturned to button returned of (display dialog "MeticAI Uninstaller
+
+This will remove MeticAI from your system, including:
+
+• Docker containers and images
+• Cloned repositories
+• Configuration files
+• macOS integrations (if installed)
+
+Your Docker, Git, and other tools will be kept.
+
+Are you sure you want to uninstall MeticAI?" buttons {"Cancel", "Uninstall"} default button "Cancel" with icon file iconPath with title "MeticAI Uninstaller")
+    
+    if buttonReturned is "Cancel" then
+        error number -128
+    end if
+end tell
+EOF
+    else
+        osascript <<EOF
 tell application "System Events"
     activate
     set buttonReturned to button returned of (display dialog "MeticAI Uninstaller
@@ -59,6 +103,7 @@ Are you sure you want to uninstall MeticAI?" buttons {"Cancel", "Uninstall"} def
     end if
 end tell
 EOF
+    fi
 }
 
 # Find MeticAI installation directory
@@ -291,8 +336,29 @@ EOF
     if run_uninstallation "$INSTALL_DIR" > "$UNINSTALL_LOG" 2>&1; then
         log_message "Uninstallation completed successfully"
         
-        # Show success dialog
-        osascript <<'EOF'
+        # Show success dialog with custom icon
+        local icon_path=$(get_icon_path)
+        
+        if [ -n "$icon_path" ]; then
+            osascript <<EOF
+tell application "System Events"
+    activate
+    set iconPath to POSIX file "$icon_path"
+    display dialog "Uninstallation Complete! ✓
+
+MeticAI has been successfully uninstalled.
+
+• Docker containers removed
+• Docker images removed
+• Repositories removed
+• Configuration files removed
+• macOS integrations removed
+
+Docker, Git, and other tools have been kept on your system." buttons {"OK"} default button "OK" with icon file iconPath with title "MeticAI Uninstaller"
+end tell
+EOF
+        else
+            osascript <<'EOF'
 tell application "System Events"
     activate
     display dialog "Uninstallation Complete! ✓
@@ -308,6 +374,7 @@ MeticAI has been successfully uninstalled.
 Docker, Git, and other tools have been kept on your system." buttons {"OK"} default button "OK" with icon note with title "MeticAI Uninstaller"
 end tell
 EOF
+        fi
         
     else
         log_error "Uninstallation failed"
