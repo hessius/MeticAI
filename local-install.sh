@@ -1047,72 +1047,98 @@ scan_for_meticulous() {
 }
 
 # 1. Check for Prerequisites
-echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    show_progress "Checking prerequisites..." 10
+else
+    echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
+fi
 
 # Check and install git
 if ! command -v git &> /dev/null; then
-    echo -e "${RED}Error: git is not installed.${NC}"
-    read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
-    INSTALL_GIT=${INSTALL_GIT:-y}
-    
-    if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        # Auto-install in non-interactive mode
+        show_progress "Installing git..." 12
         install_git
     else
-        echo -e "${RED}Error: git is required. Please install it manually and run this script again.${NC}"
-        exit 1
+        echo -e "${RED}Error: git is not installed.${NC}"
+        read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
+        INSTALL_GIT=${INSTALL_GIT:-y}
+        
+        if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
+            install_git
+        else
+            echo -e "${RED}Error: git is required. Please install it manually and run this script again.${NC}"
+            exit 1
+        fi
     fi
 else
-    echo -e "${GREEN}✓ Git found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Git found.${NC}"
 fi
 
 # Check and install docker
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Error: docker is not installed.${NC}"
-    read -r -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER </dev/tty
-    INSTALL_DOCKER=${INSTALL_DOCKER:-y}
-    
-    if [[ "$INSTALL_DOCKER" =~ ^[Yy]$ ]]; then
-        install_docker
-    else
-        echo -e "${RED}Error: Docker is required. Please install it manually and run this script again.${NC}"
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        echo "ERROR: Docker is not installed. Please install Docker Desktop first."
         exit 1
+    else
+        echo -e "${RED}Error: docker is not installed.${NC}"
+        read -r -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER </dev/tty
+        INSTALL_DOCKER=${INSTALL_DOCKER:-y}
+        
+        if [[ "$INSTALL_DOCKER" =~ ^[Yy]$ ]]; then
+            install_docker
+        else
+            echo -e "${RED}Error: Docker is required. Please install it manually and run this script again.${NC}"
+            exit 1
+        fi
     fi
 else
-    echo -e "${GREEN}✓ Docker found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Docker found.${NC}"
 fi
 
 # Check and install docker compose
 if ! check_docker_compose; then
-    echo -e "${YELLOW}Docker Compose is not installed.${NC}"
-    read -r -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE </dev/tty
-    INSTALL_COMPOSE=${INSTALL_COMPOSE:-y}
-    
-    if [[ "$INSTALL_COMPOSE" =~ ^[Yy]$ ]]; then
-        install_docker_compose
-    else
-        echo -e "${RED}Error: Docker Compose is required. Please install it manually and run this script again.${NC}"
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        # Docker Compose usually comes with Docker Desktop, so this is an error
+        echo "ERROR: Docker Compose is not available. Please ensure Docker Desktop is properly installed."
         exit 1
+    else
+        echo -e "${YELLOW}Docker Compose is not installed.${NC}"
+        read -r -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE </dev/tty
+        INSTALL_COMPOSE=${INSTALL_COMPOSE:-y}
+        
+        if [[ "$INSTALL_COMPOSE" =~ ^[Yy]$ ]]; then
+            install_docker_compose
+        else
+            echo -e "${RED}Error: Docker Compose is required. Please install it manually and run this script again.${NC}"
+            exit 1
+        fi
     fi
 else
-    echo -e "${GREEN}✓ Docker Compose found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Docker Compose found.${NC}"
 fi
 
 # Check and install qrencode (optional, for QR code generation)
 if ! command -v qrencode &> /dev/null; then
-    echo -e "${YELLOW}qrencode is not installed (used for QR code generation).${NC}"
-    read -r -p "Would you like to install qrencode now? (y/n) [y]: " INSTALL_QRENCODE </dev/tty
-    INSTALL_QRENCODE=${INSTALL_QRENCODE:-y}
-    
-    if [[ "$INSTALL_QRENCODE" =~ ^[Yy]$ ]]; then
-        if ! install_qrencode; then
-            echo -e "${YELLOW}Warning: qrencode installation failed. QR code may not be available at the end.${NC}"
-            echo -e "${YELLOW}Installation will continue - you can still access the web interface via URL.${NC}"
-        fi
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        # Skip qrencode in non-interactive mode - it's optional
+        : # no-op
     else
-        echo -e "${YELLOW}Skipping qrencode installation. QR code will not be available.${NC}"
+        echo -e "${YELLOW}qrencode is not installed (used for QR code generation).${NC}"
+        read -r -p "Would you like to install qrencode now? (y/n) [y]: " INSTALL_QRENCODE </dev/tty
+        INSTALL_QRENCODE=${INSTALL_QRENCODE:-y}
+        
+        if [[ "$INSTALL_QRENCODE" =~ ^[Yy]$ ]]; then
+            if ! install_qrencode; then
+                echo -e "${YELLOW}Warning: qrencode installation failed. QR code may not be available at the end.${NC}"
+                echo -e "${YELLOW}Installation will continue - you can still access the web interface via URL.${NC}"
+            fi
+        else
+            echo -e "${YELLOW}Skipping qrencode installation. QR code will not be available.${NC}"
+        fi
     fi
 else
-    echo -e "${GREEN}✓ qrencode found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ qrencode found.${NC}"
 fi
 
 echo -e "${GREEN}✓ All prerequisites satisfied.${NC}"
