@@ -35,9 +35,52 @@ show_progress() {
     echo "PROGRESS: $message"
 }
 
+# Get icon path for dialogs
+get_icon_path() {
+    # Try to find the app bundle we're running from
+    if [[ "$0" == *"/Contents/MacOS/"* ]]; then
+        # We're running from inside an app bundle
+        local bundle_path=$(echo "$0" | sed 's|/Contents/MacOS/.*||')
+        local icon_path="$bundle_path/Contents/Resources/AppIcon.icns"
+        
+        if [ -f "$icon_path" ]; then
+            echo "$icon_path"
+            return
+        fi
+    fi
+    
+    # Fallback to system icon
+    echo ""
+}
+
 # Display welcome dialog
 show_welcome() {
-    osascript <<EOF
+    local icon_path=$(get_icon_path)
+    
+    if [ -n "$icon_path" ]; then
+        osascript <<EOF
+tell application "System Events"
+    activate
+    set iconPath to POSIX file "$icon_path"
+    display dialog "Welcome to MeticAI Installer
+
+This installer will guide you through setting up MeticAI - your AI Barista for the Meticulous Espresso Machine.
+
+The installation will:
+• Check for prerequisites (Git, Docker)
+• Download MeticAI from GitHub
+• Guide you through configuration
+• Launch the MeticAI services
+
+Click OK to continue." buttons {"Cancel", "OK"} default button "OK" with icon file iconPath with title "MeticAI Installer"
+    
+    if button returned of result is "Cancel" then
+        error number -128
+    end if
+end tell
+EOF
+    else
+        osascript <<EOF
 tell application "System Events"
     activate
     display dialog "Welcome to MeticAI Installer
@@ -57,6 +100,7 @@ Click OK to continue." buttons {"Cancel", "OK"} default button "OK" with icon no
     end if
 end tell
 EOF
+    fi
 }
 
 # Check for prerequisites and offer to install if missing
@@ -443,8 +487,33 @@ EOF
     if run_installation "$INSTALL_DIR" "$GEMINI_API_KEY" "$METICULOUS_IP" "$SERVER_IP" > "$INSTALL_LOG" 2>&1; then
         log_message "Installation completed successfully"
         
-        # Show success dialog with QR code info
-        osascript <<EOF
+        # Show success dialog with custom icon
+        local icon_path=$(get_icon_path)
+        
+        if [ -n "$icon_path" ]; then
+            osascript <<EOF
+tell application "System Events"
+    activate
+    set iconPath to POSIX file "$icon_path"
+    display dialog "Installation Complete! ✓
+
+MeticAI has been successfully installed!
+
+🌐 Web Interface:
+   http://$SERVER_IP:3550
+
+📱 You can access this from any device on your network.
+
+☕️ Start using MeticAI:
+   1. Open the web interface in your browser
+   2. Upload a photo of your coffee bag
+   3. Let AI create the perfect espresso profile!
+
+The web interface should open automatically in a moment." buttons {"OK"} default button "OK" with icon file iconPath with title "MeticAI Installer"
+end tell
+EOF
+        else
+            osascript <<EOF
 tell application "System Events"
     activate
     display dialog "Installation Complete! ✓
@@ -464,6 +533,7 @@ MeticAI has been successfully installed!
 The web interface should open automatically in a moment." buttons {"OK"} default button "OK" with icon note with title "MeticAI Installer"
 end tell
 EOF
+        fi
         
         # Open web interface
         sleep 2
