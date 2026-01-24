@@ -75,6 +75,7 @@ if command -v platypus &> /dev/null; then
         --interface-type "Progress Bar"
         --interpreter "/bin/bash"
         --quit-after-execution
+        --overwrite
     )
     
     # Add icon if available
