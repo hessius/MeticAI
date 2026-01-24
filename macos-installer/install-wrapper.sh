@@ -575,29 +575,17 @@ EOF
     log_message "macOS Installer completed successfully"
 }
 
-# Run the actual installation
+# Run the actual installation by delegating to local-install.sh
 run_installation() {
     local install_dir="$1"
     local api_key="$2"
     local meticulous_ip="$3"
     local server_ip="$4"
     
-    show_progress "Downloading installer..."
+    echo "PROGRESS:5"
+    echo "Cloning MeticAI repository..."
     
-    # Download the web installer
-    TEMP_INSTALLER=$(mktemp)
-    trap 'rm -f "$TEMP_INSTALLER"' EXIT INT TERM
-    
-    if ! curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh -o "$TEMP_INSTALLER"; then
-        echo "ERROR: Failed to download installer"
-        return 1
-    fi
-    
-    chmod +x "$TEMP_INSTALLER"
-    
-    show_progress "Cloning repository..."
-    
-    # Clone the repository
+    # Clone the repository if it doesn't exist
     if [ -d "$install_dir" ]; then
         rm -rf "$install_dir"
     fi
@@ -609,55 +597,28 @@ run_installation() {
     
     cd "$install_dir" || return 1
     
-    show_progress "Creating configuration..."
+    echo "PROGRESS:15"
+    echo "Running installer..."
     
-    # Create .env file with collected configuration
-    cat > .env <<ENVFILE
-GEMINI_API_KEY=$api_key
-METICULOUS_IP=$meticulous_ip
-PI_IP=$server_ip
-ENVFILE
+    # Export environment variables for non-interactive mode
+    export METICAI_NON_INTERACTIVE=true
+    export METICAI_PROGRESS_FORMAT=platypus
+    export GEMINI_API_KEY="$api_key"
+    export METICULOUS_IP="$meticulous_ip"
+    export PI_IP="$server_ip"
+    export SKIP_PREVIOUS_INSTALL_CHECK=true
+    export FORCE_RECLONE=true
+    export SKIP_DOCK_SHORTCUT=false  # We want the dock shortcut
+    export SKIP_REBUILD_WATCHER=true  # Skip interactive watcher install
     
-    show_progress "Setting up dependencies..."
-    
-    # Clone meticulous-source
-    if [ ! -d "meticulous-source" ]; then
-        git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
-    fi
-    
-    # Clone web app
-    if [ ! -d "meticai-web" ]; then
-        git clone https://github.com/hessius/MeticAI-web.git meticai-web
-    fi
-    
-    # Generate web app config
-    mkdir -p meticai-web/public
-    cat > meticai-web/public/config.json <<WEBCONFIG
-{
-  "serverUrl": "http://$server_ip:8000"
-}
-WEBCONFIG
-    
-    show_progress "Building and starting containers..."
-    
-    # Ensure .versions.json exists as a file
-    if [ -d ".versions.json" ]; then
-        rm -rf .versions.json
-    fi
-    if [ ! -f ".versions.json" ]; then
-        echo '{}' > .versions.json
-    fi
-    
-    # Stop any existing containers
-    docker compose down 2>/dev/null || true
-    
-    # Build and start containers
-    if ! docker compose up -d --build; then
-        echo "ERROR: Failed to build and start containers"
+    # Run local-install.sh in non-interactive mode
+    if ! ./local-install.sh; then
+        echo "ERROR: Installation failed"
         return 1
     fi
     
-    show_progress "Installation complete!"
+    echo "PROGRESS:100"
+    echo "Installation complete!"
     
     return 0
 }
