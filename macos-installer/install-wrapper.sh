@@ -20,22 +20,7 @@ set -e
 # Docker Desktop installs to /Applications/Docker.app
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
-# Logging functions
-log_message() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-}
-
-log_error() {
-    echo "ERROR: $1" >&2
-}
-
-# Show progress dialog (non-blocking)
-show_progress() {
-    local message="$1"
-    echo "PROGRESS: $message"
-}
-
-# Get icon path for dialogs
+# Get icon path for dialogs - set globally at startup
 get_icon_path() {
     # Try to find the app bundle we're running from
     if [[ "$0" == *"/Contents/MacOS/"* ]]; then
@@ -49,19 +34,35 @@ get_icon_path() {
         fi
     fi
     
-    # Fallback to system icon
+    # Fallback - empty means use system icon
     echo ""
+}
+
+# Set global icon path at startup
+ICON_PATH=$(get_icon_path)
+
+# Logging functions - use >&2 to avoid capturing in command substitution
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}
+
+log_error() {
+    echo "ERROR: $1" >&2
+}
+
+# Show progress dialog (non-blocking)
+show_progress() {
+    local message="$1"
+    echo "PROGRESS: $message"
 }
 
 # Display welcome dialog
 show_welcome() {
-    local icon_path=$(get_icon_path)
-    
-    if [ -n "$icon_path" ]; then
+    if [ -n "$ICON_PATH" ]; then
         osascript <<EOF
 tell application "System Events"
     activate
-    set iconPath to POSIX file "$icon_path"
+    set iconPath to POSIX file "$ICON_PATH"
     display dialog "Welcome to MeticAI Installer
 
 This installer will guide you through setting up MeticAI - your AI Barista for the Meticulous Espresso Machine.
@@ -251,7 +252,7 @@ get_api_key() {
     local continue_input=false
     
     while [ -z "$api_key" ]; do
-        local result=$(osascript <<'EOF'
+        local result=$(osascript <<EOF
 tell application "System Events"
     activate
     set dialogResult to display dialog "Google Gemini API Key
@@ -260,7 +261,7 @@ Please enter your Google Gemini API Key.
 
 This key is required for MeticAI to function.
 
-Click 'Get API Key' to open the Google AI Studio page in your browser." default answer "" buttons {"Cancel", "Get API Key", "Continue"} default button "Continue" with title "MeticAI Installer" with icon note
+Click 'Get API Key' to open the Google AI Studio page in your browser." default answer "" buttons {"Cancel", "Get API Key", "Continue"} default button "Continue" with title "MeticAI Installer" with hidden answer
     
     set buttonPressed to button returned of dialogResult
     set apiKey to text returned of dialogResult
@@ -302,9 +303,74 @@ EOF
     echo "$api_key"
 }
 
-# Get Meticulous machine IP address
+# Scan for Meticulous machines using Bonjour/mDNS
+scan_for_meticulous() {
+    local devices=()
+    
+    # Use dns-sd to discover Meticulous devices (timeout after 3 seconds)
+    if command -v dns-sd &>/dev/null; then
+        log_message "Scanning for Meticulous devices via Bonjour..." >&2
+        
+        # Run dns-sd in background and capture output
+        local dns_output
+        dns_output=$(timeout 3 dns-sd -B _http._tcp local 2>/dev/null || true)
+        
+        # Look for meticulous in the output
+        if echo "$dns_output" | grep -qi "meticulous"; then
+            # Extract the hostname and try to resolve it
+            local hostname
+            hostname=$(echo "$dns_output" | grep -i "meticulous" | awk '{print $NF}' | head -1)
+            
+            if [ -n "$hostname" ]; then
+                # Try to resolve the IP
+                local resolved_ip
+                resolved_ip=$(dscacheutil -q host -a name "${hostname}.local" 2>/dev/null | grep "^ip_address:" | awk '{print $2}' | head -1)
+                
+                if [ -n "$resolved_ip" ]; then
+                    echo "${hostname}.local,$resolved_ip"
+                fi
+            fi
+        fi
+    fi
+}
+
+# Get Meticulous machine IP address (with auto-detection)
 get_meticulous_ip() {
-    local met_ip=$(osascript <<'EOF'
+    local met_ip=""
+    
+    # Try to auto-detect Meticulous on the network
+    log_message "Scanning for Meticulous machines..." >&2
+    local detected_device
+    detected_device=$(scan_for_meticulous)
+    
+    if [ -n "$detected_device" ]; then
+        local hostname=$(echo "$detected_device" | cut -d',' -f1)
+        local ip=$(echo "$detected_device" | cut -d',' -f2)
+        
+        # Ask user if they want to use the detected device
+        local response=$(osascript <<EOF
+tell application "System Events"
+    activate
+    set buttonReturned to button returned of (display dialog "Meticulous Machine Found!
+
+Detected: $hostname
+IP Address: $ip
+
+Would you like to use this machine?" buttons {"Use Different", "Use This"} default button "Use This" with title "MeticAI Installer")
+    
+    return buttonReturned
+end tell
+EOF
+)
+        
+        if [ "$response" = "Use This" ]; then
+            echo "$ip"
+            return
+        fi
+    fi
+    
+    # Manual input if not auto-detected or user chose different
+    met_ip=$(osascript <<EOF
 tell application "System Events"
     activate
     set metIP to text returned of (display dialog "Meticulous Machine IP Address
@@ -313,14 +379,14 @@ Please enter the IP address of your Meticulous Espresso Machine.
 
 Example: 192.168.1.100
 
-You can find this in your machine's network settings or router." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with title "MeticAI Installer" with icon note)
+You can find this in your machine's network settings or router." default answer "" buttons {"Cancel", "Continue"} default button "Continue" with title "MeticAI Installer")
     
     return metIP
 end tell
 EOF
 )
     
-    # Validate not empty and looks like an IP
+    # Validate not empty
     if [ -z "$met_ip" ]; then
         osascript <<'EOF'
 tell application "System Events"
@@ -491,13 +557,11 @@ EOF
         log_message "Installation completed successfully"
         
         # Show success dialog with custom icon
-        local icon_path=$(get_icon_path)
-        
-        if [ -n "$icon_path" ]; then
+        if [ -n "$ICON_PATH" ]; then
             osascript <<EOF
 tell application "System Events"
     activate
-    set iconPath to POSIX file "$icon_path"
+    set iconPath to POSIX file "$ICON_PATH"
     display dialog "Installation Complete! ✓
 
 MeticAI has been successfully installed!
