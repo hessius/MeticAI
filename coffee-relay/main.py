@@ -2343,6 +2343,8 @@ async def apply_profile_image(
             
             _set_cached_image(profile_name, png_bytes)
         except HTTPException:
+            # Re-raise HTTP exceptions to preserve the status code and error message
+            # that was specifically created for the API client
             raise
         except Exception as e:
             logger.warning(f"Failed to process/cache image from apply-image: {e}")
