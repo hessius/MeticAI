@@ -48,7 +48,7 @@ jobs:
       # Without signing, users just need to right-click → Open once
       # =======================================================================
       - name: Import Code Signing Certificate (Optional)
-        if: github.event_name != 'pull_request' && secrets.MACOS_CERTIFICATE != ''
+        if: github.event_name != 'pull_request' && env.MACOS_CERTIFICATE != ''
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
@@ -69,7 +69,7 @@ jobs:
           echo "✅ Code signing certificate imported"
           
       - name: Sign Apps (Optional - requires Apple Developer account)
-        if: github.event_name != 'pull_request' && secrets.SIGNING_IDENTITY != ''
+        if: github.event_name != 'pull_request' && env.SIGNING_IDENTITY != ''
         env:
           SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
         run: |
@@ -94,7 +94,7 @@ jobs:
       # Without notarization, users just need to right-click → Open once
       # =======================================================================
       - name: Notarize DMG (Optional - requires Apple Developer account)
-        if: github.event_name != 'pull_request' && secrets.APPLE_ID != '' && secrets.APPLE_ID_PASSWORD != '' && secrets.APPLE_TEAM_ID != ''
+        if: github.event_name != 'pull_request' && env.APPLE_ID != ''
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
