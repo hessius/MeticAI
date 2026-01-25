@@ -540,7 +540,11 @@ get_server_ip() {
     
     # If detected, offer to use it
     if [ -n "$detected_ip" ]; then
-        local response=$(osascript <<EOF
+        local response
+        if [ -n "$ICON_PATH" ]; then
+            response=$(osascript -e "tell application \"System Events\"" -e "activate" -e "set iconPath to POSIX file \"$ICON_PATH\"" -e "set buttonReturned to button returned of (display dialog \"Server IP Address Detected\" & return & return & \"Your server IP address appears to be:\" & return & \"$detected_ip\" & return & return & \"Would you like to use this address?\" buttons {\"Use Different\", \"Use This\"} default button \"Use This\" with icon file iconPath with title \"MeticAI Installer\")" -e "return buttonReturned" -e "end tell")
+        else
+            response=$(osascript <<EOF
 tell application "System Events"
     activate
     set buttonReturned to button returned of (display dialog "Server IP Address Detected
@@ -554,6 +558,7 @@ Would you like to use this address?" buttons {"Use Different", "Use This"} defau
 end tell
 EOF
 )
+        fi
         
         if [ "$response" = "Use This" ]; then
             echo "$detected_ip"
@@ -651,7 +656,11 @@ main() {
     
     # Show installation starting dialog - use simple text to avoid variable issues
     debug_log "Showing 'Starting Installation' dialog"
-    osascript -e 'tell application "System Events" to display dialog "Starting Installation\n\nMeticAI is now being installed. This may take several minutes.\n\nPlease wait..." buttons {"OK"} default button "OK" with icon note giving up after 5' &
+    if [ -n "$ICON_PATH" ]; then
+        osascript -e "tell application \"System Events\"" -e "activate" -e "set iconPath to POSIX file \"$ICON_PATH\"" -e "display dialog \"Starting Installation\" & return & return & \"MeticAI is now being installed. This may take several minutes.\" & return & return & \"This dialog will close automatically.\" buttons {\"OK\"} default button \"OK\" with icon file iconPath giving up after 5" -e "end tell" &
+    else
+        osascript -e 'tell application "System Events" to display dialog "Starting Installation\n\nMeticAI is now being installed. This may take several minutes.\n\nThis dialog will close automatically." buttons {"OK"} default button "OK" with icon note giving up after 5' &
+    fi
     
     sleep 2
     debug_log "Creating parent directory..."
@@ -664,7 +673,7 @@ main() {
     fi
     debug_log "Parent directory ready: $PARENT_DIR"
     
-    # Run installation in background
+    # Run installation
     debug_log "Starting run_installation..."
     log_message "Running installation..."
     show_progress "Installing MeticAI..."
@@ -672,22 +681,40 @@ main() {
     # Create temporary directory for installation logs
     INSTALL_LOG=$(mktemp)
     debug_log "Install log: $INSTALL_LOG"
-    trap 'rm -f "$INSTALL_LOG"' EXIT INT TERM
     
-    # Run the installation - capture output AND show it in debug log
+    # Run the installation - capture output to file and debug log
     debug_log "Calling run_installation with:"
     debug_log "  install_dir: $INSTALL_DIR"
     debug_log "  api_key length: ${#GEMINI_API_KEY}"
     debug_log "  meticulous_ip: $METICULOUS_IP"
     debug_log "  server_ip: $SERVER_IP"
     
-    if run_installation "$INSTALL_DIR" "$GEMINI_API_KEY" "$METICULOUS_IP" "$SERVER_IP" 2>&1 | tee "$INSTALL_LOG" | while read line; do debug_log "INSTALL: $line"; done; then
+    # Run installation and capture exit code properly
+    set +e  # Don't exit on error
+    run_installation "$INSTALL_DIR" "$GEMINI_API_KEY" "$METICULOUS_IP" "$SERVER_IP" > "$INSTALL_LOG" 2>&1
+    INSTALL_EXIT_CODE=$?
+    set -e  # Re-enable exit on error
+    
+    # Log the installation output
+    debug_log "=== INSTALL OUTPUT ==="
+    cat "$INSTALL_LOG" >> "$DEBUG_LOG" 2>/dev/null || true
+    debug_log "=== END INSTALL OUTPUT ==="
+    debug_log "Installation exit code: $INSTALL_EXIT_CODE"
+    
+    # Clean up log file
+    rm -f "$INSTALL_LOG"
+    
+    if [ $INSTALL_EXIT_CODE -eq 0 ]; then
         debug_log "run_installation completed successfully"
         log_message "Installation completed successfully"
         
-        # Show simple success dialog to avoid variable interpolation issues
+        # Show success dialog with icon
         debug_log "Showing success dialog"
-        osascript -e 'tell application "System Events" to display dialog "Installation Complete!\n\nMeticAI has been successfully installed.\n\nThe web interface will open in your browser." buttons {"OK"} default button "OK" with icon note'
+        if [ -n "$ICON_PATH" ]; then
+            osascript -e "tell application \"System Events\"" -e "activate" -e "set iconPath to POSIX file \"$ICON_PATH\"" -e "display dialog \"Installation Complete!\" & return & return & \"MeticAI has been successfully installed.\" & return & return & \"The web interface will open in your browser.\" buttons {\"OK\"} default button \"OK\" with icon file iconPath" -e "end tell"
+        else
+            osascript -e 'tell application "System Events" to display dialog "Installation Complete!\n\nMeticAI has been successfully installed.\n\nThe web interface will open in your browser." buttons {"OK"} default button "OK" with icon note'
+        fi
         
         # Open web interface
         debug_log "Opening web interface: http://$SERVER_IP:3550"
@@ -695,16 +722,16 @@ main() {
         open "http://$SERVER_IP:3550" 2>/dev/null || true
         
     else
-        debug_log "run_installation FAILED"
+        debug_log "run_installation FAILED with exit code $INSTALL_EXIT_CODE"
         log_error "Installation failed"
         
-        # Copy install log to debug log
-        debug_log "=== INSTALL LOG CONTENTS ==="
-        cat "$INSTALL_LOG" >> "$DEBUG_LOG" 2>/dev/null || true
-        debug_log "=== END INSTALL LOG ==="
-        
-        # Show simple error dialog
-        osascript -e 'tell application "System Events" to display dialog "Installation Failed\n\nPlease check ~/Desktop/MeticAI_Installer_Debug.log for details." buttons {"OK"} default button "OK" with icon stop'
+        # Show error dialog with icon
+        debug_log "Showing error dialog"
+        if [ -n "$ICON_PATH" ]; then
+            osascript -e "tell application \"System Events\"" -e "activate" -e "display dialog \"Installation Failed\" & return & return & \"Please check ~/Desktop/MeticAI_Installer_Debug.log for details.\" buttons {\"OK\"} default button \"OK\" with icon stop" -e "end tell"
+        else
+            osascript -e 'tell application "System Events" to display dialog "Installation Failed\n\nPlease check ~/Desktop/MeticAI_Installer_Debug.log for details." buttons {"OK"} default button "OK" with icon stop'
+        fi
         exit 1
     fi
     
