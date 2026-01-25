@@ -64,7 +64,26 @@ No manual recipe tweaking. No guesswork. Just consistently great espresso.
 
 ### Installation (5 minutes)
 
-**Option 1: One-Line Install** (Recommended)
+**Option 1: macOS Installer App** (Easiest for Mac users)
+
+Download and run the standalone installer app - **completely GUI-based, no terminal at all!**
+
+1. Download the installer: [MeticAI-Installer.dmg](https://github.com/hessius/MeticAI/releases/latest) *(coming soon)*
+2. Open the DMG and drag "MeticAI Installer" to Applications
+3. Launch the app and follow the graphical prompts
+
+The app will guide you through everything via dialogs:
+- ✅ Checking prerequisites (with helpful install links)
+- ✅ Choosing installation location
+- ✅ Entering API key and IP addresses
+- ✅ Background installation with progress feedback
+- ✅ Auto-opens web interface when complete
+
+**No Terminal window - 100% graphical!**
+
+[→ Learn more about the macOS installer](macos-installer/README.md)
+
+**Option 2: One-Line Install** (Recommended for terminal users)
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash
 ```
@@ -78,7 +97,7 @@ That's it! The installer will:
 - ✅ Show a QR code to access the web interface from your phone
 - ✅ *[macOS only]* Optionally create a Dock icon for quick access
 
-**Option 2: Manual Install**
+**Option 3: Manual Install**
 ```bash
 git clone https://github.com/hessius/MeticAI.git
 cd MeticAI

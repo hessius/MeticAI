@@ -32,10 +32,71 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=========================================${NC}"
-echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
-echo -e "${BLUE}=========================================${NC}"
-echo ""
+################################################################################
+# Non-Interactive Mode Support
+################################################################################
+# Set METICAI_NON_INTERACTIVE=true to run without prompts.
+# Required environment variables for non-interactive mode:
+#   - GEMINI_API_KEY: Your Google Gemini API key
+#   - METICULOUS_IP: IP address of your Meticulous machine
+#   - PI_IP: IP address of this server
+#
+# Optional environment variables:
+#   - METICAI_PROGRESS_FORMAT: Set to "platypus" for PROGRESS:X% format
+#   - SKIP_DOCK_SHORTCUT: Set to "true" to skip dock shortcut creation
+#   - SKIP_REBUILD_WATCHER: Set to "true" to skip watcher installation
+#   - SKIP_PREVIOUS_INSTALL_CHECK: Set to "true" to skip existing install check
+#   - FORCE_RECLONE: Set to "true" to force re-clone of repositories
+################################################################################
+
+# Progress output function (supports Platypus progress bar format)
+show_progress() {
+    local message="$1"
+    local percent="${2:-}"
+    
+    if [ "$METICAI_PROGRESS_FORMAT" = "platypus" ]; then
+        if [ -n "$percent" ]; then
+            echo "PROGRESS:$percent"
+        fi
+        echo "$message"
+    else
+        echo -e "${YELLOW}$message${NC}"
+    fi
+}
+
+# Check if running in non-interactive mode
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    # Validate required environment variables
+    if [ -z "$GEMINI_API_KEY" ]; then
+        echo "ERROR: GEMINI_API_KEY is required in non-interactive mode" >&2
+        exit 1
+    fi
+    if [ -z "$METICULOUS_IP" ]; then
+        echo "ERROR: METICULOUS_IP is required in non-interactive mode" >&2
+        exit 1
+    fi
+    if [ -z "$PI_IP" ]; then
+        echo "ERROR: PI_IP is required in non-interactive mode" >&2
+        exit 1
+    fi
+    
+    # Set defaults for non-interactive mode
+    SKIP_ENV_CREATION=false  # Will create .env from environment variables
+    SKIP_PREVIOUS_INSTALL_CHECK="${SKIP_PREVIOUS_INSTALL_CHECK:-true}"
+    FORCE_RECLONE="${FORCE_RECLONE:-true}"
+    SKIP_DOCK_SHORTCUT="${SKIP_DOCK_SHORTCUT:-true}"
+    SKIP_REBUILD_WATCHER="${SKIP_REBUILD_WATCHER:-true}"
+    
+    show_progress "Running in non-interactive mode..." 5
+fi
+
+# Only show banner in interactive mode
+if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
+    echo -e "${BLUE}=========================================${NC}"
+    echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
+    echo -e "${BLUE}=========================================${NC}"
+    echo ""
+fi
 
 # Detect running MeticAI containers
 detect_running_containers() {
@@ -115,58 +176,60 @@ detect_previous_installation() {
 }
 
 # Check for running containers and previous installations
-echo -e "${YELLOW}Checking for existing MeticAI installations...${NC}"
-echo ""
+# Skip in non-interactive mode if SKIP_PREVIOUS_INSTALL_CHECK is set
+if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
+    echo -e "${YELLOW}Checking for existing MeticAI installations...${NC}"
+    echo ""
 
-CONTAINERS_FOUND=""
-PREVIOUS_INSTALL_FOUND=""
+    CONTAINERS_FOUND=""
+    PREVIOUS_INSTALL_FOUND=""
 
-# Detect running containers
-if CONTAINERS_FOUND=$(detect_running_containers); then
-    echo -e "${YELLOW}Found running MeticAI containers:${NC}"
-    echo "$CONTAINERS_FOUND" | sed 's/^/  - /'
-    echo ""
-fi
+    # Detect running containers
+    if CONTAINERS_FOUND=$(detect_running_containers); then
+        echo -e "${YELLOW}Found running MeticAI containers:${NC}"
+        echo "$CONTAINERS_FOUND" | sed 's/^/  - /'
+        echo ""
+    fi
 
-# Detect previous installation artifacts
-if PREVIOUS_INSTALL_FOUND=$(detect_previous_installation); then
-    echo -e "${YELLOW}Found existing MeticAI installation artifacts:${NC}"
-    # Items are returned line-separated, so we can process them directly
-    echo "$PREVIOUS_INSTALL_FOUND" | while IFS= read -r item; do
-        echo "  - $item"
-    done
-    echo ""
-fi
+    # Detect previous installation artifacts
+    if PREVIOUS_INSTALL_FOUND=$(detect_previous_installation); then
+        echo -e "${YELLOW}Found existing MeticAI installation artifacts:${NC}"
+        # Items are returned line-separated, so we can process them directly
+        echo "$PREVIOUS_INSTALL_FOUND" | while IFS= read -r item; do
+            echo "  - $item"
+        done
+        echo ""
+    fi
 
-# If we found either containers or previous installation, offer uninstall
-if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
-    echo -e "${YELLOW}=========================================${NC}"
-    echo -e "${YELLOW}  Previous Installation Detected${NC}"
-    echo -e "${YELLOW}=========================================${NC}"
-    echo ""
-    echo -e "${BLUE}It looks like MeticAI may already be installed or partially installed.${NC}"
-    echo ""
-    echo -e "${YELLOW}Recommended actions:${NC}"
-    echo -e "  1) Run the uninstall script first to clean up: ${BLUE}./uninstall.sh${NC}"
-    echo -e "  2) Then run this installer again for a fresh installation"
-    echo ""
-    echo -e "${YELLOW}Or:${NC}"
-    echo -e "  3) Continue anyway (may cause conflicts or use existing configuration)"
-    echo ""
+    # If we found either containers or previous installation, offer uninstall
+    if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
+        echo -e "${YELLOW}=========================================${NC}"
+        echo -e "${YELLOW}  Previous Installation Detected${NC}"
+        echo -e "${YELLOW}=========================================${NC}"
+        echo ""
+        echo -e "${BLUE}It looks like MeticAI may already be installed or partially installed.${NC}"
+        echo ""
+        echo -e "${YELLOW}Recommended actions:${NC}"
+        echo -e "  1) Run the uninstall script first to clean up: ${BLUE}./uninstall.sh${NC}"
+        echo -e "  2) Then run this installer again for a fresh installation"
+        echo ""
+        echo -e "${YELLOW}Or:${NC}"
+        echo -e "  3) Continue anyway (may cause conflicts or use existing configuration)"
+        echo ""
     
-    # Check if uninstall script exists
-    if [ -f "./uninstall.sh" ]; then
-        read -r -p "Would you like to run the uninstall script now? (y/n) [y]: " RUN_UNINSTALL </dev/tty
-        RUN_UNINSTALL=${RUN_UNINSTALL:-y}
+        # Check if uninstall script exists
+        if [ -f "./uninstall.sh" ]; then
+            read -r -p "Would you like to run the uninstall script now? (y/n) [y]: " RUN_UNINSTALL </dev/tty
+            RUN_UNINSTALL=${RUN_UNINSTALL:-y}
         
-        if [[ "$RUN_UNINSTALL" =~ ^[Yy]$ ]]; then
-            echo ""
-            echo -e "${GREEN}Starting uninstallation...${NC}"
-            echo ""
-            chmod +x ./uninstall.sh
-            # Set environment variable to indicate we're calling from install script
-            # Only set METICAI_INSTALL_METHOD if not already set (e.g., by web_install.sh)
-            if [[ -z "$METICAI_INSTALL_METHOD" ]]; then
+            if [[ "$RUN_UNINSTALL" =~ ^[Yy]$ ]]; then
+                echo ""
+                echo -e "${GREEN}Starting uninstallation...${NC}"
+                echo ""
+                chmod +x ./uninstall.sh
+                # Set environment variable to indicate we're calling from install script
+                # Only set METICAI_INSTALL_METHOD if not already set (e.g., by web_install.sh)
+                if [[ -z "$METICAI_INSTALL_METHOD" ]]; then
                 export METICAI_INSTALL_METHOD="local-install.sh"
             fi
             export METICAI_CALLED_FROM_INSTALLER="true"
@@ -260,13 +323,19 @@ if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
     
     echo ""
 fi
+fi  # End of SKIP_PREVIOUS_INSTALL_CHECK block
 
 
 
 # Configuration Step: Check for existing .env file
 # Note: We reach here only if user chose to continue with existing installation
 # or if no previous installation was detected
-if [ -f ".env" ]; then
+
+# In non-interactive mode, skip .env check prompts
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    # Non-interactive mode: always create new .env from environment variables
+    SKIP_ENV_CREATION=false
+elif [ -f ".env" ]; then
     echo -e "${YELLOW}Found existing .env file.${NC}"
     echo ""
     cat .env
@@ -978,72 +1047,98 @@ scan_for_meticulous() {
 }
 
 # 1. Check for Prerequisites
-echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    show_progress "Checking prerequisites..." 10
+else
+    echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
+fi
 
 # Check and install git
 if ! command -v git &> /dev/null; then
-    echo -e "${RED}Error: git is not installed.${NC}"
-    read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
-    INSTALL_GIT=${INSTALL_GIT:-y}
-    
-    if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        # Auto-install in non-interactive mode
+        show_progress "Installing git..." 12
         install_git
     else
-        echo -e "${RED}Error: git is required. Please install it manually and run this script again.${NC}"
-        exit 1
+        echo -e "${RED}Error: git is not installed.${NC}"
+        read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
+        INSTALL_GIT=${INSTALL_GIT:-y}
+        
+        if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
+            install_git
+        else
+            echo -e "${RED}Error: git is required. Please install it manually and run this script again.${NC}"
+            exit 1
+        fi
     fi
 else
-    echo -e "${GREEN}✓ Git found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Git found.${NC}"
 fi
 
 # Check and install docker
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Error: docker is not installed.${NC}"
-    read -r -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER </dev/tty
-    INSTALL_DOCKER=${INSTALL_DOCKER:-y}
-    
-    if [[ "$INSTALL_DOCKER" =~ ^[Yy]$ ]]; then
-        install_docker
-    else
-        echo -e "${RED}Error: Docker is required. Please install it manually and run this script again.${NC}"
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        echo "ERROR: Docker is not installed. Please install Docker Desktop first."
         exit 1
+    else
+        echo -e "${RED}Error: docker is not installed.${NC}"
+        read -r -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER </dev/tty
+        INSTALL_DOCKER=${INSTALL_DOCKER:-y}
+        
+        if [[ "$INSTALL_DOCKER" =~ ^[Yy]$ ]]; then
+            install_docker
+        else
+            echo -e "${RED}Error: Docker is required. Please install it manually and run this script again.${NC}"
+            exit 1
+        fi
     fi
 else
-    echo -e "${GREEN}✓ Docker found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Docker found.${NC}"
 fi
 
 # Check and install docker compose
 if ! check_docker_compose; then
-    echo -e "${YELLOW}Docker Compose is not installed.${NC}"
-    read -r -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE </dev/tty
-    INSTALL_COMPOSE=${INSTALL_COMPOSE:-y}
-    
-    if [[ "$INSTALL_COMPOSE" =~ ^[Yy]$ ]]; then
-        install_docker_compose
-    else
-        echo -e "${RED}Error: Docker Compose is required. Please install it manually and run this script again.${NC}"
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        # Docker Compose usually comes with Docker Desktop, so this is an error
+        echo "ERROR: Docker Compose is not available. Please ensure Docker Desktop is properly installed."
         exit 1
+    else
+        echo -e "${YELLOW}Docker Compose is not installed.${NC}"
+        read -r -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE </dev/tty
+        INSTALL_COMPOSE=${INSTALL_COMPOSE:-y}
+        
+        if [[ "$INSTALL_COMPOSE" =~ ^[Yy]$ ]]; then
+            install_docker_compose
+        else
+            echo -e "${RED}Error: Docker Compose is required. Please install it manually and run this script again.${NC}"
+            exit 1
+        fi
     fi
 else
-    echo -e "${GREEN}✓ Docker Compose found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Docker Compose found.${NC}"
 fi
 
 # Check and install qrencode (optional, for QR code generation)
 if ! command -v qrencode &> /dev/null; then
-    echo -e "${YELLOW}qrencode is not installed (used for QR code generation).${NC}"
-    read -r -p "Would you like to install qrencode now? (y/n) [y]: " INSTALL_QRENCODE </dev/tty
-    INSTALL_QRENCODE=${INSTALL_QRENCODE:-y}
-    
-    if [[ "$INSTALL_QRENCODE" =~ ^[Yy]$ ]]; then
-        if ! install_qrencode; then
-            echo -e "${YELLOW}Warning: qrencode installation failed. QR code may not be available at the end.${NC}"
-            echo -e "${YELLOW}Installation will continue - you can still access the web interface via URL.${NC}"
-        fi
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        # Skip qrencode in non-interactive mode - it's optional
+        : # no-op
     else
-        echo -e "${YELLOW}Skipping qrencode installation. QR code will not be available.${NC}"
+        echo -e "${YELLOW}qrencode is not installed (used for QR code generation).${NC}"
+        read -r -p "Would you like to install qrencode now? (y/n) [y]: " INSTALL_QRENCODE </dev/tty
+        INSTALL_QRENCODE=${INSTALL_QRENCODE:-y}
+        
+        if [[ "$INSTALL_QRENCODE" =~ ^[Yy]$ ]]; then
+            if ! install_qrencode; then
+                echo -e "${YELLOW}Warning: qrencode installation failed. QR code may not be available at the end.${NC}"
+                echo -e "${YELLOW}Installation will continue - you can still access the web interface via URL.${NC}"
+            fi
+        else
+            echo -e "${YELLOW}Skipping qrencode installation. QR code will not be available.${NC}"
+        fi
     fi
 else
-    echo -e "${GREEN}✓ qrencode found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ qrencode found.${NC}"
 fi
 
 echo -e "${GREEN}✓ All prerequisites satisfied.${NC}"
@@ -1062,6 +1157,22 @@ if [ "$SKIP_ENV_CREATION" = true ]; then
     echo -e "${YELLOW}[2/4] Configuration${NC}"
     echo -e "${GREEN}✓ Using existing .env configuration.${NC}"
     echo ""
+elif [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    # Non-interactive mode: use environment variables
+    show_progress "Creating configuration from environment variables..." 20
+    
+    # Set the variables from environment (already validated at script start)
+    GEMINI_KEY="$GEMINI_API_KEY"
+    MET_IP="$METICULOUS_IP"
+    # PI_IP is already set from environment
+    
+    # Write .env file
+    cat <<EOF > .env
+GEMINI_API_KEY=$GEMINI_KEY
+METICULOUS_IP=$MET_IP
+PI_IP=$PI_IP
+EOF
+    show_progress "Configuration created" 25
 else
     echo -e "${YELLOW}[2/4] Configuration${NC}"
     echo "We need to create a .env file with your specific settings."
@@ -1188,41 +1299,68 @@ fi
 echo -e "${YELLOW}[3/4] Setting up Meticulous Source and Web App...${NC}"
 
 # Clone MCP Source
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    show_progress "Setting up dependencies..." 30
+fi
 if [ -d "meticulous-source" ]; then
-    echo "Directory 'meticulous-source' already exists."
-    read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " CLONE_CONFIRM </dev/tty
-    CLONE_CONFIRM=${CLONE_CONFIRM:-n}
-    
-    if [[ "$CLONE_CONFIRM" =~ ^[Yy]$ ]]; then
-        echo "Removing old source..."
+    if [ "$FORCE_RECLONE" = "true" ]; then
+        # Non-interactive mode: force re-clone
+        show_progress "Removing old meticulous-source..." 35
         rm -rf meticulous-source
-        echo "Cloning fresh repository..."
+        show_progress "Cloning meticulous-source..." 40
         git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
-    else
-        echo "Skipping clone (using existing source)."
+    elif [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
+        echo "Directory 'meticulous-source' already exists."
+        read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " CLONE_CONFIRM </dev/tty
+        CLONE_CONFIRM=${CLONE_CONFIRM:-n}
+    
+        if [[ "$CLONE_CONFIRM" =~ ^[Yy]$ ]]; then
+            echo "Removing old source..."
+            rm -rf meticulous-source
+            echo "Cloning fresh repository..."
+            git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+        else
+            echo "Skipping clone (using existing source)."
+        fi
     fi
 else
-    echo "Cloning Meticulous MCP fork..."
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        show_progress "Cloning meticulous-source..." 40
+    else
+        echo "Cloning Meticulous MCP fork..."
+    fi
     git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
 fi
 echo -e "${GREEN}✓ MCP source code ready.${NC}"
 
 # Clone Web App
 if [ -d "meticai-web" ]; then
-    echo "Directory 'meticai-web' already exists."
-    read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " WEB_CLONE_CONFIRM </dev/tty
-    WEB_CLONE_CONFIRM=${WEB_CLONE_CONFIRM:-n}
-    
-    if [[ "$WEB_CLONE_CONFIRM" =~ ^[Yy]$ ]]; then
-        echo "Removing old web app..."
+    if [ "$FORCE_RECLONE" = "true" ]; then
+        # Non-interactive mode: force re-clone
+        show_progress "Removing old meticai-web..." 45
         rm -rf meticai-web
-        echo "Cloning fresh web app repository..."
+        show_progress "Cloning meticai-web..." 50
         git clone https://github.com/hessius/MeticAI-web.git meticai-web
-    else
-        echo "Skipping clone (using existing web app)."
+    elif [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
+        echo "Directory 'meticai-web' already exists."
+        read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " WEB_CLONE_CONFIRM </dev/tty
+        WEB_CLONE_CONFIRM=${WEB_CLONE_CONFIRM:-n}
+    
+        if [[ "$WEB_CLONE_CONFIRM" =~ ^[Yy]$ ]]; then
+            echo "Removing old web app..."
+            rm -rf meticai-web
+            echo "Cloning fresh web app repository..."
+            git clone https://github.com/hessius/MeticAI-web.git meticai-web
+        else
+            echo "Skipping clone (using existing web app)."
+        fi
     fi
 else
-    echo "Cloning MeticAI Web Interface..."
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        show_progress "Cloning meticai-web..." 50
+    else
+        echo "Cloning MeticAI Web Interface..."
+    fi
     git clone https://github.com/hessius/MeticAI-web.git meticai-web
 fi
 echo -e "${GREEN}✓ Web app source code ready.${NC}"
@@ -1260,13 +1398,19 @@ if [ -f ".env" ]; then
     : ${MET_IP:="localhost"}
 fi
 
-echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
-echo "Note: Running with sudo permissions."
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    show_progress "Building and launching containers..." 60
+else
+    echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
+    echo "Note: Running with sudo permissions."
+fi
 
 # Ensure .versions.json exists as a file (not directory) before Docker mounts it
 # Docker will create a directory if the file doesn't exist, causing mount errors
 if [ -d ".versions.json" ]; then
-    echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+    if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
+        echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+    fi
     rm -rf .versions.json
 fi
 if [ ! -f ".versions.json" ]; then
@@ -1300,26 +1444,62 @@ fi
 # Pre-create directories that Docker would otherwise create as root
 # This ensures proper ownership for the current user
 mkdir -p data logs
-echo -e "${GREEN}✓ Data directories created with correct ownership${NC}"
+if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
+    echo -e "${GREEN}✓ Data directories created with correct ownership${NC}"
+fi
 
 # Stop existing containers if running (safety net in case any were missed earlier)
 # This handles edge cases where containers might have been started after detection
-sudo docker compose down 2>/dev/null || true
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    show_progress "Stopping existing containers..." 65
+fi
+
+# On macOS with Docker Desktop, we don't need sudo for docker commands
+# On Linux, we may need sudo if user isn't in docker group
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    docker compose down 2>/dev/null || true
+else
+    sudo docker compose down 2>/dev/null || true
+fi
 
 # Build and start
-if sudo docker compose up -d --build; then
-    # Fix ownership of any files created by Docker running as root
-    # This is needed because sudo docker compose creates files as root
-    echo "Fixing file ownership..."
-    sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed .update-check-requested .update-requested 2>/dev/null || true
-    # Also fix git directories in case they were affected
-    sudo chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
+if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+    show_progress "Building containers (this may take a few minutes)..." 70
+fi
+
+# Use docker without sudo on macOS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    DOCKER_CMD="docker compose"
+else
+    DOCKER_CMD="sudo docker compose"
+fi
+
+if $DOCKER_CMD up -d --build; then
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        show_progress "Finalizing installation..." 90
+    fi
     
-    echo ""
-    echo -e "${GREEN}=========================================${NC}"
-    echo -e "${GREEN}      🎉 Installation Complete! 🎉       ${NC}"
-    echo -e "${GREEN}=========================================${NC}"
-    echo ""
+    # Fix ownership of any files created by Docker running as root
+    # This is needed on Linux because sudo docker compose creates files as root
+    # On macOS with Docker Desktop, this is usually not necessary but doesn't hurt
+    if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
+        echo "Fixing file ownership..."
+    fi
+    if [[ "$OSTYPE" != "darwin"* ]]; then
+        sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed .update-check-requested .update-requested 2>/dev/null || true
+        # Also fix git directories in case they were affected
+        sudo chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
+    fi
+    
+    if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+        show_progress "Installation complete!" 100
+    else
+        echo ""
+        echo -e "${GREEN}=========================================${NC}"
+        echo -e "${GREEN}      🎉 Installation Complete! 🎉       ${NC}"
+        echo -e "${GREEN}=========================================${NC}"
+        echo ""
+    fi
     echo "Your Barista Agent is running."
     echo ""
     echo -e "👉 **Web Interface:** http://$PI_IP:3550"
