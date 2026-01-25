@@ -285,11 +285,24 @@ The app requires:
 - Docker Desktop installed and running
 - Internet connection to download the installer script
 
-## Code Signing and Notarization
+## Code Signing and Notarization (Optional)
 
-For public distribution, you should code-sign and notarize the app to avoid macOS Gatekeeper warnings.
+Code signing requires a **paid Apple Developer Program membership ($99/year)**. Without signing, the apps work perfectly - users just need to right-click → Open once to bypass Gatekeeper.
 
-### Local Code Signing
+| Feature | Without Signing | With Signing ($99/year) |
+|---------|-----------------|-------------------------|
+| App works | ✅ | ✅ |
+| Double-click to open | ❌ (right-click → Open) | ✅ |
+| No security warnings | ❌ | ✅ |
+| Suitable for | Personal use, small audience | Public distribution |
+
+### For Unsigned Apps (Default)
+
+Users can open unsigned apps by:
+1. Right-click the app → Select "Open" → Click "Open" in the dialog
+2. Or run: `xattr -cr "/Applications/MeticAI Installer.app"`
+
+### Local Code Signing (If you have a Developer account)
 
 ```bash
 # Sign the apps
@@ -321,9 +334,11 @@ xcrun stapler staple "build/MeticAI.dmg"
 
 ### GitHub Actions (Automated)
 
-The repository includes a GitHub Action that automatically builds and releases the DMG on every push to `main` that modifies the installer scripts.
+The repository includes a GitHub Action that automatically builds and releases the DMG on every push to `main` that modifies the installer scripts. **No configuration needed for unsigned builds.**
 
-To enable code signing in GitHub Actions, add these secrets to your repository:
+#### Optional: Enable Code Signing
+
+To enable code signing in GitHub Actions (requires $99/year Apple Developer account), add these secrets:
 
 | Secret | Description |
 |--------|-------------|
@@ -344,14 +359,9 @@ To enable code signing in GitHub Actions, add these secrets to your repository:
    ```
 3. Paste the result as the `MACOS_CERTIFICATE` secret
 
-#### Without Signing
+#### Without Signing (Default)
 
-If you don't have an Apple Developer account, the GitHub Action will still build the DMG - it just won't be signed. Users will need to right-click and select "Open" to bypass Gatekeeper.
-
-For most users, an unsigned app with quarantine removal instructions is sufficient:
-```bash
-xattr -cr "/Applications/MeticAI Installer.app"
-```
+The GitHub Action will still build the DMG - it just won't be signed. Users will need to right-click and select "Open" to bypass Gatekeeper, which is fine for most use cases.
 
 ## Automated Releases
 
