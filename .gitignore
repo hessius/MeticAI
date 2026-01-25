@@ -40,6 +40,7 @@ htmlcov/
 # Web app (cloned dependency)
 meticai-web/
 
-# User data
-data/
-data/shot_cache.json
+# macOS Installer build artifacts
+macos-installer/build/
+*.dmg
+*.app
