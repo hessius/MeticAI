@@ -285,35 +285,84 @@ The app requires:
 - Docker Desktop installed and running
 - Internet connection to download the installer script
 
-## Code Signing and Notarization (Optional)
+## Code Signing and Notarization
 
-For public distribution, you may want to code-sign and notarize the app:
+For public distribution, you should code-sign and notarize the app to avoid macOS Gatekeeper warnings.
 
-### Code Signing
+### Local Code Signing
 
 ```bash
+# Sign the apps
 codesign --deep --force --verify --verbose \
   --sign "Developer ID Application: Your Name (TEAM_ID)" \
   "build/MeticAI Installer.app"
+
+codesign --deep --force --verify --verbose \
+  --sign "Developer ID Application: Your Name (TEAM_ID)" \
+  "build/MeticAI Uninstaller.app"
 ```
 
 ### Notarization
 
 ```bash
-# Create a ZIP for notarization
-ditto -c -k --keepParent "build/MeticAI Installer.app" "build/MeticAI-Installer.zip"
+# Create the DMG first
+hdiutil create -volname "MeticAI" -srcfolder build -ov -format UDZO "build/MeticAI.dmg"
 
 # Submit for notarization
-xcrun notarytool submit "build/MeticAI-Installer.zip" \
+xcrun notarytool submit "build/MeticAI.dmg" \
   --apple-id "your@email.com" \
   --team-id "TEAM_ID" \
-  --password "app-specific-password"
+  --password "app-specific-password" \
+  --wait
 
 # Staple the notarization ticket
-xcrun stapler staple "build/MeticAI Installer.app"
+xcrun stapler staple "build/MeticAI.dmg"
 ```
 
-For most users, an unsigned app with quarantine removal instructions is sufficient.
+### GitHub Actions (Automated)
+
+The repository includes a GitHub Action that automatically builds and releases the DMG on every push to `main` that modifies the installer scripts.
+
+To enable code signing in GitHub Actions, add these secrets to your repository:
+
+| Secret | Description |
+|--------|-------------|
+| `MACOS_CERTIFICATE` | Base64-encoded .p12 certificate file |
+| `MACOS_CERTIFICATE_PWD` | Password for the .p12 certificate |
+| `KEYCHAIN_PWD` | A random password for the temporary keychain |
+| `SIGNING_IDENTITY` | The certificate name, e.g., "Developer ID Application: Your Name (TEAM_ID)" |
+| `APPLE_ID` | Your Apple ID email (for notarization) |
+| `APPLE_ID_PASSWORD` | App-specific password (generate at appleid.apple.com) |
+| `APPLE_TEAM_ID` | Your Apple Developer Team ID |
+
+#### Creating the Certificate Secret
+
+1. Export your "Developer ID Application" certificate from Keychain Access as a .p12 file
+2. Base64 encode it:
+   ```bash
+   base64 -i certificate.p12 | pbcopy
+   ```
+3. Paste the result as the `MACOS_CERTIFICATE` secret
+
+#### Without Signing
+
+If you don't have an Apple Developer account, the GitHub Action will still build the DMG - it just won't be signed. Users will need to right-click and select "Open" to bypass Gatekeeper.
+
+For most users, an unsigned app with quarantine removal instructions is sufficient:
+```bash
+xattr -cr "/Applications/MeticAI Installer.app"
+```
+
+## Automated Releases
+
+The GitHub Action (`.github/workflows/build-macos-installer.yml`) automatically:
+
+1. **Triggers on changes** to `macos-installer/`, `local-install.sh`, or `uninstall.sh`
+2. **Builds both apps** using Platypus on macOS
+3. **Signs the apps** (if certificates are configured)
+4. **Creates the DMG**
+5. **Notarizes** (if Apple credentials are configured)
+6. **Creates a GitHub Release** with the DMG attached
 
 ## Future Enhancements
 
