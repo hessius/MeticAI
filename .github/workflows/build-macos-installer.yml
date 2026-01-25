@@ -41,14 +41,20 @@ jobs:
           cd macos-installer
           chmod +x build-uninstaller-app.sh
           ./build-uninstaller-app.sh
-          
-      - name: Import Code Signing Certificate
-        if: github.event_name != 'pull_request' && env.MACOS_CERTIFICATE != ''
+      
+      # =======================================================================
+      # CODE SIGNING (OPTIONAL)
+      # Requires paid Apple Developer Program ($99/year)
+      # Without signing, users just need to right-click → Open once
+      # =======================================================================
+      - name: Import Code Signing Certificate (Optional)
+        if: github.event_name != 'pull_request' && secrets.MACOS_CERTIFICATE != ''
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
           KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PWD }}
         run: |
+          echo "🔐 Setting up code signing..."
           # Create a temporary keychain
           security create-keychain -p "$KEYCHAIN_PWD" build.keychain
           security default-keychain -s build.keychain
@@ -60,52 +66,50 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" build.keychain
           
           rm certificate.p12
+          echo "✅ Code signing certificate imported"
           
-      - name: Sign Apps
-        if: github.event_name != 'pull_request' && env.MACOS_CERTIFICATE != ''
+      - name: Sign Apps (Optional - requires Apple Developer account)
+        if: github.event_name != 'pull_request' && secrets.SIGNING_IDENTITY != ''
         env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
         run: |
-          if [ -n "$SIGNING_IDENTITY" ]; then
-            echo "Signing MeticAI Installer.app..."
-            codesign --force --deep --sign "$SIGNING_IDENTITY" "macos-installer/build/MeticAI Installer.app"
-            
-            echo "Signing MeticAI Uninstaller.app..."
-            codesign --force --deep --sign "$SIGNING_IDENTITY" "macos-installer/build/MeticAI Uninstaller.app"
-            
-            echo "Verifying signatures..."
-            codesign --verify --verbose "macos-installer/build/MeticAI Installer.app"
-            codesign --verify --verbose "macos-installer/build/MeticAI Uninstaller.app"
-          else
-            echo "No signing identity provided, skipping code signing"
-          fi
+          echo "🔐 Signing apps with: $SIGNING_IDENTITY"
+          codesign --force --deep --sign "$SIGNING_IDENTITY" "macos-installer/build/MeticAI Installer.app"
+          codesign --force --deep --sign "$SIGNING_IDENTITY" "macos-installer/build/MeticAI Uninstaller.app"
+          
+          echo "✅ Verifying signatures..."
+          codesign --verify --verbose "macos-installer/build/MeticAI Installer.app"
+          codesign --verify --verbose "macos-installer/build/MeticAI Uninstaller.app"
+          echo "✅ Apps signed successfully"
 
       - name: Create DMG
         run: |
           cd macos-installer
           hdiutil create -volname "MeticAI" -srcfolder build -ov -format UDZO "build/MeticAI.dmg"
-          
-      - name: Notarize DMG
-        if: github.event_name != 'pull_request' && env.APPLE_ID != ''
+          echo "✅ DMG created: build/MeticAI.dmg"
+      
+      # =======================================================================
+      # NOTARIZATION (OPTIONAL)
+      # Requires paid Apple Developer Program ($99/year)
+      # Without notarization, users just need to right-click → Open once
+      # =======================================================================
+      - name: Notarize DMG (Optional - requires Apple Developer account)
+        if: github.event_name != 'pull_request' && secrets.APPLE_ID != '' && secrets.APPLE_ID_PASSWORD != '' && secrets.APPLE_TEAM_ID != ''
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_ID_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            echo "Submitting for notarization..."
-            xcrun notarytool submit "macos-installer/build/MeticAI.dmg" \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_ID_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" \
-              --wait
-            
-            echo "Stapling notarization ticket..."
-            xcrun stapler staple "macos-installer/build/MeticAI.dmg"
-          else
-            echo "Apple credentials not provided, skipping notarization"
-          fi
+          echo "📤 Submitting for notarization..."
+          xcrun notarytool submit "macos-installer/build/MeticAI.dmg" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          
+          echo "📎 Stapling notarization ticket..."
+          xcrun stapler staple "macos-installer/build/MeticAI.dmg"
+          echo "✅ Notarization complete"
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
@@ -144,21 +148,26 @@ jobs:
           body: |
             ## macOS Installer for MeticAI
             
-            This release contains the macOS installer DMG for MeticAI.
+            Download `MeticAI.dmg` to install MeticAI on your Mac.
             
             ### Installation
-            1. Download `MeticAI.dmg`
+            1. Download `MeticAI.dmg` below
             2. Open the DMG file
-            3. Run "MeticAI Installer"
+            3. Run **MeticAI Installer**
             4. Follow the on-screen prompts
             
-            ### Uninstallation
-            1. Open the DMG file
-            2. Run "MeticAI Uninstaller"
-            3. Follow the on-screen prompts
+            ### First Launch Note
+            Since this app is not signed with an Apple Developer certificate, macOS will show a security warning.
             
-            ### Changes
-            - Built from commit: ${{ github.sha }}
+            **To open the app:**
+            - Right-click the app → Select "Open" → Click "Open" in the dialog
+            - Or run: `xattr -cr "/path/to/MeticAI Installer.app"`
+            
+            ### Uninstallation
+            The DMG also includes **MeticAI Uninstaller** to cleanly remove MeticAI.
+            
+            ---
+            Built from commit: ${{ github.sha }}
           files: MeticAI.dmg
           draft: false
           prerelease: false
