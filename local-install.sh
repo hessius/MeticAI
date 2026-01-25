@@ -1453,26 +1453,43 @@ fi
 if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Stopping existing containers..." 65
 fi
-sudo docker compose down 2>/dev/null || true
+
+# On macOS with Docker Desktop, we don't need sudo for docker commands
+# On Linux, we may need sudo if user isn't in docker group
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    docker compose down 2>/dev/null || true
+else
+    sudo docker compose down 2>/dev/null || true
+fi
 
 # Build and start
 if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Building containers (this may take a few minutes)..." 70
 fi
 
-if sudo docker compose up -d --build; then
+# Use docker without sudo on macOS
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    DOCKER_CMD="docker compose"
+else
+    DOCKER_CMD="sudo docker compose"
+fi
+
+if $DOCKER_CMD up -d --build; then
     if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
         show_progress "Finalizing installation..." 90
     fi
     
     # Fix ownership of any files created by Docker running as root
-    # This is needed because sudo docker compose creates files as root
+    # This is needed on Linux because sudo docker compose creates files as root
+    # On macOS with Docker Desktop, this is usually not necessary but doesn't hurt
     if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
         echo "Fixing file ownership..."
     fi
-    sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed .update-check-requested .update-requested 2>/dev/null || true
-    # Also fix git directories in case they were affected
-    sudo chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
+    if [[ "$OSTYPE" != "darwin"* ]]; then
+        sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed .update-check-requested .update-requested 2>/dev/null || true
+        # Also fix git directories in case they were affected
+        sudo chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
+    fi
     
     if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
         show_progress "Installation complete!" 100

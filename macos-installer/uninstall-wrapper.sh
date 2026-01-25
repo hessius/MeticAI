@@ -36,11 +36,22 @@ show_progress() {
     echo "PROGRESS: $message"
 }
 
-# Get icon path for dialogs
+# Get icon path for dialogs - set globally at startup
 get_icon_path() {
     # Try to find the app bundle we're running from
-    if [[ "$0" == *"/Contents/MacOS/"* ]]; then
-        # We're running from inside an app bundle
+    # Platypus bundles script in Contents/Resources/script
+    # Manual bundles put it in Contents/MacOS/
+    if [[ "$0" == *"/Contents/Resources/"* ]]; then
+        # Platypus bundle - script is in Contents/Resources/script
+        local bundle_path=$(echo "$0" | sed 's|/Contents/Resources/.*||')
+        local icon_path="$bundle_path/Contents/Resources/AppIcon.icns"
+        
+        if [ -f "$icon_path" ]; then
+            echo "$icon_path"
+            return
+        fi
+    elif [[ "$0" == *"/Contents/MacOS/"* ]]; then
+        # Manual bundle - script is in Contents/MacOS/
         local bundle_path=$(echo "$0" | sed 's|/Contents/MacOS/.*||')
         local icon_path="$bundle_path/Contents/Resources/AppIcon.icns"
         
@@ -54,15 +65,16 @@ get_icon_path() {
     echo ""
 }
 
+# Set global icon path at startup
+ICON_PATH=$(get_icon_path)
+
 # Display welcome/confirmation dialog
 show_welcome() {
-    local icon_path=$(get_icon_path)
-    
-    if [ -n "$icon_path" ]; then
+    if [ -n "$ICON_PATH" ]; then
         osascript <<EOF
 tell application "System Events"
     activate
-    set iconPath to POSIX file "$icon_path"
+    set iconPath to POSIX file "$ICON_PATH"
     set buttonReturned to button returned of (display dialog "MeticAI Uninstaller
 
 This will remove MeticAI from your system, including:
@@ -233,10 +245,18 @@ run_uninstallation() {
     # Remove macOS integrations
     show_progress "Removing macOS integrations..."
     
-    # Remove Dock shortcut if it exists
-    if [ -f "$HOME/Applications/MeticAI.app" ]; then
+    # Remove Dock shortcut if it exists (check both locations)
+    if [ -d "/Applications/MeticAI.app" ]; then
+        log_message "Removing /Applications/MeticAI.app"
+        rm -rf "/Applications/MeticAI.app" 2>/dev/null || sudo rm -rf "/Applications/MeticAI.app" 2>/dev/null || true
+    fi
+    if [ -d "$HOME/Applications/MeticAI.app" ]; then
+        log_message "Removing $HOME/Applications/MeticAI.app"
         rm -rf "$HOME/Applications/MeticAI.app"
     fi
+    
+    # Remove from Dock (refresh Dock to remove orphaned items)
+    killall Dock 2>/dev/null || true
     
     # Remove rebuild watcher service (macOS)
     if [ -f "$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist" ]; then
@@ -247,7 +267,11 @@ run_uninstallation() {
     # Ask about removing the installation directory
     show_progress "Finalizing uninstallation..."
     
-    local remove_dir=$(osascript <<EOF
+    local remove_dir
+    if [ -n "$ICON_PATH" ]; then
+        remove_dir=$(osascript -e "tell application \"System Events\"" -e "activate" -e "set iconPath to POSIX file \"$ICON_PATH\"" -e "set buttonReturned to button returned of (display dialog \"Remove Installation Directory?\" & return & return & \"Do you want to remove the MeticAI installation directory?\" & return & return & \"$install_dir\" & return & return & \"This will delete all files in this directory.\" buttons {\"Keep Directory\", \"Remove Directory\"} default button \"Keep Directory\" with icon file iconPath with title \"MeticAI Uninstaller\")" -e "return buttonReturned" -e "end tell")
+    else
+        remove_dir=$(osascript <<EOF
 tell application "System Events"
     activate
     set buttonReturned to button returned of (display dialog "Remove Installation Directory?
@@ -262,6 +286,7 @@ This will delete all files in this directory." buttons {"Keep Directory", "Remov
 end tell
 EOF
 )
+    fi
     
     if [ "$remove_dir" = "Remove Directory" ]; then
         cd "$HOME" || cd /
@@ -293,7 +318,10 @@ main() {
     
     if [ -z "$INSTALL_DIR" ]; then
         log_error "Could not find MeticAI installation"
-        osascript <<'EOF'
+        if [ -n "$ICON_PATH" ]; then
+            osascript -e "tell application \"System Events\"" -e "activate" -e "display dialog \"Installation Not Found\" & return & return & \"Could not locate MeticAI installation directory.\" & return & return & \"Please make sure MeticAI is installed before running the uninstaller.\" buttons {\"OK\"} default button \"OK\" with icon stop with title \"MeticAI Uninstaller\"" -e "end tell"
+        else
+            osascript <<'EOF'
 tell application "System Events"
     activate
     display dialog "Installation Not Found
@@ -303,25 +331,18 @@ Could not locate MeticAI installation directory.
 Please make sure MeticAI is installed before running the uninstaller." buttons {"OK"} default button "OK" with icon stop with title "MeticAI Uninstaller"
 end tell
 EOF
+        fi
         exit 1
     fi
     
     log_message "Installation directory: $INSTALL_DIR"
     
-    # Show starting dialog
-    osascript <<EOF &
-tell application "System Events"
-    activate
-    display dialog "Starting Uninstallation
-
-MeticAI will now be uninstalled from:
-$INSTALL_DIR
-
-The uninstallation will run in the background.
-
-Please wait for completion..." buttons {"OK"} default button "OK" with icon note with title "MeticAI Uninstaller" giving up after 5
-end tell
-EOF
+    # Show starting dialog - inform user it will auto-close
+    if [ -n "$ICON_PATH" ]; then
+        osascript -e "tell application \"System Events\"" -e "activate" -e "set iconPath to POSIX file \"$ICON_PATH\"" -e "display dialog \"Starting Uninstallation\" & return & return & \"MeticAI will now be uninstalled.\" & return & return & \"This dialog will close automatically.\" buttons {\"OK\"} default button \"OK\" with icon file iconPath giving up after 5" -e "end tell" &
+    else
+        osascript -e 'tell application "System Events" to display dialog "Starting Uninstallation\n\nMeticAI will now be uninstalled.\n\nThis dialog will close automatically." buttons {"OK"} default button "OK" with icon caution giving up after 5' &
+    fi
     
     sleep 1
     
@@ -337,13 +358,11 @@ EOF
         log_message "Uninstallation completed successfully"
         
         # Show success dialog with custom icon
-        local icon_path=$(get_icon_path)
-        
-        if [ -n "$icon_path" ]; then
+        if [ -n "$ICON_PATH" ]; then
             osascript <<EOF
 tell application "System Events"
     activate
-    set iconPath to POSIX file "$icon_path"
+    set iconPath to POSIX file "$ICON_PATH"
     display dialog "Uninstallation Complete! ✓
 
 MeticAI has been successfully uninstalled.
