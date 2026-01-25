@@ -39,6 +39,9 @@ logger = logging.getLogger(__name__)
 # Update check interval: 2 hours in seconds
 UPDATE_CHECK_INTERVAL = 7200
 
+# Maximum upload file size: 10 MB
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
+
 
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
@@ -1037,6 +1040,30 @@ def _set_cached_shots(profile_name: str, data: dict, limit: int):
 IMAGE_CACHE_DIR = Path("/app/data/image_cache")
 
 
+def _sanitize_profile_name_for_filename(profile_name: str) -> str:
+    """Safely sanitize profile name for use in filenames.
+    
+    Args:
+        profile_name: The profile name to sanitize
+        
+    Returns:
+        A safe filename string
+        
+    Note:
+        This prevents path traversal attacks by removing/replacing
+        all potentially dangerous characters.
+    """
+    import re
+    # Remove any path separators and parent directory references
+    safe_name = profile_name.replace('/', '_').replace('\\', '_').replace('..', '_')
+    # Keep only alphanumeric, spaces, hyphens, and underscores
+    safe_name = re.sub(r'[^a-zA-Z0-9\s\-_]', '_', safe_name)
+    # Replace spaces with underscores and convert to lowercase
+    safe_name = safe_name.replace(' ', '_').lower()
+    # Limit length to prevent filesystem issues
+    return safe_name[:200]
+
+
 def _ensure_image_cache_dir():
     """Ensure the image cache directory exists."""
     IMAGE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -1048,7 +1075,18 @@ def _get_cached_image(profile_name: str) -> Optional[bytes]:
     Returns the image bytes or None if not cached.
     """
     _ensure_image_cache_dir()
-    cache_file = IMAGE_CACHE_DIR / f"{profile_name.lower().replace('/', '_').replace(' ', '_')}.png"
+    safe_name = _sanitize_profile_name_for_filename(profile_name)
+    cache_file = IMAGE_CACHE_DIR / f"{safe_name}.png"
+    
+    # Security check: ensure the resolved path is still within IMAGE_CACHE_DIR
+    try:
+        cache_file_resolved = cache_file.resolve()
+        if not str(cache_file_resolved).startswith(str(IMAGE_CACHE_DIR.resolve())):
+            logger.warning(f"Path traversal attempt detected for profile: {profile_name}")
+            return None
+    except Exception as e:
+        logger.warning(f"Failed to resolve cache path for {profile_name}: {e}")
+        return None
     
     if cache_file.exists():
         try:
@@ -1062,7 +1100,18 @@ def _get_cached_image(profile_name: str) -> Optional[bytes]:
 def _set_cached_image(profile_name: str, image_data: bytes):
     """Store image in cache for a profile."""
     _ensure_image_cache_dir()
-    cache_file = IMAGE_CACHE_DIR / f"{profile_name.lower().replace('/', '_').replace(' ', '_')}.png"
+    safe_name = _sanitize_profile_name_for_filename(profile_name)
+    cache_file = IMAGE_CACHE_DIR / f"{safe_name}.png"
+    
+    # Security check: ensure the resolved path is still within IMAGE_CACHE_DIR
+    try:
+        cache_file_resolved = cache_file.resolve()
+        if not str(cache_file_resolved).startswith(str(IMAGE_CACHE_DIR.resolve())):
+            logger.warning(f"Path traversal attempt detected for profile: {profile_name}")
+            return
+    except Exception as e:
+        logger.warning(f"Failed to resolve cache path for {profile_name}: {e}")
+        return
     
     try:
         cache_file.write_bytes(image_data)
@@ -1818,8 +1867,15 @@ async def upload_profile_image(
                 detail="File must be an image"
             )
         
-        # Read image data
+        # Read image data with size limit
         image_data = await file.read()
+        
+        # Validate file size
+        if len(image_data) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Image too large. Maximum size is {MAX_UPLOAD_SIZE / (1024*1024):.0f}MB"
+            )
         
         # Process image: crop, resize, encode
         image_data_uri, png_bytes = process_image_for_profile(image_data, file.content_type)
@@ -2258,9 +2314,37 @@ async def apply_profile_image(
             # Format: data:image/png;base64,<data>
             header, b64_data = image_data_uri.split(',', 1)
             png_bytes = base64.b64decode(b64_data)
+            
+            # Validate decoded size
+            if len(png_bytes) > MAX_UPLOAD_SIZE:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Decoded image too large. Maximum size is {MAX_UPLOAD_SIZE / (1024*1024):.0f}MB"
+                )
+            
+            # Validate it's actually a valid PNG image
+            try:
+                img = PILImage.open(io.BytesIO(png_bytes))
+                img.verify()  # Verify it's a valid image
+                # Re-open since verify() closes the file
+                img = PILImage.open(io.BytesIO(png_bytes))
+                if img.format != 'PNG':
+                    logger.warning(f"Expected PNG format, got {img.format} for profile {profile_name}")
+            except Exception as img_err:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid image data: {str(img_err)}"
+                )
+            
             _set_cached_image(profile_name, png_bytes)
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.warning(f"Failed to cache image from apply-image: {e}")
+            logger.warning(f"Failed to process/cache image from apply-image: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to decode image data: {str(e)}"
+            )
         
         # Find the profile and update it
         api = get_meticulous_api()
