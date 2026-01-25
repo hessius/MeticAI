@@ -10,6 +10,7 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 from unittest.mock import Mock, patch, MagicMock, mock_open, AsyncMock
 from io import BytesIO
 from PIL import Image
@@ -1687,6 +1688,120 @@ class TestShotAnalysisHelpers:
         assert stats["avg_pressure"] > 8.0
         assert stats["avg_pressure"] < 9.0
 
+    def test_format_dynamics_description_flow_type(self):
+        """Test with flow type."""
+        from main import _format_dynamics_description
+        
+        stage = {
+            "type": "flow",
+            "dynamics_points": [[0, 2.0], [10, 4.0]],
+            "dynamics_over": "time"
+        }
+        result = _format_dynamics_description(stage)
+        assert "ml/s" in result
+
+    def test_safe_float_with_string(self):
+        """Test _safe_float with string input."""
+        from main import _safe_float
+        
+        assert _safe_float("42.5") == 42.5
+        assert _safe_float("invalid") == 0.0
+        assert _safe_float("", 5.0) == 5.0
+        assert _safe_float(None, 10.0) == 10.0
+
+    def test_resolve_variable_basic(self):
+        """Test variable resolution."""
+        from main import _resolve_variable
+        
+        variables = [
+            {"key": "dose", "name": "Dose", "value": 18.0},
+            {"key": "ratio", "name": "Ratio", "value": 2.0}
+        ]
+        
+        value, name = _resolve_variable("$dose", variables)
+        assert value == 18.0
+        assert name == "Dose"
+
+    def test_resolve_variable_not_found(self):
+        """Test variable resolution when variable not found."""
+        from main import _resolve_variable
+        
+        variables = []
+        value, name = _resolve_variable("$unknown", variables)
+        assert value == "$unknown"
+        assert name == "unknown"
+
+    def test_resolve_variable_not_variable(self):
+        """Test resolution of non-variable value."""
+        from main import _resolve_variable
+        
+        value, name = _resolve_variable(42.0, [])
+        assert value == 42.0
+        assert name is None
+
+    def test_format_exit_triggers_basic(self):
+        """Test exit trigger formatting."""
+        from main import _format_exit_triggers
+        
+        triggers = [
+            {"type": "time", "value": 25, "comparison": ">="},
+            {"type": "weight", "value": 36, "comparison": ">="}
+        ]
+        
+        result = _format_exit_triggers(triggers)
+        assert len(result) == 2
+        assert result[0]["type"] == "time"
+        assert "25" in result[0]["description"]  # Contains 25
+        assert "s" in result[0]["description"]   # Has seconds unit
+
+    def test_format_limits_basic(self):
+        """Test limits formatting."""
+        from main import _format_limits
+        
+        limits = [
+            {"type": "pressure", "value": 10, "comparison": "<="},
+            {"type": "flow", "value": 4, "comparison": "<="}
+        ]
+        
+        result = _format_limits(limits)
+        assert len(result) == 2
+        assert "10" in result[0]["description"]  # Contains 10
+        assert "bar" in result[0]["description"]  # Has bar unit
+
+    def test_extract_shot_stage_data(self):
+        """Test extracting stage data from shot."""
+        from main import _extract_shot_stage_data
+        
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0, "flow": 0.5}, "status": "during", "stage_name": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0, "flow": 0.5}, "status": "during", "stage_name": "Bloom"},
+                {"time": 10000, "shot": {"weight": 10.0, "pressure": 9.0, "flow": 2.5}, "status": "during", "stage_name": "Main"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}, "status": "during", "stage_name": "Main"},
+            ]
+        }
+        
+        result = _extract_shot_stage_data(shot_data)
+        # Function returns dict of stages
+        assert isinstance(result, dict)
+
+    def test_prepare_profile_for_llm(self):
+        """Test preparing profile data for LLM."""
+        from main import _prepare_profile_for_llm
+        
+        profile_data = {
+            "name": "Test",
+            "temperature": 93.0,
+            "final_weight": 36.0,
+            "variables": [{"key": "dose", "value": 18.0}],
+            "stages": [{"name": "Main", "type": "pressure"}]
+        }
+        
+        result = _prepare_profile_for_llm(profile_data, "Test description")
+        assert result["name"] == "Test"
+        assert "stages" in result
+        assert "variables" in result
+
 
 class TestBasicEndpoints:
     """Tests for basic utility endpoints."""
@@ -2749,6 +2864,949 @@ class TestAdditionalEndpoints:
         assert "update_available" in data
 
 
+class TestGetProfileInfoEndpoint:
+    """Tests for the GET /api/profile/{profile_name} endpoint."""
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_success(self, mock_get_api, client):
+        """Test successful profile retrieval."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        # Mock list profiles
+        partial_profile = type('PartialProfile', (), {})()
+        partial_profile.name = "Test Profile"
+        partial_profile.id = "profile-123"
+        partial_profile.error = None
+        mock_api.list_profiles.return_value = [partial_profile]
+        
+        # Mock get full profile
+        full_profile = type('FullProfile', (), {})()
+        full_profile.id = "profile-123"
+        full_profile.name = "Test Profile"
+        full_profile.author = "Barista"
+        full_profile.temperature = 93.0
+        full_profile.final_weight = 36.0
+        full_profile.error = None
+        
+        display = type('Display', (), {})()
+        display.image = "data:image/png;base64,abc123"
+        display.accentColor = "#FF5733"
+        full_profile.display = display
+        
+        mock_api.get_profile.return_value = full_profile
+        
+        response = client.get("/api/profile/Test%20Profile")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile"]["name"] == "Test Profile"
+        assert data["profile"]["temperature"] == 93.0
+        assert data["profile"]["final_weight"] == 36.0
+        assert data["profile"]["image"] == "data:image/png;base64,abc123"
+        assert data["profile"]["accent_color"] == "#FF5733"
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_not_found(self, mock_get_api, client):
+        """Test error when profile not found."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.get("/api/profile/Nonexistent")
+        
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_no_display(self, mock_get_api, client):
+        """Test profile without display/image."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial_profile = type('PartialProfile', (), {})()
+        partial_profile.name = "Simple"
+        partial_profile.id = "profile-456"
+        partial_profile.error = None
+        mock_api.list_profiles.return_value = [partial_profile]
+        
+        full_profile = type('FullProfile', (), {})()
+        full_profile.id = "profile-456"
+        full_profile.name = "Simple"
+        full_profile.author = "Basic"
+        full_profile.temperature = 90.0
+        full_profile.final_weight = 40.0
+        full_profile.display = None
+        full_profile.error = None
+        
+        mock_api.get_profile.return_value = full_profile
+        
+        response = client.get("/api/profile/Simple")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile"]["image"] is None
+        assert data["profile"]["accent_color"] is None
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_api_error(self, mock_get_api, client):
+        """Test handling of machine API errors."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        error_result = type('ErrorResult', (), {})()
+        error_result.error = "Connection failed"
+        mock_api.list_profiles.return_value = error_result
+        
+        response = client.get("/api/profile/Test")
+        
+        assert response.status_code == 502
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_exception(self, mock_get_api, client):
+        """Test exception handling."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.side_effect = Exception("Unexpected error")
+        
+        response = client.get("/api/profile/Test")
+        
+        assert response.status_code == 500
+
+
+class TestLocalShotAnalysisEndpoint:
+    """Tests for the POST /api/shots/analyze endpoint."""
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_success(self, mock_get_api, mock_fetch_shot, client):
+        """Test successful local shot analysis."""
+        # Mock shot data
+        shot_data = {
+            "profile_name": "Test Profile",
+            "time": 1705320000,
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 0, "flow": 0}},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}},
+            ]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        # Mock profile data
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial_profile = type('PartialProfile', (), {})()
+        partial_profile.name = "Test Profile"
+        partial_profile.id = "profile-123"
+        partial_profile.error = None
+        mock_api.list_profiles.return_value = [partial_profile]
+        
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Test Profile"
+        full_profile.temperature = 93.0
+        full_profile.final_weight = 36.0
+        full_profile.variables = []
+        full_profile.stages = []
+        full_profile.error = None
+        mock_api.get_profile.return_value = full_profile
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test Profile",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot_001.json"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "analysis" in data
+        assert "shot_summary" in data["analysis"]
+        assert data["analysis"]["shot_summary"]["final_weight"] == 36.0
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_with_preinfusion(self, mock_get_api, mock_fetch_shot, client):
+        """Test analysis detects preinfusion stages."""
+        shot_data = {
+            "profile_name": "Complex",
+            "time": 1705320000,
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0, "flow": 0.5}, "stage_name": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0, "flow": 0.5}, "stage_name": "Bloom"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}, "stage_name": "Main"},
+            ]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Complex"
+        partial.id = "p-456"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Complex"
+        full.temperature = 92.0
+        full.final_weight = 36.0
+        full.variables = []
+        
+        # Create stages with preinfusion
+        stage1 = type('Stage', (), {})()
+        stage1.name = "Bloom"
+        stage1.key = "bloom"
+        stage1.type = "pressure"
+        stage1.dynamics_points = [[0, 2.0], [5, 2.0]]
+        stage1.dynamics_over = "time"
+        stage1.dynamics_interpolation = "linear"
+        stage1.exit_triggers = []
+        stage1.limits = []
+        
+        stage2 = type('Stage', (), {})()
+        stage2.name = "Main"
+        stage2.key = "main"
+        stage2.type = "pressure"
+        stage2.dynamics_points = [[0, 9.0]]
+        stage2.dynamics_over = "time"
+        stage2.dynamics_interpolation = "linear"
+        stage2.exit_triggers = []
+        stage2.limits = []
+        
+        full.stages = [stage1, stage2]
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Complex",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "preinfusion_summary" in data["analysis"]
+
+    def test_local_shot_analysis_missing_params(self, client):
+        """Test error when required parameters missing."""
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test"
+            # Missing shot_date and shot_filename
+        })
+        
+        assert response.status_code == 422
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    def test_local_shot_analysis_shot_not_found(self, mock_fetch_shot, client):
+        """Test error when shot data not found."""
+        async def raise_http_exception(*args, **kwargs):
+            raise HTTPException(status_code=404, detail="Shot not found")
+        
+        mock_fetch_shot.side_effect = raise_http_exception
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "missing.json"
+        })
+        
+        assert response.status_code == 404
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
+        """Test error when profile not found."""
+        mock_fetch_shot.return_value = {
+            "profile_name": "Unknown",
+            "time": 1705320000,
+            "data": []
+        }
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Unknown",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 404
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_weight_deviation(self, mock_get_api, mock_fetch_shot, client):
+        """Test analysis with weight deviation."""
+        shot_data = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 0, "flow": 0}},
+                {"time": 25000, "shot": {"weight": 45.0, "pressure": 9.0, "flow": 2.5}},  # Over target
+            ]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0  # Target is 36g, got 45g
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["analysis"]["weight_analysis"]["status"] == "over"
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_exception(self, mock_get_api, mock_fetch_shot, client):
+        """Test handling of unexpected exceptions."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.side_effect = Exception("Unexpected error")
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 500
+
+
+class TestGenerateProfileImageEndpoint:
+    """Tests for the POST /api/profile/{profile_name}/generate-image endpoint."""
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_preview_mode(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test image generation in preview mode."""
+        # Mock subprocess for nanobanana
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        mock_result.stderr = ""
+        
+        mock_subprocess.side_effect = [
+            mock_result,  # nanobanana execution
+            MagicMock(returncode=0),  # test -f check
+            MagicMock(returncode=0, stdout=b"fake_png_data")  # cat image
+        ]
+        
+        # Mock image processing
+        mock_process.return_value = ("data:image/png;base64,abc123", b"png_bytes")
+        
+        response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "preview"
+        assert "image_data" in data
+        assert data["style"] == "abstract"
+        assert "prompt" in data
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_save_to_profile(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test image generation and save to profile."""
+        # Mock subprocess
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        
+        # Mock API
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test Profile"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.id = "p-123"
+        full.name = "Test Profile"
+        full.display = None
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        save_result = type('SaveResult', (), {})()
+        save_result.error = None
+        mock_api.save_profile.return_value = save_result
+        
+        response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile_id"] == "p-123"
+
+    @patch('subprocess.run')
+    def test_generate_image_nanobanana_auth_error(self, mock_subprocess, client):
+        """Test handling of API key errors."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "API key authentication failed"
+        mock_result.stdout = ""
+        mock_subprocess.return_value = mock_result
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 402
+
+    @patch('subprocess.run')
+    def test_generate_image_nanobanana_generic_error(self, mock_subprocess, client):
+        """Test handling of generic generation errors."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "Unknown error occurred"
+        mock_result.stdout = ""
+        mock_subprocess.return_value = mock_result
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 500
+
+    @patch('subprocess.run')
+    def test_generate_image_timeout(self, mock_subprocess, client):
+        """Test handling of generation timeout."""
+        mock_subprocess.side_effect = subprocess.TimeoutExpired("docker", 120)
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 504
+
+    @patch('subprocess.run')
+    @patch('main.process_image_for_profile')
+    def test_generate_image_file_not_found(self, mock_process, mock_subprocess, client):
+        """Test when generated image cannot be found."""
+        # Nanobanana succeeds but file not found
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Done but no file path"
+        
+        # All file checks fail
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=1),  # File not found
+            MagicMock(returncode=1, stdout="")  # ls also fails
+        ]
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 500
+
+    @patch('subprocess.run')
+    @patch('main._set_cached_image')
+    def test_generate_image_invalid_style(self, mock_cache, mock_subprocess, client):
+        """Test with invalid style parameter (should default to abstract)."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        with patch('main.process_image_for_profile') as mock_process:
+            mock_process.return_value = ("data:image/png;base64,xyz", b"png")
+            
+            response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["style"] == "abstract"  # Should default
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_profile_not_found_for_save(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test error when profile not found for saving."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
+        
+        assert response.status_code == 404
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_save_failure(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test handling of profile save failure."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.id = "p-123"
+        full.name = "Test"
+        full.display = None
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        # Save fails
+        save_result = type('SaveResult', (), {})()
+        save_result.error = "Failed to save"
+        mock_api.save_profile.return_value = save_result
+        
+        response = client.post("/api/profile/Test/generate-image?preview=false")
+        
+        assert response.status_code == 502
+
+    @patch('subprocess.run')
+    def test_generate_image_read_failure(self, mock_subprocess, client):
+        """Test when reading generated image fails."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        # File exists but cat fails
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),  # test -f succeeds
+            MagicMock(returncode=1, stderr="Read error")  # cat fails
+        ]
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 500
+
+
+class TestLLMShotAnalysisEndpoint:
+    """Tests for the POST /api/shots/analyze-llm endpoint."""
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_success(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test successful LLM shot analysis."""
+        # Mock shot data
+        shot_data = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [{"time": 25000, "shot": {"weight": 36.0}}]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        # Mock profile
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        # Mock local analysis
+        mock_local_analysis.return_value = {
+            "summary": {"final_weight": 36.0},
+            "stages": []
+        }
+        
+        # Mock LLM response
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "## 1. Shot Performance\n\n**What Happened:**\n- Excellent extraction\n\n**Assessment:** Good"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json",
+            "profile_description": "Test description"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "llm_analysis" in data
+        assert "Shot Performance" in data["llm_analysis"]
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_llm_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
+        """Test error when profile not found."""
+        mock_fetch_shot.return_value = {"profile_name": "Unknown", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Unknown",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 404
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_model_error(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test handling of LLM errors."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        
+        mock_model = MagicMock()
+        mock_model.generate_content.side_effect = Exception("API rate limit")
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 500
+
+    def test_llm_analysis_missing_params(self, client):
+        """Test error with missing required parameters."""
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test"
+            # Missing shot_date and shot_filename
+        })
+        
+        assert response.status_code == 422
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_with_description(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test LLM analysis with profile description."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Analysis with description context"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json",
+            "profile_description": "A gentle preinfusion profile"
+        })
+        
+        assert response.status_code == 200
+        # Verify description was passed to LLM
+        call_args = mock_model.generate_content.call_args[0][0]
+        assert "gentle preinfusion" in call_args
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_with_variables(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test LLM analysis with profile variables."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        # Create variable
+        var = type('Var', (), {})()
+        var.key = "dose"
+        var.name = "Dose"
+        var.type = "number"
+        var.value = 18.0
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = [var]
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Analysis"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 200
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    def test_llm_analysis_shot_not_found(self, mock_fetch_shot, client):
+        """Test error when shot data not found."""
+        async def raise_http_exception(*args, **kwargs):
+            raise HTTPException(status_code=404, detail="Shot not found")
+        
+        mock_fetch_shot.side_effect = raise_http_exception
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "missing.json"
+        })
+        
+        assert response.status_code == 404
+
+
+class TestConvertDescriptionEndpoint:
+    """Tests for the POST /api/profile/convert-description endpoint."""
+
+    @patch('main.get_vision_model')
+    @patch('main.HISTORY_FILE')
+    def test_convert_description_success(self, mock_history_file, mock_get_model, client):
+        """Test successful description conversion."""
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = """Profile Created: Test Profile
+
+Description:
+A balanced espresso profile with gentle preinfusion.
+
+Preparation:
+• Dose: 18g
+• Grind: Medium-fine
+• Temperature: 93°C
+• Target Yield: 36g
+
+Why This Works:
+The preinfusion allows even saturation before pressure ramp.
+
+Special Notes:
+Adjust grind based on bean age."""
+        
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        mock_history_file.exists.return_value = False
+        
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {
+                "name": "Test Profile",
+                "temperature": 93.0,
+                "final_weight": 36.0,
+                "stages": []
+            },
+            "description": "Original description here"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "converted_description" in data
+        assert "Profile Created" in data["converted_description"]
+
+    @patch('main.get_vision_model')
+    @patch('main.HISTORY_FILE')
+    def test_convert_description_with_history_update(self, mock_history_file, mock_get_model, client):
+        """Test conversion updates history entry."""
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Converted description"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        # Mock history file
+        mock_history_file.exists.return_value = True
+        existing_history = [
+            {"id": "entry-123", "profile_name": "Test", "reply": "Old description"},
+            {"id": "entry-456", "profile_name": "Other", "reply": "Other description"}
+        ]
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(existing_history))) as mock_file:
+            response = client.post("/api/profile/convert-description", json={
+                "profile": {"name": "Test", "temperature": 93.0, "final_weight": 36.0},
+                "description": "Original",
+                "entry_id": "entry-123"
+            })
+        
+        assert response.status_code == 200
+
+    def test_convert_description_missing_profile(self, client):
+        """Test error when profile JSON missing."""
+        response = client.post("/api/profile/convert-description", json={
+            "description": "Some description"
+            # Missing profile
+        })
+        
+        assert response.status_code == 400
+
+    @patch('main.get_vision_model')
+    def test_convert_description_model_error(self, mock_get_model, client):
+        """Test handling of LLM errors."""
+        mock_model = MagicMock()
+        mock_model.generate_content.side_effect = Exception("API error")
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {"name": "Test", "temperature": 93.0},
+            "description": "Original"
+        })
+        
+        assert response.status_code == 500
+
+    @patch('main.get_vision_model')
+    def test_convert_description_preserves_info(self, mock_get_model, client):
+        """Test that conversion prompt preserves all information."""
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Converted"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {
+                "name": "Complex Profile",
+                "temperature": 94.5,
+                "final_weight": 42.0,
+                "stages": [{"name": "Stage1"}]
+            },
+            "description": "Detailed original description with specific notes"
+        })
+        
+        assert response.status_code == 200
+        # Verify prompt included original description
+        call_args = mock_model.generate_content.call_args[0][0]
+        assert "Detailed original description" in call_args
+        assert "Complex Profile" in call_args
+
+
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 
@@ -2772,3 +3830,53 @@ class TestErrorHandling:
         
         # Should return empty or handle gracefully
         assert response.status_code in [200, 500]
+
+    def test_parse_gemini_error_rate_limit(self):
+        """Test parsing of Gemini rate limit errors."""
+        from main import parse_gemini_error
+        
+        error_text = "429 RESOURCE_EXHAUSTED: Quota exceeded"
+        result = parse_gemini_error(error_text)
+        result_lower = str(result).lower()
+        assert "rate limit" in result_lower or "quota" in result_lower
+
+    def test_parse_gemini_error_generic(self):
+        """Test parsing of generic errors."""
+        from main import parse_gemini_error
+        
+        error_text = "Unknown error occurred"
+        result = parse_gemini_error(error_text)
+        assert isinstance(result, str)  # Returns a string
+
+    def test_safe_float_edge_cases(self):
+        """Test safe float conversion with various inputs."""
+        from main import _safe_float
+        
+        assert _safe_float(0) == 0.0
+        assert _safe_float(0.0) == 0.0
+        assert _safe_float([]) == 0.0  # Invalid type
+        assert _safe_float({}) == 0.0  # Invalid type
+
+    def test_compute_stage_stats_with_gravimetric_flow(self):
+        """Test stats with gravimetric_flow field."""
+        from main import _compute_stage_stats
+        
+        entries = [
+            {"time": 0, "shot": {"weight": 0, "pressure": 9.0, "gravimetric_flow": 2.0}},
+            {"time": 5000, "shot": {"weight": 10.0, "pressure": 9.0, "gravimetric_flow": 2.5}},
+        ]
+        
+        result = _compute_stage_stats(entries)
+        assert result["max_flow"] > 0  # Should use gravimetric_flow
+
+    def test_format_dynamics_over_weight(self):
+        """Test dynamics description over weight."""
+        from main import _format_dynamics_description
+        
+        stage = {
+            "type": "flow",
+            "dynamics_points": [[0, 2.0], [40, 3.0]],
+            "dynamics_over": "weight"
+        }
+        result = _format_dynamics_description(stage)
+        assert "g" in result  # Should use weight unit
