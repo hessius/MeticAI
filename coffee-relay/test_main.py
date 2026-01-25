@@ -1380,3 +1380,134 @@ Description: A test profile
         assert len(saved_history) == 2
         assert saved_history[0]["profile_name"] == "New Profile"
         assert saved_history[1]["id"] == "old-entry"
+
+
+class TestSecurityFeatures:
+    """Tests for security features added to prevent vulnerabilities."""
+
+    def test_sanitize_profile_name_for_filename(self):
+        """Test that profile names are properly sanitized for filenames."""
+        from main import _sanitize_profile_name_for_filename
+        
+        # Test path traversal attempts
+        assert ".." not in _sanitize_profile_name_for_filename("../../etc/passwd")
+        assert "/" not in _sanitize_profile_name_for_filename("path/to/file")
+        assert "\\" not in _sanitize_profile_name_for_filename("path\\to\\file")
+        
+        # Test special characters are removed/replaced
+        result = _sanitize_profile_name_for_filename("Profile: Test & Name!")
+        assert ":" not in result
+        assert "&" not in result
+        assert "!" not in result
+        
+        # Test spaces are replaced with underscores
+        assert _sanitize_profile_name_for_filename("My Profile") == "my_profile"
+        
+        # Test length limiting
+        long_name = "a" * 300
+        result = _sanitize_profile_name_for_filename(long_name)
+        assert len(result) <= 200
+    
+    def test_get_cached_image_prevents_path_traversal(self):
+        """Test that _get_cached_image prevents path traversal attacks."""
+        from main import _get_cached_image
+        from pathlib import Path
+        import tempfile
+        import shutil
+        
+        # Create a temporary test cache directory
+        temp_dir = tempfile.mkdtemp()
+        cache_dir = Path(temp_dir) / 'test_cache'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Patch IMAGE_CACHE_DIR to use our temp directory
+        with patch('main.IMAGE_CACHE_DIR', cache_dir):
+            # Attempt path traversal - should return None safely
+            result = _get_cached_image("../../etc/passwd")
+            assert result is None
+            
+            # Also test other path traversal attempts
+            result = _get_cached_image("../../../root")
+            assert result is None
+        
+        # Clean up
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.get_meticulous_api')
+    def test_upload_profile_image_validates_size(self, mock_api, client):
+        """Test that image upload validates file size."""
+        from main import MAX_UPLOAD_SIZE
+        
+        # Create a large image (simulate exceeding limit)
+        large_image = BytesIO(b"x" * (MAX_UPLOAD_SIZE + 1000))
+        
+        response = client.post(
+            "/api/profile/test-profile/image",
+            files={"file": ("test.png", large_image, "image/png")}
+        )
+        
+        assert response.status_code == 413  # Payload Too Large
+        assert "too large" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.get_meticulous_api')
+    def test_upload_profile_image_validates_content_type(self, mock_api, client, sample_image):
+        """Test that image upload validates content type."""
+        response = client.post(
+            "/api/profile/test-profile/image",
+            files={"file": ("test.txt", sample_image, "text/plain")}
+        )
+        
+        assert response.status_code == 400
+        assert "must be an image" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.get_meticulous_api')
+    def test_apply_profile_image_validates_base64_size(self, mock_api, client):
+        """Test that apply-image endpoint validates decoded size."""
+        import base64
+        from main import MAX_UPLOAD_SIZE
+        
+        # Create oversized base64 data
+        large_data = b"x" * (MAX_UPLOAD_SIZE + 1000)
+        b64_data = base64.b64encode(large_data).decode('utf-8')
+        data_uri = f"data:image/png;base64,{b64_data}"
+        
+        response = client.post(
+            "/api/profile/test-profile/apply-image",
+            json={"image_data": data_uri}
+        )
+        
+        assert response.status_code == 413  # Payload Too Large
+        assert "too large" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_apply_profile_image_validates_format(self, client):
+        """Test that apply-image endpoint validates image format."""
+        # Test with invalid data URI format
+        response = client.post(
+            "/api/profile/test-profile/apply-image",
+            json={"image_data": "not-a-data-uri"}
+        )
+        
+        assert response.status_code == 400
+        assert "invalid" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_apply_profile_image_validates_png_format(self, client):
+        """Test that apply-image validates it's actually PNG data."""
+        import base64
+        
+        # Create invalid PNG data (just random bytes)
+        fake_data = b"not-a-valid-png-image"
+        b64_data = base64.b64encode(fake_data).decode('utf-8')
+        data_uri = f"data:image/png;base64,{b64_data}"
+        
+        response = client.post(
+            "/api/profile/test-profile/apply-image",
+            json={"image_data": data_uri}
+        )
+        
+        assert response.status_code == 400
+        assert "invalid image" in response.json()["detail"].lower()
