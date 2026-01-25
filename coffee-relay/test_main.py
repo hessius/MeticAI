@@ -10,11 +10,14 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, MagicMock, mock_open
+from unittest.mock import Mock, patch, MagicMock, mock_open, AsyncMock
 from io import BytesIO
 from PIL import Image
+from pathlib import Path
 import os
 import subprocess
+import json
+import time
 
 
 # Import the app
@@ -1514,3 +1517,272 @@ class TestSecurityFeatures:
         
         assert response.status_code == 400
         assert "invalid image" in response.json()["detail"].lower()
+
+
+class TestHelperFunctions:
+    """Tests for helper functions that process data."""
+    
+    def test_safe_float_with_valid_input(self):
+        """Test _safe_float with valid float."""
+        from main import _safe_float
+        
+        assert _safe_float(3.14) == 3.14
+        assert _safe_float("5.5") == 5.5
+        assert _safe_float(10) == 10.0
+    
+    def test_safe_float_with_invalid_input(self):
+        """Test _safe_float with invalid input uses default."""
+        from main import _safe_float
+        
+        assert _safe_float("invalid", default=0.0) == 0.0
+        assert _safe_float(None, default=1.5) == 1.5
+        assert _safe_float({}, default=2.0) == 2.0
+    
+    def test_sanitize_profile_name_for_filename_basic(self):
+        """Test basic filename sanitization."""
+        from main import _sanitize_profile_name_for_filename
+        
+        # Normal name
+        assert _sanitize_profile_name_for_filename("My Profile") == "my_profile"
+        
+        # With special characters
+        result = _sanitize_profile_name_for_filename("Profile: Test!")
+        assert ":" not in result
+        assert "!" not in result
+    
+    def test_sanitize_profile_name_path_traversal(self):
+        """Test path traversal prevention in filename sanitization."""
+        from main import _sanitize_profile_name_for_filename
+        
+        # Path traversal attempts
+        assert ".." not in _sanitize_profile_name_for_filename("../../../etc/passwd")
+        assert "/" not in _sanitize_profile_name_for_filename("path/to/file")
+        assert "\\" not in _sanitize_profile_name_for_filename("path\\to\\file")
+    
+    def test_extract_profile_name_from_reply(self):
+        """Test extraction of profile name from LLM reply."""
+        from main import _extract_profile_name
+        
+        # Standard format
+        reply = "Profile Created: My Amazing Profile\nSome description..."
+        assert _extract_profile_name(reply) == "My Amazing Profile"
+        
+        # With extra whitespace
+        reply2 = "Profile Created:  Spaced Name  \nMore text"
+        assert _extract_profile_name(reply2).strip() == "Spaced Name"
+    
+    def test_extract_profile_name_not_found(self):
+        """Test profile name extraction when not found."""
+        from main import _extract_profile_name
+        
+        reply = "This doesn't contain the profile marker"
+        assert _extract_profile_name(reply) == "Untitled Profile"
+
+
+class TestCacheManagement:
+    """Tests for caching helper functions."""
+    
+    @patch('main.IMAGE_CACHE_DIR', Path('/tmp/test_image_cache'))
+    def test_ensure_image_cache_dir(self):
+        """Test that cache directory is created."""
+        from main import _ensure_image_cache_dir
+        import shutil
+        
+        # Clean up if exists
+        if Path('/tmp/test_image_cache').exists():
+            shutil.rmtree('/tmp/test_image_cache')
+        
+        _ensure_image_cache_dir()
+        
+        assert Path('/tmp/test_image_cache').exists()
+        
+        # Clean up
+        shutil.rmtree('/tmp/test_image_cache', ignore_errors=True)
+    
+    @patch('main.SHOT_CACHE_FILE', Path('/tmp/test_shot_cache.json'))
+    @patch('main._load_shot_cache')
+    @patch('main._save_shot_cache')
+    def test_set_cached_shots(self, mock_save, mock_load):
+        """Test setting cached shot data."""
+        from main import _set_cached_shots
+        
+        mock_load.return_value = {}
+        
+        test_data = {"shot1": {"time": 30}}
+        _set_cached_shots("test-profile", test_data, limit=50)
+        
+        # Verify save was called
+        mock_save.assert_called_once()
+        saved_cache = mock_save.call_args[0][0]
+        assert "test-profile" in saved_cache
+    
+    @patch('main.SHOT_CACHE_FILE', Path('/tmp/test_shot_cache.json'))
+    @patch('main._load_shot_cache')
+    def test_get_cached_shots_hit(self, mock_load):
+        """Test getting cached shots when cache exists."""
+        from main import _get_cached_shots
+        import time
+        
+        # Mock recent cache
+        mock_load.return_value = {
+            "test-profile": {
+                "data": {"shot1": {"time": 30}},
+                "cached_at": time.time() - 100,  # 100 seconds ago
+                "limit": 50
+            }
+        }
+        
+        data, is_stale, age = _get_cached_shots("test-profile", limit=50)
+        
+        assert data is not None
+        assert data is not None
+        assert "shot1" in data
+        assert not is_stale
+    
+    @patch('main.SHOT_CACHE_FILE', Path('/tmp/test_shot_cache.json'))
+    @patch('main._load_shot_cache')
+    def test_get_cached_shots_miss(self, mock_load):
+        """Test getting cached shots when cache doesn't exist."""
+        from main import _get_cached_shots
+        
+        mock_load.return_value = {}
+        
+        data, is_stale, age = _get_cached_shots("nonexistent-profile", limit=50)
+        
+        assert data is None
+        assert age is None
+
+
+class TestShotAnalysisHelpers:
+    """Tests for shot analysis helper functions."""
+    
+    def test_format_dynamics_description_basic(self):
+        """Test formatting of stage dynamics description."""
+        from main import _format_dynamics_description
+        
+        stage = {
+            "type": "pressure",
+            "dynamics_points": [[0, 2.0], [10, 2.5]],
+            "dynamics_over": "time"
+        }
+        
+        desc = _format_dynamics_description(stage)
+        
+        assert isinstance(desc, str)
+        assert isinstance(desc, str) and len(desc) > 0
+    
+    def test_compute_stage_stats_basic(self):
+        """Test computing statistics for stage telemetry."""
+        from main import _compute_stage_stats
+        
+        entries = [
+            {"time": 0, "shot": {"pressure": 8.0, "flow": 2.0}},
+            {"time": 1000, "shot": {"pressure": 9.0, "flow": 2.5}},
+            {"time": 2000, "shot": {"pressure": 8.5, "flow": 2.2}}
+        ]
+        
+        stats = _compute_stage_stats(entries)
+        
+        assert "avg_pressure" in stats
+        assert stats["avg_pressure"] > 8.0
+        assert stats["avg_pressure"] < 9.0
+
+
+class TestBasicEndpoints:
+    """Tests for basic utility endpoints."""
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_parse_gemini_error(self):
+        """Test Gemini error parsing."""
+        from main import parse_gemini_error
+        
+        error_text = """Some error occurred
+        Error details here
+        Quota exceeded message"""
+        
+        result = parse_gemini_error(error_text)
+        
+        assert isinstance(result, str)
+        assert len(result) > 0
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._ensure_history_file')
+    @patch('main.Path')
+    def test_load_history_with_valid_file(self, mock_path, mock_ensure):
+        """Test loading history from valid file."""
+        from main import _load_history
+        
+        # Mock file operations
+        mock_file = Mock()
+        mock_file.exists.return_value = True
+        mock_file.read_text.return_value = json.dumps([
+            {"id": "123", "profile_name": "Test"}
+        ])
+        mock_path.return_value = mock_file
+        
+        history = _load_history()
+        
+        assert isinstance(history, list)
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._ensure_history_file')
+    @patch('main.Path')
+    def test_load_history_with_missing_file(self, mock_path, mock_ensure):
+        """Test loading history when file doesn't exist."""
+        from main import _load_history
+        
+        # Mock missing file
+        mock_file = Mock()
+        mock_file.exists.return_value = False
+        mock_path.return_value = mock_file
+        
+        history = _load_history()
+        
+        assert history == []
+
+
+
+class TestProcessImageForProfile:
+    """Tests for image processing function."""
+    
+    def test_process_image_for_profile_valid_png(self):
+        """Test processing a valid PNG image."""
+        from main import process_image_for_profile
+        from PIL import Image
+        import io
+        
+        # Create a test image
+        img = Image.new('RGB', (1024, 768), color='red')
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        data_uri, png_bytes = process_image_for_profile(img_data, "image/png")
+        
+        assert data_uri.startswith("data:image/png;base64,")
+        assert len(png_bytes) > 0
+        
+        # Verify it's 512x512
+        result_img = Image.open(io.BytesIO(png_bytes))
+        assert result_img.size == (512, 512)
+    
+    def test_process_image_for_profile_jpeg(self):
+        """Test processing a JPEG image."""
+        from main import process_image_for_profile
+        from PIL import Image
+        import io
+        
+        # Create a test JPEG image
+        img = Image.new('RGB', (800, 600), color='blue')
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='JPEG')
+        img_data = img_bytes.getvalue()
+        
+        data_uri, png_bytes = process_image_for_profile(img_data, "image/jpeg")
+        
+        assert data_uri.startswith("data:image/png;base64,")
+        
+        # Verify conversion and resize
+        result_img = Image.open(io.BytesIO(png_bytes))
+        assert result_img.format == 'PNG'
+        assert result_img.size == (512, 512)
