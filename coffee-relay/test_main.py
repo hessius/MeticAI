@@ -869,7 +869,7 @@ class TestTriggerUpdateEndpoint:
         data = response.json()
         assert data["status"] == "success"
         assert "message" in data
-        assert "host will perform the update" in data["message"].lower()
+        assert "host will pull updates and restart containers" in data["message"].lower()
         
         # Verify write_text was called to signal the update
         mock_rebuild_file.write_text.assert_called_once()
@@ -1032,7 +1032,7 @@ class TestTriggerUpdateEndpoint:
         
         assert response.status_code == 200
         # Verify Path was called with the correct path
-        mock_path.assert_called_once_with("/app/.rebuild-needed")
+        mock_path.assert_called_once_with("/app/.update-requested")
         # Verify write_text was called
         mock_rebuild_file.write_text.assert_called_once()
 
