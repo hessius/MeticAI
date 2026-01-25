@@ -39,6 +39,7 @@ EXEC_NAME="MeticAI-Installer"
 # Script and resources
 WRAPPER_SCRIPT="$SCRIPT_DIR/install-wrapper.sh"
 ICON_FILE="$REPO_ROOT/resources/MeticAI.icns"
+LOCAL_INSTALL_SCRIPT="$REPO_ROOT/local-install.sh"
 
 echo -e "${BLUE}=========================================${NC}"
 echo -e "${BLUE}   MeticAI macOS App Builder${NC}"
@@ -81,6 +82,11 @@ if command -v platypus &> /dev/null; then
     # Add icon if available
     if [ -n "$ICON_FILE" ]; then
         platypus_args+=(--app-icon "$ICON_FILE")
+    fi
+    
+    # Bundle local-install.sh as a resource
+    if [ -f "$LOCAL_INSTALL_SCRIPT" ]; then
+        platypus_args+=(--bundled-file "$LOCAL_INSTALL_SCRIPT")
     fi
     
     # Add script
