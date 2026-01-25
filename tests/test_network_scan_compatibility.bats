@@ -98,8 +98,8 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     # All local keywords should be inside the scan_for_meticulous function
     # or other defined functions (generate_qr_code, create_macos_dock_shortcut, etc.)
     
-    # The network scanning section (587-640) should NOT have local outside functions
-    run bash -c "sed -n '587,640p' '$SCRIPT_PATH' | grep -c '^[[:space:]]*local '"
+    # The network scanning section (1190-1252) should NOT have local outside functions
+    run bash -c "sed -n '1190,1252p' '$SCRIPT_PATH' | grep -c '^[[:space:]]*local '"
     
     # Should be 0 (no local keywords at the top level in this section)
     [ "$output" -eq 0 ]

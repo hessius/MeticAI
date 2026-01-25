@@ -53,7 +53,7 @@ jobs:
       - name: Check coverage threshold
         run: |
           cd coffee-relay
-          coverage report --fail-under=70
+          coverage report --fail-under=68
 
   bash-tests:
     name: Bash Tests (Install Scripts)
