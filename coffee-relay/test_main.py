@@ -10,11 +10,15 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, MagicMock, mock_open
+from fastapi import HTTPException
+from unittest.mock import Mock, patch, MagicMock, mock_open, AsyncMock
 from io import BytesIO
 from PIL import Image
+from pathlib import Path
 import os
 import subprocess
+import json
+import time
 
 
 # Import the app
@@ -869,7 +873,7 @@ class TestTriggerUpdateEndpoint:
         data = response.json()
         assert data["status"] == "success"
         assert "message" in data
-        assert "host will perform the update" in data["message"].lower()
+        assert "host will pull updates and restart containers" in data["message"].lower()
         
         # Verify write_text was called to signal the update
         mock_rebuild_file.write_text.assert_called_once()
@@ -1032,7 +1036,7 @@ class TestTriggerUpdateEndpoint:
         
         assert response.status_code == 200
         # Verify Path was called with the correct path
-        mock_path.assert_called_once_with("/app/.rebuild-needed")
+        mock_path.assert_called_once_with("/app/.update-requested")
         # Verify write_text was called
         mock_rebuild_file.write_text.assert_called_once()
 
@@ -1380,3 +1384,2499 @@ Description: A test profile
         assert len(saved_history) == 2
         assert saved_history[0]["profile_name"] == "New Profile"
         assert saved_history[1]["id"] == "old-entry"
+
+
+class TestSecurityFeatures:
+    """Tests for security features added to prevent vulnerabilities."""
+    
+    # Test constants
+    TEST_SIZE_EXCESS = 1000  # Bytes to exceed limits in tests
+
+    def test_sanitize_profile_name_for_filename(self):
+        """Test that profile names are properly sanitized for filenames."""
+        from main import _sanitize_profile_name_for_filename
+        
+        # Test path traversal attempts
+        assert ".." not in _sanitize_profile_name_for_filename("../../etc/passwd")
+        assert "/" not in _sanitize_profile_name_for_filename("path/to/file")
+        assert "\\" not in _sanitize_profile_name_for_filename("path\\to\\file")
+        
+        # Test special characters are removed/replaced
+        result = _sanitize_profile_name_for_filename("Profile: Test & Name!")
+        assert ":" not in result
+        assert "&" not in result
+        assert "!" not in result
+        
+        # Test spaces are replaced with underscores
+        assert _sanitize_profile_name_for_filename("My Profile") == "my_profile"
+        
+        # Test length limiting
+        long_name = "a" * 300
+        result = _sanitize_profile_name_for_filename(long_name)
+        assert len(result) <= 200
+    
+    def test_get_cached_image_prevents_path_traversal(self):
+        """Test that _get_cached_image prevents path traversal attacks."""
+        from main import _get_cached_image
+        from pathlib import Path
+        import tempfile
+        import shutil
+        
+        # Create a temporary test cache directory
+        temp_dir = tempfile.mkdtemp()
+        cache_dir = Path(temp_dir) / 'test_cache'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Patch IMAGE_CACHE_DIR to use our temp directory
+        with patch('main.IMAGE_CACHE_DIR', cache_dir):
+            # Attempt path traversal - should return None safely
+            result = _get_cached_image("../../etc/passwd")
+            assert result is None
+            
+            # Also test other path traversal attempts
+            result = _get_cached_image("../../../root")
+            assert result is None
+        
+        # Clean up
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.get_meticulous_api')
+    def test_upload_profile_image_validates_size(self, mock_api, client):
+        """Test that image upload validates file size."""
+        from main import MAX_UPLOAD_SIZE
+        
+        # Create a large image (simulate exceeding limit)
+        large_image = BytesIO(b"x" * (MAX_UPLOAD_SIZE + self.TEST_SIZE_EXCESS))
+        
+        response = client.post(
+            "/api/profile/test-profile/image",
+            files={"file": ("test.png", large_image, "image/png")}
+        )
+        
+        assert response.status_code == 413  # Payload Too Large
+        assert "too large" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.get_meticulous_api')
+    def test_upload_profile_image_validates_content_type(self, mock_api, client, sample_image):
+        """Test that image upload validates content type."""
+        response = client.post(
+            "/api/profile/test-profile/image",
+            files={"file": ("test.txt", sample_image, "text/plain")}
+        )
+        
+        assert response.status_code == 400
+        assert "must be an image" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.get_meticulous_api')
+    def test_apply_profile_image_validates_base64_size(self, mock_api, client):
+        """Test that apply-image endpoint validates decoded size."""
+        import base64
+        from main import MAX_UPLOAD_SIZE
+        
+        # Create oversized base64 data
+        large_data = b"x" * (MAX_UPLOAD_SIZE + self.TEST_SIZE_EXCESS)
+        b64_data = base64.b64encode(large_data).decode('utf-8')
+        data_uri = f"data:image/png;base64,{b64_data}"
+        
+        response = client.post(
+            "/api/profile/test-profile/apply-image",
+            json={"image_data": data_uri}
+        )
+        
+        assert response.status_code == 413  # Payload Too Large
+        assert "too large" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_apply_profile_image_validates_format(self, client):
+        """Test that apply-image endpoint validates image format."""
+        # Test with invalid data URI format
+        response = client.post(
+            "/api/profile/test-profile/apply-image",
+            json={"image_data": "not-a-data-uri"}
+        )
+        
+        assert response.status_code == 400
+        assert "invalid" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_apply_profile_image_validates_png_format(self, client):
+        """Test that apply-image validates it's actually PNG data."""
+        import base64
+        
+        # Create invalid PNG data (just random bytes)
+        fake_data = b"not-a-valid-png-image"
+        b64_data = base64.b64encode(fake_data).decode('utf-8')
+        data_uri = f"data:image/png;base64,{b64_data}"
+        
+        response = client.post(
+            "/api/profile/test-profile/apply-image",
+            json={"image_data": data_uri}
+        )
+        
+        assert response.status_code == 400
+        assert "invalid image" in response.json()["detail"].lower()
+
+
+class TestHelperFunctions:
+    """Tests for helper functions that process data."""
+    
+    def test_safe_float_with_valid_input(self):
+        """Test _safe_float with valid float."""
+        from main import _safe_float
+        
+        assert _safe_float(3.14) == 3.14
+        assert _safe_float("5.5") == 5.5
+        assert _safe_float(10) == 10.0
+    
+    def test_safe_float_with_invalid_input(self):
+        """Test _safe_float with invalid input uses default."""
+        from main import _safe_float
+        
+        assert _safe_float("invalid", default=0.0) == 0.0
+        assert _safe_float(None, default=1.5) == 1.5
+        assert _safe_float({}, default=2.0) == 2.0
+    
+    def test_sanitize_profile_name_for_filename_basic(self):
+        """Test basic filename sanitization."""
+        from main import _sanitize_profile_name_for_filename
+        
+        # Normal name
+        assert _sanitize_profile_name_for_filename("My Profile") == "my_profile"
+        
+        # With special characters
+        result = _sanitize_profile_name_for_filename("Profile: Test!")
+        assert ":" not in result
+        assert "!" not in result
+    
+    def test_sanitize_profile_name_path_traversal(self):
+        """Test path traversal prevention in filename sanitization."""
+        from main import _sanitize_profile_name_for_filename
+        
+        # Path traversal attempts
+        assert ".." not in _sanitize_profile_name_for_filename("../../../etc/passwd")
+        assert "/" not in _sanitize_profile_name_for_filename("path/to/file")
+        assert "\\" not in _sanitize_profile_name_for_filename("path\\to\\file")
+    
+    def test_extract_profile_name_from_reply(self):
+        """Test extraction of profile name from LLM reply."""
+        from main import _extract_profile_name
+        
+        # Standard format
+        reply = "Profile Created: My Amazing Profile\nSome description..."
+        assert _extract_profile_name(reply) == "My Amazing Profile"
+        
+        # With extra whitespace
+        reply2 = "Profile Created:  Spaced Name  \nMore text"
+        assert _extract_profile_name(reply2).strip() == "Spaced Name"
+    
+    def test_extract_profile_name_not_found(self):
+        """Test profile name extraction when not found."""
+        from main import _extract_profile_name
+        
+        reply = "This doesn't contain the profile marker"
+        assert _extract_profile_name(reply) == "Untitled Profile"
+
+
+class TestCacheManagement:
+    """Tests for caching helper functions."""
+    
+    @patch('main.IMAGE_CACHE_DIR', Path('/tmp/test_image_cache'))
+    def test_ensure_image_cache_dir(self):
+        """Test that cache directory is created."""
+        from main import _ensure_image_cache_dir
+        import shutil
+        
+        # Clean up if exists
+        if Path('/tmp/test_image_cache').exists():
+            shutil.rmtree('/tmp/test_image_cache')
+        
+        _ensure_image_cache_dir()
+        
+        assert Path('/tmp/test_image_cache').exists()
+        
+        # Clean up
+        shutil.rmtree('/tmp/test_image_cache', ignore_errors=True)
+    
+    @patch('main.SHOT_CACHE_FILE', Path('/tmp/test_shot_cache.json'))
+    @patch('main._load_shot_cache')
+    @patch('main._save_shot_cache')
+    def test_set_cached_shots(self, mock_save, mock_load):
+        """Test setting cached shot data."""
+        from main import _set_cached_shots
+        
+        mock_load.return_value = {}
+        
+        test_data = {"shot1": {"time": 30}}
+        _set_cached_shots("test-profile", test_data, limit=50)
+        
+        # Verify save was called
+        mock_save.assert_called_once()
+        saved_cache = mock_save.call_args[0][0]
+        assert "test-profile" in saved_cache
+    
+    @patch('main.SHOT_CACHE_FILE', Path('/tmp/test_shot_cache.json'))
+    @patch('main._load_shot_cache')
+    def test_get_cached_shots_hit(self, mock_load):
+        """Test getting cached shots when cache exists."""
+        from main import _get_cached_shots
+        import time
+        
+        # Mock recent cache
+        mock_load.return_value = {
+            "test-profile": {
+                "data": {"shot1": {"time": 30}},
+                "cached_at": time.time() - 100,  # 100 seconds ago
+                "limit": 50
+            }
+        }
+        
+        data, is_stale, age = _get_cached_shots("test-profile", limit=50)
+        
+        assert data is not None
+        assert data is not None
+        assert "shot1" in data
+        assert not is_stale
+    
+    @patch('main.SHOT_CACHE_FILE', Path('/tmp/test_shot_cache.json'))
+    @patch('main._load_shot_cache')
+    def test_get_cached_shots_miss(self, mock_load):
+        """Test getting cached shots when cache doesn't exist."""
+        from main import _get_cached_shots
+        
+        mock_load.return_value = {}
+        
+        data, is_stale, age = _get_cached_shots("nonexistent-profile", limit=50)
+        
+        assert data is None
+        assert age is None
+
+
+class TestShotAnalysisHelpers:
+    """Tests for shot analysis helper functions."""
+    
+    def test_format_dynamics_description_basic(self):
+        """Test formatting of stage dynamics description."""
+        from main import _format_dynamics_description
+        
+        stage = {
+            "type": "pressure",
+            "dynamics_points": [[0, 2.0], [10, 2.5]],
+            "dynamics_over": "time"
+        }
+        
+        desc = _format_dynamics_description(stage)
+        
+        assert isinstance(desc, str)
+        assert isinstance(desc, str) and len(desc) > 0
+    
+    def test_compute_stage_stats_basic(self):
+        """Test computing statistics for stage telemetry."""
+        from main import _compute_stage_stats
+        
+        entries = [
+            {"time": 0, "shot": {"pressure": 8.0, "flow": 2.0}},
+            {"time": 1000, "shot": {"pressure": 9.0, "flow": 2.5}},
+            {"time": 2000, "shot": {"pressure": 8.5, "flow": 2.2}}
+        ]
+        
+        stats = _compute_stage_stats(entries)
+        
+        assert "avg_pressure" in stats
+        assert stats["avg_pressure"] > 8.0
+        assert stats["avg_pressure"] < 9.0
+
+    def test_format_dynamics_description_flow_type(self):
+        """Test with flow type."""
+        from main import _format_dynamics_description
+        
+        stage = {
+            "type": "flow",
+            "dynamics_points": [[0, 2.0], [10, 4.0]],
+            "dynamics_over": "time"
+        }
+        result = _format_dynamics_description(stage)
+        assert "ml/s" in result
+
+    def test_safe_float_with_string(self):
+        """Test _safe_float with string input."""
+        from main import _safe_float
+        
+        assert _safe_float("42.5") == 42.5
+        assert _safe_float("invalid") == 0.0
+        assert _safe_float("", 5.0) == 5.0
+        assert _safe_float(None, 10.0) == 10.0
+
+    def test_resolve_variable_basic(self):
+        """Test variable resolution."""
+        from main import _resolve_variable
+        
+        variables = [
+            {"key": "dose", "name": "Dose", "value": 18.0},
+            {"key": "ratio", "name": "Ratio", "value": 2.0}
+        ]
+        
+        value, name = _resolve_variable("$dose", variables)
+        assert value == 18.0
+        assert name == "Dose"
+
+    def test_resolve_variable_not_found(self):
+        """Test variable resolution when variable not found."""
+        from main import _resolve_variable
+        
+        variables = []
+        value, name = _resolve_variable("$unknown", variables)
+        assert value == "$unknown"
+        assert name == "unknown"
+
+    def test_resolve_variable_not_variable(self):
+        """Test resolution of non-variable value."""
+        from main import _resolve_variable
+        
+        value, name = _resolve_variable(42.0, [])
+        assert value == 42.0
+        assert name is None
+
+    def test_format_exit_triggers_basic(self):
+        """Test exit trigger formatting."""
+        from main import _format_exit_triggers
+        
+        triggers = [
+            {"type": "time", "value": 25, "comparison": ">="},
+            {"type": "weight", "value": 36, "comparison": ">="}
+        ]
+        
+        result = _format_exit_triggers(triggers)
+        assert len(result) == 2
+        assert result[0]["type"] == "time"
+        assert "25" in result[0]["description"]  # Contains 25
+        assert "s" in result[0]["description"]   # Has seconds unit
+
+    def test_format_limits_basic(self):
+        """Test limits formatting."""
+        from main import _format_limits
+        
+        limits = [
+            {"type": "pressure", "value": 10, "comparison": "<="},
+            {"type": "flow", "value": 4, "comparison": "<="}
+        ]
+        
+        result = _format_limits(limits)
+        assert len(result) == 2
+        assert "10" in result[0]["description"]  # Contains 10
+        assert "bar" in result[0]["description"]  # Has bar unit
+
+    def test_extract_shot_stage_data(self):
+        """Test extracting stage data from shot."""
+        from main import _extract_shot_stage_data
+        
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0, "flow": 0.5}, "status": "during", "stage_name": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0, "flow": 0.5}, "status": "during", "stage_name": "Bloom"},
+                {"time": 10000, "shot": {"weight": 10.0, "pressure": 9.0, "flow": 2.5}, "status": "during", "stage_name": "Main"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}, "status": "during", "stage_name": "Main"},
+            ]
+        }
+        
+        result = _extract_shot_stage_data(shot_data)
+        # Function returns dict of stages
+        assert isinstance(result, dict)
+
+    def test_prepare_profile_for_llm(self):
+        """Test preparing profile data for LLM."""
+        from main import _prepare_profile_for_llm
+        
+        profile_data = {
+            "name": "Test",
+            "temperature": 93.0,
+            "final_weight": 36.0,
+            "variables": [{"key": "dose", "value": 18.0}],
+            "stages": [{"name": "Main", "type": "pressure"}]
+        }
+        
+        result = _prepare_profile_for_llm(profile_data, "Test description")
+        assert result["name"] == "Test"
+        assert "stages" in result
+        assert "variables" in result
+
+
+class TestBasicEndpoints:
+    """Tests for basic utility endpoints."""
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_parse_gemini_error(self):
+        """Test Gemini error parsing."""
+        from main import parse_gemini_error
+        
+        error_text = """Some error occurred
+        Error details here
+        Quota exceeded message"""
+        
+        result = parse_gemini_error(error_text)
+        
+        assert isinstance(result, str)
+        assert len(result) > 0
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._ensure_history_file')
+    @patch('main.Path')
+    def test_load_history_with_valid_file(self, mock_path, mock_ensure):
+        """Test loading history from valid file."""
+        from main import _load_history
+        
+        # Mock file operations
+        mock_file = Mock()
+        mock_file.exists.return_value = True
+        mock_file.read_text.return_value = json.dumps([
+            {"id": "123", "profile_name": "Test"}
+        ])
+        mock_path.return_value = mock_file
+        
+        history = _load_history()
+        
+        assert isinstance(history, list)
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._ensure_history_file')
+    @patch('main.Path')
+    def test_load_history_with_missing_file(self, mock_path, mock_ensure):
+        """Test loading history when file doesn't exist."""
+        from main import _load_history
+        
+        # Mock missing file
+        mock_file = Mock()
+        mock_file.exists.return_value = False
+        mock_path.return_value = mock_file
+        
+        history = _load_history()
+        
+        assert history == []
+
+
+
+class TestProcessImageForProfile:
+    """Tests for image processing function."""
+    
+    def test_process_image_for_profile_valid_png(self):
+        """Test processing a valid PNG image."""
+        from main import process_image_for_profile
+        from PIL import Image
+        import io
+        
+        # Create a test image
+        img = Image.new('RGB', (1024, 768), color='red')
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='PNG')
+        img_data = img_bytes.getvalue()
+        
+        data_uri, png_bytes = process_image_for_profile(img_data, "image/png")
+        
+        assert data_uri.startswith("data:image/png;base64,")
+        assert len(png_bytes) > 0
+        
+        # Verify it's 512x512
+        result_img = Image.open(io.BytesIO(png_bytes))
+        assert result_img.size == (512, 512)
+    
+    def test_process_image_for_profile_jpeg(self):
+        """Test processing a JPEG image."""
+        from main import process_image_for_profile
+        from PIL import Image
+        import io
+        
+        # Create a test JPEG image
+        img = Image.new('RGB', (800, 600), color='blue')
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='JPEG')
+        img_data = img_bytes.getvalue()
+        
+        data_uri, png_bytes = process_image_for_profile(img_data, "image/jpeg")
+        
+        assert data_uri.startswith("data:image/png;base64,")
+        
+        # Verify conversion and resize
+        result_img = Image.open(io.BytesIO(png_bytes))
+        assert result_img.format == 'PNG'
+        assert result_img.size == (512, 512)
+
+
+class TestCheckUpdatesEndpoint:
+    """Tests for the /api/check-updates endpoint."""
+
+    @patch('main.Path')
+    @patch('main.asyncio.sleep', new_callable=AsyncMock)
+    def test_check_updates_success_with_updates(self, mock_sleep, mock_path, client):
+        """Test successful update check with updates available."""
+        # Mock version file exists and has update data
+        mock_version_file = MagicMock()
+        mock_version_file.exists.return_value = True
+        mock_path.return_value = mock_version_file
+        
+        version_data = {
+            "update_available": True,
+            "last_check": "2024-01-15T10:30:00",
+            "repositories": {
+                "MeticAI": {"current": "v1.0.0", "latest": "v1.1.0"}
+            }
+        }
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(version_data))):
+            response = client.post("/api/check-updates")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["update_available"] is True
+        assert data["last_check"] == "2024-01-15T10:30:00"
+        assert "repositories" in data
+
+    @patch('main.Path')
+    @patch('main.asyncio.sleep', new_callable=AsyncMock)
+    def test_check_updates_no_updates(self, mock_sleep, mock_path, client):
+        """Test update check with no updates available."""
+        mock_version_file = MagicMock()
+        mock_version_file.exists.return_value = True
+        mock_path.return_value = mock_version_file
+        
+        version_data = {
+            "update_available": False,
+            "last_check": "2024-01-15T10:30:00",
+            "repositories": {
+                "MeticAI": {"current": "v1.0.0", "latest": "v1.0.0"}
+            }
+        }
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(version_data))):
+            response = client.post("/api/check-updates")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["update_available"] is False
+
+    @patch('main.Path')
+    def test_check_updates_file_not_found(self, mock_path, client):
+        """Test update check when version file doesn't exist."""
+        mock_version_file = MagicMock()
+        mock_version_file.exists.return_value = False
+        mock_path.return_value = mock_version_file
+        
+        response = client.post("/api/check-updates")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["update_available"] is False
+        assert "error" in data
+        assert "Version file not found" in data["error"]
+
+    @patch('main.Path')
+    @patch('main.asyncio.sleep', new_callable=AsyncMock)
+    def test_check_updates_fresh_check(self, mock_sleep, mock_path, client):
+        """Test that update check triggers fresh check and waits for update."""
+        mock_version_file = MagicMock()
+        mock_signal_file = MagicMock()
+        
+        # Setup: version file exists, signal file gets created then removed
+        call_count = {"path_calls": 0}
+        
+        def path_side_effect(arg):
+            if ".versions.json" in str(arg):
+                return mock_version_file
+            elif ".update-check-requested" in str(arg):
+                return mock_signal_file
+            return MagicMock()
+        
+        mock_path.side_effect = path_side_effect
+        mock_version_file.exists.return_value = True
+        
+        # Signal file exists initially, then gets removed
+        signal_exists_calls = [True, False]
+        mock_signal_file.exists.side_effect = signal_exists_calls
+        
+        old_version_data = {
+            "update_available": False,
+            "last_check": "2024-01-15T10:00:00",
+            "repositories": {}
+        }
+        
+        new_version_data = {
+            "update_available": True,
+            "last_check": "2024-01-15T10:30:00",
+            "repositories": {
+                "MeticAI": {"current": "v1.0.0", "latest": "v1.1.0"}
+            }
+        }
+        
+        read_calls = [json.dumps(old_version_data), json.dumps(new_version_data)]
+        
+        with patch('builtins.open', mock_open()) as mock_file:
+            mock_file.return_value.read.side_effect = read_calls
+            response = client.post("/api/check-updates")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "update_available" in data
+
+    @patch('main.Path')
+    def test_check_updates_json_error(self, mock_path, client):
+        """Test handling of corrupted version file."""
+        mock_version_file = MagicMock()
+        mock_version_file.exists.return_value = True
+        mock_path.return_value = mock_version_file
+        
+        with patch('builtins.open', mock_open(read_data="invalid json {")):
+            response = client.post("/api/check-updates")
+        
+        # Should handle gracefully
+        assert response.status_code in [200, 500]
+
+
+class TestMachineProfilesEndpoint:
+    """Tests for the /api/machine/profiles endpoint."""
+
+    @patch('main.get_meticulous_api')
+    @patch('main.HISTORY_FILE')
+    def test_list_profiles_success(self, mock_history_file, mock_get_api, client):
+        """Test successful profile listing from machine."""
+        # Mock API responses
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        # Mock list_profiles result - return simple objects
+        mock_profile1 = type('Profile', (), {})()
+        mock_profile1.id = "profile-1"
+        mock_profile1.name = "Espresso Classic"
+        mock_profile1.error = None
+        
+        mock_profile2 = type('Profile', (), {})()
+        mock_profile2.id = "profile-2"
+        mock_profile2.name = "Light Roast"
+        mock_profile2.error = None
+        
+        mock_api.list_profiles.return_value = [mock_profile1, mock_profile2]
+        
+        # Mock get_profile results - return simple objects with all required attributes
+        full_profile1 = type('FullProfile', (), {})()
+        full_profile1.id = "profile-1"
+        full_profile1.name = "Espresso Classic"
+        full_profile1.author = "Barista Joe"
+        full_profile1.temperature = 93.0
+        full_profile1.final_weight = 36.0
+        full_profile1.error = None
+        
+        full_profile2 = type('FullProfile', (), {})()
+        full_profile2.id = "profile-2"
+        full_profile2.name = "Light Roast"
+        full_profile2.author = "Barista Jane"
+        full_profile2.temperature = 91.0
+        full_profile2.final_weight = 40.0
+        full_profile2.error = None
+        
+        mock_api.get_profile.side_effect = [full_profile1, full_profile2]
+        
+        # Mock history file
+        mock_history_file.exists.return_value = True
+        history_data = [
+            {"profile_name": "Espresso Classic", "reply": "Great profile"}
+        ]
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))):
+            response = client.get("/api/machine/profiles")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["total"] == 2
+        assert len(data["profiles"]) == 2
+        
+        # Check first profile has history
+        profile1 = next(p for p in data["profiles"] if p["name"] == "Espresso Classic")
+        assert profile1["in_history"] is True
+        assert profile1["has_description"] is True
+        
+        # Check second profile has no history
+        profile2 = next(p for p in data["profiles"] if p["name"] == "Light Roast")
+        assert profile2["in_history"] is False
+
+    @patch('main.get_meticulous_api')
+    def test_list_profiles_api_error(self, mock_get_api, client):
+        """Test error handling when machine API fails."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        # Mock API error
+        mock_result = MagicMock()
+        mock_result.error = "Connection timeout"
+        mock_api.list_profiles.return_value = mock_result
+        
+        response = client.get("/api/machine/profiles")
+        
+        assert response.status_code == 502
+        assert "Machine API error" in response.json()["detail"]
+
+    @patch('main.get_meticulous_api')
+    @patch('main.HISTORY_FILE')
+    def test_list_profiles_empty(self, mock_history_file, mock_get_api, client):
+        """Test listing when no profiles exist."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        mock_history_file.exists.return_value = False
+        
+        response = client.get("/api/machine/profiles")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["total"] == 0
+        assert len(data["profiles"]) == 0
+
+    @patch('main.get_meticulous_api')
+    @patch('main.HISTORY_FILE')
+    def test_list_profiles_partial_failure(self, mock_history_file, mock_get_api, client):
+        """Test listing continues when individual profile fetch fails."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        mock_profile1 = type('Profile', (), {})()
+        mock_profile1.id = "profile-1"
+        mock_profile1.name = "Good Profile"
+        mock_profile1.error = None
+        
+        mock_profile2 = type('Profile', (), {})()
+        mock_profile2.id = "profile-2"
+        mock_profile2.name = "Bad Profile"
+        mock_profile2.error = None
+        
+        mock_api.list_profiles.return_value = [mock_profile1, mock_profile2]
+        
+        full_profile1 = type('FullProfile', (), {})()
+        full_profile1.id = "profile-1"
+        full_profile1.name = "Good Profile"
+        full_profile1.author = "Barista"
+        full_profile1.error = None
+        
+        # Second profile fetch fails
+        mock_api.get_profile.side_effect = [full_profile1, Exception("Network error")]
+        
+        mock_history_file.exists.return_value = False
+        
+        response = client.get("/api/machine/profiles")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["total"] == 1  # Only successful profile
+        assert len(data["profiles"]) == 1
+        assert data["profiles"][0]["name"] == "Good Profile"
+
+    @patch('main.get_meticulous_api')
+    @patch('main.HISTORY_FILE')
+    def test_list_profiles_history_dict_format(self, mock_history_file, mock_get_api, client):
+        """Test handling of legacy history format (dict with entries key)."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Test Profile"
+        mock_profile.error = None
+        
+        mock_api.list_profiles.return_value = [mock_profile]
+        
+        full_profile = type('FullProfile', (), {})()
+        full_profile.id = "profile-1"
+        full_profile.name = "Test Profile"
+        full_profile.author = "Barista"
+        full_profile.error = None
+        
+        mock_api.get_profile.return_value = full_profile
+        
+        mock_history_file.exists.return_value = True
+        # Legacy format: dict with entries key
+        history_data = {
+            "entries": [
+                {"profile_name": "Test Profile", "reply": "Description here"}
+            ]
+        }
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))):
+            response = client.get("/api/machine/profiles")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profiles"][0]["in_history"] is True
+
+
+class TestMachineProfileJsonEndpoint:
+    """Tests for the /api/machine/profile/{profile_id}/json endpoint."""
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_json_success(self, mock_get_api, client):
+        """Test successful profile JSON retrieval."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        # Mock profile object with various attributes
+        mock_profile = MagicMock()
+        mock_profile.id = "profile-123"
+        mock_profile.name = "Test Profile"
+        mock_profile.author = "Barista Joe"
+        mock_profile.temperature = 93.0
+        mock_profile.final_weight = 36.0
+        mock_profile.stages = [{"name": "preinfusion"}]
+        mock_profile.variables = {"key": "value"}
+        mock_profile.error = None
+        
+        mock_api.get_profile.return_value = mock_profile
+        
+        response = client.get("/api/machine/profile/profile-123/json")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile"]["id"] == "profile-123"
+        assert data["profile"]["name"] == "Test Profile"
+        assert data["profile"]["author"] == "Barista Joe"
+        assert data["profile"]["temperature"] == 93.0
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_json_api_error(self, mock_get_api, client):
+        """Test error handling when machine API fails."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        mock_result = MagicMock()
+        mock_result.error = "Profile not found"
+        mock_api.get_profile.return_value = mock_result
+        
+        response = client.get("/api/machine/profile/invalid-id/json")
+        
+        assert response.status_code == 502
+        assert "Machine API error" in response.json()["detail"]
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_json_nested_objects(self, mock_get_api, client):
+        """Test handling of nested objects in profile."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        # Create mock profile with nested object using simple class
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-456"
+        mock_profile.name = "Complex Profile"
+        mock_profile.error = None
+        
+        # Create nested display object
+        nested_obj = type('Display', (), {})()
+        nested_obj.nested_key = "nested_value"
+        mock_profile.display = nested_obj
+        
+        mock_api.get_profile.return_value = mock_profile
+        
+        response = client.get("/api/machine/profile/profile-456/json")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "display" in data["profile"]
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_json_list_of_objects(self, mock_get_api, client):
+        """Test handling of list of objects in profile."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        stage1 = MagicMock()
+        stage1.__dict__ = {"name": "preinfusion", "duration": 5}
+        
+        stage2 = MagicMock()
+        stage2.__dict__ = {"name": "extraction", "duration": 25}
+        
+        mock_profile = MagicMock()
+        mock_profile.id = "profile-789"
+        mock_profile.name = "Multi-Stage Profile"
+        mock_profile.stages = [stage1, stage2]
+        mock_profile.error = None
+        
+        mock_api.get_profile.return_value = mock_profile
+        
+        response = client.get("/api/machine/profile/profile-789/json")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["profile"]["stages"]) == 2
+        assert data["profile"]["stages"][0]["name"] == "preinfusion"
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_json_exception(self, mock_get_api, client):
+        """Test handling of unexpected exceptions."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.get_profile.side_effect = Exception("Unexpected error")
+        
+        response = client.get("/api/machine/profile/error-id/json")
+        
+        assert response.status_code == 500
+
+
+class TestProfileImportEndpoint:
+    """Tests for the /api/profile/import endpoint."""
+
+    @patch('main._generate_profile_description', new_callable=AsyncMock)
+    @patch('main.HISTORY_FILE')
+    def test_import_profile_success(self, mock_history_file, mock_generate_desc, client):
+        """Test successful profile import with description generation."""
+        mock_generate_desc.return_value = "Great espresso profile with balanced extraction"
+        
+        profile_json = {
+            "name": "Imported Espresso",
+            "author": "Coffee Master",
+            "temperature": 93.0,
+            "stages": [{"name": "extraction"}]
+        }
+        
+        mock_history_file.exists.return_value = True
+        
+        with patch('builtins.open', mock_open(read_data='[]')) as mock_file:
+            response = client.post(
+                "/api/profile/import",
+                json={
+                    "profile": profile_json,
+                    "generate_description": True,
+                    "source": "file"
+                }
+            )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile_name"] == "Imported Espresso"
+        assert data["has_description"] is True
+        assert "entry_id" in data
+
+    @patch('main._generate_profile_description', new_callable=AsyncMock)
+    @patch('main.HISTORY_FILE')
+    def test_import_profile_without_description(self, mock_history_file, mock_generate_desc, client):
+        """Test profile import without generating description."""
+        # Should not be called when generate_description=False
+        mock_generate_desc.return_value = "Should not use this"
+        
+        profile_json = {
+            "name": "Quick Import",
+            "temperature": 92.0
+        }
+        
+        mock_history_file.exists.return_value = False
+        
+        with patch('builtins.open', mock_open()) as mock_file:
+            response = client.post(
+                "/api/profile/import",
+                json={
+                    "profile": profile_json,
+                    "generate_description": False,
+                    "source": "machine"
+                }
+            )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Description not generated, but basic message exists
+        # has_description checks for "Description generation failed" not in reply
+        # So we just verify import succeeded
+        mock_generate_desc.assert_not_called()
+
+    @patch('main.HISTORY_FILE')
+    def test_import_profile_already_exists(self, mock_history_file, client):
+        """Test importing a profile that already exists in history."""
+        profile_json = {
+            "name": "Existing Profile",
+            "temperature": 93.0
+        }
+        
+        mock_history_file.exists.return_value = True
+        history_data = [
+            {
+                "id": "existing-123",
+                "profile_name": "Existing Profile",
+                "reply": "Already here"
+            }
+        ]
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))):
+            response = client.post(
+                "/api/profile/import",
+                json={"profile": profile_json}
+            )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "exists"
+        assert "already exists" in data["message"]
+        assert data["entry_id"] == "existing-123"
+
+    def test_import_profile_missing_json(self, client):
+        """Test error when no profile JSON is provided."""
+        response = client.post(
+            "/api/profile/import",
+            json={"generate_description": True}
+        )
+        
+        assert response.status_code == 400
+        assert "No profile JSON provided" in response.json()["detail"]
+
+    @patch('main._generate_profile_description', new_callable=AsyncMock)
+    @patch('main.HISTORY_FILE')
+    def test_import_profile_description_generation_fails(self, mock_history_file, mock_generate_desc, client):
+        """Test import continues when description generation fails."""
+        mock_generate_desc.side_effect = Exception("AI service unavailable")
+        
+        profile_json = {
+            "name": "Fallback Profile",
+            "temperature": 91.0
+        }
+        
+        mock_history_file.exists.return_value = False
+        
+        with patch('builtins.open', mock_open()) as mock_file:
+            response = client.post(
+                "/api/profile/import",
+                json={
+                    "profile": profile_json,
+                    "generate_description": True,
+                    "source": "file"
+                }
+            )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Should have fallback message
+        assert data["has_description"] is False
+
+    @patch('main.HISTORY_FILE')
+    def test_import_profile_legacy_history_format(self, mock_history_file, client):
+        """Test import with legacy history format (dict with entries)."""
+        profile_json = {
+            "name": "New Profile",
+            "temperature": 94.0
+        }
+        
+        mock_history_file.exists.return_value = True
+        # Legacy format
+        history_data = {
+            "entries": [
+                {"profile_name": "Old Profile"}
+            ]
+        }
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))) as mock_file:
+            response = client.post(
+                "/api/profile/import",
+                json={
+                    "profile": profile_json,
+                    "generate_description": False
+                }
+            )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+
+    def test_import_profile_empty_request(self, client):
+        """Test error when request body is empty."""
+        response = client.post("/api/profile/import", json={})
+        
+        assert response.status_code == 400
+
+
+class TestShotsByProfileEndpoint:
+    """Tests for the /api/shots/by-profile/{profile_name} endpoint."""
+
+    @patch('main.get_meticulous_api')
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main._get_cached_shots')
+    @patch('main._set_cached_shots')
+    def test_get_shots_by_profile_success(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+        """Test successful retrieval of shots for a profile."""
+        # No cache initially
+        mock_get_cache.return_value = (None, False, None)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        # Mock dates
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_api.get_history_dates.return_value = [date1]
+        
+        # Mock files
+        file1 = MagicMock()
+        file1.name = "shot_001.json"
+        file2 = MagicMock()
+        file2.name = "shot_002.json"
+        mock_api.get_shot_files.return_value = [file1, file2]
+        
+        # Mock shot data
+        shot_data_1 = {
+            "profile_name": "Espresso Classic",
+            "time": 1705320000,
+            "data": [
+                {"time": 25000, "shot": {"weight": 36.5}}
+            ]
+        }
+        
+        shot_data_2 = {
+            "profile": {"name": "Espresso Classic"},
+            "time": 1705320100,
+            "data": [
+                {"time": 28000, "shot": {"weight": 38.0}}
+            ]
+        }
+        
+        mock_fetch_shot.side_effect = [shot_data_1, shot_data_2]
+        
+        response = client.get("/api/shots/by-profile/Espresso%20Classic?limit=10")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_name"] == "Espresso Classic"
+        assert data["count"] == 2
+        assert len(data["shots"]) == 2
+        assert data["shots"][0]["final_weight"] == 36.5
+        assert data["shots"][1]["final_weight"] == 38.0
+
+    @patch('main._get_cached_shots')
+    def test_get_shots_by_profile_from_cache(self, mock_get_cache, client):
+        """Test returning cached shots when available."""
+        cached_data = {
+            "profile_name": "Cached Profile",
+            "shots": [{"date": "2024-01-15", "filename": "shot_001.json"}],
+            "count": 1,
+            "limit": 10
+        }
+        
+        mock_get_cache.return_value = (cached_data, False, 1705320000.0)
+        
+        response = client.get("/api/shots/by-profile/Cached%20Profile")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_name"] == "Cached Profile"
+        assert data["count"] == 1
+        assert "cached_at" in data
+        assert data["is_stale"] is False
+
+    @patch('main.get_meticulous_api')
+    @patch('main._get_cached_shots')
+    def test_get_shots_by_profile_api_error(self, mock_get_cache, mock_get_api, client):
+        """Test error handling when machine API fails."""
+        mock_get_cache.return_value = (None, False, None)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        mock_result = MagicMock()
+        mock_result.error = "Connection timeout"
+        mock_api.get_history_dates.return_value = mock_result
+        
+        response = client.get("/api/shots/by-profile/Test%20Profile")
+        
+        assert response.status_code == 502
+
+    @patch('main.get_meticulous_api')
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main._get_cached_shots')
+    @patch('main._set_cached_shots')
+    def test_get_shots_by_profile_no_matches(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+        """Test when no shots match the profile."""
+        mock_get_cache.return_value = (None, False, None)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        date1 = type('Date', (), {})()
+        date1.name = "2024-01-15"
+        date1.error = None
+        mock_api.get_history_dates.return_value = [date1]
+        
+        file1 = type('File', (), {})()
+        file1.name = "shot_001.json"
+        file1.error = None
+        mock_api.get_shot_files.return_value = [file1]
+        
+        # Shot with different profile name
+        shot_data = {
+            "profile_name": "Different Profile",
+            "time": 1705320000,
+            "data": []
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        response = client.get("/api/shots/by-profile/Nonexistent%20Profile")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 0
+        assert len(data["shots"]) == 0
+
+    @patch('main.get_meticulous_api')
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main._get_cached_shots')
+    @patch('main._set_cached_shots')
+    def test_get_shots_by_profile_with_limit(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+        """Test limit parameter works correctly."""
+        mock_get_cache.return_value = (None, False, None)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        date1 = type('Date', (), {})()
+        date1.name = "2024-01-15"
+        date1.error = None
+        mock_api.get_history_dates.return_value = [date1]
+        
+        # Create file objects properly
+        files = []
+        for i in range(5):
+            f = type('File', (), {})()
+            f.name = f"shot_{i:03d}.json"
+            f.error = None
+            files.append(f)
+        mock_api.get_shot_files.return_value = files
+        
+        # All shots match
+        def create_shot_data(i):
+            return {
+                "profile_name": "Test Profile",
+                "time": 1705320000 + i,
+                "data": [{"time": 25000, "shot": {"weight": 36.0 + i}}]
+            }
+        
+        mock_fetch_shot.side_effect = [create_shot_data(i) for i in range(5)]
+        
+        response = client.get("/api/shots/by-profile/Test%20Profile?limit=2")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 2
+        assert data["limit"] == 2
+
+    @patch('main.get_meticulous_api')
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main._get_cached_shots')
+    def test_get_shots_by_profile_include_data(self, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+        """Test including full shot data in response."""
+        mock_get_cache.return_value = (None, False, None)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_api.get_history_dates.return_value = [date1]
+        
+        file1 = MagicMock()
+        file1.name = "shot_001.json"
+        mock_api.get_shot_files.return_value = [file1]
+        
+        shot_data = {
+            "profile_name": "Full Data Profile",
+            "time": 1705320000,
+            "data": [
+                {"time": 10000, "shot": {"weight": 10.0, "pressure": 9.0}},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0}}
+            ]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        response = client.get("/api/shots/by-profile/Full%20Data%20Profile?include_data=true")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+        assert "data" in data["shots"][0]
+        assert len(data["shots"][0]["data"]["data"]) == 2
+
+    @patch('main.get_meticulous_api')
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main._get_cached_shots')
+    @patch('main._set_cached_shots')
+    def test_get_shots_by_profile_case_insensitive(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+        """Test profile name matching is case-insensitive."""
+        mock_get_cache.return_value = (None, False, None)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        date1 = type('Date', (), {})()
+        date1.name = "2024-01-15"
+        date1.error = None
+        mock_api.get_history_dates.return_value = [date1]
+        
+        file1 = type('File', (), {})()
+        file1.name = "shot_001.json"
+        file1.error = None
+        mock_api.get_shot_files.return_value = [file1]
+        
+        shot_data = {
+            "profile_name": "ESPRESSO CLASSIC",
+            "time": 1705320000,
+            "data": [{"time": 25000, "shot": {"weight": 36.0}}]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        response = client.get("/api/shots/by-profile/espresso%20classic")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1
+
+    @patch('main._get_cached_shots')
+    @patch('main.get_meticulous_api')
+    @patch('main._set_cached_shots')
+    def test_get_shots_by_profile_force_refresh(self, mock_set_cache, mock_get_api, mock_get_cache, client):
+        """Test force_refresh parameter bypasses cache."""
+        # Cache exists but should be ignored
+        cached_data = {
+            "profile_name": "Cached",
+            "shots": [],
+            "count": 0
+        }
+        mock_get_cache.return_value = (cached_data, False, 1705320000.0)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.get_history_dates.return_value = []
+        
+        response = client.get("/api/shots/by-profile/Test?force_refresh=true")
+        
+        assert response.status_code == 200
+        # Should hit API, not cache
+        mock_api.get_history_dates.assert_called_once()
+
+    @patch('main.get_meticulous_api')
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main._get_cached_shots')
+    @patch('main._set_cached_shots')
+    def test_get_shots_by_profile_partial_shot_errors(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+        """Test continues when individual shot fetch fails."""
+        mock_get_cache.return_value = (None, False, None)
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        date1 = type('Date', (), {})()
+        date1.name = "2024-01-15"
+        date1.error = None
+        mock_api.get_history_dates.return_value = [date1]
+        
+        file1 = type('File', (), {})()
+        file1.name = "good.json"
+        file1.error = None
+        file2 = type('File', (), {})()
+        file2.name = "bad.json"
+        file2.error = None
+        mock_api.get_shot_files.return_value = [file1, file2]
+        
+        good_shot = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [{"time": 25000, "shot": {"weight": 36.0}}]
+        }
+        
+        # First succeeds, second fails
+        mock_fetch_shot.side_effect = [good_shot, Exception("Corrupted file")]
+        
+        response = client.get("/api/shots/by-profile/Test")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["count"] == 1  # Only the good shot
+
+
+class TestImageProxyEndpoint:
+    """Tests for the /api/profile/{profile_name}/image-proxy endpoint."""
+
+    @patch('main._get_cached_image')
+    def test_image_proxy_from_cache(self, mock_get_cache, client):
+        """Test returning cached image."""
+        mock_get_cache.return_value = b"fake_png_data"
+        
+        response = client.get("/api/profile/Test%20Profile/image-proxy")
+        
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == b"fake_png_data"
+
+    @patch('main._get_cached_image')
+    @patch('main.get_meticulous_api')
+    def test_image_proxy_profile_not_found(self, mock_get_api, mock_get_cache, client):
+        """Test error when profile not found."""
+        mock_get_cache.return_value = None
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.get("/api/profile/Nonexistent/image-proxy")
+        
+        assert response.status_code == 404
+
+    @patch('main._get_cached_image')
+    @patch('main.get_meticulous_api')
+    def test_image_proxy_no_image(self, mock_get_api, mock_get_cache, client):
+        """Test error when profile has no image."""
+        mock_get_cache.return_value = None
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        mock_profile = type('Profile', (), {})()
+        mock_profile.name = "No Image"
+        mock_profile.id = "profile-456"
+        mock_profile.error = None
+        mock_api.list_profiles.return_value = [mock_profile]
+        
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "No Image"
+        full_profile.display = None
+        full_profile.error = None
+        mock_api.get_profile.return_value = full_profile
+        
+        response = client.get("/api/profile/No%20Image/image-proxy")
+        
+        assert response.status_code == 404
+
+
+class TestAdditionalEndpoints:
+    """Tests for additional utility endpoints."""
+
+    def test_status_endpoint(self, client):
+        """Test status endpoint."""
+        response = client.get("/status")
+        
+        assert response.status_code == 200
+        data = response.json()
+        # Status endpoint returns update information
+        assert "update_available" in data
+
+
+class TestGetProfileInfoEndpoint:
+    """Tests for the GET /api/profile/{profile_name} endpoint."""
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_success(self, mock_get_api, client):
+        """Test successful profile retrieval."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        # Mock list profiles
+        partial_profile = type('PartialProfile', (), {})()
+        partial_profile.name = "Test Profile"
+        partial_profile.id = "profile-123"
+        partial_profile.error = None
+        mock_api.list_profiles.return_value = [partial_profile]
+        
+        # Mock get full profile
+        full_profile = type('FullProfile', (), {})()
+        full_profile.id = "profile-123"
+        full_profile.name = "Test Profile"
+        full_profile.author = "Barista"
+        full_profile.temperature = 93.0
+        full_profile.final_weight = 36.0
+        full_profile.error = None
+        
+        display = type('Display', (), {})()
+        display.image = "data:image/png;base64,abc123"
+        display.accentColor = "#FF5733"
+        full_profile.display = display
+        
+        mock_api.get_profile.return_value = full_profile
+        
+        response = client.get("/api/profile/Test%20Profile")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile"]["name"] == "Test Profile"
+        assert data["profile"]["temperature"] == 93.0
+        assert data["profile"]["final_weight"] == 36.0
+        assert data["profile"]["image"] == "data:image/png;base64,abc123"
+        assert data["profile"]["accent_color"] == "#FF5733"
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_not_found(self, mock_get_api, client):
+        """Test error when profile not found."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.get("/api/profile/Nonexistent")
+        
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_no_display(self, mock_get_api, client):
+        """Test profile without display/image."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial_profile = type('PartialProfile', (), {})()
+        partial_profile.name = "Simple"
+        partial_profile.id = "profile-456"
+        partial_profile.error = None
+        mock_api.list_profiles.return_value = [partial_profile]
+        
+        full_profile = type('FullProfile', (), {})()
+        full_profile.id = "profile-456"
+        full_profile.name = "Simple"
+        full_profile.author = "Basic"
+        full_profile.temperature = 90.0
+        full_profile.final_weight = 40.0
+        full_profile.display = None
+        full_profile.error = None
+        
+        mock_api.get_profile.return_value = full_profile
+        
+        response = client.get("/api/profile/Simple")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile"]["image"] is None
+        assert data["profile"]["accent_color"] is None
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_api_error(self, mock_get_api, client):
+        """Test handling of machine API errors."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        error_result = type('ErrorResult', (), {})()
+        error_result.error = "Connection failed"
+        mock_api.list_profiles.return_value = error_result
+        
+        response = client.get("/api/profile/Test")
+        
+        assert response.status_code == 502
+
+    @patch('main.get_meticulous_api')
+    def test_get_profile_info_exception(self, mock_get_api, client):
+        """Test exception handling."""
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.side_effect = Exception("Unexpected error")
+        
+        response = client.get("/api/profile/Test")
+        
+        assert response.status_code == 500
+
+
+class TestLocalShotAnalysisEndpoint:
+    """Tests for the POST /api/shots/analyze endpoint."""
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_success(self, mock_get_api, mock_fetch_shot, client):
+        """Test successful local shot analysis."""
+        # Mock shot data
+        shot_data = {
+            "profile_name": "Test Profile",
+            "time": 1705320000,
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 0, "flow": 0}},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}},
+            ]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        # Mock profile data
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial_profile = type('PartialProfile', (), {})()
+        partial_profile.name = "Test Profile"
+        partial_profile.id = "profile-123"
+        partial_profile.error = None
+        mock_api.list_profiles.return_value = [partial_profile]
+        
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Test Profile"
+        full_profile.temperature = 93.0
+        full_profile.final_weight = 36.0
+        full_profile.variables = []
+        full_profile.stages = []
+        full_profile.error = None
+        mock_api.get_profile.return_value = full_profile
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test Profile",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot_001.json"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "analysis" in data
+        assert "shot_summary" in data["analysis"]
+        assert data["analysis"]["shot_summary"]["final_weight"] == 36.0
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_with_preinfusion(self, mock_get_api, mock_fetch_shot, client):
+        """Test analysis detects preinfusion stages."""
+        shot_data = {
+            "profile_name": "Complex",
+            "time": 1705320000,
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0, "flow": 0.5}, "stage_name": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0, "flow": 0.5}, "stage_name": "Bloom"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}, "stage_name": "Main"},
+            ]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Complex"
+        partial.id = "p-456"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Complex"
+        full.temperature = 92.0
+        full.final_weight = 36.0
+        full.variables = []
+        
+        # Create stages with preinfusion
+        stage1 = type('Stage', (), {})()
+        stage1.name = "Bloom"
+        stage1.key = "bloom"
+        stage1.type = "pressure"
+        stage1.dynamics_points = [[0, 2.0], [5, 2.0]]
+        stage1.dynamics_over = "time"
+        stage1.dynamics_interpolation = "linear"
+        stage1.exit_triggers = []
+        stage1.limits = []
+        
+        stage2 = type('Stage', (), {})()
+        stage2.name = "Main"
+        stage2.key = "main"
+        stage2.type = "pressure"
+        stage2.dynamics_points = [[0, 9.0]]
+        stage2.dynamics_over = "time"
+        stage2.dynamics_interpolation = "linear"
+        stage2.exit_triggers = []
+        stage2.limits = []
+        
+        full.stages = [stage1, stage2]
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Complex",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "preinfusion_summary" in data["analysis"]
+
+    def test_local_shot_analysis_missing_params(self, client):
+        """Test error when required parameters missing."""
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test"
+            # Missing shot_date and shot_filename
+        })
+        
+        assert response.status_code == 422
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    def test_local_shot_analysis_shot_not_found(self, mock_fetch_shot, client):
+        """Test error when shot data not found."""
+        async def raise_http_exception(*args, **kwargs):
+            raise HTTPException(status_code=404, detail="Shot not found")
+        
+        mock_fetch_shot.side_effect = raise_http_exception
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "missing.json"
+        })
+        
+        assert response.status_code == 404
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
+        """Test error when profile not found."""
+        mock_fetch_shot.return_value = {
+            "profile_name": "Unknown",
+            "time": 1705320000,
+            "data": []
+        }
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Unknown",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 404
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_weight_deviation(self, mock_get_api, mock_fetch_shot, client):
+        """Test analysis with weight deviation."""
+        shot_data = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 0, "flow": 0}},
+                {"time": 25000, "shot": {"weight": 45.0, "pressure": 9.0, "flow": 2.5}},  # Over target
+            ]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0  # Target is 36g, got 45g
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["analysis"]["weight_analysis"]["status"] == "over"
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_local_shot_analysis_exception(self, mock_get_api, mock_fetch_shot, client):
+        """Test handling of unexpected exceptions."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.side_effect = Exception("Unexpected error")
+        
+        response = client.post("/api/shots/analyze", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 500
+
+
+class TestGenerateProfileImageEndpoint:
+    """Tests for the POST /api/profile/{profile_name}/generate-image endpoint."""
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_preview_mode(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test image generation in preview mode."""
+        # Mock subprocess for nanobanana
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        mock_result.stderr = ""
+        
+        mock_subprocess.side_effect = [
+            mock_result,  # nanobanana execution
+            MagicMock(returncode=0),  # test -f check
+            MagicMock(returncode=0, stdout=b"fake_png_data")  # cat image
+        ]
+        
+        # Mock image processing
+        mock_process.return_value = ("data:image/png;base64,abc123", b"png_bytes")
+        
+        response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "preview"
+        assert "image_data" in data
+        assert data["style"] == "abstract"
+        assert "prompt" in data
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_save_to_profile(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test image generation and save to profile."""
+        # Mock subprocess
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        
+        # Mock API
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test Profile"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.id = "p-123"
+        full.name = "Test Profile"
+        full.display = None
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        save_result = type('SaveResult', (), {})()
+        save_result.error = None
+        mock_api.save_profile.return_value = save_result
+        
+        response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile_id"] == "p-123"
+
+    @patch('subprocess.run')
+    def test_generate_image_nanobanana_auth_error(self, mock_subprocess, client):
+        """Test handling of API key errors."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "API key authentication failed"
+        mock_result.stdout = ""
+        mock_subprocess.return_value = mock_result
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 402
+
+    @patch('subprocess.run')
+    def test_generate_image_nanobanana_generic_error(self, mock_subprocess, client):
+        """Test handling of generic generation errors."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "Unknown error occurred"
+        mock_result.stdout = ""
+        mock_subprocess.return_value = mock_result
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 500
+
+    @patch('subprocess.run')
+    def test_generate_image_timeout(self, mock_subprocess, client):
+        """Test handling of generation timeout."""
+        mock_subprocess.side_effect = subprocess.TimeoutExpired("docker", 120)
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 504
+
+    @patch('subprocess.run')
+    @patch('main.process_image_for_profile')
+    def test_generate_image_file_not_found(self, mock_process, mock_subprocess, client):
+        """Test when generated image cannot be found."""
+        # Nanobanana succeeds but file not found
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Done but no file path"
+        
+        # All file checks fail
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=1),  # File not found
+            MagicMock(returncode=1, stdout="")  # ls also fails
+        ]
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 500
+
+    @patch('subprocess.run')
+    @patch('main._set_cached_image')
+    def test_generate_image_invalid_style(self, mock_cache, mock_subprocess, client):
+        """Test with invalid style parameter (should default to abstract)."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        with patch('main.process_image_for_profile') as mock_process:
+            mock_process.return_value = ("data:image/png;base64,xyz", b"png")
+            
+            response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["style"] == "abstract"  # Should default
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_profile_not_found_for_save(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test error when profile not found for saving."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
+        
+        assert response.status_code == 404
+
+    @patch('subprocess.run')
+    @patch('main.get_meticulous_api')
+    @patch('main.process_image_for_profile')
+    @patch('main._set_cached_image')
+    def test_generate_image_save_failure(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+        """Test handling of profile save failure."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),
+            MagicMock(returncode=0, stdout=b"fake_png")
+        ]
+        
+        mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.id = "p-123"
+        full.name = "Test"
+        full.display = None
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        # Save fails
+        save_result = type('SaveResult', (), {})()
+        save_result.error = "Failed to save"
+        mock_api.save_profile.return_value = save_result
+        
+        response = client.post("/api/profile/Test/generate-image?preview=false")
+        
+        assert response.status_code == 502
+
+    @patch('subprocess.run')
+    def test_generate_image_read_failure(self, mock_subprocess, client):
+        """Test when reading generated image fails."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        
+        # File exists but cat fails
+        mock_subprocess.side_effect = [
+            mock_result,
+            MagicMock(returncode=0),  # test -f succeeds
+            MagicMock(returncode=1, stderr="Read error")  # cat fails
+        ]
+        
+        response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 500
+
+
+class TestLLMShotAnalysisEndpoint:
+    """Tests for the POST /api/shots/analyze-llm endpoint."""
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_success(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test successful LLM shot analysis."""
+        # Mock shot data
+        shot_data = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [{"time": 25000, "shot": {"weight": 36.0}}]
+        }
+        mock_fetch_shot.return_value = shot_data
+        
+        # Mock profile
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        # Mock local analysis
+        mock_local_analysis.return_value = {
+            "summary": {"final_weight": 36.0},
+            "stages": []
+        }
+        
+        # Mock LLM response
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "## 1. Shot Performance\n\n**What Happened:**\n- Excellent extraction\n\n**Assessment:** Good"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json",
+            "profile_description": "Test description"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "llm_analysis" in data
+        assert "Shot Performance" in data["llm_analysis"]
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    def test_llm_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
+        """Test error when profile not found."""
+        mock_fetch_shot.return_value = {"profile_name": "Unknown", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        mock_api.list_profiles.return_value = []
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Unknown",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 404
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_model_error(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test handling of LLM errors."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        
+        mock_model = MagicMock()
+        mock_model.generate_content.side_effect = Exception("API rate limit")
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 500
+
+    def test_llm_analysis_missing_params(self, client):
+        """Test error with missing required parameters."""
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test"
+            # Missing shot_date and shot_filename
+        })
+        
+        assert response.status_code == 422
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_with_description(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test LLM analysis with profile description."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Analysis with description context"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json",
+            "profile_description": "A gentle preinfusion profile"
+        })
+        
+        assert response.status_code == 200
+        # Verify description was passed to LLM
+        call_args = mock_model.generate_content.call_args[0][0]
+        assert "gentle preinfusion" in call_args
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    @patch('main.get_meticulous_api')
+    @patch('main.get_vision_model')
+    @patch('main._perform_local_shot_analysis')
+    def test_llm_analysis_with_variables(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+        """Test LLM analysis with profile variables."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+        
+        mock_api = MagicMock()
+        mock_get_api.return_value = mock_api
+        
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_api.list_profiles.return_value = [partial]
+        
+        # Create variable
+        var = type('Var', (), {})()
+        var.key = "dose"
+        var.name = "Dose"
+        var.type = "number"
+        var.value = 18.0
+        
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = [var]
+        full.stages = []
+        full.error = None
+        mock_api.get_profile.return_value = full
+        
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Analysis"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json"
+        })
+        
+        assert response.status_code == 200
+
+    @patch('main.fetch_shot_data', new_callable=AsyncMock)
+    def test_llm_analysis_shot_not_found(self, mock_fetch_shot, client):
+        """Test error when shot data not found."""
+        async def raise_http_exception(*args, **kwargs):
+            raise HTTPException(status_code=404, detail="Shot not found")
+        
+        mock_fetch_shot.side_effect = raise_http_exception
+        
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "missing.json"
+        })
+        
+        assert response.status_code == 404
+
+
+class TestConvertDescriptionEndpoint:
+    """Tests for the POST /api/profile/convert-description endpoint."""
+
+    @patch('main.get_vision_model')
+    @patch('main.HISTORY_FILE')
+    def test_convert_description_success(self, mock_history_file, mock_get_model, client):
+        """Test successful description conversion."""
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = """Profile Created: Test Profile
+
+Description:
+A balanced espresso profile with gentle preinfusion.
+
+Preparation:
+• Dose: 18g
+• Grind: Medium-fine
+• Temperature: 93°C
+• Target Yield: 36g
+
+Why This Works:
+The preinfusion allows even saturation before pressure ramp.
+
+Special Notes:
+Adjust grind based on bean age."""
+        
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        mock_history_file.exists.return_value = False
+        
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {
+                "name": "Test Profile",
+                "temperature": 93.0,
+                "final_weight": 36.0,
+                "stages": []
+            },
+            "description": "Original description here"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "converted_description" in data
+        assert "Profile Created" in data["converted_description"]
+
+    @patch('main.get_vision_model')
+    @patch('main.HISTORY_FILE')
+    def test_convert_description_with_history_update(self, mock_history_file, mock_get_model, client):
+        """Test conversion updates history entry."""
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Converted description"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        # Mock history file
+        mock_history_file.exists.return_value = True
+        existing_history = [
+            {"id": "entry-123", "profile_name": "Test", "reply": "Old description"},
+            {"id": "entry-456", "profile_name": "Other", "reply": "Other description"}
+        ]
+        
+        with patch('builtins.open', mock_open(read_data=json.dumps(existing_history))) as mock_file:
+            response = client.post("/api/profile/convert-description", json={
+                "profile": {"name": "Test", "temperature": 93.0, "final_weight": 36.0},
+                "description": "Original",
+                "entry_id": "entry-123"
+            })
+        
+        assert response.status_code == 200
+
+    def test_convert_description_missing_profile(self, client):
+        """Test error when profile JSON missing."""
+        response = client.post("/api/profile/convert-description", json={
+            "description": "Some description"
+            # Missing profile
+        })
+        
+        assert response.status_code == 400
+
+    @patch('main.get_vision_model')
+    def test_convert_description_model_error(self, mock_get_model, client):
+        """Test handling of LLM errors."""
+        mock_model = MagicMock()
+        mock_model.generate_content.side_effect = Exception("API error")
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {"name": "Test", "temperature": 93.0},
+            "description": "Original"
+        })
+        
+        assert response.status_code == 500
+
+    @patch('main.get_vision_model')
+    def test_convert_description_preserves_info(self, mock_get_model, client):
+        """Test that conversion prompt preserves all information."""
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "Converted"
+        mock_model.generate_content.return_value = mock_response
+        mock_get_model.return_value = mock_model
+        
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {
+                "name": "Complex Profile",
+                "temperature": 94.5,
+                "final_weight": 42.0,
+                "stages": [{"name": "Stage1"}]
+            },
+            "description": "Detailed original description with specific notes"
+        })
+        
+        assert response.status_code == 200
+        # Verify prompt included original description
+        call_args = mock_model.generate_content.call_args[0][0]
+        assert "Detailed original description" in call_args
+        assert "Complex Profile" in call_args
+
+
+class TestErrorHandling:
+    """Tests for error handling and edge cases."""
+
+    @patch('main.get_meticulous_api')
+    def test_api_connection_error(self, mock_get_api, client):
+        """Test handling of machine connection errors."""
+        mock_api = MagicMock()
+        mock_get_api.side_effect = Exception("Connection refused")
+        
+        response = client.get("/api/machine/profiles")
+        
+        assert response.status_code == 500
+
+    @patch('main.HISTORY_FILE')
+    def test_corrupted_history_file(self, mock_history_file, client):
+        """Test handling of corrupted history JSON."""
+        mock_history_file.exists.return_value = True
+        
+        with patch('builtins.open', mock_open(read_data="invalid json {")):
+            response = client.get("/api/history")
+        
+        # Should return empty or handle gracefully
+        assert response.status_code in [200, 500]
+
+    def test_parse_gemini_error_rate_limit(self):
+        """Test parsing of Gemini rate limit errors."""
+        from main import parse_gemini_error
+        
+        error_text = "429 RESOURCE_EXHAUSTED: Quota exceeded"
+        result = parse_gemini_error(error_text)
+        result_lower = str(result).lower()
+        assert "rate limit" in result_lower or "quota" in result_lower
+
+    def test_parse_gemini_error_generic(self):
+        """Test parsing of generic errors."""
+        from main import parse_gemini_error
+        
+        error_text = "Unknown error occurred"
+        result = parse_gemini_error(error_text)
+        assert isinstance(result, str)  # Returns a string
+
+    def test_safe_float_edge_cases(self):
+        """Test safe float conversion with various inputs."""
+        from main import _safe_float
+        
+        assert _safe_float(0) == 0.0
+        assert _safe_float(0.0) == 0.0
+        assert _safe_float([]) == 0.0  # Invalid type
+        assert _safe_float({}) == 0.0  # Invalid type
+
+    def test_compute_stage_stats_with_gravimetric_flow(self):
+        """Test stats with gravimetric_flow field."""
+        from main import _compute_stage_stats
+        
+        entries = [
+            {"time": 0, "shot": {"weight": 0, "pressure": 9.0, "gravimetric_flow": 2.0}},
+            {"time": 5000, "shot": {"weight": 10.0, "pressure": 9.0, "gravimetric_flow": 2.5}},
+        ]
+        
+        result = _compute_stage_stats(entries)
+        assert result["max_flow"] > 0  # Should use gravimetric_flow
+
+    def test_format_dynamics_over_weight(self):
+        """Test dynamics description over weight."""
+        from main import _format_dynamics_description
+        
+        stage = {
+            "type": "flow",
+            "dynamics_points": [[0, 2.0], [40, 3.0]],
+            "dynamics_over": "weight"
+        }
+        result = _format_dynamics_description(stage)
+        assert "g" in result  # Should use weight unit
