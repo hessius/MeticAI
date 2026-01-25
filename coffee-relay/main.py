@@ -2329,7 +2329,12 @@ async def apply_profile_image(
                 # Re-open since verify() closes the file
                 img = PILImage.open(io.BytesIO(png_bytes))
                 if img.format != 'PNG':
-                    logger.warning(f"Expected PNG format, got {img.format} for profile {profile_name}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Expected PNG format, got {img.format}"
+                    )
+            except HTTPException:
+                raise
             except Exception as img_err:
                 raise HTTPException(
                     status_code=400,

@@ -1384,6 +1384,9 @@ Description: A test profile
 
 class TestSecurityFeatures:
     """Tests for security features added to prevent vulnerabilities."""
+    
+    # Test constants
+    TEST_SIZE_EXCESS = 1000  # Bytes to exceed limits in tests
 
     def test_sanitize_profile_name_for_filename(self):
         """Test that profile names are properly sanitized for filenames."""
@@ -1440,7 +1443,7 @@ class TestSecurityFeatures:
         from main import MAX_UPLOAD_SIZE
         
         # Create a large image (simulate exceeding limit)
-        large_image = BytesIO(b"x" * (MAX_UPLOAD_SIZE + 1000))
+        large_image = BytesIO(b"x" * (MAX_UPLOAD_SIZE + self.TEST_SIZE_EXCESS))
         
         response = client.post(
             "/api/profile/test-profile/image",
@@ -1470,7 +1473,7 @@ class TestSecurityFeatures:
         from main import MAX_UPLOAD_SIZE
         
         # Create oversized base64 data
-        large_data = b"x" * (MAX_UPLOAD_SIZE + 1000)
+        large_data = b"x" * (MAX_UPLOAD_SIZE + self.TEST_SIZE_EXCESS)
         b64_data = base64.b64encode(large_data).decode('utf-8')
         data_uri = f"data:image/png;base64,{b64_data}"
         
