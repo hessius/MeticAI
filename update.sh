@@ -60,6 +60,10 @@ WEB_UPDATE_AVAILABLE=false
 METICAI_REMOTE_HASH=""
 MCP_REMOTE_HASH=""
 WEB_REMOTE_HASH=""
+METICAI_LOCAL_VERSION=""
+METICAI_REMOTE_VERSION=""
+WEB_LOCAL_VERSION=""
+WEB_REMOTE_VERSION=""
 
 # Parse command line arguments
 CHECK_ONLY=false
@@ -158,6 +162,78 @@ get_remote_url() {
     else
         echo "unknown"
     fi
+}
+
+# Function to read local VERSION file
+get_local_version() {
+    local dir="$1"
+    local version_file="$dir/VERSION"
+    if [ -f "$version_file" ]; then
+        cat "$version_file" | tr -d '[:space:]'
+    else
+        echo "0.0.0"
+    fi
+}
+
+# Function to fetch remote VERSION file from GitHub
+get_remote_version() {
+    local repo_owner="$1"
+    local repo_name="$2"
+    local branch="${3:-main}"
+    local url="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${branch}/VERSION"
+    
+    local version
+    if command -v curl &> /dev/null; then
+        version=$(curl -fsSL "$url" 2>/dev/null | tr -d '[:space:]')
+    elif command -v wget &> /dev/null; then
+        version=$(wget -qO- "$url" 2>/dev/null | tr -d '[:space:]')
+    fi
+    
+    if [ -n "$version" ] && [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        echo "$version"
+    else
+        echo "0.0.0"
+    fi
+}
+
+# Function to compare semantic versions
+# Returns 0 if version1 > version2, 1 otherwise
+version_greater_than() {
+    local version1="$1"
+    local version2="$2"
+    
+    # Handle edge cases
+    if [ "$version1" = "$version2" ]; then
+        return 1
+    fi
+    if [ "$version1" = "0.0.0" ]; then
+        return 1
+    fi
+    if [ "$version2" = "0.0.0" ]; then
+        return 0
+    fi
+    
+    # Split versions into arrays
+    IFS='.' read -ra v1_parts <<< "$version1"
+    IFS='.' read -ra v2_parts <<< "$version2"
+    
+    # Compare each part
+    for i in 0 1 2; do
+        local v1_part="${v1_parts[$i]:-0}"
+        local v2_part="${v2_parts[$i]:-0}"
+        
+        # Remove any non-numeric suffix (e.g., -beta)
+        v1_part="${v1_part%%[!0-9]*}"
+        v2_part="${v2_part%%[!0-9]*}"
+        
+        if [ "$v1_part" -gt "$v2_part" ] 2>/dev/null; then
+            return 0
+        elif [ "$v1_part" -lt "$v2_part" ] 2>/dev/null; then
+            return 1
+        fi
+    done
+    
+    return 1  # Versions are equal
 }
 
 # Function to fetch central configuration
@@ -446,25 +522,24 @@ check_for_updates() {
     echo -e "${YELLOW}Checking for updates...${NC}"
     echo ""
     
-    # Check main MeticAI repo
+    # Check main MeticAI repo (using semantic versioning)
     echo "📦 MeticAI Main Repository"
-    local meticai_current=$(get_commit_hash "$SCRIPT_DIR")
-    local meticai_remote=$(get_remote_hash "$SCRIPT_DIR" "$(get_current_branch "$SCRIPT_DIR")")
-    METICAI_REMOTE_HASH="$meticai_remote"
+    METICAI_LOCAL_VERSION=$(get_local_version "$SCRIPT_DIR")
+    METICAI_REMOTE_VERSION=$(get_remote_version "hessius" "MeticAI" "main")
     
-    if [ "$meticai_current" != "$meticai_remote" ] && [ "$meticai_remote" != "not-a-git-repo" ]; then
+    if version_greater_than "$METICAI_REMOTE_VERSION" "$METICAI_LOCAL_VERSION"; then
         echo -e "   ${YELLOW}⚠ Update available${NC}"
-        echo "   Current: ${meticai_current:0:8}"
-        echo "   Latest:  ${meticai_remote:0:8}"
+        echo "   Current: v${METICAI_LOCAL_VERSION}"
+        echo "   Latest:  v${METICAI_REMOTE_VERSION}"
         has_updates=true
         METICAI_UPDATE_AVAILABLE=true
     else
-        echo -e "   ${GREEN}✓ Up to date${NC}"
+        echo -e "   ${GREEN}✓ Up to date${NC} (v${METICAI_LOCAL_VERSION})"
         METICAI_UPDATE_AVAILABLE=false
     fi
     echo ""
     
-    # Check meticulous-mcp
+    # Check meticulous-mcp (still uses commit-based checking - external dependency)
     if [ -d "$SCRIPT_DIR/meticulous-source" ]; then
         echo "📦 Meticulous MCP"
         local mcp_current=$(get_commit_hash "$SCRIPT_DIR/meticulous-source")
@@ -493,22 +568,20 @@ check_for_updates() {
     fi
     echo ""
     
-    # Check meticai-web
+    # Check meticai-web (using semantic versioning)
     if [ -d "$SCRIPT_DIR/meticai-web" ]; then
         echo "📦 MeticAI Web Interface"
-        local web_current=$(get_commit_hash "$SCRIPT_DIR/meticai-web")
-        local web_branch=$(get_current_branch "$SCRIPT_DIR/meticai-web")
-        local web_remote=$(get_remote_hash "$SCRIPT_DIR/meticai-web" "$web_branch")
-        WEB_REMOTE_HASH="$web_remote"
+        WEB_LOCAL_VERSION=$(get_local_version "$SCRIPT_DIR/meticai-web")
+        WEB_REMOTE_VERSION=$(get_remote_version "hessius" "MeticAI-web" "main")
         
-        if [ "$web_current" != "$web_remote" ] && [ "$web_remote" != "not-a-git-repo" ]; then
+        if version_greater_than "$WEB_REMOTE_VERSION" "$WEB_LOCAL_VERSION"; then
             echo -e "   ${YELLOW}⚠ Update available${NC}"
-            echo "   Current: ${web_current:0:8}"
-            echo "   Latest:  ${web_remote:0:8}"
+            echo "   Current: v${WEB_LOCAL_VERSION}"
+            echo "   Latest:  v${WEB_REMOTE_VERSION}"
             has_updates=true
             WEB_UPDATE_AVAILABLE=true
         else
-            echo -e "   ${GREEN}✓ Up to date${NC}"
+            echo -e "   ${GREEN}✓ Up to date${NC} (v${WEB_LOCAL_VERSION})"
             WEB_UPDATE_AVAILABLE=false
         fi
     else
@@ -516,7 +589,7 @@ check_for_updates() {
         echo -e "   ${RED}✗ Not installed${NC}"
         has_updates=true
         WEB_UPDATE_AVAILABLE=true
-        WEB_REMOTE_HASH="not-installed"
+        WEB_REMOTE_VERSION="not-installed"
     fi
     echo ""
     
@@ -776,8 +849,9 @@ update_version_file() {
   "update_available": $UPDATE_AVAILABLE,
   "repositories": {
     "meticai": {
+      "current_version": "$METICAI_LOCAL_VERSION",
+      "remote_version": "$METICAI_REMOTE_VERSION",
       "current_hash": "$(get_commit_hash "$SCRIPT_DIR")",
-      "remote_hash": "$METICAI_REMOTE_HASH",
       "update_available": $METICAI_UPDATE_AVAILABLE,
       "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     },
@@ -789,8 +863,9 @@ update_version_file() {
       "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     },
     "meticai-web": {
+      "current_version": "$WEB_LOCAL_VERSION",
+      "remote_version": "$WEB_REMOTE_VERSION",
       "current_hash": "$(get_commit_hash "$SCRIPT_DIR/meticai-web")",
-      "remote_hash": "$WEB_REMOTE_HASH",
       "update_available": $WEB_UPDATE_AVAILABLE,
       "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     }
