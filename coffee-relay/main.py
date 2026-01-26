@@ -345,6 +345,17 @@ USER_SUMMARY_INSTRUCTIONS = (
     "   • Special Requirements: Any special gear needed (bottom filter, specific dosage, unique prep steps)\n\n"
 )
 
+
+def get_author_instruction() -> str:
+    """Get the author instruction for profile creation prompts."""
+    author = get_author_name()
+    return (
+        f"AUTHOR:\n"
+        f"• Set the 'author' field in the profile JSON to: \"{author}\"\n"
+        f"• This name will appear as the profile creator on the Meticulous device\n\n"
+    )
+
+
 @app.post("/analyze_coffee")
 async def analyze_coffee(request: Request, file: UploadFile = File(...)):
     """Phase 1: Look at the bag."""
@@ -468,6 +479,9 @@ async def analyze_and_profile(
                 }
             )
         
+        # Get author instruction with configured name
+        author_instruction = get_author_instruction()
+        
         # Construct the profile creation prompt
         if coffee_analysis and user_prefs:
             # Both image and preferences provided
@@ -480,6 +494,7 @@ async def analyze_and_profile(
                 f"TASK: Create a sophisticated espresso profile based on the coffee analysis and user preferences.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
+                author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
                 OUTPUT_FORMAT
             )
@@ -492,6 +507,7 @@ async def analyze_and_profile(
                 f"Task: Create a sophisticated espresso profile for '{coffee_analysis}'.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
+                author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
                 OUTPUT_FORMAT
             )
@@ -505,6 +521,7 @@ async def analyze_and_profile(
                 "TASK: Create a sophisticated espresso profile based on the user's instructions.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
+                author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
                 OUTPUT_FORMAT
             )
@@ -817,6 +834,62 @@ async def trigger_update(request: Request):
         )
 
 
+@app.post("/api/restart")
+async def restart_system(request: Request):
+    """Restart all MeticAI containers.
+    
+    This endpoint writes a timestamp to /app/.restart-requested which is mounted
+    from the host. The host's systemd/launchd service (rebuild-watcher) monitors this
+    file and restarts all containers without pulling updates.
+    
+    Returns:
+        - status: "success" or "error"
+        - message: Description of what happened
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Triggering system restart via host signal",
+            extra={"request_id": request_id, "endpoint": "/api/restart"}
+        )
+        
+        # Signal the host to restart containers
+        # This file is watched by systemd/launchd on the host (rebuild-watcher.sh)
+        restart_signal = Path("/app/.restart-requested")
+        
+        # Write a timestamp to trigger the file change
+        import time
+        restart_signal.write_text(f"restart-requested:{time.time()}\n")
+        
+        logger.info(
+            "Restart triggered - signaled host via .restart-requested",
+            extra={"request_id": request_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": "Restart triggered. The system will restart momentarily."
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to trigger restart: {str(e)}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "error_type": type(e).__name__
+            }
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to signal restart"
+            }
+        )
+
+
 @app.get("/api/logs")
 async def get_logs(
     request: Request,
@@ -923,6 +996,225 @@ async def get_logs(
                 "error": str(e),
                 "message": "Failed to retrieve logs"
             }
+        )
+
+
+# ============================================
+# Settings Management
+# ============================================
+
+SETTINGS_FILE = Path("/app/data/settings.json")
+
+
+def _ensure_settings_file():
+    """Ensure the settings file and directory exist."""
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not SETTINGS_FILE.exists():
+        default_settings = {
+            "geminiApiKey": "",
+            "meticulousIp": "",
+            "serverIp": "",
+            "authorName": ""
+        }
+        SETTINGS_FILE.write_text(json.dumps(default_settings, indent=2))
+
+
+def _load_settings() -> dict:
+    """Load settings from file."""
+    _ensure_settings_file()
+    try:
+        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {
+            "geminiApiKey": "",
+            "meticulousIp": "",
+            "serverIp": "",
+            "authorName": ""
+        }
+
+
+def _save_settings(settings: dict):
+    """Save settings to file."""
+    _ensure_settings_file()
+    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+
+
+def get_author_name() -> str:
+    """Get the configured author name, defaulting to 'MeticAI' if not set."""
+    settings = _load_settings()
+    author = settings.get("authorName", "").strip()
+    return author if author else "MeticAI"
+
+
+@app.get("/api/settings")
+async def get_settings(request: Request):
+    """Get current settings.
+    
+    Returns settings with API key masked for security.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Fetching settings",
+            extra={"request_id": request_id, "endpoint": "/api/settings"}
+        )
+        
+        settings = _load_settings()
+        
+        # Read current values from environment
+        env_api_key = os.environ.get("GEMINI_API_KEY", "")
+        env_meticulous_ip = os.environ.get("METICULOUS_IP", "")
+        env_server_ip = os.environ.get("PI_IP", "")
+        
+        # Always show API key as stars if set (never expose the actual key)
+        if env_api_key:
+            # Show stars to indicate a key is configured
+            settings["geminiApiKey"] = "*" * min(len(env_api_key), 20)
+            settings["geminiApiKeyMasked"] = True
+            settings["geminiApiKeyConfigured"] = True
+        else:
+            settings["geminiApiKeyConfigured"] = False
+        
+        # Always show current IP values from environment (env takes precedence)
+        if env_meticulous_ip:
+            settings["meticulousIp"] = env_meticulous_ip
+        
+        if env_server_ip:
+            settings["serverIp"] = env_server_ip
+        
+        return settings
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch settings: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to fetch settings"}
+        )
+
+
+@app.post("/api/settings")
+async def save_settings(request: Request):
+    """Save settings.
+    
+    Updates the settings.json file and optionally updates the .env file
+    for system-level settings (requires container restart to take effect).
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        
+        logger.info(
+            "Saving settings",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/api/settings",
+                "has_api_key": bool(body.get("geminiApiKey")),
+                "has_meticulous_ip": bool(body.get("meticulousIp")),
+                "has_server_ip": bool(body.get("serverIp")),
+                "has_author": bool(body.get("authorName"))
+            }
+        )
+        
+        # Load current settings
+        current_settings = _load_settings()
+        
+        # Update only provided fields
+        if "authorName" in body:
+            current_settings["authorName"] = body["authorName"].strip()
+        
+        # For IP and API key changes, also update .env file
+        env_updated = False
+        env_path = Path("/app/.env")
+        
+        # Read current .env content
+        env_content = ""
+        if env_path.exists():
+            env_content = env_path.read_text()
+        
+        # Handle API key update
+        if body.get("geminiApiKey") and not body.get("geminiApiKeyMasked"):
+            new_api_key = body["geminiApiKey"].strip()
+            if new_api_key and "..." not in new_api_key:  # Not a masked value
+                current_settings["geminiApiKey"] = new_api_key
+                # Update .env file
+                if "GEMINI_API_KEY=" in env_content:
+                    import re
+                    env_content = re.sub(
+                        r'GEMINI_API_KEY=.*',
+                        f'GEMINI_API_KEY={new_api_key}',
+                        env_content
+                    )
+                else:
+                    env_content += f"\nGEMINI_API_KEY={new_api_key}"
+                env_updated = True
+        
+        # Handle Meticulous IP update
+        if body.get("meticulousIp"):
+            new_ip = body["meticulousIp"].strip()
+            current_settings["meticulousIp"] = new_ip
+            if "METICULOUS_IP=" in env_content:
+                import re
+                env_content = re.sub(
+                    r'METICULOUS_IP=.*',
+                    f'METICULOUS_IP={new_ip}',
+                    env_content
+                )
+            else:
+                env_content += f"\nMETICULOUS_IP={new_ip}"
+            env_updated = True
+        
+        # Handle Server IP update
+        if body.get("serverIp"):
+            new_ip = body["serverIp"].strip()
+            current_settings["serverIp"] = new_ip
+            if "PI_IP=" in env_content:
+                import re
+                env_content = re.sub(
+                    r'PI_IP=.*',
+                    f'PI_IP={new_ip}',
+                    env_content
+                )
+            else:
+                env_content += f"\nPI_IP={new_ip}"
+            env_updated = True
+        
+        # Save settings to JSON file
+        _save_settings(current_settings)
+        
+        # Write .env file if updated (note: may fail if read-only mount)
+        if env_updated:
+            try:
+                env_path.write_text(env_content)
+                logger.info("Updated .env file", extra={"request_id": request_id})
+            except PermissionError:
+                logger.warning(
+                    ".env file is read-only, changes saved to settings.json only",
+                    extra={"request_id": request_id}
+                )
+        
+        return {
+            "status": "success",
+            "message": "Settings saved successfully",
+            "env_updated": env_updated
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to save settings: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to save settings"}
         )
 
 
