@@ -1841,15 +1841,13 @@ class TestBasicEndpoints:
     
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main._ensure_history_file')
-    @patch('main.Path')
-    def test_load_history_with_missing_file(self, mock_path, mock_ensure):
+    @patch('builtins.open')
+    def test_load_history_with_missing_file(self, mock_open_func, mock_ensure):
         """Test loading history when file doesn't exist."""
         from main import _load_history
         
-        # Mock missing file
-        mock_file = Mock()
-        mock_file.exists.return_value = False
-        mock_path.return_value = mock_file
+        # Mock file not found
+        mock_open_func.side_effect = FileNotFoundError("File not found")
         
         history = _load_history()
         
@@ -3497,7 +3495,8 @@ class TestLLMShotAnalysisEndpoint:
             "profile_name": "Test",
             "shot_date": "2024-01-15",
             "shot_filename": "shot.json",
-            "profile_description": "Test description"
+            "profile_description": "Test description",
+            "force_refresh": "true"
         })
         
         assert response.status_code == 200
@@ -3519,7 +3518,8 @@ class TestLLMShotAnalysisEndpoint:
         response = client.post("/api/shots/analyze-llm", data={
             "profile_name": "Unknown",
             "shot_date": "2024-01-15",
-            "shot_filename": "shot.json"
+            "shot_filename": "shot.json",
+            "force_refresh": "true"
         })
         
         assert response.status_code == 404
@@ -3559,7 +3559,8 @@ class TestLLMShotAnalysisEndpoint:
         response = client.post("/api/shots/analyze-llm", data={
             "profile_name": "Test",
             "shot_date": "2024-01-15",
-            "shot_filename": "shot.json"
+            "shot_filename": "shot.json",
+            "force_refresh": "true"
         })
         
         assert response.status_code == 500
@@ -3611,7 +3612,8 @@ class TestLLMShotAnalysisEndpoint:
             "profile_name": "Test",
             "shot_date": "2024-01-15",
             "shot_filename": "shot.json",
-            "profile_description": "A gentle preinfusion profile"
+            "profile_description": "A gentle preinfusion profile",
+            "force_refresh": "true"
         })
         
         assert response.status_code == 200
@@ -3663,7 +3665,8 @@ class TestLLMShotAnalysisEndpoint:
         response = client.post("/api/shots/analyze-llm", data={
             "profile_name": "Test",
             "shot_date": "2024-01-15",
-            "shot_filename": "shot.json"
+            "shot_filename": "shot.json",
+            "force_refresh": "true"
         })
         
         assert response.status_code == 200
@@ -3679,7 +3682,8 @@ class TestLLMShotAnalysisEndpoint:
         response = client.post("/api/shots/analyze-llm", data={
             "profile_name": "Test",
             "shot_date": "2024-01-15",
-            "shot_filename": "missing.json"
+            "shot_filename": "missing.json",
+            "force_refresh": "true"
         })
         
         assert response.status_code == 404
