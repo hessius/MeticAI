@@ -129,18 +129,19 @@ nav {
 .hero::before {
     content: '';
     position: absolute;
-    bottom: -70px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    height: 800px;
-    background: url('met-bg-transparent.png') no-repeat center center/contain;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('met-bg-transparent.png') no-repeat center bottom/contain;
     opacity: 0.8;
-    z-index: 1;
+    z-index: 0;
+    pointer-events: none;
 }
 
 .hero-content {
     z-index: 2;
+    position: relative;
     max-width: 800px;
     margin-bottom: 2rem;
 }
@@ -224,6 +225,7 @@ h1 span {
 
 .hero-tagline {
     z-index: 2;
+    position: relative;
     font-size: 3.5rem;
     font-weight: 400;
     text-transform: uppercase;
@@ -238,6 +240,7 @@ h1 span {
 
 .hero-cta {
     z-index: 2;
+    position: relative;
     margin-top: 1rem;
 }
 
@@ -420,6 +423,13 @@ h1 span {
     font-size: 1.1rem;
 }
 
+.story-signature {
+    margin-top: 2rem;
+    font-style: italic;
+    color: var(--muted-foreground);
+    font-size: 1rem;
+}
+
 /* --- Getting Started Section --- */
 .getting-started {
     padding: 5rem 5%;
@@ -523,6 +533,93 @@ h1 span {
 
 .install-options > .cta-button.cta-outline {
     margin-top: 1rem;
+}
+
+/* --- Acknowledgements Section --- */
+.acknowledgements {
+    padding: 5rem 5%;
+    background: var(--bg-color);
+    text-align: center;
+}
+
+.acknowledgements h2 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    color: var(--foreground);
+}
+
+.acknowledgements-content {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.acknowledgements-content > p {
+    color: var(--muted-foreground);
+    line-height: 1.8;
+    font-size: 1rem;
+    margin-bottom: 2rem;
+}
+
+.acknowledgements-content a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.acknowledgements-content a:hover {
+    text-decoration: underline;
+}
+
+.tech-stack {
+    margin: 2rem 0;
+    padding: 2rem;
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.tech-stack h3 {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+    color: var(--foreground);
+}
+
+.tech-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem 2rem;
+}
+
+.tech-list li {
+    color: var(--muted-foreground);
+    font-size: 0.95rem;
+}
+
+.tech-list strong {
+    color: var(--foreground);
+}
+
+.open-source {
+    margin-top: 2rem;
+}
+
+.open-source > p {
+    color: var(--muted-foreground);
+    margin-bottom: 1rem;
+}
+
+.open-source-links {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.open-source-links a {
+    color: var(--primary);
+    font-size: 0.95rem;
 }
 
 /* --- Footer --- */
