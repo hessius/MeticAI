@@ -90,6 +90,43 @@ if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Running in non-interactive mode..." 5
 fi
 
+# Function to checkout the latest release tag for a repository
+# This ensures users get stable, tested versions instead of potentially unstable main branch
+checkout_latest_release() {
+    local dir="$1"
+    local repo_name="$2"
+    
+    cd "$dir" || return 1
+    
+    # Fetch all tags
+    git fetch --tags 2>/dev/null
+    
+    # Get the latest version tag (format: vX.Y.Z or X.Y.Z)
+    local latest_tag
+    latest_tag=$(git tag -l --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
+    
+    if [ -n "$latest_tag" ]; then
+        if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
+            show_progress "Checking out $repo_name release $latest_tag..."
+        else
+            echo -e "${YELLOW}Checking out latest release: $latest_tag${NC}"
+        fi
+        if git checkout "$latest_tag" 2>/dev/null; then
+            echo -e "${GREEN}✓ $repo_name set to stable release $latest_tag${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}Could not checkout tag, staying on main branch${NC}"
+            return 1
+        fi
+    else
+        echo -e "${YELLOW}No release tags found for $repo_name, using main branch${NC}"
+        return 1
+    fi
+    
+    # Return to original directory
+    cd - >/dev/null || true
+}
+
 # Only show banner in interactive mode
 if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
     echo -e "${BLUE}=========================================${NC}"
@@ -1341,6 +1378,7 @@ if [ -d "meticai-web" ]; then
         rm -rf meticai-web
         show_progress "Cloning meticai-web..." 50
         git clone https://github.com/hessius/MeticAI-web.git meticai-web
+        checkout_latest_release "$PWD/meticai-web" "MeticAI-web"
     elif [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
         echo "Directory 'meticai-web' already exists."
         read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " WEB_CLONE_CONFIRM </dev/tty
@@ -1351,6 +1389,7 @@ if [ -d "meticai-web" ]; then
             rm -rf meticai-web
             echo "Cloning fresh web app repository..."
             git clone https://github.com/hessius/MeticAI-web.git meticai-web
+            checkout_latest_release "$PWD/meticai-web" "MeticAI-web"
         else
             echo "Skipping clone (using existing web app)."
         fi
@@ -1362,6 +1401,7 @@ else
         echo "Cloning MeticAI Web Interface..."
     fi
     git clone https://github.com/hessius/MeticAI-web.git meticai-web
+    checkout_latest_release "$PWD/meticai-web" "MeticAI-web"
 fi
 echo -e "${GREEN}✓ Web app source code ready.${NC}"
 
