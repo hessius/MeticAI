@@ -2346,12 +2346,13 @@ async def generate_profile_image(
         import shutil
         
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Execute nanobanana via gemini CLI
+            # Execute image generation via gemini CLI
+            # The prompt should ask to generate an image directly
+            image_prompt = f"generate an image: {full_prompt}"
             result = subprocess.run(
                 [
                     "docker", "exec", "-i", "gemini-client",
-                    "gemini", "-y",
-                    f'/generate "{full_prompt}"'
+                    "gemini", "-y", image_prompt
                 ],
                 capture_output=True,
                 text=True,
@@ -2389,7 +2390,7 @@ async def generate_profile_image(
             logger.info(f"Nanobanana output: {output}", extra={"request_id": request_id})
             
             # Try to find the image path in the output
-            # nanobanana saves to /root/nanobanana-output/
+            # nanobanana saves to /nanobanana-output/ (not /root/nanobanana-output/)
             image_path = None
             
             # Look for paths in backticks first (common format)
@@ -2423,13 +2424,13 @@ async def generate_profile_image(
             # If no path found, try to list the output directory
             if not image_path:
                 list_result = subprocess.run(
-                    ["docker", "exec", "gemini-client", "ls", "-t", "/root/nanobanana-output/"],
+                    ["docker", "exec", "gemini-client", "ls", "-t", "/nanobanana-output/"],
                     capture_output=True,
                     text=True
                 )
                 if list_result.returncode == 0 and list_result.stdout.strip():
                     newest_file = list_result.stdout.strip().split('\n')[0]
-                    image_path = f"/root/nanobanana-output/{newest_file}"
+                    image_path = f"/nanobanana-output/{newest_file}"
             
             if not image_path:
                 raise HTTPException(
