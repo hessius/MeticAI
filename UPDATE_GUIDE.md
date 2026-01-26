@@ -19,16 +19,16 @@ This document provides a quick reference for the MeticAI update system.
 
 The update system manages three components:
 
-1. **MeticAI Main Repository** - The core application
-2. **Meticulous MCP** - The machine control protocol server
-3. **MeticAI Web Interface** - The web-based user interface
+1. **MeticAI Main Repository** - The core application (version-based)
+2. **Meticulous MCP** - The machine control protocol server (commit-based)
+3. **MeticAI Web Interface** - The web-based user interface (version-based)
 
 ## Features
 
 ### 1. Update Checking
-- Checks git repositories for new commits
-- Compares local vs. remote commit hashes
-- Displays clear status for each component
+- Uses semantic versioning for MeticAI and MeticAI-web repos
+- Compares local `VERSION` file with remote on GitHub
+- Displays clear version numbers (e.g., v1.0.0 → v1.1.0)
 - Non-invasive - doesn't modify anything in check-only mode
 
 ### 2. Dependency Management
@@ -278,6 +278,50 @@ setInterval(checkForUpdates, 3600000);
     ./update.sh --auto
 ```
 
+## Version-Based Updates
+
+MeticAI uses **semantic versioning** to control when users are notified about updates. Not every commit triggers an update notification - only when the maintainer explicitly bumps the version.
+
+### How It Works
+
+1. Each repository has a `VERSION` file containing the semantic version (e.g., `1.0.0`)
+2. The update checker compares local `VERSION` with remote `VERSION` on GitHub
+3. Users are only notified when the remote version is **greater than** their local version
+4. Meticulous MCP (external dependency) still uses commit-based checking
+
+### For Maintainers: Releasing a New Version
+
+To release a new version that will trigger updates for all users:
+
+```bash
+# 1. Update the VERSION file
+echo "1.1.0" > VERSION
+
+# 2. Commit and push
+git add VERSION
+git commit -m "Release v1.1.0"
+git push
+
+# 3. Optionally create a GitHub release/tag
+git tag v1.1.0
+git push --tags
+```
+
+**For MeticAI-web**, do the same in the web repository:
+```bash
+cd meticai-web
+echo "1.1.0" > VERSION
+git add VERSION
+git commit -m "Release v1.1.0"
+git push
+```
+
+### Version Format
+
+- Use semantic versioning: `MAJOR.MINOR.PATCH`
+- Examples: `1.0.0`, `1.1.0`, `2.0.0`
+- The system compares versions numerically (e.g., `1.10.0` > `1.9.0`)
+
 ## Best Practices
 
 1. **Check before updating**: Always run `--check-only` first
@@ -300,7 +344,8 @@ setInterval(checkForUpdates, 3600000);
 |------|---------|------------|
 | `update.sh` | Main update script | Tracked |
 | `check-updates-on-start.sh` | Startup notification | Tracked |
-| `.versions.json` | Version tracking | Ignored |
+| `VERSION` | Semantic version for releases | Tracked |
+| `.versions.json` | Version tracking cache | Ignored |
 | `tests/test_update.bats` | Test suite | Tracked |
 
 ## Support
