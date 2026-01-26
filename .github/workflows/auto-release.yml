@@ -1,0 +1,96 @@
+name: Auto Release on Version Change
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for changelog
+          
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(cat VERSION)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+          
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag v${{ steps.version.outputs.version }} already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag v${{ steps.version.outputs.version }} does not exist"
+          fi
+          
+      - name: Generate changelog
+        if: steps.check_tag.outputs.exists == 'false'
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "📝 Generating changelog since $PREV_TAG"
+            CHANGELOG=$(git log --pretty=format:"- %s" "$PREV_TAG"..HEAD --no-merges | head -50)
+          else
+            echo "📝 First release - generating full changelog"
+            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges | head -50)
+          fi
+          
+          # Escape for GitHub Actions
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "changelog<<$EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+          
+      - name: Create Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: MeticAI v${{ steps.version.outputs.version }}
+          body: |
+            ## MeticAI v${{ steps.version.outputs.version }}
+            
+            ### What's Changed
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ---
+            
+            ### Installation
+            
+            **Quick Install (Raspberry Pi / Linux):**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/v${{ steps.version.outputs.version }}/web_install.sh | bash
+            ```
+            
+            **macOS:** Download the DMG from the [latest macOS installer release](https://github.com/hessius/MeticAI/releases?q=macos-installer&expanded=true).
+            
+            ---
+            Built from commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Skip message
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          echo "⏭️ Skipping release - tag v${{ steps.version.outputs.version }} already exists"
+          echo "To create a new release, increment the version in VERSION file"
