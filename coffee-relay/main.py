@@ -1250,6 +1250,77 @@ def _save_history(history: list):
 
 
 # ============================================
+# LLM Analysis Cache Management  
+# ============================================
+
+LLM_CACHE_FILE = Path("/app/data/llm_analysis_cache.json")
+LLM_CACHE_TTL_SECONDS = 3 * 24 * 60 * 60  # 3 days
+
+
+def _ensure_llm_cache_file():
+    """Ensure the LLM cache file and directory exist."""
+    LLM_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not LLM_CACHE_FILE.exists():
+        LLM_CACHE_FILE.write_text("{}")
+
+
+def _load_llm_cache() -> dict:
+    """Load LLM analysis cache from file."""
+    _ensure_llm_cache_file()
+    try:
+        return json.loads(LLM_CACHE_FILE.read_text())
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def _save_llm_cache(cache: dict):
+    """Save LLM analysis cache to file."""
+    _ensure_llm_cache_file()
+    LLM_CACHE_FILE.write_text(json.dumps(cache, indent=2))
+
+
+def _get_llm_cache_key(profile_name: str, shot_date: str, shot_filename: str) -> str:
+    """Generate a cache key for LLM analysis."""
+    return f"{profile_name}_{shot_date}_{shot_filename}"
+
+
+def get_cached_llm_analysis(profile_name: str, shot_date: str, shot_filename: str) -> Optional[str]:
+    """Get cached LLM analysis if it exists and is not expired."""
+    cache = _load_llm_cache()
+    key = _get_llm_cache_key(profile_name, shot_date, shot_filename)
+    
+    if key in cache:
+        entry = cache[key]
+        timestamp = entry.get("timestamp", 0)
+        now = time.time()
+        
+        if now - timestamp < LLM_CACHE_TTL_SECONDS:
+            return entry.get("analysis")
+        else:
+            # Expired - remove from cache
+            del cache[key]
+            _save_llm_cache(cache)
+    
+    return None
+
+
+def save_llm_analysis_to_cache(profile_name: str, shot_date: str, shot_filename: str, analysis: str):
+    """Save LLM analysis to cache."""
+    cache = _load_llm_cache()
+    key = _get_llm_cache_key(profile_name, shot_date, shot_filename)
+    
+    cache[key] = {
+        "analysis": analysis,
+        "timestamp": time.time(),
+        "profile_name": profile_name,
+        "shot_date": shot_date,
+        "shot_filename": shot_filename
+    }
+    
+    _save_llm_cache(cache)
+
+
+# ============================================
 # Shot History Cache Management
 # ============================================
 
@@ -3831,13 +3902,62 @@ def _prepare_profile_for_llm(profile_data: dict, description: str | None) -> dic
     return clean_profile
 
 
+@app.get("/api/shots/llm-analysis-cache")
+async def get_llm_analysis_cache(
+    request: Request,
+    profile_name: str,
+    shot_date: str,
+    shot_filename: str
+):
+    """Check if a cached LLM analysis exists for the given shot.
+    
+    Returns the cached analysis if it exists and is not expired,
+    otherwise returns null.
+    """
+    request_id = request.state.request_id
+    
+    logger.info(
+        "Checking LLM analysis cache",
+        extra={
+            "request_id": request_id,
+            "profile_name": profile_name,
+            "shot_date": shot_date,
+            "shot_filename": shot_filename
+        }
+    )
+    
+    cached = get_cached_llm_analysis(profile_name, shot_date, shot_filename)
+    
+    if cached:
+        logger.info(
+            "LLM analysis cache hit",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        return {
+            "status": "success",
+            "cached": True,
+            "analysis": cached
+        }
+    else:
+        logger.info(
+            "LLM analysis cache miss",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        return {
+            "status": "success", 
+            "cached": False,
+            "analysis": None
+        }
+
+
 @app.post("/api/shots/analyze-llm")
 async def analyze_shot_with_llm(
     request: Request,
     profile_name: str = Form(...),
     shot_date: str = Form(...),
     shot_filename: str = Form(...),
-    profile_description: Optional[str] = Form(None)
+    profile_description: Optional[str] = Form(None),
+    force_refresh: bool = Form(False)
 ):
     """Analyze a shot using LLM with expert profiling knowledge.
     
@@ -3845,6 +3965,9 @@ async def analyze_shot_with_llm(
     - Local algorithmic analysis for data extraction
     - Expert espresso profiling knowledge
     - LLM reasoning for actionable recommendations
+    
+    Results are cached server-side for 3 days.
+    Use force_refresh=True to bypass cache and regenerate analysis.
     
     Returns structured analysis answering:
     1. How did the shot go and why?
@@ -3861,9 +3984,27 @@ async def analyze_shot_with_llm(
                 "request_id": request_id,
                 "profile_name": profile_name,
                 "shot_date": shot_date,
-                "shot_filename": shot_filename
+                "shot_filename": shot_filename,
+                "force_refresh": force_refresh
             }
         )
+        
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            cached_analysis = get_cached_llm_analysis(profile_name, shot_date, shot_filename)
+            if cached_analysis:
+                logger.info(
+                    "Returning cached LLM analysis",
+                    extra={"request_id": request_id, "profile_name": profile_name}
+                )
+                return {
+                    "status": "success",
+                    "profile_name": profile_name,
+                    "shot_date": shot_date,
+                    "shot_filename": shot_filename,
+                    "llm_analysis": cached_analysis,
+                    "cached": True
+                }
         
         # Fetch shot data
         shot_data = await fetch_shot_data(shot_date, shot_filename)
@@ -4021,8 +4162,11 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
         
         llm_analysis = response.text if response else "Analysis generation failed"
         
+        # Save to cache
+        save_llm_analysis_to_cache(profile_name, shot_date, shot_filename, llm_analysis)
+        
         logger.info(
-            "LLM shot analysis completed",
+            "LLM shot analysis completed and cached",
             extra={
                 "request_id": request_id,
                 "profile_name": profile_name,
@@ -4035,7 +4179,8 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
             "profile_name": profile_name,
             "shot_date": shot_date,
             "shot_filename": shot_filename,
-            "llm_analysis": llm_analysis
+            "llm_analysis": llm_analysis,
+            "cached": False
         }
         
     except HTTPException:
