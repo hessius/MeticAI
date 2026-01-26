@@ -368,12 +368,17 @@ fi  # End of SKIP_PREVIOUS_INSTALL_CHECK block
 # Note: We reach here only if user chose to continue with existing installation
 # or if no previous installation was detected
 
+# Check for existing data directory (preserved from previous installation)
+if [ -d "data" ] && [ "$(ls -A data 2>/dev/null)" ]; then
+    echo -e "${GREEN}✓ Found existing data directory with profile history - will preserve it${NC}"
+fi
+
 # In non-interactive mode, skip .env check prompts
 if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     # Non-interactive mode: always create new .env from environment variables
     SKIP_ENV_CREATION=false
 elif [ -f ".env" ]; then
-    echo -e "${YELLOW}Found existing .env file.${NC}"
+    echo -e "${YELLOW}Found existing .env file (preserved from previous installation).${NC}"
     echo ""
     cat .env
     echo ""

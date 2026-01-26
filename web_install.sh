@@ -250,11 +250,44 @@ echo ""
 # Check if directory already exists
 if [ -d "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}Warning: Directory '$INSTALL_DIR' already exists.${NC}"
+    
+    # Check for preserved files from previous installation
+    PRESERVED_FILES=""
+    if [ -f "$INSTALL_DIR/.env" ]; then
+        PRESERVED_FILES="${PRESERVED_FILES}.env (configuration), "
+    fi
+    if [ -d "$INSTALL_DIR/data" ] && [ "$(ls -A "$INSTALL_DIR/data" 2>/dev/null)" ]; then
+        PRESERVED_FILES="${PRESERVED_FILES}data/ (profile history), "
+    fi
+    if [ -d "$INSTALL_DIR/logs" ]; then
+        PRESERVED_FILES="${PRESERVED_FILES}logs/, "
+    fi
+    
+    if [ -n "$PRESERVED_FILES" ]; then
+        echo -e "${GREEN}Found preserved files from previous installation: ${PRESERVED_FILES%,*}${NC}"
+    fi
+    
     read -r -p "Do you want to remove it and clone fresh? (y/n) [y]: " REMOVE_DIR </dev/tty
     REMOVE_DIR=${REMOVE_DIR:-y}
     
     if [[ "$REMOVE_DIR" =~ ^[Yy]$ ]]; then
-        echo "Removing existing directory..."
+        echo "Removing existing directory (preserving .env, data/, logs/)..."
+        
+        # Preserve .env, data, and logs by moving them temporarily
+        TEMP_PRESERVE_DIR=$(mktemp -d)
+        if [ -f "$INSTALL_DIR/.env" ]; then
+            cp "$INSTALL_DIR/.env" "$TEMP_PRESERVE_DIR/.env"
+            echo -e "${BLUE}ℹ Preserving .env file${NC}"
+        fi
+        if [ -d "$INSTALL_DIR/data" ]; then
+            cp -r "$INSTALL_DIR/data" "$TEMP_PRESERVE_DIR/data"
+            echo -e "${BLUE}ℹ Preserving data/ directory${NC}"
+        fi
+        if [ -d "$INSTALL_DIR/logs" ]; then
+            cp -r "$INSTALL_DIR/logs" "$TEMP_PRESERVE_DIR/logs"
+            echo -e "${BLUE}ℹ Preserving logs/ directory${NC}"
+        fi
+        
         rm -rf "$INSTALL_DIR"
     else
         echo -e "${YELLOW}Using existing directory. Attempting to update...${NC}"
@@ -300,9 +333,30 @@ if git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"; then
     
     # Checkout the latest stable release instead of main branch
     checkout_latest_release "$INSTALL_DIR" "MeticAI"
+    
+    # Restore preserved files from previous installation
+    if [ -n "${TEMP_PRESERVE_DIR:-}" ] && [ -d "$TEMP_PRESERVE_DIR" ]; then
+        if [ -f "$TEMP_PRESERVE_DIR/.env" ]; then
+            cp "$TEMP_PRESERVE_DIR/.env" "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ Restored .env file from previous installation${NC}"
+        fi
+        if [ -d "$TEMP_PRESERVE_DIR/data" ]; then
+            cp -r "$TEMP_PRESERVE_DIR/data" "$INSTALL_DIR/data"
+            echo -e "${GREEN}✓ Restored data/ directory (profile history) from previous installation${NC}"
+        fi
+        if [ -d "$TEMP_PRESERVE_DIR/logs" ]; then
+            cp -r "$TEMP_PRESERVE_DIR/logs" "$INSTALL_DIR/logs"
+            echo -e "${GREEN}✓ Restored logs/ directory from previous installation${NC}"
+        fi
+        rm -rf "$TEMP_PRESERVE_DIR"
+    fi
 else
     echo -e "${RED}Error: Failed to clone repository.${NC}"
     echo "Please check your internet connection and try again."
+    # Clean up temp directory if cloning failed
+    if [ -n "${TEMP_PRESERVE_DIR:-}" ] && [ -d "$TEMP_PRESERVE_DIR" ]; then
+        rm -rf "$TEMP_PRESERVE_DIR"
+    fi
     exit 1
 fi
 

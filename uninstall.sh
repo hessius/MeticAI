@@ -145,16 +145,29 @@ fi
 
 echo ""
 
-# 4. Remove configuration files
+# 4. Remove configuration files (preserving .env and data for reinstallation)
 ################################################################################
-echo -e "${YELLOW}[4/7] Removing configuration files...${NC}"
+echo -e "${YELLOW}[4/7] Handling configuration files...${NC}"
 
 REMOVED_CONFIGS=0
 
+# Preserve .env file for potential reinstallation
 if [ -f ".env" ]; then
-    rm -f .env
-    echo -e "${GREEN}✓ Removed .env file${NC}"
-    ((REMOVED_CONFIGS++))
+    echo -e "${BLUE}ℹ Preserving .env file for potential reinstallation${NC}"
+    echo -e "${BLUE}  (Contains your GEMINI_API_KEY, METICULOUS_IP, PI_IP settings)${NC}"
+    KEPT_ITEMS+=(".env file (preserved)")
+fi
+
+# Preserve data directory (contains profile history)
+if [ -d "data" ]; then
+    echo -e "${BLUE}ℹ Preserving data/ directory (contains profile history)${NC}"
+    KEPT_ITEMS+=("data/ directory (preserved)")
+fi
+
+# Preserve logs directory
+if [ -d "logs" ]; then
+    echo -e "${BLUE}ℹ Preserving logs/ directory${NC}"
+    KEPT_ITEMS+=("logs/ directory (preserved)")
 fi
 
 if [ -f ".versions.json" ]; then
