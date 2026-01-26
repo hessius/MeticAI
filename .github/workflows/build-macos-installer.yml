@@ -6,6 +6,7 @@ on:
       - 'macos-installer/**'
       - 'local-install.sh'
       - 'uninstall.sh'
+      - 'VERSION'  # Also build when version changes
     branches:
       - main
       - develop
@@ -129,6 +130,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
         
       - name: Download DMG Artifact
         uses: actions/download-artifact@v4
@@ -136,38 +139,65 @@ jobs:
           name: MeticAI-macOS-Installer
           path: ./
           
-      - name: Get version from build script
+      - name: Get version from VERSION file
         id: version
         run: |
-          VERSION=$(grep 'VERSION=' macos-installer/build-macos-app.sh | head -1 | cut -d'"' -f2)
+          VERSION=$(cat VERSION)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
+          echo "📦 Version: $VERSION"
           
-      - name: Create Release
+      - name: Check if main release exists
+        id: check_release
+        run: |
+          # Wait a moment for auto-release workflow to complete if running concurrently
+          sleep 10
+          
+          # Check if release exists
+          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Release v${{ steps.version.outputs.version }} exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Release v${{ steps.version.outputs.version }} does not exist"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload DMG to existing release
+        if: steps.check_release.outputs.exists == 'true'
+        run: |
+          echo "📤 Uploading DMG to release v${{ steps.version.outputs.version }}..."
+          # Delete existing DMG if present (to update it)
+          gh release delete-asset "v${{ steps.version.outputs.version }}" MeticAI.dmg --yes 2>/dev/null || true
+          # Upload the new DMG
+          gh release upload "v${{ steps.version.outputs.version }}" MeticAI.dmg
+          echo "✅ DMG attached to release v${{ steps.version.outputs.version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Create release with DMG (if main release doesn't exist)
+        if: steps.check_release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: macos-installer-v${{ steps.version.outputs.version }}-${{ github.run_number }}
-          name: macOS Installer v${{ steps.version.outputs.version }} (Build ${{ github.run_number }})
+          tag_name: v${{ steps.version.outputs.version }}
+          name: MeticAI v${{ steps.version.outputs.version }}
           body: |
-            ## macOS Installer for MeticAI
+            ## MeticAI v${{ steps.version.outputs.version }}
             
+            ### macOS Installation
             Download `MeticAI.dmg` to install MeticAI on your Mac.
             
-            ### Installation
             1. Download `MeticAI.dmg` below
             2. Open the DMG file
             3. Run **MeticAI Installer**
             4. Follow the on-screen prompts
             
-            ### First Launch Note
-            Since this app is not signed with an Apple Developer certificate, macOS will show a security warning.
+            **First Launch Note:** Right-click the app → Select "Open" → Click "Open" in the dialog
             
-            **To open the app:**
-            - Right-click the app → Select "Open" → Click "Open" in the dialog
-            - Or run: `xattr -cr "/path/to/MeticAI Installer.app"`
-            
-            ### Uninstallation
-            The DMG also includes **MeticAI Uninstaller** to cleanly remove MeticAI.
+            ### Linux/Raspberry Pi Installation
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/v${{ steps.version.outputs.version }}/web_install.sh | bash
+            ```
             
             ---
             Built from commit: ${{ github.sha }}
