@@ -134,7 +134,7 @@ nav {
     transform: translateX(-50%);
     width: 100%;
     height: 800px;
-    background: url('met-bg.jpg') no-repeat center center/contain;
+    background: url('met-bg-transparent.png') no-repeat center center/contain;
     opacity: 0.8;
     z-index: 1;
 }
@@ -160,7 +160,7 @@ h1 {
 
 /* Brand title - matches app styling exactly */
 .brand-title {
-    font-size: 4rem;
+    font-size: 8rem;
     font-weight: 700;
     letter-spacing: -0.025em;
     color: var(--foreground);
@@ -175,8 +175,9 @@ h1 span {
 }
 
 .subtitle {
-    font-size: 1.25rem;
+    font-size: 2.5rem;
     color: rgba(255, 255, 255, 0.8);
+    margin-top:-30px;
     margin-bottom: 2.5rem;
     font-weight: 300;
 }
@@ -201,38 +202,43 @@ h1 span {
     box-shadow: 0 0 15px color-mix(in oklch, var(--primary) 30%, transparent);
 }
 
-/* --- Phone Mockup Container --- */
-.phone-showcase {
-    padding: 4rem 20px;
-    background-color: var(--bg-color);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+.cta-button.cta-secondary {
+    background-color: var(--secondary);
+    color: var(--foreground);
 }
 
-.phone-container {
-    position: relative;
-    z-index: 2;
-    width: 300px;
+.cta-button.cta-secondary:hover {
+    background-color: var(--muted);
 }
 
-.phone-mockup {
-    width: 100%;
-    height: auto;
-    border-radius: 40px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-    border: 8px solid #1a1a1a; /* Enkel CSS-ram om ingen bildram finns */
+.cta-button.cta-outline {
+    background-color: transparent;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+}
+
+.cta-button.cta-outline:hover {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
 }
 
 .hero-tagline {
     z-index: 2;
     font-size: 3.5rem;
-    font-weight: 300;
+    font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 4px;
-    color: var(--muted-foreground);
-    margin-top: 2rem;
-    margin-bottom: 2rem;
+    color: var(--foreground);
+    margin-top: 4rem;
+    margin-bottom: 1.5rem;
+    text-shadow: 
+        0 0 20px color-mix(in oklch, var(--primary) 40%, transparent),
+        0 0 40px color-mix(in oklch, var(--primary) 20%, transparent);
+}
+
+.hero-cta {
+    z-index: 2;
+    margin-top: 1rem;
 }
 
 /* --- Features Section --- */
@@ -252,32 +258,100 @@ h1 span {
     color: rgba(255,255,255,0.5);
 }
 
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
-    max-width: 1200px;
+.features-layout {
+    display: flex;
+    gap: 3rem;
+    max-width: 1400px;
     margin: 0 auto;
+    align-items: center;
 }
 
-/* Feature cards - App-style elevated surfaces */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    flex: 1;
+}
+
+.demo-video-container {
+    flex: 0 0 280px;
+}
+
+.demo-video-container .phone-container {
+    width: 100%;
+    aspect-ratio: 606 / 1080;
+}
+
+.demo-video-container .phone-mockup {
+    width: 100%;
+    height: 100%;
+    border-radius: 40px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    border: 8px solid #1a1a1a;
+    background-color: #000;
+    object-fit: contain;
+}
+
+@media (max-width: 900px) {
+    .features-layout {
+        flex-direction: column-reverse;
+    }
+    
+    .demo-video-container {
+        flex: 0 0 auto;
+        width: 280px;
+    }
+    
+    .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .demo-video-container {
+        width: 240px;
+    }
+}
+
+/* Feature cards - App-style elevated surfaces with neon glow */
 .feature-card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: calc(var(--radius) * 1.5);
-    padding: 2rem;
+    padding: 1.5rem;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    opacity: 0.6;
+}
+
+.feature-card:hover,
+.feature-card.highlighted {
+    opacity: 1;
+    border-color: var(--primary);
+    box-shadow: 
+        0 0 20px color-mix(in oklch, var(--primary) 40%, transparent),
+        0 0 40px color-mix(in oklch, var(--primary) 20%, transparent),
+        inset 0 0 30px color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.feature-card.highlighted {
+    transform: scale(1.02);
+    box-shadow: 
+        0 0 30px color-mix(in oklch, var(--primary) 60%, transparent),
+        0 0 60px color-mix(in oklch, var(--primary) 30%, transparent),
+        inset 0 0 40px color-mix(in oklch, var(--primary) 15%, transparent);
 }
 
 .feature-card:hover {
-    transform: translateY(-5px);
-    border-color: var(--primary);
-    box-shadow: 0 0 20px color-mix(in oklch, var(--primary) 15%, transparent);
+    transform: translateY(-3px);
 }
 
 .icon-box {
@@ -332,6 +406,7 @@ h1 span {
     font-style: italic;
     color: var(--muted-foreground);
     text-align: left;
+    font-size: 1.6rem;
 }
 
 .story-content blockquote p {
@@ -405,6 +480,12 @@ h1 span {
     margin-bottom: 1rem;
 }
 
+.install-label {
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
 .install-command {
     display: block;
     background: var(--bg-color);
@@ -423,6 +504,25 @@ h1 span {
     font-size: 0.9rem;
     color: var(--muted-foreground);
     margin-bottom: 2rem;
+}
+
+.install-alternative {
+    margin: 2.5rem 0;
+    padding: 2rem;
+    background: var(--secondary);
+    border-radius: var(--radius);
+}
+
+.install-alternative .install-label {
+    margin-bottom: 0.5rem;
+}
+
+.install-alternative .install-note {
+    margin-bottom: 1rem;
+}
+
+.install-options > .cta-button.cta-outline {
+    margin-top: 1rem;
 }
 
 /* --- Footer --- */

@@ -26,31 +26,41 @@
         </div>
 
         <p class="hero-tagline">Meticulous Unleashed</p>
-        <a href="#" class="cta-button">Get Started on Raspberry Pi</a>
+        <a href="#getting-started" class="cta-button hero-cta">Get Started on Raspberry Pi or Mac</a>
     </section>
 
     <section id="features" class="features">
         <div class="features-header">What It Does</div>
         
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="icon-box">🧠</div> <h3>Create Profiles</h3>
-                <p>Automatically create espresso profiles tailored to your preferences and coffee at hand. Just snap a photo or describe what you want.</p>
+        <div class="features-layout">
+            <div class="features-grid">
+                <div class="feature-card" data-feature="create-profiles">
+                    <div class="icon-box">🧠</div> <h3>Create Profiles</h3>
+                    <p>Automatically create espresso profiles tailored to your preferences and coffee at hand. Just snap a photo or describe what you want.</p>
+                </div>
+
+                <div class="feature-card" data-feature="understand-shots">
+                    <div class="icon-box">📊</div> <h3>Understand Your Shots</h3>
+                    <p>Understand your espresso profiles and shot data like never before with detailed analysis and visualizations.</p>
+                </div>
+
+                <div class="feature-card" data-feature="ai-coaching">
+                    <div class="icon-box">🔬</div> <h3>AI Coaching</h3>
+                    <p>Get AI-powered coaching to improve your technique and dial in faster.</p>
+                </div>
+
+                <div class="feature-card" data-feature="great-espresso">
+                    <div class="icon-box">☕️</div> <h3>Just Great Espresso</h3>
+                    <p>No more guesswork. From input to machine, fully automatic profile creation.</p>
+                </div>
             </div>
 
-            <div class="feature-card">
-                <div class="icon-box">📊</div> <h3>Understand Your Shots</h3>
-                <p>Understand your espresso profiles and shot data like never before with detailed analysis and visualizations.</p>
-            </div>
-
-            <div class="feature-card">
-                <div class="icon-box">🔬</div> <h3>AI Coaching</h3>
-                <p>Get AI-powered coaching to improve your technique and dial in faster.</p>
-            </div>
-
-            <div class="feature-card">
-                <div class="icon-box">☕️</div> <h3>Just Great Espresso</h3>
-                <p>No more guesswork. From input to machine, fully automatic profile creation.</p>
+            <div class="demo-video-container">
+                <div class="phone-container">
+                    <video id="demo-video" class="phone-mockup" autoplay muted playsinline>
+                        <source id="video-source" src="demo_profile_generation.mp4" type="video/mp4">
+                    </video>
+                </div>
             </div>
         </div>
     </section>
@@ -59,19 +69,14 @@
         <div class="story-content">
             <h2>Why I Built This</h2>
             <blockquote>
-                <p>When I got my Meticulous, after a loooong wait, I was overwhelmed with the options — dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless — my knowledge and time not so.</p>
+                <p>The potential was (and is) basically limitless — my knowledge and time not so.</p>
             </blockquote>
+                <p>When I got my Meticulous, after a loooong wait, I was overwhelmed with the options — dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless — my knowledge and time not so.</p>
             <p>MeticAI is a growing set of AI tools to enable me, and you, to get the most out of a Meticulous Espresso machine. Among other things it lets you automatically create espresso profiles tailored to your preferences and coffee at hand, understand your espresso profiles and shot data like never before, and ultimately — lets you unleash your Meticulous.</p>
         </div>
     </section>
 
-    <section class="phone-showcase">
-        <div class="phone-container">
-            <img src="app-mockup.png" alt="MeticAI Interface" class="phone-mockup">
-        </div>
-    </section>
-
-    <section class="getting-started">
+    <section id="getting-started" class="getting-started">
         <h2>Getting Started</h2>
         <div class="requirements">
             <h3>What You Need</h3>
@@ -83,17 +88,95 @@
         </div>
         <div class="install-options">
             <h3>Installation (5 minutes)</h3>
-            <p>One-line install for terminal users:</p>
+            <p class="install-label">Recommended: One-line install for Raspberry Pi, Linux, and Mac:</p>
             <code class="install-command">curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash</code>
             <p class="install-note">The installer will guide you through setup, check prerequisites, and start all services automatically.</p>
-            <a href="https://github.com/hessius/MeticAI" target="_blank" class="cta-button">View Full Documentation on GitHub</a>
+            
+            <div class="install-alternative">
+                <p class="install-label">macOS App Installer:</p>
+                <p class="install-note">Prefer a GUI? Download the macOS installer app — no terminal required.</p>
+                <a href="https://github.com/hessius/MeticAI/releases/latest/download/MeticAI-Installer.dmg" class="cta-button cta-secondary">Download macOS Installer</a>
+            </div>
+            
+            <a href="https://github.com/hessius/MeticAI" target="_blank" class="cta-button cta-outline">View Full Documentation on GitHub</a>
         </div>
     </section>
 
     <footer>
-        <p>&copy; 2026 MeticAI Project. Not affiliated with Meticulous Espresso.</p>
         <p>Built with ❤️ for coffee lovers</p>
+        <p>Not affiliated with Meticulous Espresso.</p>
     </footer>
+
+    <script>
+        // Demo video configuration
+        const demoConfig = {
+            videos: [
+                {
+                    src: 'demo_profile_generation.mp4',
+                    duration: 39,
+                    highlights: [
+                        { feature: 'create-profiles', start: 0, end: 39 }
+                    ]
+                },
+                {
+                    src: 'demo_analysis.mp4',
+                    duration: 94,
+                    highlights: [
+                        { feature: 'understand-shots', start: 0, end: 69 },
+                        { feature: 'ai-coaching', start: 69, end: 94 }
+                    ]
+                }
+            ],
+            currentVideoIndex: 0
+        };
+
+        const videoElement = document.getElementById('demo-video');
+        const videoSource = document.getElementById('video-source');
+        const featureCards = document.querySelectorAll('.feature-card');
+
+        function clearHighlights() {
+            featureCards.forEach(card => card.classList.remove('highlighted'));
+        }
+
+        function highlightFeature(featureName) {
+            clearHighlights();
+            const card = document.querySelector(`[data-feature="${featureName}"]`);
+            if (card) {
+                card.classList.add('highlighted');
+            }
+        }
+
+        function updateHighlight() {
+            const currentVideo = demoConfig.videos[demoConfig.currentVideoIndex];
+            const currentTime = videoElement.currentTime;
+            
+            for (const highlight of currentVideo.highlights) {
+                if (currentTime >= highlight.start && currentTime < highlight.end) {
+                    highlightFeature(highlight.feature);
+                    return;
+                }
+            }
+            clearHighlights();
+        }
+
+        function playNextVideo() {
+            demoConfig.currentVideoIndex = (demoConfig.currentVideoIndex + 1) % demoConfig.videos.length;
+            const nextVideo = demoConfig.videos[demoConfig.currentVideoIndex];
+            
+            videoSource.src = nextVideo.src;
+            videoElement.load();
+            videoElement.play();
+        }
+
+        // Event listeners
+        videoElement.addEventListener('timeupdate', updateHighlight);
+        videoElement.addEventListener('ended', playNextVideo);
+
+        // Start with first video highlight
+        videoElement.addEventListener('loadeddata', () => {
+            updateHighlight();
+        });
+    </script>
 
 </body>
 </html>
