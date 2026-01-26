@@ -199,6 +199,36 @@ if ! command -v curl &> /dev/null; then
 fi
 echo -e "${GREEN}✓ curl found.${NC}"
 
+# Function to checkout the latest release tag
+# This ensures users get stable, tested versions instead of potentially unstable main branch
+checkout_latest_release() {
+    local dir="$1"
+    local repo_name="$2"
+    
+    cd "$dir" || return 1
+    
+    # Fetch all tags
+    git fetch --tags 2>/dev/null
+    
+    # Get the latest version tag (format: vX.Y.Z or X.Y.Z)
+    local latest_tag
+    latest_tag=$(git tag -l --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
+    
+    if [ -n "$latest_tag" ]; then
+        echo -e "${YELLOW}Checking out latest release: $latest_tag${NC}"
+        if git checkout "$latest_tag" 2>/dev/null; then
+            echo -e "${GREEN}✓ $repo_name set to stable release $latest_tag${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}Could not checkout tag, staying on main branch${NC}"
+            return 1
+        fi
+    else
+        echo -e "${YELLOW}No release tags found for $repo_name, using main branch${NC}"
+        return 1
+    fi
+}
+
 # Check and install git if needed
 if ! command -v git &> /dev/null; then
     echo -e "${RED}Error: git is not installed.${NC}"
@@ -267,6 +297,9 @@ fi
 echo -e "${YELLOW}Cloning MeticAI repository...${NC}"
 if git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"; then
     echo -e "${GREEN}✓ Repository cloned successfully.${NC}"
+    
+    # Checkout the latest stable release instead of main branch
+    checkout_latest_release "$INSTALL_DIR" "MeticAI"
 else
     echo -e "${RED}Error: Failed to clone repository.${NC}"
     echo "Please check your internet connection and try again."
