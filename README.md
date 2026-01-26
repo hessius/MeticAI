@@ -18,13 +18,14 @@
 
 ## 🎯 What is MeticAI?
 
-MeticAI transforms your Meticulous Espresso Machine into an AI-powered coffee expert. Take a photo of your coffee bag or describe what you want, and MeticAI uses Google's Gemini AI to:
+When I got my Meticulous, after a loooong wait, I was overwhelmed with the options — dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless — my knowledge and time not so.
 
-1. 🧠 **Create a custom recipe** - Tailored extraction profile for your beans
-2. 📸 **Analyze your coffee** - Identify roaster, origin, and roast level
-3. ☕️ **Upload it to your machine** - Ready to brew in seconds
+**MeticAI** is a growing set of AI tools to help you get the most out of your Meticulous Espresso machine. Among other things it lets you:
 
-No manual recipe tweaking. No guesswork. Just consistently great espresso.
+- 🧠 **Automatically create espresso profiles** tailored to your preferences and coffee at hand
+- 📊 **Understand your espresso profiles and shot data** like never before
+- 🔬 **Get AI coaching** to improve your technique
+- ☕️ **Unleash your Meticulous** — no more guesswork, just great espresso
 
 ## ✨ What It Does
 

@@ -1,0 +1,449 @@
+/* --- MeticAI Branding - Synced with meticai-web app --- */
+:root {
+    /* Background colors - Pure black like Meticulous app */
+    --background: oklch(0.05 0 0);
+    --foreground: oklch(0.98 0 0);
+    
+    /* Card - Noticeably elevated dark surface */
+    --card: oklch(0.16 0.006 250);
+    --card-foreground: oklch(0.98 0 0);
+    
+    /* Primary - Warm amber/gold accent (like coffee, matches Meticulous warmth) */
+    --primary: oklch(0.78 0.14 75);
+    --primary-foreground: oklch(0.12 0 0);
+    
+    /* Secondary - Fields, items, interactive areas */
+    --secondary: oklch(0.24 0.006 250);
+    --secondary-foreground: oklch(0.95 0 0);
+    
+    /* Muted - For subtle text and borders */
+    --muted: oklch(0.28 0.006 250);
+    --muted-foreground: oklch(0.60 0 0);
+    
+    /* Borders and inputs */
+    --border: oklch(0.32 0.006 250);
+    
+    /* Border radius - Matching Meticulous app */
+    --radius: 0.875rem;
+    
+    /* Legacy variables for compatibility */
+    --bg-color: oklch(0.05 0 0);
+    --text-color: oklch(0.98 0 0);
+    --accent-color: oklch(0.78 0.14 75);
+    --glass-bg: oklch(0.16 0.006 250);
+    --glass-border: oklch(0.32 0.006 250);
+    --font-main: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-main);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* --- Navigation --- */
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2rem 5%;
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: 10;
+}
+
+.logo {
+    font-weight: 700;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-icon {
+    width: 30px;
+    height: 30px;
+}
+
+.nav-links a {
+    color: var(--text-color);
+    text-decoration: none;
+    margin-left: 2rem;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.nav-links a:hover {
+    opacity: 1;
+    color: var(--accent-color);
+}
+
+/* --- Hero Section --- */
+.hero {
+    height: 100vh;
+    min-height: 800px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
+    position: relative;
+    padding: 0 20px;
+    padding-top: 180px;
+    overflow: hidden;
+    background-color: var(--bg-color);
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    bottom: -70px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    height: 800px;
+    background: url('met-bg.jpg') no-repeat center center/contain;
+    opacity: 0.8;
+    z-index: 1;
+}
+
+.hero-content {
+    z-index: 2;
+    max-width: 800px;
+    margin-bottom: 2rem;
+}
+
+h1, h2, h3, h4 {
+    font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+}
+
+/* Brand title - matches app styling exactly */
+.brand-title {
+    font-size: 4rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--foreground);
+}
+
+.text-primary {
+    color: var(--primary);
+}
+
+h1 span {
+    color: var(--accent-color);
+}
+
+.subtitle {
+    font-size: 1.25rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 2.5rem;
+    font-weight: 300;
+}
+
+.cta-button {
+    background-color: var(--accent-color);
+    color: var(--primary-foreground);
+    padding: 1rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.cta-button:hover {
+    transform: translateY(-2px);
+    opacity: 0.9;
+    box-shadow: 0 0 15px color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+/* --- Phone Mockup Container --- */
+.phone-showcase {
+    padding: 4rem 20px;
+    background-color: var(--bg-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.phone-container {
+    position: relative;
+    z-index: 2;
+    width: 300px;
+}
+
+.phone-mockup {
+    width: 100%;
+    height: auto;
+    border-radius: 40px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    border: 8px solid #1a1a1a; /* Enkel CSS-ram om ingen bildram finns */
+}
+
+.hero-tagline {
+    z-index: 2;
+    font-size: 3.5rem;
+    font-weight: 300;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: var(--muted-foreground);
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* --- Features Section --- */
+.features {
+    padding: 5rem 5%;
+    background-color: var(--bg-color);
+    position: relative;
+    z-index: 2;
+}
+
+.features-header {
+    text-align: center;
+    margin-bottom: 4rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.5);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Feature cards - App-style elevated surfaces */
+.feature-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.5);
+    padding: 2rem;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary);
+    box-shadow: 0 0 20px color-mix(in oklch, var(--primary) 15%, transparent);
+}
+
+.icon-box {
+    width: 50px;
+    height: 50px;
+    background: var(--secondary);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    color: var(--accent-color);
+    font-size: 1.5rem;
+}
+
+.feature-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: var(--foreground);
+}
+
+.feature-card p {
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+}
+
+/* --- Story Section --- */
+.story-section {
+    padding: 5rem 5%;
+    background-color: var(--bg-color);
+    display: flex;
+    justify-content: center;
+}
+
+.story-content {
+    max-width: 800px;
+    text-align: center;
+}
+
+.story-content h2 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    color: var(--foreground);
+}
+
+.story-content blockquote {
+    background: var(--card);
+    border-left: 4px solid var(--primary);
+    padding: 1.5rem 2rem;
+    margin: 0 0 2rem 0;
+    border-radius: var(--radius);
+    font-style: italic;
+    color: var(--muted-foreground);
+    text-align: left;
+}
+
+.story-content blockquote p {
+    margin: 0;
+    line-height: 1.8;
+}
+
+.story-content > p {
+    color: var(--foreground);
+    line-height: 1.8;
+    font-size: 1.1rem;
+}
+
+/* --- Getting Started Section --- */
+.getting-started {
+    padding: 5rem 5%;
+    background: var(--card);
+    text-align: center;
+}
+
+.getting-started h2 {
+    font-size: 2.5rem;
+    margin-bottom: 3rem;
+    color: var(--foreground);
+}
+
+.getting-started h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary);
+}
+
+.requirements {
+    max-width: 600px;
+    margin: 0 auto 3rem;
+    text-align: left;
+}
+
+.requirements ul {
+    list-style: none;
+    padding: 0;
+}
+
+.requirements li {
+    padding: 0.75rem 0;
+    font-size: 1.1rem;
+    color: var(--foreground);
+    border-bottom: 1px solid var(--border);
+}
+
+.requirements li:last-child {
+    border-bottom: none;
+}
+
+.requirements a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.requirements a:hover {
+    text-decoration: underline;
+}
+
+.install-options {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.install-options p {
+    color: var(--muted-foreground);
+    margin-bottom: 1rem;
+}
+
+.install-command {
+    display: block;
+    background: var(--bg-color);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.5rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.9rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.install-note {
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+    margin-bottom: 2rem;
+}
+
+/* --- Footer --- */
+footer {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted-foreground);
+    font-size: 0.85rem;
+    background-color: var(--bg-color);
+}
+
+footer p {
+    margin: 0.5rem 0;
+}
+
+/* Responsivitet */
+@media (max-width: 768px) {
+    h1, .brand-title { font-size: 2.5rem; }
+    .hero { padding-top: 100px; height: auto; padding-bottom: 50px; }
+    .hero-tagline { font-size: 2rem; letter-spacing: 2px; }
+    .phone-container { width: 80%; max-width: 300px; }
+    .story-content blockquote { padding: 1rem 1.5rem; }
+    .install-command { font-size: 0.75rem; padding: 0.75rem 1rem; }
+}
