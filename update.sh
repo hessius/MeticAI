@@ -960,8 +960,15 @@ main() {
             update_main_repo || update_success=false
         fi
         
-        update_mcp || update_success=false
-        update_web || update_success=false
+        # Update MCP (external dependency - always update if available)
+        if [ "$MCP_UPDATE_AVAILABLE" = true ]; then
+            update_mcp || update_success=false
+        fi
+        
+        # Update web interface (version-based)
+        if [ "$WEB_UPDATE_AVAILABLE" = true ]; then
+            update_web || update_success=false
+        fi
         
         # Update version file again after applying updates (to clear update_available flags)
         # Re-check to update the global variables
