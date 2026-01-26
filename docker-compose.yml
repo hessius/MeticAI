@@ -56,6 +56,8 @@ services:
       - ./.update-check-requested:/app/.update-check-requested
       # Mount full update signal file for host-side watcher
       - ./.update-requested:/app/.update-requested
+      # Mount restart signal file for host-side watcher
+      - ./.restart-requested:/app/.restart-requested
       # Mount logs directory for persistent log storage
       - ./logs:/app/logs
       # Mount data directory for profile history
@@ -64,6 +66,7 @@ services:
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - METICULOUS_IP=${METICULOUS_IP}
+      - PI_IP=${PI_IP}
     restart: unless-stopped
 
   # 4. MeticAI Web Interface

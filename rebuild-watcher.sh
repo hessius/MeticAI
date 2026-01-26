@@ -32,6 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REBUILD_FLAG="$SCRIPT_DIR/.rebuild-needed"
 UPDATE_CHECK_FLAG="$SCRIPT_DIR/.update-check-requested"
 UPDATE_REQUESTED_FLAG="$SCRIPT_DIR/.update-requested"
+RESTART_REQUESTED_FLAG="$SCRIPT_DIR/.restart-requested"
 LOG_FILE="$SCRIPT_DIR/.rebuild-watcher.log"
 
 # Set up PATH for launchd environment (needed for Docker credential helpers)
@@ -51,7 +52,7 @@ prepare_for_docker() {
     cd "$SCRIPT_DIR"
     
     # Ensure required files exist as files (not directories)
-    for file in ".versions.json" ".rebuild-needed" ".update-check-requested" ".update-requested"; do
+    for file in ".versions.json" ".rebuild-needed" ".update-check-requested" ".update-requested" ".restart-requested"; do
         if [ -d "$SCRIPT_DIR/$file" ]; then
             rm -rf "$SCRIPT_DIR/$file"
         fi
@@ -61,6 +62,7 @@ prepare_for_docker() {
     [ ! -f "$SCRIPT_DIR/.rebuild-needed" ] && touch "$SCRIPT_DIR/.rebuild-needed"
     [ ! -f "$SCRIPT_DIR/.update-check-requested" ] && touch "$SCRIPT_DIR/.update-check-requested"
     [ ! -f "$SCRIPT_DIR/.update-requested" ] && touch "$SCRIPT_DIR/.update-requested"
+    [ ! -f "$SCRIPT_DIR/.restart-requested" ] && touch "$SCRIPT_DIR/.restart-requested"
     
     # Pre-create directories so Docker doesn't create them as root
     mkdir -p "$SCRIPT_DIR/data" "$SCRIPT_DIR/logs"
@@ -76,7 +78,7 @@ fix_permissions() {
     
     if [ -n "$dir_owner" ]; then
         # Fix ownership of files that Docker might have created as root
-        for item in data logs .versions.json .rebuild-needed .update-check-requested .update-requested meticulous-source meticai-web; do
+        for item in data logs .versions.json .rebuild-needed .update-check-requested .update-requested .restart-requested meticulous-source meticai-web; do
             if [ -e "$SCRIPT_DIR/$item" ]; then
                 sudo chown -R "$dir_owner" "$SCRIPT_DIR/$item" 2>/dev/null || true
             fi
@@ -138,6 +140,68 @@ check_update_check_needed() {
     if [ -f "$UPDATE_CHECK_FLAG" ]; then
         # File exists - check if it has non-whitespace content
         if grep -q '[^[:space:]]' "$UPDATE_CHECK_FLAG" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Handle restart request (triggered by API endpoint)
+do_restart() {
+    log "${BLUE}Restart requested by API...${NC}"
+    
+    cd "$SCRIPT_DIR"
+    
+    # Prepare files before Docker runs
+    prepare_for_docker
+    
+    # Check if docker compose is available
+    DOCKER_PATHS="/usr/local/bin/docker /opt/homebrew/bin/docker /Applications/Docker.app/Contents/Resources/bin/docker"
+    DOCKER_CMD=""
+    
+    for path in $DOCKER_PATHS; do
+        if [ -x "$path" ]; then
+            DOCKER_CMD="$path"
+            break
+        fi
+    done
+    
+    if [ -z "$DOCKER_CMD" ]; then
+        DOCKER_CMD=$(command -v docker 2>/dev/null)
+    fi
+    
+    if [ -z "$DOCKER_CMD" ] || ! "$DOCKER_CMD" compose version &> /dev/null; then
+        log "${RED}Error: Docker Compose not found${NC}"
+        echo "" > "$RESTART_REQUESTED_FLAG"
+        return 1
+    fi
+    
+    # On Linux, we may need sudo for docker commands
+    SUDO_PREFIX=""
+    if [[ "$OSTYPE" == "linux"* ]]; then
+        if ! "$DOCKER_CMD" info &> /dev/null; then
+            SUDO_PREFIX="sudo"
+        fi
+    fi
+    
+    COMPOSE_CMD="$SUDO_PREFIX $DOCKER_CMD compose"
+    
+    log "Restarting containers..."
+    if $COMPOSE_CMD restart 2>&1 | tee -a "$LOG_FILE"; then
+        log "${GREEN}✓ Containers restarted successfully${NC}"
+        fix_permissions
+    else
+        log "${RED}✗ Failed to restart containers${NC}"
+    fi
+    
+    # Clear the signal file
+    echo "" > "$RESTART_REQUESTED_FLAG"
+}
+
+check_restart_needed() {
+    if [ -f "$RESTART_REQUESTED_FLAG" ]; then
+        # File exists - check if it has non-whitespace content
+        if grep -q '[^[:space:]]' "$RESTART_REQUESTED_FLAG" 2>/dev/null; then
             return 0
         fi
     fi
@@ -242,6 +306,8 @@ install_launchd() {
     <array>
         <string>$REBUILD_FLAG</string>
         <string>$UPDATE_CHECK_FLAG</string>
+        <string>$UPDATE_REQUESTED_FLAG</string>
+        <string>$RESTART_REQUESTED_FLAG</string>
     </array>
     <key>RunAtLoad</key>
     <false/>
@@ -420,6 +486,9 @@ case "${1:-}" in
             if check_update_check_needed; then
                 do_update_check
             fi
+            if check_restart_needed; then
+                do_restart
+            fi
             if check_rebuild_needed; then
                 do_rebuild
             fi
@@ -451,6 +520,8 @@ case "${1:-}" in
             do_full_update
         elif check_update_check_needed; then
             do_update_check
+        elif check_restart_needed; then
+            do_restart
         elif check_rebuild_needed; then
             do_rebuild
         else
