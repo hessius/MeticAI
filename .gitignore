@@ -26,10 +26,14 @@ meticulous-source/
 .pytest_cache/
 .coverage
 coverage.xml
+coverage.json
 htmlcov/
 *.cover
 .hypothesis/
 .tox/
+
+# Data files (runtime generated)
+data/
 
 # Update tracking
 .versions.json
