@@ -165,10 +165,40 @@ h1 {
     font-weight: 700;
     letter-spacing: -0.025em;
     color: var(--foreground);
+    animation: title-glow 3s ease-in-out infinite;
+}
+
+@keyframes title-glow {
+    0%, 100% {
+        text-shadow: 
+            0 0 10px rgba(255, 255, 255, 0.1),
+            0 0 20px rgba(255, 255, 255, 0.05);
+    }
+    50% {
+        text-shadow: 
+            0 0 20px rgba(255, 255, 255, 0.2),
+            0 0 40px rgba(255, 255, 255, 0.1),
+            0 0 60px rgba(255, 255, 255, 0.05);
+    }
 }
 
 .text-primary {
     color: var(--primary);
+    animation: primary-glow 3s ease-in-out infinite;
+}
+
+@keyframes primary-glow {
+    0%, 100% {
+        text-shadow: 
+            0 0 10px oklch(0.78 0.14 75 / 0.2),
+            0 0 20px oklch(0.78 0.14 75 / 0.1);
+    }
+    50% {
+        text-shadow: 
+            0 0 20px oklch(0.78 0.14 75 / 0.4),
+            0 0 40px oklch(0.78 0.14 75 / 0.2),
+            0 0 60px oklch(0.78 0.14 75 / 0.1);
+    }
 }
 
 h1 span {
@@ -176,11 +206,25 @@ h1 span {
 }
 
 .subtitle {
-    font-size: 2.5rem;
+    font-size: 2rem;
     color: rgba(255, 255, 255, 0.8);
     margin-top:-30px;
     margin-bottom: 2.5rem;
     font-weight: 300;
+    animation: subtitle-glow 3s ease-in-out infinite;
+    animation-delay: 0.5s;
+}
+
+@keyframes subtitle-glow {
+    0%, 100% {
+        text-shadow: 
+            0 0 8px rgba(255, 255, 255, 0.05);
+    }
+    50% {
+        text-shadow: 
+            0 0 15px rgba(255, 255, 255, 0.15),
+            0 0 30px rgba(255, 255, 255, 0.08);
+    }
 }
 
 .cta-button {
@@ -379,6 +423,77 @@ h1 span {
 .feature-card p {
     font-size: 0.9rem;
     color: var(--muted-foreground);
+}
+
+/* --- How It Works Section --- */
+.how-it-works {
+    padding: 5rem 5%;
+    background: var(--card);
+    text-align: center;
+}
+
+.how-it-works h2 {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--foreground);
+}
+
+.how-it-works-content {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.how-intro {
+    font-size: 1.2rem;
+    color: var(--muted-foreground);
+    line-height: 1.8;
+    margin-bottom: 3rem;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.how-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+}
+
+.how-step {
+    background: var(--bg-color);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem 1.5rem;
+    text-align: center;
+}
+
+.step-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.how-step h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    color: var(--foreground);
+}
+
+.how-step p {
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+    .how-steps {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .how-steps {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* --- Story Section --- */
