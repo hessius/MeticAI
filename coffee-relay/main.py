@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 import uuid
 import time
+import tempfile
 from logging_config import setup_logging, get_logger
 
 # Initialize logging system with environment-aware defaults
@@ -22,7 +23,6 @@ try:
     logger = setup_logging(log_dir=log_dir)
 except (PermissionError, OSError) as e:
     # Fallback to temp directory for testing
-    import tempfile
     log_dir = tempfile.mkdtemp()
     logger = setup_logging(log_dir=log_dir)
     logger.warning(
@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 
 # Data directory configuration - use environment variable or default
 # In test mode, use temporary directory to avoid permission issues
-import tempfile
 TEST_MODE = os.environ.get("TEST_MODE") == "true"
 if TEST_MODE:
     DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"

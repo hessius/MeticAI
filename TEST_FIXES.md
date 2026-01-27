@@ -133,9 +133,9 @@ def test_load_history_with_missing_file(self, mock_open_func, mock_ensure):
 - Unexpected cache hits
 
 #### After Fixes
-- **0 failures**, 179 passed ✅ (test_main.py)
+- **0 failures**, 192 passed ✅ (test_main.py)
 - **0 failures**, 19 passed ✅ (test_logging.py)
-- **Total: 198 tests passing**
+- **Total: 211 tests passing**
 
 ### Benefits Added
 
@@ -149,7 +149,7 @@ This fix maintains all recent improvements while adding:
 ### Validation
 
 All fixes validated by:
-1. Running full Python test suite (179 + 19 = 198 tests)
+1. Running full Python test suite (192 + 19 = 211 tests)
 2. Verifying bash scripts have valid syntax
 3. Confirming no production behavior changed
 4. Ensuring proper separation of test and production environments
