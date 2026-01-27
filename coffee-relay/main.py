@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 import uuid
 import time
+import tempfile
 from logging_config import setup_logging, get_logger
 
 # Initialize logging system with environment-aware defaults
@@ -22,7 +23,6 @@ try:
     logger = setup_logging(log_dir=log_dir)
 except (PermissionError, OSError) as e:
     # Fallback to temp directory for testing
-    import tempfile
     log_dir = tempfile.mkdtemp()
     logger = setup_logging(log_dir=log_dir)
     logger.warning(
@@ -35,6 +35,15 @@ from datetime import datetime, timezone
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Data directory configuration - use environment variable or default
+# In test mode, use temporary directory to avoid permission issues
+TEST_MODE = os.environ.get("TEST_MODE") == "true"
+if TEST_MODE:
+    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+else:
+    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
 
 # Update check interval: 2 hours in seconds
 UPDATE_CHECK_INTERVAL = 7200
@@ -1003,7 +1012,7 @@ async def get_logs(
 # Settings Management
 # ============================================
 
-SETTINGS_FILE = Path("/app/data/settings.json")
+SETTINGS_FILE = DATA_DIR / "settings.json"
 
 
 def _ensure_settings_file():
@@ -1222,7 +1231,7 @@ async def save_settings(request: Request):
 # Profile History Management
 # ============================================
 
-HISTORY_FILE = Path("/app/data/profile_history.json")
+HISTORY_FILE = DATA_DIR / "profile_history.json"
 
 
 def _ensure_history_file():
@@ -1253,7 +1262,7 @@ def _save_history(history: list):
 # LLM Analysis Cache Management  
 # ============================================
 
-LLM_CACHE_FILE = Path("/app/data/llm_analysis_cache.json")
+LLM_CACHE_FILE = DATA_DIR / "llm_analysis_cache.json"
 LLM_CACHE_TTL_SECONDS = 3 * 24 * 60 * 60  # 3 days
 
 
@@ -1324,7 +1333,7 @@ def save_llm_analysis_to_cache(profile_name: str, shot_date: str, shot_filename:
 # Shot History Cache Management
 # ============================================
 
-SHOT_CACHE_FILE = Path("/app/data/shot_cache.json")
+SHOT_CACHE_FILE = DATA_DIR / "shot_cache.json"
 SHOT_CACHE_STALE_SECONDS = 3600  # 60 minutes - after this, data is stale but still returned
 
 
@@ -1400,7 +1409,7 @@ def _set_cached_shots(profile_name: str, data: dict, limit: int):
 # Profile Image Cache Management
 # ============================================
 
-IMAGE_CACHE_DIR = Path("/app/data/image_cache")
+IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
 
 def _sanitize_profile_name_for_filename(profile_name: str) -> str:
@@ -2398,8 +2407,22 @@ async def generate_profile_image(
             tags=tag_list
         )
         
-        full_prompt = prompt_result["prompt"]
-        prompt_metadata = prompt_result["metadata"]
+        # Validate prompt_result to avoid NoneType subscript errors
+        if not prompt_result or not isinstance(prompt_result, dict):
+            logger.error(
+                "Failed to build image prompt - prompt_result is invalid",
+                extra={
+                    "request_id": request_id,
+                    "prompt_result": prompt_result
+                }
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to build image generation prompt"
+            )
+        
+        full_prompt = prompt_result.get("prompt", "")
+        prompt_metadata = prompt_result.get("metadata", {})
         
         logger.info(
             f"Built image generation prompt",
@@ -2413,7 +2436,6 @@ async def generate_profile_image(
         )
         
         # Create a temporary directory for the output
-        import tempfile
         import shutil
         
         with tempfile.TemporaryDirectory() as temp_dir:

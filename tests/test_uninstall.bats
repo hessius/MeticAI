@@ -63,8 +63,8 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "Script removes .env file" {
-    run grep -q 'rm.*\.env' "$SCRIPT_PATH"
+@test "Script preserves .env file" {
+    run grep -q 'Preserving .env file' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
