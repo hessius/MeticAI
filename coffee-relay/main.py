@@ -2436,7 +2436,6 @@ async def generate_profile_image(
         )
         
         # Create a temporary directory for the output
-        import tempfile
         import shutil
         
         with tempfile.TemporaryDirectory() as temp_dir:
