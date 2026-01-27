@@ -109,9 +109,9 @@ def test_load_history_with_missing_file(self, mock_open_func, mock_ensure):
 ### Changes Made
 
 #### File: `coffee-relay/main.py`
-- **Lines 35-47**: Added `DATA_DIR` configuration with test mode support
-- **Lines 1006, 1225, 1256, 1327, 1403**: Updated all hardcoded paths to use `DATA_DIR`
-- **Lines 2402-2422**: Added null safety checks for `prompt_result` in `generate_profile_image()`
+- **Lines 39-47**: Added `DATA_DIR` configuration with test mode support
+- **Lines 1016, 1235, 1266, 1337, 1413**: Updated all hardcoded paths to use `DATA_DIR`
+- **Lines 2411-2426**: Added null safety checks for `prompt_result` in `generate_profile_image()`
 - **Impact**: Enables tests to run with temporary directories, prevents NoneType errors
 
 #### File: `coffee-relay/conftest.py` (new file)
