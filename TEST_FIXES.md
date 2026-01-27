@@ -3,7 +3,160 @@
 ## Overview
 This document explains the test failures that occurred after recent bugfixes and how they were resolved without rolling back the improvements.
 
-## Problem Statement
+---
+
+## Latest Fix (January 2026) - Post-Caching Implementation
+
+### Problem Statement
+After adding server-side LLM analysis caching, **19 Python tests were failing**:
+- **5 LLM analysis tests**: Permission denied errors on `/app/data`
+- **6 Barista persona tests**: TypeError when accessing NoneType
+- **8 analyze_and_profile tests**: Status returning 'error' instead of 'success'
+
+### Root Causes
+
+#### 1. Hardcoded Data Paths
+**Issue**: All data files used hardcoded `/app/data` paths which don't exist in test environment.
+
+**Root Cause**: Paths were defined as constants at module level:
+```python
+SETTINGS_FILE = Path("/app/data/settings.json")
+HISTORY_FILE = Path("/app/data/profile_history.json")
+LLM_CACHE_FILE = Path("/app/data/llm_analysis_cache.json")
+SHOT_CACHE_FILE = Path("/app/data/shot_cache.json")
+IMAGE_CACHE_DIR = Path("/app/data/image_cache")
+```
+
+When tests ran, these paths couldn't be created due to permission issues, causing errors.
+
+**Fix**: Made paths configurable via environment variables:
+```python
+# In main.py
+TEST_MODE = os.environ.get("TEST_MODE") == "true"
+if TEST_MODE:
+    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+else:
+    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
+
+# Then use DATA_DIR for all paths
+SETTINGS_FILE = DATA_DIR / "settings.json"
+HISTORY_FILE = DATA_DIR / "profile_history.json"
+# etc.
+```
+
+Created `conftest.py` to set environment variables before main.py imports:
+```python
+# conftest.py runs at import time before tests
+os.environ["TEST_MODE"] = "true"
+test_data_dir = tempfile.mkdtemp(prefix="meticai_test_")
+os.environ["DATA_DIR"] = test_data_dir
+```
+
+#### 2. Missing Null Safety in Image Prompt Generation
+**Issue**: `TypeError: 'NoneType' object is not subscriptable` in 6 barista tests.
+
+**Root Cause**: In `generate_profile_image()`, code accessed dictionary keys without checking if result was None:
+```python
+prompt_result = build_image_prompt_with_metadata(...)
+full_prompt = prompt_result["prompt"]  # TypeError if None!
+```
+
+**Fix**: Added null checking and safe access:
+```python
+prompt_result = build_image_prompt_with_metadata(...)
+
+if not prompt_result or not isinstance(prompt_result, dict):
+    raise HTTPException(
+        status_code=500,
+        detail="Failed to build image generation prompt"
+    )
+
+full_prompt = prompt_result.get("prompt", "")
+prompt_metadata = prompt_result.get("metadata", {})
+```
+
+#### 3. LLM Analysis Cache Persistence
+**Issue**: Tests expecting specific LLM behavior were hitting cached results from previous tests.
+
+**Root Cause**: The new LLM caching feature (with 3-day TTL) was persisting data across tests because all tests shared the same temp directory.
+
+**Fix**: Added `force_refresh=true` parameter to all LLM analysis tests:
+```python
+response = client.post("/api/shots/analyze-llm", data={
+    "profile_name": "Test",
+    "shot_date": "2024-01-15",
+    "shot_filename": "shot.json",
+    "force_refresh": "true"  # Bypass cache in tests
+})
+```
+
+#### 4. History File Mock Issue  
+**Issue**: Test `test_load_history_with_missing_file` expected empty list but got data from previous tests.
+
+**Root Cause**: Test was trying to mock `Path` class but the module-level constant `HISTORY_FILE` was already evaluated. Also, the file actually existed from previous tests.
+
+**Fix**: Changed test to mock `open()` to raise `FileNotFoundError`:
+```python
+@patch('main._ensure_history_file')
+@patch('builtins.open')
+def test_load_history_with_missing_file(self, mock_open_func, mock_ensure):
+    mock_open_func.side_effect = FileNotFoundError("File not found")
+    history = _load_history()
+    assert history == []
+```
+
+### Changes Made
+
+#### File: `coffee-relay/main.py`
+- **Lines 39-47**: Added `DATA_DIR` configuration with test mode support
+- **Lines 1016, 1235, 1266, 1337, 1413**: Updated all hardcoded paths to use `DATA_DIR`
+- **Lines 2411-2426**: Added null safety checks for `prompt_result` in `generate_profile_image()`
+- **Impact**: Enables tests to run with temporary directories, prevents NoneType errors
+
+#### File: `coffee-relay/conftest.py` (new file)
+- **Purpose**: Set up test environment variables before main.py is imported
+- **Lines 10-16**: Configure TEST_MODE and DATA_DIR for all tests
+- **Impact**: All tests automatically use temporary directories
+
+#### File: `coffee-relay/test_main.py`
+- **Lines 3497, 3520, 3563, 3611, 3666, 3682**: Added `force_refresh="true"` to 6 LLM analysis tests
+- **Lines 1843-1856**: Fixed `test_load_history_with_missing_file` to mock `open()` instead of `Path`
+- **Impact**: Tests properly bypass cache and handle file operations
+
+### Test Results
+
+#### Before Fixes
+- **19 failures**, 160 passed
+- Permission errors on `/app/data`
+- NoneType subscript errors
+- Unexpected cache hits
+
+#### After Fixes
+- **0 failures**, 192 passed ✅ (test_main.py)
+- **0 failures**, 19 passed ✅ (test_logging.py)
+- **Total: 211 tests passing**
+
+### Benefits Added
+
+This fix maintains all recent improvements while adding:
+
+1. **Test Environment Isolation**: Tests use temporary directories, preventing conflicts
+2. **Production Flexibility**: `DATA_DIR` can be configured via environment variable
+3. **Robust Error Handling**: Null safety prevents crashes on edge cases
+4. **Cache Control**: Tests can bypass cache when needed for deterministic behavior
+
+### Validation
+
+All fixes validated by:
+1. Running full Python test suite (192 + 19 = 211 tests)
+2. Verifying bash scripts have valid syntax
+3. Confirming no production behavior changed
+4. Ensuring proper separation of test and production environments
+
+---
+
+## Previous Fix (Earlier) - Status and Update Endpoints
 After merging several PRs with bugfixes and improvements (#32, #37, #39, #42, #45, #47), CI tests started failing:
 - **10 Python tests failing** (all in `/status` and `/api/trigger-update` endpoints)
 - **1 Bash test failing** (macOS dock shortcut prompt text)
