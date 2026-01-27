@@ -2696,6 +2696,7 @@ async def apply_profile_image(
         
         # Extract and cache the PNG bytes from the data URI
         import base64
+        from PIL import Image as PILImage
         try:
             # Format: data:image/png;base64,<data>
             header, b64_data = image_data_uri.split(',', 1)
