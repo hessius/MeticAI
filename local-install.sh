@@ -1608,12 +1608,12 @@ if $DOCKER_CMD up -d --build; then
                 echo -e "${YELLOW}Skipping Dock shortcut creation.${NC}"
             fi
         fi
-        
-        # Install rebuild watcher for automatic web UI updates
-        if [[ "${SKIP_REBUILD_WATCHER}" != "true" ]]; then
-            echo ""
-            install_rebuild_watcher "$(pwd)"
-        fi
+    fi
+    
+    # Install rebuild watcher for automatic web UI updates (all platforms)
+    if [[ "${SKIP_REBUILD_WATCHER}" != "true" ]]; then
+        echo ""
+        install_rebuild_watcher "$(pwd)"
     fi
     
     echo "To test the connection, copy/paste this command:"
