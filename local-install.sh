@@ -1486,6 +1486,14 @@ if [ ! -f ".update-requested" ]; then
     touch .update-requested
 fi
 
+# Ensure .restart-requested exists as a file for the restart endpoint
+if [ -d ".restart-requested" ]; then
+    rm -rf .restart-requested
+fi
+if [ ! -f ".restart-requested" ]; then
+    touch .restart-requested
+fi
+
 # Pre-create directories that Docker would otherwise create as root
 # This ensures proper ownership for the current user
 mkdir -p data logs
