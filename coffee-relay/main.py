@@ -36,6 +36,62 @@ from datetime import datetime, timezone
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def deep_convert_to_dict(obj):
+    """Recursively convert an object with __dict__ to a JSON-serializable dict.
+    
+    Handles nested objects, lists, and special types that can't be directly serialized.
+    """
+    if obj is None:
+        return None
+    elif isinstance(obj, (str, int, float, bool)):
+        return obj
+    elif isinstance(obj, dict):
+        return {k: deep_convert_to_dict(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [deep_convert_to_dict(item) for item in obj]
+    elif hasattr(obj, '__dict__'):
+        return {k: deep_convert_to_dict(v) for k, v in obj.__dict__.items() 
+                if not k.startswith('_')}
+    else:
+        # For other types, try to convert to string as fallback
+        try:
+            return str(obj)
+        except Exception:
+            return None
+
+
+def atomic_write_json(filepath: Path, data, indent: int = 2):
+    """Write JSON data to a file atomically to prevent corruption.
+    
+    Writes to a temporary file first, then renames it to the target path.
+    This ensures the file is never left in a partially-written state.
+    """
+    import tempfile as tf
+    
+    # Serialize the data first to catch any serialization errors before writing
+    json_str = json.dumps(data, indent=indent, default=str)
+    
+    # Write to a temporary file in the same directory
+    temp_fd, temp_path = tf.mkstemp(
+        dir=filepath.parent, 
+        prefix=f'.{filepath.name}.', 
+        suffix='.tmp'
+    )
+    try:
+        with os.fdopen(temp_fd, 'w') as f:
+            f.write(json_str)
+        # Atomic rename
+        os.rename(temp_path, filepath)
+    except Exception:
+        # Clean up temp file on failure
+        try:
+            os.unlink(temp_path)
+        except Exception:
+            pass
+        raise
+
+
 # Data directory configuration - use environment variable or default
 # In test mode, use temporary directory to avoid permission issues
 TEST_MODE = os.environ.get("TEST_MODE") == "true"
@@ -314,6 +370,9 @@ SAFETY_RULES = (
 
 PROFILE_GUIDELINES = (
     "PROFILE CREATION GUIDELINES:\n"
+    "• USER PREFERENCES ARE MANDATORY: If the user specifies a dose, grind, temperature, ratio, or any other parameter, you MUST use EXACTLY that value. Do NOT override with defaults.\n"
+    "• Examples: If user says '20g dose' → use 20g, NOT 18g. If user says '94°C' → use 94°C. If user says '1:2.5 ratio' → calculate output accordingly.\n"
+    "• Only use standard defaults (18g dose, 93°C, etc.) when the user has NOT specified a preference.\n"
     "• Support complex recipes: multi-stage extraction, multiple pre-infusion steps, blooming phases\n"
     "• Consider flow profiling, pressure ramping, and temperature surfing techniques\n"
     "• Design for the specific bean characteristics (origin, roast level, flavor notes)\n"
@@ -498,9 +557,11 @@ async def analyze_and_profile(
                 BARISTA_PERSONA +
                 SAFETY_RULES +
                 f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"Coffee Analysis: '{coffee_analysis}'\n"
-                f"User Preferences: '{user_prefs}'\n\n"
-                f"TASK: Create a sophisticated espresso profile based on the coffee analysis and user preferences.\n\n" +
+                f"Coffee Analysis: '{coffee_analysis}'\n\n"
+                f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
+                f"'{user_prefs}'\n"
+                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
+                f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements above.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
@@ -525,9 +586,11 @@ async def analyze_and_profile(
             final_prompt = (
                 BARISTA_PERSONA +
                 SAFETY_RULES +
-                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"User Instructions: '{user_prefs}'\n\n"
-                "TASK: Create a sophisticated espresso profile based on the user's instructions.\n\n" +
+                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n\n"
+                f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
+                f"'{user_prefs}'\n"
+                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
+                "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements above.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
@@ -2203,7 +2266,7 @@ def process_image_for_profile(image_data: bytes, content_type: str = "image/png"
     return f"data:image/png;base64,{b64_data}", png_bytes
 
 
-@app.post("/api/profile/{profile_name}/image")
+@app.post("/api/profile/{profile_name:path}/image")
 async def upload_profile_image(
     profile_name: str,
     request: Request,
@@ -2346,7 +2409,7 @@ IMAGE_GEN_STYLES = [
 ]
 
 
-@app.post("/api/profile/{profile_name}/generate-image")
+@app.post("/api/profile/{profile_name:path}/generate-image")
 async def generate_profile_image(
     profile_name: str,
     request: Request,
@@ -2659,7 +2722,7 @@ class ApplyImageRequest(BaseModel):
     image_data: str  # Base64 data URI
 
 
-@app.post("/api/profile/{profile_name}/apply-image")
+@app.post("/api/profile/{profile_name:path}/apply-image")
 async def apply_profile_image(
     profile_name: str,
     request: Request,
@@ -2810,7 +2873,7 @@ async def apply_profile_image(
         )
 
 
-@app.get("/api/profile/{profile_name}/image-proxy")
+@app.get("/api/profile/{profile_name:path}/image-proxy")
 async def proxy_profile_image(
     profile_name: str,
     request: Request,
@@ -2914,7 +2977,7 @@ async def proxy_profile_image(
         )
 
 
-@app.get("/api/profile/{profile_name}")
+@app.get("/api/profile/{profile_name:path}")
 async def get_profile_info(
     profile_name: str,
     request: Request
@@ -4471,12 +4534,12 @@ async def import_profile(request: Request):
             "profile_name": profile_name,
             "user_preferences": f"Imported from {source}",
             "reply": reply,
-            "profile_json": profile_json,
+            "profile_json": deep_convert_to_dict(profile_json),
             "imported": True,
             "import_source": source
         }
         
-        # Save to history - history is a list
+        # Save to history using atomic write to prevent corruption
         if HISTORY_FILE.exists():
             with open(HISTORY_FILE, 'r') as f:
                 history = json.load(f)
@@ -4488,8 +4551,7 @@ async def import_profile(request: Request):
         
         history.insert(0, new_entry)
         
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump(history, f, indent=2)
+        atomic_write_json(HISTORY_FILE, history)
         
         logger.info(
             f"Profile imported successfully: {profile_name}",
@@ -4510,6 +4572,257 @@ async def import_profile(request: Request):
             f"Failed to import profile: {str(e)}",
             exc_info=True,
             extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/profile/import-all")
+async def import_all_profiles(request: Request):
+    """Import all profiles from the Meticulous machine that aren't already in history.
+    
+    This is a long-running operation that imports profiles one at a time,
+    generating descriptions for each. The response is streamed as newline-delimited JSON
+    to provide progress updates.
+    
+    Returns:
+        Streamed JSON with progress updates and final summary
+    """
+    from fastapi.responses import StreamingResponse
+    
+    request_id = request.state.request_id
+    
+    async def generate_import_stream():
+        """Generator that yields progress updates as JSON lines."""
+        imported = []
+        skipped = []
+        failed = []
+        
+        try:
+            # Get list of machine profiles
+            api = get_meticulous_api()
+            profiles_result = api.list_profiles()
+            
+            if hasattr(profiles_result, 'error') and profiles_result.error:
+                yield json.dumps({
+                    "type": "error",
+                    "message": f"Machine API error: {profiles_result.error}"
+                }) + "\n"
+                return
+            
+            # Get existing profile names from history
+            existing_names = set()
+            if HISTORY_FILE.exists():
+                try:
+                    with open(HISTORY_FILE, 'r') as f:
+                        history = json.load(f)
+                        entries = history if isinstance(history, list) else history.get("entries", [])
+                        existing_names = {entry.get("profile_name") for entry in entries}
+                except Exception:
+                    pass
+            
+            # Filter profiles to import
+            profiles_to_import = []
+            for partial_profile in profiles_result:
+                try:
+                    full_profile = api.get_profile(partial_profile.id)
+                    if hasattr(full_profile, 'error') and full_profile.error:
+                        continue
+                    if full_profile.name not in existing_names:
+                        profiles_to_import.append(full_profile)
+                    else:
+                        skipped.append(full_profile.name)
+                except Exception:
+                    pass
+            
+            total_to_import = len(profiles_to_import)
+            total_profiles = total_to_import + len(skipped)
+            
+            # Send initial status
+            yield json.dumps({
+                "type": "start",
+                "total": total_profiles,
+                "to_import": total_to_import,
+                "already_imported": len(skipped),
+                "message": f"Found {total_to_import} profiles to import ({len(skipped)} already in catalogue)"
+            }) + "\n"
+            
+            if total_to_import == 0:
+                yield json.dumps({
+                    "type": "complete",
+                    "imported": 0,
+                    "skipped": len(skipped),
+                    "failed": 0,
+                    "message": "All profiles already in catalogue"
+                }) + "\n"
+                return
+            
+            # Import each profile
+            for idx, profile in enumerate(profiles_to_import, 1):
+                profile_name = profile.name
+                
+                yield json.dumps({
+                    "type": "progress",
+                    "current": idx,
+                    "total": total_to_import,
+                    "profile_name": profile_name,
+                    "message": f"Importing {idx}/{total_to_import}: {profile_name}"
+                }) + "\n"
+                
+                try:
+                    # Convert profile to JSON dict using deep conversion
+                    profile_json = deep_convert_to_dict(profile)
+                    
+                    # Generate description
+                    reply = None
+                    try:
+                        reply = await _generate_profile_description(profile_json, request_id)
+                    except Exception as e:
+                        logger.warning(f"Failed to generate description for {profile_name}: {e}")
+                        reply = "Profile imported from machine. Description generation failed."
+                    
+                    # Create history entry
+                    entry_id = str(uuid.uuid4())
+                    created_at = datetime.now(timezone.utc).isoformat()
+                    
+                    new_entry = {
+                        "id": entry_id,
+                        "created_at": created_at,
+                        "profile_name": profile_name,
+                        "user_preferences": "Imported from machine (bulk import)",
+                        "reply": reply,
+                        "profile_json": profile_json,
+                        "imported": True,
+                        "import_source": "machine_bulk"
+                    }
+                    
+                    # Save to history using atomic write to prevent corruption
+                    if HISTORY_FILE.exists():
+                        with open(HISTORY_FILE, 'r') as f:
+                            history = json.load(f)
+                            if not isinstance(history, list):
+                                history = history.get("entries", [])
+                    else:
+                        history = []
+                    
+                    history.insert(0, new_entry)
+                    
+                    atomic_write_json(HISTORY_FILE, history)
+                    
+                    imported.append(profile_name)
+                    
+                    yield json.dumps({
+                        "type": "imported",
+                        "current": idx,
+                        "total": total_to_import,
+                        "profile_name": profile_name,
+                        "message": f"Imported: {profile_name}"
+                    }) + "\n"
+                    
+                except Exception as e:
+                    logger.error(f"Failed to import {profile_name}: {e}", exc_info=True)
+                    failed.append({"name": profile_name, "error": str(e)})
+                    
+                    yield json.dumps({
+                        "type": "failed",
+                        "current": idx,
+                        "total": total_to_import,
+                        "profile_name": profile_name,
+                        "error": str(e),
+                        "message": f"Failed: {profile_name}"
+                    }) + "\n"
+            
+            # Send completion summary
+            yield json.dumps({
+                "type": "complete",
+                "imported": len(imported),
+                "skipped": len(skipped),
+                "failed": len(failed),
+                "imported_profiles": imported,
+                "skipped_profiles": skipped,
+                "failed_profiles": failed,
+                "message": f"Import complete: {len(imported)} imported, {len(skipped)} skipped, {len(failed)} failed"
+            }) + "\n"
+            
+            logger.info(
+                f"Bulk import completed: {len(imported)} imported, {len(skipped)} skipped, {len(failed)} failed",
+                extra={"request_id": request_id}
+            )
+            
+        except Exception as e:
+            logger.error(f"Bulk import error: {e}", exc_info=True, extra={"request_id": request_id})
+            yield json.dumps({
+                "type": "error",
+                "message": str(e)
+            }) + "\n"
+    
+    return StreamingResponse(
+        generate_import_stream(),
+        media_type="application/x-ndjson"
+    )
+
+
+@app.get("/api/machine/profiles/count")
+async def get_machine_profile_count(request: Request):
+    """Get a quick count of profiles on the machine and how many are not yet imported.
+    
+    This is a lightweight endpoint for showing import-all button availability.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}"
+            )
+        
+        total_on_machine = len(list(profiles_result))
+        
+        # Re-fetch to count (iterator was consumed)
+        profiles_result = api.list_profiles()
+        
+        # Get existing profile names from history
+        existing_names = set()
+        if HISTORY_FILE.exists():
+            try:
+                with open(HISTORY_FILE, 'r') as f:
+                    history = json.load(f)
+                    entries = history if isinstance(history, list) else history.get("entries", [])
+                    existing_names = {entry.get("profile_name") for entry in entries}
+            except Exception:
+                pass
+        
+        not_imported = 0
+        for partial_profile in profiles_result:
+            try:
+                full_profile = api.get_profile(partial_profile.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+                if full_profile.name not in existing_names:
+                    not_imported += 1
+            except Exception:
+                pass
+        
+        return {
+            "status": "success",
+            "total_on_machine": total_on_machine,
+            "not_imported": not_imported,
+            "already_imported": total_on_machine - not_imported
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get profile count: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
         )
         raise HTTPException(
             status_code=500,
