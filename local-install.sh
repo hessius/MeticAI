@@ -1199,6 +1199,10 @@ echo ""
 if [ "$SKIP_ENV_CREATION" = true ]; then
     echo -e "${YELLOW}[2/4] Configuration${NC}"
     echo -e "${GREEN}✓ Using existing .env configuration.${NC}"
+    # Source the .env file to load variables for later use
+    set -a
+    source .env
+    set +a
     echo ""
 elif [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     # Non-interactive mode: use environment variables
