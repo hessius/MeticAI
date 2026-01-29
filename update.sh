@@ -468,6 +468,10 @@ perform_web_repo_switch() {
             # shellcheck disable=SC1091
             source "$SCRIPT_DIR/.env"
             mkdir -p meticai-web/public
+            # Fix: Remove config.json if it's a directory
+            if [ -d "meticai-web/public/config.json" ]; then
+                rm -rf meticai-web/public/config.json
+            fi
             cat > meticai-web/public/config.json <<WEBCONFIG
 {
   "serverUrl": "http://$PI_IP:8000"
@@ -699,6 +703,10 @@ update_web() {
                 # shellcheck disable=SC1091
                 source "$SCRIPT_DIR/.env"
                 mkdir -p meticai-web/public
+                # Fix: Remove config.json if it's a directory
+                if [ -d "meticai-web/public/config.json" ]; then
+                    rm -rf meticai-web/public/config.json
+                fi
                 cat > meticai-web/public/config.json <<WEBCONFIG
 {
   "serverUrl": "http://$PI_IP:8000"

@@ -1413,6 +1413,12 @@ echo -e "${GREEN}✓ Web app source code ready.${NC}"
 # Create web app config directory if it doesn't exist
 mkdir -p meticai-web/public
 
+# Fix: Remove config.json if it's a directory (Docker creates directories when mounting non-existent files)
+if [ -d "meticai-web/public/config.json" ]; then
+    echo "Removing config.json directory (should be a file)..."
+    rm -rf meticai-web/public/config.json
+fi
+
 # Generate config.json for web app
 echo "Generating web app configuration..."
 cat <<WEBCONFIG > meticai-web/public/config.json
