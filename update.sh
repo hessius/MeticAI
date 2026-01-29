@@ -468,7 +468,10 @@ perform_web_repo_switch() {
             # shellcheck disable=SC1091
             source "$SCRIPT_DIR/.env"
             mkdir -p meticai-web/public
-            # Fix: Remove config.json if it's a directory
+            # Fix: Remove config.json if it's a directory (both locations)
+            if [ -d "meticai-web/config.json" ]; then
+                rm -rf meticai-web/config.json
+            fi
             if [ -d "meticai-web/public/config.json" ]; then
                 rm -rf meticai-web/public/config.json
             fi
@@ -477,6 +480,8 @@ perform_web_repo_switch() {
   "serverUrl": "http://$PI_IP:8000"
 }
 WEBCONFIG
+            # Also create in meticai-web root for standalone docker-compose usage
+            cp meticai-web/public/config.json meticai-web/config.json
             echo -e "${GREEN}✓ Web app configured${NC}"
         fi
         
@@ -703,7 +708,10 @@ update_web() {
                 # shellcheck disable=SC1091
                 source "$SCRIPT_DIR/.env"
                 mkdir -p meticai-web/public
-                # Fix: Remove config.json if it's a directory
+                # Fix: Remove config.json if it's a directory (both locations)
+                if [ -d "meticai-web/config.json" ]; then
+                    rm -rf meticai-web/config.json
+                fi
                 if [ -d "meticai-web/public/config.json" ]; then
                     rm -rf meticai-web/public/config.json
                 fi
@@ -712,6 +720,8 @@ update_web() {
   "serverUrl": "http://$PI_IP:8000"
 }
 WEBCONFIG
+                # Also create in meticai-web root for standalone docker-compose usage
+                cp meticai-web/public/config.json meticai-web/config.json
                 echo -e "${GREEN}✓ Web app configured${NC}"
             fi
             return 0

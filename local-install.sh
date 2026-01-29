@@ -1414,18 +1414,26 @@ echo -e "${GREEN}✓ Web app source code ready.${NC}"
 mkdir -p meticai-web/public
 
 # Fix: Remove config.json if it's a directory (Docker creates directories when mounting non-existent files)
+# Check both locations: meticai-web/config.json (used by meticai-web's own docker-compose.yml)
+# and meticai-web/public/config.json (used by main docker-compose.yml)
+if [ -d "meticai-web/config.json" ]; then
+    echo "Removing meticai-web/config.json directory (should be a file)..."
+    rm -rf meticai-web/config.json
+fi
 if [ -d "meticai-web/public/config.json" ]; then
-    echo "Removing config.json directory (should be a file)..."
+    echo "Removing meticai-web/public/config.json directory (should be a file)..."
     rm -rf meticai-web/public/config.json
 fi
 
-# Generate config.json for web app
+# Generate config.json for web app (in both locations for compatibility)
 echo "Generating web app configuration..."
 cat <<WEBCONFIG > meticai-web/public/config.json
 {
   "serverUrl": "http://$PI_IP:8000"
 }
 WEBCONFIG
+# Also create in meticai-web root for standalone docker-compose usage
+cp meticai-web/public/config.json meticai-web/config.json
 echo -e "${GREEN}✓ Web app configured.${NC}"
 echo ""
 
