@@ -738,6 +738,30 @@ rebuild_containers() {
         touch "$SCRIPT_DIR/.rebuild-needed"
     fi
     
+    # Ensure .update-check-requested exists as a file
+    if [ -d "$SCRIPT_DIR/.update-check-requested" ]; then
+        rm -rf "$SCRIPT_DIR/.update-check-requested"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.update-check-requested" ]; then
+        touch "$SCRIPT_DIR/.update-check-requested"
+    fi
+    
+    # Ensure .update-requested exists as a file
+    if [ -d "$SCRIPT_DIR/.update-requested" ]; then
+        rm -rf "$SCRIPT_DIR/.update-requested"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.update-requested" ]; then
+        touch "$SCRIPT_DIR/.update-requested"
+    fi
+    
+    # Ensure .restart-requested exists as a file
+    if [ -d "$SCRIPT_DIR/.restart-requested" ]; then
+        rm -rf "$SCRIPT_DIR/.restart-requested"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.restart-requested" ]; then
+        touch "$SCRIPT_DIR/.restart-requested"
+    fi
+    
     # Check if docker compose is available
     if docker compose version &> /dev/null; then
         COMPOSE_CMD="docker compose"
@@ -891,6 +915,24 @@ main() {
     fi
     if [ ! -f "$SCRIPT_DIR/.rebuild-needed" ]; then
         touch "$SCRIPT_DIR/.rebuild-needed"
+    fi
+    if [ -d "$SCRIPT_DIR/.update-check-requested" ]; then
+        rm -rf "$SCRIPT_DIR/.update-check-requested"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.update-check-requested" ]; then
+        touch "$SCRIPT_DIR/.update-check-requested"
+    fi
+    if [ -d "$SCRIPT_DIR/.update-requested" ]; then
+        rm -rf "$SCRIPT_DIR/.update-requested"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.update-requested" ]; then
+        touch "$SCRIPT_DIR/.update-requested"
+    fi
+    if [ -d "$SCRIPT_DIR/.restart-requested" ]; then
+        rm -rf "$SCRIPT_DIR/.restart-requested"
+    fi
+    if [ ! -f "$SCRIPT_DIR/.restart-requested" ]; then
+        touch "$SCRIPT_DIR/.restart-requested"
     fi
     
     # Fix common permission issues with git directories
