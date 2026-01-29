@@ -95,6 +95,7 @@ fi
 checkout_latest_release() {
     local dir="$1"
     local repo_name="$2"
+    local original_dir="$PWD"
     
     cd "$dir" || return 1
     
@@ -113,18 +114,18 @@ checkout_latest_release() {
         fi
         if git checkout "$latest_tag" 2>/dev/null; then
             echo -e "${GREEN}✓ $repo_name set to stable release $latest_tag${NC}"
+            cd "$original_dir" || true
             return 0
         else
             echo -e "${YELLOW}Could not checkout tag, staying on main branch${NC}"
+            cd "$original_dir" || true
             return 1
         fi
     else
         echo -e "${YELLOW}No release tags found for $repo_name, using main branch${NC}"
+        cd "$original_dir" || true
         return 1
     fi
-    
-    # Return to original directory
-    cd - >/dev/null || true
 }
 
 # Only show banner in interactive mode
@@ -1511,6 +1512,18 @@ fi
 # Pre-create directories that Docker would otherwise create as root
 # This ensures proper ownership for the current user
 mkdir -p data logs
+
+# Final safety check: ensure config.json files are not directories
+# This catches cases where a previous failed install left directories behind
+if [ -d "meticai-web/config.json" ]; then
+    rm -rf meticai-web/config.json
+    echo '{"serverUrl": "http://'"$PI_IP"':8000"}' > meticai-web/config.json
+fi
+if [ -d "meticai-web/public/config.json" ]; then
+    rm -rf meticai-web/public/config.json
+    echo '{"serverUrl": "http://'"$PI_IP"':8000"}' > meticai-web/public/config.json
+fi
+
 if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
     echo -e "${GREEN}✓ Data directories created with correct ownership${NC}"
 fi

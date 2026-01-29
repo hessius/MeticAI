@@ -862,6 +862,29 @@ REBUILD_EOF
         # Pre-create directories so Docker doesn't create them as root
         mkdir -p "$SCRIPT_DIR/data" "$SCRIPT_DIR/logs"
         
+        # Final safety check: ensure config.json files are not directories
+        # This catches cases where a previous failed install left directories behind
+        if [ -d "$SCRIPT_DIR/meticai-web/config.json" ]; then
+            rm -rf "$SCRIPT_DIR/meticai-web/config.json"
+            if [ -f "$SCRIPT_DIR/.env" ]; then
+                # shellcheck disable=SC1091
+                source "$SCRIPT_DIR/.env"
+                echo '{"serverUrl": "http://'"$PI_IP"':8000"}' > "$SCRIPT_DIR/meticai-web/config.json"
+            else
+                echo '{"serverUrl": "http://localhost:8000"}' > "$SCRIPT_DIR/meticai-web/config.json"
+            fi
+        fi
+        if [ -d "$SCRIPT_DIR/meticai-web/public/config.json" ]; then
+            rm -rf "$SCRIPT_DIR/meticai-web/public/config.json"
+            if [ -f "$SCRIPT_DIR/.env" ]; then
+                # shellcheck disable=SC1091
+                source "$SCRIPT_DIR/.env"
+                echo '{"serverUrl": "http://'"$PI_IP"':8000"}' > "$SCRIPT_DIR/meticai-web/public/config.json"
+            else
+                echo '{"serverUrl": "http://localhost:8000"}' > "$SCRIPT_DIR/meticai-web/public/config.json"
+            fi
+        fi
+        
         # Rebuild and start
         echo "Building and starting containers..."
         if $SUDO_PREFIX $COMPOSE_CMD up -d --build; then
