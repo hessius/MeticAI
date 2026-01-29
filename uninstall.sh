@@ -59,14 +59,25 @@ UNINSTALLED_ITEMS=()
 KEPT_ITEMS=()
 FAILED_ITEMS=()
 
+# Determine if we need sudo for Docker (Linux without user in docker group)
+DOCKER_CMD="docker"
+if [[ "$OSTYPE" != "darwin"* ]]; then
+    if ! docker info &> /dev/null; then
+        if command -v sudo &> /dev/null && sudo docker info &> /dev/null; then
+            DOCKER_CMD="sudo docker"
+            echo -e "${YELLOW}Note: Using sudo for Docker commands${NC}"
+        fi
+    fi
+fi
+
 # 1. Stop and remove Docker containers
 ################################################################################
 echo -e "${YELLOW}[1/7] Stopping and removing Docker containers...${NC}"
 
 if command -v docker &> /dev/null; then
     # Check for running containers
-    if docker compose ps -q &> /dev/null 2>&1 || [ -f "docker-compose.yml" ]; then
-        if docker compose down 2>/dev/null || docker-compose down 2>/dev/null; then
+    if $DOCKER_CMD compose ps -q &> /dev/null 2>&1 || [ -f "docker-compose.yml" ]; then
+        if $DOCKER_CMD compose down 2>/dev/null || $DOCKER_CMD-compose down 2>/dev/null; then
             echo -e "${GREEN}✓ Containers stopped and removed${NC}"
             UNINSTALLED_ITEMS+=("Docker containers")
         else
@@ -89,8 +100,8 @@ echo ""
 echo -e "${YELLOW}[2/7] Removing Docker images...${NC}"
 
 if command -v docker &> /dev/null; then
-    # List MeticAI-related images
-    IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|coffee-relay|gemini-client|meticulous-mcp)" || true)
+    # List MeticAI-related images (matches various naming patterns: meticai-, met-ai-, meticai-web-, etc.)
+    IMAGES=$($DOCKER_CMD images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
     
     if [ -n "$IMAGES" ]; then
         echo "Found MeticAI images:"
@@ -100,7 +111,7 @@ if command -v docker &> /dev/null; then
         REMOVE_IMAGES=${REMOVE_IMAGES:-y}
         
         if [[ "$REMOVE_IMAGES" =~ ^[Yy]$ ]]; then
-            echo "$IMAGES" | xargs docker rmi -f 2>/dev/null || true
+            echo "$IMAGES" | xargs $DOCKER_CMD rmi -f 2>/dev/null || true
             echo -e "${GREEN}✓ Docker images removed${NC}"
             UNINSTALLED_ITEMS+=("Docker images")
         else
