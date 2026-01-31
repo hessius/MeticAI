@@ -2,6 +2,8 @@
 
 # Secrets
 .env
+tasks.md
+PROFILING_AXIOMS*
 
 # Python
 __pycache__/
