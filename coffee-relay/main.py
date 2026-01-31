@@ -5078,6 +5078,12 @@ async def start_preheat(request: Request):
         
         api = get_meticulous_api()
         
+        if api is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Meticulous machine not connected"
+            )
+        
         # Enable auto_preheat setting and trigger it
         # The Meticulous machine handles preheat via the settings
         try:
@@ -5137,6 +5143,12 @@ async def run_profile(profile_id: str, request: Request):
         )
         
         api = get_meticulous_api()
+        
+        if api is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Meticulous machine not connected"
+            )
         
         # Load the profile
         load_result = api.load_profile_by_id(profile_id)
@@ -5201,9 +5213,19 @@ async def schedule_shot(request: Request):
                 detail="scheduled_time is required"
             )
         
+        # Validate that we have either a profile or preheat enabled
+        if not profile_id and not preheat:
+            raise HTTPException(
+                status_code=400,
+                detail="Either profile_id or preheat must be provided"
+            )
+        
         # Parse the scheduled time
         try:
             scheduled_time = datetime.fromisoformat(scheduled_time_str.replace('Z', '+00:00'))
+            # Ensure timezone-aware datetime
+            if scheduled_time.tzinfo is None:
+                scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
         except ValueError:
             raise HTTPException(
                 status_code=400,
