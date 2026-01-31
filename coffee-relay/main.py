@@ -1120,6 +1120,67 @@ def get_author_name() -> str:
     return author if author else "MeticAI"
 
 
+@app.get("/api/version")
+async def get_version_info(request: Request):
+    """Get version information for all MeticAI components.
+    
+    Returns version info for:
+    - MeticAI (backend)
+    - MeticAI-web (frontend)
+    - MCP Server
+    """
+    request_id = request.state.request_id
+    
+    try:
+        # Read MeticAI version from VERSION file
+        meticai_version = "unknown"
+        version_file = Path(__file__).parent.parent / "VERSION"
+        if version_file.exists():
+            meticai_version = version_file.read_text().strip()
+        
+        # Read MeticAI-web version from meticai-web/VERSION
+        meticai_web_version = "unknown"
+        web_version_file = Path(__file__).parent.parent / "meticai-web" / "VERSION"
+        if web_version_file.exists():
+            meticai_web_version = web_version_file.read_text().strip()
+        
+        # Read MCP server version from meticulous-source
+        mcp_version = "unknown"
+        mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"
+        mcp_source_dir = Path(__file__).parent.parent / "meticulous-source"
+        if mcp_source_dir.exists():
+            # Try to get version from pyproject.toml or setup.py
+            pyproject = mcp_source_dir / "pyproject.toml"
+            if pyproject.exists():
+                try:
+                    content = pyproject.read_text()
+                    for line in content.split('\n'):
+                        if 'version' in line.lower() and '=' in line:
+                            mcp_version = line.split('=')[1].strip().strip('"').strip("'")
+                            break
+                except Exception:
+                    pass
+        
+        return {
+            "meticai": meticai_version,
+            "meticai_web": meticai_web_version,
+            "mcp_server": mcp_version,
+            "mcp_repo_url": mcp_repo_url
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to get version info: {str(e)}",
+            extra={"request_id": request_id},
+            exc_info=True
+        )
+        return {
+            "meticai": "unknown",
+            "meticai_web": "unknown", 
+            "mcp_server": "unknown",
+            "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp"
+        }
+
+
 @app.get("/api/settings")
 async def get_settings(request: Request):
     """Get current settings.
