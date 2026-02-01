@@ -1184,8 +1184,6 @@ async def get_version_info(request: Request):
                             f"Skipping git remote check: MCP source directory is outside base directory: {resolved_mcp_dir}",
                             extra={"request_id": request_id}
                         )
-                        # Explicitly skip subprocess execution for security
-                        pass
                     else:
                         result = subprocess.run(
                             ["git", "config", "--get", "remote.origin.url"],
