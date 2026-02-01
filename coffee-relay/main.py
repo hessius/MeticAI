@@ -1160,7 +1160,11 @@ async def get_version_info(request: Request):
                     if version_match:
                         mcp_version = version_match.group(1)
                 except Exception as e:
-                    logger.debug(f"Failed to read version from pyproject.toml: {e}")
+                    logger.debug(
+                        f"Failed to read version from pyproject.toml: {str(e)}",
+                        extra={"request_id": request_id},
+                        exc_info=True
+                    )
             
             # Fallback to setup.py if version not found in pyproject.toml
             if mcp_version == "unknown":
@@ -1173,7 +1177,11 @@ async def get_version_info(request: Request):
                         if version_match:
                             mcp_version = version_match.group(1)
                     except Exception as e:
-                        logger.debug(f"Failed to read version from setup.py: {e}")
+                        logger.debug(
+                            f"Failed to read version from setup.py: {str(e)}",
+                            extra={"request_id": request_id},
+                            exc_info=True
+                        )
         
         return {
             "meticai": meticai_version,
