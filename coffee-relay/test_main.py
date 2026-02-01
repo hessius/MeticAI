@@ -1909,6 +1909,64 @@ class TestShotAnalysisHelpers:
         assert result["triggered"]["type"] == "flow"
         assert result["triggered"]["actual"] == 1.5
 
+    def test_determine_exit_trigger_hit_zero_pressure(self):
+        """Test that zero pressure is treated as a legitimate value, not missing data."""
+        from main import _determine_exit_trigger_hit
+        
+        # Stage data where pressure dropped to zero (e.g., pressure release phase)
+        stage_data = {
+            "duration": 10.0,
+            "end_weight": 30.0,
+            "max_pressure": 5.0,
+            "min_pressure": 0.0,
+            "end_pressure": 0.0,  # Legitimate zero at end
+            "max_flow": 2.0,
+            "min_flow": 0.5,
+            "end_flow": 0.5
+        }
+        
+        # Exit trigger: pressure <= 1.0 bar (should trigger because end_pressure is 0)
+        exit_triggers = [
+            {"type": "pressure", "value": 1.0, "comparison": "<="}
+        ]
+        
+        result = _determine_exit_trigger_hit(stage_data, exit_triggers)
+        
+        # Should trigger because end_pressure (0.0) <= 1.0
+        assert result["triggered"] is not None
+        assert result["triggered"]["type"] == "pressure"
+        # The actual value should be end_pressure (0.0), not min_pressure
+        assert result["triggered"]["actual"] == 0.0
+
+    def test_determine_exit_trigger_hit_zero_flow(self):
+        """Test that zero flow is treated as a legitimate value, not missing data."""
+        from main import _determine_exit_trigger_hit
+        
+        # Stage data where flow dropped to zero
+        stage_data = {
+            "duration": 12.0,
+            "end_weight": 35.0,
+            "max_pressure": 6.0,
+            "min_pressure": 5.0,
+            "end_pressure": 5.5,
+            "max_flow": 3.0,
+            "min_flow": 0.0,
+            "end_flow": 0.0  # Legitimate zero at end
+        }
+        
+        # Exit trigger: flow <= 0.5 ml/s (should trigger because end_flow is 0)
+        exit_triggers = [
+            {"type": "flow", "value": 0.5, "comparison": "<="}
+        ]
+        
+        result = _determine_exit_trigger_hit(stage_data, exit_triggers)
+        
+        # Should trigger because end_flow (0.0) <= 0.5
+        assert result["triggered"] is not None
+        assert result["triggered"]["type"] == "flow"
+        # The actual value should be end_flow (0.0), not min_flow
+        assert result["triggered"]["actual"] == 0.0
+
     def test_generate_execution_description_rising_pressure(self):
         """Test execution description for rising pressure."""
         from main import _generate_execution_description
