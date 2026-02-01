@@ -5138,12 +5138,6 @@ async def run_profile(profile_id: str, request: Request):
         
         api = get_meticulous_api()
         
-        if api is None:
-            raise HTTPException(
-                status_code=503,
-                detail="Meticulous machine not connected"
-            )
-        
         # Load the profile
         load_result = api.load_profile_by_id(profile_id)
         if hasattr(load_result, 'error') and load_result.error:
