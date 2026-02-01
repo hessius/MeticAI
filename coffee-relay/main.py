@@ -3624,10 +3624,18 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict) 
             continue
             
         # Get actual stage timing from shot
-        stage_key = stage_name.lower().strip()
+        # Match using either stage name or stage key (for consistency with main analysis)
+        identifiers = set()
+        if stage_name:
+            identifiers.add(stage_name.lower().strip())
+        stage_key_field = stage.get("key", "")
+        if stage_key_field:
+            identifiers.add(stage_key_field.lower().strip())
+
         stage_timing = None
         for shot_stage_name, timing in shot_stage_times.items():
-            if shot_stage_name.lower().strip() == stage_key:
+            normalized_shot_stage_name = shot_stage_name.lower().strip()
+            if normalized_shot_stage_name in identifiers:
                 stage_timing = timing
                 break
         
