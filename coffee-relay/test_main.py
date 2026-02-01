@@ -4809,7 +4809,12 @@ class TestVersionEndpoint:
         
         data = response.json()
         # Should have all required keys even on error
-        # Verify it's cleared
+        assert "meticai" in data
+        assert "meticai_web" in data
+        assert "mcp_server" in data
+        assert "mcp_repo_url" in data
+
+        # Verify history can be retrieved and has expected structure
         response2 = client.get("/api/history")
         data = response2.json()
         # Should have minimal or no history in entries
@@ -4867,7 +4872,6 @@ class TestVersionEndpoint:
         
         # Setup path mocking to return appropriate files
         def path_side_effect(*args):
-            path_obj = Mock()
             if args:
                 path_str = str(args[0])
                 if "VERSION" in path_str and "meticai-web" not in path_str:
