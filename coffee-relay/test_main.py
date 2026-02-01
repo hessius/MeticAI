@@ -4467,6 +4467,13 @@ class TestRunShotEndpoints:
         
         # Connection errors are caught by the general exception handler
         assert response.status_code == 500
+    def test_preheat_no_connection(self, mock_get_api, client):
+        """Test preheat when machine not connected."""
+        mock_get_api.return_value = None
+
+        response = client.post("/api/machine/preheat")
+        
+        assert response.status_code == 503
 
     @patch('main.get_meticulous_api')
     def test_run_profile_success(self, mock_get_api, client):
@@ -4516,6 +4523,13 @@ class TestRunShotEndpoints:
         
         # Connection errors are caught by the general exception handler
         assert response.status_code == 500
+    def test_run_profile_no_connection(self, mock_get_api, client):
+        """Test run profile when machine not connected."""
+        mock_get_api.return_value = None
+
+        response = client.post("/api/machine/run-profile/test-123")
+        
+        assert response.status_code == 503
 
     def test_schedule_shot_success(self, client):
         """Test POST /api/machine/schedule-shot endpoint."""
