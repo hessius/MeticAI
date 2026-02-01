@@ -2041,6 +2041,86 @@ def get_meticulous_api():
     return _meticulous_api
 
 
+async def execute_scheduled_shot(
+    schedule_id: str,
+    shot_delay: float,
+    preheat: bool,
+    profile_id: Optional[str],
+    scheduled_shots_dict: dict,
+    scheduled_tasks_dict: dict,
+    preheat_duration_minutes: int = 10
+):
+    """Execute a scheduled shot with optional preheating.
+    
+    Args:
+        schedule_id: Unique identifier for this scheduled shot
+        shot_delay: Seconds to wait before executing the shot
+        preheat: Whether to preheat before the shot
+        profile_id: The profile ID to run (optional, can be None for preheat-only)
+        scheduled_shots_dict: Reference to the global scheduled shots dictionary
+        scheduled_tasks_dict: Reference to the global scheduled tasks dictionary
+        preheat_duration_minutes: Minutes to preheat (default: 10)
+    """
+    from meticulous.api_types import PartialSettings, ActionType
+    
+    try:
+        api = get_meticulous_api()
+        
+        # If preheat is enabled, start it before the scheduled time
+        if preheat:
+            preheat_delay = shot_delay - (preheat_duration_minutes * 60)
+            if preheat_delay > 0:
+                await asyncio.sleep(preheat_delay)
+                scheduled_shots_dict[schedule_id]["status"] = "preheating"
+                
+                # Start preheat
+                try:
+                    settings = PartialSettings(auto_preheat=1)
+                    api.update_setting(settings)
+                except Exception as e:
+                    logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                
+                # Wait for remaining time until shot
+                await asyncio.sleep(preheat_duration_minutes * 60)
+            else:
+                # Not enough time for full preheat, start immediately
+                scheduled_shots_dict[schedule_id]["status"] = "preheating"
+                try:
+                    settings = PartialSettings(auto_preheat=1)
+                    api.update_setting(settings)
+                except Exception as e:
+                    logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                await asyncio.sleep(shot_delay)
+        else:
+            await asyncio.sleep(shot_delay)
+        
+        scheduled_shots_dict[schedule_id]["status"] = "running"
+        
+        # Load and run the profile (if profile_id was provided)
+        if profile_id:
+            load_result = api.load_profile_by_id(profile_id)
+            if not (hasattr(load_result, 'error') and load_result.error):
+                api.execute_action(ActionType.START)
+                scheduled_shots_dict[schedule_id]["status"] = "completed"
+            else:
+                scheduled_shots_dict[schedule_id]["status"] = "failed"
+                scheduled_shots_dict[schedule_id]["error"] = load_result.error
+        else:
+            # Preheat only mode - mark as completed
+            scheduled_shots_dict[schedule_id]["status"] = "completed"
+            
+    except asyncio.CancelledError:
+        scheduled_shots_dict[schedule_id]["status"] = "cancelled"
+    except Exception as e:
+        logger.error(f"Scheduled shot {schedule_id} failed: {e}")
+        scheduled_shots_dict[schedule_id]["status"] = "failed"
+        scheduled_shots_dict[schedule_id]["error"] = str(e)
+    finally:
+        # Clean up task reference
+        if schedule_id in scheduled_tasks_dict:
+            del scheduled_tasks_dict[schedule_id]
+
+
 def decompress_shot_data(compressed_data: bytes) -> dict:
     """Decompress zstandard-compressed shot data."""
     import zstandard as zstd
@@ -5828,7 +5908,17 @@ async def schedule_shot(request: Request):
                     del _scheduled_tasks[schedule_id]
         
         # Start the background task
-        task = asyncio.create_task(execute_scheduled_shot())
+        task = asyncio.create_task(
+            execute_scheduled_shot(
+                schedule_id=schedule_id,
+                shot_delay=shot_delay,
+                preheat=preheat,
+                profile_id=profile_id,
+                scheduled_shots_dict=_scheduled_shots,
+                scheduled_tasks_dict=_scheduled_tasks,
+                preheat_duration_minutes=PREHEAT_DURATION_MINUTES
+            )
+        )
         _scheduled_tasks[schedule_id] = task
         
         return {
