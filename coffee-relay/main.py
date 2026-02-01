@@ -1160,6 +1160,25 @@ async def get_version_info(request: Request):
                             break
                 except Exception:
                     pass
+            
+            # Fallback to setup.py if version not found in pyproject.toml
+            if mcp_version == "unknown":
+                setup_py = mcp_source_dir / "setup.py"
+                if setup_py.exists():
+                    try:
+                        content = setup_py.read_text()
+                        # Look for version= in setup() call
+                        for line in content.split('\n'):
+                            if 'version' in line.lower() and '=' in line and not line.strip().startswith('#'):
+                                # Extract version from patterns like: version="1.0.0" or version='1.0.0'
+                                if '"' in line or "'" in line:
+                                    parts = line.split('=', 1)
+                                    if len(parts) == 2:
+                                        version_part = parts[1].strip().rstrip(',')
+                                        mcp_version = version_part.strip('"').strip("'")
+                                        break
+                    except Exception:
+                        pass
         
         return {
             "meticai": meticai_version,
