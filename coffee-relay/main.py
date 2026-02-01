@@ -108,6 +108,9 @@ UPDATE_CHECK_INTERVAL = 7200
 # Maximum upload file size: 10 MB
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
 
+# Regex pattern for extracting version from pyproject.toml or setup.py
+VERSION_PATTERN = r'^\s*version\s*=\s*["\']([^"\']+)["\']'
+
 
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
@@ -1156,7 +1159,7 @@ async def get_version_info(request: Request):
                 try:
                     content = pyproject.read_text()
                     # Look for version = "x.y.z" pattern in pyproject.toml
-                    version_match = re.search(r'^\s*version\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+                    version_match = re.search(VERSION_PATTERN, content, re.MULTILINE)
                     if version_match:
                         mcp_version = version_match.group(1)
                 except Exception as e:
@@ -1173,7 +1176,7 @@ async def get_version_info(request: Request):
                     try:
                         content = setup_py.read_text()
                         # Look for version="x.y.z" or version='x.y.z' in setup() call
-                        version_match = re.search(r'^\s*version\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+                        version_match = re.search(VERSION_PATTERN, content, re.MULTILINE)
                         if version_match:
                             mcp_version = version_match.group(1)
                     except Exception as e:
