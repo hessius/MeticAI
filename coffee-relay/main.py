@@ -167,6 +167,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting periodic update checker (runs on startup and every 24 hours)")
     update_task = asyncio.create_task(periodic_update_checker())
     
+    # Restore scheduled shots from persistence
+    logger.info("Restoring scheduled shots from persistence")
+    await _restore_scheduled_shots()
+    
     yield
     
     # Cleanup on shutdown
@@ -175,6 +179,15 @@ async def lifespan(app: FastAPI):
         await update_task
     except asyncio.CancelledError:
         logger.info("Periodic update checker stopped")
+    
+    # Cancel all scheduled shot tasks
+    for task in _scheduled_tasks.values():
+        task.cancel()
+    
+    # Wait for all tasks to complete
+    if _scheduled_tasks:
+        await asyncio.gather(*_scheduled_tasks.values(), return_exceptions=True)
+        logger.info("All scheduled shot tasks cancelled")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -5463,17 +5476,250 @@ Remember: NO information should be lost in this conversion!"""
 # Run Shot Endpoints
 # ============================================================================
 
-# Scheduled shots storage.
-# NOTE: These dictionaries are in-memory only. Any scheduled shots and their
-# associated asyncio tasks will be lost if the server process restarts
-# (e.g., crash, deploy, or host reboot). This means shots scheduled for the
-# future will not execute after a restart. For production-grade durability,
-# consider persisting scheduled shots to disk or a database and recreating
-# tasks on application startup.
+# ==============================================================================
+# Scheduled Shots Persistence Layer
+# ==============================================================================
+
+class ScheduledShotsPersistence:
+    """Manages persistence of scheduled shots to disk.
+    
+    Scheduled shots are stored in a JSON file to survive server restarts.
+    This ensures that scheduled shots are not lost during crashes, deploys,
+    or host reboots.
+    """
+    
+    def __init__(self, persistence_file: str = "/app/data/scheduled_shots.json"):
+        """Initialize the persistence layer.
+        
+        Args:
+            persistence_file: Path to the JSON file for storing scheduled shots.
+        """
+        self.persistence_file = Path(persistence_file)
+        self._lock = asyncio.Lock()
+        
+        # Ensure the parent directory exists
+        try:
+            self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            # Fallback to temp directory if we can't create the default location
+            logger.warning(
+                f"Could not create persistence directory at {self.persistence_file.parent}, "
+                f"using temporary directory: {e}"
+            )
+            temp_dir = Path(tempfile.gettempdir()) / "meticai_data"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            self.persistence_file = temp_dir / "scheduled_shots.json"
+            logger.info(f"Using persistence file: {self.persistence_file}")
+    
+    async def save(self, scheduled_shots: dict) -> None:
+        """Save scheduled shots to disk.
+        
+        Args:
+            scheduled_shots: Dictionary of scheduled shots to persist.
+        """
+        async with self._lock:
+            try:
+                # Only save shots that are scheduled or preheating (not completed/failed/cancelled)
+                active_shots = {
+                    shot_id: shot for shot_id, shot in scheduled_shots.items()
+                    if shot.get("status") in ["scheduled", "preheating"]
+                }
+                
+                # Write atomically using a temporary file
+                temp_file = self.persistence_file.with_suffix('.tmp')
+                with open(temp_file, 'w') as f:
+                    json.dump(active_shots, f, indent=2)
+                
+                # Atomic rename
+                temp_file.replace(self.persistence_file)
+                
+                logger.debug(f"Persisted {len(active_shots)} scheduled shots to {self.persistence_file}")
+            except Exception as e:
+                logger.error(f"Failed to save scheduled shots: {e}", exc_info=True)
+    
+    async def load(self) -> dict:
+        """Load scheduled shots from disk.
+        
+        Returns:
+            Dictionary of scheduled shots, or empty dict if file doesn't exist or is invalid.
+        """
+        async with self._lock:
+            try:
+                if not self.persistence_file.exists():
+                    logger.info("No persisted scheduled shots found (first run)")
+                    return {}
+                
+                with open(self.persistence_file, 'r') as f:
+                    data = json.load(f)
+                
+                if not isinstance(data, dict):
+                    logger.warning("Invalid scheduled shots file format, ignoring")
+                    return {}
+                
+                logger.info(f"Loaded {len(data)} scheduled shots from {self.persistence_file}")
+                return data
+            except json.JSONDecodeError as e:
+                logger.error(f"Corrupt scheduled shots file, ignoring: {e}")
+                # Backup the corrupt file
+                try:
+                    backup_file = self.persistence_file.with_suffix('.corrupt')
+                    self.persistence_file.rename(backup_file)
+                    logger.info(f"Backed up corrupt file to {backup_file}")
+                except Exception:
+                    pass
+                return {}
+            except Exception as e:
+                logger.error(f"Failed to load scheduled shots: {e}", exc_info=True)
+                return {}
+    
+    async def clear(self) -> None:
+        """Clear all persisted scheduled shots."""
+        async with self._lock:
+            try:
+                if self.persistence_file.exists():
+                    self.persistence_file.unlink()
+                    logger.info("Cleared persisted scheduled shots")
+            except Exception as e:
+                logger.error(f"Failed to clear scheduled shots: {e}", exc_info=True)
+
+
+# Initialize persistence layer
+_persistence = ScheduledShotsPersistence()
+
+# Scheduled shots storage with persistence
 _scheduled_shots: dict = {}
 _scheduled_tasks: dict = {}
 
 PREHEAT_DURATION_MINUTES = 10
+
+
+async def _save_scheduled_shots():
+    """Helper to persist scheduled shots to disk."""
+    await _persistence.save(_scheduled_shots)
+
+
+async def _restore_scheduled_shots():
+    """Restore scheduled shots from disk on startup and recreate tasks."""
+    global _scheduled_shots
+    
+    # Load persisted shots
+    persisted_shots = await _persistence.load()
+    
+    if not persisted_shots:
+        return
+    
+    # Filter out shots that are in the past or invalid
+    now = datetime.now(timezone.utc)
+    restored_count = 0
+    
+    for schedule_id, shot in persisted_shots.items():
+        try:
+            # Parse scheduled time
+            scheduled_time_str = shot.get("scheduled_time")
+            if not scheduled_time_str:
+                logger.warning(f"Skipping shot {schedule_id}: no scheduled_time")
+                continue
+            
+            scheduled_time = datetime.fromisoformat(scheduled_time_str.replace('Z', '+00:00'))
+            if scheduled_time.tzinfo is None:
+                scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+            
+            # Skip if time has passed
+            if scheduled_time <= now:
+                logger.info(f"Skipping expired shot {schedule_id} (scheduled for {scheduled_time_str})")
+                continue
+            
+            # Restore the shot
+            _scheduled_shots[schedule_id] = shot
+            
+            # Recreate the async task
+            profile_id = shot.get("profile_id")
+            preheat = shot.get("preheat", False)
+            shot_delay = (scheduled_time - now).total_seconds()
+            
+            # Create the execution task
+            async def execute_scheduled_shot(sid=schedule_id, pid=profile_id, ph=preheat, delay=shot_delay):
+                try:
+                    api = get_meticulous_api()
+                    
+                    # If preheat is enabled, start it 10 minutes before
+                    if ph:
+                        preheat_delay = delay - (PREHEAT_DURATION_MINUTES * 60)
+                        if preheat_delay > 0:
+                            await asyncio.sleep(preheat_delay)
+                            _scheduled_shots[sid]["status"] = "preheating"
+                            await _save_scheduled_shots()
+                            
+                            # Start preheat
+                            try:
+                                from meticulous.api_types import PartialSettings
+                                settings = PartialSettings(auto_preheat=1)
+                                api.update_setting(settings)
+                            except Exception as e:
+                                logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
+                            
+                            # Wait for remaining time until shot
+                            await asyncio.sleep(PREHEAT_DURATION_MINUTES * 60)
+                        else:
+                            # Not enough time for full preheat, start immediately
+                            _scheduled_shots[sid]["status"] = "preheating"
+                            await _save_scheduled_shots()
+                            try:
+                                from meticulous.api_types import PartialSettings
+                                settings = PartialSettings(auto_preheat=1)
+                                api.update_setting(settings)
+                            except Exception as e:
+                                logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
+                            await asyncio.sleep(delay)
+                    else:
+                        await asyncio.sleep(delay)
+                    
+                    _scheduled_shots[sid]["status"] = "running"
+                    await _save_scheduled_shots()
+                    
+                    # Load and run the profile (if profile_id was provided)
+                    if pid:
+                        load_result = api.load_profile_by_id(pid)
+                        if not (hasattr(load_result, 'error') and load_result.error):
+                            from meticulous.api_types import ActionType
+                            api.execute_action(ActionType.START)
+                            _scheduled_shots[sid]["status"] = "completed"
+                        else:
+                            _scheduled_shots[sid]["status"] = "failed"
+                            _scheduled_shots[sid]["error"] = load_result.error
+                    else:
+                        # Preheat only mode - mark as completed
+                        _scheduled_shots[sid]["status"] = "completed"
+                    
+                    await _save_scheduled_shots()
+                        
+                except asyncio.CancelledError:
+                    _scheduled_shots[sid]["status"] = "cancelled"
+                    await _save_scheduled_shots()
+                except Exception as e:
+                    logger.error(f"Scheduled shot {sid} failed: {e}")
+                    _scheduled_shots[sid]["status"] = "failed"
+                    _scheduled_shots[sid]["error"] = str(e)
+                    await _save_scheduled_shots()
+                finally:
+                    # Clean up task reference
+                    if sid in _scheduled_tasks:
+                        del _scheduled_tasks[sid]
+            
+            task = asyncio.create_task(execute_scheduled_shot())
+            _scheduled_tasks[schedule_id] = task
+            restored_count += 1
+            
+            logger.info(
+                f"Restored scheduled shot {schedule_id} for {scheduled_time_str} "
+                f"(profile: {profile_id}, preheat: {preheat})"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to restore scheduled shot {schedule_id}: {e}", exc_info=True)
+    
+    if restored_count > 0:
+        logger.info(f"Restored {restored_count} scheduled shot(s) from persistence")
 
 
 @app.get("/api/machine/status")
@@ -5746,6 +5992,9 @@ async def schedule_shot(request: Request):
         }
         _scheduled_shots[schedule_id] = scheduled_shot
         
+        # Persist to disk
+        await _save_scheduled_shots()
+        
         logger.info(
             f"Scheduling shot: {schedule_id}",
             extra={
@@ -5768,6 +6017,7 @@ async def schedule_shot(request: Request):
                     if preheat_delay > 0:
                         await asyncio.sleep(preheat_delay)
                         _scheduled_shots[schedule_id]["status"] = "preheating"
+                        await _save_scheduled_shots()
                         
                         # Start preheat
                         try:
@@ -5782,6 +6032,7 @@ async def schedule_shot(request: Request):
                     else:
                         # Not enough time for full preheat, start immediately
                         _scheduled_shots[schedule_id]["status"] = "preheating"
+                        await _save_scheduled_shots()
                         try:
                             from meticulous.api_types import PartialSettings
                             settings = PartialSettings(auto_preheat=1)
@@ -5793,6 +6044,7 @@ async def schedule_shot(request: Request):
                     await asyncio.sleep(shot_delay)
                 
                 _scheduled_shots[schedule_id]["status"] = "running"
+                await _save_scheduled_shots()
                 
                 # Load and run the profile (if profile_id was provided)
                 if profile_id:
@@ -5801,19 +6053,24 @@ async def schedule_shot(request: Request):
                         from meticulous.api_types import ActionType
                         api.execute_action(ActionType.START)
                         _scheduled_shots[schedule_id]["status"] = "completed"
+                        await _save_scheduled_shots()
                     else:
                         _scheduled_shots[schedule_id]["status"] = "failed"
                         _scheduled_shots[schedule_id]["error"] = load_result.error
+                        await _save_scheduled_shots()
                 else:
                     # Preheat only mode - mark as completed
                     _scheduled_shots[schedule_id]["status"] = "completed"
+                    await _save_scheduled_shots()
                     
             except asyncio.CancelledError:
                 _scheduled_shots[schedule_id]["status"] = "cancelled"
+                await _save_scheduled_shots()
             except Exception as e:
                 logger.error(f"Scheduled shot {schedule_id} failed: {e}")
                 _scheduled_shots[schedule_id]["status"] = "failed"
                 _scheduled_shots[schedule_id]["error"] = str(e)
+                await _save_scheduled_shots()
             finally:
                 # Clean up task reference
                 if schedule_id in _scheduled_tasks:
@@ -5862,6 +6119,9 @@ async def cancel_scheduled_shot(schedule_id: str, request: Request):
         
         _scheduled_shots[schedule_id]["status"] = "cancelled"
         
+        # Persist to disk
+        await _save_scheduled_shots()
+        
         logger.info(
             f"Cancelled scheduled shot: {schedule_id}",
             extra={"request_id": request_id, "schedule_id": schedule_id}
@@ -5904,6 +6164,10 @@ async def list_scheduled_shots(request: Request):
         
         for schedule_id in to_remove:
             del _scheduled_shots[schedule_id]
+        
+        # Persist changes if any shots were removed
+        if to_remove:
+            await _save_scheduled_shots()
         
         return {
             "status": "success",
