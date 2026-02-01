@@ -3292,18 +3292,18 @@ def _determine_exit_trigger_hit(
             actual_value = end_weight
         elif trigger_type == "pressure":
             # For >= or >: we want to know if max reached the target
-            # For <= or <: we want to know if pressure dropped below target (use end or min)
+            # For <= or <: we want to know if pressure dropped below target (use end)
             if comparison in (">=", ">"):
                 actual_value = max_pressure
             else:  # <= or < or ==
-                actual_value = end_pressure if end_pressure > 0 else min_pressure
+                actual_value = end_pressure
         elif trigger_type == "flow":
             # For >= or >: we want to know if max reached the target
-            # For <= or <: we want to know if flow dropped below target (use end or min)
+            # For <= or <: we want to know if flow dropped below target (use end)
             if comparison in (">=", ">"):
                 actual_value = max_flow
             else:  # <= or < or ==
-                actual_value = end_flow if end_flow > 0 else min_flow
+                actual_value = end_flow
         
         # Evaluate comparison with small tolerance
         tolerance = 0.5 if trigger_type in ["time", "weight"] else 0.2
