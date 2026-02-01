@@ -266,3 +266,58 @@ The barista persona understands modern espresso techniques and will create profi
 ## Attribution & Credits
 
 MeticAI is built on the excellent Meticulous MCP project by twchad and its containerized fork by @manonstreet, which provides the essential interface for controlling the Meticulous Espresso Machine.
+
+## Data Persistence
+
+### Scheduled Shots Persistence
+
+MeticAI includes a robust persistence layer for scheduled shots to ensure reliability across server restarts.
+
+#### Features
+
+- **Automatic Persistence:** All scheduled shots are automatically saved to disk
+- **Crash Recovery:** Scheduled shots survive server crashes, deploys, and host reboots
+- **Smart Restoration:** On startup, pending shots are automatically restored and rescheduled
+- **Expired Shot Filtering:** Shots scheduled in the past are automatically skipped during restoration
+- **Atomic Writes:** File writes use atomic operations (temp file + rename) to prevent corruption
+- **Graceful Degradation:** Corrupt files are automatically backed up and ignored
+
+#### Implementation Details
+
+**Storage Location:**
+- Default: `/app/data/scheduled_shots.json`
+- Fallback: System temporary directory if default is not writable
+
+**Persisted Data:**
+- Only active shots (`scheduled` and `preheating` status) are saved
+- Completed, failed, and cancelled shots are not persisted
+- Each shot includes: `id`, `profile_id`, `scheduled_time`, `preheat`, `status`, `created_at`
+
+**Lifecycle:**
+1. **On Creation:** Shot is saved to disk immediately after scheduling
+2. **On Status Change:** Disk is updated when status changes (preheating → running → completed)
+3. **On Startup:** All persisted shots are loaded and validated
+4. **On Restoration:** Async tasks are recreated for pending shots with time remaining
+5. **On Cleanup:** Completed/cancelled shots older than 1 hour are removed from memory and disk
+
+**Error Handling:**
+- Corrupt JSON files are backed up with `.corrupt` extension
+- Permission errors fall back to temporary directory
+- Invalid data is logged and skipped
+- Missing files are treated as empty (no scheduled shots)
+
+#### Testing
+
+The persistence layer includes comprehensive test coverage:
+- Save and load operations
+- Active shot filtering
+- Missing file handling
+- Corrupt file recovery
+- Atomic write verification
+- Integration with scheduling endpoints
+
+Run persistence tests:
+```bash
+cd coffee-relay
+pytest test_main.py::TestScheduledShotsPersistence -v
+```
