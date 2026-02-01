@@ -4435,11 +4435,21 @@ async def analyze_shot(
                                 "key": getattr(stage, 'key', ''),
                                 "type": getattr(stage, 'type', 'unknown'),
                             }
-                            # Add dynamics
-                            for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation']:
-                                val = getattr(stage, attr, None)
-                                if val is not None:
-                                    stage_dict[attr] = val
+                            # Add dynamics - handle both direct attributes and dynamics object
+                            if hasattr(stage, 'dynamics') and stage.dynamics is not None:
+                                dynamics = stage.dynamics
+                                if hasattr(dynamics, 'points'):
+                                    stage_dict['dynamics_points'] = dynamics.points
+                                if hasattr(dynamics, 'over'):
+                                    stage_dict['dynamics_over'] = dynamics.over
+                                if hasattr(dynamics, 'interpolation'):
+                                    stage_dict['dynamics_interpolation'] = dynamics.interpolation
+                            else:
+                                # Fallback: check for direct attributes
+                                for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation']:
+                                    val = getattr(stage, attr, None)
+                                    if val is not None:
+                                        stage_dict[attr] = val
                             # Add exit triggers and limits
                             for attr in ['exit_triggers', 'limits']:
                                 val = getattr(stage, attr, None)
