@@ -2084,7 +2084,7 @@ class TestShotAnalysisHelpers:
         assert len(flow_points) > 0
         assert flow_points[0]["target_flow"] == 2.5
 
-    def test_generate_profile_target_curves_weight_based(self):
+    def test_generate_profile_target_curves_with_weight_based_dynamics(self):
         """Test generating target curves for weight-based dynamics."""
         from main import _generate_profile_target_curves
         
@@ -2134,8 +2134,8 @@ class TestShotAnalysisHelpers:
         # 40g should be at 30s (from shot data)
         assert abs(flow_points[2]["time"] - 30.0) < 1.0
 
-    def test_interpolate_weight_to_time(self):
-        """Test weight-to-time interpolation helper function."""
+    def test_interpolate_weight_to_time_with_edge_cases(self):
+        """Test weight-to-time interpolation helper function including edge cases."""
         from main import _interpolate_weight_to_time
         
         # Create sample weight-time pairs (weight, time)
