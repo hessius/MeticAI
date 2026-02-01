@@ -87,8 +87,15 @@ if command -v docker &> /dev/null; then
     if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ] || [ -f "compose.yml" ] || [ -f "compose.yaml" ]; then
         # Check if containers exist and stop them
         if try_docker_command "docker compose ps -q" || try_docker_command "docker-compose ps -q"; then
-            # Stop and remove containers (try both docker compose variants)
-            if try_docker_command "docker compose down" || try_docker_command "docker-compose down"; then
+            # Stop and remove containers (supports both: docker compose down || docker-compose down)
+            CONTAINERS_REMOVED=false
+            if try_docker_command "docker compose down"; then
+                CONTAINERS_REMOVED=true
+            elif try_docker_command "docker-compose down"; then
+                CONTAINERS_REMOVED=true
+            fi
+            
+            if [ "$CONTAINERS_REMOVED" = true ]; then
                 if [ "$USED_SUDO" = "true" ]; then
                     echo -e "${GREEN}✓ Containers stopped and removed (with sudo)${NC}"
                 else
