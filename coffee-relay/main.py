@@ -1204,8 +1204,13 @@ async def get_version_info(request: Request):
                         if 'version' in line.lower() and '=' in line:
                             mcp_version = line.split('=')[1].strip().strip('"').strip("'")
                             break
-                except Exception:
-                    pass
+                except Exception as e:
+                    # If we can't parse the MCP version, keep the default "unknown"
+                    logger.debug(
+                        f"Failed to parse MCP version from pyproject.toml: {e}",
+                        extra={"request_id": request_id},
+                        exc_info=True,
+                    )
         
         return {
             "meticai": meticai_version,
