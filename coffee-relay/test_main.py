@@ -2134,6 +2134,49 @@ class TestShotAnalysisHelpers:
         # 40g should be at 30s (from shot data)
         assert abs(flow_points[2]["time"] - 30.0) < 1.0
 
+    def test_interpolate_weight_to_time(self):
+        """Test weight-to-time interpolation helper function."""
+        from main import _interpolate_weight_to_time
+        
+        # Create sample weight-time pairs (weight, time)
+        weight_time_pairs = [
+            (0, 0.0),
+            (10, 5.0),
+            (20, 12.0),
+            (40, 30.0)
+        ]
+        
+        # Test exact match points
+        assert _interpolate_weight_to_time(0, weight_time_pairs) == 0.0
+        assert _interpolate_weight_to_time(10, weight_time_pairs) == 5.0
+        assert _interpolate_weight_to_time(20, weight_time_pairs) == 12.0
+        assert _interpolate_weight_to_time(40, weight_time_pairs) == 30.0
+        
+        # Test interpolation between points
+        # Weight 5 is halfway between 0 and 10, so time should be halfway between 0 and 5 = 2.5
+        result = _interpolate_weight_to_time(5, weight_time_pairs)
+        assert abs(result - 2.5) < 0.01
+        
+        # Weight 15 is halfway between 10 and 20, so time should be halfway between 5 and 12 = 8.5
+        result = _interpolate_weight_to_time(15, weight_time_pairs)
+        assert abs(result - 8.5) < 0.01
+        
+        # Weight 30 is halfway between 20 and 40, so time should be halfway between 12 and 30 = 21
+        result = _interpolate_weight_to_time(30, weight_time_pairs)
+        assert abs(result - 21.0) < 0.01
+        
+        # Test edge case: weight before first point
+        result = _interpolate_weight_to_time(-5, weight_time_pairs)
+        assert result == 0.0  # Should use first time
+        
+        # Test edge case: weight after last point
+        result = _interpolate_weight_to_time(50, weight_time_pairs)
+        assert result == 30.0  # Should use last time
+        
+        # Test edge case: empty list
+        result = _interpolate_weight_to_time(10, [])
+        assert result is None
+
     def test_local_analysis_includes_profile_target_curves(self):
         """Test that local analysis returns profile target curves."""
         from main import _perform_local_shot_analysis

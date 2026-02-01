@@ -3515,6 +3515,10 @@ def _analyze_stage_execution(
     return result
 
 
+# Shot stage status constants
+STAGE_STATUS_RETRACTING = "retracting"
+
+
 def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
     """Extract per-stage telemetry from shot data.
     
@@ -3533,7 +3537,7 @@ def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
         status = entry.get("status", "")
         
         # Skip retracting - it's machine cleanup
-        if status.lower().strip() == "retracting":
+        if status.lower().strip() == STAGE_STATUS_RETRACTING:
             continue
         
         if status and status != current_stage:
@@ -3596,6 +3600,42 @@ def _compute_stage_stats(entries: list) -> dict:
     }
 
 
+def _interpolate_weight_to_time(target_weight: float, weight_time_pairs: list[tuple[float, float]]) -> Optional[float]:
+    """Interpolate time value for a given weight using linear interpolation.
+    
+    Args:
+        target_weight: The weight value to find the corresponding time for
+        weight_time_pairs: List of (weight, time) tuples sorted by weight
+        
+    Returns:
+        Interpolated time value, or None if no data available
+    """
+    if not weight_time_pairs:
+        return None
+    
+    # Find bracketing weight values
+    for i in range(len(weight_time_pairs)):
+        weight_actual, time_actual = weight_time_pairs[i]
+        
+        if weight_actual >= target_weight:
+            if i == 0:
+                # Before first point, use first time
+                return time_actual
+            else:
+                # Interpolate between i-1 and i
+                weight_prev, time_prev = weight_time_pairs[i-1]
+                if weight_actual > weight_prev:
+                    # Linear interpolation
+                    weight_fraction = (target_weight - weight_prev) / (weight_actual - weight_prev)
+                    return time_prev + weight_fraction * (time_actual - time_prev)
+                else:
+                    # Same weight, use current time
+                    return time_actual
+            
+    # If not found, use last time (weight exceeds all actual weights)
+    return weight_time_pairs[-1][1]
+
+
 def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, shot_data: dict) -> list[dict]:
     """Generate target curves for profile overlay on shot chart.
     
@@ -3622,7 +3662,7 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
     
     for entry in data_entries:
         status = entry.get("status", "")
-        if not status or status.lower().strip() == "retracting":
+        if not status or status.lower().strip() == STAGE_STATUS_RETRACTING:
             continue
         
         time_sec = entry.get("time", 0) / 1000  # Convert to seconds
@@ -3783,31 +3823,7 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
                         dp_value = _safe_float(dp_value)
                     
                     # Find time corresponding to this weight using linear interpolation
-                    actual_time = None
-                    
-                    # Find bracketing weight values
-                    for i in range(len(weight_time_pairs)):
-                        weight_actual, time_actual = weight_time_pairs[i]
-                        
-                        if weight_actual >= dp_weight:
-                            if i == 0:
-                                # Before first point, use first time
-                                actual_time = time_actual
-                            else:
-                                # Interpolate between i-1 and i
-                                weight_prev, time_prev = weight_time_pairs[i-1]
-                                if weight_actual > weight_prev:
-                                    # Linear interpolation
-                                    weight_fraction = (dp_weight - weight_prev) / (weight_actual - weight_prev)
-                                    actual_time = time_prev + weight_fraction * (time_actual - time_prev)
-                                else:
-                                    # Same weight, use current time
-                                    actual_time = time_actual
-                            break
-                    
-                    # If not found, use last time (weight exceeds all actual weights)
-                    if actual_time is None and weight_time_pairs:
-                        actual_time = weight_time_pairs[-1][1]
+                    actual_time = _interpolate_weight_to_time(dp_weight, weight_time_pairs)
                     
                     if actual_time is not None:
                         point = {"time": round(actual_time, 2), "stage_name": stage_name}
