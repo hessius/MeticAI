@@ -5025,6 +5025,9 @@ class TestRunShotEndpoints:
         assert "machine_status" in data
         # Connection error should be captured in the status
         assert "error" in data["machine_status"] or "state" in data["machine_status"]
+
+    @patch('main.get_meticulous_api')
+    def test_machine_status_api_unavailable(self, mock_get_api, client):
         """Test machine status when API is not available."""
         mock_get_api.return_value = None
 
