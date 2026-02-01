@@ -66,8 +66,13 @@ echo -e "${YELLOW}[1/7] Stopping and removing Docker containers...${NC}"
 if command -v docker &> /dev/null; then
     # Check for running containers
     if docker compose ps -q &> /dev/null 2>&1 || docker-compose ps -q &> /dev/null 2>&1 || [ -f "docker-compose.yml" ]; then
+        # Try without sudo first (works on macOS and Linux with docker group)
         if docker compose down 2>/dev/null || docker-compose down 2>/dev/null; then
             echo -e "${GREEN}✓ Containers stopped and removed${NC}"
+            UNINSTALLED_ITEMS+=("Docker containers")
+        # Try with sudo on Linux if regular commands failed
+        elif [[ "$OSTYPE" != "darwin"* ]] && (sudo docker compose down 2>/dev/null || sudo docker-compose down 2>/dev/null); then
+            echo -e "${GREEN}✓ Containers stopped and removed (with sudo)${NC}"
             UNINSTALLED_ITEMS+=("Docker containers")
         else
             echo -e "${YELLOW}Warning: Could not stop containers (they may not be running)${NC}"
@@ -90,7 +95,13 @@ echo -e "${YELLOW}[2/7] Removing Docker images...${NC}"
 
 if command -v docker &> /dev/null; then
     # List MeticAI-related images (matches various naming patterns: meticai-, met-ai-, meticai-web-, etc.)
-    IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
+    # Try without sudo first
+    IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
+    
+    # If that failed and we're on Linux, try with sudo
+    if [ -z "$IMAGES" ] && [[ "$OSTYPE" != "darwin"* ]]; then
+        IMAGES=$(sudo docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
+    fi
     
     if [ -n "$IMAGES" ]; then
         echo "Found MeticAI images:"
@@ -100,9 +111,18 @@ if command -v docker &> /dev/null; then
         REMOVE_IMAGES=${REMOVE_IMAGES:-y}
         
         if [[ "$REMOVE_IMAGES" =~ ^[Yy]$ ]]; then
-            echo "$IMAGES" | xargs docker rmi -f 2>/dev/null || true
-            echo -e "${GREEN}✓ Docker images removed${NC}"
-            UNINSTALLED_ITEMS+=("Docker images")
+            # Try removing without sudo first
+            if echo "$IMAGES" | xargs docker rmi -f 2>/dev/null; then
+                echo -e "${GREEN}✓ Docker images removed${NC}"
+                UNINSTALLED_ITEMS+=("Docker images")
+            # Try with sudo on Linux if regular command failed
+            elif [[ "$OSTYPE" != "darwin"* ]] && echo "$IMAGES" | xargs sudo docker rmi -f 2>/dev/null; then
+                echo -e "${GREEN}✓ Docker images removed (with sudo)${NC}"
+                UNINSTALLED_ITEMS+=("Docker images")
+            else
+                echo -e "${YELLOW}Warning: Could not remove images${NC}"
+                KEPT_ITEMS+=("Docker images (removal failed)")
+            fi
         else
             echo -e "${YELLOW}Keeping Docker images${NC}"
             KEPT_ITEMS+=("Docker images (user choice)")
