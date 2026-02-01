@@ -1158,25 +1158,40 @@ async def get_version_info(request: Request):
                     repo_url_from_file = versions_data["repositories"]["meticulous-mcp"].get("repo_url")
                     if repo_url_from_file and repo_url_from_file != "unknown":
                         mcp_repo_url = repo_url_from_file
-            except Exception:
-                pass  # Continue with fallback methods
+            except Exception as e:
+                logger.debug(
+                    f"Failed to read MCP repo URL from .versions.json: {str(e)}",
+                    extra={"request_id": request_id}
+                )
         
         # If not found in .versions.json, try git remote from meticulous-source
         if mcp_repo_url == "https://github.com/manonstreet/meticulous-mcp" and mcp_source_dir.exists():
             git_dir = mcp_source_dir / ".git"
             if git_dir.exists():
                 try:
-                    result = subprocess.run(
-                        ["git", "config", "--get", "remote.origin.url"],
-                        cwd=mcp_source_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=5
+                    # Validate that mcp_source_dir is within expected bounds
+                    base_dir = Path(__file__).parent.parent.resolve()
+                    resolved_mcp_dir = mcp_source_dir.resolve()
+                    if not str(resolved_mcp_dir).startswith(str(base_dir)):
+                        logger.warning(
+                            f"MCP source directory is outside base directory: {resolved_mcp_dir}",
+                            extra={"request_id": request_id}
+                        )
+                    else:
+                        result = subprocess.run(
+                            ["git", "config", "--get", "remote.origin.url"],
+                            cwd=resolved_mcp_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        if result.returncode == 0 and result.stdout.strip():
+                            mcp_repo_url = result.stdout.strip()
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to read MCP repo URL from git remote: {str(e)}",
+                        extra={"request_id": request_id}
                     )
-                    if result.returncode == 0 and result.stdout.strip():
-                        mcp_repo_url = result.stdout.strip()
-                except Exception:
-                    pass  # Keep default fallback
         
         # Get MCP version from pyproject.toml
         if mcp_source_dir.exists():
