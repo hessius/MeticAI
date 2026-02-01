@@ -3129,11 +3129,11 @@ def _generate_execution_description(
     flow_delta = end_flow - start_flow
     if abs(flow_delta) > 0.3:
         if flow_delta > 0:
-            descriptions.append(f"flow increased from {start_flow:.1f} to {end_flow:.1f} ml/s")
+            descriptions.append(f"Flow increased from {start_flow:.1f} to {end_flow:.1f} ml/s")
         else:
-            descriptions.append(f"flow decreased from {start_flow:.1f} to {end_flow:.1f} ml/s")
+            descriptions.append(f"Flow decreased from {start_flow:.1f} to {end_flow:.1f} ml/s")
     elif max_flow > 0:
-        descriptions.append(f"flow steady at {(start_flow + end_flow) / 2:.1f} ml/s")
+        descriptions.append(f"Flow steady at {(start_flow + end_flow) / 2:.1f} ml/s")
     
     # Add weight info if significant
     if weight_gain > 1.0:
