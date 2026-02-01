@@ -4809,7 +4809,12 @@ class TestVersionEndpoint:
         
         data = response.json()
         # Should have all required keys even on error
-        # Verify it's cleared
+        assert "meticai" in data
+        assert "meticai_web" in data
+        assert "mcp_server" in data
+        assert "mcp_repo_url" in data
+
+        # Verify history can be retrieved and has expected structure
         response2 = client.get("/api/history")
         data = response2.json()
         # Should have minimal or no history in entries
