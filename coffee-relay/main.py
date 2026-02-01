@@ -3403,7 +3403,6 @@ def _determine_exit_trigger_hit(
     end_pressure = _safe_float(stage_data.get("end_pressure", 0))
     # Flow values for different comparison types
     max_flow = _safe_float(stage_data.get("max_flow", 0))
-    min_flow = _safe_float(stage_data.get("min_flow", 0))
     end_flow = _safe_float(stage_data.get("end_flow", 0))
     
     triggered = None
