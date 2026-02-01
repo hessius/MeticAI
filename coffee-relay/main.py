@@ -5761,7 +5761,11 @@ async def schedule_shot(request: Request):
         # Create async task to execute at scheduled time
         async def execute_scheduled_shot():
             try:
+                task_start_time = datetime.now(timezone.utc)
                 api = get_meticulous_api()
+                
+                # Track whether we've already waited the full delay
+                full_delay_waited = False
                 
                 # If preheat is enabled, start it 10 minutes before
                 if preheat:
@@ -5780,6 +5784,7 @@ async def schedule_shot(request: Request):
                         
                         # Wait for remaining time until shot
                         await asyncio.sleep(PREHEAT_DURATION_MINUTES * 60)
+                        full_delay_waited = True
                     else:
                         # Not enough time for full preheat, start immediately
                         _scheduled_shots[schedule_id]["status"] = "preheating"
@@ -5789,9 +5794,12 @@ async def schedule_shot(request: Request):
                             api.update_setting(settings)
                         except Exception as e:
                             logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
-                        await asyncio.sleep(shot_delay)
-                else:
-                    await asyncio.sleep(shot_delay)
+                
+                # If we haven't already waited the full delay, calculate remaining time
+                if not full_delay_waited:
+                    elapsed = (datetime.now(timezone.utc) - task_start_time).total_seconds()
+                    remaining_delay = max(0, shot_delay - elapsed)
+                    await asyncio.sleep(remaining_delay)
                 
                 _scheduled_shots[schedule_id]["status"] = "running"
                 
