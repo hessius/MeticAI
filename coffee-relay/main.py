@@ -113,6 +113,9 @@ MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
 # Pre-compiled for better performance when called repeatedly
 VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 
+# Shot stage status constants
+STAGE_STATUS_RETRACTING = "retracting"
+
 
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
@@ -1175,12 +1178,13 @@ async def get_version_info(request: Request):
             git_dir = mcp_source_dir / ".git"
             if git_dir.exists():
                 try:
-                    # Validate that mcp_source_dir is within expected bounds
+                    # Validate that mcp_source_dir is within expected bounds to prevent path traversal
                     base_dir = Path(__file__).parent.parent.resolve()
                     resolved_mcp_dir = mcp_source_dir.resolve()
                     if not str(resolved_mcp_dir).startswith(str(base_dir)):
+                        # Security: Skip subprocess call if path is outside expected bounds
                         logger.warning(
-                            f"MCP source directory is outside base directory: {resolved_mcp_dir}",
+                            f"Skipping git remote check: MCP source directory is outside base directory: {resolved_mcp_dir}",
                             extra={"request_id": request_id}
                         )
                     else:
@@ -3400,11 +3404,9 @@ def _determine_exit_trigger_hit(
     end_weight = _safe_float(stage_data.get("end_weight", 0))
     # Pressure values for different comparison types
     max_pressure = _safe_float(stage_data.get("max_pressure", 0))
-    min_pressure = _safe_float(stage_data.get("min_pressure", 0))
     end_pressure = _safe_float(stage_data.get("end_pressure", 0))
     # Flow values for different comparison types
     max_flow = _safe_float(stage_data.get("max_flow", 0))
-    min_flow = _safe_float(stage_data.get("min_flow", 0))
     end_flow = _safe_float(stage_data.get("end_flow", 0))
     
     triggered = None
@@ -3649,10 +3651,6 @@ def _analyze_stage_execution(
         }
     
     return result
-
-
-# Shot stage status constants
-STAGE_STATUS_RETRACTING = "retracting"
 
 
 def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
@@ -5465,7 +5463,13 @@ Remember: NO information should be lost in this conversion!"""
 # Run Shot Endpoints
 # ============================================================================
 
-# Scheduled shots storage (in-memory for now, could be persisted)
+# Scheduled shots storage.
+# NOTE: These dictionaries are in-memory only. Any scheduled shots and their
+# associated asyncio tasks will be lost if the server process restarts
+# (e.g., crash, deploy, or host reboot). This means shots scheduled for the
+# future will not execute after a restart. For production-grade durability,
+# consider persisting scheduled shots to disk or a database and recreating
+# tasks on application startup.
 _scheduled_shots: dict = {}
 _scheduled_tasks: dict = {}
 
@@ -5756,7 +5760,11 @@ async def schedule_shot(request: Request):
         # Create async task to execute at scheduled time
         async def execute_scheduled_shot():
             try:
+                task_start_time = datetime.now(timezone.utc)
                 api = get_meticulous_api()
+                
+                # Track whether we've already waited the full delay
+                full_delay_waited = False
                 
                 # If preheat is enabled, start it 10 minutes before
                 if preheat:
@@ -5775,6 +5783,7 @@ async def schedule_shot(request: Request):
                         
                         # Wait for remaining time until shot
                         await asyncio.sleep(PREHEAT_DURATION_MINUTES * 60)
+                        full_delay_waited = True
                     else:
                         # Not enough time for full preheat, start immediately
                         _scheduled_shots[schedule_id]["status"] = "preheating"
@@ -5784,9 +5793,12 @@ async def schedule_shot(request: Request):
                             api.update_setting(settings)
                         except Exception as e:
                             logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
-                        await asyncio.sleep(shot_delay)
-                else:
-                    await asyncio.sleep(shot_delay)
+                
+                # If we haven't already waited the full delay, calculate remaining time
+                if not full_delay_waited:
+                    elapsed = (datetime.now(timezone.utc) - task_start_time).total_seconds()
+                    remaining_delay = max(0, shot_delay - elapsed)
+                    await asyncio.sleep(remaining_delay)
                 
                 _scheduled_shots[schedule_id]["status"] = "running"
                 
