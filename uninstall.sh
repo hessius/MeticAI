@@ -59,45 +59,53 @@ UNINSTALLED_ITEMS=()
 KEPT_ITEMS=()
 FAILED_ITEMS=()
 
+# Helper function: Try docker command with and without sudo
+# Returns: 0 on success, 1 on failure
+# Sets USED_SUDO to "true" if sudo was needed
+try_docker_command() {
+    local cmd="$1"
+    USED_SUDO="false"
+    
+    # Try without sudo first (works on macOS and Linux with docker group)
+    if eval "$cmd" 2>/dev/null; then
+        return 0
+    # Try with sudo on Linux if regular command failed
+    elif [[ "$OSTYPE" != "darwin"* ]] && eval "sudo $cmd" 2>/dev/null; then
+        USED_SUDO="true"
+        return 0
+    else
+        return 1
+    fi
+}
+
 # 1. Stop and remove Docker containers
 ################################################################################
 echo -e "${YELLOW}[1/7] Stopping and removing Docker containers...${NC}"
 
 if command -v docker &> /dev/null; then
-    # Check for running containers (try with and without sudo on Linux)
-    HAS_CONTAINERS=false
-    HAS_COMPOSE_FILE=false
-    # Only attempt to query docker compose status if a compose file exists
+    # Only attempt docker compose commands if a compose file exists
     if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ] || [ -f "compose.yml" ] || [ -f "compose.yaml" ]; then
-        HAS_COMPOSE_FILE=true
-    fi
-
-    if [ "$HAS_COMPOSE_FILE" = true ]; then
-        # Try without sudo first (works on macOS and Linux with docker group)
-        if docker compose ps -q >/dev/null 2>&1 || docker-compose ps -q >/dev/null 2>&1; then
-            HAS_CONTAINERS=true
-        # Try with sudo on Linux if regular commands failed
-        elif [[ "$OSTYPE" != "darwin"* ]] && (sudo docker compose ps -q >/dev/null 2>&1 || sudo docker-compose ps -q >/dev/null 2>&1); then
-            HAS_CONTAINERS=true
-        fi
-    fi
-    
-    if [ "$HAS_CONTAINERS" = true ]; then
-        # Try without sudo first (works on macOS and Linux with docker group)
-        if docker compose down 2>/dev/null || docker-compose down 2>/dev/null; then
-            echo -e "${GREEN}✓ Containers stopped and removed${NC}"
-            UNINSTALLED_ITEMS+=("Docker containers")
-        # Try with sudo on Linux if regular commands failed
-        elif [[ "$OSTYPE" != "darwin"* ]] && (sudo docker compose down 2>/dev/null || sudo docker-compose down 2>/dev/null); then
-            echo -e "${GREEN}✓ Containers stopped and removed (with sudo)${NC}"
-            UNINSTALLED_ITEMS+=("Docker containers")
+        # Check if containers exist
+        if try_docker_command "docker compose ps -q >/dev/null 2>&1" || try_docker_command "docker-compose ps -q >/dev/null 2>&1"; then
+            # Stop and remove containers
+            if try_docker_command "docker compose down" || try_docker_command "docker-compose down"; then
+                if [ "$USED_SUDO" = "true" ]; then
+                    echo -e "${GREEN}✓ Containers stopped and removed (with sudo)${NC}"
+                else
+                    echo -e "${GREEN}✓ Containers stopped and removed${NC}"
+                fi
+                UNINSTALLED_ITEMS+=("Docker containers")
+            else
+                echo -e "${YELLOW}Warning: Could not stop containers (they may not be running)${NC}"
+                KEPT_ITEMS+=("Docker containers (not found)")
+            fi
         else
-            echo -e "${YELLOW}Warning: Could not stop containers (they may not be running)${NC}"
+            echo -e "${YELLOW}No containers found or not running${NC}"
             KEPT_ITEMS+=("Docker containers (not found)")
         fi
     else
-        echo -e "${YELLOW}No docker-compose.yml found or containers not running${NC}"
-        KEPT_ITEMS+=("Docker containers (not found)")
+        echo -e "${YELLOW}No docker-compose.yml found${NC}"
+        KEPT_ITEMS+=("Docker containers (no compose file)")
     fi
 else
     echo -e "${YELLOW}Docker not found, skipping container cleanup${NC}"
