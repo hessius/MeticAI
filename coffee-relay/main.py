@@ -31,7 +31,7 @@ except (PermissionError, OSError) as e:
         f"using temporary directory: {log_dir}",
         extra={"original_error": str(e)}
     )
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1276,6 +1276,112 @@ async def get_version_info(request: Request):
             "meticai_web": "unknown", 
             "mcp_server": "unknown",
             "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp"
+        }
+
+
+# Changelog cache
+_changelog_cache: Optional[dict] = None
+_changelog_cache_time: Optional[datetime] = None
+CHANGELOG_CACHE_DURATION = timedelta(hours=1)  # Cache for 1 hour
+
+
+@app.get("/api/changelog")
+async def get_changelog(request: Request):
+    """Get release notes from GitHub.
+    
+    Returns cached release notes if available and fresh,
+    otherwise fetches from GitHub API and caches the result.
+    """
+    global _changelog_cache, _changelog_cache_time
+    request_id = request.state.request_id
+    
+    try:
+        # Check if we have a valid cache
+        now = datetime.now(timezone.utc)
+        if _changelog_cache and _changelog_cache_time:
+            cache_age = now - _changelog_cache_time
+            if cache_age < CHANGELOG_CACHE_DURATION:
+                logger.debug(
+                    f"Returning cached changelog (age: {cache_age.total_seconds():.0f}s)",
+                    extra={"request_id": request_id}
+                )
+                return _changelog_cache
+        
+        # Fetch from GitHub API
+        import httpx
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.github.com/repos/hessius/MeticAI/releases",
+                params={"per_page": 10},
+                headers={"Accept": "application/vnd.github.v3+json"},
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                releases = response.json()
+                changelog_data = {
+                    "releases": [
+                        {
+                            "version": release.get("tag_name", ""),
+                            "date": release.get("published_at", "")[:10] if release.get("published_at") else "",
+                            "body": release.get("body", "No release notes available.")
+                        }
+                        for release in releases
+                    ],
+                    "cached_at": now.isoformat()
+                }
+                
+                # Update cache
+                _changelog_cache = changelog_data
+                _changelog_cache_time = now
+                
+                logger.info(
+                    f"Fetched and cached {len(releases)} releases from GitHub",
+                    extra={"request_id": request_id}
+                )
+                
+                return changelog_data
+            elif response.status_code in (403, 429):
+                # Rate limited
+                logger.warning(
+                    f"GitHub API rate limit reached: {response.status_code}",
+                    extra={"request_id": request_id}
+                )
+                # Return cached data if available, even if stale
+                if _changelog_cache:
+                    return _changelog_cache
+                return {
+                    "releases": [],
+                    "error": "GitHub API rate limit reached. Please try again later.",
+                    "cached_at": None
+                }
+            else:
+                logger.error(
+                    f"GitHub API error: {response.status_code}",
+                    extra={"request_id": request_id}
+                )
+                if _changelog_cache:
+                    return _changelog_cache
+                return {
+                    "releases": [],
+                    "error": f"Failed to fetch releases (status {response.status_code})",
+                    "cached_at": None
+                }
+                
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch changelog: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        # Return cached data if available
+        if _changelog_cache:
+            return _changelog_cache
+        return {
+            "releases": [],
+            "error": str(e),
+            "cached_at": None
         }
 
 
