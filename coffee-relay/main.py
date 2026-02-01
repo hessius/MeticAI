@@ -1175,12 +1175,13 @@ async def get_version_info(request: Request):
             git_dir = mcp_source_dir / ".git"
             if git_dir.exists():
                 try:
-                    # Validate that mcp_source_dir is within expected bounds
+                    # Validate that mcp_source_dir is within expected bounds to prevent path traversal
                     base_dir = Path(__file__).parent.parent.resolve()
                     resolved_mcp_dir = mcp_source_dir.resolve()
                     if not str(resolved_mcp_dir).startswith(str(base_dir)):
+                        # Security: Skip subprocess call if path is outside expected bounds
                         logger.warning(
-                            f"MCP source directory is outside base directory: {resolved_mcp_dir}",
+                            f"Skipping git remote check: MCP source directory is outside base directory: {resolved_mcp_dir}",
                             extra={"request_id": request_id}
                         )
                     else:
