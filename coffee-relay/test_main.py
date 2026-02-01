@@ -2053,7 +2053,16 @@ class TestShotAnalysisHelpers:
             "Main": (5.0, 25.0)
         }
         
-        curves = _generate_profile_target_curves(profile_data, shot_stage_times)
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0}, "status": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0}, "status": "Bloom"},
+                {"time": 6000, "shot": {"weight": 5.0, "pressure": 9.0}, "status": "Main"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0}, "status": "Main"}
+            ]
+        }
+        
+        curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
         
         assert isinstance(curves, list)
         assert len(curves) > 0
@@ -2082,7 +2091,14 @@ class TestShotAnalysisHelpers:
             "Ramp Up": (0.0, 5.0)
         }
         
-        curves = _generate_profile_target_curves(profile_data, shot_stage_times)
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0}, "status": "Ramp Up"},
+                {"time": 5000, "shot": {"weight": 5.0, "pressure": 9.0}, "status": "Ramp Up"}
+            ]
+        }
+        
+        curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
         
         # Should have at least 2 points (start and end)
         pressure_points = [c for c in curves if "target_pressure" in c]
@@ -2112,13 +2128,22 @@ class TestShotAnalysisHelpers:
             "Flow Stage": (0.0, 20.0)
         }
         
-        curves = _generate_profile_target_curves(profile_data, shot_stage_times)
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "flow": 2.5}, "status": "Flow Stage"},
+                {"time": 20000, "shot": {"weight": 36.0, "flow": 2.5}, "status": "Flow Stage"}
+            ]
+        }
+        
+        curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
         
         # Should have target_flow values
         flow_points = [c for c in curves if "target_flow" in c]
         assert len(flow_points) > 0
         assert flow_points[0]["target_flow"] == 2.5
 
+    def test_generate_profile_target_curves_with_weight_based_dynamics(self):
+        """Test generating target curves for weight-based dynamics."""
     def test_generate_profile_target_curves_weight_based_dynamics(self):
         """Test that weight-based dynamics stages are skipped in target curve generation.
         
@@ -2131,6 +2156,10 @@ class TestShotAnalysisHelpers:
         profile_data = {
             "stages": [
                 {
+                    "name": "Ramp",
+                    "type": "flow",
+                    "dynamics_points": [[0, 2.0], [20, 3.0], [40, 2.5]],  # Flow changes by weight
+                    "dynamics_over": "weight"
                     "name": "Weight-Based Pressure",
                     "type": "pressure",
                     "dynamics_points": [[0, 2.0], [20, 9.0], [40, 6.0]],
@@ -2147,6 +2176,81 @@ class TestShotAnalysisHelpers:
         }
         
         shot_stage_times = {
+            "Ramp": (0.0, 30.0)
+        }
+        
+        # Shot data with weight progression
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "flow": 2.0}, "status": "Ramp"},
+                {"time": 10000, "shot": {"weight": 10, "flow": 2.3}, "status": "Ramp"},
+                {"time": 20000, "shot": {"weight": 20, "flow": 2.8}, "status": "Ramp"},
+                {"time": 25000, "shot": {"weight": 30, "flow": 2.7}, "status": "Ramp"},
+                {"time": 30000, "shot": {"weight": 40, "flow": 2.5}, "status": "Ramp"}
+            ]
+        }
+        
+        curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
+        
+        # Should have target_flow values
+        flow_points = [c for c in curves if "target_flow" in c]
+        assert len(flow_points) == 3  # Three dynamics points
+        
+        # Verify values are correct
+        assert flow_points[0]["target_flow"] == 2.0  # At 0g
+        assert flow_points[1]["target_flow"] == 3.0  # At 20g
+        assert flow_points[2]["target_flow"] == 2.5  # At 40g
+        
+        # Verify times are mapped correctly (roughly)
+        # 0g should be at time 0
+        assert flow_points[0]["time"] == 0.0
+        # 20g should be around 20s (from shot data)
+        assert abs(flow_points[1]["time"] - 20.0) < 1.0
+        # 40g should be at 30s (from shot data)
+        assert abs(flow_points[2]["time"] - 30.0) < 1.0
+
+    def test_interpolate_weight_to_time_with_edge_cases(self):
+        """Test weight-to-time interpolation helper function including edge cases."""
+        from main import _interpolate_weight_to_time
+        
+        # Create sample weight-time pairs (weight, time)
+        weight_time_pairs = [
+            (0, 0.0),
+            (10, 5.0),
+            (20, 12.0),
+            (40, 30.0)
+        ]
+        
+        # Test exact match points
+        assert _interpolate_weight_to_time(0, weight_time_pairs) == 0.0
+        assert _interpolate_weight_to_time(10, weight_time_pairs) == 5.0
+        assert _interpolate_weight_to_time(20, weight_time_pairs) == 12.0
+        assert _interpolate_weight_to_time(40, weight_time_pairs) == 30.0
+        
+        # Test interpolation between points
+        # Weight 5 is halfway between 0 and 10, so time should be halfway between 0 and 5 = 2.5
+        result = _interpolate_weight_to_time(5, weight_time_pairs)
+        assert abs(result - 2.5) < 0.01
+        
+        # Weight 15 is halfway between 10 and 20, so time should be halfway between 5 and 12 = 8.5
+        result = _interpolate_weight_to_time(15, weight_time_pairs)
+        assert abs(result - 8.5) < 0.01
+        
+        # Weight 30 is halfway between 20 and 40, so time should be halfway between 12 and 30 = 21
+        result = _interpolate_weight_to_time(30, weight_time_pairs)
+        assert abs(result - 21.0) < 0.01
+        
+        # Test edge case: weight before first point
+        result = _interpolate_weight_to_time(-5, weight_time_pairs)
+        assert result == 0.0  # Should use first time
+        
+        # Test edge case: weight after last point
+        result = _interpolate_weight_to_time(50, weight_time_pairs)
+        assert result == 30.0  # Should use last time
+        
+        # Test edge case: empty list
+        result = _interpolate_weight_to_time(10, [])
+        assert result is None
             "Weight-Based Pressure": (0.0, 15.0),
             "Time-Based Flow": (15.0, 30.0)
         }

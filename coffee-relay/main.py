@@ -3515,6 +3515,10 @@ def _analyze_stage_execution(
     return result
 
 
+# Shot stage status constants
+STAGE_STATUS_RETRACTING = "retracting"
+
+
 def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
     """Extract per-stage telemetry from shot data.
     
@@ -3533,7 +3537,7 @@ def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
         status = entry.get("status", "")
         
         # Skip retracting - it's machine cleanup
-        if status.lower().strip() == "retracting":
+        if status.lower().strip() == STAGE_STATUS_RETRACTING:
             continue
         
         if status and status != current_stage:
@@ -3596,15 +3600,53 @@ def _compute_stage_stats(entries: list) -> dict:
     }
 
 
-def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict) -> list[dict]:
+def _interpolate_weight_to_time(target_weight: float, weight_time_pairs: list[tuple[float, float]]) -> Optional[float]:
+    """Interpolate time value for a given weight using linear interpolation.
+    
+    Args:
+        target_weight: The weight value to find the corresponding time for
+        weight_time_pairs: List of (weight, time) tuples sorted by weight
+        
+    Returns:
+        Interpolated time value, or None if no data available
+    """
+    if not weight_time_pairs:
+        return None
+    
+    # Find bracketing weight values
+    for i in range(len(weight_time_pairs)):
+        weight_actual, time_actual = weight_time_pairs[i]
+        
+        if weight_actual >= target_weight:
+            if i == 0:
+                # Before first point, use first time
+                return time_actual
+            else:
+                # Interpolate between i-1 and i
+                weight_prev, time_prev = weight_time_pairs[i-1]
+                if weight_actual > weight_prev:
+                    # Linear interpolation
+                    weight_fraction = (target_weight - weight_prev) / (weight_actual - weight_prev)
+                    return time_prev + weight_fraction * (time_actual - time_prev)
+                else:
+                    # Same weight, use current time
+                    return time_actual
+            
+    # If not found, use last time (weight exceeds all actual weights)
+    return weight_time_pairs[-1][1]
+
+
+def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, shot_data: dict) -> list[dict]:
     """Generate target curves for profile overlay on shot chart.
     
     Creates data points representing what the profile was targeting at each time point.
     Uses actual shot stage times to align the profile curves with the shot execution.
+    Supports both time-based and weight-based dynamics.
     
     Args:
         profile_data: The profile configuration
         shot_stage_times: Dict mapping stage names to (start_time, end_time) tuples
+        shot_data: The complete shot data including telemetry entries
         
     Returns:
         List of data points: [{time, target_pressure, target_flow, stage_name}, ...]
@@ -3612,6 +3654,27 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict) 
     stages = profile_data.get("stages", [])
     variables = profile_data.get("variables", [])
     data_points = []
+    
+    # Build weight-to-time mappings for each stage from shot data
+    # This enables weight-based dynamics interpolation
+    stage_weight_to_time = {}
+    data_entries = shot_data.get("data", [])
+    
+    for entry in data_entries:
+        status = entry.get("status", "")
+        if not status or status.lower().strip() == STAGE_STATUS_RETRACTING:
+            continue
+        
+        time_sec = entry.get("time", 0) / 1000  # Convert to seconds
+        weight = entry.get("shot", {}).get("weight", 0)
+        
+        # Normalize stage name for matching
+        normalized_status = status.lower().strip()
+        
+        if normalized_status not in stage_weight_to_time:
+            stage_weight_to_time[normalized_status] = []
+        
+        stage_weight_to_time[normalized_status].append((weight, time_sec))
     
     for stage in stages:
         stage_name = stage.get("name", "")
@@ -3702,6 +3765,74 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict) 
                         point["target_flow"] = round(dp_value, 1)
                         
                     data_points.append(point)
+        
+        # For weight-based dynamics, map weight values to time using actual shot data
+        elif dynamics_over == "weight":
+            # Get weight-to-time mapping for this stage
+            stage_key_normalized = None
+            for identifier in identifiers:
+                if identifier in stage_weight_to_time:
+                    stage_key_normalized = identifier
+                    break
+            
+            if not stage_key_normalized or not stage_weight_to_time[stage_key_normalized]:
+                # No weight data available for this stage
+                continue
+            
+            weight_time_pairs = stage_weight_to_time[stage_key_normalized]
+            
+            # Sort by weight to enable interpolation
+            weight_time_pairs.sort(key=lambda x: x[0])
+            
+            if len(dynamics_points) == 1:
+                # Constant value throughout stage
+                value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+                
+                # Resolve variable if needed
+                if isinstance(value, str) and value.startswith('$'):
+                    resolved, _ = _resolve_variable(value, variables)
+                    value = _safe_float(resolved)
+                else:
+                    value = _safe_float(value)
+                
+                # Add start and end points
+                point_start = {"time": round(stage_start, 2), "stage_name": stage_name}
+                point_end = {"time": round(stage_end, 2), "stage_name": stage_name}
+                
+                if stage_type == "pressure":
+                    point_start["target_pressure"] = round(value, 1)
+                    point_end["target_pressure"] = round(value, 1)
+                elif stage_type == "flow":
+                    point_start["target_flow"] = round(value, 1)
+                    point_end["target_flow"] = round(value, 1)
+                
+                data_points.append(point_start)
+                data_points.append(point_end)
+            else:
+                # Multiple points - interpolate weight values to time
+                # dynamics_points format: [[weight1, value1], [weight2, value2], ...]
+                for dp in dynamics_points:
+                    dp_weight = dp[0]
+                    dp_value = dp[1] if len(dp) > 1 else dp[0]
+                    
+                    # Resolve variable if needed
+                    if isinstance(dp_value, str) and dp_value.startswith('$'):
+                        resolved, _ = _resolve_variable(dp_value, variables)
+                        dp_value = _safe_float(resolved)
+                    else:
+                        dp_value = _safe_float(dp_value)
+                    
+                    # Find time corresponding to this weight using linear interpolation
+                    actual_time = _interpolate_weight_to_time(dp_weight, weight_time_pairs)
+                    
+                    if actual_time is not None:
+                        point = {"time": round(actual_time, 2), "stage_name": stage_name}
+                        if stage_type == "pressure":
+                            point["target_pressure"] = round(dp_value, 1)
+                        elif stage_type == "flow":
+                            point["target_flow"] = round(dp_value, 1)
+                        
+                        data_points.append(point)
     
     # Sort by time
     data_points.sort(key=lambda x: x["time"])
@@ -3757,7 +3888,7 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
         shot_stage_times[stage_name] = (start_time, end_time)
     
     # Generate profile target curves for chart overlay
-    profile_target_curves = _generate_profile_target_curves(profile_data, shot_stage_times)
+    profile_target_curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
     
     # Profile stages
     profile_stages = profile_data.get("stages", [])
