@@ -5078,6 +5078,12 @@ async def start_preheat(request: Request):
         
         api = get_meticulous_api()
         
+        if api is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Meticulous machine not connected"
+            )
+        
         # Enable auto_preheat setting and trigger it
         # The Meticulous machine handles preheat via the settings
         try:
