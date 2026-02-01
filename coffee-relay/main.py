@@ -15,6 +15,7 @@ from pathlib import Path
 import uuid
 import time
 import tempfile
+import re
 from logging_config import setup_logging, get_logger
 
 # Initialize logging system with environment-aware defaults
@@ -1154,12 +1155,12 @@ async def get_version_info(request: Request):
             if pyproject.exists():
                 try:
                     content = pyproject.read_text()
-                    for line in content.split('\n'):
-                        if 'version' in line.lower() and '=' in line:
-                            mcp_version = line.split('=')[1].strip().strip('"').strip("'")
-                            break
-                except Exception:
-                    pass
+                    # Look for version = "x.y.z" pattern in pyproject.toml
+                    version_match = re.search(r'^\s*version\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+                    if version_match:
+                        mcp_version = version_match.group(1)
+                except Exception as e:
+                    logger.debug(f"Failed to read version from pyproject.toml: {e}")
             
             # Fallback to setup.py if version not found in pyproject.toml
             if mcp_version == "unknown":
@@ -1167,18 +1168,12 @@ async def get_version_info(request: Request):
                 if setup_py.exists():
                     try:
                         content = setup_py.read_text()
-                        # Look for version= in setup() call
-                        for line in content.split('\n'):
-                            if 'version' in line.lower() and '=' in line and not line.strip().startswith('#'):
-                                # Extract version from patterns like: version="1.0.0" or version='1.0.0'
-                                if '"' in line or "'" in line:
-                                    parts = line.split('=', 1)
-                                    if len(parts) == 2:
-                                        version_part = parts[1].strip().rstrip(',')
-                                        mcp_version = version_part.strip('"').strip("'")
-                                        break
-                    except Exception:
-                        pass
+                        # Look for version="x.y.z" or version='x.y.z' in setup() call
+                        version_match = re.search(r'^\s*version\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+                        if version_match:
+                            mcp_version = version_match.group(1)
+                    except Exception as e:
+                        logger.debug(f"Failed to read version from setup.py: {e}")
         
         return {
             "meticai": meticai_version,
