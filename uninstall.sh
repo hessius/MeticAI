@@ -61,19 +61,25 @@ FAILED_ITEMS=()
 
 # Helper function: Try docker command with and without sudo
 # Returns: 0 on success, 1 on failure
-# Sets USED_SUDO to "true" if sudo was needed (reset to "false" on each call)
+# Sets USED_SUDO to "true" if sudo was needed
+# Note: Preserves existing USED_SUDO=true state to track sudo across multiple calls
 try_docker_command() {
     local cmd="$1"
+    local prev_used_sudo="$USED_SUDO"
     USED_SUDO="false"
     
     # Try without sudo first (works on macOS and Linux with docker group)
     if eval "$cmd" 2>/dev/null; then
+        # Preserve previous sudo state if it was true
+        [ "$prev_used_sudo" = "true" ] && USED_SUDO="true"
         return 0
     # Try with sudo on Linux if regular command failed
     elif [[ "$OSTYPE" != "darwin"* ]] && eval "sudo $cmd" 2>/dev/null; then
         USED_SUDO="true"
         return 0
     else
+        # Preserve previous sudo state if it was true
+        [ "$prev_used_sudo" = "true" ] && USED_SUDO="true"
         return 1
     fi
 }
