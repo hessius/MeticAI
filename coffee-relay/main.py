@@ -1229,23 +1229,18 @@ async def get_version_info(request: Request):
                         version_match = VERSION_PATTERN.search(content)
                         if version_match:
                             mcp_version = version_match.group(1)
+                        else:
+                            # Fallback to line-by-line parsing if regex doesn't match
+                            for line in content.split('\n'):
+                                if 'version' in line.lower() and '=' in line:
+                                    mcp_version = line.split('=')[1].strip().strip('"').strip("'")
+                                    break
                     except Exception as e:
                         logger.debug(
                             f"Failed to read version from setup.py: {str(e)}",
                             extra={"request_id": request_id},
                             exc_info=True
                         )
-                    for line in content.split('\n'):
-                        if 'version' in line.lower() and '=' in line:
-                            mcp_version = line.split('=')[1].strip().strip('"').strip("'")
-                            break
-                except Exception as e:
-                    # If we can't parse the MCP version, keep the default "unknown"
-                    logger.debug(
-                        f"Failed to parse MCP version from pyproject.toml: {e}",
-                        extra={"request_id": request_id},
-                        exc_info=True,
-                    )
         
         return {
             "meticai": meticai_version,
