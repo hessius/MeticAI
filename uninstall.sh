@@ -66,10 +66,20 @@ echo -e "${YELLOW}[1/7] Stopping and removing Docker containers...${NC}"
 if command -v docker &> /dev/null; then
     # Check for running containers (try with and without sudo on Linux)
     HAS_CONTAINERS=false
-    if docker compose ps -q &> /dev/null || docker-compose ps -q &> /dev/null || [ -f "docker-compose.yml" ]; then
-        HAS_CONTAINERS=true
-    elif [[ "$OSTYPE" != "darwin"* ]] && (sudo docker compose ps -q &> /dev/null || sudo docker-compose ps -q &> /dev/null); then
-        HAS_CONTAINERS=true
+    HAS_COMPOSE_FILE=false
+    # Only attempt to query docker compose status if a compose file exists
+    if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ] || [ -f "compose.yml" ] || [ -f "compose.yaml" ]; then
+        HAS_COMPOSE_FILE=true
+    fi
+
+    if [ "$HAS_COMPOSE_FILE" = true ]; then
+        # Try without sudo first (works on macOS and Linux with docker group)
+        if docker compose ps -q >/dev/null 2>&1 || docker-compose ps -q >/dev/null 2>&1; then
+            HAS_CONTAINERS=true
+        # Try with sudo on Linux if regular commands failed
+        elif [[ "$OSTYPE" != "darwin"* ]] && (sudo docker compose ps -q >/dev/null 2>&1 || sudo docker-compose ps -q >/dev/null 2>&1); then
+            HAS_CONTAINERS=true
+        fi
     fi
     
     if [ "$HAS_CONTAINERS" = true ]; then
