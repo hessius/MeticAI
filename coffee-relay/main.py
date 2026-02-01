@@ -6165,17 +6165,7 @@ async def schedule_shot(request: Request):
                     del _scheduled_tasks[schedule_id]
         
         # Start the background task
-        task = asyncio.create_task(
-            execute_scheduled_shot(
-                schedule_id=schedule_id,
-                shot_delay=shot_delay,
-                preheat=preheat,
-                profile_id=profile_id,
-                scheduled_shots_dict=_scheduled_shots,
-                scheduled_tasks_dict=_scheduled_tasks,
-                preheat_duration_minutes=PREHEAT_DURATION_MINUTES
-            )
-        )
+        task = asyncio.create_task(execute_scheduled_shot())
         _scheduled_tasks[schedule_id] = task
         
         return {
