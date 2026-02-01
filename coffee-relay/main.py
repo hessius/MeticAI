@@ -3393,7 +3393,6 @@ def _analyze_stage_execution(
     end_flow = _safe_float(shot_stage_data.get("end_flow", 0))
     avg_flow = _safe_float(shot_stage_data.get("avg_flow", 0))
     max_flow = _safe_float(shot_stage_data.get("max_flow", 0))
-    min_flow = _safe_float(shot_stage_data.get("min_flow", 0))
     
     # Generate execution description based on what actually happened
     execution_description = _generate_execution_description(
