@@ -66,9 +66,9 @@ echo -e "${YELLOW}[1/7] Stopping and removing Docker containers...${NC}"
 if command -v docker &> /dev/null; then
     # Check for running containers (try with and without sudo on Linux)
     HAS_CONTAINERS=false
-    if docker compose ps -q &> /dev/null 2>&1 || docker-compose ps -q &> /dev/null 2>&1 || [ -f "docker-compose.yml" ]; then
+    if docker compose ps -q &> /dev/null || docker-compose ps -q &> /dev/null || [ -f "docker-compose.yml" ]; then
         HAS_CONTAINERS=true
-    elif [[ "$OSTYPE" != "darwin"* ]] && (sudo docker compose ps -q &> /dev/null 2>&1 || sudo docker-compose ps -q &> /dev/null 2>&1); then
+    elif [[ "$OSTYPE" != "darwin"* ]] && (sudo docker compose ps -q &> /dev/null || sudo docker-compose ps -q &> /dev/null); then
         HAS_CONTAINERS=true
     fi
     
@@ -103,13 +103,15 @@ echo -e "${YELLOW}[2/7] Removing Docker images...${NC}"
 if command -v docker &> /dev/null; then
     # List MeticAI-related images (matches various naming patterns: meticai-, met-ai-, meticai-web-, etc.)
     # Try without sudo first
-    IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
-    
-    # If the docker command itself failed (not just no matches), try with sudo on Linux
-    if ! docker images &> /dev/null && [[ "$OSTYPE" != "darwin"* ]]; then
+    if docker images &> /dev/null; then
+        IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
+        USED_SUDO_FOR_IMAGES=false
+    # If the docker command failed (permission denied), try with sudo on Linux
+    elif [[ "$OSTYPE" != "darwin"* ]] && sudo docker images &> /dev/null; then
         IMAGES=$(sudo docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
         USED_SUDO_FOR_IMAGES=true
     else
+        IMAGES=""
         USED_SUDO_FOR_IMAGES=false
     fi
     
