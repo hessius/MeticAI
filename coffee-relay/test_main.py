@@ -19,6 +19,7 @@ import os
 import subprocess
 import json
 import time
+import requests
 
 
 # Import the app
@@ -4986,4 +4987,279 @@ description = "MCP server"
         assert "get" in openapi_data["paths"]["/api/version"]
 
 
+class TestRunShotEndpoints:
+    """Tests for the Run Shot / Machine control endpoints."""
 
+    @patch('main.get_meticulous_api')
+    def test_machine_status_endpoint(self, mock_get_api, client):
+        """Test GET /api/machine/status endpoint."""
+        # Mock the API response
+        mock_api = MagicMock()
+        mock_api.get_settings.return_value = MagicMock(auto_preheat=0)
+        mock_api.get_last_profile.return_value = MagicMock(
+            profile=MagicMock(id="test-123", name="Test Profile")
+        )
+        mock_get_api.return_value = mock_api
+
+        response = client.get("/api/machine/status")
+        
+        # Should return status info
+        assert response.status_code == 200
+        data = response.json()
+        assert "machine_status" in data or "status" in data or "scheduled_shots" in data
+
+    @patch('main.get_meticulous_api')
+    def test_machine_status_no_connection(self, mock_get_api, client):
+        """Test machine status when machine is not reachable."""
+        mock_api = MagicMock()
+        # Simulate connection error when trying to fetch status
+        mock_api.session.get.side_effect = requests.exceptions.ConnectionError("Connection refused")
+        mock_api.base_url = "http://test-machine"
+        mock_get_api.return_value = mock_api
+
+        response = client.get("/api/machine/status")
+        
+        # Should handle gracefully and return status with error info
+        assert response.status_code == 200
+        data = response.json()
+        assert "machine_status" in data
+        # Connection error should be captured in the status
+        assert "error" in data["machine_status"] or "state" in data["machine_status"]
+        """Test machine status when API is not available."""
+        mock_get_api.return_value = None
+
+        response = client.get("/api/machine/status")
+        
+        # Should handle gracefully
+        assert response.status_code in [200, 503]
+
+    @patch('main.get_meticulous_api')
+    def test_preheat_endpoint_success(self, mock_get_api, client):
+        """Test POST /api/machine/preheat endpoint."""
+        mock_api = MagicMock()
+        # Ensure the mock response doesn't have an error attribute
+        mock_result = MagicMock(spec=[])  # Empty spec means no 'error' attribute
+        mock_api.update_setting.return_value = mock_result
+        mock_get_api.return_value = mock_api
+
+        response = client.post("/api/machine/preheat")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+        assert "preheat" in data["message"].lower() or "Preheat" in data["message"]
+
+    @patch('main.get_meticulous_api')
+    def test_preheat_no_connection(self, mock_get_api, client):
+        """Test preheat when machine not reachable."""
+        mock_api = MagicMock()
+        # Simulate connection error when trying to update settings
+        mock_api.update_setting.side_effect = requests.exceptions.ConnectionError("Connection refused")
+        mock_api.base_url = "http://test-machine"
+    @patch('main.get_meticulous_api')
+    def test_preheat_connection_error(self, mock_get_api, client):
+        """Test preheat when connection fails."""
+        mock_api = MagicMock()
+        # Simulate a connection error when trying to update settings
+        mock_api.update_setting.side_effect = Exception("Connection refused")
+        mock_get_api.return_value = mock_api
+
+        response = client.post("/api/machine/preheat")
+        
+        # Connection error should result in 500 (internal error handling the request)
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        # Connection errors are caught by the general exception handler
+        assert response.status_code == 500
+    @patch('main.get_meticulous_api')
+    def test_preheat_no_connection(self, mock_get_api, client):
+        """Test preheat when machine not connected."""
+        mock_get_api.return_value = None
+
+        response = client.post("/api/machine/preheat")
+        
+        assert response.status_code == 503
+
+    @patch('main.get_meticulous_api')
+    def test_run_profile_success(self, mock_get_api, client):
+        """Test POST /api/machine/run-profile/{profile_id} endpoint."""
+        mock_api = MagicMock()
+        # Create mock results without 'error' attribute
+        mock_load_result = MagicMock(spec=['id', 'name'])
+        mock_load_result.id = "test-123"
+        mock_load_result.name = "Test"
+        mock_api.load_profile_by_id.return_value = mock_load_result
+        
+        mock_action_result = MagicMock(spec=['status', 'action'])
+        mock_action_result.status = "ok"
+        mock_action_result.action = "start"
+        mock_api.execute_action.return_value = mock_action_result
+        mock_get_api.return_value = mock_api
+
+        response = client.post("/api/machine/run-profile/test-123")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+
+    @patch('main.get_meticulous_api')
+    def test_run_profile_not_found(self, mock_get_api, client):
+        """Test running a profile that doesn't exist."""
+        mock_api = MagicMock()
+        # Create a mock result with error attribute
+        mock_result = MagicMock()
+        mock_result.error = "Profile not found"
+        mock_api.load_profile_by_id.return_value = mock_result
+        mock_get_api.return_value = mock_api
+
+        response = client.post("/api/machine/run-profile/nonexistent")
+        
+        assert response.status_code == 502
+
+    @patch('main.get_meticulous_api')
+    def test_run_profile_no_connection(self, mock_get_api, client):
+        """Test run profile when machine not reachable."""
+        mock_api = MagicMock()
+        # Simulate connection error when trying to load profile
+        mock_api.load_profile_by_id.side_effect = requests.exceptions.ConnectionError("Connection refused")
+        mock_api.base_url = "http://test-machine"
+    @patch('main.get_meticulous_api')
+    def test_run_profile_connection_error(self, mock_get_api, client):
+        """Test run profile when connection fails."""
+        mock_api = MagicMock()
+        # Simulate a connection error when trying to load the profile
+        mock_api.load_profile_by_id.side_effect = Exception("Connection refused")
+        mock_get_api.return_value = mock_api
+
+        response = client.post("/api/machine/run-profile/test-123")
+        
+        # Connection error should result in 500 (internal error handling the request)
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        # Connection errors are caught by the general exception handler
+        assert response.status_code == 500
+    @patch('main.get_meticulous_api')
+    def test_run_profile_no_connection(self, mock_get_api, client):
+        """Test run profile when machine not connected."""
+        mock_get_api.return_value = None
+
+        response = client.post("/api/machine/run-profile/test-123")
+        
+        assert response.status_code == 503
+
+    def test_schedule_shot_success(self, client):
+        """Test POST /api/machine/schedule-shot endpoint."""
+        from datetime import datetime, timedelta
+        
+        scheduled_time = (datetime.now() + timedelta(hours=1)).isoformat()
+        
+        response = client.post(
+            "/api/machine/schedule-shot",
+            json={
+                "profile_id": "test-123",
+                "scheduled_time": scheduled_time,
+                "preheat": False
+            }
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "scheduled_shot" in data
+        assert data["scheduled_shot"]["profile_id"] == "test-123"
+
+    def test_schedule_shot_with_preheat(self, client):
+        """Test scheduling a shot with preheat enabled."""
+        from datetime import datetime, timedelta
+        
+        scheduled_time = (datetime.now() + timedelta(hours=1)).isoformat()
+        
+        response = client.post(
+            "/api/machine/schedule-shot",
+            json={
+                "profile_id": "test-456",
+                "scheduled_time": scheduled_time,
+                "preheat": True
+            }
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["scheduled_shot"]["preheat"] == True
+
+    def test_schedule_shot_preheat_only(self, client):
+        """Test scheduling preheat only without a profile."""
+        from datetime import datetime, timedelta
+        
+        scheduled_time = (datetime.now() + timedelta(hours=1)).isoformat()
+        
+        response = client.post(
+            "/api/machine/schedule-shot",
+            json={
+                "profile_id": None,
+                "scheduled_time": scheduled_time,
+                "preheat": True
+            }
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["scheduled_shot"]["profile_id"] is None
+        assert data["scheduled_shot"]["preheat"] == True
+
+    def test_schedule_shot_invalid_no_profile_no_preheat(self, client):
+        """Test that scheduling without profile and without preheat fails."""
+        from datetime import datetime, timedelta
+        
+        scheduled_time = (datetime.now() + timedelta(hours=1)).isoformat()
+        
+        response = client.post(
+            "/api/machine/schedule-shot",
+            json={
+                "profile_id": None,
+                "scheduled_time": scheduled_time,
+                "preheat": False
+            }
+        )
+        
+        assert response.status_code == 400
+
+    def test_get_scheduled_shots(self, client):
+        """Test GET /api/machine/scheduled-shots endpoint."""
+        response = client.get("/api/machine/scheduled-shots")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "scheduled_shots" in data
+        assert isinstance(data["scheduled_shots"], list)
+
+    def test_cancel_scheduled_shot(self, client):
+        """Test DELETE /api/machine/schedule-shot/{schedule_id}."""
+        from datetime import datetime, timedelta
+        
+        # First create a scheduled shot
+        scheduled_time = (datetime.now() + timedelta(hours=1)).isoformat()
+        create_response = client.post(
+            "/api/machine/schedule-shot",
+            json={
+                "profile_id": "test-cancel",
+                "scheduled_time": scheduled_time,
+                "preheat": False
+            }
+        )
+        assert create_response.status_code == 200
+        schedule_id = create_response.json()["scheduled_shot"]["id"]
+        
+        # Now cancel it
+        response = client.delete(f"/api/machine/schedule-shot/{schedule_id}")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+
+    def test_cancel_nonexistent_scheduled_shot(self, client):
+        """Test canceling a scheduled shot that doesn't exist."""
+        response = client.delete("/api/machine/schedule-shot/nonexistent-id-123")
+        
+        assert response.status_code == 404

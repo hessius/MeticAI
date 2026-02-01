@@ -5466,3 +5466,459 @@ Remember: NO information should be lost in this conversion!"""
             detail={"status": "error", "error": str(e)}
         )
 
+
+# ============================================================================
+# Run Shot Endpoints
+# ============================================================================
+
+# Scheduled shots storage (in-memory for now, could be persisted)
+_scheduled_shots: dict = {}
+_scheduled_tasks: dict = {}
+
+PREHEAT_DURATION_MINUTES = 10
+
+
+@app.get("/api/machine/status")
+async def get_machine_status(request: Request):
+    """Get the current status of the Meticulous machine.
+    
+    Returns machine state, current profile, and whether preheating is active.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Fetching machine status",
+            extra={"request_id": request_id}
+        )
+        
+        api = get_meticulous_api()
+        
+        # Get current shot/status (live machine state)
+        try:
+            status = api.session.get(f"{api.base_url}/api/v1/status")
+            if status.status_code == 200:
+                status_data = status.json()
+            else:
+                status_data = {"state": "unknown"}
+        except Exception as e:
+            logger.warning(f"Could not fetch machine status: {e}")
+            status_data = {"state": "unknown", "error": str(e)}
+        
+        # Get settings to check preheat state
+        try:
+            settings = api.get_settings()
+            if hasattr(settings, 'error') and settings.error:
+                settings_data = {}
+            elif hasattr(settings, 'model_dump'):
+                settings_data = settings.model_dump()
+            else:
+                settings_data = dict(settings) if settings else {}
+        except Exception as e:
+            logger.warning(f"Could not fetch settings: {e}")
+            settings_data = {}
+        
+        # Get last loaded profile
+        try:
+            last_profile = api.get_last_profile()
+            if hasattr(last_profile, 'error') and last_profile.error:
+                last_profile_data = None
+            elif hasattr(last_profile, 'profile'):
+                last_profile_data = {
+                    "id": last_profile.profile.id if hasattr(last_profile.profile, 'id') else None,
+                    "name": last_profile.profile.name if hasattr(last_profile.profile, 'name') else None
+                }
+            else:
+                last_profile_data = None
+        except Exception as e:
+            logger.warning(f"Could not fetch last profile: {e}")
+            last_profile_data = None
+        
+        return {
+            "status": "success",
+            "machine_status": status_data,
+            "settings": settings_data,
+            "current_profile": last_profile_data,
+            "scheduled_shots": list(_scheduled_shots.values())
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to get machine status: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/machine/preheat")
+async def start_preheat(request: Request):
+    """Start preheating the machine.
+    
+    Preheating takes approximately 10 minutes to reach optimal temperature.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Starting machine preheat",
+            extra={"request_id": request_id}
+        )
+        
+        api = get_meticulous_api()
+        
+        if api is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Meticulous machine not connected"
+            )
+        
+        # Enable auto_preheat setting and trigger it
+        # The Meticulous machine handles preheat via the settings
+        try:
+            from meticulous.api_types import PartialSettings
+            settings = PartialSettings(auto_preheat=1)  # Enable preheat
+            result = api.update_setting(settings)
+            
+            if hasattr(result, 'error') and result.error:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to start preheat: {result.error}"
+                )
+        except ImportError:
+            # Fallback: direct API call
+            result = api.session.post(
+                f"{api.base_url}/api/v1/settings",
+                json={"auto_preheat": 1}
+            )
+            if result.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to start preheat: {result.text}"
+                )
+        
+        return {
+            "status": "success",
+            "message": "Preheat started",
+            "estimated_ready_in_minutes": PREHEAT_DURATION_MINUTES
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to start preheat: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/machine/run-profile/{profile_id}")
+async def run_profile(profile_id: str, request: Request):
+    """Load and run a profile immediately.
+    
+    This loads the profile into the machine and starts extraction.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            f"Running profile: {profile_id}",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        api = get_meticulous_api()
+        
+        if api is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Meticulous machine not connected"
+            )
+        
+        # Load the profile
+        load_result = api.load_profile_by_id(profile_id)
+        if hasattr(load_result, 'error') and load_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to load profile: {load_result.error}"
+            )
+        
+        # Start the extraction
+        from meticulous.api_types import ActionType
+        action_result = api.execute_action(ActionType.START)
+        if hasattr(action_result, 'error') and action_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to start profile: {action_result.error}"
+            )
+        
+        return {
+            "status": "success",
+            "message": f"Profile started",
+            "profile_id": profile_id,
+            "action": action_result.action if hasattr(action_result, 'action') else "start"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to run profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/machine/schedule-shot")
+async def schedule_shot(request: Request):
+    """Schedule a shot to run at a specific time.
+    
+    Request body:
+    - profile_id: str - The profile ID to run
+    - scheduled_time: str - ISO format datetime when to run the shot
+    - preheat: bool - Whether to preheat before the shot (default: false)
+    
+    If preheat is enabled, preheating will start 10 minutes before scheduled_time.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        profile_id = body.get("profile_id")
+        scheduled_time_str = body.get("scheduled_time")
+        preheat = body.get("preheat", False)
+        
+        if not scheduled_time_str:
+            raise HTTPException(
+                status_code=400,
+                detail="scheduled_time is required"
+            )
+        
+        # Validate that we have either a profile or preheat enabled
+        if not profile_id and not preheat:
+            raise HTTPException(
+                status_code=400,
+                detail="Either profile_id or preheat must be provided"
+            )
+        
+        # Parse the scheduled time
+        try:
+            scheduled_time = datetime.fromisoformat(scheduled_time_str.replace('Z', '+00:00'))
+            # Ensure timezone-aware datetime
+            if scheduled_time.tzinfo is None:
+                scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid scheduled_time format. Use ISO format."
+            )
+        
+        # Calculate delays
+        now = datetime.now(timezone.utc)
+        shot_delay = (scheduled_time - now).total_seconds()
+        
+        if shot_delay < 0:
+            raise HTTPException(
+                status_code=400,
+                detail="scheduled_time must be in the future"
+            )
+        
+        # Generate a unique ID for this scheduled shot
+        schedule_id = str(uuid.uuid4())
+        
+        # Store the scheduled shot info
+        scheduled_shot = {
+            "id": schedule_id,
+            "profile_id": profile_id,
+            "scheduled_time": scheduled_time_str,
+            "preheat": preheat,
+            "status": "scheduled",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        _scheduled_shots[schedule_id] = scheduled_shot
+        
+        logger.info(
+            f"Scheduling shot: {schedule_id}",
+            extra={
+                "request_id": request_id,
+                "schedule_id": schedule_id,
+                "profile_id": profile_id,
+                "scheduled_time": scheduled_time_str,
+                "preheat": preheat
+            }
+        )
+        
+        # Create async task to execute at scheduled time
+        async def execute_scheduled_shot():
+            try:
+                api = get_meticulous_api()
+                
+                # If preheat is enabled, start it 10 minutes before
+                if preheat:
+                    preheat_delay = shot_delay - (PREHEAT_DURATION_MINUTES * 60)
+                    if preheat_delay > 0:
+                        await asyncio.sleep(preheat_delay)
+                        _scheduled_shots[schedule_id]["status"] = "preheating"
+                        
+                        # Start preheat
+                        try:
+                            from meticulous.api_types import PartialSettings
+                            settings = PartialSettings(auto_preheat=1)
+                            api.update_setting(settings)
+                        except Exception as e:
+                            logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                        
+                        # Wait for remaining time until shot
+                        await asyncio.sleep(PREHEAT_DURATION_MINUTES * 60)
+                    else:
+                        # Not enough time for full preheat, start immediately
+                        _scheduled_shots[schedule_id]["status"] = "preheating"
+                        try:
+                            from meticulous.api_types import PartialSettings
+                            settings = PartialSettings(auto_preheat=1)
+                            api.update_setting(settings)
+                        except Exception as e:
+                            logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                        await asyncio.sleep(shot_delay)
+                else:
+                    await asyncio.sleep(shot_delay)
+                
+                _scheduled_shots[schedule_id]["status"] = "running"
+                
+                # Load and run the profile (if profile_id was provided)
+                if profile_id:
+                    load_result = api.load_profile_by_id(profile_id)
+                    if not (hasattr(load_result, 'error') and load_result.error):
+                        from meticulous.api_types import ActionType
+                        api.execute_action(ActionType.START)
+                        _scheduled_shots[schedule_id]["status"] = "completed"
+                    else:
+                        _scheduled_shots[schedule_id]["status"] = "failed"
+                        _scheduled_shots[schedule_id]["error"] = load_result.error
+                else:
+                    # Preheat only mode - mark as completed
+                    _scheduled_shots[schedule_id]["status"] = "completed"
+                    
+            except asyncio.CancelledError:
+                _scheduled_shots[schedule_id]["status"] = "cancelled"
+            except Exception as e:
+                logger.error(f"Scheduled shot {schedule_id} failed: {e}")
+                _scheduled_shots[schedule_id]["status"] = "failed"
+                _scheduled_shots[schedule_id]["error"] = str(e)
+            finally:
+                # Clean up task reference
+                if schedule_id in _scheduled_tasks:
+                    del _scheduled_tasks[schedule_id]
+        
+        # Start the background task
+        task = asyncio.create_task(execute_scheduled_shot())
+        _scheduled_tasks[schedule_id] = task
+        
+        return {
+            "status": "success",
+            "schedule_id": schedule_id,
+            "scheduled_shot": scheduled_shot
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to schedule shot: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.delete("/api/machine/schedule-shot/{schedule_id}")
+async def cancel_scheduled_shot(schedule_id: str, request: Request):
+    """Cancel a scheduled shot."""
+    request_id = request.state.request_id
+    
+    try:
+        if schedule_id not in _scheduled_shots:
+            raise HTTPException(
+                status_code=404,
+                detail="Scheduled shot not found"
+            )
+        
+        # Cancel the task if it exists
+        if schedule_id in _scheduled_tasks:
+            _scheduled_tasks[schedule_id].cancel()
+            del _scheduled_tasks[schedule_id]
+        
+        _scheduled_shots[schedule_id]["status"] = "cancelled"
+        
+        logger.info(
+            f"Cancelled scheduled shot: {schedule_id}",
+            extra={"request_id": request_id, "schedule_id": schedule_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": "Scheduled shot cancelled",
+            "schedule_id": schedule_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to cancel scheduled shot: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "schedule_id": schedule_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.get("/api/machine/scheduled-shots")
+async def list_scheduled_shots(request: Request):
+    """List all scheduled shots."""
+    request_id = request.state.request_id
+    
+    try:
+        # Clean up completed/cancelled shots older than 1 hour
+        now = datetime.now(timezone.utc)
+        to_remove = []
+        for schedule_id, shot in _scheduled_shots.items():
+            if shot["status"] in ["completed", "cancelled", "failed"]:
+                created_at = datetime.fromisoformat(shot["created_at"].replace('Z', '+00:00'))
+                if (now - created_at).total_seconds() > 3600:
+                    to_remove.append(schedule_id)
+        
+        for schedule_id in to_remove:
+            del _scheduled_shots[schedule_id]
+        
+        return {
+            "status": "success",
+            "scheduled_shots": list(_scheduled_shots.values())
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to list scheduled shots: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
