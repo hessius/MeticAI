@@ -2142,15 +2142,8 @@ class TestShotAnalysisHelpers:
         assert len(flow_points) > 0
         assert flow_points[0]["target_flow"] == 2.5
 
-    def test_generate_profile_target_curves_with_weight_based_dynamics(self):
+    def test_generate_profile_target_curves_weight_based(self):
         """Test generating target curves for weight-based dynamics."""
-    def test_generate_profile_target_curves_weight_based_dynamics(self):
-        """Test that weight-based dynamics stages are skipped in target curve generation.
-        
-        Weight-based dynamics cannot be plotted on a time-based chart since they
-        don't have a fixed time mapping. This test verifies the expected behavior
-        of skipping these stages rather than attempting to convert them.
-        """
         from main import _generate_profile_target_curves
         
         profile_data = {
@@ -2160,16 +2153,6 @@ class TestShotAnalysisHelpers:
                     "type": "flow",
                     "dynamics_points": [[0, 2.0], [20, 3.0], [40, 2.5]],  # Flow changes by weight
                     "dynamics_over": "weight"
-                    "name": "Weight-Based Pressure",
-                    "type": "pressure",
-                    "dynamics_points": [[0, 2.0], [20, 9.0], [40, 6.0]],
-                    "dynamics_over": "weight"
-                },
-                {
-                    "name": "Time-Based Flow",
-                    "type": "flow",
-                    "dynamics_points": [[0, 2.5]],
-                    "dynamics_over": "time"
                 }
             ],
             "variables": []
@@ -2251,22 +2234,6 @@ class TestShotAnalysisHelpers:
         # Test edge case: empty list
         result = _interpolate_weight_to_time(10, [])
         assert result is None
-            "Weight-Based Pressure": (0.0, 15.0),
-            "Time-Based Flow": (15.0, 30.0)
-        }
-        
-        curves = _generate_profile_target_curves(profile_data, shot_stage_times)
-        
-        # Weight-based stages should be skipped, so only time-based stage should appear
-        flow_points = [c for c in curves if "target_flow" in c]
-        pressure_points = [c for c in curves if "target_pressure" in c]
-        
-        # Should have flow points from the time-based stage
-        assert len(flow_points) > 0
-        assert flow_points[0]["target_flow"] == 2.5
-        
-        # Should NOT have pressure points from the weight-based stage
-        assert len(pressure_points) == 0
 
     def test_local_analysis_includes_profile_target_curves(self):
         """Test that local analysis returns profile target curves."""
