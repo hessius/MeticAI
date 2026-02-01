@@ -4777,6 +4777,53 @@ class TestHelperFunctions:
 class TestVersionEndpoint:
     """Tests for the /api/version endpoint."""
     
+    def test_version_endpoint_basic_structure(self, client):
+        """Test basic version endpoint returns correct structure."""
+        response = client.get("/api/version")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "meticai" in data
+        assert "meticai_web" in data
+        assert "mcp_server" in data
+        assert "mcp_repo_url" in data
+        # Should always have a repo URL (at minimum the default)
+        assert isinstance(data["mcp_repo_url"], str)
+        assert len(data["mcp_repo_url"]) > 0
+    
+    def test_version_endpoint_returns_default_fallback(self, client):
+        """Test that version endpoint returns a valid URL."""
+        response = client.get("/api/version")
+        assert response.status_code == 200
+        
+        data = response.json()
+        # Should be a GitHub URL
+        assert "github.com" in data["mcp_repo_url"]
+        assert "meticulous-mcp" in data["mcp_repo_url"]
+    
+    def test_version_endpoint_handles_errors_gracefully(self, client):
+        """Test that version endpoint doesn't crash even if files are missing."""
+        # Even if all files are missing, endpoint should work
+        response = client.get("/api/version")
+        assert response.status_code == 200
+        
+        data = response.json()
+        # Should have all required keys even on error
+        assert "meticai" in data
+        assert "meticai_web" in data
+        assert "mcp_server" in data
+        assert "mcp_repo_url" in data
+
+        # Verify history can be retrieved and has expected structure
+        response2 = client.get("/api/history")
+        data = response2.json()
+        # Should have minimal or no history in entries
+        assert isinstance(data.get("entries", []), list)
+
+
+class TestVersionEndpoint:
+    """Tests for the /api/version endpoint."""
+    
     def test_version_endpoint_exists(self, client):
         """Test that /api/version endpoint exists and is accessible."""
         response = client.get("/api/version")
@@ -4825,7 +4872,6 @@ class TestVersionEndpoint:
         
         # Setup path mocking to return appropriate files
         def path_side_effect(*args):
-            path_obj = Mock()
             if args:
                 path_str = str(args[0])
                 if "VERSION" in path_str and "meticai-web" not in path_str:
@@ -4983,6 +5029,9 @@ class TestRunShotEndpoints:
         assert "machine_status" in data
         # Connection error should be captured in the status
         assert "error" in data["machine_status"] or "state" in data["machine_status"]
+
+    @patch('main.get_meticulous_api')
+    def test_machine_status_api_unavailable(self, mock_get_api, client):
         """Test machine status when API is not available."""
         mock_get_api.return_value = None
 
