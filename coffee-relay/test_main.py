@@ -4478,6 +4478,7 @@ class TestRunShotEndpoints:
         # Simulate connection error when trying to update settings
         mock_api.update_setting.side_effect = requests.exceptions.ConnectionError("Connection refused")
         mock_api.base_url = "http://test-machine"
+    @patch('main.get_meticulous_api')
     def test_preheat_connection_error(self, mock_get_api, client):
         """Test preheat when connection fails."""
         mock_api = MagicMock()
@@ -4493,6 +4494,7 @@ class TestRunShotEndpoints:
         assert "detail" in data
         # Connection errors are caught by the general exception handler
         assert response.status_code == 500
+    @patch('main.get_meticulous_api')
     def test_preheat_no_connection(self, mock_get_api, client):
         """Test preheat when machine not connected."""
         mock_get_api.return_value = None
@@ -4544,6 +4546,7 @@ class TestRunShotEndpoints:
         # Simulate connection error when trying to load profile
         mock_api.load_profile_by_id.side_effect = requests.exceptions.ConnectionError("Connection refused")
         mock_api.base_url = "http://test-machine"
+    @patch('main.get_meticulous_api')
     def test_run_profile_connection_error(self, mock_get_api, client):
         """Test run profile when connection fails."""
         mock_api = MagicMock()
@@ -4559,6 +4562,7 @@ class TestRunShotEndpoints:
         assert "detail" in data
         # Connection errors are caught by the general exception handler
         assert response.status_code == 500
+    @patch('main.get_meticulous_api')
     def test_run_profile_no_connection(self, mock_get_api, client):
         """Test run profile when machine not connected."""
         mock_get_api.return_value = None
