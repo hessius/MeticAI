@@ -3094,6 +3094,63 @@ def _format_dynamics_description(stage: dict) -> str:
         return f"Multi-point {stage_type} curve"
 
 
+def _generate_execution_description(
+    stage_type: str,
+    duration: float,
+    start_pressure: float,
+    end_pressure: float,
+    max_pressure: float,
+    start_flow: float,
+    end_flow: float,
+    max_flow: float,
+    weight_gain: float
+) -> str:
+    """Generate a human-readable description of what actually happened during stage execution.
+    
+    This describes the actual behavior observed, not the target.
+    Examples:
+    - "Pressure rose from 2.1 bar to 8.5 bar over 4.2s"
+    - "Declining pressure from 9.0 bar to 6.2 bar"
+    - "Steady flow at 2.1 ml/s, extracted 18.5g"
+    """
+    descriptions = []
+    
+    # Determine pressure behavior
+    pressure_delta = end_pressure - start_pressure
+    if abs(pressure_delta) > 0.5:
+        if pressure_delta > 0:
+            descriptions.append(f"Pressure rose from {start_pressure:.1f} to {end_pressure:.1f} bar")
+        else:
+            descriptions.append(f"Pressure declined from {start_pressure:.1f} to {end_pressure:.1f} bar")
+    elif max_pressure > 0:
+        descriptions.append(f"Pressure held around {(start_pressure + end_pressure) / 2:.1f} bar")
+    
+    # Determine flow behavior
+    flow_delta = end_flow - start_flow
+    if abs(flow_delta) > 0.3:
+        if flow_delta > 0:
+            descriptions.append(f"Flow increased from {start_flow:.1f} to {end_flow:.1f} ml/s")
+        else:
+            descriptions.append(f"Flow decreased from {start_flow:.1f} to {end_flow:.1f} ml/s")
+    elif max_flow > 0:
+        descriptions.append(f"Flow steady at {(start_flow + end_flow) / 2:.1f} ml/s")
+    
+    # Add weight info if significant
+    if weight_gain > 1.0:
+        descriptions.append(f"extracted {weight_gain:.1f}g")
+    
+    # Add duration
+    if duration > 0:
+        descriptions.append(f"over {duration:.1f}s")
+    
+    if descriptions:
+        # Capitalize first letter and join
+        result = ", ".join(descriptions)
+        return result[0].upper() + result[1:]
+    
+    return f"Stage executed for {duration:.1f}s"
+
+
 def _safe_float(val, default: float = 0.0) -> float:
     """Safely convert a value to float, handling strings and None."""
     if val is None:
@@ -3205,8 +3262,14 @@ def _determine_exit_trigger_hit(
     variables = variables or []
     duration = _safe_float(stage_data.get("duration", 0))
     end_weight = _safe_float(stage_data.get("end_weight", 0))
+    # Pressure values for different comparison types
     max_pressure = _safe_float(stage_data.get("max_pressure", 0))
+    min_pressure = _safe_float(stage_data.get("min_pressure", 0))
+    end_pressure = _safe_float(stage_data.get("end_pressure", 0))
+    # Flow values for different comparison types
     max_flow = _safe_float(stage_data.get("max_flow", 0))
+    min_flow = _safe_float(stage_data.get("min_flow", 0))
+    end_flow = _safe_float(stage_data.get("end_flow", 0))
     
     triggered = None
     not_triggered = []
@@ -3221,15 +3284,26 @@ def _determine_exit_trigger_hit(
         value = _safe_float(resolved_value)
         
         # Check if this trigger was satisfied
+        # Select the appropriate actual value based on comparison operator
         actual_value = 0.0
         if trigger_type == "time":
             actual_value = duration
         elif trigger_type == "weight":
             actual_value = end_weight
         elif trigger_type == "pressure":
-            actual_value = max_pressure
+            # For >= or >: we want to know if max reached the target
+            # For <= or <: we want to know if pressure dropped below target (use end)
+            if comparison in (">=", ">"):
+                actual_value = max_pressure
+            else:  # <= or < or ==
+                actual_value = end_pressure
         elif trigger_type == "flow":
-            actual_value = max_flow
+            # For >= or >: we want to know if max reached the target
+            # For <= or <: we want to know if flow dropped below target (use end)
+            if comparison in (">=", ">"):
+                actual_value = max_flow
+            else:  # <= or < or ==
+                actual_value = end_flow
         
         # Evaluate comparison with small tolerance
         tolerance = 0.5 if trigger_type in ["time", "weight"] else 0.2
@@ -3310,22 +3384,39 @@ def _analyze_stage_execution(
     start_weight = _safe_float(shot_stage_data.get("start_weight", 0))
     end_weight = _safe_float(shot_stage_data.get("end_weight", 0))
     weight_gain = end_weight - start_weight
+    start_pressure = _safe_float(shot_stage_data.get("start_pressure", 0))
+    end_pressure = _safe_float(shot_stage_data.get("end_pressure", 0))
     avg_pressure = _safe_float(shot_stage_data.get("avg_pressure", 0))
     max_pressure = _safe_float(shot_stage_data.get("max_pressure", 0))
     min_pressure = _safe_float(shot_stage_data.get("min_pressure", 0))
+    start_flow = _safe_float(shot_stage_data.get("start_flow", 0))
+    end_flow = _safe_float(shot_stage_data.get("end_flow", 0))
     avg_flow = _safe_float(shot_stage_data.get("avg_flow", 0))
     max_flow = _safe_float(shot_stage_data.get("max_flow", 0))
+    
+    # Generate execution description based on what actually happened
+    execution_description = _generate_execution_description(
+        stage_type, duration, 
+        start_pressure, end_pressure, max_pressure,
+        start_flow, end_flow, max_flow,
+        weight_gain
+    )
     
     result["execution_data"] = {
         "duration": round(duration, 1),
         "weight_gain": round(weight_gain, 1),
         "start_weight": round(start_weight, 1),
         "end_weight": round(end_weight, 1),
+        "start_pressure": round(start_pressure, 1),
+        "end_pressure": round(end_pressure, 1),
         "avg_pressure": round(avg_pressure, 1),
         "max_pressure": round(max_pressure, 1),
         "min_pressure": round(min_pressure, 1),
+        "start_flow": round(start_flow, 1),
+        "end_flow": round(end_flow, 1),
         "avg_flow": round(avg_flow, 1),
-        "max_flow": round(max_flow, 1)
+        "max_flow": round(max_flow, 1),
+        "description": execution_description
     }
     
     # Determine which exit trigger was hit
@@ -3424,6 +3515,10 @@ def _analyze_stage_execution(
     return result
 
 
+# Shot stage status constants
+STAGE_STATUS_RETRACTING = "retracting"
+
+
 def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
     """Extract per-stage telemetry from shot data.
     
@@ -3442,7 +3537,7 @@ def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
         status = entry.get("status", "")
         
         # Skip retracting - it's machine cleanup
-        if status.lower().strip() == "retracting":
+        if status.lower().strip() == STAGE_STATUS_RETRACTING:
             continue
         
         if status and status != current_stage:
@@ -3491,14 +3586,258 @@ def _compute_stage_stats(entries: list) -> dict:
         "duration": end_time - start_time,
         "start_weight": weights[0] if weights else 0,
         "end_weight": weights[-1] if weights else 0,
+        "start_pressure": pressures[0] if pressures else 0,
+        "end_pressure": pressures[-1] if pressures else 0,
         "min_pressure": min(pressures) if pressures else 0,
         "max_pressure": max(pressures) if pressures else 0,
         "avg_pressure": sum(pressures) / len(pressures) if pressures else 0,
+        "start_flow": flows[0] if flows else 0,
+        "end_flow": flows[-1] if flows else 0,
         "min_flow": min(flows) if flows else 0,
         "max_flow": max(flows) if flows else 0,
         "avg_flow": sum(flows) / len(flows) if flows else 0,
         "entry_count": len(entries)
     }
+
+
+def _interpolate_weight_to_time(target_weight: float, weight_time_pairs: list[tuple[float, float]]) -> Optional[float]:
+    """Interpolate time value for a given weight using linear interpolation.
+    
+    Args:
+        target_weight: The weight value to find the corresponding time for
+        weight_time_pairs: List of (weight, time) tuples sorted by weight
+        
+    Returns:
+        Interpolated time value, or None if no data available
+    """
+    if not weight_time_pairs:
+        return None
+    
+    # Find bracketing weight values
+    for i in range(len(weight_time_pairs)):
+        weight_actual, time_actual = weight_time_pairs[i]
+        
+        if weight_actual >= target_weight:
+            if i == 0:
+                # Before first point, use first time
+                return time_actual
+            else:
+                # Interpolate between i-1 and i
+                weight_prev, time_prev = weight_time_pairs[i-1]
+                if weight_actual > weight_prev:
+                    # Linear interpolation
+                    weight_fraction = (target_weight - weight_prev) / (weight_actual - weight_prev)
+                    return time_prev + weight_fraction * (time_actual - time_prev)
+                else:
+                    # Same weight, use current time
+                    return time_actual
+            
+    # If not found, use last time (weight exceeds all actual weights)
+    return weight_time_pairs[-1][1]
+
+
+def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, shot_data: dict) -> list[dict]:
+    """Generate target curves for profile overlay on shot chart.
+    
+    Creates data points representing what the profile was targeting at each time point.
+    Uses actual shot stage times to align the profile curves with the shot execution.
+    Supports both time-based and weight-based dynamics.
+    
+    Args:
+        profile_data: The profile configuration
+        shot_stage_times: Dict mapping stage names to (start_time, end_time) tuples
+        shot_data: The complete shot data including telemetry entries
+        
+    Returns:
+        List of data points: [{time, target_pressure, target_flow, stage_name}, ...]
+    """
+    stages = profile_data.get("stages", [])
+    variables = profile_data.get("variables", [])
+    data_points = []
+    
+    # Build weight-to-time mappings for each stage from shot data
+    # This enables weight-based dynamics interpolation
+    stage_weight_to_time = {}
+    data_entries = shot_data.get("data", [])
+    
+    for entry in data_entries:
+        status = entry.get("status", "")
+        if not status or status.lower().strip() == STAGE_STATUS_RETRACTING:
+            continue
+        
+        time_sec = entry.get("time", 0) / 1000  # Convert to seconds
+        weight = entry.get("shot", {}).get("weight", 0)
+        
+        # Normalize stage name for matching
+        normalized_status = status.lower().strip()
+        
+        if normalized_status not in stage_weight_to_time:
+            stage_weight_to_time[normalized_status] = []
+        
+        stage_weight_to_time[normalized_status].append((weight, time_sec))
+    
+    for stage in stages:
+        stage_name = stage.get("name", "")
+        stage_type = stage.get("type", "")  # pressure or flow
+        dynamics_points = stage.get("dynamics_points", [])
+        dynamics_over = stage.get("dynamics_over", "time")  # time or weight
+        
+        if not dynamics_points:
+            continue
+            
+        # Get actual stage timing from shot
+        # Match using either stage name or stage key (for consistency with main analysis)
+        identifiers = set()
+        if stage_name:
+            identifiers.add(stage_name.lower().strip())
+        stage_key_field = stage.get("key", "")
+        if stage_key_field:
+            identifiers.add(stage_key_field.lower().strip())
+
+        stage_timing = None
+        for shot_stage_name, timing in shot_stage_times.items():
+            normalized_shot_stage_name = shot_stage_name.lower().strip()
+            if normalized_shot_stage_name in identifiers:
+                stage_timing = timing
+                break
+        
+        if not stage_timing:
+            continue
+            
+        stage_start, stage_end = stage_timing
+        stage_duration = stage_end - stage_start
+        
+        if stage_duration <= 0:
+            continue
+        
+        # Generate points along the stage duration
+        # For time-based dynamics, interpolate directly
+        if dynamics_over == "time":
+            # Get the dynamics point times (x values) and target values (y values)
+            if len(dynamics_points) == 1:
+                # Constant value throughout stage
+                value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+                # Resolve variable if needed
+                if isinstance(value, str) and value.startswith('$'):
+                    resolved, _ = _resolve_variable(value, variables)
+                    value = _safe_float(resolved)
+                else:
+                    value = _safe_float(value)
+                    
+                # Add start and end points
+                point_start = {"time": round(stage_start, 2), "stage_name": stage_name}
+                point_end = {"time": round(stage_end, 2), "stage_name": stage_name}
+                
+                if stage_type == "pressure":
+                    point_start["target_pressure"] = round(value, 1)
+                    point_end["target_pressure"] = round(value, 1)
+                elif stage_type == "flow":
+                    point_start["target_flow"] = round(value, 1)
+                    point_end["target_flow"] = round(value, 1)
+                    
+                data_points.append(point_start)
+                data_points.append(point_end)
+            else:
+                # Multiple points - interpolate based on relative time within stage
+                # dynamics_points format: [[time1, value1], [time2, value2], ...]
+                max_dynamics_time = max(p[0] for p in dynamics_points)
+                
+                # Scale factor to map dynamics time to actual stage duration
+                scale = stage_duration / max_dynamics_time if max_dynamics_time > 0 else 1
+                
+                for dp in dynamics_points:
+                    dp_time = dp[0]
+                    dp_value = dp[1] if len(dp) > 1 else dp[0]
+                    
+                    # Resolve variable if needed
+                    if isinstance(dp_value, str) and dp_value.startswith('$'):
+                        resolved, _ = _resolve_variable(dp_value, variables)
+                        dp_value = _safe_float(resolved)
+                    else:
+                        dp_value = _safe_float(dp_value)
+                    
+                    actual_time = stage_start + (dp_time * scale)
+                    
+                    point = {"time": round(actual_time, 2), "stage_name": stage_name}
+                    if stage_type == "pressure":
+                        point["target_pressure"] = round(dp_value, 1)
+                    elif stage_type == "flow":
+                        point["target_flow"] = round(dp_value, 1)
+                        
+                    data_points.append(point)
+        
+        # For weight-based dynamics, map weight values to time using actual shot data
+        elif dynamics_over == "weight":
+            # Get weight-to-time mapping for this stage
+            stage_key_normalized = None
+            for identifier in identifiers:
+                if identifier in stage_weight_to_time:
+                    stage_key_normalized = identifier
+                    break
+            
+            if not stage_key_normalized or not stage_weight_to_time[stage_key_normalized]:
+                # No weight data available for this stage
+                continue
+            
+            weight_time_pairs = stage_weight_to_time[stage_key_normalized]
+            
+            # Sort by weight to enable interpolation
+            weight_time_pairs.sort(key=lambda x: x[0])
+            
+            if len(dynamics_points) == 1:
+                # Constant value throughout stage
+                value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+                
+                # Resolve variable if needed
+                if isinstance(value, str) and value.startswith('$'):
+                    resolved, _ = _resolve_variable(value, variables)
+                    value = _safe_float(resolved)
+                else:
+                    value = _safe_float(value)
+                
+                # Add start and end points
+                point_start = {"time": round(stage_start, 2), "stage_name": stage_name}
+                point_end = {"time": round(stage_end, 2), "stage_name": stage_name}
+                
+                if stage_type == "pressure":
+                    point_start["target_pressure"] = round(value, 1)
+                    point_end["target_pressure"] = round(value, 1)
+                elif stage_type == "flow":
+                    point_start["target_flow"] = round(value, 1)
+                    point_end["target_flow"] = round(value, 1)
+                
+                data_points.append(point_start)
+                data_points.append(point_end)
+            else:
+                # Multiple points - interpolate weight values to time
+                # dynamics_points format: [[weight1, value1], [weight2, value2], ...]
+                for dp in dynamics_points:
+                    dp_weight = dp[0]
+                    dp_value = dp[1] if len(dp) > 1 else dp[0]
+                    
+                    # Resolve variable if needed
+                    if isinstance(dp_value, str) and dp_value.startswith('$'):
+                        resolved, _ = _resolve_variable(dp_value, variables)
+                        dp_value = _safe_float(resolved)
+                    else:
+                        dp_value = _safe_float(dp_value)
+                    
+                    # Find time corresponding to this weight using linear interpolation
+                    actual_time = _interpolate_weight_to_time(dp_weight, weight_time_pairs)
+                    
+                    if actual_time is not None:
+                        point = {"time": round(actual_time, 2), "stage_name": stage_name}
+                        if stage_type == "pressure":
+                            point["target_pressure"] = round(dp_value, 1)
+                        elif stage_type == "flow":
+                            point["target_flow"] = round(dp_value, 1)
+                        
+                        data_points.append(point)
+    
+    # Sort by time
+    data_points.sort(key=lambda x: x["time"])
+    
+    return data_points
 
 
 def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
@@ -3540,6 +3879,16 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
     
     # Extract shot stage data
     shot_stages = _extract_shot_stage_data(shot_data)
+    
+    # Build shot stage times for profile curve generation
+    shot_stage_times = {}
+    for stage_name, stage_data in shot_stages.items():
+        start_time = stage_data.get("start_time", 0)
+        end_time = stage_data.get("end_time", 0)
+        shot_stage_times[stage_name] = (start_time, end_time)
+    
+    # Generate profile target curves for chart overlay
+    profile_target_curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
     
     # Profile stages
     profile_stages = profile_data.get("stages", [])
@@ -3669,7 +4018,8 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
             "name": profile_data.get("name", "Unknown"),
             "temperature": profile_data.get("temperature"),
             "stage_count": len(profile_stages)
-        }
+        },
+        "profile_target_curves": profile_target_curves
     }
 
 
