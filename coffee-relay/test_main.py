@@ -2322,9 +2322,10 @@ class TestMachineProfileJsonEndpoint:
 class TestProfileImportEndpoint:
     """Tests for the /api/profile/import endpoint."""
 
+    @patch('main.atomic_write_json')
     @patch('main._generate_profile_description', new_callable=AsyncMock)
     @patch('main.HISTORY_FILE')
-    def test_import_profile_success(self, mock_history_file, mock_generate_desc, client):
+    def test_import_profile_success(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test successful profile import with description generation."""
         mock_generate_desc.return_value = "Great espresso profile with balanced extraction"
         
@@ -2353,10 +2354,12 @@ class TestProfileImportEndpoint:
         assert data["profile_name"] == "Imported Espresso"
         assert data["has_description"] is True
         assert "entry_id" in data
+        mock_atomic_write.assert_called_once()
 
+    @patch('main.atomic_write_json')
     @patch('main._generate_profile_description', new_callable=AsyncMock)
     @patch('main.HISTORY_FILE')
-    def test_import_profile_without_description(self, mock_history_file, mock_generate_desc, client):
+    def test_import_profile_without_description(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test profile import without generating description."""
         # Should not be called when generate_description=False
         mock_generate_desc.return_value = "Should not use this"
@@ -2385,6 +2388,7 @@ class TestProfileImportEndpoint:
         # has_description checks for "Description generation failed" not in reply
         # So we just verify import succeeded
         mock_generate_desc.assert_not_called()
+        mock_atomic_write.assert_called_once()
 
     @patch('main.HISTORY_FILE')
     def test_import_profile_already_exists(self, mock_history_file, client):
@@ -2425,9 +2429,10 @@ class TestProfileImportEndpoint:
         assert response.status_code == 400
         assert "No profile JSON provided" in response.json()["detail"]
 
+    @patch('main.atomic_write_json')
     @patch('main._generate_profile_description', new_callable=AsyncMock)
     @patch('main.HISTORY_FILE')
-    def test_import_profile_description_generation_fails(self, mock_history_file, mock_generate_desc, client):
+    def test_import_profile_description_generation_fails(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test import continues when description generation fails."""
         mock_generate_desc.side_effect = Exception("AI service unavailable")
         
@@ -2453,9 +2458,11 @@ class TestProfileImportEndpoint:
         assert data["status"] == "success"
         # Should have fallback message
         assert data["has_description"] is False
+        mock_atomic_write.assert_called_once()
 
+    @patch('main.atomic_write_json')
     @patch('main.HISTORY_FILE')
-    def test_import_profile_legacy_history_format(self, mock_history_file, client):
+    def test_import_profile_legacy_history_format(self, mock_history_file, mock_atomic_write, client):
         """Test import with legacy history format (dict with entries)."""
         profile_json = {
             "name": "New Profile",
