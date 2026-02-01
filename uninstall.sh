@@ -61,7 +61,7 @@ FAILED_ITEMS=()
 
 # Helper function: Try docker command with and without sudo
 # Returns: 0 on success, 1 on failure
-# Sets USED_SUDO to "true" if sudo was needed
+# Sets USED_SUDO to "true" if sudo was needed (reset to "false" on each call)
 try_docker_command() {
     local cmd="$1"
     USED_SUDO="false"
@@ -85,9 +85,9 @@ echo -e "${YELLOW}[1/7] Stopping and removing Docker containers...${NC}"
 if command -v docker &> /dev/null; then
     # Only attempt docker compose commands if a compose file exists
     if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ] || [ -f "compose.yml" ] || [ -f "compose.yaml" ]; then
-        # Check if containers exist
-        if try_docker_command "docker compose ps -q >/dev/null 2>&1" || try_docker_command "docker-compose ps -q >/dev/null 2>&1"; then
-            # Stop and remove containers
+        # Check if containers exist and stop them
+        if try_docker_command "docker compose ps -q" || try_docker_command "docker-compose ps -q"; then
+            # Stop and remove containers (try both docker compose variants)
             if try_docker_command "docker compose down" || try_docker_command "docker-compose down"; then
                 if [ "$USED_SUDO" = "true" ]; then
                     echo -e "${GREEN}✓ Containers stopped and removed (with sudo)${NC}"
