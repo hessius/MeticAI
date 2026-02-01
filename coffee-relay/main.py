@@ -2057,6 +2057,8 @@ async def execute_scheduled_shot(
         scheduled_tasks_dict: Reference to the global scheduled tasks dictionary
         preheat_duration_minutes: Minutes to preheat (default: 10)
     """
+    from meticulous.api_types import PartialSettings, ActionType
+    
     try:
         api = get_meticulous_api()
         
@@ -2069,7 +2071,6 @@ async def execute_scheduled_shot(
                 
                 # Start preheat
                 try:
-                    from meticulous.api_types import PartialSettings
                     settings = PartialSettings(auto_preheat=1)
                     api.update_setting(settings)
                 except Exception as e:
@@ -2081,7 +2082,6 @@ async def execute_scheduled_shot(
                 # Not enough time for full preheat, start immediately
                 scheduled_shots_dict[schedule_id]["status"] = "preheating"
                 try:
-                    from meticulous.api_types import PartialSettings
                     settings = PartialSettings(auto_preheat=1)
                     api.update_setting(settings)
                 except Exception as e:
@@ -2096,7 +2096,6 @@ async def execute_scheduled_shot(
         if profile_id:
             load_result = api.load_profile_by_id(profile_id)
             if not (hasattr(load_result, 'error') and load_result.error):
-                from meticulous.api_types import ActionType
                 api.execute_action(ActionType.START)
                 scheduled_shots_dict[schedule_id]["status"] = "completed"
             else:
