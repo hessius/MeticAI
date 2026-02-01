@@ -109,7 +109,9 @@ UPDATE_CHECK_INTERVAL = 7200
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
 
 # Regex pattern for extracting version from pyproject.toml or setup.py
-VERSION_PATTERN = r'^\s*version\s*=\s*["\']([^"\']+)["\']'
+# Matches: version = "x.y.z" or version = 'x.y.z'
+# Pre-compiled for better performance when called repeatedly
+VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 
 
 async def check_for_updates_task():
@@ -1159,7 +1161,7 @@ async def get_version_info(request: Request):
                 try:
                     content = pyproject.read_text()
                     # Look for version = "x.y.z" pattern in pyproject.toml
-                    version_match = re.search(VERSION_PATTERN, content, re.MULTILINE)
+                    version_match = VERSION_PATTERN.search(content)
                     if version_match:
                         mcp_version = version_match.group(1)
                 except Exception as e:
@@ -1176,7 +1178,7 @@ async def get_version_info(request: Request):
                     try:
                         content = setup_py.read_text()
                         # Look for version="x.y.z" or version='x.y.z' in setup() call
-                        version_match = re.search(VERSION_PATTERN, content, re.MULTILINE)
+                        version_match = VERSION_PATTERN.search(content)
                         if version_match:
                             mcp_version = version_match.group(1)
                     except Exception as e:
