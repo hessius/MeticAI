@@ -1909,6 +1909,64 @@ class TestShotAnalysisHelpers:
         assert result["triggered"]["type"] == "flow"
         assert result["triggered"]["actual"] == 1.5
 
+    def test_determine_exit_trigger_hit_zero_pressure(self):
+        """Test that zero pressure is treated as a legitimate value, not missing data."""
+        from main import _determine_exit_trigger_hit
+        
+        # Stage data where pressure dropped to zero (e.g., pressure release phase)
+        stage_data = {
+            "duration": 10.0,
+            "end_weight": 30.0,
+            "max_pressure": 5.0,
+            "min_pressure": 0.0,
+            "end_pressure": 0.0,  # Legitimate zero at end
+            "max_flow": 2.0,
+            "min_flow": 0.5,
+            "end_flow": 0.5
+        }
+        
+        # Exit trigger: pressure <= 1.0 bar (should trigger because end_pressure is 0)
+        exit_triggers = [
+            {"type": "pressure", "value": 1.0, "comparison": "<="}
+        ]
+        
+        result = _determine_exit_trigger_hit(stage_data, exit_triggers)
+        
+        # Should trigger because end_pressure (0.0) <= 1.0
+        assert result["triggered"] is not None
+        assert result["triggered"]["type"] == "pressure"
+        # The actual value should be end_pressure (0.0), not min_pressure
+        assert result["triggered"]["actual"] == 0.0
+
+    def test_determine_exit_trigger_hit_zero_flow(self):
+        """Test that zero flow is treated as a legitimate value, not missing data."""
+        from main import _determine_exit_trigger_hit
+        
+        # Stage data where flow dropped to zero
+        stage_data = {
+            "duration": 12.0,
+            "end_weight": 35.0,
+            "max_pressure": 6.0,
+            "min_pressure": 5.0,
+            "end_pressure": 5.5,
+            "max_flow": 3.0,
+            "min_flow": 0.0,
+            "end_flow": 0.0  # Legitimate zero at end
+        }
+        
+        # Exit trigger: flow <= 0.5 ml/s (should trigger because end_flow is 0)
+        exit_triggers = [
+            {"type": "flow", "value": 0.5, "comparison": "<="}
+        ]
+        
+        result = _determine_exit_trigger_hit(stage_data, exit_triggers)
+        
+        # Should trigger because end_flow (0.0) <= 0.5
+        assert result["triggered"] is not None
+        assert result["triggered"]["type"] == "flow"
+        # The actual value should be end_flow (0.0), not min_flow
+        assert result["triggered"]["actual"] == 0.0
+
     def test_generate_execution_description_rising_pressure(self):
         """Test execution description for rising pressure."""
         from main import _generate_execution_description
@@ -2086,6 +2144,13 @@ class TestShotAnalysisHelpers:
 
     def test_generate_profile_target_curves_with_weight_based_dynamics(self):
         """Test generating target curves for weight-based dynamics."""
+    def test_generate_profile_target_curves_weight_based_dynamics(self):
+        """Test that weight-based dynamics stages are skipped in target curve generation.
+        
+        Weight-based dynamics cannot be plotted on a time-based chart since they
+        don't have a fixed time mapping. This test verifies the expected behavior
+        of skipping these stages rather than attempting to convert them.
+        """
         from main import _generate_profile_target_curves
         
         profile_data = {
@@ -2095,6 +2160,16 @@ class TestShotAnalysisHelpers:
                     "type": "flow",
                     "dynamics_points": [[0, 2.0], [20, 3.0], [40, 2.5]],  # Flow changes by weight
                     "dynamics_over": "weight"
+                    "name": "Weight-Based Pressure",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 2.0], [20, 9.0], [40, 6.0]],
+                    "dynamics_over": "weight"
+                },
+                {
+                    "name": "Time-Based Flow",
+                    "type": "flow",
+                    "dynamics_points": [[0, 2.5]],
+                    "dynamics_over": "time"
                 }
             ],
             "variables": []
@@ -2176,6 +2251,22 @@ class TestShotAnalysisHelpers:
         # Test edge case: empty list
         result = _interpolate_weight_to_time(10, [])
         assert result is None
+            "Weight-Based Pressure": (0.0, 15.0),
+            "Time-Based Flow": (15.0, 30.0)
+        }
+        
+        curves = _generate_profile_target_curves(profile_data, shot_stage_times)
+        
+        # Weight-based stages should be skipped, so only time-based stage should appear
+        flow_points = [c for c in curves if "target_flow" in c]
+        pressure_points = [c for c in curves if "target_pressure" in c]
+        
+        # Should have flow points from the time-based stage
+        assert len(flow_points) > 0
+        assert flow_points[0]["target_flow"] == 2.5
+        
+        # Should NOT have pressure points from the weight-based stage
+        assert len(pressure_points) == 0
 
     def test_local_analysis_includes_profile_target_curves(self):
         """Test that local analysis returns profile target curves."""
