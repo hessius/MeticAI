@@ -1230,12 +1230,6 @@ async def get_version_info(request: Request):
                         version_match = VERSION_PATTERN.search(content)
                         if version_match:
                             mcp_version = version_match.group(1)
-                        else:
-                            # Fallback to line-by-line parsing if regex doesn't match
-                            for line in content.split('\n'):
-                                if 'version' in line.lower() and '=' in line:
-                                    mcp_version = line.split('=')[1].strip().strip('"').strip("'")
-                                    break
                     except Exception as e:
                         logger.debug(
                             f"Failed to read version from setup.py: {str(e)}",
@@ -3407,11 +3401,9 @@ def _determine_exit_trigger_hit(
     end_weight = _safe_float(stage_data.get("end_weight", 0))
     # Pressure values for different comparison types
     max_pressure = _safe_float(stage_data.get("max_pressure", 0))
-    min_pressure = _safe_float(stage_data.get("min_pressure", 0))
     end_pressure = _safe_float(stage_data.get("end_pressure", 0))
     # Flow values for different comparison types
     max_flow = _safe_float(stage_data.get("max_flow", 0))
-    min_flow = _safe_float(stage_data.get("min_flow", 0))
     end_flow = _safe_float(stage_data.get("end_flow", 0))
     
     triggered = None
@@ -5472,7 +5464,13 @@ Remember: NO information should be lost in this conversion!"""
 # Run Shot Endpoints
 # ============================================================================
 
-# Scheduled shots storage (in-memory for now, could be persisted)
+# Scheduled shots storage.
+# NOTE: These dictionaries are in-memory only. Any scheduled shots and their
+# associated asyncio tasks will be lost if the server process restarts
+# (e.g., crash, deploy, or host reboot). This means shots scheduled for the
+# future will not execute after a restart. For production-grade durability,
+# consider persisting scheduled shots to disk or a database and recreating
+# tasks on application startup.
 _scheduled_shots: dict = {}
 _scheduled_tasks: dict = {}
 
