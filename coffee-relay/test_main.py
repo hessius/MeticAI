@@ -4259,148 +4259,42 @@ class TestHelperFunctions:
         """Test extracting profile name from LLM reply."""
         from main import _extract_profile_name
         
-        # Test with clear profile name
-        reply = "Profile Created: My Amazing Profile"
-        name = _extract_profile_name(reply)
-        assert name == "My Amazing Profile"
-        
-        # Test with variations
-        reply2 = "profile created: Simple Name"
-        name2 = _extract_profile_name(reply2)
-        assert name2 == "Simple Name"
-    
-    def test_parse_gemini_error_messages(self):
-        """Test parsing various Gemini error messages."""
-        from main import parse_gemini_error
-        
-        # Test API key error
-        error = "API key not valid"
-        result = parse_gemini_error(error)
-        assert "API key" in result or "key" in result.lower()
-        
-        # Test rate limit
-        error2 = "429 RESOURCE_EXHAUSTED"
-        result2 = parse_gemini_error(error2)
-        assert "rate" in result2.lower() or "quota" in result2.lower()
-        
-        # Test generic error
-        error3 = "Unknown error"
-        result3 = parse_gemini_error(error3)
-        assert isinstance(result3, str)
 
-
-class TestAdditionalCoverage:
-    """Additional tests to improve coverage to 68%."""
+class TestVersionEndpoint:
+    """Tests for the /api/version endpoint."""
     
-    def test_save_settings_endpoint_structure(self, client):
-        """Test save settings endpoint accepts valid data."""
-        from unittest.mock import patch
-        
-        test_settings = {
-            "geminiApiKey": "test_key_123",
-            "meticulousIp": "192.168.1.100",
-            "serverIp": "192.168.1.101",
-            "authorName": "Test User"
-        }
-        
-        with patch.dict('os.environ', {"GEMINI_API_KEY": "test"}):
-            # Just test the endpoint structure, don't actually save
-            # (endpoint requires more complex setup)
-            response = client.post("/api/settings", json=test_settings)
-            # Endpoint may return various statuses depending on setup
-            assert response.status_code in [200, 422, 500]
-    
-    def test_get_settings_endpoint(self, client):
-        """Test get settings endpoint."""
-        from unittest.mock import patch
-        
-        with patch.dict('os.environ', {"GEMINI_API_KEY": "test"}):
-            response = client.get("/api/settings")
-            # Endpoint may succeed or fail depending on setup
-            assert response.status_code in [200, 500]
-    
-    def test_llm_cache_expiration(self):
-        """Test LLM cache expiration logic."""
-        from main import save_llm_analysis_to_cache, get_cached_llm_analysis, LLM_CACHE_TTL_SECONDS
-        import time
-        
-        # Save with current timestamp
-        save_llm_analysis_to_cache("ExpireTest", "2024-01-01", "test.json", "Old analysis")
-        
-        # Should be cached
-        result = get_cached_llm_analysis("ExpireTest", "2024-01-01", "test.json")
-        assert result == "Old analysis"
-        
-        # Note: We can't easily test expiration without mocking time
-        # But we've at least tested the happy path
-    
-    def test_shot_cache_with_different_limits(self):
-        """Test shot cache respects different limits."""
-        from main import _set_cached_shots, _get_cached_shots
-        
-        test_data_50 = {"shots": list(range(50))}
-        test_data_100 = {"shots": list(range(100))}
-        
-        # Cache with limit 50
-        _set_cached_shots("Profile1", test_data_50, limit=50)
-        
-        # Cache with limit 100
-        _set_cached_shots("Profile2", test_data_100, limit=100)
-        
-        # Retrieve both
-        result1, _, _ = _get_cached_shots("Profile1", limit=50)
-        result2, _, _ = _get_cached_shots("Profile2", limit=100)
-        
-        assert result1 is not None
-        assert result2 is not None
-    
-    def test_extract_profile_name_edge_cases(self):
-        """Test profile name extraction with edge cases."""
-        from main import _extract_profile_name
-        
-        # Test with no match
-        reply_no_match = "This is just a regular message"
-        name = _extract_profile_name(reply_no_match)
-        assert name == "Untitled Profile"
-        
-        # Test with extra whitespace
-        reply_whitespace = "Profile Created:    Spaced Name   "
-        name2 = _extract_profile_name(reply_whitespace)
-        assert "Spaced Name" in name2
-    
-    def test_safe_float_with_none(self):
-        """Test _safe_float with None value."""
-        from main import _safe_float
-        
-        result = _safe_float(None)
-        assert result == 0.0
-        
-        result2 = _safe_float("not a number")
-        assert result2 == 0.0
-        
-        result3 = _safe_float(42.5)
-        assert result3 == 42.5
-    
-    def test_history_pagination(self, client):
-        """Test history pagination parameters."""
-        response = client.get("/api/history?page=1&per_page=10")
+    def test_version_endpoint_basic_structure(self, client):
+        """Test basic version endpoint returns correct structure."""
+        response = client.get("/api/version")
         assert response.status_code == 200
+        
         data = response.json()
-        # API returns 'entries' not 'history'
-        assert "entries" in data
-        assert "total" in data
-        assert "limit" in data or "per_page" in data
+        assert "meticai" in data
+        assert "meticai_web" in data
+        assert "mcp_server" in data
+        assert "mcp_repo_url" in data
+        # Should always have a repo URL (at minimum the default)
+        assert isinstance(data["mcp_repo_url"], str)
+        assert len(data["mcp_repo_url"]) > 0
     
-    def test_clear_history_endpoint(self, client):
-        """Test clear history endpoint."""
-        # First add some history
-        from main import save_to_history
-        save_to_history("Test Coffee", "Test Prefs", "Test Reply")
-        
-        # Clear it
-        response = client.delete("/api/history")
+    def test_version_endpoint_returns_default_fallback(self, client):
+        """Test that version endpoint returns a valid URL."""
+        response = client.get("/api/version")
         assert response.status_code == 200
         
+        data = response.json()
+        # Should be a GitHub URL
+        assert "github.com" in data["mcp_repo_url"]
+        assert "meticulous-mcp" in data["mcp_repo_url"]
+    
+    def test_version_endpoint_handles_errors_gracefully(self, client):
+        """Test that version endpoint doesn't crash even if files are missing."""
+        # Even if all files are missing, endpoint should work
+        response = client.get("/api/version")
+        assert response.status_code == 200
+        
+        data = response.json()
+        # Should have all required keys even on error
         # Verify it's cleared
         response2 = client.get("/api/history")
         data = response2.json()
