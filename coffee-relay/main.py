@@ -1144,10 +1144,41 @@ async def get_version_info(request: Request):
         if web_version_file.exists():
             meticai_web_version = web_version_file.read_text().strip()
         
-        # Read MCP server version from meticulous-source
+        # Read MCP server version and repo URL from meticulous-source
         mcp_version = "unknown"
-        mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"
+        mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"  # Default fallback
         mcp_source_dir = Path(__file__).parent.parent / "meticulous-source"
+        
+        # Try to get repo URL from .versions.json first (mounted by docker-compose)
+        versions_file = Path(__file__).parent.parent / ".versions.json"
+        if versions_file.exists():
+            try:
+                versions_data = json.loads(versions_file.read_text())
+                if "repositories" in versions_data and "meticulous-mcp" in versions_data["repositories"]:
+                    repo_url_from_file = versions_data["repositories"]["meticulous-mcp"].get("repo_url")
+                    if repo_url_from_file and repo_url_from_file != "unknown":
+                        mcp_repo_url = repo_url_from_file
+            except Exception:
+                pass  # Continue with fallback methods
+        
+        # If not found in .versions.json, try git remote from meticulous-source
+        if mcp_repo_url == "https://github.com/manonstreet/meticulous-mcp" and mcp_source_dir.exists():
+            git_dir = mcp_source_dir / ".git"
+            if git_dir.exists():
+                try:
+                    result = subprocess.run(
+                        ["git", "config", "--get", "remote.origin.url"],
+                        cwd=mcp_source_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0 and result.stdout.strip():
+                        mcp_repo_url = result.stdout.strip()
+                except Exception:
+                    pass  # Keep default fallback
+        
+        # Get MCP version from pyproject.toml
         if mcp_source_dir.exists():
             # Try to get version from pyproject.toml or setup.py
             pyproject = mcp_source_dir / "pyproject.toml"
