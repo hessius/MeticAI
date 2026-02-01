@@ -15,6 +15,7 @@ from pathlib import Path
 import uuid
 import time
 import tempfile
+import re
 from logging_config import setup_logging, get_logger
 
 # Initialize logging system with environment-aware defaults
@@ -106,6 +107,11 @@ UPDATE_CHECK_INTERVAL = 7200
 
 # Maximum upload file size: 10 MB
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
+
+# Regex pattern for extracting version from pyproject.toml or setup.py
+# Matches: version = "x.y.z" or version = 'x.y.z'
+# Pre-compiled for better performance when called repeatedly
+VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 
 
 async def check_for_updates_task():
@@ -1118,6 +1124,142 @@ def get_author_name() -> str:
     settings = _load_settings()
     author = settings.get("authorName", "").strip()
     return author if author else "MeticAI"
+
+
+@app.get("/api/version")
+async def get_version_info(request: Request):
+    """Get version information for all MeticAI components.
+    
+    Returns version info for:
+    - MeticAI (backend)
+    - MeticAI-web (frontend)
+    - MCP Server
+    """
+    request_id = request.state.request_id
+    
+    try:
+        # Read MeticAI version from VERSION file
+        meticai_version = "unknown"
+        version_file = Path(__file__).parent.parent / "VERSION"
+        if version_file.exists():
+            meticai_version = version_file.read_text().strip()
+        
+        # Read MeticAI-web version from meticai-web/VERSION
+        meticai_web_version = "unknown"
+        web_version_file = Path(__file__).parent.parent / "meticai-web" / "VERSION"
+        if web_version_file.exists():
+            meticai_web_version = web_version_file.read_text().strip()
+        
+        # Read MCP server version and repo URL from meticulous-source
+        mcp_version = "unknown"
+        mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"  # Default fallback
+        mcp_source_dir = Path(__file__).parent.parent / "meticulous-source"
+        
+        # Try to get repo URL from .versions.json first (mounted by docker-compose)
+        versions_file = Path(__file__).parent.parent / ".versions.json"
+        if versions_file.exists():
+            try:
+                versions_data = json.loads(versions_file.read_text())
+                if "repositories" in versions_data and "meticulous-mcp" in versions_data["repositories"]:
+                    repo_url_from_file = versions_data["repositories"]["meticulous-mcp"].get("repo_url")
+                    if repo_url_from_file and repo_url_from_file != "unknown":
+                        mcp_repo_url = repo_url_from_file
+            except Exception as e:
+                logger.debug(
+                    f"Failed to read MCP repo URL from .versions.json: {str(e)}",
+                    extra={"request_id": request_id}
+                )
+        
+        # If not found in .versions.json, try git remote from meticulous-source
+        if mcp_repo_url == "https://github.com/manonstreet/meticulous-mcp" and mcp_source_dir.exists():
+            git_dir = mcp_source_dir / ".git"
+            if git_dir.exists():
+                try:
+                    # Validate that mcp_source_dir is within expected bounds
+                    base_dir = Path(__file__).parent.parent.resolve()
+                    resolved_mcp_dir = mcp_source_dir.resolve()
+                    if not str(resolved_mcp_dir).startswith(str(base_dir)):
+                        logger.warning(
+                            f"MCP source directory is outside base directory: {resolved_mcp_dir}",
+                            extra={"request_id": request_id}
+                        )
+                    else:
+                        result = subprocess.run(
+                            ["git", "config", "--get", "remote.origin.url"],
+                            cwd=resolved_mcp_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        if result.returncode == 0 and result.stdout.strip():
+                            mcp_repo_url = result.stdout.strip()
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to read MCP repo URL from git remote: {str(e)}",
+                        extra={"request_id": request_id}
+                    )
+        
+        # Get MCP version from pyproject.toml
+        if mcp_source_dir.exists():
+            # Try to get version from pyproject.toml or setup.py
+            version_found = False
+            pyproject = mcp_source_dir / "pyproject.toml"
+            if pyproject.exists():
+                try:
+                    content = pyproject.read_text()
+                    # Look for version = "x.y.z" pattern in pyproject.toml
+                    version_match = VERSION_PATTERN.search(content)
+                    if version_match:
+                        mcp_version = version_match.group(1)
+                        version_found = True
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to read version from pyproject.toml: {str(e)}",
+                        extra={"request_id": request_id},
+                        exc_info=True
+                    )
+            
+            # Fallback to setup.py if version not found in pyproject.toml
+            if not version_found:
+                setup_py = mcp_source_dir / "setup.py"
+                if setup_py.exists():
+                    try:
+                        content = setup_py.read_text()
+                        # Look for version = "x.y.z" pattern in setup.py
+                        version_match = VERSION_PATTERN.search(content)
+                        if version_match:
+                            mcp_version = version_match.group(1)
+                        else:
+                            # Fallback to line-by-line parsing if regex doesn't match
+                            for line in content.split('\n'):
+                                if 'version' in line.lower() and '=' in line:
+                                    mcp_version = line.split('=')[1].strip().strip('"').strip("'")
+                                    break
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to read version from setup.py: {str(e)}",
+                            extra={"request_id": request_id},
+                            exc_info=True
+                        )
+        
+        return {
+            "meticai": meticai_version,
+            "meticai_web": meticai_web_version,
+            "mcp_server": mcp_version,
+            "mcp_repo_url": mcp_repo_url
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to get version info: {str(e)}",
+            extra={"request_id": request_id},
+            exc_info=True
+        )
+        return {
+            "meticai": "unknown",
+            "meticai_web": "unknown", 
+            "mcp_server": "unknown",
+            "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp"
+        }
 
 
 @app.get("/api/settings")
