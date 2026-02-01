@@ -5047,7 +5047,7 @@ class TestRunShotEndpoints:
         mock_api = MagicMock()
         # Ensure the mock response doesn't have an error attribute
         mock_result = MagicMock(spec=[])  # Empty spec means no 'error' attribute
-        mock_api.update_setting.return_value = mock_result
+        mock_api.execute_action.return_value = mock_result
         mock_get_api.return_value = mock_api
 
         response = client.post("/api/machine/preheat")
@@ -5061,8 +5061,8 @@ class TestRunShotEndpoints:
     def test_preheat_connection_error(self, mock_get_api, client):
         """Test preheat when connection fails."""
         mock_api = MagicMock()
-        # Simulate a connection error when trying to update settings
-        mock_api.update_setting.side_effect = Exception("Connection refused")
+        # Simulate a connection error when trying to execute action
+        mock_api.execute_action.side_effect = Exception("Connection refused")
         mock_get_api.return_value = mock_api
 
         response = client.post("/api/machine/preheat")

@@ -1180,6 +1180,9 @@ async def get_version_info(request: Request):
                     repo_url_from_file = versions_data["repositories"]["meticulous-mcp"].get("repo_url")
                     if repo_url_from_file and repo_url_from_file != "unknown":
                         mcp_repo_url = repo_url_from_file
+                        # Remove .git suffix if present for cleaner URL
+                        if mcp_repo_url.endswith('.git'):
+                            mcp_repo_url = mcp_repo_url[:-4]
             except Exception as e:
                 logger.debug(
                     f"Failed to read MCP repo URL from .versions.json: {str(e)}",
@@ -1210,6 +1213,9 @@ async def get_version_info(request: Request):
                         )
                         if result.returncode == 0 and result.stdout.strip():
                             mcp_repo_url = result.stdout.strip()
+                            # Remove .git suffix if present for cleaner URL
+                            if mcp_repo_url.endswith('.git'):
+                                mcp_repo_url = mcp_repo_url[:-4]
                 except Exception as e:
                     logger.debug(
                         f"Failed to read MCP repo URL from git remote: {str(e)}",
@@ -2074,7 +2080,7 @@ async def execute_scheduled_shot(
         scheduled_tasks_dict: Reference to the global scheduled tasks dictionary
         preheat_duration_minutes: Minutes to preheat (default: 10)
     """
-    from meticulous.api_types import PartialSettings, ActionType
+    from meticulous.api_types import ActionType
     
     try:
         api = get_meticulous_api()
@@ -2086,10 +2092,9 @@ async def execute_scheduled_shot(
                 await asyncio.sleep(preheat_delay)
                 scheduled_shots_dict[schedule_id]["status"] = "preheating"
                 
-                # Start preheat
+                # Start preheat using ActionType.PREHEAT
                 try:
-                    settings = PartialSettings(auto_preheat=1)
-                    api.update_setting(settings)
+                    api.execute_action(ActionType.PREHEAT)
                 except Exception as e:
                     logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
                 
@@ -2099,8 +2104,7 @@ async def execute_scheduled_shot(
                 # Not enough time for full preheat, start immediately
                 scheduled_shots_dict[schedule_id]["status"] = "preheating"
                 try:
-                    settings = PartialSettings(auto_preheat=1)
-                    api.update_setting(settings)
+                    api.execute_action(ActionType.PREHEAT)
                 except Exception as e:
                     logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
                 await asyncio.sleep(shot_delay)
@@ -5730,11 +5734,10 @@ async def _restore_scheduled_shots():
                             _scheduled_shots[sid]["status"] = "preheating"
                             await _save_scheduled_shots()
                             
-                            # Start preheat
+                            # Start preheat using ActionType.PREHEAT
                             try:
-                                from meticulous.api_types import PartialSettings
-                                settings = PartialSettings(auto_preheat=1)
-                                api.update_setting(settings)
+                                from meticulous.api_types import ActionType
+                                api.execute_action(ActionType.PREHEAT)
                             except Exception as e:
                                 logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
                             
@@ -5745,9 +5748,8 @@ async def _restore_scheduled_shots():
                             _scheduled_shots[sid]["status"] = "preheating"
                             await _save_scheduled_shots()
                             try:
-                                from meticulous.api_types import PartialSettings
-                                settings = PartialSettings(auto_preheat=1)
-                                api.update_setting(settings)
+                                from meticulous.api_types import ActionType
+                                api.execute_action(ActionType.PREHEAT)
                             except Exception as e:
                                 logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
                             await asyncio.sleep(delay)
@@ -5900,12 +5902,10 @@ async def start_preheat(request: Request):
                 detail="Meticulous machine not connected"
             )
         
-        # Enable auto_preheat setting and trigger it
-        # The Meticulous machine handles preheat via the settings
+        # Use ActionType.PREHEAT to start the preheat cycle
         try:
-            from meticulous.api_types import PartialSettings
-            settings = PartialSettings(auto_preheat=1)  # Enable preheat
-            result = api.update_setting(settings)
+            from meticulous.api_types import ActionType
+            result = api.execute_action(ActionType.PREHEAT)
             
             if hasattr(result, 'error') and result.error:
                 raise HTTPException(
@@ -5915,8 +5915,8 @@ async def start_preheat(request: Request):
         except ImportError:
             # Fallback: direct API call
             result = api.session.post(
-                f"{api.base_url}/api/v1/settings",
-                json={"auto_preheat": 1}
+                f"{api.base_url}/api/v1/action",
+                json={"action": "preheat"}
             )
             if result.status_code != 200:
                 raise HTTPException(
@@ -6103,11 +6103,10 @@ async def schedule_shot(request: Request):
                         _scheduled_shots[schedule_id]["status"] = "preheating"
                         await _save_scheduled_shots()
                         
-                        # Start preheat
+                        # Start preheat using ActionType.PREHEAT
                         try:
-                            from meticulous.api_types import PartialSettings
-                            settings = PartialSettings(auto_preheat=1)
-                            api.update_setting(settings)
+                            from meticulous.api_types import ActionType as AT
+                            api.execute_action(AT.PREHEAT)
                         except Exception as e:
                             logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
                         
@@ -6119,9 +6118,8 @@ async def schedule_shot(request: Request):
                         _scheduled_shots[schedule_id]["status"] = "preheating"
                         await _save_scheduled_shots()
                         try:
-                            from meticulous.api_types import PartialSettings
-                            settings = PartialSettings(auto_preheat=1)
-                            api.update_setting(settings)
+                            from meticulous.api_types import ActionType as AT
+                            api.execute_action(AT.PREHEAT)
                         except Exception as e:
                             logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
                 
