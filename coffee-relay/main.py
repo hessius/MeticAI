@@ -5465,7 +5465,13 @@ Remember: NO information should be lost in this conversion!"""
 # Run Shot Endpoints
 # ============================================================================
 
-# Scheduled shots storage (in-memory for now, could be persisted)
+# Scheduled shots storage.
+# NOTE: These dictionaries are in-memory only. Any scheduled shots and their
+# associated asyncio tasks will be lost if the server process restarts
+# (e.g., crash, deploy, or host reboot). This means shots scheduled for the
+# future will not execute after a restart. For production-grade durability,
+# consider persisting scheduled shots to disk or a database and recreating
+# tasks on application startup.
 _scheduled_shots: dict = {}
 _scheduled_tasks: dict = {}
 
