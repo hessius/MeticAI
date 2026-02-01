@@ -1156,6 +1156,7 @@ async def get_version_info(request: Request):
         mcp_source_dir = Path(__file__).parent.parent / "meticulous-source"
         if mcp_source_dir.exists():
             # Try to get version from pyproject.toml or setup.py
+            version_found = False
             pyproject = mcp_source_dir / "pyproject.toml"
             if pyproject.exists():
                 try:
@@ -1164,6 +1165,7 @@ async def get_version_info(request: Request):
                     version_match = VERSION_PATTERN.search(content)
                     if version_match:
                         mcp_version = version_match.group(1)
+                        version_found = True
                 except Exception as e:
                     logger.debug(
                         f"Failed to read version from pyproject.toml: {str(e)}",
@@ -1172,12 +1174,12 @@ async def get_version_info(request: Request):
                     )
             
             # Fallback to setup.py if version not found in pyproject.toml
-            if mcp_version == "unknown":
+            if not version_found:
                 setup_py = mcp_source_dir / "setup.py"
                 if setup_py.exists():
                     try:
                         content = setup_py.read_text()
-                        # Look for version="x.y.z" or version='x.y.z' in setup() call
+                        # Look for version = "x.y.z" pattern in setup.py
                         version_match = VERSION_PATTERN.search(content)
                         if version_match:
                             mcp_version = version_match.group(1)
