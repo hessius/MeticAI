@@ -113,6 +113,9 @@ MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
 # Pre-compiled for better performance when called repeatedly
 VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 
+# Shot stage status constants
+STAGE_STATUS_RETRACTING = "retracting"
+
 
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
@@ -3648,10 +3651,6 @@ def _analyze_stage_execution(
         }
     
     return result
-
-
-# Shot stage status constants
-STAGE_STATUS_RETRACTING = "retracting"
 
 
 def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
