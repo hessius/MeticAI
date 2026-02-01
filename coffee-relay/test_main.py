@@ -4809,7 +4809,12 @@ class TestVersionEndpoint:
         
         data = response.json()
         # Should have all required keys even on error
-        # Verify it's cleared
+        assert "meticai" in data
+        assert "meticai_web" in data
+        assert "mcp_server" in data
+        assert "mcp_repo_url" in data
+
+        # Verify history can be retrieved and has expected structure
         response2 = client.get("/api/history")
         data = response2.json()
         # Should have minimal or no history in entries
@@ -4867,7 +4872,6 @@ class TestVersionEndpoint:
         
         # Setup path mocking to return appropriate files
         def path_side_effect(*args):
-            path_obj = Mock()
             if args:
                 path_str = str(args[0])
                 if "VERSION" in path_str and "meticai-web" not in path_str:
@@ -5025,6 +5029,9 @@ class TestRunShotEndpoints:
         assert "machine_status" in data
         # Connection error should be captured in the status
         assert "error" in data["machine_status"] or "state" in data["machine_status"]
+
+    @patch('main.get_meticulous_api')
+    def test_machine_status_api_unavailable(self, mock_get_api, client):
         """Test machine status when API is not available."""
         mock_get_api.return_value = None
 
@@ -5049,13 +5056,6 @@ class TestRunShotEndpoints:
         assert "message" in data
         assert "preheat" in data["message"].lower() or "Preheat" in data["message"]
 
-    @patch('main.get_meticulous_api')
-    def test_preheat_no_connection(self, mock_get_api, client):
-        """Test preheat when machine not reachable."""
-        mock_api = MagicMock()
-        # Simulate connection error when trying to update settings
-        mock_api.update_setting.side_effect = requests.exceptions.ConnectionError("Connection refused")
-        mock_api.base_url = "http://test-machine"
     @patch('main.get_meticulous_api')
     def test_preheat_connection_error(self, mock_get_api, client):
         """Test preheat when connection fails."""
@@ -5117,13 +5117,6 @@ class TestRunShotEndpoints:
         
         assert response.status_code == 502
 
-    @patch('main.get_meticulous_api')
-    def test_run_profile_no_connection(self, mock_get_api, client):
-        """Test run profile when machine not reachable."""
-        mock_api = MagicMock()
-        # Simulate connection error when trying to load profile
-        mock_api.load_profile_by_id.side_effect = requests.exceptions.ConnectionError("Connection refused")
-        mock_api.base_url = "http://test-machine"
     @patch('main.get_meticulous_api')
     def test_run_profile_connection_error(self, mock_get_api, client):
         """Test run profile when connection fails."""
