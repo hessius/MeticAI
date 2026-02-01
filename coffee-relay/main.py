@@ -15,6 +15,7 @@ from pathlib import Path
 import uuid
 import time
 import tempfile
+import re
 from logging_config import setup_logging, get_logger
 
 # Initialize logging system with environment-aware defaults
@@ -106,6 +107,11 @@ UPDATE_CHECK_INTERVAL = 7200
 
 # Maximum upload file size: 10 MB
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
+
+# Regex pattern for extracting version from pyproject.toml or setup.py
+# Matches: version = "x.y.z" or version = 'x.y.z'
+# Pre-compiled for better performance when called repeatedly
+VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 
 
 async def check_for_updates_task():
@@ -1196,10 +1202,39 @@ async def get_version_info(request: Request):
         # Get MCP version from pyproject.toml
         if mcp_source_dir.exists():
             # Try to get version from pyproject.toml or setup.py
+            version_found = False
             pyproject = mcp_source_dir / "pyproject.toml"
             if pyproject.exists():
                 try:
                     content = pyproject.read_text()
+                    # Look for version = "x.y.z" pattern in pyproject.toml
+                    version_match = VERSION_PATTERN.search(content)
+                    if version_match:
+                        mcp_version = version_match.group(1)
+                        version_found = True
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to read version from pyproject.toml: {str(e)}",
+                        extra={"request_id": request_id},
+                        exc_info=True
+                    )
+            
+            # Fallback to setup.py if version not found in pyproject.toml
+            if not version_found:
+                setup_py = mcp_source_dir / "setup.py"
+                if setup_py.exists():
+                    try:
+                        content = setup_py.read_text()
+                        # Look for version = "x.y.z" pattern in setup.py
+                        version_match = VERSION_PATTERN.search(content)
+                        if version_match:
+                            mcp_version = version_match.group(1)
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to read version from setup.py: {str(e)}",
+                            extra={"request_id": request_id},
+                            exc_info=True
+                        )
                     for line in content.split('\n'):
                         if 'version' in line.lower() and '=' in line:
                             mcp_version = line.split('=')[1].strip().strip('"').strip("'")
