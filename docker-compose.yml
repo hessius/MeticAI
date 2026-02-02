@@ -60,6 +60,8 @@ services:
       - ./.update-requested:/app/.update-requested
       # Mount restart signal file for host-side watcher
       - ./.restart-requested:/app/.restart-requested
+      # Mount watcher log file for status endpoint
+      - ./.rebuild-watcher.log:/app/.rebuild-watcher.log:ro
       # Mount logs directory for persistent log storage
       - ./logs:/app/logs
       # Mount data directory for profile history
