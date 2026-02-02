@@ -1166,10 +1166,44 @@ async def get_version_info(request: Request):
         if web_version_file.exists():
             meticai_web_version = web_version_file.read_text().strip()
         
+        # Try to get git commit hash for meticai-web if version not found or to supplement
+        meticai_web_commit = None
+        web_git_dir = Path(__file__).parent.parent / "meticai-web" / ".git"
+        if web_git_dir.exists():
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    cwd=Path(__file__).parent.parent / "meticai-web",
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    meticai_web_commit = result.stdout.strip()
+            except Exception:
+                pass
+        
         # Read MCP server version and repo URL from meticulous-source
         mcp_version = "unknown"
+        mcp_commit = None
         mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"  # Default fallback
         mcp_source_dir = Path(__file__).parent.parent / "meticulous-source"
+        
+        # Try to get git commit hash for MCP
+        mcp_git_dir = mcp_source_dir / ".git"
+        if mcp_git_dir.exists():
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    cwd=mcp_source_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    mcp_commit = result.stdout.strip()
+            except Exception:
+                pass
         
         # Try to get repo URL from .versions.json first (mounted by docker-compose)
         versions_file = Path(__file__).parent.parent / ".versions.json"
@@ -1259,10 +1293,16 @@ async def get_version_info(request: Request):
                             exc_info=True
                         )
         
+        # Use commit hash as version fallback if no version found
+        if mcp_version == "unknown" and mcp_commit:
+            mcp_version = mcp_commit
+        
         return {
             "meticai": meticai_version,
             "meticai_web": meticai_web_version,
+            "meticai_web_commit": meticai_web_commit,
             "mcp_server": mcp_version,
+            "mcp_commit": mcp_commit,
             "mcp_repo_url": mcp_repo_url
         }
     except Exception as e:
@@ -1273,8 +1313,10 @@ async def get_version_info(request: Request):
         )
         return {
             "meticai": "unknown",
-            "meticai_web": "unknown", 
+            "meticai_web": "unknown",
+            "meticai_web_commit": None,
             "mcp_server": "unknown",
+            "mcp_commit": None,
             "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp"
         }
 
