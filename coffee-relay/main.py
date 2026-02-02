@@ -5980,15 +5980,26 @@ async def _restore_scheduled_shots():
             # Recreate the async task
             profile_id = shot.get("profile_id")
             preheat = shot.get("preheat", False)
+            current_status = shot.get("status", "scheduled")
             shot_delay = (scheduled_time - now).total_seconds()
             
-            # Create the execution task
-            async def execute_scheduled_shot(sid=schedule_id, pid=profile_id, ph=preheat, delay=shot_delay):
+            # Create the execution task that handles restoration properly
+            async def execute_scheduled_shot(sid=schedule_id, pid=profile_id, ph=preheat, delay=shot_delay, was_preheating=(current_status == "preheating")):
                 try:
                     api = get_meticulous_api()
                     
-                    # If preheat is enabled, start it 10 minutes before
-                    if ph:
+                    # If we were already preheating when restored, skip preheat logic
+                    # and just wait for the shot time
+                    if was_preheating:
+                        logger.info(f"Restored shot {sid} was already preheating, waiting {delay:.0f}s until shot time")
+                        _scheduled_shots[sid]["status"] = "preheating"
+                        await _save_scheduled_shots()
+                        
+                        # Just wait until shot time (preheat should still be running on machine)
+                        if delay > 0:
+                            await asyncio.sleep(delay)
+                    elif ph:
+                        # Normal preheat flow for shots that weren't yet preheating
                         preheat_delay = delay - (PREHEAT_DURATION_MINUTES * 60)
                         if preheat_delay > 0:
                             await asyncio.sleep(preheat_delay)
@@ -6055,7 +6066,7 @@ async def _restore_scheduled_shots():
             
             logger.info(
                 f"Restored scheduled shot {schedule_id} for {scheduled_time_str} "
-                f"(profile: {profile_id}, preheat: {preheat})"
+                f"(profile: {profile_id}, preheat: {preheat}, status: {current_status}, delay: {shot_delay:.0f}s)"
             )
             
         except Exception as e:
