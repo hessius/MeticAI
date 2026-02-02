@@ -4177,8 +4177,17 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
     for stage in stages:
         stage_name = stage.get("name", "")
         stage_type = stage.get("type", "")  # pressure or flow
+        
+        # Handle both flat format (dynamics_points) and nested format (dynamics.points)
         dynamics_points = stage.get("dynamics_points", [])
         dynamics_over = stage.get("dynamics_over", "time")  # time or weight
+        
+        # If flat format not found, try nested dynamics object
+        if not dynamics_points:
+            dynamics_obj = stage.get("dynamics", {})
+            if isinstance(dynamics_obj, dict):
+                dynamics_points = dynamics_obj.get("points", [])
+                dynamics_over = dynamics_obj.get("over", "time")
         
         if not dynamics_points:
             continue
