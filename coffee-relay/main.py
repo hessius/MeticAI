@@ -4563,9 +4563,13 @@ async def analyze_shot(
         api = get_meticulous_api()
         profiles_result = api.list_profiles()
         
+        logger.debug(f"Looking for profile '{profile_name}' in {len(profiles_result)} profiles")
+        
         profile_data = None
         for partial_profile in profiles_result:
-            if partial_profile.name.lower() == profile_name.lower():
+            # Compare ignoring case and whitespace
+            if partial_profile.name.lower().strip() == profile_name.lower().strip():
+                logger.debug(f"Found matching profile: {partial_profile.name} (id={partial_profile.id})")
                 full_profile = api.get_profile(partial_profile.id)
                 if not (hasattr(full_profile, 'error') and full_profile.error):
                     # Convert profile object to dict
@@ -4599,7 +4603,7 @@ async def analyze_shot(
                             # Add dynamics - handle both direct attributes and dynamics object
                             if hasattr(stage, 'dynamics') and stage.dynamics is not None:
                                 dynamics = stage.dynamics
-                                if hasattr(dynamics, 'points'):
+                                if hasattr(dynamics, 'points') and dynamics.points:
                                     stage_dict['dynamics_points'] = dynamics.points
                                 if hasattr(dynamics, 'over'):
                                     stage_dict['dynamics_over'] = dynamics.over
