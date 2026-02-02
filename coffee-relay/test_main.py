@@ -2194,6 +2194,123 @@ class TestShotAnalysisHelpers:
         # 40g should be at 30s (from shot data)
         assert abs(flow_points[2]["time"] - 30.0) < 1.0
 
+    def test_generate_profile_target_curves_nested_dynamics_format(self):
+        """Test generating target curves when dynamics is nested (dynamics.points format from embedded profile)."""
+        from main import _generate_profile_target_curves
+        
+        # Profile with nested dynamics format (as embedded in shot data from machine)
+        profile_data = {
+            "stages": [
+                {
+                    "name": "Ultra Slow Preinfusion",
+                    "type": "flow",
+                    "dynamics": {
+                        "points": [[0, 1.3]],
+                        "over": "time",
+                        "interpolation": "linear"
+                    }
+                },
+                {
+                    "name": "Pressure Ramp Up",
+                    "type": "pressure",
+                    "dynamics": {
+                        "points": [[0, 2.1], [2, 8.4], [40.9, 3.7]],
+                        "over": "time",
+                        "interpolation": "curve"
+                    }
+                }
+            ],
+            "variables": []
+        }
+        
+        shot_stage_times = {
+            "Ultra Slow Preinfusion": (0.0, 19.0),
+            "Pressure Ramp Up": (19.0, 45.0)
+        }
+        
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "flow": 1.3}, "status": "Ultra Slow Preinfusion"},
+                {"time": 19000, "shot": {"weight": 5.0, "flow": 1.3}, "status": "Ultra Slow Preinfusion"},
+                {"time": 20000, "shot": {"weight": 6.0, "pressure": 2.5}, "status": "Pressure Ramp Up"},
+                {"time": 45000, "shot": {"weight": 36.0, "pressure": 4.0}, "status": "Pressure Ramp Up"}
+            ]
+        }
+        
+        curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
+        
+        assert isinstance(curves, list)
+        assert len(curves) > 0
+        
+        # Should have both flow and pressure targets
+        flow_points = [c for c in curves if "target_flow" in c]
+        pressure_points = [c for c in curves if "target_pressure" in c]
+        
+        assert len(flow_points) >= 2  # At least start and end of flow stage
+        assert len(pressure_points) >= 3  # Three dynamics points in pressure stage
+        
+        # Verify flow targets
+        assert flow_points[0]["target_flow"] == 1.3
+        
+        # Verify pressure targets (should have the ramp values)
+        pressure_values = [p["target_pressure"] for p in pressure_points]
+        assert 2.1 in pressure_values
+        assert 8.4 in pressure_values
+        assert 3.7 in pressure_values
+
+    def test_generate_profile_target_curves_handles_both_formats(self):
+        """Test that target curve generation handles both flat and nested dynamics formats."""
+        from main import _generate_profile_target_curves
+        
+        # Mix of both formats in same profile
+        profile_data = {
+            "stages": [
+                {
+                    # Flat format (dynamics_points)
+                    "name": "Stage1",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 3.0]],
+                    "dynamics_over": "time"
+                },
+                {
+                    # Nested format (dynamics.points)
+                    "name": "Stage2",
+                    "type": "flow",
+                    "dynamics": {
+                        "points": [[0, 2.0], [5, 3.0]],
+                        "over": "time"
+                    }
+                }
+            ],
+            "variables": []
+        }
+        
+        shot_stage_times = {
+            "Stage1": (0.0, 10.0),
+            "Stage2": (10.0, 20.0)
+        }
+        
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0}, "status": "Stage1"},
+                {"time": 10000, "shot": {"weight": 5}, "status": "Stage1"},
+                {"time": 11000, "shot": {"weight": 6}, "status": "Stage2"},
+                {"time": 20000, "shot": {"weight": 15}, "status": "Stage2"}
+            ]
+        }
+        
+        curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
+        
+        # Should have targets from both stages
+        pressure_points = [c for c in curves if "target_pressure" in c]
+        flow_points = [c for c in curves if "target_flow" in c]
+        
+        assert len(pressure_points) >= 1  # From Stage1
+        assert len(flow_points) >= 2  # From Stage2
+        assert pressure_points[0]["target_pressure"] == 3.0
+        assert 2.0 in [p["target_flow"] for p in flow_points]
+        assert 3.0 in [p["target_flow"] for p in flow_points]
+
     def test_interpolate_weight_to_time_with_edge_cases(self):
         """Test weight-to-time interpolation helper function including edge cases."""
         from main import _interpolate_weight_to_time
@@ -2316,6 +2433,102 @@ class TestShotAnalysisHelpers:
         assert "description" in result["execution_data"]
         assert isinstance(result["execution_data"]["description"], str)
         assert len(result["execution_data"]["description"]) > 0
+
+    def test_flow_stage_assessment_uses_end_flow_not_max_flow(self):
+        """Test that flow stage assessment uses end_flow instead of max_flow.
+        
+        The initial peak flow from piston retraction should be ignored.
+        Assessment should use end_flow which reflects the stabilized value.
+        """
+        from main import _analyze_stage_execution
+        
+        # Flow stage with target flow of 1.3 ml/s
+        profile_stage = {
+            "name": "Ultra Slow Preinfusion",
+            "key": "preinfusion",
+            "type": "flow",
+            "dynamics_points": [[0, 1.3]],  # Target 1.3 ml/s
+            "dynamics_over": "time",
+            "exit_triggers": [{"type": "time", "value": 20, "comparison": ">="}]
+        }
+        
+        # Shot stage data where:
+        # - max_flow is 4.8 (initial peak from piston)
+        # - end_flow is 1.5 (stabilized flow, close to target)
+        shot_stage_data = {
+            "duration": 18.0,  # Stage ended early (before 20s trigger)
+            "start_weight": 0.0,
+            "end_weight": 5.0,
+            "start_pressure": 0.0,
+            "end_pressure": 0.5,
+            "avg_pressure": 0.3,
+            "max_pressure": 0.6,
+            "min_pressure": 0.0,
+            "start_flow": 4.8,  # Initial peak
+            "end_flow": 1.5,    # Stabilized flow, close to target 1.3
+            "avg_flow": 2.0,
+            "max_flow": 4.8,    # Peak from initial rush
+            "min_flow": 0.5
+        }
+        
+        result = _analyze_stage_execution(profile_stage, shot_stage_data, 40.0)
+        
+        # Should have an assessment
+        assert result["assessment"] is not None
+        
+        # The message should reference end_flow (1.5), NOT max_flow (4.8)
+        message = result["assessment"]["message"]
+        assert "1.5" in message or "1.5" in message.replace(" ", "")  # end_flow value
+        assert "4.8" not in message  # max_flow should NOT be used
+        
+        # Status should be 'incomplete' (ended early) but goal reached
+        # because end_flow 1.5 >= 1.3 * 0.95 (target within 5%)
+        assert result["assessment"]["status"] == "incomplete"
+        assert "reached" in message.lower()
+
+    def test_pressure_stage_assessment_uses_max_pressure(self):
+        """Test that pressure stage assessment correctly uses max_pressure."""
+        from main import _analyze_stage_execution
+        
+        # Pressure stage with target 9 bar
+        profile_stage = {
+            "name": "Main Extraction",
+            "key": "main",
+            "type": "pressure",
+            "dynamics_points": [[0, 9.0]],  # Target 9 bar
+            "dynamics_over": "time",
+            "exit_triggers": [{"type": "time", "value": 30, "comparison": ">="}]
+        }
+        
+        # Shot stage where we hit target pressure
+        shot_stage_data = {
+            "duration": 25.0,  # Stage ended early
+            "start_weight": 5.0,
+            "end_weight": 30.0,
+            "start_pressure": 2.0,
+            "end_pressure": 8.5,
+            "avg_pressure": 8.0,
+            "max_pressure": 9.2,  # Hit target
+            "min_pressure": 2.0,
+            "start_flow": 0.5,
+            "end_flow": 2.5,
+            "avg_flow": 2.0,
+            "max_flow": 3.0,
+            "min_flow": 0.5
+        }
+        
+        result = _analyze_stage_execution(profile_stage, shot_stage_data, 50.0)
+        
+        # Should have an assessment
+        assert result["assessment"] is not None
+        
+        # The message should reference max_pressure (9.2)
+        message = result["assessment"]["message"]
+        assert "9.2" in message  # max_pressure value
+        
+        # Status should be 'incomplete' but goal reached
+        assert result["assessment"]["status"] == "incomplete"
+        assert "reached" in message.lower()
 
 
 class TestBasicEndpoints:
