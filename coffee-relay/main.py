@@ -868,6 +868,91 @@ async def get_status(request: Request):
             "message": "Could not read update status"
         }
 
+
+@app.get("/api/watcher-status")
+async def get_watcher_status(request: Request):
+    """Get the status of the host rebuild-watcher service.
+    
+    The watcher is considered active if:
+    1. The log file exists and was modified recently, OR
+    2. The signal file was processed (log is newer than signal)
+    
+    Returns:
+        - running: Whether the watcher appears to be running
+        - last_activity: Timestamp of last watcher activity
+        - message: Human-readable status message
+    """
+    request_id = request.state.request_id
+    
+    try:
+        import os
+        from datetime import datetime, timezone
+        
+        log_file = Path("/app/.rebuild-watcher.log")
+        restart_signal = Path("/app/.restart-requested")
+        
+        status = {
+            "running": False,
+            "last_activity": None,
+            "message": "Watcher status unknown"
+        }
+        
+        # Check 1: Log file exists and has recent activity
+        if log_file.exists():
+            log_mtime = os.path.getmtime(log_file)
+            log_time = datetime.fromtimestamp(log_mtime, tz=timezone.utc)
+            now = datetime.now(timezone.utc)
+            age_seconds = (now - log_time).total_seconds()
+            
+            status["last_activity"] = log_time.isoformat()
+            
+            # If log was modified in the last 10 minutes, watcher is likely active
+            if age_seconds < 600:  # 10 minutes
+                status["running"] = True
+                status["message"] = f"Watcher active (last activity {int(age_seconds)}s ago)"
+            else:
+                # Check the restart signal file's mtime vs log mtime
+                # If signal is newer than log, watcher might not be running
+                if restart_signal.exists():
+                    signal_mtime = os.path.getmtime(restart_signal)
+                    if signal_mtime > log_mtime + 10:  # Signal newer by >10s
+                        status["running"] = False
+                        status["message"] = "Watcher may not be running (signal not processed)"
+                    else:
+                        status["running"] = True
+                        status["message"] = f"Watcher idle (last activity {int(age_seconds/60)}m ago)"
+                else:
+                    status["running"] = True
+                    status["message"] = f"Watcher idle (last activity {int(age_seconds/60)}m ago)"
+        else:
+            # No log file - check if this is a fresh install
+            if restart_signal.exists():
+                status["running"] = False
+                status["message"] = "Watcher not installed or not running"
+            else:
+                status["message"] = "Unable to determine watcher status"
+        
+        logger.debug(
+            f"Watcher status: {status}",
+            extra={"request_id": request_id}
+        )
+        
+        return status
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to check watcher status: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        return {
+            "running": False,
+            "last_activity": None,
+            "error": str(e),
+            "message": "Failed to check watcher status"
+        }
+
+
 @app.post("/api/trigger-update")
 async def trigger_update(request: Request):
     """Trigger the backend update process by signaling the host.
@@ -1162,18 +1247,19 @@ async def get_version_info(request: Request):
         
         # Read MeticAI-web version from meticai-web/VERSION
         meticai_web_version = "unknown"
-        web_version_file = Path(__file__).parent.parent / "meticai-web" / "VERSION"
+        # In container: meticai-web is at /app/meticai-web (same level as main.py)
+        web_version_file = Path(__file__).parent / "meticai-web" / "VERSION"
         if web_version_file.exists():
             meticai_web_version = web_version_file.read_text().strip()
         
         # Try to get git commit hash for meticai-web if version not found or to supplement
         meticai_web_commit = None
-        web_git_dir = Path(__file__).parent.parent / "meticai-web" / ".git"
+        web_git_dir = Path(__file__).parent / "meticai-web" / ".git"
         if web_git_dir.exists():
             try:
                 result = subprocess.run(
                     ["git", "rev-parse", "--short", "HEAD"],
-                    cwd=Path(__file__).parent.parent / "meticai-web",
+                    cwd=Path(__file__).parent / "meticai-web",
                     capture_output=True,
                     text=True,
                     timeout=5
@@ -1187,7 +1273,8 @@ async def get_version_info(request: Request):
         mcp_version = "unknown"
         mcp_commit = None
         mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"  # Default fallback
-        mcp_source_dir = Path(__file__).parent.parent / "meticulous-source"
+        # In container: meticulous-source is at /app/meticulous-source (same level as main.py)
+        mcp_source_dir = Path(__file__).parent / "meticulous-source"
         
         # Try to get git commit hash for MCP
         mcp_git_dir = mcp_source_dir / ".git"
@@ -1206,7 +1293,8 @@ async def get_version_info(request: Request):
                 pass
         
         # Try to get repo URL from .versions.json first (mounted by docker-compose)
-        versions_file = Path(__file__).parent.parent / ".versions.json"
+        # In container: .versions.json is at /app/.versions.json (same level as main.py)
+        versions_file = Path(__file__).parent / ".versions.json"
         if versions_file.exists():
             try:
                 versions_data = json.loads(versions_file.read_text())
@@ -1362,12 +1450,27 @@ async def get_changelog(request: Request):
             
             if response.status_code == 200:
                 releases = response.json()
+                
+                def strip_installation_section(body: str) -> str:
+                    """Remove the Installation section from release notes."""
+                    if not body:
+                        return body
+                    # Find where Installation section starts (### Installation or ## Installation)
+                    import re
+                    # Match "### Installation" or "## Installation" and everything after until end or next major section
+                    pattern = r'\n---\n+### Installation.*$'
+                    cleaned = re.sub(pattern, '', body, flags=re.DOTALL | re.IGNORECASE)
+                    # Also try without the --- separator
+                    pattern2 = r'\n### Installation.*$'
+                    cleaned = re.sub(pattern2, '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+                    return cleaned.strip()
+                
                 changelog_data = {
                     "releases": [
                         {
                             "version": release.get("tag_name", ""),
                             "date": release.get("published_at", "")[:10] if release.get("published_at") else "",
-                            "body": release.get("body", "No release notes available.")
+                            "body": strip_installation_section(release.get("body", "No release notes available."))
                         }
                         for release in releases
                     ],
