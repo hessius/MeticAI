@@ -199,6 +199,200 @@ curl "http://<PI_IP>:8000/api/logs?lines=200&level=ERROR&log_type=errors"
 
 For more details on the logging system, see [LOGGING.md](LOGGING.md).
 
+### 6. Machine Control & Scheduled Shots
+
+#### 6.1 Get Machine Status
+`GET /api/machine/status`
+
+Get the current status of the Meticulous espresso machine, including scheduled shots.
+
+**Example:**
+```bash
+curl http://<PI_IP>:8000/api/machine/status
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "machine_status": {
+    "state": "idle",
+    "temperature": 93.5
+  },
+  "settings": {
+    "auto_preheat": 0
+  },
+  "current_profile": {
+    "id": "profile-123",
+    "name": "Morning Blend"
+  },
+  "scheduled_shots": [
+    {
+      "id": "shot-uuid-1",
+      "profile_id": "profile-123",
+      "scheduled_time": "2026-02-01T18:00:00Z",
+      "preheat": true,
+      "status": "scheduled",
+      "created_at": "2026-02-01T17:30:00Z"
+    }
+  ]
+}
+```
+
+#### 6.2 Preheat Machine
+`POST /api/machine/preheat`
+
+Start preheating the espresso machine. Preheating takes approximately 10 minutes.
+
+**Example:**
+```bash
+curl -X POST http://<PI_IP>:8000/api/machine/preheat
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Preheat started",
+  "estimated_ready_in_minutes": 10
+}
+```
+
+#### 6.3 Run Profile
+`POST /api/machine/run-profile/{profile_id}`
+
+Load and run a specific profile immediately.
+
+**Example:**
+```bash
+curl -X POST http://<PI_IP>:8000/api/machine/run-profile/my-profile-id
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Profile loaded and started",
+  "profile_id": "my-profile-id"
+}
+```
+
+#### 6.4 Schedule Shot
+`POST /api/machine/schedule-shot`
+
+Schedule a shot to run at a specific time in the future. Scheduled shots persist across server restarts.
+
+**Request Body:**
+- `profile_id` (optional): Profile ID to run
+- `scheduled_time` (required): ISO format datetime (e.g., "2026-02-01T18:00:00Z")
+- `preheat` (optional): Whether to preheat 10 minutes before (default: false)
+
+**Note:** Either `profile_id` or `preheat` must be provided (or both).
+
+**Example - Schedule with profile:**
+```bash
+curl -X POST http://<PI_IP>:8000/api/machine/schedule-shot \
+  -H "Content-Type: application/json" \
+  -d '{
+    "profile_id": "morning-blend",
+    "scheduled_time": "2026-02-02T07:00:00Z",
+    "preheat": true
+  }'
+```
+
+**Example - Preheat only:**
+```bash
+curl -X POST http://<PI_IP>:8000/api/machine/schedule-shot \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scheduled_time": "2026-02-02T07:00:00Z",
+    "preheat": true
+  }'
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "schedule_id": "uuid-of-scheduled-shot",
+  "scheduled_shot": {
+    "id": "uuid-of-scheduled-shot",
+    "profile_id": "morning-blend",
+    "scheduled_time": "2026-02-02T07:00:00Z",
+    "preheat": true,
+    "status": "scheduled",
+    "created_at": "2026-02-01T20:00:00Z"
+  }
+}
+```
+
+#### 6.5 List Scheduled Shots
+`GET /api/machine/scheduled-shots`
+
+List all scheduled shots. Completed or cancelled shots are automatically cleaned up after 1 hour.
+
+**Example:**
+```bash
+curl http://<PI_IP>:8000/api/machine/scheduled-shots
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "scheduled_shots": [
+    {
+      "id": "uuid-1",
+      "profile_id": "morning-blend",
+      "scheduled_time": "2026-02-02T07:00:00Z",
+      "preheat": true,
+      "status": "scheduled",
+      "created_at": "2026-02-01T20:00:00Z"
+    }
+  ]
+}
+```
+
+#### 6.6 Cancel Scheduled Shot
+`DELETE /api/machine/schedule-shot/{schedule_id}`
+
+Cancel a scheduled shot.
+
+**Example:**
+```bash
+curl -X DELETE http://<PI_IP>:8000/api/machine/schedule-shot/uuid-of-scheduled-shot
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Scheduled shot cancelled",
+  "schedule_id": "uuid-of-scheduled-shot"
+}
+```
+
+#### Scheduled Shots Persistence
+
+**Important:** Scheduled shots are automatically persisted to disk and will survive server restarts. This ensures that:
+
+- Scheduled shots are not lost during crashes, deploys, or host reboots
+- When the server restarts, pending scheduled shots are automatically restored
+- Background tasks are recreated to execute shots at the scheduled time
+- Expired scheduled shots (time in the past) are automatically skipped during restoration
+
+**Persistence Location:** Scheduled shots are stored in `/app/data/scheduled_shots.json` (or a temporary directory if the default location is not writable).
+
+**Status Values:**
+- `scheduled`: Shot is scheduled and waiting to execute
+- `preheating`: Machine is preheating before the shot
+- `running`: Shot is currently executing
+- `completed`: Shot completed successfully
+- `failed`: Shot failed (includes error message)
+- `cancelled`: Shot was cancelled by user
+
+For more details on the logging system, see [LOGGING.md](LOGGING.md).
+
 ## Interactive API Documentation
 
 MeticAI includes automatic interactive API documentation powered by FastAPI:

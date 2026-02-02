@@ -39,6 +39,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./.versions.json:/app/.versions.json
+      # Mount VERSION files for version info endpoint
+      - ./VERSION:/VERSION:ro
       # Mount update infrastructure for trigger-update endpoint
       - ./update.sh:/app/update.sh:ro
       - ./.env:/app/.env:ro
@@ -58,6 +60,8 @@ services:
       - ./.update-requested:/app/.update-requested
       # Mount restart signal file for host-side watcher
       - ./.restart-requested:/app/.restart-requested
+      # Mount watcher log file for status endpoint
+      - ./.rebuild-watcher.log:/app/.rebuild-watcher.log:ro
       # Mount logs directory for persistent log storage
       - ./logs:/app/logs
       # Mount data directory for profile history

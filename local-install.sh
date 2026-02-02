@@ -552,6 +552,9 @@ install_rebuild_watcher() {
     # Create empty signal files for Docker mount
     touch "${script_dir}/.rebuild-needed"
     touch "${script_dir}/.update-check-requested"
+    touch "${script_dir}/.update-requested"
+    touch "${script_dir}/.restart-requested"
+    touch "${script_dir}/.rebuild-watcher.log"
     
     # Configure git safe.directory for root (needed when systemd runs as root)
     # This prevents "dubious ownership" errors
@@ -1511,6 +1514,14 @@ if [ -d ".restart-requested" ]; then
 fi
 if [ ! -f ".restart-requested" ]; then
     touch .restart-requested
+fi
+
+# Ensure .rebuild-watcher.log exists as a file for the watcher status endpoint
+if [ -d ".rebuild-watcher.log" ]; then
+    rm -rf .rebuild-watcher.log
+fi
+if [ ! -f ".rebuild-watcher.log" ]; then
+    touch .rebuild-watcher.log
 fi
 
 # Pre-create directories that Docker would otherwise create as root

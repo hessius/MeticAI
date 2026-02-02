@@ -15,6 +15,7 @@ from pathlib import Path
 import uuid
 import time
 import tempfile
+import re
 from logging_config import setup_logging, get_logger
 
 # Initialize logging system with environment-aware defaults
@@ -30,7 +31,7 @@ except (PermissionError, OSError) as e:
         f"using temporary directory: {log_dir}",
         extra={"original_error": str(e)}
     )
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -107,6 +108,14 @@ UPDATE_CHECK_INTERVAL = 7200
 # Maximum upload file size: 10 MB
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
 
+# Regex pattern for extracting version from pyproject.toml or setup.py
+# Matches: version = "x.y.z" or version = 'x.y.z'
+# Pre-compiled for better performance when called repeatedly
+VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
+
+# Shot stage status constants
+STAGE_STATUS_RETRACTING = "retracting"
+
 
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
@@ -161,14 +170,43 @@ async def lifespan(app: FastAPI):
     logger.info("Starting periodic update checker (runs on startup and every 24 hours)")
     update_task = asyncio.create_task(periodic_update_checker())
     
+    # Restore scheduled shots from persistence
+    logger.info("Restoring scheduled shots from persistence")
+    await _restore_scheduled_shots()
+    
+    # Load recurring schedules and schedule next occurrences
+    logger.info("Loading recurring schedules from persistence")
+    await _load_recurring_schedules()
+    for schedule_id, schedule in _recurring_schedules.items():
+        if schedule.get("enabled", True):
+            await _schedule_next_recurring(schedule_id, schedule)
+    
+    # Start recurring schedule checker (runs every hour to ensure schedules stay current)
+    recurring_task = asyncio.create_task(_recurring_schedule_checker())
+    
     yield
     
     # Cleanup on shutdown
     update_task.cancel()
+    recurring_task.cancel()
     try:
         await update_task
     except asyncio.CancelledError:
         logger.info("Periodic update checker stopped")
+    
+    try:
+        await recurring_task
+    except asyncio.CancelledError:
+        logger.info("Recurring schedule checker stopped")
+    
+    # Cancel all scheduled shot tasks
+    for task in _scheduled_tasks.values():
+        task.cancel()
+    
+    # Wait for all tasks to complete
+    if _scheduled_tasks:
+        await asyncio.gather(*_scheduled_tasks.values(), return_exceptions=True)
+        logger.info("All scheduled shot tasks cancelled")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -846,6 +884,91 @@ async def get_status(request: Request):
             "message": "Could not read update status"
         }
 
+
+@app.get("/api/watcher-status")
+async def get_watcher_status(request: Request):
+    """Get the status of the host rebuild-watcher service.
+    
+    The watcher is considered active if:
+    1. The log file exists and was modified recently, OR
+    2. The signal file was processed (log is newer than signal)
+    
+    Returns:
+        - running: Whether the watcher appears to be running
+        - last_activity: Timestamp of last watcher activity
+        - message: Human-readable status message
+    """
+    request_id = request.state.request_id
+    
+    try:
+        import os
+        from datetime import datetime, timezone
+        
+        log_file = Path("/app/.rebuild-watcher.log")
+        restart_signal = Path("/app/.restart-requested")
+        
+        status = {
+            "running": False,
+            "last_activity": None,
+            "message": "Watcher status unknown"
+        }
+        
+        # Check 1: Log file exists and has recent activity
+        if log_file.exists():
+            log_mtime = os.path.getmtime(log_file)
+            log_time = datetime.fromtimestamp(log_mtime, tz=timezone.utc)
+            now = datetime.now(timezone.utc)
+            age_seconds = (now - log_time).total_seconds()
+            
+            status["last_activity"] = log_time.isoformat()
+            
+            # If log was modified in the last 10 minutes, watcher is likely active
+            if age_seconds < 600:  # 10 minutes
+                status["running"] = True
+                status["message"] = f"Watcher active (last activity {int(age_seconds)}s ago)"
+            else:
+                # Check the restart signal file's mtime vs log mtime
+                # If signal is newer than log, watcher might not be running
+                if restart_signal.exists():
+                    signal_mtime = os.path.getmtime(restart_signal)
+                    if signal_mtime > log_mtime + 10:  # Signal newer by >10s
+                        status["running"] = False
+                        status["message"] = "Watcher may not be running (signal not processed)"
+                    else:
+                        status["running"] = True
+                        status["message"] = f"Watcher idle (last activity {int(age_seconds/60)}m ago)"
+                else:
+                    status["running"] = True
+                    status["message"] = f"Watcher idle (last activity {int(age_seconds/60)}m ago)"
+        else:
+            # No log file - check if this is a fresh install
+            if restart_signal.exists():
+                status["running"] = False
+                status["message"] = "Watcher not installed or not running"
+            else:
+                status["message"] = "Unable to determine watcher status"
+        
+        logger.debug(
+            f"Watcher status: {status}",
+            extra={"request_id": request_id}
+        )
+        
+        return status
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to check watcher status: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        return {
+            "running": False,
+            "last_activity": None,
+            "error": str(e),
+            "message": "Failed to check watcher status"
+        }
+
+
 @app.post("/api/trigger-update")
 async def trigger_update(request: Request):
     """Trigger the backend update process by signaling the host.
@@ -1118,6 +1241,309 @@ def get_author_name() -> str:
     settings = _load_settings()
     author = settings.get("authorName", "").strip()
     return author if author else "MeticAI"
+
+
+@app.get("/api/version")
+async def get_version_info(request: Request):
+    """Get version information for all MeticAI components.
+    
+    Returns version info for:
+    - MeticAI (backend)
+    - MeticAI-web (frontend)
+    - MCP Server
+    """
+    request_id = request.state.request_id
+    
+    try:
+        # Read MeticAI version from VERSION file
+        meticai_version = "unknown"
+        version_file = Path(__file__).parent.parent / "VERSION"
+        if version_file.exists():
+            meticai_version = version_file.read_text().strip()
+        
+        # Read MeticAI-web version from meticai-web/VERSION
+        meticai_web_version = "unknown"
+        # In container: meticai-web is at /app/meticai-web (same level as main.py)
+        web_version_file = Path(__file__).parent / "meticai-web" / "VERSION"
+        if web_version_file.exists():
+            meticai_web_version = web_version_file.read_text().strip()
+        
+        # Try to get git commit hash for meticai-web if version not found or to supplement
+        meticai_web_commit = None
+        web_git_dir = Path(__file__).parent / "meticai-web" / ".git"
+        if web_git_dir.exists():
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    cwd=Path(__file__).parent / "meticai-web",
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    meticai_web_commit = result.stdout.strip()
+            except Exception:
+                pass
+        
+        # Read MCP server version and repo URL from meticulous-source
+        mcp_version = "unknown"
+        mcp_commit = None
+        mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"  # Default fallback
+        # In container: meticulous-source is at /app/meticulous-source (same level as main.py)
+        mcp_source_dir = Path(__file__).parent / "meticulous-source"
+        
+        # Try to get git commit hash for MCP
+        mcp_git_dir = mcp_source_dir / ".git"
+        if mcp_git_dir.exists():
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    cwd=mcp_source_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    mcp_commit = result.stdout.strip()
+            except Exception:
+                pass
+        
+        # Try to get repo URL from .versions.json first (mounted by docker-compose)
+        # In container: .versions.json is at /app/.versions.json (same level as main.py)
+        versions_file = Path(__file__).parent / ".versions.json"
+        if versions_file.exists():
+            try:
+                versions_data = json.loads(versions_file.read_text())
+                if "repositories" in versions_data and "meticulous-mcp" in versions_data["repositories"]:
+                    repo_url_from_file = versions_data["repositories"]["meticulous-mcp"].get("repo_url")
+                    if repo_url_from_file and repo_url_from_file != "unknown":
+                        mcp_repo_url = repo_url_from_file
+                        # Remove .git suffix if present for cleaner URL
+                        if mcp_repo_url.endswith('.git'):
+                            mcp_repo_url = mcp_repo_url[:-4]
+            except Exception as e:
+                logger.debug(
+                    f"Failed to read MCP repo URL from .versions.json: {str(e)}",
+                    extra={"request_id": request_id}
+                )
+        
+        # If not found in .versions.json, try git remote from meticulous-source
+        if mcp_repo_url == "https://github.com/manonstreet/meticulous-mcp" and mcp_source_dir.exists():
+            git_dir = mcp_source_dir / ".git"
+            if git_dir.exists():
+                try:
+                    # Validate that mcp_source_dir is within expected bounds to prevent path traversal
+                    base_dir = Path(__file__).parent.parent.resolve()
+                    resolved_mcp_dir = mcp_source_dir.resolve()
+                    if not str(resolved_mcp_dir).startswith(str(base_dir)):
+                        # Security: Skip subprocess call if path is outside expected bounds
+                        logger.warning(
+                            f"Skipping git remote check: MCP source directory is outside base directory: {resolved_mcp_dir}",
+                            extra={"request_id": request_id}
+                        )
+                    else:
+                        result = subprocess.run(
+                            ["git", "config", "--get", "remote.origin.url"],
+                            cwd=resolved_mcp_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        if result.returncode == 0 and result.stdout.strip():
+                            mcp_repo_url = result.stdout.strip()
+                            # Remove .git suffix if present for cleaner URL
+                            if mcp_repo_url.endswith('.git'):
+                                mcp_repo_url = mcp_repo_url[:-4]
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to read MCP repo URL from git remote: {str(e)}",
+                        extra={"request_id": request_id}
+                    )
+        
+        # Get MCP version from pyproject.toml
+        if mcp_source_dir.exists():
+            # Try to get version from pyproject.toml or setup.py
+            version_found = False
+            pyproject = mcp_source_dir / "pyproject.toml"
+            if pyproject.exists():
+                try:
+                    content = pyproject.read_text()
+                    # Look for version = "x.y.z" pattern in pyproject.toml
+                    version_match = VERSION_PATTERN.search(content)
+                    if version_match:
+                        mcp_version = version_match.group(1)
+                        version_found = True
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to read version from pyproject.toml: {str(e)}",
+                        extra={"request_id": request_id},
+                        exc_info=True
+                    )
+            
+            # Fallback to setup.py if version not found in pyproject.toml
+            if not version_found:
+                setup_py = mcp_source_dir / "setup.py"
+                if setup_py.exists():
+                    try:
+                        content = setup_py.read_text()
+                        # Look for version = "x.y.z" pattern in setup.py
+                        version_match = VERSION_PATTERN.search(content)
+                        if version_match:
+                            mcp_version = version_match.group(1)
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to read version from setup.py: {str(e)}",
+                            extra={"request_id": request_id},
+                            exc_info=True
+                        )
+        
+        # Use commit hash as version fallback if no version found
+        if mcp_version == "unknown" and mcp_commit:
+            mcp_version = mcp_commit
+        
+        return {
+            "meticai": meticai_version,
+            "meticai_web": meticai_web_version,
+            "meticai_web_commit": meticai_web_commit,
+            "mcp_server": mcp_version,
+            "mcp_commit": mcp_commit,
+            "mcp_repo_url": mcp_repo_url
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to get version info: {str(e)}",
+            extra={"request_id": request_id},
+            exc_info=True
+        )
+        return {
+            "meticai": "unknown",
+            "meticai_web": "unknown",
+            "meticai_web_commit": None,
+            "mcp_server": "unknown",
+            "mcp_commit": None,
+            "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp"
+        }
+
+
+# Changelog cache
+_changelog_cache: Optional[dict] = None
+_changelog_cache_time: Optional[datetime] = None
+CHANGELOG_CACHE_DURATION = timedelta(hours=1)  # Cache for 1 hour
+
+
+@app.get("/api/changelog")
+async def get_changelog(request: Request):
+    """Get release notes from GitHub.
+    
+    Returns cached release notes if available and fresh,
+    otherwise fetches from GitHub API and caches the result.
+    """
+    global _changelog_cache, _changelog_cache_time
+    request_id = request.state.request_id
+    
+    try:
+        # Check if we have a valid cache
+        now = datetime.now(timezone.utc)
+        if _changelog_cache and _changelog_cache_time:
+            cache_age = now - _changelog_cache_time
+            if cache_age < CHANGELOG_CACHE_DURATION:
+                logger.debug(
+                    f"Returning cached changelog (age: {cache_age.total_seconds():.0f}s)",
+                    extra={"request_id": request_id}
+                )
+                return _changelog_cache
+        
+        # Fetch from GitHub API
+        import httpx
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.github.com/repos/hessius/MeticAI/releases",
+                params={"per_page": 10},
+                headers={"Accept": "application/vnd.github.v3+json"},
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                releases = response.json()
+                
+                def strip_installation_section(body: str) -> str:
+                    """Remove the Installation section from release notes."""
+                    if not body:
+                        return body
+                    # Find where Installation section starts (### Installation or ## Installation)
+                    import re
+                    # Match "### Installation" or "## Installation" and everything after until end or next major section
+                    pattern = r'\n---\n+### Installation.*$'
+                    cleaned = re.sub(pattern, '', body, flags=re.DOTALL | re.IGNORECASE)
+                    # Also try without the --- separator
+                    pattern2 = r'\n### Installation.*$'
+                    cleaned = re.sub(pattern2, '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+                    return cleaned.strip()
+                
+                changelog_data = {
+                    "releases": [
+                        {
+                            "version": release.get("tag_name", ""),
+                            "date": release.get("published_at", "")[:10] if release.get("published_at") else "",
+                            "body": strip_installation_section(release.get("body", "No release notes available."))
+                        }
+                        for release in releases
+                    ],
+                    "cached_at": now.isoformat()
+                }
+                
+                # Update cache
+                _changelog_cache = changelog_data
+                _changelog_cache_time = now
+                
+                logger.info(
+                    f"Fetched and cached {len(releases)} releases from GitHub",
+                    extra={"request_id": request_id}
+                )
+                
+                return changelog_data
+            elif response.status_code in (403, 429):
+                # Rate limited
+                logger.warning(
+                    f"GitHub API rate limit reached: {response.status_code}",
+                    extra={"request_id": request_id}
+                )
+                # Return cached data if available, even if stale
+                if _changelog_cache:
+                    return _changelog_cache
+                return {
+                    "releases": [],
+                    "error": "GitHub API rate limit reached. Please try again later.",
+                    "cached_at": None
+                }
+            else:
+                logger.error(
+                    f"GitHub API error: {response.status_code}",
+                    extra={"request_id": request_id}
+                )
+                if _changelog_cache:
+                    return _changelog_cache
+                return {
+                    "releases": [],
+                    "error": f"Failed to fetch releases (status {response.status_code})",
+                    "cached_at": None
+                }
+                
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch changelog: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        # Return cached data if available
+        if _changelog_cache:
+            return _changelog_cache
+        return {
+            "releases": [],
+            "error": str(e),
+            "cached_at": None
+        }
 
 
 @app.get("/api/settings")
@@ -1899,6 +2325,84 @@ def get_meticulous_api():
             meticulous_ip = f"http://{meticulous_ip}"
         _meticulous_api = Api(base_url=meticulous_ip)
     return _meticulous_api
+
+
+async def execute_scheduled_shot(
+    schedule_id: str,
+    shot_delay: float,
+    preheat: bool,
+    profile_id: Optional[str],
+    scheduled_shots_dict: dict,
+    scheduled_tasks_dict: dict,
+    preheat_duration_minutes: int = 10
+):
+    """Execute a scheduled shot with optional preheating.
+    
+    Args:
+        schedule_id: Unique identifier for this scheduled shot
+        shot_delay: Seconds to wait before executing the shot
+        preheat: Whether to preheat before the shot
+        profile_id: The profile ID to run (optional, can be None for preheat-only)
+        scheduled_shots_dict: Reference to the global scheduled shots dictionary
+        scheduled_tasks_dict: Reference to the global scheduled tasks dictionary
+        preheat_duration_minutes: Minutes to preheat (default: 10)
+    """
+    from meticulous.api_types import ActionType
+    
+    try:
+        api = get_meticulous_api()
+        
+        # If preheat is enabled, start it before the scheduled time
+        if preheat:
+            preheat_delay = shot_delay - (preheat_duration_minutes * 60)
+            if preheat_delay > 0:
+                await asyncio.sleep(preheat_delay)
+                scheduled_shots_dict[schedule_id]["status"] = "preheating"
+                
+                # Start preheat using ActionType.PREHEAT
+                try:
+                    api.execute_action(ActionType.PREHEAT)
+                except Exception as e:
+                    logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                
+                # Wait for remaining time until shot
+                await asyncio.sleep(preheat_duration_minutes * 60)
+            else:
+                # Not enough time for full preheat, start immediately
+                scheduled_shots_dict[schedule_id]["status"] = "preheating"
+                try:
+                    api.execute_action(ActionType.PREHEAT)
+                except Exception as e:
+                    logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                await asyncio.sleep(shot_delay)
+        else:
+            await asyncio.sleep(shot_delay)
+        
+        scheduled_shots_dict[schedule_id]["status"] = "running"
+        
+        # Load and run the profile (if profile_id was provided)
+        if profile_id:
+            load_result = api.load_profile_by_id(profile_id)
+            if not (hasattr(load_result, 'error') and load_result.error):
+                api.execute_action(ActionType.START)
+                scheduled_shots_dict[schedule_id]["status"] = "completed"
+            else:
+                scheduled_shots_dict[schedule_id]["status"] = "failed"
+                scheduled_shots_dict[schedule_id]["error"] = load_result.error
+        else:
+            # Preheat only mode - mark as completed
+            scheduled_shots_dict[schedule_id]["status"] = "completed"
+            
+    except asyncio.CancelledError:
+        scheduled_shots_dict[schedule_id]["status"] = "cancelled"
+    except Exception as e:
+        logger.error(f"Scheduled shot {schedule_id} failed: {e}")
+        scheduled_shots_dict[schedule_id]["status"] = "failed"
+        scheduled_shots_dict[schedule_id]["error"] = str(e)
+    finally:
+        # Clean up task reference
+        if schedule_id in scheduled_tasks_dict:
+            del scheduled_tasks_dict[schedule_id]
 
 
 def decompress_shot_data(compressed_data: bytes) -> dict:
@@ -3094,6 +3598,63 @@ def _format_dynamics_description(stage: dict) -> str:
         return f"Multi-point {stage_type} curve"
 
 
+def _generate_execution_description(
+    stage_type: str,
+    duration: float,
+    start_pressure: float,
+    end_pressure: float,
+    max_pressure: float,
+    start_flow: float,
+    end_flow: float,
+    max_flow: float,
+    weight_gain: float
+) -> str:
+    """Generate a human-readable description of what actually happened during stage execution.
+    
+    This describes the actual behavior observed, not the target.
+    Examples:
+    - "Pressure rose from 2.1 bar to 8.5 bar over 4.2s"
+    - "Declining pressure from 9.0 bar to 6.2 bar"
+    - "Steady flow at 2.1 ml/s, extracted 18.5g"
+    """
+    descriptions = []
+    
+    # Determine pressure behavior
+    pressure_delta = end_pressure - start_pressure
+    if abs(pressure_delta) > 0.5:
+        if pressure_delta > 0:
+            descriptions.append(f"Pressure rose from {start_pressure:.1f} to {end_pressure:.1f} bar")
+        else:
+            descriptions.append(f"Pressure declined from {start_pressure:.1f} to {end_pressure:.1f} bar")
+    elif max_pressure > 0:
+        descriptions.append(f"Pressure held around {(start_pressure + end_pressure) / 2:.1f} bar")
+    
+    # Determine flow behavior
+    flow_delta = end_flow - start_flow
+    if abs(flow_delta) > 0.3:
+        if flow_delta > 0:
+            descriptions.append(f"Flow increased from {start_flow:.1f} to {end_flow:.1f} ml/s")
+        else:
+            descriptions.append(f"Flow decreased from {start_flow:.1f} to {end_flow:.1f} ml/s")
+    elif max_flow > 0:
+        descriptions.append(f"Flow steady at {(start_flow + end_flow) / 2:.1f} ml/s")
+    
+    # Add weight info if significant
+    if weight_gain > 1.0:
+        descriptions.append(f"extracted {weight_gain:.1f}g")
+    
+    # Add duration
+    if duration > 0:
+        descriptions.append(f"over {duration:.1f}s")
+    
+    if descriptions:
+        # Capitalize first letter and join
+        result = ", ".join(descriptions)
+        return result[0].upper() + result[1:]
+    
+    return f"Stage executed for {duration:.1f}s"
+
+
 def _safe_float(val, default: float = 0.0) -> float:
     """Safely convert a value to float, handling strings and None."""
     if val is None:
@@ -3205,8 +3766,12 @@ def _determine_exit_trigger_hit(
     variables = variables or []
     duration = _safe_float(stage_data.get("duration", 0))
     end_weight = _safe_float(stage_data.get("end_weight", 0))
+    # Pressure values for different comparison types
     max_pressure = _safe_float(stage_data.get("max_pressure", 0))
+    end_pressure = _safe_float(stage_data.get("end_pressure", 0))
+    # Flow values for different comparison types
     max_flow = _safe_float(stage_data.get("max_flow", 0))
+    end_flow = _safe_float(stage_data.get("end_flow", 0))
     
     triggered = None
     not_triggered = []
@@ -3221,15 +3786,26 @@ def _determine_exit_trigger_hit(
         value = _safe_float(resolved_value)
         
         # Check if this trigger was satisfied
+        # Select the appropriate actual value based on comparison operator
         actual_value = 0.0
         if trigger_type == "time":
             actual_value = duration
         elif trigger_type == "weight":
             actual_value = end_weight
         elif trigger_type == "pressure":
-            actual_value = max_pressure
+            # For >= or >: we want to know if max reached the target
+            # For <= or <: we want to know if pressure dropped below target (use end)
+            if comparison in (">=", ">"):
+                actual_value = max_pressure
+            else:  # <= or < or ==
+                actual_value = end_pressure
         elif trigger_type == "flow":
-            actual_value = max_flow
+            # For >= or >: we want to know if max reached the target
+            # For <= or <: we want to know if flow dropped below target (use end)
+            if comparison in (">=", ">"):
+                actual_value = max_flow
+            else:  # <= or < or ==
+                actual_value = end_flow
         
         # Evaluate comparison with small tolerance
         tolerance = 0.5 if trigger_type in ["time", "weight"] else 0.2
@@ -3310,22 +3886,39 @@ def _analyze_stage_execution(
     start_weight = _safe_float(shot_stage_data.get("start_weight", 0))
     end_weight = _safe_float(shot_stage_data.get("end_weight", 0))
     weight_gain = end_weight - start_weight
+    start_pressure = _safe_float(shot_stage_data.get("start_pressure", 0))
+    end_pressure = _safe_float(shot_stage_data.get("end_pressure", 0))
     avg_pressure = _safe_float(shot_stage_data.get("avg_pressure", 0))
     max_pressure = _safe_float(shot_stage_data.get("max_pressure", 0))
     min_pressure = _safe_float(shot_stage_data.get("min_pressure", 0))
+    start_flow = _safe_float(shot_stage_data.get("start_flow", 0))
+    end_flow = _safe_float(shot_stage_data.get("end_flow", 0))
     avg_flow = _safe_float(shot_stage_data.get("avg_flow", 0))
     max_flow = _safe_float(shot_stage_data.get("max_flow", 0))
+    
+    # Generate execution description based on what actually happened
+    execution_description = _generate_execution_description(
+        stage_type, duration, 
+        start_pressure, end_pressure, max_pressure,
+        start_flow, end_flow, max_flow,
+        weight_gain
+    )
     
     result["execution_data"] = {
         "duration": round(duration, 1),
         "weight_gain": round(weight_gain, 1),
         "start_weight": round(start_weight, 1),
         "end_weight": round(end_weight, 1),
+        "start_pressure": round(start_pressure, 1),
+        "end_pressure": round(end_pressure, 1),
         "avg_pressure": round(avg_pressure, 1),
         "max_pressure": round(max_pressure, 1),
         "min_pressure": round(min_pressure, 1),
+        "start_flow": round(start_flow, 1),
+        "end_flow": round(end_flow, 1),
         "avg_flow": round(avg_flow, 1),
-        "max_flow": round(max_flow, 1)
+        "max_flow": round(max_flow, 1),
+        "description": execution_description
     }
     
     # Determine which exit trigger was hit
@@ -3399,11 +3992,12 @@ def _analyze_stage_execution(
                 else:
                     goal_message = f"Target pressure of {target_value} bar was NOT reached (only {max_pressure:.1f} bar achieved)"
             elif stage_type == "flow":
-                if max_flow >= target_value * 0.95:
+                # For flow stages, use end_flow (not max_flow) since initial peak is just piston movement
+                if end_flow >= target_value * 0.95:
                     goal_reached = True
-                    goal_message = f"Target flow of {target_value} ml/s was reached ({max_flow:.1f} ml/s achieved)"
+                    goal_message = f"Target flow of {target_value} ml/s was reached ({end_flow:.1f} ml/s at end)"
                 else:
-                    goal_message = f"Target flow of {target_value} ml/s was NOT reached (only {max_flow:.1f} ml/s achieved)"
+                    goal_message = f"Target flow of {target_value} ml/s was NOT reached ({end_flow:.1f} ml/s at end)"
         
         if goal_reached:
             result["assessment"] = {
@@ -3442,7 +4036,7 @@ def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
         status = entry.get("status", "")
         
         # Skip retracting - it's machine cleanup
-        if status.lower().strip() == "retracting":
+        if status.lower().strip() == STAGE_STATUS_RETRACTING:
             continue
         
         if status and status != current_stage:
@@ -3491,14 +4085,267 @@ def _compute_stage_stats(entries: list) -> dict:
         "duration": end_time - start_time,
         "start_weight": weights[0] if weights else 0,
         "end_weight": weights[-1] if weights else 0,
+        "start_pressure": pressures[0] if pressures else 0,
+        "end_pressure": pressures[-1] if pressures else 0,
         "min_pressure": min(pressures) if pressures else 0,
         "max_pressure": max(pressures) if pressures else 0,
         "avg_pressure": sum(pressures) / len(pressures) if pressures else 0,
+        "start_flow": flows[0] if flows else 0,
+        "end_flow": flows[-1] if flows else 0,
         "min_flow": min(flows) if flows else 0,
         "max_flow": max(flows) if flows else 0,
         "avg_flow": sum(flows) / len(flows) if flows else 0,
         "entry_count": len(entries)
     }
+
+
+def _interpolate_weight_to_time(target_weight: float, weight_time_pairs: list[tuple[float, float]]) -> Optional[float]:
+    """Interpolate time value for a given weight using linear interpolation.
+    
+    Args:
+        target_weight: The weight value to find the corresponding time for
+        weight_time_pairs: List of (weight, time) tuples sorted by weight
+        
+    Returns:
+        Interpolated time value, or None if no data available
+    """
+    if not weight_time_pairs:
+        return None
+    
+    # Find bracketing weight values
+    for i in range(len(weight_time_pairs)):
+        weight_actual, time_actual = weight_time_pairs[i]
+        
+        if weight_actual >= target_weight:
+            if i == 0:
+                # Before first point, use first time
+                return time_actual
+            else:
+                # Interpolate between i-1 and i
+                weight_prev, time_prev = weight_time_pairs[i-1]
+                if weight_actual > weight_prev:
+                    # Linear interpolation
+                    weight_fraction = (target_weight - weight_prev) / (weight_actual - weight_prev)
+                    return time_prev + weight_fraction * (time_actual - time_prev)
+                else:
+                    # Same weight, use current time
+                    return time_actual
+            
+    # If not found, use last time (weight exceeds all actual weights)
+    return weight_time_pairs[-1][1]
+
+
+def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, shot_data: dict) -> list[dict]:
+    """Generate target curves for profile overlay on shot chart.
+    
+    Creates data points representing what the profile was targeting at each time point.
+    Uses actual shot stage times to align the profile curves with the shot execution.
+    Supports both time-based and weight-based dynamics.
+    
+    Args:
+        profile_data: The profile configuration
+        shot_stage_times: Dict mapping stage names to (start_time, end_time) tuples
+        shot_data: The complete shot data including telemetry entries
+        
+    Returns:
+        List of data points: [{time, target_pressure, target_flow, stage_name}, ...]
+    """
+    stages = profile_data.get("stages", [])
+    variables = profile_data.get("variables", [])
+    data_points = []
+    
+    # Build weight-to-time mappings for each stage from shot data
+    # This enables weight-based dynamics interpolation
+    stage_weight_to_time = {}
+    data_entries = shot_data.get("data", [])
+    
+    for entry in data_entries:
+        status = entry.get("status", "")
+        if not status or status.lower().strip() == STAGE_STATUS_RETRACTING:
+            continue
+        
+        time_sec = entry.get("time", 0) / 1000  # Convert to seconds
+        weight = entry.get("shot", {}).get("weight", 0)
+        
+        # Normalize stage name for matching
+        normalized_status = status.lower().strip()
+        
+        if normalized_status not in stage_weight_to_time:
+            stage_weight_to_time[normalized_status] = []
+        
+        stage_weight_to_time[normalized_status].append((weight, time_sec))
+    
+    for stage in stages:
+        stage_name = stage.get("name", "")
+        stage_type = stage.get("type", "")  # pressure or flow
+        
+        # Handle both flat format (dynamics_points) and nested format (dynamics.points)
+        dynamics_points = stage.get("dynamics_points", [])
+        dynamics_over = stage.get("dynamics_over", "time")  # time or weight
+        
+        # If flat format not found, try nested dynamics object
+        if not dynamics_points:
+            dynamics_obj = stage.get("dynamics", {})
+            if isinstance(dynamics_obj, dict):
+                dynamics_points = dynamics_obj.get("points", [])
+                dynamics_over = dynamics_obj.get("over", "time")
+        
+        if not dynamics_points:
+            continue
+            
+        # Get actual stage timing from shot
+        # Match using either stage name or stage key (for consistency with main analysis)
+        identifiers = set()
+        if stage_name:
+            identifiers.add(stage_name.lower().strip())
+        stage_key_field = stage.get("key", "")
+        if stage_key_field:
+            identifiers.add(stage_key_field.lower().strip())
+
+        stage_timing = None
+        for shot_stage_name, timing in shot_stage_times.items():
+            normalized_shot_stage_name = shot_stage_name.lower().strip()
+            if normalized_shot_stage_name in identifiers:
+                stage_timing = timing
+                break
+        
+        if not stage_timing:
+            continue
+            
+        stage_start, stage_end = stage_timing
+        stage_duration = stage_end - stage_start
+        
+        if stage_duration <= 0:
+            continue
+        
+        # Generate points along the stage duration
+        # For time-based dynamics, interpolate directly
+        if dynamics_over == "time":
+            # Get the dynamics point times (x values) and target values (y values)
+            if len(dynamics_points) == 1:
+                # Constant value throughout stage
+                value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+                # Resolve variable if needed
+                if isinstance(value, str) and value.startswith('$'):
+                    resolved, _ = _resolve_variable(value, variables)
+                    value = _safe_float(resolved)
+                else:
+                    value = _safe_float(value)
+                    
+                # Add start and end points
+                point_start = {"time": round(stage_start, 2), "stage_name": stage_name}
+                point_end = {"time": round(stage_end, 2), "stage_name": stage_name}
+                
+                if stage_type == "pressure":
+                    point_start["target_pressure"] = round(value, 1)
+                    point_end["target_pressure"] = round(value, 1)
+                elif stage_type == "flow":
+                    point_start["target_flow"] = round(value, 1)
+                    point_end["target_flow"] = round(value, 1)
+                    
+                data_points.append(point_start)
+                data_points.append(point_end)
+            else:
+                # Multiple points - interpolate based on relative time within stage
+                # dynamics_points format: [[time1, value1], [time2, value2], ...]
+                max_dynamics_time = max(p[0] for p in dynamics_points)
+                
+                # Scale factor to map dynamics time to actual stage duration
+                scale = stage_duration / max_dynamics_time if max_dynamics_time > 0 else 1
+                
+                for dp in dynamics_points:
+                    dp_time = dp[0]
+                    dp_value = dp[1] if len(dp) > 1 else dp[0]
+                    
+                    # Resolve variable if needed
+                    if isinstance(dp_value, str) and dp_value.startswith('$'):
+                        resolved, _ = _resolve_variable(dp_value, variables)
+                        dp_value = _safe_float(resolved)
+                    else:
+                        dp_value = _safe_float(dp_value)
+                    
+                    actual_time = stage_start + (dp_time * scale)
+                    
+                    point = {"time": round(actual_time, 2), "stage_name": stage_name}
+                    if stage_type == "pressure":
+                        point["target_pressure"] = round(dp_value, 1)
+                    elif stage_type == "flow":
+                        point["target_flow"] = round(dp_value, 1)
+                        
+                    data_points.append(point)
+        
+        # For weight-based dynamics, map weight values to time using actual shot data
+        elif dynamics_over == "weight":
+            # Get weight-to-time mapping for this stage
+            stage_key_normalized = None
+            for identifier in identifiers:
+                if identifier in stage_weight_to_time:
+                    stage_key_normalized = identifier
+                    break
+            
+            if not stage_key_normalized or not stage_weight_to_time[stage_key_normalized]:
+                # No weight data available for this stage
+                continue
+            
+            weight_time_pairs = stage_weight_to_time[stage_key_normalized]
+            
+            # Sort by weight to enable interpolation
+            weight_time_pairs.sort(key=lambda x: x[0])
+            
+            if len(dynamics_points) == 1:
+                # Constant value throughout stage
+                value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+                
+                # Resolve variable if needed
+                if isinstance(value, str) and value.startswith('$'):
+                    resolved, _ = _resolve_variable(value, variables)
+                    value = _safe_float(resolved)
+                else:
+                    value = _safe_float(value)
+                
+                # Add start and end points
+                point_start = {"time": round(stage_start, 2), "stage_name": stage_name}
+                point_end = {"time": round(stage_end, 2), "stage_name": stage_name}
+                
+                if stage_type == "pressure":
+                    point_start["target_pressure"] = round(value, 1)
+                    point_end["target_pressure"] = round(value, 1)
+                elif stage_type == "flow":
+                    point_start["target_flow"] = round(value, 1)
+                    point_end["target_flow"] = round(value, 1)
+                
+                data_points.append(point_start)
+                data_points.append(point_end)
+            else:
+                # Multiple points - interpolate weight values to time
+                # dynamics_points format: [[weight1, value1], [weight2, value2], ...]
+                for dp in dynamics_points:
+                    dp_weight = dp[0]
+                    dp_value = dp[1] if len(dp) > 1 else dp[0]
+                    
+                    # Resolve variable if needed
+                    if isinstance(dp_value, str) and dp_value.startswith('$'):
+                        resolved, _ = _resolve_variable(dp_value, variables)
+                        dp_value = _safe_float(resolved)
+                    else:
+                        dp_value = _safe_float(dp_value)
+                    
+                    # Find time corresponding to this weight using linear interpolation
+                    actual_time = _interpolate_weight_to_time(dp_weight, weight_time_pairs)
+                    
+                    if actual_time is not None:
+                        point = {"time": round(actual_time, 2), "stage_name": stage_name}
+                        if stage_type == "pressure":
+                            point["target_pressure"] = round(dp_value, 1)
+                        elif stage_type == "flow":
+                            point["target_flow"] = round(dp_value, 1)
+                        
+                        data_points.append(point)
+    
+    # Sort by time
+    data_points.sort(key=lambda x: x["time"])
+    
+    return data_points
 
 
 def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
@@ -3540,6 +4387,16 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
     
     # Extract shot stage data
     shot_stages = _extract_shot_stage_data(shot_data)
+    
+    # Build shot stage times for profile curve generation
+    shot_stage_times = {}
+    for stage_name, stage_data in shot_stages.items():
+        start_time = stage_data.get("start_time", 0)
+        end_time = stage_data.get("end_time", 0)
+        shot_stage_times[stage_name] = (start_time, end_time)
+    
+    # Generate profile target curves for chart overlay
+    profile_target_curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
     
     # Profile stages
     profile_stages = profile_data.get("stages", [])
@@ -3669,7 +4526,8 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
             "name": profile_data.get("name", "Unknown"),
             "temperature": profile_data.get("temperature"),
             "stage_count": len(profile_stages)
-        }
+        },
+        "profile_target_curves": profile_target_curves
     }
 
 
@@ -3715,9 +4573,13 @@ async def analyze_shot(
         api = get_meticulous_api()
         profiles_result = api.list_profiles()
         
+        logger.debug(f"Looking for profile '{profile_name}' in {len(profiles_result)} profiles")
+        
         profile_data = None
         for partial_profile in profiles_result:
-            if partial_profile.name.lower() == profile_name.lower():
+            # Compare ignoring case and whitespace
+            if partial_profile.name.lower().strip() == profile_name.lower().strip():
+                logger.debug(f"Found matching profile: {partial_profile.name} (id={partial_profile.id})")
                 full_profile = api.get_profile(partial_profile.id)
                 if not (hasattr(full_profile, 'error') and full_profile.error):
                     # Convert profile object to dict
@@ -3748,11 +4610,21 @@ async def analyze_shot(
                                 "key": getattr(stage, 'key', ''),
                                 "type": getattr(stage, 'type', 'unknown'),
                             }
-                            # Add dynamics
-                            for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation']:
-                                val = getattr(stage, attr, None)
-                                if val is not None:
-                                    stage_dict[attr] = val
+                            # Add dynamics - handle both direct attributes and dynamics object
+                            if hasattr(stage, 'dynamics') and stage.dynamics is not None:
+                                dynamics = stage.dynamics
+                                if hasattr(dynamics, 'points') and dynamics.points:
+                                    stage_dict['dynamics_points'] = dynamics.points
+                                if hasattr(dynamics, 'over'):
+                                    stage_dict['dynamics_over'] = dynamics.over
+                                if hasattr(dynamics, 'interpolation'):
+                                    stage_dict['dynamics_interpolation'] = dynamics.interpolation
+                            else:
+                                # Fallback: check for direct attributes
+                                for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation']:
+                                    val = getattr(stage, attr, None)
+                                    if val is not None:
+                                        stage_dict[attr] = val
                             # Add exit triggers and limits
                             for attr in ['exit_triggers', 'limits']:
                                 val = getattr(stage, attr, None)
@@ -4974,3 +5846,1205 @@ Remember: NO information should be lost in this conversion!"""
             detail={"status": "error", "error": str(e)}
         )
 
+
+# ============================================================================
+# Run Shot Endpoints
+# ============================================================================
+
+# ==============================================================================
+# Scheduled Shots Persistence Layer
+# ==============================================================================
+
+class ScheduledShotsPersistence:
+    """Manages persistence of scheduled shots to disk.
+    
+    Scheduled shots are stored in a JSON file to survive server restarts.
+    This ensures that scheduled shots are not lost during crashes, deploys,
+    or host reboots.
+    """
+    
+    def __init__(self, persistence_file: str = "/app/data/scheduled_shots.json"):
+        """Initialize the persistence layer.
+        
+        Args:
+            persistence_file: Path to the JSON file for storing scheduled shots.
+        """
+        self.persistence_file = Path(persistence_file)
+        self._lock = asyncio.Lock()
+        
+        # Ensure the parent directory exists
+        try:
+            self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            # Fallback to temp directory if we can't create the default location
+            logger.warning(
+                f"Could not create persistence directory at {self.persistence_file.parent}, "
+                f"using temporary directory: {e}"
+            )
+            temp_dir = Path(tempfile.gettempdir()) / "meticai_data"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            self.persistence_file = temp_dir / "scheduled_shots.json"
+            logger.info(f"Using persistence file: {self.persistence_file}")
+    
+    async def save(self, scheduled_shots: dict) -> None:
+        """Save scheduled shots to disk.
+        
+        Args:
+            scheduled_shots: Dictionary of scheduled shots to persist.
+        """
+        async with self._lock:
+            try:
+                # Only save shots that are scheduled or preheating (not completed/failed/cancelled)
+                active_shots = {
+                    shot_id: shot for shot_id, shot in scheduled_shots.items()
+                    if shot.get("status") in ["scheduled", "preheating"]
+                }
+                
+                # Write atomically using a temporary file
+                temp_file = self.persistence_file.with_suffix('.tmp')
+                with open(temp_file, 'w') as f:
+                    json.dump(active_shots, f, indent=2)
+                
+                # Atomic rename
+                temp_file.replace(self.persistence_file)
+                
+                logger.debug(f"Persisted {len(active_shots)} scheduled shots to {self.persistence_file}")
+            except Exception as e:
+                logger.error(f"Failed to save scheduled shots: {e}", exc_info=True)
+    
+    async def load(self) -> dict:
+        """Load scheduled shots from disk.
+        
+        Returns:
+            Dictionary of scheduled shots, or empty dict if file doesn't exist or is invalid.
+        """
+        async with self._lock:
+            try:
+                if not self.persistence_file.exists():
+                    logger.info("No persisted scheduled shots found (first run)")
+                    return {}
+                
+                with open(self.persistence_file, 'r') as f:
+                    data = json.load(f)
+                
+                if not isinstance(data, dict):
+                    logger.warning("Invalid scheduled shots file format, ignoring")
+                    return {}
+                
+                logger.info(f"Loaded {len(data)} scheduled shots from {self.persistence_file}")
+                return data
+            except json.JSONDecodeError as e:
+                logger.error(f"Corrupt scheduled shots file, ignoring: {e}")
+                # Backup the corrupt file
+                try:
+                    backup_file = self.persistence_file.with_suffix('.corrupt')
+                    self.persistence_file.rename(backup_file)
+                    logger.info(f"Backed up corrupt file to {backup_file}")
+                except Exception:
+                    pass
+                return {}
+            except Exception as e:
+                logger.error(f"Failed to load scheduled shots: {e}", exc_info=True)
+                return {}
+    
+    async def clear(self) -> None:
+        """Clear all persisted scheduled shots."""
+        async with self._lock:
+            try:
+                if self.persistence_file.exists():
+                    self.persistence_file.unlink()
+                    logger.info("Cleared persisted scheduled shots")
+            except Exception as e:
+                logger.error(f"Failed to clear scheduled shots: {e}", exc_info=True)
+
+
+# Initialize persistence layer
+_persistence = ScheduledShotsPersistence()
+
+# Scheduled shots storage with persistence
+_scheduled_shots: dict = {}
+_scheduled_tasks: dict = {}
+
+PREHEAT_DURATION_MINUTES = 10
+
+
+async def _save_scheduled_shots():
+    """Helper to persist scheduled shots to disk."""
+    await _persistence.save(_scheduled_shots)
+
+
+# ==============================================================================
+# Recurring Schedules Persistence Layer
+# ==============================================================================
+
+class RecurringSchedulesPersistence:
+    """Manages persistence of recurring schedules to disk.
+    
+    Recurring schedules define repeated preheat/shot times (e.g., daily, weekdays).
+    """
+    
+    def __init__(self, persistence_file: str = "/app/data/recurring_schedules.json"):
+        self.persistence_file = Path(persistence_file)
+        self._lock = asyncio.Lock()
+        
+        try:
+            self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            logger.warning(f"Could not create persistence directory: {e}")
+            temp_dir = Path(tempfile.gettempdir()) / "meticai_data"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            self.persistence_file = temp_dir / "recurring_schedules.json"
+    
+    async def save(self, schedules: dict) -> None:
+        """Save recurring schedules to disk."""
+        async with self._lock:
+            try:
+                # Only save enabled schedules
+                active_schedules = {
+                    sid: s for sid, s in schedules.items()
+                    if s.get("enabled", True)
+                }
+                
+                temp_file = self.persistence_file.with_suffix('.tmp')
+                with open(temp_file, 'w') as f:
+                    json.dump(active_schedules, f, indent=2)
+                temp_file.replace(self.persistence_file)
+                
+                logger.debug(f"Persisted {len(active_schedules)} recurring schedules")
+            except Exception as e:
+                logger.error(f"Failed to save recurring schedules: {e}", exc_info=True)
+    
+    async def load(self) -> dict:
+        """Load recurring schedules from disk."""
+        async with self._lock:
+            try:
+                if not self.persistence_file.exists():
+                    return {}
+                
+                with open(self.persistence_file, 'r') as f:
+                    data = json.load(f)
+                
+                if not isinstance(data, dict):
+                    return {}
+                
+                logger.info(f"Loaded {len(data)} recurring schedules")
+                return data
+            except Exception as e:
+                logger.error(f"Failed to load recurring schedules: {e}", exc_info=True)
+                return {}
+
+
+# Initialize recurring schedules persistence
+_recurring_persistence = RecurringSchedulesPersistence()
+_recurring_schedules: dict = {}
+
+
+async def _save_recurring_schedules():
+    """Helper to persist recurring schedules to disk."""
+    await _recurring_persistence.save(_recurring_schedules)
+
+
+async def _load_recurring_schedules():
+    """Load recurring schedules from disk."""
+    global _recurring_schedules
+    _recurring_schedules = await _recurring_persistence.load()
+
+
+def _get_next_occurrence(schedule: dict) -> Optional[datetime]:
+    """Calculate the next occurrence of a recurring schedule.
+    
+    Args:
+        schedule: Recurring schedule dict with:
+            - time: HH:MM format
+            - recurrence_type: 'daily', 'weekdays', 'weekends', 'interval', 'specific_days'
+            - interval_days: For 'interval' type, number of days between runs
+            - days_of_week: For 'specific_days' type, list of day numbers (0=Monday)
+    
+    Returns:
+        Next datetime when the schedule should run, or None if invalid.
+    """
+    try:
+        time_str = schedule.get("time", "07:00")
+        hour, minute = map(int, time_str.split(":"))
+        recurrence_type = schedule.get("recurrence_type", "daily")
+        
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        
+        # Start checking from today
+        candidate = datetime(today.year, today.month, today.day, hour, minute, tzinfo=timezone.utc)
+        
+        # If today's time has passed, start from tomorrow
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        
+        # Find the next valid day based on recurrence type
+        for _ in range(400):  # Max ~1 year ahead
+            weekday = candidate.weekday()  # 0=Monday, 6=Sunday
+            
+            if recurrence_type == "daily":
+                return candidate
+            elif recurrence_type == "weekdays":
+                if weekday < 5:  # Monday-Friday
+                    return candidate
+            elif recurrence_type == "weekends":
+                if weekday >= 5:  # Saturday-Sunday
+                    return candidate
+            elif recurrence_type == "specific_days":
+                days = schedule.get("days_of_week", [])
+                if weekday in days:
+                    return candidate
+            elif recurrence_type == "interval":
+                # For interval, we need to check against last_run
+                last_run_str = schedule.get("last_run")
+                interval_days = schedule.get("interval_days", 1)
+                
+                if not last_run_str:
+                    return candidate  # First run
+                
+                last_run = datetime.fromisoformat(last_run_str.replace('Z', '+00:00'))
+                next_run = last_run + timedelta(days=interval_days)
+                next_run = next_run.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                
+                if next_run > now:
+                    return next_run
+                else:
+                    # If we missed runs, schedule for next available slot
+                    return candidate
+            
+            candidate += timedelta(days=1)
+        
+        return None
+    except Exception as e:
+        logger.error(f"Failed to calculate next occurrence: {e}")
+        return None
+
+
+async def _schedule_next_recurring(schedule_id: str, schedule: dict):
+    """Schedule the next occurrence of a recurring schedule."""
+    next_time = _get_next_occurrence(schedule)
+    
+    if not next_time:
+        logger.warning(f"Could not calculate next occurrence for recurring schedule {schedule_id}")
+        return
+    
+    profile_id = schedule.get("profile_id")
+    preheat = schedule.get("preheat", True)
+    
+    # Create a one-time scheduled shot for the next occurrence
+    shot_id = f"recurring-{schedule_id}-{next_time.isoformat()}"
+    
+    # Check if we already have this shot scheduled
+    if shot_id in _scheduled_shots:
+        logger.debug(f"Recurring shot {shot_id} already scheduled")
+        return
+    
+    shot_delay = (next_time - datetime.now(timezone.utc)).total_seconds()
+    
+    if shot_delay < 0:
+        logger.warning(f"Next occurrence for {schedule_id} is in the past, skipping")
+        return
+    
+    # Store the scheduled shot
+    scheduled_shot = {
+        "id": shot_id,
+        "profile_id": profile_id,
+        "scheduled_time": next_time.isoformat(),
+        "preheat": preheat,
+        "status": "scheduled",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "recurring_schedule_id": schedule_id
+    }
+    _scheduled_shots[shot_id] = scheduled_shot
+    await _save_scheduled_shots()
+    
+    logger.info(
+        f"Scheduled next recurring shot {shot_id} for {next_time.isoformat()} "
+        f"(profile: {profile_id}, preheat: {preheat})"
+    )
+
+
+async def _recurring_schedule_checker():
+    """Background task to ensure recurring schedules stay up to date.
+    
+    Runs every hour to:
+    1. Check for completed recurring shots and schedule the next occurrence
+    2. Ensure all enabled recurring schedules have an upcoming shot scheduled
+    """
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Check every hour
+            
+            logger.info("Running recurring schedule check")
+            
+            # Find completed recurring shots and schedule next occurrence
+            for shot_id, shot in list(_scheduled_shots.items()):
+                recurring_id = shot.get("recurring_schedule_id")
+                if recurring_id and shot.get("status") in ["completed", "failed"]:
+                    # Update last_run time for interval-based schedules
+                    if recurring_id in _recurring_schedules:
+                        schedule = _recurring_schedules[recurring_id]
+                        if schedule.get("recurrence_type") == "interval":
+                            schedule["last_run"] = shot.get("scheduled_time")
+                            await _save_recurring_schedules()
+                        
+                        # Schedule next occurrence
+                        await _schedule_next_recurring(recurring_id, schedule)
+            
+            # Ensure all enabled schedules have an upcoming shot
+            for schedule_id, schedule in _recurring_schedules.items():
+                if not schedule.get("enabled", True):
+                    continue
+                
+                # Check if there's already a pending shot for this schedule
+                has_pending = any(
+                    s.get("recurring_schedule_id") == schedule_id 
+                    and s.get("status") in ["scheduled", "preheating"]
+                    for s in _scheduled_shots.values()
+                )
+                
+                if not has_pending:
+                    await _schedule_next_recurring(schedule_id, schedule)
+                    
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in recurring schedule checker: {e}", exc_info=True)
+            await asyncio.sleep(60)  # Wait a bit before retrying
+
+
+async def _restore_scheduled_shots():
+    """Restore scheduled shots from disk on startup and recreate tasks."""
+    global _scheduled_shots
+    
+    # Load persisted shots
+    persisted_shots = await _persistence.load()
+    
+    if not persisted_shots:
+        return
+    
+    # Filter out shots that are in the past or invalid
+    now = datetime.now(timezone.utc)
+    restored_count = 0
+    
+    for schedule_id, shot in persisted_shots.items():
+        try:
+            # Parse scheduled time
+            scheduled_time_str = shot.get("scheduled_time")
+            if not scheduled_time_str:
+                logger.warning(f"Skipping shot {schedule_id}: no scheduled_time")
+                continue
+            
+            scheduled_time = datetime.fromisoformat(scheduled_time_str.replace('Z', '+00:00'))
+            if scheduled_time.tzinfo is None:
+                scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+            
+            # Skip if time has passed
+            if scheduled_time <= now:
+                logger.info(f"Skipping expired shot {schedule_id} (scheduled for {scheduled_time_str})")
+                continue
+            
+            # Restore the shot
+            _scheduled_shots[schedule_id] = shot
+            
+            # Recreate the async task
+            profile_id = shot.get("profile_id")
+            preheat = shot.get("preheat", False)
+            current_status = shot.get("status", "scheduled")
+            shot_delay = (scheduled_time - now).total_seconds()
+            
+            # Create the execution task that handles restoration properly
+            async def execute_scheduled_shot(sid=schedule_id, pid=profile_id, ph=preheat, delay=shot_delay, was_preheating=(current_status == "preheating")):
+                try:
+                    api = get_meticulous_api()
+                    
+                    # If we were already preheating when restored, skip preheat logic
+                    # and just wait for the shot time
+                    if was_preheating:
+                        logger.info(f"Restored shot {sid} was already preheating, waiting {delay:.0f}s until shot time")
+                        _scheduled_shots[sid]["status"] = "preheating"
+                        await _save_scheduled_shots()
+                        
+                        # Just wait until shot time (preheat should still be running on machine)
+                        if delay > 0:
+                            await asyncio.sleep(delay)
+                    elif ph:
+                        # Normal preheat flow for shots that weren't yet preheating
+                        preheat_delay = delay - (PREHEAT_DURATION_MINUTES * 60)
+                        if preheat_delay > 0:
+                            await asyncio.sleep(preheat_delay)
+                            _scheduled_shots[sid]["status"] = "preheating"
+                            await _save_scheduled_shots()
+                            
+                            # Start preheat using ActionType.PREHEAT
+                            try:
+                                from meticulous.api_types import ActionType
+                                api.execute_action(ActionType.PREHEAT)
+                            except Exception as e:
+                                logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
+                            
+                            # Wait for remaining time until shot
+                            await asyncio.sleep(PREHEAT_DURATION_MINUTES * 60)
+                        else:
+                            # Not enough time for full preheat, start immediately
+                            _scheduled_shots[sid]["status"] = "preheating"
+                            await _save_scheduled_shots()
+                            try:
+                                from meticulous.api_types import ActionType
+                                api.execute_action(ActionType.PREHEAT)
+                            except Exception as e:
+                                logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
+                            await asyncio.sleep(delay)
+                    else:
+                        await asyncio.sleep(delay)
+                    
+                    _scheduled_shots[sid]["status"] = "running"
+                    await _save_scheduled_shots()
+                    
+                    # Load and run the profile (if profile_id was provided)
+                    if pid:
+                        load_result = api.load_profile_by_id(pid)
+                        if not (hasattr(load_result, 'error') and load_result.error):
+                            from meticulous.api_types import ActionType
+                            api.execute_action(ActionType.START)
+                            _scheduled_shots[sid]["status"] = "completed"
+                        else:
+                            _scheduled_shots[sid]["status"] = "failed"
+                            _scheduled_shots[sid]["error"] = load_result.error
+                    else:
+                        # Preheat only mode - mark as completed
+                        _scheduled_shots[sid]["status"] = "completed"
+                    
+                    await _save_scheduled_shots()
+                        
+                except asyncio.CancelledError:
+                    _scheduled_shots[sid]["status"] = "cancelled"
+                    await _save_scheduled_shots()
+                except Exception as e:
+                    logger.error(f"Scheduled shot {sid} failed: {e}")
+                    _scheduled_shots[sid]["status"] = "failed"
+                    _scheduled_shots[sid]["error"] = str(e)
+                    await _save_scheduled_shots()
+                finally:
+                    # Clean up task reference
+                    if sid in _scheduled_tasks:
+                        del _scheduled_tasks[sid]
+            
+            task = asyncio.create_task(execute_scheduled_shot())
+            _scheduled_tasks[schedule_id] = task
+            restored_count += 1
+            
+            logger.info(
+                f"Restored scheduled shot {schedule_id} for {scheduled_time_str} "
+                f"(profile: {profile_id}, preheat: {preheat}, status: {current_status}, delay: {shot_delay:.0f}s)"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to restore scheduled shot {schedule_id}: {e}", exc_info=True)
+    
+    if restored_count > 0:
+        logger.info(f"Restored {restored_count} scheduled shot(s) from persistence")
+
+
+@app.get("/api/machine/status")
+async def get_machine_status(request: Request):
+    """Get the current status of the Meticulous machine.
+    
+    Returns machine state, current profile, and whether preheating is active.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Fetching machine status",
+            extra={"request_id": request_id}
+        )
+        
+        api = get_meticulous_api()
+        
+        # Get current shot/status (live machine state)
+        try:
+            status = api.session.get(f"{api.base_url}/api/v1/status")
+            if status.status_code == 200:
+                status_data = status.json()
+            else:
+                status_data = {"state": "unknown"}
+        except Exception as e:
+            logger.warning(f"Could not fetch machine status: {e}")
+            status_data = {"state": "unknown", "error": str(e)}
+        
+        # Get settings to check preheat state
+        try:
+            settings = api.get_settings()
+            if hasattr(settings, 'error') and settings.error:
+                settings_data = {}
+            elif hasattr(settings, 'model_dump'):
+                settings_data = settings.model_dump()
+            else:
+                settings_data = dict(settings) if settings else {}
+        except Exception as e:
+            logger.warning(f"Could not fetch settings: {e}")
+            settings_data = {}
+        
+        # Get last loaded profile
+        try:
+            last_profile = api.get_last_profile()
+            if hasattr(last_profile, 'error') and last_profile.error:
+                last_profile_data = None
+            elif hasattr(last_profile, 'profile'):
+                last_profile_data = {
+                    "id": last_profile.profile.id if hasattr(last_profile.profile, 'id') else None,
+                    "name": last_profile.profile.name if hasattr(last_profile.profile, 'name') else None
+                }
+            else:
+                last_profile_data = None
+        except Exception as e:
+            logger.warning(f"Could not fetch last profile: {e}")
+            last_profile_data = None
+        
+        return {
+            "status": "success",
+            "machine_status": status_data,
+            "settings": settings_data,
+            "current_profile": last_profile_data,
+            "scheduled_shots": list(_scheduled_shots.values())
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to get machine status: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/machine/preheat")
+async def start_preheat(request: Request):
+    """Start preheating the machine.
+    
+    Preheating takes approximately 10 minutes to reach optimal temperature.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            "Starting machine preheat",
+            extra={"request_id": request_id}
+        )
+        
+        api = get_meticulous_api()
+        
+        if api is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Meticulous machine not connected"
+            )
+        
+        # Use ActionType.PREHEAT to start the preheat cycle
+        try:
+            from meticulous.api_types import ActionType
+            result = api.execute_action(ActionType.PREHEAT)
+            
+            if hasattr(result, 'error') and result.error:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to start preheat: {result.error}"
+                )
+        except ImportError:
+            # Fallback: direct API call
+            result = api.session.post(
+                f"{api.base_url}/api/v1/action",
+                json={"action": "preheat"}
+            )
+            if result.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to start preheat: {result.text}"
+                )
+        
+        return {
+            "status": "success",
+            "message": "Preheat started",
+            "estimated_ready_in_minutes": PREHEAT_DURATION_MINUTES
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to start preheat: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/machine/run-profile/{profile_id}")
+async def run_profile(profile_id: str, request: Request):
+    """Load and run a profile immediately.
+    
+    This loads the profile into the machine and starts extraction.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        logger.info(
+            f"Running profile: {profile_id}",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        api = get_meticulous_api()
+        
+        if api is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Meticulous machine not connected"
+            )
+        
+        # Load the profile
+        load_result = api.load_profile_by_id(profile_id)
+        if hasattr(load_result, 'error') and load_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to load profile: {load_result.error}"
+            )
+        
+        # Start the extraction
+        from meticulous.api_types import ActionType
+        action_result = api.execute_action(ActionType.START)
+        if hasattr(action_result, 'error') and action_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to start profile: {action_result.error}"
+            )
+        
+        return {
+            "status": "success",
+            "message": f"Profile started",
+            "profile_id": profile_id,
+            "action": action_result.action if hasattr(action_result, 'action') else "start"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to run profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/api/machine/schedule-shot")
+async def schedule_shot(request: Request):
+    """Schedule a shot to run at a specific time.
+    
+    Request body:
+    - profile_id: str - The profile ID to run
+    - scheduled_time: str - ISO format datetime when to run the shot
+    - preheat: bool - Whether to preheat before the shot (default: false)
+    
+    If preheat is enabled, preheating will start 10 minutes before scheduled_time.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        profile_id = body.get("profile_id")
+        scheduled_time_str = body.get("scheduled_time")
+        preheat = body.get("preheat", False)
+        
+        if not scheduled_time_str:
+            raise HTTPException(
+                status_code=400,
+                detail="scheduled_time is required"
+            )
+        
+        # Validate that we have either a profile or preheat enabled
+        if not profile_id and not preheat:
+            raise HTTPException(
+                status_code=400,
+                detail="Either profile_id or preheat must be provided"
+            )
+        
+        # Parse the scheduled time
+        try:
+            scheduled_time = datetime.fromisoformat(scheduled_time_str.replace('Z', '+00:00'))
+            # Ensure timezone-aware datetime
+            if scheduled_time.tzinfo is None:
+                scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid scheduled_time format. Use ISO format."
+            )
+        
+        # Calculate delays
+        now = datetime.now(timezone.utc)
+        shot_delay = (scheduled_time - now).total_seconds()
+        
+        if shot_delay < 0:
+            raise HTTPException(
+                status_code=400,
+                detail="scheduled_time must be in the future"
+            )
+        
+        # Generate a unique ID for this scheduled shot
+        schedule_id = str(uuid.uuid4())
+        
+        # Store the scheduled shot info
+        scheduled_shot = {
+            "id": schedule_id,
+            "profile_id": profile_id,
+            "scheduled_time": scheduled_time_str,
+            "preheat": preheat,
+            "status": "scheduled",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        _scheduled_shots[schedule_id] = scheduled_shot
+        
+        # Persist to disk
+        await _save_scheduled_shots()
+        
+        logger.info(
+            f"Scheduling shot: {schedule_id}",
+            extra={
+                "request_id": request_id,
+                "schedule_id": schedule_id,
+                "profile_id": profile_id,
+                "scheduled_time": scheduled_time_str,
+                "preheat": preheat
+            }
+        )
+        
+        # Create async task to execute at scheduled time
+        async def execute_scheduled_shot():
+            try:
+                task_start_time = datetime.now(timezone.utc)
+                api = get_meticulous_api()
+                
+                # Track whether we've already waited the full delay
+                full_delay_waited = False
+                
+                # If preheat is enabled, start it 10 minutes before
+                if preheat:
+                    preheat_delay = shot_delay - (PREHEAT_DURATION_MINUTES * 60)
+                    if preheat_delay > 0:
+                        await asyncio.sleep(preheat_delay)
+                        _scheduled_shots[schedule_id]["status"] = "preheating"
+                        await _save_scheduled_shots()
+                        
+                        # Start preheat using ActionType.PREHEAT
+                        try:
+                            from meticulous.api_types import ActionType as AT
+                            api.execute_action(AT.PREHEAT)
+                        except Exception as e:
+                            logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                        
+                        # Wait for remaining time until shot
+                        await asyncio.sleep(PREHEAT_DURATION_MINUTES * 60)
+                        full_delay_waited = True
+                    else:
+                        # Not enough time for full preheat, start immediately
+                        _scheduled_shots[schedule_id]["status"] = "preheating"
+                        await _save_scheduled_shots()
+                        try:
+                            from meticulous.api_types import ActionType as AT
+                            api.execute_action(AT.PREHEAT)
+                        except Exception as e:
+                            logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                
+                # If we haven't already waited the full delay, calculate remaining time
+                if not full_delay_waited:
+                    elapsed = (datetime.now(timezone.utc) - task_start_time).total_seconds()
+                    remaining_delay = max(0, shot_delay - elapsed)
+                    await asyncio.sleep(remaining_delay)
+                
+                _scheduled_shots[schedule_id]["status"] = "running"
+                await _save_scheduled_shots()
+                
+                # Load and run the profile (if profile_id was provided)
+                if profile_id:
+                    load_result = api.load_profile_by_id(profile_id)
+                    if not (hasattr(load_result, 'error') and load_result.error):
+                        from meticulous.api_types import ActionType
+                        api.execute_action(ActionType.START)
+                        _scheduled_shots[schedule_id]["status"] = "completed"
+                        await _save_scheduled_shots()
+                    else:
+                        _scheduled_shots[schedule_id]["status"] = "failed"
+                        _scheduled_shots[schedule_id]["error"] = load_result.error
+                        await _save_scheduled_shots()
+                else:
+                    # Preheat only mode - mark as completed
+                    _scheduled_shots[schedule_id]["status"] = "completed"
+                    await _save_scheduled_shots()
+                    
+            except asyncio.CancelledError:
+                _scheduled_shots[schedule_id]["status"] = "cancelled"
+                await _save_scheduled_shots()
+            except Exception as e:
+                logger.error(f"Scheduled shot {schedule_id} failed: {e}")
+                _scheduled_shots[schedule_id]["status"] = "failed"
+                _scheduled_shots[schedule_id]["error"] = str(e)
+                await _save_scheduled_shots()
+            finally:
+                # Clean up task reference
+                if schedule_id in _scheduled_tasks:
+                    del _scheduled_tasks[schedule_id]
+        
+        # Start the background task
+        task = asyncio.create_task(execute_scheduled_shot())
+        _scheduled_tasks[schedule_id] = task
+        
+        return {
+            "status": "success",
+            "schedule_id": schedule_id,
+            "scheduled_shot": scheduled_shot
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to schedule shot: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.delete("/api/machine/schedule-shot/{schedule_id}")
+async def cancel_scheduled_shot(schedule_id: str, request: Request):
+    """Cancel a scheduled shot."""
+    request_id = request.state.request_id
+    
+    try:
+        if schedule_id not in _scheduled_shots:
+            raise HTTPException(
+                status_code=404,
+                detail="Scheduled shot not found"
+            )
+        
+        # Cancel the task if it exists
+        if schedule_id in _scheduled_tasks:
+            _scheduled_tasks[schedule_id].cancel()
+            del _scheduled_tasks[schedule_id]
+        
+        _scheduled_shots[schedule_id]["status"] = "cancelled"
+        
+        # Persist to disk
+        await _save_scheduled_shots()
+        
+        logger.info(
+            f"Cancelled scheduled shot: {schedule_id}",
+            extra={"request_id": request_id, "schedule_id": schedule_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": "Scheduled shot cancelled",
+            "schedule_id": schedule_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to cancel scheduled shot: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "schedule_id": schedule_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@app.get("/api/machine/scheduled-shots")
+async def list_scheduled_shots(request: Request):
+    """List all scheduled shots."""
+    request_id = request.state.request_id
+    
+    try:
+        # Clean up completed/cancelled shots older than 1 hour
+        now = datetime.now(timezone.utc)
+        to_remove = []
+        for schedule_id, shot in _scheduled_shots.items():
+            if shot["status"] in ["completed", "cancelled", "failed"]:
+                created_at = datetime.fromisoformat(shot["created_at"].replace('Z', '+00:00'))
+                if (now - created_at).total_seconds() > 3600:
+                    to_remove.append(schedule_id)
+        
+        for schedule_id in to_remove:
+            del _scheduled_shots[schedule_id]
+        
+        # Persist changes if any shots were removed
+        if to_remove:
+            await _save_scheduled_shots()
+        
+        return {
+            "status": "success",
+            "scheduled_shots": list(_scheduled_shots.values())
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to list scheduled shots: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+# ==============================================================================
+# Recurring Schedule Endpoints
+# ==============================================================================
+
+@app.get("/api/machine/recurring-schedules")
+async def list_recurring_schedules(request: Request):
+    """List all recurring schedules."""
+    request_id = request.state.request_id
+    
+    try:
+        logger.debug("Listing recurring schedules", extra={"request_id": request_id})
+        
+        # Enrich schedules with next occurrence
+        enriched_schedules = []
+        for schedule_id, schedule in _recurring_schedules.items():
+            schedule_copy = {**schedule, "id": schedule_id}
+            next_time = _get_next_occurrence(schedule)
+            if next_time:
+                schedule_copy["next_occurrence"] = next_time.isoformat()
+            enriched_schedules.append(schedule_copy)
+        
+        return {
+            "status": "success",
+            "recurring_schedules": enriched_schedules
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to list recurring schedules: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+
+
+@app.post("/api/machine/recurring-schedules")
+async def create_recurring_schedule(request: Request):
+    """Create a new recurring schedule.
+    
+    Request body:
+    - name: str - Display name for the schedule
+    - time: str - Time in HH:MM format (24-hour)
+    - recurrence_type: str - One of: 'daily', 'weekdays', 'weekends', 'interval', 'specific_days'
+    - interval_days: int - For 'interval' type, number of days between runs (default: 1)
+    - days_of_week: list[int] - For 'specific_days' type, list of day numbers (0=Monday, 6=Sunday)
+    - profile_id: str | null - Profile to run (null for preheat only)
+    - preheat: bool - Whether to preheat before the shot (default: true)
+    - enabled: bool - Whether the schedule is active (default: true)
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        
+        # Validate required fields
+        time_str = body.get("time")
+        if not time_str:
+            raise HTTPException(status_code=400, detail="time is required (HH:MM format)")
+        
+        # Validate time format
+        try:
+            hour, minute = map(int, time_str.split(":"))
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("Invalid time")
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
+        
+        recurrence_type = body.get("recurrence_type", "daily")
+        valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
+        if recurrence_type not in valid_types:
+            raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
+        
+        # Validate type-specific fields
+        if recurrence_type == "interval":
+            interval_days = body.get("interval_days", 1)
+            if not isinstance(interval_days, int) or interval_days < 1:
+                raise HTTPException(status_code=400, detail="interval_days must be a positive integer")
+        
+        if recurrence_type == "specific_days":
+            days_of_week = body.get("days_of_week", [])
+            if not isinstance(days_of_week, list) or not all(isinstance(d, int) and 0 <= d <= 6 for d in days_of_week):
+                raise HTTPException(status_code=400, detail="days_of_week must be a list of integers 0-6")
+            if not days_of_week:
+                raise HTTPException(status_code=400, detail="days_of_week cannot be empty for specific_days type")
+        
+        profile_id = body.get("profile_id")
+        preheat = body.get("preheat", True)
+        
+        if not profile_id and not preheat:
+            raise HTTPException(status_code=400, detail="Either profile_id or preheat must be provided")
+        
+        # Generate unique ID
+        schedule_id = str(uuid.uuid4())
+        
+        # Create schedule object
+        schedule = {
+            "name": body.get("name", f"Schedule {time_str}"),
+            "time": time_str,
+            "recurrence_type": recurrence_type,
+            "interval_days": body.get("interval_days", 1) if recurrence_type == "interval" else None,
+            "days_of_week": body.get("days_of_week", []) if recurrence_type == "specific_days" else None,
+            "profile_id": profile_id,
+            "preheat": preheat,
+            "enabled": body.get("enabled", True),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        _recurring_schedules[schedule_id] = schedule
+        await _save_recurring_schedules()
+        
+        # Schedule the next occurrence immediately
+        if schedule["enabled"]:
+            await _schedule_next_recurring(schedule_id, schedule)
+        
+        logger.info(
+            f"Created recurring schedule: {schedule_id}",
+            extra={"request_id": request_id, "schedule": schedule}
+        )
+        
+        next_time = _get_next_occurrence(schedule)
+        
+        return {
+            "status": "success",
+            "message": "Recurring schedule created",
+            "schedule_id": schedule_id,
+            "schedule": {**schedule, "id": schedule_id},
+            "next_occurrence": next_time.isoformat() if next_time else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+
+
+@app.put("/api/machine/recurring-schedules/{schedule_id}")
+async def update_recurring_schedule(schedule_id: str, request: Request):
+    """Update an existing recurring schedule."""
+    request_id = request.state.request_id
+    
+    try:
+        if schedule_id not in _recurring_schedules:
+            raise HTTPException(status_code=404, detail="Recurring schedule not found")
+        
+        body = await request.json()
+        schedule = _recurring_schedules[schedule_id]
+        
+        # Update allowed fields
+        if "name" in body:
+            schedule["name"] = body["name"]
+        if "time" in body:
+            time_str = body["time"]
+            try:
+                hour, minute = map(int, time_str.split(":"))
+                if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                    raise ValueError("Invalid time")
+                schedule["time"] = time_str
+            except (ValueError, AttributeError):
+                raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
+        if "recurrence_type" in body:
+            valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
+            if body["recurrence_type"] not in valid_types:
+                raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
+            schedule["recurrence_type"] = body["recurrence_type"]
+        if "interval_days" in body:
+            schedule["interval_days"] = body["interval_days"]
+        if "days_of_week" in body:
+            schedule["days_of_week"] = body["days_of_week"]
+        if "profile_id" in body:
+            schedule["profile_id"] = body["profile_id"]
+        if "preheat" in body:
+            schedule["preheat"] = body["preheat"]
+        if "enabled" in body:
+            schedule["enabled"] = body["enabled"]
+        
+        schedule["updated_at"] = datetime.now(timezone.utc).isoformat()
+        
+        await _save_recurring_schedules()
+        
+        # If enabled, ensure next occurrence is scheduled
+        if schedule.get("enabled", True):
+            await _schedule_next_recurring(schedule_id, schedule)
+        
+        logger.info(f"Updated recurring schedule: {schedule_id}", extra={"request_id": request_id})
+        
+        next_time = _get_next_occurrence(schedule)
+        
+        return {
+            "status": "success",
+            "message": "Recurring schedule updated",
+            "schedule": {**schedule, "id": schedule_id},
+            "next_occurrence": next_time.isoformat() if next_time else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+
+
+@app.delete("/api/machine/recurring-schedules/{schedule_id}")
+async def delete_recurring_schedule(schedule_id: str, request: Request):
+    """Delete a recurring schedule."""
+    request_id = request.state.request_id
+    
+    try:
+        if schedule_id not in _recurring_schedules:
+            raise HTTPException(status_code=404, detail="Recurring schedule not found")
+        
+        # Cancel any pending shots for this schedule
+        for shot_id, shot in list(_scheduled_shots.items()):
+            if shot.get("recurring_schedule_id") == schedule_id and shot.get("status") == "scheduled":
+                if shot_id in _scheduled_tasks:
+                    _scheduled_tasks[shot_id].cancel()
+                    del _scheduled_tasks[shot_id]
+                _scheduled_shots[shot_id]["status"] = "cancelled"
+        
+        await _save_scheduled_shots()
+        
+        # Delete the recurring schedule
+        del _recurring_schedules[schedule_id]
+        await _save_recurring_schedules()
+        
+        logger.info(f"Deleted recurring schedule: {schedule_id}", extra={"request_id": request_id})
+        
+        return {
+            "status": "success",
+            "message": "Recurring schedule deleted",
+            "schedule_id": schedule_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
