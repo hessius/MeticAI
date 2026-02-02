@@ -174,14 +174,30 @@ async def lifespan(app: FastAPI):
     logger.info("Restoring scheduled shots from persistence")
     await _restore_scheduled_shots()
     
+    # Load recurring schedules and schedule next occurrences
+    logger.info("Loading recurring schedules from persistence")
+    await _load_recurring_schedules()
+    for schedule_id, schedule in _recurring_schedules.items():
+        if schedule.get("enabled", True):
+            await _schedule_next_recurring(schedule_id, schedule)
+    
+    # Start recurring schedule checker (runs every hour to ensure schedules stay current)
+    recurring_task = asyncio.create_task(_recurring_schedule_checker())
+    
     yield
     
     # Cleanup on shutdown
     update_task.cancel()
+    recurring_task.cancel()
     try:
         await update_task
     except asyncio.CancelledError:
         logger.info("Periodic update checker stopped")
+    
+    try:
+        await recurring_task
+    except asyncio.CancelledError:
+        logger.info("Recurring schedule checker stopped")
     
     # Cancel all scheduled shot tasks
     for task in _scheduled_tasks.values():
@@ -5943,6 +5959,246 @@ async def _save_scheduled_shots():
     await _persistence.save(_scheduled_shots)
 
 
+# ==============================================================================
+# Recurring Schedules Persistence Layer
+# ==============================================================================
+
+class RecurringSchedulesPersistence:
+    """Manages persistence of recurring schedules to disk.
+    
+    Recurring schedules define repeated preheat/shot times (e.g., daily, weekdays).
+    """
+    
+    def __init__(self, persistence_file: str = "/app/data/recurring_schedules.json"):
+        self.persistence_file = Path(persistence_file)
+        self._lock = asyncio.Lock()
+        
+        try:
+            self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            logger.warning(f"Could not create persistence directory: {e}")
+            temp_dir = Path(tempfile.gettempdir()) / "meticai_data"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            self.persistence_file = temp_dir / "recurring_schedules.json"
+    
+    async def save(self, schedules: dict) -> None:
+        """Save recurring schedules to disk."""
+        async with self._lock:
+            try:
+                # Only save enabled schedules
+                active_schedules = {
+                    sid: s for sid, s in schedules.items()
+                    if s.get("enabled", True)
+                }
+                
+                temp_file = self.persistence_file.with_suffix('.tmp')
+                with open(temp_file, 'w') as f:
+                    json.dump(active_schedules, f, indent=2)
+                temp_file.replace(self.persistence_file)
+                
+                logger.debug(f"Persisted {len(active_schedules)} recurring schedules")
+            except Exception as e:
+                logger.error(f"Failed to save recurring schedules: {e}", exc_info=True)
+    
+    async def load(self) -> dict:
+        """Load recurring schedules from disk."""
+        async with self._lock:
+            try:
+                if not self.persistence_file.exists():
+                    return {}
+                
+                with open(self.persistence_file, 'r') as f:
+                    data = json.load(f)
+                
+                if not isinstance(data, dict):
+                    return {}
+                
+                logger.info(f"Loaded {len(data)} recurring schedules")
+                return data
+            except Exception as e:
+                logger.error(f"Failed to load recurring schedules: {e}", exc_info=True)
+                return {}
+
+
+# Initialize recurring schedules persistence
+_recurring_persistence = RecurringSchedulesPersistence()
+_recurring_schedules: dict = {}
+
+
+async def _save_recurring_schedules():
+    """Helper to persist recurring schedules to disk."""
+    await _recurring_persistence.save(_recurring_schedules)
+
+
+async def _load_recurring_schedules():
+    """Load recurring schedules from disk."""
+    global _recurring_schedules
+    _recurring_schedules = await _recurring_persistence.load()
+
+
+def _get_next_occurrence(schedule: dict) -> Optional[datetime]:
+    """Calculate the next occurrence of a recurring schedule.
+    
+    Args:
+        schedule: Recurring schedule dict with:
+            - time: HH:MM format
+            - recurrence_type: 'daily', 'weekdays', 'weekends', 'interval', 'specific_days'
+            - interval_days: For 'interval' type, number of days between runs
+            - days_of_week: For 'specific_days' type, list of day numbers (0=Monday)
+    
+    Returns:
+        Next datetime when the schedule should run, or None if invalid.
+    """
+    try:
+        time_str = schedule.get("time", "07:00")
+        hour, minute = map(int, time_str.split(":"))
+        recurrence_type = schedule.get("recurrence_type", "daily")
+        
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        
+        # Start checking from today
+        candidate = datetime(today.year, today.month, today.day, hour, minute, tzinfo=timezone.utc)
+        
+        # If today's time has passed, start from tomorrow
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        
+        # Find the next valid day based on recurrence type
+        for _ in range(400):  # Max ~1 year ahead
+            weekday = candidate.weekday()  # 0=Monday, 6=Sunday
+            
+            if recurrence_type == "daily":
+                return candidate
+            elif recurrence_type == "weekdays":
+                if weekday < 5:  # Monday-Friday
+                    return candidate
+            elif recurrence_type == "weekends":
+                if weekday >= 5:  # Saturday-Sunday
+                    return candidate
+            elif recurrence_type == "specific_days":
+                days = schedule.get("days_of_week", [])
+                if weekday in days:
+                    return candidate
+            elif recurrence_type == "interval":
+                # For interval, we need to check against last_run
+                last_run_str = schedule.get("last_run")
+                interval_days = schedule.get("interval_days", 1)
+                
+                if not last_run_str:
+                    return candidate  # First run
+                
+                last_run = datetime.fromisoformat(last_run_str.replace('Z', '+00:00'))
+                next_run = last_run + timedelta(days=interval_days)
+                next_run = next_run.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                
+                if next_run > now:
+                    return next_run
+                else:
+                    # If we missed runs, schedule for next available slot
+                    return candidate
+            
+            candidate += timedelta(days=1)
+        
+        return None
+    except Exception as e:
+        logger.error(f"Failed to calculate next occurrence: {e}")
+        return None
+
+
+async def _schedule_next_recurring(schedule_id: str, schedule: dict):
+    """Schedule the next occurrence of a recurring schedule."""
+    next_time = _get_next_occurrence(schedule)
+    
+    if not next_time:
+        logger.warning(f"Could not calculate next occurrence for recurring schedule {schedule_id}")
+        return
+    
+    profile_id = schedule.get("profile_id")
+    preheat = schedule.get("preheat", True)
+    
+    # Create a one-time scheduled shot for the next occurrence
+    shot_id = f"recurring-{schedule_id}-{next_time.isoformat()}"
+    
+    # Check if we already have this shot scheduled
+    if shot_id in _scheduled_shots:
+        logger.debug(f"Recurring shot {shot_id} already scheduled")
+        return
+    
+    shot_delay = (next_time - datetime.now(timezone.utc)).total_seconds()
+    
+    if shot_delay < 0:
+        logger.warning(f"Next occurrence for {schedule_id} is in the past, skipping")
+        return
+    
+    # Store the scheduled shot
+    scheduled_shot = {
+        "id": shot_id,
+        "profile_id": profile_id,
+        "scheduled_time": next_time.isoformat(),
+        "preheat": preheat,
+        "status": "scheduled",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "recurring_schedule_id": schedule_id
+    }
+    _scheduled_shots[shot_id] = scheduled_shot
+    await _save_scheduled_shots()
+    
+    logger.info(
+        f"Scheduled next recurring shot {shot_id} for {next_time.isoformat()} "
+        f"(profile: {profile_id}, preheat: {preheat})"
+    )
+
+
+async def _recurring_schedule_checker():
+    """Background task to ensure recurring schedules stay up to date.
+    
+    Runs every hour to:
+    1. Check for completed recurring shots and schedule the next occurrence
+    2. Ensure all enabled recurring schedules have an upcoming shot scheduled
+    """
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Check every hour
+            
+            logger.info("Running recurring schedule check")
+            
+            # Find completed recurring shots and schedule next occurrence
+            for shot_id, shot in list(_scheduled_shots.items()):
+                recurring_id = shot.get("recurring_schedule_id")
+                if recurring_id and shot.get("status") in ["completed", "failed"]:
+                    # Update last_run time for interval-based schedules
+                    if recurring_id in _recurring_schedules:
+                        schedule = _recurring_schedules[recurring_id]
+                        if schedule.get("recurrence_type") == "interval":
+                            schedule["last_run"] = shot.get("scheduled_time")
+                            await _save_recurring_schedules()
+                        
+                        # Schedule next occurrence
+                        await _schedule_next_recurring(recurring_id, schedule)
+            
+            # Ensure all enabled schedules have an upcoming shot
+            for schedule_id, schedule in _recurring_schedules.items():
+                if not schedule.get("enabled", True):
+                    continue
+                
+                # Check if there's already a pending shot for this schedule
+                has_pending = any(
+                    s.get("recurring_schedule_id") == schedule_id 
+                    and s.get("status") in ["scheduled", "preheating"]
+                    for s in _scheduled_shots.values()
+                )
+                
+                if not has_pending:
+                    await _schedule_next_recurring(schedule_id, schedule)
+                    
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in recurring schedule checker: {e}", exc_info=True)
+            await asyncio.sleep(60)  # Wait a bit before retrying
+
+
 async def _restore_scheduled_shots():
     """Restore scheduled shots from disk on startup and recreate tasks."""
     global _scheduled_shots
@@ -6542,3 +6798,239 @@ async def list_scheduled_shots(request: Request):
             status_code=500,
             detail={"status": "error", "error": str(e)}
         )
+
+
+# ==============================================================================
+# Recurring Schedule Endpoints
+# ==============================================================================
+
+@app.get("/api/machine/recurring-schedules")
+async def list_recurring_schedules(request: Request):
+    """List all recurring schedules."""
+    request_id = request.state.request_id
+    
+    try:
+        logger.debug("Listing recurring schedules", extra={"request_id": request_id})
+        
+        # Enrich schedules with next occurrence
+        enriched_schedules = []
+        for schedule_id, schedule in _recurring_schedules.items():
+            schedule_copy = {**schedule, "id": schedule_id}
+            next_time = _get_next_occurrence(schedule)
+            if next_time:
+                schedule_copy["next_occurrence"] = next_time.isoformat()
+            enriched_schedules.append(schedule_copy)
+        
+        return {
+            "status": "success",
+            "recurring_schedules": enriched_schedules
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to list recurring schedules: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+
+
+@app.post("/api/machine/recurring-schedules")
+async def create_recurring_schedule(request: Request):
+    """Create a new recurring schedule.
+    
+    Request body:
+    - name: str - Display name for the schedule
+    - time: str - Time in HH:MM format (24-hour)
+    - recurrence_type: str - One of: 'daily', 'weekdays', 'weekends', 'interval', 'specific_days'
+    - interval_days: int - For 'interval' type, number of days between runs (default: 1)
+    - days_of_week: list[int] - For 'specific_days' type, list of day numbers (0=Monday, 6=Sunday)
+    - profile_id: str | null - Profile to run (null for preheat only)
+    - preheat: bool - Whether to preheat before the shot (default: true)
+    - enabled: bool - Whether the schedule is active (default: true)
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        
+        # Validate required fields
+        time_str = body.get("time")
+        if not time_str:
+            raise HTTPException(status_code=400, detail="time is required (HH:MM format)")
+        
+        # Validate time format
+        try:
+            hour, minute = map(int, time_str.split(":"))
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("Invalid time")
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
+        
+        recurrence_type = body.get("recurrence_type", "daily")
+        valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
+        if recurrence_type not in valid_types:
+            raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
+        
+        # Validate type-specific fields
+        if recurrence_type == "interval":
+            interval_days = body.get("interval_days", 1)
+            if not isinstance(interval_days, int) or interval_days < 1:
+                raise HTTPException(status_code=400, detail="interval_days must be a positive integer")
+        
+        if recurrence_type == "specific_days":
+            days_of_week = body.get("days_of_week", [])
+            if not isinstance(days_of_week, list) or not all(isinstance(d, int) and 0 <= d <= 6 for d in days_of_week):
+                raise HTTPException(status_code=400, detail="days_of_week must be a list of integers 0-6")
+            if not days_of_week:
+                raise HTTPException(status_code=400, detail="days_of_week cannot be empty for specific_days type")
+        
+        profile_id = body.get("profile_id")
+        preheat = body.get("preheat", True)
+        
+        if not profile_id and not preheat:
+            raise HTTPException(status_code=400, detail="Either profile_id or preheat must be provided")
+        
+        # Generate unique ID
+        schedule_id = str(uuid.uuid4())
+        
+        # Create schedule object
+        schedule = {
+            "name": body.get("name", f"Schedule {time_str}"),
+            "time": time_str,
+            "recurrence_type": recurrence_type,
+            "interval_days": body.get("interval_days", 1) if recurrence_type == "interval" else None,
+            "days_of_week": body.get("days_of_week", []) if recurrence_type == "specific_days" else None,
+            "profile_id": profile_id,
+            "preheat": preheat,
+            "enabled": body.get("enabled", True),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        _recurring_schedules[schedule_id] = schedule
+        await _save_recurring_schedules()
+        
+        # Schedule the next occurrence immediately
+        if schedule["enabled"]:
+            await _schedule_next_recurring(schedule_id, schedule)
+        
+        logger.info(
+            f"Created recurring schedule: {schedule_id}",
+            extra={"request_id": request_id, "schedule": schedule}
+        )
+        
+        next_time = _get_next_occurrence(schedule)
+        
+        return {
+            "status": "success",
+            "message": "Recurring schedule created",
+            "schedule_id": schedule_id,
+            "schedule": {**schedule, "id": schedule_id},
+            "next_occurrence": next_time.isoformat() if next_time else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+
+
+@app.put("/api/machine/recurring-schedules/{schedule_id}")
+async def update_recurring_schedule(schedule_id: str, request: Request):
+    """Update an existing recurring schedule."""
+    request_id = request.state.request_id
+    
+    try:
+        if schedule_id not in _recurring_schedules:
+            raise HTTPException(status_code=404, detail="Recurring schedule not found")
+        
+        body = await request.json()
+        schedule = _recurring_schedules[schedule_id]
+        
+        # Update allowed fields
+        if "name" in body:
+            schedule["name"] = body["name"]
+        if "time" in body:
+            time_str = body["time"]
+            try:
+                hour, minute = map(int, time_str.split(":"))
+                if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                    raise ValueError("Invalid time")
+                schedule["time"] = time_str
+            except (ValueError, AttributeError):
+                raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
+        if "recurrence_type" in body:
+            valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
+            if body["recurrence_type"] not in valid_types:
+                raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
+            schedule["recurrence_type"] = body["recurrence_type"]
+        if "interval_days" in body:
+            schedule["interval_days"] = body["interval_days"]
+        if "days_of_week" in body:
+            schedule["days_of_week"] = body["days_of_week"]
+        if "profile_id" in body:
+            schedule["profile_id"] = body["profile_id"]
+        if "preheat" in body:
+            schedule["preheat"] = body["preheat"]
+        if "enabled" in body:
+            schedule["enabled"] = body["enabled"]
+        
+        schedule["updated_at"] = datetime.now(timezone.utc).isoformat()
+        
+        await _save_recurring_schedules()
+        
+        # If enabled, ensure next occurrence is scheduled
+        if schedule.get("enabled", True):
+            await _schedule_next_recurring(schedule_id, schedule)
+        
+        logger.info(f"Updated recurring schedule: {schedule_id}", extra={"request_id": request_id})
+        
+        next_time = _get_next_occurrence(schedule)
+        
+        return {
+            "status": "success",
+            "message": "Recurring schedule updated",
+            "schedule": {**schedule, "id": schedule_id},
+            "next_occurrence": next_time.isoformat() if next_time else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+
+
+@app.delete("/api/machine/recurring-schedules/{schedule_id}")
+async def delete_recurring_schedule(schedule_id: str, request: Request):
+    """Delete a recurring schedule."""
+    request_id = request.state.request_id
+    
+    try:
+        if schedule_id not in _recurring_schedules:
+            raise HTTPException(status_code=404, detail="Recurring schedule not found")
+        
+        # Cancel any pending shots for this schedule
+        for shot_id, shot in list(_scheduled_shots.items()):
+            if shot.get("recurring_schedule_id") == schedule_id and shot.get("status") == "scheduled":
+                if shot_id in _scheduled_tasks:
+                    _scheduled_tasks[shot_id].cancel()
+                    del _scheduled_tasks[shot_id]
+                _scheduled_shots[shot_id]["status"] = "cancelled"
+        
+        await _save_scheduled_shots()
+        
+        # Delete the recurring schedule
+        del _recurring_schedules[schedule_id]
+        await _save_recurring_schedules()
+        
+        logger.info(f"Deleted recurring schedule: {schedule_id}", extra={"request_id": request_id})
+        
+        return {
+            "status": "success",
+            "message": "Recurring schedule deleted",
+            "schedule_id": schedule_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
