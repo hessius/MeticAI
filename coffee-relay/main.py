@@ -3992,11 +3992,12 @@ def _analyze_stage_execution(
                 else:
                     goal_message = f"Target pressure of {target_value} bar was NOT reached (only {max_pressure:.1f} bar achieved)"
             elif stage_type == "flow":
-                if max_flow >= target_value * 0.95:
+                # For flow stages, use end_flow (not max_flow) since initial peak is just piston movement
+                if end_flow >= target_value * 0.95:
                     goal_reached = True
-                    goal_message = f"Target flow of {target_value} ml/s was reached ({max_flow:.1f} ml/s achieved)"
+                    goal_message = f"Target flow of {target_value} ml/s was reached ({end_flow:.1f} ml/s at end)"
                 else:
-                    goal_message = f"Target flow of {target_value} ml/s was NOT reached (only {max_flow:.1f} ml/s achieved)"
+                    goal_message = f"Target flow of {target_value} ml/s was NOT reached ({end_flow:.1f} ml/s at end)"
         
         if goal_reached:
             result["assessment"] = {
