@@ -415,6 +415,18 @@ PROFILE_GUIDELINES = (
     "• Consider flow profiling, pressure ramping, and temperature surfing techniques\n"
     "• Design for the specific bean characteristics (origin, roast level, flavor notes)\n"
     "• Balance extraction science with creative experimentation\n\n"
+    "VARIABLES (STRONGLY ENCOURAGED):\n"
+    "• Always define variables for key adjustable parameters - this makes profiles much easier to tune!\n"
+    "• Variables allow users to adjust the profile in the Meticulous app without manually editing JSON\n"
+    "• Common variables to define:\n"
+    "  - peak_pressure: The main extraction pressure (e.g., 8-9 bar)\n"
+    "  - preinfusion_pressure: Low pressure for saturation phase (e.g., 2-4 bar)\n"
+    "  - peak_flow: Target flow rate during extraction (e.g., 2-3 ml/s)\n"
+    "  - decline_pressure: Final pressure at end of shot (e.g., 5-6 bar)\n"
+    "• Variable format in profile JSON:\n"
+    '  "variables": [{"name": "Peak Pressure", "key": "peak_pressure", "type": "pressure", "value": 9.0}]\n'
+    "• Reference variables in dynamics using $ prefix: {\"value\": \"$peak_pressure\"}\n"
+    "• ALWAYS include the 'variables' array in profiles, even if empty (required for app compatibility)\n\n"
 )
 
 NAMING_CONVENTION = (
@@ -459,6 +471,27 @@ def get_author_instruction() -> str:
         f"AUTHOR:\n"
         f"• Set the 'author' field in the profile JSON to: \"{author}\"\n"
         f"• This name will appear as the profile creator on the Meticulous device\n\n"
+    )
+
+
+def build_advanced_customization_section(advanced_customization: Optional[str]) -> str:
+    """Build the advanced customization section for the prompt.
+    
+    These are MANDATORY equipment and extraction parameters that MUST be followed.
+    """
+    if not advanced_customization:
+        return ""
+    
+    return (
+        f"⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):\n"
+        f"{advanced_customization}\n\n"
+        f"CRITICAL: You MUST configure the profile to use these EXACT values. "
+        f"These are non-negotiable hardware/extraction constraints:\n"
+        f"• If a temperature is specified, set the profile temperature to that EXACT value\n"
+        f"• If a dose is specified, the profile MUST be designed for that EXACT dose\n"
+        f"• If max pressure/flow is specified, NO stage should exceed those limits\n"
+        f"• If basket size/type is specified, account for it in your dose and extraction design\n"
+        f"• If bottom filter is specified, mention it in preparation notes\n\n"
     )
 
 
@@ -524,13 +557,17 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
 async def analyze_and_profile(
     request: Request,
     file: Optional[UploadFile] = File(None),
-    user_prefs: Optional[str] = Form(None)
+    user_prefs: Optional[str] = Form(None),
+    advanced_customization: Optional[str] = Form(None)
 ):
     """Unified endpoint: Analyze coffee bag and generate profile in a single LLM pass.
     
     Requires at least one of:
     - file: Image of the coffee bag
     - user_prefs: User preferences or specific instructions
+    
+    Optional:
+    - advanced_customization: Advanced equipment/extraction settings (basket, temp, dose, etc.)
     """
     request_id = request.state.request_id
     
@@ -558,8 +595,10 @@ async def analyze_and_profile(
                 "endpoint": "/analyze_and_profile",
                 "has_image": file is not None,
                 "has_preferences": user_prefs is not None,
+                "has_advanced_customization": advanced_customization is not None,
                 "upload_filename": file.filename if file else None,
-                "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs
+                "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs,
+                "advanced_customization": advanced_customization
             }
         )
         
@@ -588,6 +627,9 @@ async def analyze_and_profile(
         # Get author instruction with configured name
         author_instruction = get_author_instruction()
         
+        # Build advanced customization section if provided
+        advanced_section = build_advanced_customization_section(advanced_customization)
+        
         # Construct the profile creation prompt
         if coffee_analysis and user_prefs:
             # Both image and preferences provided
@@ -595,11 +637,12 @@ async def analyze_and_profile(
                 BARISTA_PERSONA +
                 SAFETY_RULES +
                 f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"Coffee Analysis: '{coffee_analysis}'\n\n"
+                f"Coffee Analysis: '{coffee_analysis}'\n\n" +
+                advanced_section +
                 f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                 f"'{user_prefs}'\n"
                 f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
-                f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements above.\n\n" +
+                f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
@@ -607,12 +650,15 @@ async def analyze_and_profile(
                 OUTPUT_FORMAT
             )
         elif coffee_analysis:
-            # Only image provided
+            # Only image provided (may still have advanced customization)
             final_prompt = (
                 BARISTA_PERSONA +
                 SAFETY_RULES +
                 f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"Task: Create a sophisticated espresso profile for '{coffee_analysis}'.\n\n" +
+                f"Coffee Analysis: '{coffee_analysis}'\n\n" +
+                advanced_section +
+                f"TASK: Create a sophisticated espresso profile for this coffee" +
+                (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
@@ -620,15 +666,16 @@ async def analyze_and_profile(
                 OUTPUT_FORMAT
             )
         else:
-            # Only user preferences provided
+            # Only user preferences provided (may still have advanced customization)
             final_prompt = (
                 BARISTA_PERSONA +
                 SAFETY_RULES +
-                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n\n"
+                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n\n" +
+                advanced_section +
                 f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                 f"'{user_prefs}'\n"
                 f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
-                "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements above.\n\n" +
+                "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
