@@ -455,18 +455,27 @@ NAMING_CONVENTION = (
 )
 
 OUTPUT_FORMAT = (
-    "OUTPUT FORMAT:\n"
+    "OUTPUT FORMAT (use this exact format - no bold/italic markdown):\n"
+    "---\n"
     "Profile Created: [Name]\n"
-    "Description: [What makes this profile special]\n"
+    "\n"
+    "Description: [What makes this profile special - 1-2 sentences]\n"
+    "\n"
     "Preparation: [Dose, grind, temp, and any pre-shot steps]\n"
+    "\n"
     "Why This Works: [Science and reasoning behind the profile design]\n"
-    "Special Notes: [Any equipment or technique requirements, or 'None' if standard setup]\n\n"
+    "\n"
+    "Special Notes: [Any equipment or technique requirements, or 'None' if standard setup]\n"
+    "---\n\n"
     "PROFILE JSON:\n"
     "```json\n"
-    "[Include the EXACT JSON that was sent to create_profile tool here, formatted as valid JSON]\n"
+    "[Include the EXACT JSON that was sent to create_profile tool here]\n"
     "```\n\n"
-    "IMPORTANT: You MUST include the complete profile JSON above exactly as it was passed to the create_profile tool. "
-    "This allows users to download and share their profiles."
+    "FORMATTING RULES:\n"
+    "• Do NOT use **bold** or *italic* markdown in the output - keep it plain text\n"
+    "• Use the exact label format shown above (e.g., 'Profile Created:' not '**Profile Created:**')\n"
+    "• Keep descriptions concise - this will be displayed on mobile\n"
+    "• You MUST include the complete profile JSON exactly as passed to create_profile tool\n"
 )
 
 USER_SUMMARY_INSTRUCTIONS = (
