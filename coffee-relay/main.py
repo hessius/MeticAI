@@ -416,19 +416,19 @@ PROFILE_GUIDELINES = (
     "• Design for the specific bean characteristics (origin, roast level, flavor notes)\n"
     "• Balance extraction science with creative experimentation\n\n"
     "VARIABLES (REQUIRED):\n"
-    "• The 'variables' array serves TWO purposes: adjustable parameters AND user information\n"
+    "• The 'variables' array serves TWO purposes: adjustable parameters AND essential preparation info\n"
     "• ALWAYS include the 'variables' array - it is REQUIRED for app compatibility\n\n"
-    "1. INFO VARIABLES (always include these first):\n"
-    "   • ☕ Dose: ALWAYS the first variable - shows recommended dose in grams\n"
-    "     Format: {\"name\": \"☕ Dose\", \"key\": \"info_dose\", \"type\": \"power\", \"value\": 18}\n"
-    "   • Add other info variables for special instructions using emoji prefixes:\n"
-    "     - 💧 Dilute: For drinks needing dilution (e.g., lungo, americano-style)\n"
-    "       Example: {\"name\": \"💧 Dilute with\", \"key\": \"info_dilute\", \"type\": \"power\", \"value\": 50} (meaning add 50ml water)\n"
-    "     - 🔧 Bottom Filter: If profile works best with bottom filter\n"
-    "       Example: {\"name\": \"🔧 Use Bottom Filter!\", \"key\": \"info_filter\", \"type\": \"power\", \"value\": 1}\n"
-    "     - ⚙️ Grind: Grind size recommendation on a 1-100 scale (optional)\n"
-    "       Example: {\"name\": \"⚙️ Grind Setting\", \"key\": \"info_grind\", \"type\": \"power\", \"value\": 25}\n"
-    "   • Info variables use 'power' type and 'info_' key prefix - they are display-only, never used in stages\n\n"
+    "1. PREPARATION INFO (include first - only essentials needed to make the profile work):\n"
+    "   • ☕ Dose: ALWAYS first - use type 'weight' so it displays correctly in the Meticulous app\n"
+    "     Format: {\"name\": \"☕ Dose\", \"key\": \"info_dose\", \"type\": \"weight\", \"value\": 18}\n"
+    "   • Only add other info variables if ESSENTIAL for the profile to work properly:\n"
+    "     - 💧 Dilute: Only for profiles that REQUIRE dilution to taste right (e.g., lungo, allongé)\n"
+    "       Format: {\"name\": \"💧 Add water\", \"key\": \"info_dilute\", \"type\": \"weight\", \"value\": 50}\n"
+    "     - 🔧 Bottom Filter: Only if the profile specifically REQUIRES it\n"
+    "       Format: {\"name\": \"🔧 Use bottom filter\", \"key\": \"info_filter\", \"type\": \"power\", \"value\": 0}\n"
+    "   • Use the correct type where the unit makes sense (weight for grams), otherwise use power with value 0\n"
+    "   • Info variable keys start with 'info_' - they are NOT used in stages, just for user communication\n"
+    "   • Keep it minimal: only critical info, not general tips or preferences\n\n"
     "2. ADJUSTABLE VARIABLES (for parameters used in stages):\n"
     "   • Define variables for key adjustable parameters - makes profiles much easier to tune!\n"
     "   • Users can adjust these in the Meticulous app without manually editing JSON\n"
@@ -440,7 +440,7 @@ PROFILE_GUIDELINES = (
     "   • Reference these in dynamics using $ prefix: {\"value\": \"$peak_pressure\"}\n\n"
     "VARIABLE FORMAT EXAMPLE:\n"
     '"variables": [\n'
-    '  {"name": "☕ Dose", "key": "info_dose", "type": "power", "value": 18},\n'
+    '  {"name": "☕ Dose", "key": "info_dose", "type": "weight", "value": 18},\n'
     '  {"name": "Peak Pressure", "key": "peak_pressure", "type": "pressure", "value": 9.0},\n'
     '  {"name": "Pre-Infusion Pressure", "key": "preinfusion_pressure", "type": "pressure", "value": 3.0}\n'
     ']\n\n'
