@@ -48,7 +48,7 @@ CONFIG_URL="https://raw.githubusercontent.com/hessius/MeticAI/main/.update-confi
 LOCAL_CONFIG_FILE="$SCRIPT_DIR/.update-config.json"
 
 # Default URLs (used if config fetch fails)
-MCP_FORK_URL="https://github.com/manonstreet/meticulous-mcp.git"
+MCP_FORK_URL="https://github.com/hessius/meticulous-mcp.git"
 MCP_MAIN_URL="https://github.com/meticulous/meticulous-mcp.git"  # Placeholder for when fork merges
 WEB_APP_URL="https://github.com/hessius/MeticAI-web.git"
 
