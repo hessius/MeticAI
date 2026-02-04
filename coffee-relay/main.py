@@ -457,28 +457,27 @@ NAMING_CONVENTION = (
 OUTPUT_FORMAT = (
     "OUTPUT FORMAT (use this exact format):\n"
     "---\n"
-    "Profile Created: [Name]\n"
+    "**Profile Created:** [Name]\n"
     "\n"
-    "Description: [What makes this profile special - 1-2 sentences]\n"
+    "**Description:** [What makes this profile special - 1-2 sentences]\n"
     "\n"
-    "Preparation:\n"
+    "**Preparation:**\n"
     "- Dose: [X]g\n"
     "- Grind: [description]\n"
     "- Temperature: [X]°C\n"
     "- [Any other prep steps]\n"
     "\n"
-    "Why This Works: [Science and reasoning behind the profile design]\n"
+    "**Why This Works:** [Science and reasoning behind the profile design]\n"
     "\n"
-    "Special Notes: [Any equipment or technique requirements, or 'None' if standard setup]\n"
+    "**Special Notes:** [Any equipment or technique requirements, or 'None' if standard setup]\n"
     "---\n\n"
     "PROFILE JSON:\n"
     "```json\n"
     "[Include the EXACT JSON that was sent to create_profile tool here]\n"
     "```\n\n"
-    "FORMATTING RULES:\n"
-    "• Do NOT use **bold** or *italic* markdown - keep labels as plain text\n"
-    "• List items with - or • are fine and encouraged for preparation steps\n"
-    "• Use the exact label format shown above (e.g., 'Profile Created:' not '**Profile Created:**')\n"
+    "FORMATTING:\n"
+    "• Use **bold** for section labels as shown above\n"
+    "• List items with - are encouraged for preparation steps\n"
     "• Keep descriptions concise - this will be displayed on mobile\n"
     "• You MUST include the complete profile JSON exactly as passed to create_profile tool\n"
 )
@@ -2094,12 +2093,24 @@ def _extract_profile_json(reply: str) -> Optional[dict]:
     return None
 
 
+def _clean_profile_name(name: str) -> str:
+    """Clean markdown artifacts from profile name."""
+    import re
+    # Remove leading/trailing ** or *
+    cleaned = re.sub(r'^[\*]+\s*', '', name)
+    cleaned = re.sub(r'\s*[\*]+$', '', cleaned)
+    # Remove any remaining ** pairs
+    cleaned = cleaned.replace('**', '')
+    return cleaned.strip()
+
+
 def _extract_profile_name(reply: str) -> str:
     """Extract the profile name from the LLM reply."""
     import re
-    match = re.search(r'Profile Created:\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
+    # Handle both **Profile Created:** and Profile Created: formats
+    match = re.search(r'\*?\*?Profile Created:\*?\*?\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
     if match:
-        return match.group(1).strip()
+        return _clean_profile_name(match.group(1))
     return "Untitled Profile"
 
 
@@ -2323,6 +2334,59 @@ async def clear_history(request: Request):
         raise HTTPException(
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "Failed to clear history"}
+        )
+
+
+@app.post("/api/history/migrate")
+async def migrate_history_profile_names(request: Request):
+    """Migrate history to clean up malformed profile names.
+    
+    This fixes profile names that have markdown artifacts like ** or *.
+    
+    Returns:
+        Number of entries fixed
+    """
+    request_id = request.state.request_id
+    
+    try:
+        history = _load_history()
+        fixed_count = 0
+        
+        for entry in history:
+            old_name = entry.get("profile_name", "")
+            new_name = _clean_profile_name(old_name)
+            
+            if old_name != new_name:
+                entry["profile_name"] = new_name
+                fixed_count += 1
+                logger.info(
+                    f"Fixed profile name: '{old_name}' -> '{new_name}'",
+                    extra={"request_id": request_id}
+                )
+        
+        if fixed_count > 0:
+            _save_history(history)
+        
+        logger.info(
+            f"Migration complete: {fixed_count} profile names fixed",
+            extra={"request_id": request_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Fixed {fixed_count} profile names",
+            "fixed_count": fixed_count
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to migrate history: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to migrate history"}
         )
 
 
