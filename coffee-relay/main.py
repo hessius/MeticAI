@@ -448,10 +448,15 @@ PROFILE_GUIDELINES = (
 
 NAMING_CONVENTION = (
     "NAMING CONVENTION:\n"
-    "• Create a witty, pun-heavy name that's creative yet clear about the profile specifics\n"
+    "• Create a UNIQUE, witty, pun-heavy name - NEVER reuse names you've used before!\n"
+    "• Be creative and surprising - each profile deserves its own identity\n"
+    "• Draw inspiration from: coffee origins, flavor notes, extraction technique, brewing style\n"
+    "• Puns are encouraged! Word play, coffee jokes, clever references all welcome\n"
     "• Balance humor with clarity - users should understand what they're getting\n"
-    "• Examples: 'Slow-Mo Blossom' (gentle blooming profile), 'Pressure Point' (aggressive ramp), "
-    "'The Gusher' (high flow), 'Espresso Yourself' (expressive profile)\n\n"
+    "• AVOID generic names like 'Berry Blast', 'Morning Brew', 'Classic Espresso'\n"
+    "• Examples: 'Slow-Mo Blossom' (gentle blooming), 'The Grind Awakens' (Star Wars pun), "
+    "'Brew-tal Force' (aggressive extraction), 'Puck Norris' (roundhouse your tastebuds), "
+    "'The Daily Grind', 'Brew Lagoon', 'Espresso Yourself', 'Wake Me Up Before You Go-Go'\n\n"
 )
 
 OUTPUT_FORMAT = (
