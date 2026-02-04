@@ -415,18 +415,35 @@ PROFILE_GUIDELINES = (
     "• Consider flow profiling, pressure ramping, and temperature surfing techniques\n"
     "• Design for the specific bean characteristics (origin, roast level, flavor notes)\n"
     "• Balance extraction science with creative experimentation\n\n"
-    "VARIABLES (STRONGLY ENCOURAGED):\n"
-    "• Always define variables for key adjustable parameters - this makes profiles much easier to tune!\n"
-    "• Variables allow users to adjust the profile in the Meticulous app without manually editing JSON\n"
-    "• Common variables to define:\n"
-    "  - peak_pressure: The main extraction pressure (e.g., 8-9 bar)\n"
-    "  - preinfusion_pressure: Low pressure for saturation phase (e.g., 2-4 bar)\n"
-    "  - peak_flow: Target flow rate during extraction (e.g., 2-3 ml/s)\n"
-    "  - decline_pressure: Final pressure at end of shot (e.g., 5-6 bar)\n"
-    "• Variable format in profile JSON:\n"
-    '  "variables": [{"name": "Peak Pressure", "key": "peak_pressure", "type": "pressure", "value": 9.0}]\n'
-    "• Reference variables in dynamics using $ prefix: {\"value\": \"$peak_pressure\"}\n"
-    "• ALWAYS include the 'variables' array in profiles, even if empty (required for app compatibility)\n\n"
+    "VARIABLES (REQUIRED):\n"
+    "• The 'variables' array serves TWO purposes: adjustable parameters AND user information\n"
+    "• ALWAYS include the 'variables' array - it is REQUIRED for app compatibility\n\n"
+    "1. INFO VARIABLES (always include these first):\n"
+    "   • ☕ Dose: ALWAYS the first variable - shows recommended dose in grams\n"
+    "     Format: {\"name\": \"☕ Dose\", \"key\": \"info_dose\", \"type\": \"power\", \"value\": 18}\n"
+    "   • Add other info variables for special instructions using emoji prefixes:\n"
+    "     - 💧 Dilute: For drinks needing dilution (e.g., lungo, americano-style)\n"
+    "       Example: {\"name\": \"💧 Dilute with\", \"key\": \"info_dilute\", \"type\": \"power\", \"value\": 50} (meaning add 50ml water)\n"
+    "     - 🔧 Bottom Filter: If profile works best with bottom filter\n"
+    "       Example: {\"name\": \"🔧 Use Bottom Filter!\", \"key\": \"info_filter\", \"type\": \"power\", \"value\": 1}\n"
+    "     - ⚙️ Grind: Grind size recommendation on a 1-100 scale (optional)\n"
+    "       Example: {\"name\": \"⚙️ Grind Setting\", \"key\": \"info_grind\", \"type\": \"power\", \"value\": 25}\n"
+    "   • Info variables use 'power' type and 'info_' key prefix - they are display-only, never used in stages\n\n"
+    "2. ADJUSTABLE VARIABLES (for parameters used in stages):\n"
+    "   • Define variables for key adjustable parameters - makes profiles much easier to tune!\n"
+    "   • Users can adjust these in the Meticulous app without manually editing JSON\n"
+    "   • Common adjustable variables:\n"
+    "     - peak_pressure: The main extraction pressure (e.g., 8-9 bar)\n"
+    "     - preinfusion_pressure: Low pressure for saturation phase (e.g., 2-4 bar)\n"
+    "     - peak_flow: Target flow rate during extraction (e.g., 2-3 ml/s)\n"
+    "     - decline_pressure: Final pressure at end of shot (e.g., 5-6 bar)\n"
+    "   • Reference these in dynamics using $ prefix: {\"value\": \"$peak_pressure\"}\n\n"
+    "VARIABLE FORMAT EXAMPLE:\n"
+    '"variables": [\n'
+    '  {"name": "☕ Dose", "key": "info_dose", "type": "power", "value": 18},\n'
+    '  {"name": "Peak Pressure", "key": "peak_pressure", "type": "pressure", "value": 9.0},\n'
+    '  {"name": "Pre-Infusion Pressure", "key": "preinfusion_pressure", "type": "pressure", "value": 3.0}\n'
+    ']\n\n'
 )
 
 NAMING_CONVENTION = (
