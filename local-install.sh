@@ -1342,7 +1342,7 @@ fi
 # 3. Setup Dependencies (The MCP Fork & Web App)
 ################################################################################
 # Clone the Meticulous MCP server fork required for machine communication
-# Repository: https://github.com/manonstreet/meticulous-mcp.git
+# Repository: https://github.com/hessius/meticulous-mcp.git
 # And the MeticAI Web Interface
 # Repository: https://github.com/hessius/MeticAI-web.git
 ################################################################################
@@ -1358,7 +1358,7 @@ if [ -d "meticulous-source" ]; then
         show_progress "Removing old meticulous-source..." 35
         rm -rf meticulous-source
         show_progress "Cloning meticulous-source..." 40
-        git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+        git clone https://github.com/hessius/meticulous-mcp.git meticulous-source
     elif [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
         echo "Directory 'meticulous-source' already exists."
         read -r -p "Do you want to delete it and re-clone the latest version? (y/n) [n]: " CLONE_CONFIRM </dev/tty
@@ -1368,7 +1368,7 @@ if [ -d "meticulous-source" ]; then
             echo "Removing old source..."
             rm -rf meticulous-source
             echo "Cloning fresh repository..."
-            git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+            git clone https://github.com/hessius/meticulous-mcp.git meticulous-source
         else
             echo "Skipping clone (using existing source)."
         fi
@@ -1379,7 +1379,7 @@ else
     else
         echo "Cloning Meticulous MCP fork..."
     fi
-    git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+    git clone https://github.com/hessius/meticulous-mcp.git meticulous-source
 fi
 echo -e "${GREEN}✓ MCP source code ready.${NC}"
 

@@ -5062,7 +5062,7 @@ class TestVersionEndpoint:
         assert isinstance(data["mcp_repo_url"], str)
         
         # Check that repo URL is the expected value
-        assert data["mcp_repo_url"] == "https://github.com/manonstreet/meticulous-mcp"
+        assert data["mcp_repo_url"] == "https://github.com/hessius/meticulous-mcp"
     
     @patch('main.Path')
     def test_version_with_existing_version_files(self, mock_path, client):
@@ -5120,7 +5120,7 @@ class TestVersionEndpoint:
         assert "meticai_web" in data
         assert "mcp_server" in data
         assert "mcp_repo_url" in data
-        assert data["mcp_repo_url"] == "https://github.com/manonstreet/meticulous-mcp"
+        assert data["mcp_repo_url"] == "https://github.com/hessius/meticulous-mcp"
         # Versions should be strings (either version numbers or "unknown")
         assert isinstance(data["meticai"], str)
         assert isinstance(data["meticai_web"], str)

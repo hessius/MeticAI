@@ -1335,7 +1335,7 @@ async def get_version_info(request: Request):
         # Read MCP server version and repo URL from meticulous-source
         mcp_version = "unknown"
         mcp_commit = None
-        mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"  # Default fallback
+        mcp_repo_url = "https://github.com/hessius/meticulous-mcp"  # Default fallback
         # In container: meticulous-source is at /app/meticulous-source (same level as main.py)
         mcp_source_dir = Path(__file__).parent / "meticulous-source"
         
@@ -1375,7 +1375,7 @@ async def get_version_info(request: Request):
                 )
         
         # If not found in .versions.json, try git remote from meticulous-source
-        if mcp_repo_url == "https://github.com/manonstreet/meticulous-mcp" and mcp_source_dir.exists():
+        if mcp_repo_url == "https://github.com/hessius/meticulous-mcp" and mcp_source_dir.exists():
             git_dir = mcp_source_dir / ".git"
             if git_dir.exists():
                 try:
@@ -1468,7 +1468,7 @@ async def get_version_info(request: Request):
             "meticai_web_commit": None,
             "mcp_server": "unknown",
             "mcp_commit": None,
-            "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp"
+            "mcp_repo_url": "https://github.com/hessius/meticulous-mcp"
         }
 
 
