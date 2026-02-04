@@ -1287,6 +1287,35 @@ Description: A test profile
         
         assert result == "Ethiopian Sunrise"
 
+    def test_extract_profile_name_with_bold_format(self):
+        """Test extracting profile name when label uses **bold** format."""
+        from main import _extract_profile_name
+        
+        reply = "**Profile Created:** Berry Blast Bloom\n\nDescription: ..."
+        result = _extract_profile_name(reply)
+        
+        assert result == "Berry Blast Bloom"
+
+    def test_extract_profile_name_cleans_leading_asterisks(self):
+        """Test that leading ** are cleaned from profile name."""
+        from main import _extract_profile_name
+        
+        # This simulates the case where regex captures ** as part of the name
+        reply = "**Profile Created:** ** Berry Blast Bloom\n\nDescription: ..."
+        result = _extract_profile_name(reply)
+        
+        assert result == "Berry Blast Bloom"
+
+    def test_clean_profile_name(self):
+        """Test cleaning markdown from profile names."""
+        from main import _clean_profile_name
+        
+        assert _clean_profile_name("** Berry Blast Bloom") == "Berry Blast Bloom"
+        assert _clean_profile_name("Berry Blast Bloom **") == "Berry Blast Bloom"
+        assert _clean_profile_name("**Berry** Bloom") == "Berry Bloom"
+        assert _clean_profile_name("* test *") == "test"
+        assert _clean_profile_name("Normal Name") == "Normal Name"
+
     def test_extract_profile_name_not_found(self):
         """Test default name when pattern not found."""
         from main import _extract_profile_name
