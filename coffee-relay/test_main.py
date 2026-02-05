@@ -607,7 +607,7 @@ class TestEnhancedBaristaPersona:
         call_args = mock_subprocess.call_args[0][0]
         prompt = call_args[-1]
         
-        assert "OUTPUT FORMAT:" in prompt
+        assert "OUTPUT FORMAT (use this exact format):" in prompt
         assert "Profile Created:" in prompt
         assert "Description:" in prompt
         assert "Preparation:" in prompt
@@ -647,7 +647,7 @@ class TestEnhancedBaristaPersona:
         assert "PERSONA:" in prompt
         assert "PROFILE CREATION GUIDELINES:" in prompt
         assert "NAMING CONVENTION:" in prompt
-        assert "OUTPUT FORMAT:" in prompt
+        assert "OUTPUT FORMAT (use this exact format):" in prompt
 
 
 class TestCORS:
