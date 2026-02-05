@@ -108,7 +108,7 @@ cd MeticAI
 # PI_IP=192.168.x.x
 
 # 3. Clone MCP source
-git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+git clone https://github.com/hessius/meticulous-mcp.git meticulous-source
 
 # 4. Build and run
 docker compose up -d --build
@@ -223,7 +223,7 @@ Must include:
 
 ### Meticulous MCP
 This project depends on the excellent work by @manonstreet:
-- Repository: https://github.com/manonstreet/meticulous-mcp
+- Repository: https://github.com/hessius/meticulous-mcp
 - Cloned to `meticulous-source/` during installation
 - Provides MCP server for machine communication
 
