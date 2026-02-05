@@ -458,9 +458,10 @@ PROFILE_GUIDELINES = (
     ']\n\n'
     "STAGE LIMITS (CRITICAL SAFETY):\n"
     "• EVERY flow stage MUST have a pressure limit to prevent pressure runaway\n"
-    "• EVERY pressure stage SHOULD have a flow limit for gentler extraction\n"
-    "• Pre-infusion/blooming flow stages: Add pressure limit of 3-5 bar max\n"
-    "• Main extraction flow stages: Add pressure limit of 9-10 bar max\n"
+    "• EVERY pressure stage MUST have a flow limit to prevent channeling and ensure even extraction\n"
+    "• Flow stages during pre-infusion/blooming: Add pressure limit of 3-5 bar max\n"
+    "• Flow stages during main extraction: Add pressure limit of 9-10 bar max\n"
+    "• Pressure stages: Add flow limit of 4-6 ml/s to prevent channeling\n"
     "• Example flow stage with pressure limit:\n"
     '  {\n'
     '    "name": "Gentle Bloom",\n'
@@ -468,6 +469,14 @@ PROFILE_GUIDELINES = (
     '    "dynamics_points": [[0, 1.5]],\n'
     '    "limits": [{"type": "pressure", "value": 4}],\n'
     '    "exit_triggers": [{"type": "time", "value": 15, "comparison": ">=", "relative": true}]\n'
+    '  }\n'
+    "• Example pressure stage with flow limit:\n"
+    '  {\n'
+    '    "name": "Main Extraction",\n'
+    '    "type": "pressure",\n'
+    '    "dynamics_points": [[0, 9]],\n'
+    '    "limits": [{"type": "flow", "value": 5}],\n'
+    '    "exit_triggers": [{"type": "weight", "value": 36, "comparison": ">=", "relative": false}]\n'
     '  }\n\n'
 )
 
