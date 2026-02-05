@@ -1257,7 +1257,7 @@ class TestHistoryAPI:
             },
             {
                 "id": "entry-4",
-                "profile_name": "** Leading Spaces**",
+                "profile_name": "** Spaces After Marker**",  # Tests handling spaces after opening marker
                 "created_at": "2026-01-01T10:00:00+00:00"
             },
             {
@@ -1281,7 +1281,7 @@ class TestHistoryAPI:
         assert saved_history[0]["profile_name"] == "Bold Profile"
         assert saved_history[1]["profile_name"] == "Italic Profile"
         assert saved_history[2]["profile_name"] == "Bold Only"
-        assert saved_history[3]["profile_name"] == "Leading Spaces"
+        assert saved_history[3]["profile_name"] == "Spaces After Marker"
         assert saved_history[4]["profile_name"] == "Clean Profile"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
