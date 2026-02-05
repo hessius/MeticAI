@@ -1233,6 +1233,191 @@ class TestHistoryAPI:
         
         assert response.status_code == 404
 
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_cleans_markdown_artifacts(self, mock_load, mock_save, client):
+        """Test that migration successfully cleans profile names with markdown artifacts."""
+        # Create entries with various markdown artifacts
+        history_with_artifacts = [
+            {
+                "id": "entry-1",
+                "profile_name": "**Bold Profile**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-2",
+                "profile_name": "*Italic Profile*",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-3",
+                "profile_name": "**Bold Only**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-4",
+                "profile_name": "** Leading Spaces**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-5",
+                "profile_name": "Clean Profile",  # No artifacts
+                "created_at": "2026-01-01T10:00:00+00:00"
+            }
+        ]
+        mock_load.return_value = history_with_artifacts
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 4  # 4 entries had artifacts
+        
+        # Verify save was called with cleaned names
+        mock_save.assert_called_once()
+        saved_history = mock_save.call_args[0][0]
+        assert saved_history[0]["profile_name"] == "Bold Profile"
+        assert saved_history[1]["profile_name"] == "Italic Profile"
+        assert saved_history[2]["profile_name"] == "Bold Only"
+        assert saved_history[3]["profile_name"] == "Leading Spaces"
+        assert saved_history[4]["profile_name"] == "Clean Profile"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_returns_correct_count(self, mock_load, mock_save, client):
+        """Test that migration returns correct count of fixed entries."""
+        history_with_some_artifacts = [
+            {"id": "1", "profile_name": "**Fixed 1**", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "2", "profile_name": "Clean", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "3", "profile_name": "**Fixed 2**", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "4", "profile_name": "Also Clean", "created_at": "2026-01-01T10:00:00+00:00"},
+        ]
+        mock_load.return_value = history_with_some_artifacts
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 2
+        assert "Fixed 2 profile names" in data["message"]
+        
+        # Verify save was called since there were fixes
+        mock_save.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_handles_empty_history(self, mock_load, mock_save, client):
+        """Test that migration handles empty history gracefully."""
+        mock_load.return_value = []
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 0
+        assert "Fixed 0 profile names" in data["message"]
+        
+        # Verify save was NOT called since there were no fixes
+        mock_save.assert_not_called()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_handles_missing_profile_name(self, mock_load, mock_save, client):
+        """Test that migration handles entries without profile_name field."""
+        history_with_missing_field = [
+            {
+                "id": "entry-1",
+                "profile_name": "**Has Name**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-2",
+                # Missing profile_name field
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-3",
+                "profile_name": "**Another Name**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            }
+        ]
+        mock_load.return_value = history_with_missing_field
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Should fix the 2 entries with profile_name, ignore the one without
+        assert data["fixed_count"] == 2
+        
+        mock_save.assert_called_once()
+        saved_history = mock_save.call_args[0][0]
+        assert saved_history[0]["profile_name"] == "Has Name"
+        # Entry without profile_name should be unchanged
+        assert "profile_name" not in saved_history[1] or saved_history[1].get("profile_name") == ""
+        assert saved_history[2]["profile_name"] == "Another Name"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_migrate_history_handles_errors_gracefully(self, mock_load, client):
+        """Test that migration handles errors gracefully."""
+        # Simulate an error in _load_history
+        mock_load.side_effect = Exception("Database connection failed")
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert data["detail"]["status"] == "error"
+        assert "Failed to migrate history" in data["detail"]["message"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_no_changes_needed(self, mock_load, mock_save, client):
+        """Test migration when all profile names are already clean."""
+        clean_history = [
+            {"id": "1", "profile_name": "Clean Profile 1", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "2", "profile_name": "Clean Profile 2", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "3", "profile_name": "Clean Profile 3", "created_at": "2026-01-01T10:00:00+00:00"},
+        ]
+        mock_load.return_value = clean_history
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 0
+        
+        # Verify save was NOT called since no changes were made
+        mock_save.assert_not_called()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_save_error(self, mock_load, mock_save, client):
+        """Test migration handles save errors gracefully."""
+        history_with_artifacts = [
+            {"id": "1", "profile_name": "**Profile**", "created_at": "2026-01-01T10:00:00+00:00"}
+        ]
+        mock_load.return_value = history_with_artifacts
+        mock_save.side_effect = Exception("Disk full")
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert data["detail"]["status"] == "error"
+
 
 class TestHistoryHelperFunctions:
     """Tests for history helper functions."""
