@@ -222,7 +222,7 @@ Must include:
 ## External Dependencies
 
 ### Meticulous MCP
-This project depends on the excellent work originally by @manonstreet:
+This project depends on the excellent work originally by manonstreet:
 - Repository: https://github.com/hessius/meticulous-mcp
 - Cloned to `meticulous-source/` during installation
 - Provides MCP server for machine communication
