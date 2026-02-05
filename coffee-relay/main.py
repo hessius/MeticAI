@@ -667,7 +667,11 @@ async def analyze_and_profile(
                 "has_advanced_customization": advanced_customization is not None,
                 "upload_filename": file.filename if file else None,
                 "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs,
-                "advanced_customization": advanced_customization
+                "advanced_customization_preview": (
+                    advanced_customization[:100]
+                    if advanced_customization and len(advanced_customization) > 100
+                    else advanced_customization
+                )
             }
         )
         
