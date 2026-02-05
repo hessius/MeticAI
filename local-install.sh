@@ -892,7 +892,6 @@ install_docker_compose() {
             run_privileged chmod +x /usr/local/bin/docker-compose
             ;;
     esac
-    esac
     
     if check_docker_compose; then
         echo -e "${GREEN}✓ Docker Compose installed successfully.${NC}"
