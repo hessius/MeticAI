@@ -34,6 +34,9 @@ NC='\033[0m' # No Color
 # Constants
 WEB_INSTALL_URL="https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh"
 
+# Get the directory where this script is located (absolute path)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo -e "${RED}=========================================${NC}"
 echo -e "${RED}      ☕️ MeticAI Uninstaller 🗑️       ${NC}"
 echo -e "${RED}=========================================${NC}"
@@ -608,9 +611,11 @@ if [[ "$METICAI_CALLED_FROM_INSTALLER" == "true" ]]; then
     fi
 else
     # Standalone uninstall - show directory cleanup message
-    echo -e "${YELLOW}Note: This directory ($(pwd)) still contains the MeticAI source code.${NC}"
+    echo -e "${YELLOW}Note: The MeticAI directory still contains source code:${NC}"
+    echo -e "${BLUE}  $SCRIPT_DIR${NC}"
+    echo ""
     echo -e "${YELLOW}You can safely delete it if you no longer need it:${NC}"
-    CURRENT_DIR_NAME=$(basename "$(pwd)")
-    echo -e "${BLUE}  cd .. && rm -rf \"$CURRENT_DIR_NAME\"${NC}"
+    echo -e "${BLUE}  rm -rf \"$SCRIPT_DIR\"${NC}"
+    echo -e "${YELLOW}(On some systems like Raspbian, you may need: sudo rm -rf \"$SCRIPT_DIR\")${NC}"
     echo ""
 fi
