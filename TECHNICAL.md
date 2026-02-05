@@ -18,7 +18,7 @@ Clone the repo and the required dependencies:
 git clone https://github.com/hessius/MeticAI.git met-ai
 cd met-ai
 # Clone the specific MCP fork
-git clone https://github.com/manonstreet/meticulous-mcp.git meticulous-source
+git clone https://github.com/hessius/meticulous-mcp.git meticulous-source
 # Clone the web application
 git clone https://github.com/hessius/MeticAI-web.git meticai-web
 ```
