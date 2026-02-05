@@ -2146,8 +2146,8 @@ def _clean_profile_name(name: str) -> str:
 def _extract_profile_name(reply: str) -> str:
     """Extract the profile name from the LLM reply."""
     import re
-    # Handle both **Profile Created:** and Profile Created: formats
-    match = re.search(r'\*?\*?Profile Created:\*?\*?\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
+    # Handle both **Profile Created:** and Profile Created: formats, with 0 or 2 asterisks
+    match = re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
     if match:
         return _clean_profile_name(match.group(1))
     return "Untitled Profile"
