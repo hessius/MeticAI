@@ -90,6 +90,24 @@ if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Running in non-interactive mode..." 5
 fi
 
+################################################################################
+# Sudo Helper Function
+################################################################################
+# Some systems (like Puppy OS) are single-user and don't have sudo.
+# This helper runs commands with sudo only when needed and available.
+run_privileged() {
+    if [ "$(id -u)" -eq 0 ]; then
+        # Already root, no sudo needed
+        "$@"
+    elif command -v sudo &> /dev/null; then
+        # Not root but sudo is available
+        sudo "$@"
+    else
+        # Not root and no sudo - try anyway (will fail if permissions needed)
+        "$@"
+    fi
+}
+
 # Function to checkout the latest release tag for a repository
 # This ensures users get stable, tested versions instead of potentially unstable main branch
 checkout_latest_release() {
@@ -423,7 +441,7 @@ install_qrencode() {
         ubuntu|debian|raspbian)
             echo -e "${YELLOW}Installing qrencode...${NC}"
             # Update package cache for more reliable installation
-            if sudo apt-get update &> /dev/null && sudo apt-get install -y qrencode &> /dev/null; then
+            if run_privileged apt-get update &> /dev/null && run_privileged apt-get install -y qrencode &> /dev/null; then
                 echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
                 return 0
             else
@@ -434,12 +452,12 @@ install_qrencode() {
         fedora|rhel|centos)
             echo -e "${YELLOW}Installing qrencode...${NC}"
             if command -v dnf &> /dev/null; then
-                if sudo dnf install -y qrencode &> /dev/null; then
+                if run_privileged dnf install -y qrencode &> /dev/null; then
                     echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
                     return 0
                 fi
             elif command -v yum &> /dev/null; then
-                if sudo yum install -y qrencode &> /dev/null; then
+                if run_privileged yum install -y qrencode &> /dev/null; then
                     echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
                     return 0
                 fi
@@ -450,7 +468,7 @@ install_qrencode() {
         arch|manjaro)
             echo -e "${YELLOW}Installing qrencode...${NC}"
             # Use -S instead of -Sy to avoid slow database sync
-            if sudo pacman -S --noconfirm qrencode &> /dev/null; then
+            if run_privileged pacman -S --noconfirm qrencode &> /dev/null; then
                 echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
                 return 0
             else
@@ -559,9 +577,9 @@ install_rebuild_watcher() {
     # Configure git safe.directory for root (needed when systemd runs as root)
     # This prevents "dubious ownership" errors
     echo -e "${BLUE}Configuring git safe directories for systemd...${NC}"
-    sudo git config --global --add safe.directory "${script_dir}" 2>/dev/null || true
-    sudo git config --global --add safe.directory "${script_dir}/meticulous-source" 2>/dev/null || true
-    sudo git config --global --add safe.directory "${script_dir}/meticai-web" 2>/dev/null || true
+    run_privileged git config --global --add safe.directory "${script_dir}" 2>/dev/null || true
+    run_privileged git config --global --add safe.directory "${script_dir}/meticulous-source" 2>/dev/null || true
+    run_privileged git config --global --add safe.directory "${script_dir}/meticai-web" 2>/dev/null || true
     
     # Run the install command
     if "$watcher_script" --install; then
@@ -592,11 +610,11 @@ create_macos_dock_shortcut() {
     echo ""
     echo -e "${YELLOW}Creating macOS application and adding to Dock...${NC}"
     
-    # Create application bundle structure (may need sudo for /Applications)
+    # Create application bundle structure (may need elevated permissions for /Applications)
     if ! mkdir -p "${app_path}/Contents/MacOS" 2>/dev/null; then
-        # Try with sudo
-        sudo mkdir -p "${app_path}/Contents/MacOS"
-        sudo mkdir -p "${app_path}/Contents/Resources"
+        # Try with run_privileged (handles sudo/no-sudo)
+        run_privileged mkdir -p "${app_path}/Contents/MacOS"
+        run_privileged mkdir -p "${app_path}/Contents/Resources"
         NEED_SUDO=true
     else
         mkdir -p "${app_path}/Contents/Resources"
@@ -606,7 +624,7 @@ create_macos_dock_shortcut() {
     # Copy the icon if it exists
     if [ -f "$icon_source" ]; then
         if [ "$NEED_SUDO" = true ]; then
-            sudo cp "$icon_source" "${app_path}/Contents/Resources/MeticAI.icns"
+            run_privileged cp "$icon_source" "${app_path}/Contents/Resources/MeticAI.icns"
         else
             cp "$icon_source" "${app_path}/Contents/Resources/MeticAI.icns"
         fi
@@ -623,8 +641,8 @@ create_macos_dock_shortcut() {
 open \"${url}\"
 "
     if [ "$NEED_SUDO" = true ]; then
-        echo "$script_content" | sudo tee "${app_path}/Contents/MacOS/${app_name}" > /dev/null
-        sudo chmod +x "${app_path}/Contents/MacOS/${app_name}"
+        echo "$script_content" | run_privileged tee "${app_path}/Contents/MacOS/${app_name}" > /dev/null
+        run_privileged chmod +x "${app_path}/Contents/MacOS/${app_name}"
     else
         echo "$script_content" > "${app_path}/Contents/MacOS/${app_name}"
         chmod +x "${app_path}/Contents/MacOS/${app_name}"
@@ -656,7 +674,7 @@ open \"${url}\"
 </plist>"
     
     if [ "$NEED_SUDO" = true ]; then
-        echo "$plist_content" | sudo tee "${app_path}/Contents/Info.plist" > /dev/null
+        echo "$plist_content" | run_privileged tee "${app_path}/Contents/Info.plist" > /dev/null
     else
         echo "$plist_content" > "${app_path}/Contents/Info.plist"
     fi
@@ -742,7 +760,7 @@ install_git() {
             fi
             ;;
         ubuntu|debian|raspbian)
-            if sudo apt-get update && sudo apt-get install -y git; then
+            if run_privileged apt-get update && run_privileged apt-get install -y git; then
                 echo -e "${GREEN}✓ Git installed successfully.${NC}"
             else
                 echo -e "${RED}Failed to install git. Please install manually.${NC}"
@@ -751,14 +769,14 @@ install_git() {
             ;;
         fedora|rhel|centos)
             if command -v dnf &> /dev/null; then
-                if sudo dnf install -y git; then
+                if run_privileged dnf install -y git; then
                     echo -e "${GREEN}✓ Git installed successfully.${NC}"
                 else
                     echo -e "${RED}Failed to install git. Please install manually.${NC}"
                     exit 1
                 fi
             elif command -v yum &> /dev/null; then
-                if sudo yum install -y git; then
+                if run_privileged yum install -y git; then
                     echo -e "${GREEN}✓ Git installed successfully.${NC}"
                 else
                     echo -e "${RED}Failed to install git. Please install manually.${NC}"
@@ -770,7 +788,7 @@ install_git() {
             fi
             ;;
         arch|manjaro)
-            if sudo pacman -Sy --noconfirm git; then
+            if run_privileged pacman -Sy --noconfirm git; then
                 echo -e "${GREEN}✓ Git installed successfully.${NC}"
             else
                 echo -e "${RED}Failed to install git. Please install manually.${NC}"
@@ -801,15 +819,17 @@ install_docker() {
     # Use Docker's official convenience script
     if command -v curl &> /dev/null; then
         curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-        sudo sh /tmp/get-docker.sh
+        run_privileged sh /tmp/get-docker.sh
         rm /tmp/get-docker.sh
         
-        # Add current user to docker group
-        sudo usermod -aG docker "$USER" || true
+        # Add current user to docker group (only if not already root)
+        if [ "$(id -u)" -ne 0 ]; then
+            run_privileged usermod -aG docker "$USER" || true
+        fi
         
         # Start docker service
-        sudo systemctl enable docker || true
-        sudo systemctl start docker || true
+        run_privileged systemctl enable docker || true
+        run_privileged systemctl start docker || true
         
         echo -e "${GREEN}✓ Docker installed successfully.${NC}"
         echo -e "${YELLOW}Note: You may need to log out and back in for docker group changes to take effect.${NC}"
@@ -852,25 +872,26 @@ install_docker_compose() {
     # Try to install docker-compose-plugin (preferred method)
     case "$os" in
         ubuntu|debian|raspbian)
-            if sudo apt-get update; then
-                if sudo apt-get install -y docker-compose-plugin; then
+            if run_privileged apt-get update; then
+                if run_privileged apt-get install -y docker-compose-plugin; then
                     echo -e "${GREEN}✓ Docker Compose plugin installed.${NC}"
                 fi
             fi
             ;;
         fedora|rhel|centos)
             if command -v dnf &> /dev/null; then
-                sudo dnf install -y docker-compose-plugin
+                run_privileged dnf install -y docker-compose-plugin
             elif command -v yum &> /dev/null; then
-                sudo yum install -y docker-compose-plugin
+                run_privileged yum install -y docker-compose-plugin
             fi
             ;;
         *)
             # Fallback to standalone docker-compose
             echo -e "${YELLOW}Installing standalone docker-compose...${NC}"
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
+            run_privileged curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            run_privileged chmod +x /usr/local/bin/docker-compose
             ;;
+    esac
     esac
     
     if check_docker_compose; then
@@ -1469,7 +1490,13 @@ if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Building and launching containers..." 60
 else
     echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
-    echo "Note: Running with sudo permissions."
+    if [ "$(id -u)" -eq 0 ]; then
+        echo "Note: Running as root."
+    elif command -v sudo &> /dev/null; then
+        echo "Note: Running with sudo permissions."
+    else
+        echo "Note: Running without elevated permissions."
+    fi
 fi
 
 # Ensure .versions.json exists as a file (not directory) before Docker mounts it
@@ -1550,11 +1577,11 @@ if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
 fi
 
 # On macOS with Docker Desktop, we don't need sudo for docker commands
-# On Linux, we may need sudo if user isn't in docker group
+# On Linux, we may need sudo if user isn't in docker group (but not on single-user systems)
 if [[ "$OSTYPE" == "darwin"* ]]; then
     docker compose down 2>/dev/null || true
 else
-    sudo docker compose down 2>/dev/null || true
+    run_privileged docker compose down 2>/dev/null || true
 fi
 
 # Build and start
@@ -1562,11 +1589,20 @@ if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Building containers (this may take a few minutes)..." 70
 fi
 
-# Use docker without sudo on macOS
+# Determine the docker command to use
+# On macOS: always use docker directly (Docker Desktop handles permissions)
+# On Linux: use run_privileged to handle both sudo and non-sudo environments
 if [[ "$OSTYPE" == "darwin"* ]]; then
     DOCKER_CMD="docker compose"
 else
-    DOCKER_CMD="sudo docker compose"
+    # Build the command dynamically to handle sudo/no-sudo
+    if [ "$(id -u)" -eq 0 ]; then
+        DOCKER_CMD="docker compose"
+    elif command -v sudo &> /dev/null; then
+        DOCKER_CMD="sudo docker compose"
+    else
+        DOCKER_CMD="docker compose"
+    fi
 fi
 
 if $DOCKER_CMD up -d --build; then
@@ -1577,13 +1613,14 @@ if $DOCKER_CMD up -d --build; then
     # Fix ownership of any files created by Docker running as root
     # This is needed on Linux because sudo docker compose creates files as root
     # On macOS with Docker Desktop, this is usually not necessary but doesn't hurt
+    # On single-user systems running as root, this is a no-op
     if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
         echo "Fixing file ownership..."
     fi
-    if [[ "$OSTYPE" != "darwin"* ]]; then
-        sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed .update-check-requested .update-requested 2>/dev/null || true
+    if [[ "$OSTYPE" != "darwin"* ]] && [ "$(id -u)" -ne 0 ]; then
+        run_privileged chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed .update-check-requested .update-requested 2>/dev/null || true
         # Also fix git directories in case they were affected
-        sudo chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
+        run_privileged chown -R "$(id -u):$(id -g)" meticulous-source meticai-web 2>/dev/null || true
     fi
     
     if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
