@@ -456,6 +456,19 @@ PROFILE_GUIDELINES = (
     '  {"name": "Peak Pressure", "key": "peak_pressure", "type": "pressure", "value": 9.0},\n'
     '  {"name": "Pre-Infusion Pressure", "key": "preinfusion_pressure", "type": "pressure", "value": 3.0}\n'
     ']\n\n'
+    "STAGE LIMITS (CRITICAL SAFETY):\n"
+    "• EVERY flow stage MUST have a pressure limit to prevent pressure runaway\n"
+    "• EVERY pressure stage SHOULD have a flow limit for gentler extraction\n"
+    "• Pre-infusion/blooming flow stages: Add pressure limit of 3-5 bar max\n"
+    "• Main extraction flow stages: Add pressure limit of 9-10 bar max\n"
+    "• Example flow stage with pressure limit:\n"
+    '  {\n'
+    '    "name": "Gentle Bloom",\n'
+    '    "type": "flow",\n'
+    '    "dynamics_points": [[0, 1.5]],\n'
+    '    "limits": [{"type": "pressure", "value": 4}],\n'
+    '    "exit_triggers": [{"type": "time", "value": 15, "comparison": ">=", "relative": true}]\n'
+    '  }\n\n'
 )
 
 NAMING_CONVENTION = (
