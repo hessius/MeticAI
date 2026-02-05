@@ -2138,7 +2138,6 @@ def _extract_profile_json(reply: str) -> Optional[dict]:
 
 def _clean_profile_name(name: str) -> str:
     """Clean markdown artifacts from profile name."""
-    import re
     # Remove leading/trailing ** or *
     cleaned = re.sub(r'^[\*]+\s*', '', name)
     cleaned = re.sub(r'\s*[\*]+$', '', cleaned)
