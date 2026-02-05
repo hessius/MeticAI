@@ -182,7 +182,7 @@ curl http://YOUR_PI_IP:8000/status
     },
     "meticulous-mcp": {
       "current_hash": "def456...",
-      "repo_url": "https://github.com/manonstreet/meticulous-mcp.git",
+      "repo_url": "https://github.com/hessius/meticulous-mcp.git",
       "last_updated": "2026-01-13T18:00:00Z"
     },
     "meticai-web": {

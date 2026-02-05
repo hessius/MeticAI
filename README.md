@@ -339,7 +339,7 @@ For comprehensive troubleshooting and log analysis, see [LOGGING.md](LOGGING.md)
 
 ## 🙏 Credits & Attribution
 
-MeticAI is built on the excellent [Meticulous MCP](https://github.com/twchad/meticulous-mcp) project by **twchad** and its [containerized fork](https://github.com/manonstreet/meticulous-mcp) by **@manonstreet**, which provides the essential interface for controlling the Meticulous Espresso Machine.
+MeticAI is built on the excellent [Meticulous MCP](https://github.com/twchad/meticulous-mcp) project by **twchad** and its [containerized fork](https://github.com/hessius/meticulous-mcp) by **@manonstreet**, which provides the essential interface for controlling the Meticulous Espresso Machine.
 
 ### Technology Stack
 - **Google Gemini 2.0 Flash** - Vision AI and reasoning
