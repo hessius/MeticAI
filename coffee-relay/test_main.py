@@ -1361,8 +1361,8 @@ class TestHistoryAPI:
         mock_save.assert_called_once()
         saved_history = mock_save.call_args[0][0]
         assert saved_history[0]["profile_name"] == "Has Name"
-        # Entry without profile_name should be unchanged
-        assert "profile_name" not in saved_history[1] or saved_history[1].get("profile_name") == ""
+        # Entry without profile_name field should remain without it (not modified)
+        assert "profile_name" not in saved_history[1]
         assert saved_history[2]["profile_name"] == "Another Name"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
