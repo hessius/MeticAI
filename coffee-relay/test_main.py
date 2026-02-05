@@ -650,6 +650,256 @@ class TestEnhancedBaristaPersona:
         assert "OUTPUT FORMAT (use this exact format):" in prompt
 
 
+class TestAdvancedCustomization:
+    """Tests for advanced_customization parameter functionality."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_parameter_parsed(self, mock_subprocess, client):
+        """Test that advanced_customization parameter is correctly parsed."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Create a balanced profile",
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        # Verify the parameter was parsed and included in the prompt
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        assert advanced_params in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_includes_advanced_customization_when_provided(self, mock_subprocess, client):
+        """Test that prompt includes advanced customization section when provided."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Create a balanced profile",
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        # Verify the prompt includes advanced customization section
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Check for section header
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        # Check for the actual parameters
+        assert advanced_params in prompt
+        # Check for CRITICAL instruction
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_omits_advanced_customization_when_not_provided(self, mock_subprocess, client):
+        """Test that prompt omits advanced customization section when not provided."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Create a balanced profile"}
+        )
+
+        assert response.status_code == 200
+        
+        # Verify the prompt does NOT include advanced customization section
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" not in prompt
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." not in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_section_formatting(self, mock_subprocess, client):
+        """Test that advanced customization section has correct formatting."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 93°C\nDose: 18g\nBasket: 18g VST"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Test",
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Verify all formatting elements are present
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert "Temperature: 93°C" in prompt
+        assert "Dose: 18g" in prompt
+        assert "Basket: 18g VST" in prompt
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_mandatory_instructions_included(self, mock_subprocess, client):
+        """Test that MANDATORY instructions are included in the advanced customization section."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Test",
+                "advanced_customization": "Temperature: 93°C, Dose: 18g"
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Verify all mandatory instruction bullets are present
+        assert "• If a temperature is specified, set the profile temperature to that EXACT value" in prompt
+        assert "• If a dose is specified, the profile MUST be designed for that EXACT dose" in prompt
+        assert "• If max pressure/flow is specified, NO stage should exceed those limits" in prompt
+        assert "• If basket size/type is specified, account for it in your dose and extraction design" in prompt
+        assert "• If bottom filter is specified, mention it in preparation notes" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.get_vision_model')
+    def test_advanced_customization_with_image(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test advanced_customization with image input."""
+        mock_response = Mock()
+        mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral notes"
+        mock_vision_model.return_value.generate_content.return_value = mock_response
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Floral Fantasy"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 94°C, Dose: 20g"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")},
+            data={"advanced_customization": advanced_params}
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Should have coffee analysis
+        assert "Ethiopian Yirgacheffe, Light Roast, Floral notes" in prompt
+        # Should have advanced customization
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert advanced_params in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_with_user_prefs(self, mock_subprocess, client):
+        """Test advanced_customization with user preferences."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Precise Pour"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Max Flow: 4 ml/s, Bottom Filter: IMS Superfine"
+        user_prefs = "Emphasize clarity and sweetness"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": user_prefs,
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Should have user preferences
+        assert user_prefs in prompt
+        # Should have advanced customization
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert advanced_params in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.get_vision_model')
+    def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test advanced_customization with both image and user preferences."""
+        mock_response = Mock()
+        mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
+        mock_vision_model.return_value.generate_content.return_value = mock_response
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Berry Bomb"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 92°C, Dose: 18g, Max Pressure: 8 bar"
+        user_prefs = "Highlight berry notes with gentle extraction"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")},
+            data={
+                "user_prefs": user_prefs,
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Should have coffee analysis
+        assert "Kenyan AA, Medium Roast, Berry notes" in prompt
+        # Should have user preferences
+        assert user_prefs in prompt
+        # Should have advanced customization
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert advanced_params in prompt
+        # Should have all mandatory instructions
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
+
+
 class TestCORS:
     """Tests for CORS middleware configuration."""
 
