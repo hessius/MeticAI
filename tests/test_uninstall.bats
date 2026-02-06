@@ -265,7 +265,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
 }
 
 @test "Script shows directory cleanup message only for standalone uninstall" {
-    run grep -q "This directory.*still contains the MeticAI source code" "$SCRIPT_PATH"
+    run grep -q "MeticAI directory still contains source code" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 

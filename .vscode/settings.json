@@ -1,0 +1,9 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/coffee-relay/.venv/bin/python",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestPath": "${workspaceFolder}/coffee-relay/.venv/bin/pytest",
+  "python.testing.cwd": "${workspaceFolder}/coffee-relay",
+  "python.testing.pytestArgs": [
+    "test_main.py"
+  ]
+}

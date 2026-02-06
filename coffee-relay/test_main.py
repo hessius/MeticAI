@@ -607,7 +607,7 @@ class TestEnhancedBaristaPersona:
         call_args = mock_subprocess.call_args[0][0]
         prompt = call_args[-1]
         
-        assert "OUTPUT FORMAT:" in prompt
+        assert "OUTPUT FORMAT (use this exact format):" in prompt
         assert "Profile Created:" in prompt
         assert "Description:" in prompt
         assert "Preparation:" in prompt
@@ -647,7 +647,257 @@ class TestEnhancedBaristaPersona:
         assert "PERSONA:" in prompt
         assert "PROFILE CREATION GUIDELINES:" in prompt
         assert "NAMING CONVENTION:" in prompt
-        assert "OUTPUT FORMAT:" in prompt
+        assert "OUTPUT FORMAT (use this exact format):" in prompt
+
+
+class TestAdvancedCustomization:
+    """Tests for advanced_customization parameter functionality."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_parameter_parsed(self, mock_subprocess, client):
+        """Test that advanced_customization parameter is correctly parsed."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Create a balanced profile",
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        # Verify the parameter was parsed and included in the prompt
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        assert advanced_params in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_includes_advanced_customization_when_provided(self, mock_subprocess, client):
+        """Test that prompt includes advanced customization section when provided."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Create a balanced profile",
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        # Verify the prompt includes advanced customization section
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Check for section header
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        # Check for the actual parameters
+        assert advanced_params in prompt
+        # Check for CRITICAL instruction
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_prompt_omits_advanced_customization_when_not_provided(self, mock_subprocess, client):
+        """Test that prompt omits advanced customization section when not provided."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Create a balanced profile"}
+        )
+
+        assert response.status_code == 200
+        
+        # Verify the prompt does NOT include advanced customization section
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" not in prompt
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." not in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_section_formatting(self, mock_subprocess, client):
+        """Test that advanced customization section has correct formatting."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 93°C\nDose: 18g\nBasket: 18g VST"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Test",
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Verify all formatting elements are present
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert "Temperature: 93°C" in prompt
+        assert "Dose: 18g" in prompt
+        assert "Basket: 18g VST" in prompt
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_mandatory_instructions_included(self, mock_subprocess, client):
+        """Test that MANDATORY instructions are included in the advanced customization section."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": "Test",
+                "advanced_customization": "Temperature: 93°C, Dose: 18g"
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Verify all mandatory instruction bullets are present
+        assert "• If a temperature is specified, set the profile temperature to that EXACT value" in prompt
+        assert "• If a dose is specified, the profile MUST be designed for that EXACT dose" in prompt
+        assert "• If max pressure/flow is specified, NO stage should exceed those limits" in prompt
+        assert "• If basket size/type is specified, account for it in your dose and extraction design" in prompt
+        assert "• If bottom filter is specified, mention it in preparation notes" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.get_vision_model')
+    def test_advanced_customization_with_image(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test advanced_customization with image input."""
+        mock_response = Mock()
+        mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral notes"
+        mock_vision_model.return_value.generate_content.return_value = mock_response
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Floral Fantasy"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 94°C, Dose: 20g"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")},
+            data={"advanced_customization": advanced_params}
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Should have coffee analysis
+        assert "Ethiopian Yirgacheffe, Light Roast, Floral notes" in prompt
+        # Should have advanced customization
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert advanced_params in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    def test_advanced_customization_with_user_prefs(self, mock_subprocess, client):
+        """Test advanced_customization with user preferences."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Precise Pour"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Max Flow: 4 ml/s, Bottom Filter: IMS Superfine"
+        user_prefs = "Emphasize clarity and sweetness"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            data={
+                "user_prefs": user_prefs,
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Should have user preferences
+        assert user_prefs in prompt
+        # Should have advanced customization
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert advanced_params in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main.subprocess.run')
+    @patch('main.get_vision_model')
+    def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_subprocess, client, sample_image):
+        """Test advanced_customization with both image and user preferences."""
+        mock_response = Mock()
+        mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
+        mock_vision_model.return_value.generate_content.return_value = mock_response
+        
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Profile Created: Berry Bomb"
+        mock_subprocess.return_value = mock_result
+
+        advanced_params = "Temperature: 92°C, Dose: 18g, Max Pressure: 8 bar"
+        user_prefs = "Highlight berry notes with gentle extraction"
+        
+        response = client.post(
+            "/analyze_and_profile",
+            files={"file": ("test.png", sample_image, "image/png")},
+            data={
+                "user_prefs": user_prefs,
+                "advanced_customization": advanced_params
+            }
+        )
+
+        assert response.status_code == 200
+        
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+        
+        # Should have coffee analysis
+        assert "Kenyan AA, Medium Roast, Berry notes" in prompt
+        # Should have user preferences
+        assert user_prefs in prompt
+        # Should have advanced customization
+        assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
+        assert advanced_params in prompt
+        # Should have all mandatory instructions
+        assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
 
 
 class TestCORS:
@@ -1233,6 +1483,191 @@ class TestHistoryAPI:
         
         assert response.status_code == 404
 
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_cleans_markdown_artifacts(self, mock_load, mock_save, client):
+        """Test that migration successfully cleans profile names with markdown artifacts."""
+        # Create entries with various markdown artifacts
+        history_with_artifacts = [
+            {
+                "id": "entry-1",
+                "profile_name": "**Bold Profile**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-2",
+                "profile_name": "*Italic Profile*",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-3",
+                "profile_name": "**Bold Only**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-4",
+                "profile_name": "** Spaces After Marker**",  # Tests handling spaces after opening marker
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-5",
+                "profile_name": "Clean Profile",  # No artifacts
+                "created_at": "2026-01-01T10:00:00+00:00"
+            }
+        ]
+        mock_load.return_value = history_with_artifacts
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 4  # 4 entries had artifacts
+        
+        # Verify save was called with cleaned names
+        mock_save.assert_called_once()
+        saved_history = mock_save.call_args[0][0]
+        assert saved_history[0]["profile_name"] == "Bold Profile"
+        assert saved_history[1]["profile_name"] == "Italic Profile"
+        assert saved_history[2]["profile_name"] == "Bold Only"
+        assert saved_history[3]["profile_name"] == "Spaces After Marker"
+        assert saved_history[4]["profile_name"] == "Clean Profile"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_returns_correct_count(self, mock_load, mock_save, client):
+        """Test that migration returns correct count of fixed entries."""
+        history_with_some_artifacts = [
+            {"id": "1", "profile_name": "**Fixed 1**", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "2", "profile_name": "Clean", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "3", "profile_name": "**Fixed 2**", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "4", "profile_name": "Also Clean", "created_at": "2026-01-01T10:00:00+00:00"},
+        ]
+        mock_load.return_value = history_with_some_artifacts
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 2
+        assert "Fixed 2 profile names" in data["message"]
+        
+        # Verify save was called since there were fixes
+        mock_save.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_handles_empty_history(self, mock_load, mock_save, client):
+        """Test that migration handles empty history gracefully."""
+        mock_load.return_value = []
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 0
+        assert "Fixed 0 profile names" in data["message"]
+        
+        # Verify save was NOT called since there were no fixes
+        mock_save.assert_not_called()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_handles_missing_profile_name(self, mock_load, mock_save, client):
+        """Test that migration handles entries without profile_name field."""
+        history_with_missing_field = [
+            {
+                "id": "entry-1",
+                "profile_name": "**Has Name**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-2",
+                # Missing profile_name field
+                "created_at": "2026-01-01T10:00:00+00:00"
+            },
+            {
+                "id": "entry-3",
+                "profile_name": "**Another Name**",
+                "created_at": "2026-01-01T10:00:00+00:00"
+            }
+        ]
+        mock_load.return_value = history_with_missing_field
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Should fix the 2 entries with profile_name, ignore the one without
+        assert data["fixed_count"] == 2
+        
+        mock_save.assert_called_once()
+        saved_history = mock_save.call_args[0][0]
+        assert saved_history[0]["profile_name"] == "Has Name"
+        # Entry without profile_name field should remain without it (not modified)
+        assert "profile_name" not in saved_history[1]
+        assert saved_history[2]["profile_name"] == "Another Name"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._load_history')
+    def test_migrate_history_handles_errors_gracefully(self, mock_load, client):
+        """Test that migration handles errors gracefully."""
+        # Simulate an error in _load_history
+        mock_load.side_effect = Exception("Database connection failed")
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert data["detail"]["status"] == "error"
+        assert "Failed to migrate history" in data["detail"]["message"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_no_changes_needed(self, mock_load, mock_save, client):
+        """Test migration when all profile names are already clean."""
+        clean_history = [
+            {"id": "1", "profile_name": "Clean Profile 1", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "2", "profile_name": "Clean Profile 2", "created_at": "2026-01-01T10:00:00+00:00"},
+            {"id": "3", "profile_name": "Clean Profile 3", "created_at": "2026-01-01T10:00:00+00:00"},
+        ]
+        mock_load.return_value = clean_history
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["fixed_count"] == 0
+        
+        # Verify save was NOT called since no changes were made
+        mock_save.assert_not_called()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('main._save_history')
+    @patch('main._load_history')
+    def test_migrate_history_save_error(self, mock_load, mock_save, client):
+        """Test migration handles save errors gracefully."""
+        history_with_artifacts = [
+            {"id": "1", "profile_name": "**Profile**", "created_at": "2026-01-01T10:00:00+00:00"}
+        ]
+        mock_load.return_value = history_with_artifacts
+        mock_save.side_effect = Exception("Disk full")
+
+        response = client.post("/api/history/migrate")
+        
+        assert response.status_code == 500
+        data = response.json()
+        assert data["detail"]["status"] == "error"
+
 
 class TestHistoryHelperFunctions:
     """Tests for history helper functions."""
@@ -1286,6 +1721,35 @@ Description: A test profile
         result = _extract_profile_name(reply)
         
         assert result == "Ethiopian Sunrise"
+
+    def test_extract_profile_name_with_bold_format(self):
+        """Test extracting profile name when label uses **bold** format."""
+        from main import _extract_profile_name
+        
+        reply = "**Profile Created:** Berry Blast Bloom\n\nDescription: ..."
+        result = _extract_profile_name(reply)
+        
+        assert result == "Berry Blast Bloom"
+
+    def test_extract_profile_name_cleans_leading_asterisks(self):
+        """Test that leading ** are cleaned from profile name."""
+        from main import _extract_profile_name
+        
+        # This simulates the case where regex captures ** as part of the name
+        reply = "**Profile Created:** ** Berry Blast Bloom\n\nDescription: ..."
+        result = _extract_profile_name(reply)
+        
+        assert result == "Berry Blast Bloom"
+
+    def test_clean_profile_name(self):
+        """Test cleaning markdown from profile names."""
+        from main import _clean_profile_name
+        
+        assert _clean_profile_name("** Berry Blast Bloom") == "Berry Blast Bloom"
+        assert _clean_profile_name("Berry Blast Bloom **") == "Berry Blast Bloom"
+        assert _clean_profile_name("**Berry** Bloom") == "Berry Bloom"
+        assert _clean_profile_name("* test *") == "test"
+        assert _clean_profile_name("Normal Name") == "Normal Name"
 
     def test_extract_profile_name_not_found(self):
         """Test default name when pattern not found."""
@@ -5062,7 +5526,7 @@ class TestVersionEndpoint:
         assert isinstance(data["mcp_repo_url"], str)
         
         # Check that repo URL is the expected value
-        assert data["mcp_repo_url"] == "https://github.com/manonstreet/meticulous-mcp"
+        assert data["mcp_repo_url"] == "https://github.com/hessius/meticulous-mcp"
     
     @patch('main.Path')
     def test_version_with_existing_version_files(self, mock_path, client):
@@ -5120,7 +5584,7 @@ class TestVersionEndpoint:
         assert "meticai_web" in data
         assert "mcp_server" in data
         assert "mcp_repo_url" in data
-        assert data["mcp_repo_url"] == "https://github.com/manonstreet/meticulous-mcp"
+        assert data["mcp_repo_url"] == "https://github.com/hessius/meticulous-mcp"
         # Versions should be strings (either version numbers or "unknown")
         assert isinstance(data["meticai"], str)
         assert isinstance(data["meticai_web"], str)
