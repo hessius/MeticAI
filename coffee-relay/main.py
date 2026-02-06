@@ -415,29 +415,110 @@ PROFILE_GUIDELINES = (
     "• Consider flow profiling, pressure ramping, and temperature surfing techniques\n"
     "• Design for the specific bean characteristics (origin, roast level, flavor notes)\n"
     "• Balance extraction science with creative experimentation\n\n"
+    "VARIABLES (REQUIRED):\n"
+    "• The 'variables' array serves TWO purposes: adjustable parameters AND essential preparation info\n"
+    "• ALWAYS include the 'variables' array - it is REQUIRED for app compatibility\n\n"
+    "⚠️ NAMING VALIDATION RULES:\n"
+    "• INFO variables (key starts with 'info_'): Name MUST start with an emoji (☕🔧💧⚠️🎯 etc.)\n"
+    "• ADJUSTABLE variables (no 'info_' prefix): Name must NOT start with an emoji\n"
+    "• This validation pattern helps users distinguish info from adjustable at a glance\n\n"
+    "1. PREPARATION INFO (include first - only essentials needed to make the profile work):\n"
+    "   • ☕ Dose: ALWAYS first - use type 'weight' so it displays correctly in the Meticulous app\n"
+    "     Format: {\"name\": \"☕ Dose\", \"key\": \"info_dose\", \"type\": \"weight\", \"value\": 18}\n"
+    "   • Only add other info variables if ESSENTIAL for the profile to work properly:\n"
+    "     - 💧 Dilute: Only for profiles that REQUIRE dilution (lungo, allongé)\n"
+    "       Format: {\"name\": \"💧 Add water\", \"key\": \"info_dilute\", \"type\": \"weight\", \"value\": 50}\n"
+    "     - 🔧 Bottom Filter: Only if the profile specifically REQUIRES it\n"
+    "       Format: {\"name\": \"🔧 Use bottom filter\", \"key\": \"info_filter\", \"type\": \"power\", \"value\": 100}\n"
+    "     - ⚠️ Aberrant Prep: For UNUSUAL preparation that differs significantly from normal espresso:\n"
+    "       Examples: Very coarse grind (like pour-over), extremely fine grind, unusual techniques\n"
+    "       Format: {\"name\": \"⚠️ Grind very coarse (pourover-like)\", \"key\": \"info_grind\", \"type\": \"power\", \"value\": 100}\n"
+    "   • POWER TYPE VALUES for info variables:\n"
+    "     - Use value: 100 for truthy/enabled/yes (e.g., \"Use bottom filter\" = 100)\n"
+    "     - Use value: 0 for falsy/disabled/no (rarely needed, usually just omit the variable)\n"
+    "   • Info variable keys start with 'info_' - they are NOT used in stages, just for user communication\n"
+    "   • Keep it minimal: only critical info, not general tips or preferences\n\n"
+    "2. ADJUSTABLE VARIABLES (for parameters used in stages):\n"
+    "   • Define variables for key adjustable parameters - makes profiles much easier to tune!\n"
+    "   • Names should be descriptive WITHOUT emojis (e.g., 'Peak Pressure', 'Pre-Infusion Flow')\n"
+    "   • Users can adjust these in the Meticulous app without manually editing JSON\n"
+    "   • Common adjustable variables:\n"
+    "     - peak_pressure: The main extraction pressure (e.g., 8-9 bar)\n"
+    "     - preinfusion_pressure: Low pressure for saturation phase (e.g., 2-4 bar)\n"
+    "     - peak_flow: Target flow rate during extraction (e.g., 2-3 ml/s)\n"
+    "     - decline_pressure: Final pressure at end of shot (e.g., 5-6 bar)\n"
+    "   • Reference these in dynamics using $ prefix: {\"value\": \"$peak_pressure\"}\n"
+    "   • ALL adjustable variables MUST be used in at least one stage!\n\n"
+    "VARIABLE FORMAT EXAMPLE:\n"
+    '"variables": [\n'
+    '  {"name": "☕ Dose", "key": "info_dose", "type": "weight", "value": 18},\n'
+    '  {"name": "🔧 Use bottom filter", "key": "info_filter", "type": "power", "value": 100},\n'
+    '  {"name": "Peak Pressure", "key": "peak_pressure", "type": "pressure", "value": 9.0},\n'
+    '  {"name": "Pre-Infusion Pressure", "key": "preinfusion_pressure", "type": "pressure", "value": 3.0}\n'
+    ']\n\n'
+    "STAGE LIMITS (CRITICAL SAFETY):\n"
+    "• EVERY flow stage MUST have a pressure limit to prevent pressure runaway\n"
+    "• EVERY pressure stage MUST have a flow limit to prevent channeling and ensure even extraction\n"
+    "• Flow stages during pre-infusion/blooming: Add pressure limit of 3-5 bar max\n"
+    "• Flow stages during main extraction: Add pressure limit of 9-10 bar max\n"
+    "• Pressure stages: Add flow limit of 4-6 ml/s to prevent channeling\n"
+    "• Example flow stage with pressure limit:\n"
+    '  {\n'
+    '    "name": "Gentle Bloom",\n'
+    '    "type": "flow",\n'
+    '    "dynamics_points": [[0, 1.5]],\n'
+    '    "limits": [{"type": "pressure", "value": 4}],\n'
+    '    "exit_triggers": [{"type": "time", "value": 15, "comparison": ">=", "relative": true}]\n'
+    '  }\n'
+    "• Example pressure stage with flow limit:\n"
+    '  {\n'
+    '    "name": "Main Extraction",\n'
+    '    "type": "pressure",\n'
+    '    "dynamics_points": [[0, 9]],\n'
+    '    "limits": [{"type": "flow", "value": 5}],\n'
+    '    "exit_triggers": [{"type": "weight", "value": 36, "comparison": ">=", "relative": false}]\n'
+    '  }\n\n'
 )
 
 NAMING_CONVENTION = (
     "NAMING CONVENTION:\n"
-    "• Create a witty, pun-heavy name that's creative yet clear about the profile specifics\n"
+    "• Create a UNIQUE, witty, pun-heavy name - NEVER reuse names you've used before!\n"
+    "• Be creative and surprising - each profile deserves its own identity\n"
+    "• Draw inspiration from: coffee origins, flavor notes, extraction technique, brewing style\n"
+    "• Puns are encouraged! Word play, coffee jokes, clever references all welcome\n"
     "• Balance humor with clarity - users should understand what they're getting\n"
-    "• Examples: 'Slow-Mo Blossom' (gentle blooming profile), 'Pressure Point' (aggressive ramp), "
-    "'The Gusher' (high flow), 'Espresso Yourself' (expressive profile)\n\n"
+    "• AVOID generic names like 'Berry Blast', 'Morning Brew', 'Classic Espresso'\n"
+    "• Examples: 'Slow-Mo Blossom' (gentle blooming), 'The Grind Awakens' (Star Wars pun), "
+    "'Brew-tal Force' (aggressive extraction), 'Puck Norris' (roundhouse your tastebuds), "
+    "'The Daily Grind', 'Brew Lagoon', 'Espresso Yourself', 'Wake Me Up Before You Go-Go'\n\n"
 )
 
 OUTPUT_FORMAT = (
-    "OUTPUT FORMAT:\n"
-    "Profile Created: [Name]\n"
-    "Description: [What makes this profile special]\n"
-    "Preparation: [Dose, grind, temp, and any pre-shot steps]\n"
-    "Why This Works: [Science and reasoning behind the profile design]\n"
-    "Special Notes: [Any equipment or technique requirements, or 'None' if standard setup]\n\n"
+    "OUTPUT FORMAT (use this exact format):\n"
+    "---\n"
+    "**Profile Created:** [Name]\n"
+    "\n"
+    "**Description:** [What makes this profile special - 1-2 sentences]\n"
+    "\n"
+    "**Preparation:**\n"
+    "- Dose: [X]g\n"
+    "- Grind: [description]\n"
+    "- Temperature: [X]°C\n"
+    "- [Any other prep steps]\n"
+    "\n"
+    "**Why This Works:** [Science and reasoning behind the profile design]\n"
+    "\n"
+    "**Special Notes:** [Any equipment or technique requirements, or 'None' if standard setup]\n"
+    "---\n\n"
     "PROFILE JSON:\n"
     "```json\n"
-    "[Include the EXACT JSON that was sent to create_profile tool here, formatted as valid JSON]\n"
+    "[Include the EXACT JSON that was sent to create_profile tool here]\n"
     "```\n\n"
-    "IMPORTANT: You MUST include the complete profile JSON above exactly as it was passed to the create_profile tool. "
-    "This allows users to download and share their profiles."
+    "FORMATTING:\n"
+    "• Use **bold** for section labels as shown above\n"
+    "• List items with - are encouraged for preparation steps\n"
+    "• Keep descriptions concise - this will be displayed on mobile\n"
+    "• You MUST include the complete profile JSON exactly as passed to create_profile tool\n"
 )
 
 USER_SUMMARY_INSTRUCTIONS = (
@@ -459,6 +540,27 @@ def get_author_instruction() -> str:
         f"AUTHOR:\n"
         f"• Set the 'author' field in the profile JSON to: \"{author}\"\n"
         f"• This name will appear as the profile creator on the Meticulous device\n\n"
+    )
+
+
+def build_advanced_customization_section(advanced_customization: Optional[str]) -> str:
+    """Build the advanced customization section for the prompt.
+    
+    These are MANDATORY equipment and extraction parameters that MUST be followed.
+    """
+    if not advanced_customization:
+        return ""
+    
+    return (
+        f"⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):\n"
+        f"{advanced_customization}\n\n"
+        f"CRITICAL: You MUST configure the profile to use these EXACT values. "
+        f"These are non-negotiable hardware/extraction constraints:\n"
+        f"• If a temperature is specified, set the profile temperature to that EXACT value\n"
+        f"• If a dose is specified, the profile MUST be designed for that EXACT dose\n"
+        f"• If max pressure/flow is specified, NO stage should exceed those limits\n"
+        f"• If basket size/type is specified, account for it in your dose and extraction design\n"
+        f"• If bottom filter is specified, mention it in preparation notes\n\n"
     )
 
 
@@ -524,13 +626,17 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
 async def analyze_and_profile(
     request: Request,
     file: Optional[UploadFile] = File(None),
-    user_prefs: Optional[str] = Form(None)
+    user_prefs: Optional[str] = Form(None),
+    advanced_customization: Optional[str] = Form(None)
 ):
     """Unified endpoint: Analyze coffee bag and generate profile in a single LLM pass.
     
     Requires at least one of:
     - file: Image of the coffee bag
     - user_prefs: User preferences or specific instructions
+    
+    Optional:
+    - advanced_customization: Advanced equipment/extraction settings (basket, temp, dose, etc.)
     """
     request_id = request.state.request_id
     
@@ -558,8 +664,14 @@ async def analyze_and_profile(
                 "endpoint": "/analyze_and_profile",
                 "has_image": file is not None,
                 "has_preferences": user_prefs is not None,
+                "has_advanced_customization": advanced_customization is not None,
                 "upload_filename": file.filename if file else None,
-                "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs
+                "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs,
+                "advanced_customization_preview": (
+                    advanced_customization[:100]
+                    if advanced_customization and len(advanced_customization) > 100
+                    else advanced_customization
+                )
             }
         )
         
@@ -588,6 +700,9 @@ async def analyze_and_profile(
         # Get author instruction with configured name
         author_instruction = get_author_instruction()
         
+        # Build advanced customization section if provided
+        advanced_section = build_advanced_customization_section(advanced_customization)
+        
         # Construct the profile creation prompt
         if coffee_analysis and user_prefs:
             # Both image and preferences provided
@@ -595,11 +710,12 @@ async def analyze_and_profile(
                 BARISTA_PERSONA +
                 SAFETY_RULES +
                 f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"Coffee Analysis: '{coffee_analysis}'\n\n"
+                f"Coffee Analysis: '{coffee_analysis}'\n\n" +
+                advanced_section +
                 f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                 f"'{user_prefs}'\n"
                 f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
-                f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements above.\n\n" +
+                f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
@@ -607,12 +723,15 @@ async def analyze_and_profile(
                 OUTPUT_FORMAT
             )
         elif coffee_analysis:
-            # Only image provided
+            # Only image provided (may still have advanced customization)
             final_prompt = (
                 BARISTA_PERSONA +
                 SAFETY_RULES +
                 f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"Task: Create a sophisticated espresso profile for '{coffee_analysis}'.\n\n" +
+                f"Coffee Analysis: '{coffee_analysis}'\n\n" +
+                advanced_section +
+                f"TASK: Create a sophisticated espresso profile for this coffee" +
+                (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
@@ -620,15 +739,16 @@ async def analyze_and_profile(
                 OUTPUT_FORMAT
             )
         else:
-            # Only user preferences provided
+            # Only user preferences provided (may still have advanced customization)
             final_prompt = (
                 BARISTA_PERSONA +
                 SAFETY_RULES +
-                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n\n"
+                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n\n" +
+                advanced_section +
                 f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                 f"'{user_prefs}'\n"
                 f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
-                "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements above.\n\n" +
+                "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
                 NAMING_CONVENTION +
                 author_instruction +
@@ -1288,7 +1408,7 @@ async def get_version_info(request: Request):
         # Read MCP server version and repo URL from meticulous-source
         mcp_version = "unknown"
         mcp_commit = None
-        mcp_repo_url = "https://github.com/manonstreet/meticulous-mcp"  # Default fallback
+        mcp_repo_url = "https://github.com/hessius/meticulous-mcp"  # Default fallback
         # In container: meticulous-source is at /app/meticulous-source (same level as main.py)
         mcp_source_dir = Path(__file__).parent / "meticulous-source"
         
@@ -1328,7 +1448,7 @@ async def get_version_info(request: Request):
                 )
         
         # If not found in .versions.json, try git remote from meticulous-source
-        if mcp_repo_url == "https://github.com/manonstreet/meticulous-mcp" and mcp_source_dir.exists():
+        if mcp_repo_url == "https://github.com/hessius/meticulous-mcp" and mcp_source_dir.exists():
             git_dir = mcp_source_dir / ".git"
             if git_dir.exists():
                 try:
@@ -1421,7 +1541,7 @@ async def get_version_info(request: Request):
             "meticai_web_commit": None,
             "mcp_server": "unknown",
             "mcp_commit": None,
-            "mcp_repo_url": "https://github.com/manonstreet/meticulous-mcp"
+            "mcp_repo_url": "https://github.com/hessius/meticulous-mcp"
         }
 
 
@@ -2016,12 +2136,23 @@ def _extract_profile_json(reply: str) -> Optional[dict]:
     return None
 
 
+def _clean_profile_name(name: str) -> str:
+    """Clean markdown artifacts from profile name."""
+    # Remove leading/trailing ** or *
+    cleaned = re.sub(r'^[\*]+\s*', '', name)
+    cleaned = re.sub(r'\s*[\*]+$', '', cleaned)
+    # Remove any remaining ** pairs
+    cleaned = cleaned.replace('**', '')
+    return cleaned.strip()
+
+
 def _extract_profile_name(reply: str) -> str:
     """Extract the profile name from the LLM reply."""
     import re
-    match = re.search(r'Profile Created:\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
+    # Handle both **Profile Created:** and Profile Created: formats, with 0 or 2 asterisks
+    match = re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
     if match:
-        return match.group(1).strip()
+        return _clean_profile_name(match.group(1))
     return "Untitled Profile"
 
 
@@ -2245,6 +2376,59 @@ async def clear_history(request: Request):
         raise HTTPException(
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "Failed to clear history"}
+        )
+
+
+@app.post("/api/history/migrate")
+async def migrate_history_profile_names(request: Request):
+    """Migrate history to clean up malformed profile names.
+    
+    This fixes profile names that have markdown artifacts like ** or *.
+    
+    Returns:
+        Number of entries fixed
+    """
+    request_id = request.state.request_id
+    
+    try:
+        history = _load_history()
+        fixed_count = 0
+        
+        for entry in history:
+            old_name = entry.get("profile_name", "")
+            new_name = _clean_profile_name(old_name)
+            
+            if old_name != new_name:
+                entry["profile_name"] = new_name
+                fixed_count += 1
+                logger.info(
+                    f"Fixed profile name: '{old_name}' -> '{new_name}'",
+                    extra={"request_id": request_id}
+                )
+        
+        if fixed_count > 0:
+            _save_history(history)
+        
+        logger.info(
+            f"Migration complete: {fixed_count} profile names fixed",
+            extra={"request_id": request_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Fixed {fixed_count} profile names",
+            "fixed_count": fixed_count
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to migrate history: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e), "message": "Failed to migrate history"}
         )
 
 

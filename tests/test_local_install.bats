@@ -78,7 +78,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
 }
 
 @test "Script clones meticulous-mcp repository" {
-    run grep -q "github.com/manonstreet/meticulous-mcp.git" "$SCRIPT_PATH"
+    run grep -q "github.com/hessius/meticulous-mcp.git" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 

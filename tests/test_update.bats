@@ -341,7 +341,7 @@ teardown() {
     git config user.name "Test User"
     
     # Add the expected remote URL
-    git remote add origin "https://github.com/manonstreet/meticulous-mcp.git"
+    git remote add origin "https://github.com/hessius/meticulous-mcp.git"
     echo "mcp" > mcp.txt
     git add mcp.txt
     git commit -m "Initial MCP commit"
@@ -364,10 +364,10 @@ teardown() {
     # Create update config with matching URLs
     cat > "$TEST_DIR/.update-config.json" <<'EOF'
 {
-  "version": "1.1",
+  "version": "1.2",
   "repositories": {
     "meticulous-mcp": {
-      "url": "https://github.com/manonstreet/meticulous-mcp.git"
+      "url": "https://github.com/hessius/meticulous-mcp.git"
     },
     "meticai-web": {
       "url": "https://github.com/hessius/MeticAI-web.git"
@@ -380,7 +380,7 @@ EOF
     cd meticulous-source
     MCP_URL=$(git config --get remote.origin.url)
     [ -n "$MCP_URL" ]
-    [[ "$MCP_URL" == "https://github.com/manonstreet/meticulous-mcp.git" ]]
+    [[ "$MCP_URL" == "https://github.com/hessius/meticulous-mcp.git" ]]
     cd ..
     
     cd meticai-web

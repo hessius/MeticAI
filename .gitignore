@@ -50,3 +50,4 @@ meticai-web/
 macos-installer/build/
 *.dmg
 *.app
+.vscode/

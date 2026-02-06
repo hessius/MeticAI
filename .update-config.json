@@ -1,10 +1,10 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "description": "Central configuration for MeticAI update script. Maintainers can update repository URLs to switch all users to different repositories.",
-  "last_updated": "2026-01-13T21:38:00Z",
+  "last_updated": "2026-02-04T12:00:00Z",
   "repositories": {
     "meticulous-mcp": {
-      "url": "https://github.com/manonstreet/meticulous-mcp.git",
+      "url": "https://github.com/hessius/meticulous-mcp.git",
       "description": "Meticulous MCP server for machine control"
     },
     "meticai-web": {
