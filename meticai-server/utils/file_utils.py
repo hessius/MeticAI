@@ -70,5 +70,6 @@ def atomic_write_json(filepath: Path, data: Any, indent: int = 2) -> None:
         try:
             os.unlink(temp_path)
         except Exception:
+            # Ignore errors during cleanup (temp file may already be deleted)
             pass
         raise

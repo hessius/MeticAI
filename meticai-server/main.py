@@ -1,25 +1,18 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from typing import Optional, Any
-import google.generativeai as genai
-from PIL import Image
-import io
+from typing import Optional
 import os
 import subprocess
 import json
 import asyncio
-import logging
 from pathlib import Path
 import uuid
 import time
 import tempfile
-import re
-from logging_config import setup_logging, get_logger
+from logging_config import setup_logging
 from config import (
-    DATA_DIR, UPDATE_CHECK_INTERVAL, MAX_UPLOAD_SIZE, 
-    VERSION_PATTERN, STAGE_STATUS_RETRACTING, config
+    UPDATE_CHECK_INTERVAL, STAGE_STATUS_RETRACTING
 )
 
 # Initialize logging system with environment-aware defaults
@@ -35,33 +28,7 @@ except (PermissionError, OSError) as e:
         f"using temporary directory: {log_dir}",
         extra={"original_error": str(e)}
     )
-from datetime import datetime, timezone, timedelta
-from services.gemini_service import (
-    parse_gemini_error,
-    get_vision_model,
-    get_author_instruction,
-    build_advanced_customization_section
-)
-from services.meticulous_service import (
-    get_meticulous_api,
-    execute_scheduled_shot,
-    decompress_shot_data,
-    fetch_shot_data
-)
-from utils.file_utils import deep_convert_to_dict, atomic_write_json
-from utils.sanitization import sanitize_profile_name_for_filename, clean_profile_name
-from services.cache_service import (
-    get_cached_llm_analysis, save_llm_analysis_to_cache,
-    _get_cached_shots, _set_cached_shots,
-    _get_cached_image, _set_cached_image
-)
-from services.settings_service import load_settings, save_settings, get_author_name, ensure_settings_file
-from services.history_service import load_history, save_history, save_to_history, ensure_history_file
-from services.analysis_service import (
-    _perform_local_shot_analysis, _analyze_stage_execution, _generate_profile_description,
-    _prepare_shot_summary_for_llm, _format_dynamics_description, _generate_profile_target_curves
-)
-
+from datetime import datetime, timezone
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
     script_path = Path("/app/update.sh")
@@ -1004,6 +971,7 @@ async def get_machine_profile_count(request: Request):
                     entries = history if isinstance(history, list) else history.get("entries", [])
                     existing_names = {entry.get("profile_name") for entry in entries}
             except Exception:
+                # Ignore errors loading history file (may not exist or be corrupted)
                 pass
         
         not_imported = 0
@@ -1015,6 +983,7 @@ async def get_machine_profile_count(request: Request):
                 if full_profile.name not in existing_names:
                     not_imported += 1
             except Exception:
+                # Ignore errors fetching individual profiles (may have been deleted)
                 pass
         
         return {

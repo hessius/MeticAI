@@ -1,14 +1,11 @@
 """Meticulous service for espresso machine API and shot data management."""
 
-import subprocess
 import json
 import zstandard
 import httpx
 import asyncio
 import os
-from pathlib import Path
-from typing import Optional, Any
-from datetime import datetime
+from typing import Optional
 from logging_config import get_logger
 
 logger = get_logger()

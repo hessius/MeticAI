@@ -10,6 +10,7 @@ import os
 import tempfile
 
 from logging_config import get_logger
+from utils.sanitization import clean_profile_name
 
 logger = get_logger()
 
@@ -82,22 +83,12 @@ def _extract_profile_json(reply: str) -> Optional[dict]:
     return None
 
 
-def _clean_profile_name(name: str) -> str:
-    """Clean markdown artifacts from profile name."""
-    # Remove leading/trailing ** or *
-    cleaned = re.sub(r'^[\*]+\s*', '', name)
-    cleaned = re.sub(r'\s*[\*]+$', '', cleaned)
-    # Remove any remaining ** pairs
-    cleaned = cleaned.replace('**', '')
-    return cleaned.strip()
-
-
 def _extract_profile_name(reply: str) -> str:
     """Extract the profile name from the LLM reply."""
     # Handle both **Profile Created:** and Profile Created: formats, with 0 or 2 asterisks
     match = re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
     if match:
-        return _clean_profile_name(match.group(1))
+        return clean_profile_name(match.group(1))
     return "Untitled Profile"
 
 

@@ -64,6 +64,7 @@ async def check_updates(request: Request):
                     old_data = json.load(f)
                     old_check_time = old_data.get("last_check")
             except Exception:
+                # Ignore errors reading old version file (may not exist or be corrupted)
                 pass
         
         # Create signal file for host-side watcher
@@ -98,12 +99,14 @@ async def check_updates(request: Request):
                             # Versions file was updated
                             break
                 except Exception:
+                    # Ignore errors polling version file (may be being written or temporarily unavailable)
                     pass
         
         # Clean up signal file if it still exists
         try:
             signal_path.unlink(missing_ok=True)
         except Exception:
+            # Ignore errors during cleanup (file may already be deleted or have permission issues)
             pass
         
         # Read the versions file
@@ -216,7 +219,6 @@ async def get_watcher_status(request: Request):
     request_id = request.state.request_id
     
     try:
-        import os
         from datetime import datetime, timezone
         
         log_file = Path("/app/.rebuild-watcher.log")
@@ -549,6 +551,7 @@ async def get_version_info(request: Request):
                 if result.returncode == 0 and result.stdout.strip():
                     meticai_web_commit = result.stdout.strip()
             except Exception:
+                # Ignore errors getting commit hash (git may not be available or not in a repo)
                 pass
         
         # Read MCP server version and repo URL from meticulous-source
@@ -572,6 +575,7 @@ async def get_version_info(request: Request):
                 if result.returncode == 0 and result.stdout.strip():
                     mcp_commit = result.stdout.strip()
             except Exception:
+                # Ignore errors getting commit hash (git may not be available or not in a repo)
                 pass
         
         # Try to get repo URL from .versions.json first (mounted by docker-compose)
@@ -732,7 +736,6 @@ async def get_changelog(request: Request):
                     if not body:
                         return body
                     # Find where Installation section starts (### Installation or ## Installation)
-                    import re
                     # Match "### Installation" or "## Installation" and everything after until end or next major section
                     pattern = r'\n---\n+### Installation.*$'
                     cleaned = re.sub(pattern, '', body, flags=re.DOTALL | re.IGNORECASE)
@@ -904,7 +907,6 @@ async def save_settings_endpoint(request: Request):
                 current_settings["geminiApiKey"] = new_api_key
                 # Update .env file
                 if "GEMINI_API_KEY=" in env_content:
-                    import re
                     env_content = re.sub(
                         r'GEMINI_API_KEY=.*',
                         f'GEMINI_API_KEY={new_api_key}',
@@ -919,7 +921,6 @@ async def save_settings_endpoint(request: Request):
             new_ip = body["meticulousIp"].strip()
             current_settings["meticulousIp"] = new_ip
             if "METICULOUS_IP=" in env_content:
-                import re
                 env_content = re.sub(
                     r'METICULOUS_IP=.*',
                     f'METICULOUS_IP={new_ip}',
@@ -934,7 +935,6 @@ async def save_settings_endpoint(request: Request):
             new_ip = body["serverIp"].strip()
             current_settings["serverIp"] = new_ip
             if "PI_IP=" in env_content:
-                import re
                 env_content = re.sub(
                     r'PI_IP=.*',
                     f'PI_IP={new_ip}',
