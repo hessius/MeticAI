@@ -1874,27 +1874,27 @@ class TestSecurityFeatures:
     # Test constants
     TEST_SIZE_EXCESS = 1000  # Bytes to exceed limits in tests
 
-    def test_sanitize_profile_name_for_filename(self):
+    def testsanitize_profile_name_for_filename(self):
         """Test that profile names are properly sanitized for filenames."""
         from utils.sanitization import sanitize_profile_name_for_filename
         
         # Test path traversal attempts
         assert ".." not in sanitize_profile_name_for_filename("../../etc/passwd")
         assert "/" not in sanitize_profile_name_for_filename("path/to/file")
-        assert "\\" not in _sanitize_profile_name_for_filename("path\\to\\file")
+        assert "\\" not in sanitize_profile_name_for_filename("path\\to\\file")
         
         # Test special characters are removed/replaced
-        result = _sanitize_profile_name_for_filename("Profile: Test & Name!")
+        result = sanitize_profile_name_for_filename("Profile: Test & Name!")
         assert ":" not in result
         assert "&" not in result
         assert "!" not in result
         
         # Test spaces are replaced with underscores
-        assert _sanitize_profile_name_for_filename("My Profile") == "my_profile"
+        assert sanitize_profile_name_for_filename("My Profile") == "my_profile"
         
         # Test length limiting
         long_name = "a" * 300
-        result = _sanitize_profile_name_for_filename(long_name)
+        result = sanitize_profile_name_for_filename(long_name)
         assert len(result) <= 200
     
     def test_get_cached_image_prevents_path_traversal(self):
@@ -2020,7 +2020,7 @@ class TestHelperFunctions:
         assert _safe_float(None, default=1.5) == 1.5
         assert _safe_float({}, default=2.0) == 2.0
     
-    def test_sanitize_profile_name_for_filename_basic(self):
+    def testsanitize_profile_name_for_filename_basic(self):
         """Test basic filename sanitization."""
         from utils.sanitization import sanitize_profile_name_for_filename
         
@@ -6692,14 +6692,14 @@ class TestLLMAnalysisCacheFunctions:
 class TestAdditionalCoveragePaths:
     """Additional tests to reach 75% coverage target."""
     
-    def test_sanitize_profile_name_for_filename(self):
-        """Test _sanitize_profile_name_for_filename with various inputs."""
+    def testsanitize_profile_name_for_filename(self):
+        """Test sanitize_profile_name_for_filename with various inputs."""
         # Test with special characters
-        result = main._sanitize_profile_name_for_filename("Test/Profile\\Name:123")
+        result = main.sanitize_profile_name_for_filename("Test/Profile\\Name:123")
         assert "/" not in result and "\\" not in result
         
         # Test with spaces
-        result = main._sanitize_profile_name_for_filename("My Cool Profile")
+        result = main.sanitize_profile_name_for_filename("My Cool Profile")
         assert isinstance(result, str)
     
     def test_safe_float_with_various_types(self):

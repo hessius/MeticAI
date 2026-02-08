@@ -10,7 +10,7 @@ import asyncio
 import tempfile
 import uuid
 
-from config import DATA_DIR
+from config import DATA_DIR, MAX_UPLOAD_SIZE
 from services.meticulous_service import get_meticulous_api
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model
