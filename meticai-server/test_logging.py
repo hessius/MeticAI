@@ -61,8 +61,8 @@ class TestLoggingConfiguration:
         logger.error("Test error entry")
         
         # Check that log files were created
-        all_logs = Path(temp_log_dir) / "coffee-relay.log"
-        error_logs = Path(temp_log_dir) / "coffee-relay-errors.log"
+        all_logs = Path(temp_log_dir) / "meticai-server.log"
+        error_logs = Path(temp_log_dir) / "meticai-server-errors.log"
         
         assert all_logs.exists()
         assert error_logs.exists()
@@ -92,7 +92,7 @@ class TestLoggingConfiguration:
         setup_logging(log_dir=temp_log_dir)
         logger = get_logger()
         
-        assert logger.name == "coffee-relay"
+        assert logger.name == "meticai-server"
         assert len(logger.handlers) > 0
 
 
@@ -223,7 +223,7 @@ class TestLogRetrieval:
     def test_get_logs_returns_json_structure(self, client, temp_log_dir):
         """Test that /api/logs returns expected JSON structure."""
         # Create a test log file
-        log_file = Path(temp_log_dir) / "coffee-relay.log"
+        log_file = Path(temp_log_dir) / "meticai-server.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         
         test_log_entry = {
@@ -251,7 +251,7 @@ class TestLogRetrieval:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_get_logs_filters_by_level(self, client, temp_log_dir):
         """Test that /api/logs can filter logs by level."""
-        log_file = Path(temp_log_dir) / "coffee-relay.log"
+        log_file = Path(temp_log_dir) / "meticai-server.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         
         # Write multiple log entries with different levels
@@ -275,7 +275,7 @@ class TestLogRetrieval:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_get_logs_limits_lines(self, client, temp_log_dir):
         """Test that /api/logs respects the lines parameter."""
-        log_file = Path(temp_log_dir) / "coffee-relay.log"
+        log_file = Path(temp_log_dir) / "meticai-server.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         
         # Write many log entries
@@ -297,7 +297,7 @@ class TestLogRetrieval:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_get_logs_error_type(self, client, temp_log_dir):
         """Test that /api/logs can retrieve error logs specifically."""
-        error_log_file = Path(temp_log_dir) / "coffee-relay-errors.log"
+        error_log_file = Path(temp_log_dir) / "meticai-server-errors.log"
         error_log_file.parent.mkdir(parents=True, exist_ok=True)
         
         with open(error_log_file, 'w') as f:
@@ -310,7 +310,7 @@ class TestLogRetrieval:
             
         assert response.status_code == 200
         data = response.json()
-        assert "coffee-relay-errors.log" in data["log_file"]
+        assert "meticai-server-errors.log" in data["log_file"]
     
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.Path')
@@ -411,7 +411,7 @@ class TestLogRotation:
             logger.info(large_message, extra={"iteration": i})
         
         # Check for backup files
-        log_files = list(Path(temp_log_dir).glob("coffee-relay.log*"))
+        log_files = list(Path(temp_log_dir).glob("meticai-server.log*"))
         
         # Should have main log file and at least one backup
         assert len(log_files) >= 1

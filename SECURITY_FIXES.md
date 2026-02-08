@@ -35,7 +35,7 @@ This document tracks the security vulnerabilities that were identified and patch
 
 ## Files Modified
 
-### coffee-relay/requirements.txt
+### meticai-server/requirements.txt
 ```diff
 -fastapi==0.109.0
 +fastapi==0.109.1
@@ -47,7 +47,7 @@ This document tracks the security vulnerabilities that were identified and patch
 +python-multipart==0.0.18
 ```
 
-### coffee-relay/Dockerfile
+### meticai-server/Dockerfile
 Updated to use requirements.txt instead of hardcoded package versions for better maintainability and security management.
 
 ## Verification

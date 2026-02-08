@@ -1239,9 +1239,9 @@ async def get_logs(
         # Determine which log file to read
         log_dir = Path("/app/logs")
         if log_type == "errors":
-            log_file = log_dir / "coffee-relay-errors.log"
+            log_file = log_dir / "meticai-server-errors.log"
         else:
-            log_file = log_dir / "coffee-relay.log"
+            log_file = log_dir / "meticai-server.log"
         
         if not log_file.exists():
             logger.warning(

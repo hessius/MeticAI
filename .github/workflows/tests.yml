@@ -26,13 +26,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('coffee-relay/requirements-test.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('meticai-server/requirements-test.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
       
       - name: Install dependencies
         run: |
-          cd coffee-relay
+          cd meticai-server
           pip install --upgrade pip
           pip install -r requirements-test.txt
       
@@ -40,19 +40,19 @@ jobs:
         env:
           GEMINI_API_KEY: test_key_for_ci
         run: |
-          cd coffee-relay
+          cd meticai-server
           pytest test_main.py test_logging.py -v --cov=main --cov=logging_config --cov-report=xml --cov-report=term-missing
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./coffee-relay/coverage.xml
+          file: ./meticai-server/coverage.xml
           flags: python
           name: python-coverage
       
       - name: Check coverage threshold
         run: |
-          cd coffee-relay
+          cd meticai-server
           coverage report --fail-under=68
 
   bash-tests:
@@ -107,7 +107,7 @@ jobs:
       
       - name: Verify Dockerfiles syntax
         run: |
-          docker build --no-cache -f coffee-relay/Dockerfile -t test-coffee-relay coffee-relay || exit 1
+          docker build --no-cache -f meticai-server/Dockerfile -t test-meticai-server meticai-server || exit 1
           docker build --no-cache -f gemini-client/Dockerfile -t test-gemini-client gemini-client || exit 1
       
       - name: Test docker-compose syntax
@@ -135,12 +135,12 @@ jobs:
       
       - name: Run flake8
         run: |
-          flake8 coffee-relay/main.py coffee-relay/logging_config.py --max-line-length=100 --ignore=E501,W503
+          flake8 meticai-server/main.py meticai-server/logging_config.py --max-line-length=100 --ignore=E501,W503
         continue-on-error: true
       
       - name: Check code formatting with black
         run: |
-          black --check coffee-relay/main.py coffee-relay/logging_config.py
+          black --check meticai-server/main.py meticai-server/logging_config.py
         continue-on-error: true
       
       - name: Lint shell scripts

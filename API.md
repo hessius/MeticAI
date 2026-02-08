@@ -188,7 +188,7 @@ curl "http://<PI_IP>:8000/api/logs?lines=200&level=ERROR&log_type=errors"
     }
   ],
   "total_lines": 100,
-  "log_file": "/app/logs/coffee-relay.log",
+  "log_file": "/app/logs/meticai-server.log",
   "filters": {
     "lines_requested": 100,
     "level": null,
@@ -433,7 +433,7 @@ setInterval(async () => {
 - Ensure form field names are correct and case-sensitive
 - Review server logs: See [LOGGING.md](LOGGING.md) for details
   ```bash
-  tail -f logs/coffee-relay-errors.log | jq .
+  tail -f logs/meticai-server-errors.log | jq .
   # Or via API:
   curl "http://<PI_IP>:8000/api/logs?level=ERROR&lines=100"
   ```

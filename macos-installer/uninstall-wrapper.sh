@@ -184,7 +184,7 @@ run_uninstallation() {
             
             # Find ALL containers (running or stopped) related to MeticAI
             log_message "Searching for all MeticAI-related containers..."
-            local all_containers=$(docker ps -aq --filter "name=meticai" --filter "name=coffee-relay" --filter "name=gemini-client" --filter "name=meticulous-mcp" 2>/dev/null || true)
+            local all_containers=$(docker ps -aq --filter "name=meticai" --filter "name=meticai-server" --filter "name=gemini-client" --filter "name=meticulous-mcp" 2>/dev/null || true)
             
             if [ -n "$all_containers" ]; then
                 log_message "Found containers to remove: $(echo $all_containers | tr '\n' ' ')"
@@ -209,7 +209,7 @@ run_uninstallation() {
             
             # Remove images
             show_progress "Removing Docker images..."
-            local images=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|coffee-relay|gemini-client|meticulous-mcp)" 2>/dev/null || true)
+            local images=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(meticai|meticai-server|gemini-client|meticulous-mcp)" 2>/dev/null || true)
             
             if [ -n "$images" ]; then
                 log_message "Removing Docker images: $images"
