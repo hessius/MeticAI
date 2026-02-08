@@ -50,7 +50,7 @@ services:
       - ./.git:/app/.git
       # Mount docker-compose and Dockerfiles for container rebuild
       - ./docker-compose.yml:/app/docker-compose.yml:ro
-      - ./meticai-server:/app/meticai-server:ro
+      - ./meticai-server:/app:ro
       - ./gemini-client:/app/gemini-client:ro
       # Mount rebuild flag for host-side watcher
       - ./.rebuild-needed:/app/.rebuild-needed
