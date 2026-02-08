@@ -333,8 +333,8 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../local-install.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "Script detects coffee-relay container" {
-    run grep -q "coffee-relay" "$SCRIPT_PATH"
+@test "Script detects meticai-server container" {
+    run grep -q "meticai-server" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
