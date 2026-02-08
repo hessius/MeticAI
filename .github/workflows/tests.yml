@@ -53,10 +53,7 @@ jobs:
       - name: Check coverage threshold
         run: |
           cd meticai-server
-          # Note: Threshold lowered from 68% to 55% after refactoring
-          # The codebase was restructured and coverage needs to be rebuilt
-          # TODO: Gradually increase threshold as coverage improves
-          coverage report --fail-under=55
+          coverage report --fail-under=68
 
   bash-tests:
     name: Bash Tests (Install Scripts)

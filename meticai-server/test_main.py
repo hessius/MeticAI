@@ -7388,5 +7388,475 @@ class TestRecurringScheduleChecker:
         assert "disabled" not in enabled_schedules
 
 
+class TestSchedulingStateDirect:
+    """Direct tests for services.scheduling_state module to improve coverage."""
+    
+    @pytest.mark.asyncio
+    async def test_schedule_persistence_save_and_load(self, tmp_path):
+        """Test SchedulePersistence save and load operations."""
+        from services.scheduling_state import SchedulePersistence
+        
+        with patch('services.scheduling_state.DATA_DIR', tmp_path):
+            persistence = SchedulePersistence("test_schedules.json")
+            
+            # Test save
+            test_data = {"schedule1": {"name": "Test", "time": "07:00"}}
+            await persistence.save(test_data)
+            
+            # Verify file was created
+            assert persistence.filepath.exists()
+            
+            # Test load
+            loaded_data = await persistence.load()
+            assert loaded_data == test_data
+    
+    @pytest.mark.asyncio
+    async def test_schedule_persistence_load_nonexistent(self, tmp_path):
+        """Test loading from nonexistent file returns empty dict."""
+        from services.scheduling_state import SchedulePersistence
+        
+        with patch('services.scheduling_state.DATA_DIR', tmp_path):
+            persistence = SchedulePersistence("nonexistent.json")
+            result = await persistence.load()
+            assert result == {}
+    
+    @pytest.mark.asyncio
+    async def test_schedule_persistence_save_error_handling(self, tmp_path):
+        """Test save handles errors gracefully."""
+        from services.scheduling_state import SchedulePersistence
+        
+        with patch('services.scheduling_state.DATA_DIR', tmp_path):
+            persistence = SchedulePersistence("test.json")
+            
+            # Mock open to raise an error
+            with patch('builtins.open', side_effect=PermissionError("Permission denied")):
+                # Should not raise, just log error
+                await persistence.save({"test": "data"})
+    
+    @pytest.mark.asyncio
+    async def test_schedule_persistence_load_error_handling(self, tmp_path):
+        """Test load handles corrupted JSON gracefully."""
+        from services.scheduling_state import SchedulePersistence
+        
+        with patch('services.scheduling_state.DATA_DIR', tmp_path):
+            persistence = SchedulePersistence("bad.json")
+            
+            # Write invalid JSON
+            persistence.filepath.write_text("not valid json {{{")
+            
+            # Should return empty dict, not raise
+            result = await persistence.load()
+            assert result == {}
+    
+    @pytest.mark.asyncio
+    async def test_save_scheduled_shots(self):
+        """Test save_scheduled_shots function."""
+        from services import scheduling_state
+        
+        with patch.object(scheduling_state, '_persistence') as mock_persistence:
+            mock_persistence.save = AsyncMock()
+            scheduling_state._scheduled_shots = {"test": {"id": "test"}}
+            
+            await scheduling_state.save_scheduled_shots()
+            mock_persistence.save.assert_called_once_with({"test": {"id": "test"}})
+    
+    @pytest.mark.asyncio
+    async def test_load_scheduled_shots(self):
+        """Test load_scheduled_shots function."""
+        from services import scheduling_state
+        
+        with patch.object(scheduling_state, '_persistence') as mock_persistence:
+            mock_persistence.load = AsyncMock(return_value={"loaded": {"id": "loaded"}})
+            
+            result = await scheduling_state.load_scheduled_shots()
+            assert result == {"loaded": {"id": "loaded"}}
+    
+    @pytest.mark.asyncio
+    async def test_save_recurring_schedules(self):
+        """Test save_recurring_schedules function."""
+        from services import scheduling_state
+        
+        with patch.object(scheduling_state, '_recurring_persistence') as mock_persistence:
+            mock_persistence.save = AsyncMock()
+            scheduling_state._recurring_schedules = {"recurring1": {"name": "Test"}}
+            
+            await scheduling_state.save_recurring_schedules()
+            mock_persistence.save.assert_called_once_with({"recurring1": {"name": "Test"}})
+    
+    @pytest.mark.asyncio
+    async def test_load_recurring_schedules_function(self):
+        """Test load_recurring_schedules function."""
+        from services import scheduling_state
+        
+        with patch.object(scheduling_state, '_recurring_persistence') as mock_persistence:
+            mock_persistence.load = AsyncMock(return_value={"schedule1": {"enabled": True}})
+            
+            await scheduling_state.load_recurring_schedules()
+            assert scheduling_state._recurring_schedules == {"schedule1": {"enabled": True}}
+    
+    def test_get_next_occurrence_daily(self):
+        """Test get_next_occurrence with daily schedule."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {"time": "10:00", "recurrence_type": "daily"}
+        result = get_next_occurrence(schedule)
+        
+        assert result is not None
+        assert result.hour == 10
+        assert result.minute == 0
+    
+    def test_get_next_occurrence_weekdays(self):
+        """Test get_next_occurrence with weekdays schedule."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {"time": "09:00", "recurrence_type": "weekdays"}
+        result = get_next_occurrence(schedule)
+        
+        assert result is not None
+        # Should be a weekday (Monday-Friday)
+        assert result.weekday() < 5
+    
+    def test_get_next_occurrence_weekends(self):
+        """Test get_next_occurrence with weekends schedule."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {"time": "11:00", "recurrence_type": "weekends"}
+        result = get_next_occurrence(schedule)
+        
+        assert result is not None
+        # Should be a weekend (Saturday or Sunday)
+        assert result.weekday() >= 5
+    
+    def test_get_next_occurrence_interval_first_run(self):
+        """Test get_next_occurrence with interval schedule, no last_run."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {"time": "08:00", "recurrence_type": "interval", "interval_days": 3}
+        result = get_next_occurrence(schedule)
+        
+        assert result is not None
+    
+    def test_get_next_occurrence_interval_with_last_run(self):
+        """Test get_next_occurrence with interval schedule and last_run."""
+        from services.scheduling_state import get_next_occurrence
+        from datetime import datetime, timezone, timedelta
+        
+        last_run = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+        schedule = {
+            "time": "08:00",
+            "recurrence_type": "interval",
+            "interval_days": 3,
+            "last_run": last_run
+        }
+        result = get_next_occurrence(schedule)
+        
+        assert result is not None
+    
+    def test_get_next_occurrence_interval_invalid_last_run(self):
+        """Test get_next_occurrence handles invalid last_run format."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {
+            "time": "08:00",
+            "recurrence_type": "interval",
+            "interval_days": 2,
+            "last_run": "not-a-valid-date"
+        }
+        result = get_next_occurrence(schedule)
+        
+        # Should return a result despite invalid last_run
+        assert result is not None
+    
+    def test_get_next_occurrence_specific_days(self):
+        """Test get_next_occurrence with specific_days schedule."""
+        from services.scheduling_state import get_next_occurrence
+        
+        # All days of week to ensure we find one
+        schedule = {"time": "07:00", "recurrence_type": "specific_days", "days_of_week": [0, 1, 2, 3, 4, 5, 6]}
+        result = get_next_occurrence(schedule)
+        
+        assert result is not None
+    
+    def test_get_next_occurrence_specific_days_empty(self):
+        """Test get_next_occurrence with empty days_of_week returns None."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {"time": "07:00", "recurrence_type": "specific_days", "days_of_week": []}
+        result = get_next_occurrence(schedule)
+        
+        # Should return None since no days match
+        assert result is None
+    
+    def test_get_next_occurrence_invalid_time(self):
+        """Test get_next_occurrence with invalid time format."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {"time": "invalid", "recurrence_type": "daily"}
+        result = get_next_occurrence(schedule)
+        
+        # Should return None on error
+        assert result is None
+    
+    def test_get_next_occurrence_missing_time(self):
+        """Test get_next_occurrence with missing time uses default."""
+        from services.scheduling_state import get_next_occurrence
+        
+        schedule = {"recurrence_type": "daily"}
+        result = get_next_occurrence(schedule)
+        
+        # Should use default time (07:00)
+        assert result is not None
+        assert result.hour == 7
 
 
+class TestMeticulousServiceDirect:
+    """Direct tests for services.meticulous_service module to improve coverage."""
+    
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_shot_preheat_and_run(self):
+        """Test execute_scheduled_shot with preheat enabled."""
+        from services.meticulous_service import execute_scheduled_shot
+        
+        mock_api = MagicMock()
+        mock_api.load_profile_by_id.return_value = MagicMock(error=None)
+        mock_api.execute_action = MagicMock()
+        
+        scheduled_shots = {"test-shot": {"id": "test-shot", "status": "pending"}}
+        scheduled_tasks = {}
+        
+        with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
+            # Use very short delay for testing
+            await execute_scheduled_shot(
+                schedule_id="test-shot",
+                shot_delay=0.01,
+                preheat=True,
+                profile_id="profile-123",
+                scheduled_shots_dict=scheduled_shots,
+                scheduled_tasks_dict=scheduled_tasks,
+                preheat_duration_minutes=0.0001  # Very short for test
+            )
+        
+        assert scheduled_shots["test-shot"]["status"] in ["completed", "running"]
+    
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_shot_no_preheat(self):
+        """Test execute_scheduled_shot without preheat."""
+        from services.meticulous_service import execute_scheduled_shot
+        
+        mock_api = MagicMock()
+        mock_api.load_profile_by_id.return_value = MagicMock(error=None)
+        mock_api.execute_action = MagicMock()
+        
+        scheduled_shots = {"test-shot-2": {"id": "test-shot-2", "status": "pending"}}
+        scheduled_tasks = {}
+        
+        with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
+            await execute_scheduled_shot(
+                schedule_id="test-shot-2",
+                shot_delay=0.01,
+                preheat=False,
+                profile_id="profile-456",
+                scheduled_shots_dict=scheduled_shots,
+                scheduled_tasks_dict=scheduled_tasks
+            )
+        
+        assert scheduled_shots["test-shot-2"]["status"] == "completed"
+        mock_api.load_profile_by_id.assert_called_once_with("profile-456")
+    
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_shot_preheat_only(self):
+        """Test execute_scheduled_shot with preheat only (no profile)."""
+        from services.meticulous_service import execute_scheduled_shot
+        
+        mock_api = MagicMock()
+        mock_api.execute_action = MagicMock()
+        
+        scheduled_shots = {"preheat-only": {"id": "preheat-only", "status": "pending"}}
+        scheduled_tasks = {}
+        
+        with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
+            await execute_scheduled_shot(
+                schedule_id="preheat-only",
+                shot_delay=0.01,
+                preheat=True,
+                profile_id=None,  # No profile
+                scheduled_shots_dict=scheduled_shots,
+                scheduled_tasks_dict=scheduled_tasks,
+                preheat_duration_minutes=0.0001
+            )
+        
+        assert scheduled_shots["preheat-only"]["status"] == "completed"
+        # Should not have called load_profile_by_id
+        mock_api.load_profile_by_id.assert_not_called()
+    
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_shot_profile_load_error(self):
+        """Test execute_scheduled_shot when profile load fails."""
+        from services.meticulous_service import execute_scheduled_shot
+        
+        mock_api = MagicMock()
+        mock_api.load_profile_by_id.return_value = MagicMock(error="Profile not found")
+        
+        scheduled_shots = {"fail-shot": {"id": "fail-shot", "status": "pending"}}
+        scheduled_tasks = {}
+        
+        with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
+            await execute_scheduled_shot(
+                schedule_id="fail-shot",
+                shot_delay=0.01,
+                preheat=False,
+                profile_id="bad-profile",
+                scheduled_shots_dict=scheduled_shots,
+                scheduled_tasks_dict=scheduled_tasks
+            )
+        
+        assert scheduled_shots["fail-shot"]["status"] == "failed"
+        assert "error" in scheduled_shots["fail-shot"]
+    
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_shot_exception(self):
+        """Test execute_scheduled_shot handles exceptions."""
+        from services.meticulous_service import execute_scheduled_shot
+        
+        mock_api = MagicMock()
+        mock_api.load_profile_by_id.side_effect = Exception("Connection failed")
+        
+        scheduled_shots = {"exc-shot": {"id": "exc-shot", "status": "pending"}}
+        scheduled_tasks = {"exc-shot": MagicMock()}
+        
+        with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
+            await execute_scheduled_shot(
+                schedule_id="exc-shot",
+                shot_delay=0.01,
+                preheat=False,
+                profile_id="profile",
+                scheduled_shots_dict=scheduled_shots,
+                scheduled_tasks_dict=scheduled_tasks
+            )
+        
+        assert scheduled_shots["exc-shot"]["status"] == "failed"
+        assert "exc-shot" not in scheduled_tasks  # Should be cleaned up
+    
+    @pytest.mark.asyncio
+    async def test_execute_scheduled_shot_cancelled(self):
+        """Test execute_scheduled_shot handles cancellation."""
+        from services.meticulous_service import execute_scheduled_shot
+        import asyncio
+        
+        scheduled_shots = {"cancel-shot": {"id": "cancel-shot", "status": "pending"}}
+        scheduled_tasks = {}
+        
+        with patch('services.meticulous_service.get_meticulous_api') as mock_get_api:
+            mock_get_api.side_effect = asyncio.CancelledError()
+            
+            await execute_scheduled_shot(
+                schedule_id="cancel-shot",
+                shot_delay=0.01,
+                preheat=False,
+                profile_id="profile",
+                scheduled_shots_dict=scheduled_shots,
+                scheduled_tasks_dict=scheduled_tasks
+            )
+        
+        assert scheduled_shots["cancel-shot"]["status"] == "cancelled"
+    
+    @pytest.mark.asyncio
+    async def test_fetch_shot_data_compressed(self):
+        """Test fetch_shot_data with compressed zst file."""
+        from services.meticulous_service import fetch_shot_data
+        import zstandard
+        
+        # Create mock compressed data
+        test_data = {"shot": "data", "pressure": [1, 2, 3]}
+        cctx = zstandard.ZstdCompressor()
+        compressed = cctx.compress(json.dumps(test_data).encode('utf-8'))
+        
+        mock_api = MagicMock()
+        mock_api.base_url = "http://test.local"
+        
+        mock_response = MagicMock()
+        mock_response.content = compressed
+        mock_response.raise_for_status = MagicMock()
+        
+        with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
+            with patch('httpx.AsyncClient') as mock_client:
+                mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+                
+                result = await fetch_shot_data("2024-01-01", "shot.zst")
+                
+                assert result == test_data
+    
+    @pytest.mark.asyncio
+    async def test_fetch_shot_data_uncompressed(self):
+        """Test fetch_shot_data with uncompressed JSON file."""
+        from services.meticulous_service import fetch_shot_data
+        
+        test_data = {"shot": "data", "weight": [10, 20, 30]}
+        
+        mock_api = MagicMock()
+        mock_api.base_url = "http://test.local"
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = test_data
+        mock_response.raise_for_status = MagicMock()
+        
+        with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
+            with patch('httpx.AsyncClient') as mock_client:
+                mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+                
+                result = await fetch_shot_data("2024-01-01", "shot.json")
+                
+                assert result == test_data
+    
+    def test_get_meticulous_api_initialization(self):
+        """Test get_meticulous_api lazy initialization."""
+        from services import meticulous_service
+        
+        # Reset the cached API
+        meticulous_service._meticulous_api = None
+        
+        with patch.dict(os.environ, {"METICULOUS_IP": "192.168.1.100"}):
+            with patch('meticulous.api.Api') as mock_api_class:
+                mock_api_class.return_value = MagicMock()
+                
+                api = meticulous_service.get_meticulous_api()
+                
+                mock_api_class.assert_called_once_with(base_url="http://192.168.1.100")
+                
+                # Second call should reuse cached instance
+                api2 = meticulous_service.get_meticulous_api()
+                assert api is api2
+                assert mock_api_class.call_count == 1  # Still only called once
+
+
+class TestMainLifespanCoverage:
+    """Additional tests for main.py lifespan and middleware coverage."""
+    
+    @pytest.mark.asyncio
+    async def test_lifespan_startup_and_shutdown(self):
+        """Test the lifespan context manager."""
+        from main import lifespan, app
+        
+        # Mock the dependencies
+        with patch('main._restore_scheduled_shots', new_callable=AsyncMock) as mock_restore:
+            with patch('main._load_recurring_schedules', new_callable=AsyncMock) as mock_load:
+                with patch('main._recurring_schedules', {}):
+                    with patch('main._scheduled_tasks', {}):
+                        async with lifespan(app):
+                            # Inside the lifespan context
+                            mock_restore.assert_called_once()
+                            mock_load.assert_called_once()
+    
+    def test_log_requests_middleware_success(self, client):
+        """Test request logging middleware logs successful requests."""
+        with patch('main.logger') as mock_logger:
+            response = client.get("/api/status")
+            
+            # Should have logged incoming request and completion
+            assert mock_logger.info.call_count >= 2
+    
+    def test_log_requests_middleware_error(self, client):
+        """Test request logging middleware handles errors."""
+        # Request to non-existent endpoint
+        response = client.get("/nonexistent/endpoint")
+        assert response.status_code == 404

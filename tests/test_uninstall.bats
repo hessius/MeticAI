@@ -222,11 +222,13 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
 }
 
 @test "Script uses color codes for output" {
-    run grep -q "GREEN=.*033" "$SCRIPT_PATH"
+    # Colors are sourced from common.sh library
+    run grep -q 'source.*common.sh' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
-    run grep -q "YELLOW=.*033" "$SCRIPT_PATH"
+    # Verify colors are actually used in output
+    run grep -q '\${GREEN}' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
-    run grep -q "RED=.*033" "$SCRIPT_PATH"
+    run grep -q '\${RED}' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
