@@ -177,7 +177,7 @@ jobs:
           
       - name: Create release with DMG (if main release doesn't exist)
         if: steps.check_release.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: MeticAI v${{ steps.version.outputs.version }}
