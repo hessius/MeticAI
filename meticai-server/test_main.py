@@ -467,7 +467,7 @@ class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_coffee_large_image(self, mock_vision_model, client):
         """Test handling of large images."""
         mock_response = Mock()
@@ -489,7 +489,7 @@ class TestEdgeCases:
         assert "analysis" in response.json()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_coffee_very_long_response(self, mock_vision_model, client, sample_image):
         """Test handling of very long AI responses."""
         mock_response = Mock()
@@ -510,7 +510,7 @@ class TestEnhancedBaristaPersona:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test that the prompt includes the modern experimental barista persona."""
         mock_response = Mock()
@@ -631,7 +631,7 @@ class TestEnhancedBaristaPersona:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test enhanced prompt when both image and preferences are provided."""
         mock_response = Mock()
@@ -920,7 +920,7 @@ class TestCORS:
     """Tests for CORS middleware configuration."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_cors_headers_on_analyze_coffee(self, mock_vision_model, client, sample_image):
         """Test that CORS headers are present on /analyze_coffee responses."""
         mock_response = Mock()
@@ -1010,7 +1010,7 @@ class TestStatusEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_status_returns_json_structure(self, mock_path, mock_subprocess, client):
         """Test that /status returns expected JSON structure."""
         mock_result = Mock()
@@ -1036,7 +1036,7 @@ class TestStatusEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('builtins.open', new_callable=mock_open, read_data='{"update_available": true, "last_check": "2024-01-01T00:00:00", "repositories": {"mcp": {"update_available": true}}}')
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_status_detects_updates_available(self, mock_path, mock_file, client):
         """Test that /status correctly identifies when updates are available."""
         # Mock version file as existing
@@ -1051,7 +1051,7 @@ class TestStatusEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('builtins.open', new_callable=mock_open, read_data='{"update_available": true, "last_check": "2024-01-01T00:00:00", "repositories": {"mcp": {"update_available": true}}}')
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_status_detects_missing_dependencies(self, mock_path, mock_file, client):
         """Test that /status identifies missing dependencies as requiring updates."""
         # Mock version file as existing
@@ -1065,7 +1065,7 @@ class TestStatusEndpoint:
         assert data.get("update_available") == True
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_status_handles_missing_version_file(self, mock_path, client):
         """Test that /status handles missing version file gracefully."""
         # Mock version file as not existing
@@ -1081,7 +1081,7 @@ class TestStatusEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('builtins.open')
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_status_handles_script_error(self, mock_path, mock_open_func, client):
         """Test that /status handles update script errors gracefully."""
         # Mock version file as existing but simulate error reading it
@@ -1097,7 +1097,7 @@ class TestStatusEndpoint:
         assert "error" in data or "message" in data
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_status_endpoint_cors_enabled(self, mock_path, client):
         """Test that /status endpoint has CORS enabled for web app."""
         # Mock version file as not existing for simplicity
@@ -1128,7 +1128,7 @@ class TestTriggerUpdateEndpoint:
     """Tests for the /api/trigger-update endpoint."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_success(self, mock_path_class, client):
         """Test successful update trigger."""
         # Mock the rebuild signal file
@@ -1147,7 +1147,7 @@ class TestTriggerUpdateEndpoint:
         mock_rebuild_file.write_text.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_write_failure(self, mock_path, client):
         """Test handling of file write failure."""
         # Mock the rebuild signal file to raise an exception on write
@@ -1164,7 +1164,7 @@ class TestTriggerUpdateEndpoint:
         assert "Permission denied" in data["detail"]["error"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_io_error(self, mock_path, client):
         """Test handling of IO errors."""
         # Mock the rebuild signal file to raise an IO exception
@@ -1181,7 +1181,7 @@ class TestTriggerUpdateEndpoint:
         assert "Disk full" in data["detail"]["error"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_unexpected_error(self, mock_path, client):
         """Test handling of unexpected errors."""
         # Mock the rebuild signal file to raise an unexpected exception
@@ -1198,7 +1198,7 @@ class TestTriggerUpdateEndpoint:
         assert "unexpected error" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_cors_enabled(self, mock_path, client):
         """Test that /api/trigger-update has CORS enabled."""
         # Mock the rebuild signal file
@@ -1224,7 +1224,7 @@ class TestTriggerUpdateEndpoint:
         assert "post" in openapi_data["paths"]["/api/trigger-update"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_no_body_required(self, mock_path, client):
         """Test that endpoint works without request body."""
         # Mock the rebuild signal file
@@ -1238,7 +1238,7 @@ class TestTriggerUpdateEndpoint:
         assert response.json()["status"] == "success"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_signal_written(self, mock_path, client):
         """Test that timestamp is written to signal file."""
         # Mock the rebuild signal file
@@ -1258,7 +1258,7 @@ class TestTriggerUpdateEndpoint:
         assert call_args.startswith("update-requested:")
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_partial_failure(self, mock_path, client):
         """Test handling when file write operation encounters an error."""
         # Mock the rebuild signal file to raise an error
@@ -1276,7 +1276,7 @@ class TestTriggerUpdateEndpoint:
         assert "error" in str(data["detail"])
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_timeout(self, mock_path, client):
         """Test handling when file write operation times out or hangs."""
         # Mock the rebuild signal file to raise a timeout-related error
@@ -1293,7 +1293,7 @@ class TestTriggerUpdateEndpoint:
         assert "timed" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_trigger_update_path_resolution(self, mock_path, client):
         """Test that file path is properly resolved."""
         # Mock the rebuild signal file
@@ -1785,8 +1785,8 @@ Description: A test profile
         
         assert result == "lowercase Name"
 
-    @patch('api.routes.history.save_history')
-    @patch('api.routes.history.load_history')
+    @patch('services.history_service.save_history')
+    @patch('services.history_service.load_history')
     def test_save_to_history(self, mock_load, mock_save):
         """Test saving a profile to history."""
         from services.history_service import save_to_history
@@ -1820,8 +1820,8 @@ Description: A test profile
         assert len(saved_history) == 1
         assert saved_history[0]["id"] == entry["id"]
 
-    @patch('api.routes.history.save_history')
-    @patch('api.routes.history.load_history')
+    @patch('services.history_service.save_history')
+    @patch('services.history_service.load_history')
     def test_save_to_history_limits_entries(self, mock_load, mock_save):
         """Test that history is limited to 100 entries."""
         from services.history_service import save_to_history
@@ -1845,8 +1845,8 @@ Description: A test profile
         # New entry should be first
         assert saved_history[0]["profile_name"] == "New Profile"
 
-    @patch('api.routes.history.save_history')
-    @patch('api.routes.history.load_history')
+    @patch('services.history_service.save_history')
+    @patch('services.history_service.load_history')
     def test_save_to_history_new_entry_first(self, mock_load, mock_save):
         """Test that new entries are added at the beginning."""
         from services.history_service import save_to_history
@@ -3042,7 +3042,7 @@ class TestBasicEndpoints:
     
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('services.history_service.ensure_history_file')
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_load_history_with_valid_file(self, mock_path, mock_ensure):
         """Test loading history from valid file."""
         from services.history_service import load_history as _load_history
@@ -3124,7 +3124,7 @@ class TestProcessImageForProfile:
 class TestCheckUpdatesEndpoint:
     """Tests for the /api/check-updates endpoint."""
 
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     @patch('main.asyncio.sleep', new_callable=AsyncMock)
     def test_check_updates_success_with_updates(self, mock_sleep, mock_path, client):
         """Test successful update check with updates available."""
@@ -3150,7 +3150,7 @@ class TestCheckUpdatesEndpoint:
         assert data["last_check"] == "2024-01-15T10:30:00"
         assert "repositories" in data
 
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     @patch('main.asyncio.sleep', new_callable=AsyncMock)
     def test_check_updates_no_updates(self, mock_sleep, mock_path, client):
         """Test update check with no updates available."""
@@ -3173,7 +3173,7 @@ class TestCheckUpdatesEndpoint:
         data = response.json()
         assert data["update_available"] is False
 
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_check_updates_file_not_found(self, mock_path, client):
         """Test update check when version file doesn't exist."""
         mock_version_file = MagicMock()
@@ -3188,7 +3188,7 @@ class TestCheckUpdatesEndpoint:
         assert "error" in data
         assert "Version file not found" in data["error"]
 
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     @patch('main.asyncio.sleep', new_callable=AsyncMock)
     def test_check_updates_fresh_check(self, mock_sleep, mock_path, client):
         """Test that update check triggers fresh check and waits for update."""
@@ -3236,7 +3236,7 @@ class TestCheckUpdatesEndpoint:
         data = response.json()
         assert "update_available" in data
 
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_check_updates_json_error(self, mock_path, client):
         """Test handling of corrupted version file."""
         mock_version_file = MagicMock()
@@ -3254,7 +3254,7 @@ class TestMachineProfilesEndpoint:
     """Tests for the /api/machine/profiles endpoint."""
 
     @patch('api.routes.profiles.get_meticulous_api')
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_list_profiles_success(self, mock_history_file, mock_get_api, client):
         """Test successful profile listing from machine."""
         # Mock API responses
@@ -3334,7 +3334,7 @@ class TestMachineProfilesEndpoint:
         assert "Machine API error" in response.json()["detail"]
 
     @patch('api.routes.profiles.get_meticulous_api')
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_list_profiles_empty(self, mock_history_file, mock_get_api, client):
         """Test listing when no profiles exist."""
         mock_api = MagicMock()
@@ -3352,7 +3352,7 @@ class TestMachineProfilesEndpoint:
         assert len(data["profiles"]) == 0
 
     @patch('api.routes.profiles.get_meticulous_api')
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_list_profiles_partial_failure(self, mock_history_file, mock_get_api, client):
         """Test listing continues when individual profile fetch fails."""
         mock_api = MagicMock()
@@ -3391,7 +3391,7 @@ class TestMachineProfilesEndpoint:
         assert data["profiles"][0]["name"] == "Good Profile"
 
     @patch('api.routes.profiles.get_meticulous_api')
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_list_profiles_history_dict_format(self, mock_history_file, mock_get_api, client):
         """Test handling of legacy history format (dict with entries key)."""
         mock_api = MagicMock()
@@ -3544,7 +3544,7 @@ class TestProfileImportEndpoint:
 
     @patch('api.routes.profiles.atomic_write_json')
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_import_profile_success(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test successful profile import with description generation."""
         mock_generate_desc.return_value = "Great espresso profile with balanced extraction"
@@ -3578,7 +3578,7 @@ class TestProfileImportEndpoint:
 
     @patch('api.routes.profiles.atomic_write_json')
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_import_profile_without_description(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test profile import without generating description."""
         # Should not be called when generate_description=False
@@ -3610,7 +3610,7 @@ class TestProfileImportEndpoint:
         mock_generate_desc.assert_not_called()
         mock_atomic_write.assert_called_once()
 
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_import_profile_already_exists(self, mock_history_file, client):
         """Test importing a profile that already exists in history."""
         profile_json = {
@@ -3651,7 +3651,7 @@ class TestProfileImportEndpoint:
 
     @patch('api.routes.profiles.atomic_write_json')
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_import_profile_description_generation_fails(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test import continues when description generation fails."""
         mock_generate_desc.side_effect = Exception("AI service unavailable")
@@ -3681,7 +3681,7 @@ class TestProfileImportEndpoint:
         mock_atomic_write.assert_called_once()
 
     @patch('api.routes.profiles.atomic_write_json')
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_import_profile_legacy_history_format(self, mock_history_file, mock_atomic_write, client):
         """Test import with legacy history format (dict with entries)."""
         profile_json = {
@@ -4572,7 +4572,7 @@ class TestGenerateProfileImageEndpoint:
             MagicMock(returncode=0, stdout=b"fake_png")
         ]
         
-        with patch('main.process_image_for_profile') as mock_process:
+        with patch('api.routes.profiles.process_image_for_profile') as mock_process:
             mock_process.return_value = ("data:image/png;base64,xyz", b"png")
             
             response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
@@ -4920,7 +4920,7 @@ class TestConvertDescriptionEndpoint:
     """Tests for the POST /api/profile/convert-description endpoint."""
 
     @patch('api.routes.profiles.get_vision_model')
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_convert_description_success(self, mock_history_file, mock_get_model, client):
         """Test successful description conversion."""
         mock_model = MagicMock()
@@ -4964,7 +4964,7 @@ Adjust grind based on bean age."""
         assert "Profile Created" in data["converted_description"]
 
     @patch('api.routes.profiles.get_vision_model')
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_convert_description_with_history_update(self, mock_history_file, mock_get_model, client):
         """Test conversion updates history entry."""
         mock_model = MagicMock()
@@ -5041,17 +5041,16 @@ Adjust grind based on bean age."""
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_api_connection_error(self, mock_get_api, client):
         """Test handling of machine connection errors."""
-        mock_api = MagicMock()
         mock_get_api.side_effect = Exception("Connection refused")
         
         response = client.get("/api/machine/profiles")
         
         assert response.status_code == 500
 
-    @patch('services.history_service.HISTORY_FILE')
+    @patch('api.routes.profiles.HISTORY_FILE')
     def test_corrupted_history_file(self, mock_history_file, client):
         """Test handling of corrupted history JSON."""
         mock_history_file.exists.return_value = True
@@ -5118,7 +5117,7 @@ class TestDataDirectoryConfiguration:
     
     def test_data_dir_uses_temp_in_test_mode(self):
         """Test that DATA_DIR uses temp directory when TEST_MODE is true."""
-        from main import DATA_DIR, TEST_MODE
+        from config import DATA_DIR, TEST_MODE
         import tempfile
         
         # Verify TEST_MODE is enabled (set by conftest.py)
@@ -5130,7 +5129,7 @@ class TestDataDirectoryConfiguration:
     
     def test_data_dir_exists_in_test_mode(self):
         """Test that DATA_DIR is created in test mode."""
-        from main import DATA_DIR
+        from config import DATA_DIR
         
         # DATA_DIR should be created during import
         assert DATA_DIR.exists()
@@ -5138,10 +5137,10 @@ class TestDataDirectoryConfiguration:
     
     def test_all_data_files_use_data_dir(self):
         """Test that all data file paths use DATA_DIR."""
-        from main import (
-            SETTINGS_FILE, HISTORY_FILE, LLM_CACHE_FILE,
-            SHOT_CACHE_FILE, IMAGE_CACHE_DIR, DATA_DIR
-        )
+        from config import DATA_DIR
+        from services.settings_service import SETTINGS_FILE
+        from services.history_service import HISTORY_FILE
+        from services.cache_service import LLM_CACHE_FILE, SHOT_CACHE_FILE, IMAGE_CACHE_DIR
         
         # All paths should be under DATA_DIR
         assert SETTINGS_FILE.parent == DATA_DIR
@@ -5556,7 +5555,7 @@ class TestVersionEndpoint:
         # Check that repo URL is the expected value
         assert data["mcp_repo_url"] == "https://github.com/hessius/meticulous-mcp"
     
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_version_with_existing_version_files(self, mock_path, client):
         """Test that /api/version correctly reads VERSION files when they exist."""
         # Create mock version files
@@ -5618,7 +5617,7 @@ class TestVersionEndpoint:
         assert isinstance(data["meticai_web"], str)
         assert isinstance(data["mcp_server"], str)
     
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_version_handles_file_read_errors(self, mock_path, client):
         """Test that /api/version handles file read errors gracefully."""
         # Mock files existing but read_text raises an exception
@@ -5637,7 +5636,7 @@ class TestVersionEndpoint:
         assert "mcp_server" in data
         assert "mcp_repo_url" in data
     
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_version_parses_mcp_pyproject_toml(self, mock_path, client):
         """Test that /api/version correctly parses version from MCP pyproject.toml."""
         # Mock MCP source directory and pyproject.toml
@@ -6590,11 +6589,13 @@ class TestSettingsEndpoints:
     
     def test_get_settings_error_handling(self, client, monkeypatch):
         """Test get_settings handles errors."""
-        # Mock _load_settings to raise an exception
+        import api.routes.system as system_module
+        
+        # Mock load_settings to raise an exception
         def mock_load_settings():
             raise ValueError("Settings file corrupted")
         
-        monkeypatch.setattr(main, "_load_settings", mock_load_settings)
+        monkeypatch.setattr(system_module, "load_settings", mock_load_settings)
         
         response = client.get("/api/settings")
         assert response.status_code == 500
@@ -6963,9 +6964,10 @@ class TestRecurringScheduleEndpoints:
     @pytest.fixture(autouse=True)
     def clear_schedules(self):
         """Clear recurring schedules before each test."""
-        main._recurring_schedules.clear()
+        import api.routes.scheduling as scheduling_module
+        scheduling_module._recurring_schedules.clear()
         yield
-        main._recurring_schedules.clear()
+        scheduling_module._recurring_schedules.clear()
     
     def test_list_recurring_schedules_empty(self, client):
         """Test listing when no schedules exist."""
