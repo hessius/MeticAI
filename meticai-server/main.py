@@ -239,7 +239,9 @@ from services.scheduling_state import (
 )
 from api.routes.profiles import (
     ScheduledShotsPersistence, RecurringSchedulesPersistence,
-    _get_next_occurrence, process_image_for_profile
+    _get_next_occurrence, process_image_for_profile,
+    _restore_scheduled_shots, _load_recurring_schedules,
+    _schedule_next_recurring, _recurring_schedule_checker
 )
 
 # Re-export genai for tests that mock it
