@@ -2,6 +2,33 @@
 
 This module centralizes all configuration constants and environment variables
 for easier management and testing.
+
+Usage:
+    from config import config, DATA_DIR, MAX_UPLOAD_SIZE
+    
+    # Access via config object
+    api_key = config.GEMINI_API_KEY
+    
+    # Or use exported constants
+    upload_limit = MAX_UPLOAD_SIZE
+
+Attributes:
+    TEST_MODE: Boolean flag for test environment (affects DATA_DIR)
+    DATA_DIR: Path to data directory (temp dir in test mode, /app/data otherwise)
+    LOG_DIR: Path to log directory
+    GEMINI_API_KEY: Google Gemini API key from environment
+    METICULOUS_IP: IP address of Meticulous espresso machine
+    PI_IP: IP address of this server
+    UPDATE_CHECK_INTERVAL: Seconds between update checks (default: 7200 = 2 hours)
+    MAX_UPLOAD_SIZE: Maximum file upload size in bytes (default: 10 MB)
+    LLM_CACHE_TTL_SECONDS: TTL for LLM analysis cache (default: 259200 = 3 days)
+    SHOT_CACHE_STALE_SECONDS: Staleness threshold for shot cache (default: 3600 = 1 hour)
+    VERSION_PATTERN: Compiled regex for version extraction
+    STAGE_STATUS_RETRACTING: Constant for stage status
+
+Note:
+    DATA_DIR is automatically set to a temporary directory when TEST_MODE="true",
+    enabling isolated testing without affecting production data.
 """
 
 import os

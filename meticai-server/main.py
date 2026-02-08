@@ -17,6 +17,10 @@ import time
 import tempfile
 import re
 from logging_config import setup_logging, get_logger
+from config import (
+    DATA_DIR, UPDATE_CHECK_INTERVAL, MAX_UPLOAD_SIZE, 
+    VERSION_PATTERN, STAGE_STATUS_RETRACTING, config
+)
 
 # Initialize logging system with environment-aware defaults
 log_dir = os.environ.get("LOG_DIR", "/app/logs")
@@ -57,31 +61,6 @@ from services.analysis_service import (
     _perform_local_shot_analysis, _analyze_stage_execution, _generate_profile_description,
     _prepare_shot_summary_for_llm, _format_dynamics_description, _generate_profile_target_curves
 )
-
-
-# Data directory configuration - use environment variable or default
-# In test mode, use temporary directory to avoid permission issues
-TEST_MODE = os.environ.get("TEST_MODE") == "true"
-if TEST_MODE:
-    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-else:
-    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
-
-# Update check interval: 2 hours in seconds
-UPDATE_CHECK_INTERVAL = 7200
-
-# Maximum upload file size: 10 MB
-MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
-
-# Regex pattern for extracting version from pyproject.toml or setup.py
-# Matches: version = "x.y.z" or version = 'x.y.z'
-# Pre-compiled for better performance when called repeatedly
-VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
-
-# Shot stage status constants
-STAGE_STATUS_RETRACTING = "retracting"
-
 
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
