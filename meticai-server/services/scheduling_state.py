@@ -4,18 +4,10 @@ from typing import Optional
 import logging
 import json
 from pathlib import Path
-import os
-import tempfile
+
+from config import DATA_DIR
 
 logger = logging.getLogger(__name__)
-
-# Data directory configuration
-TEST_MODE = os.environ.get("TEST_MODE") == "true"
-if TEST_MODE:
-    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-else:
-    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
 
 # In-memory storage for scheduled shots and recurring schedules
 _scheduled_shots: dict = {}

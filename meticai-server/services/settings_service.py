@@ -2,17 +2,8 @@
 
 import json
 from pathlib import Path
-import os
-import tempfile
 
-# Data directory configuration - use environment variable or default
-# In test mode, use temporary directory to avoid permission issues
-TEST_MODE = os.environ.get("TEST_MODE") == "true"
-if TEST_MODE:
-    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-else:
-    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
+from config import DATA_DIR
 
 SETTINGS_FILE = DATA_DIR / "settings.json"
 

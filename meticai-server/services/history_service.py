@@ -6,22 +6,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-import os
-import tempfile
 
 from logging_config import get_logger
+from config import DATA_DIR
 from utils.sanitization import clean_profile_name
 
 logger = get_logger()
-
-# Data directory configuration - use environment variable or default
-# In test mode, use temporary directory to avoid permission issues
-TEST_MODE = os.environ.get("TEST_MODE") == "true"
-if TEST_MODE:
-    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-else:
-    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
 
 HISTORY_FILE = DATA_DIR / "profile_history.json"
 
