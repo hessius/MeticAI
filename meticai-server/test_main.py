@@ -1756,13 +1756,13 @@ Description: A test profile
 
     def test_clean_profile_name(self):
         """Test cleaning markdown from profile names."""
-        from utils.sanitization import clean_profile_name as _clean_profile_name
+        from utils.sanitization import clean_profile_name
         
-        assert _clean_profile_name("** Berry Blast Bloom") == "Berry Blast Bloom"
-        assert _clean_profile_name("Berry Blast Bloom **") == "Berry Blast Bloom"
-        assert _clean_profile_name("**Berry** Bloom") == "Berry Bloom"
-        assert _clean_profile_name("* test *") == "test"
-        assert _clean_profile_name("Normal Name") == "Normal Name"
+        assert clean_profile_name("** Berry Blast Bloom") == "Berry Blast Bloom"
+        assert clean_profile_name("Berry Blast Bloom **") == "Berry Blast Bloom"
+        assert clean_profile_name("**Berry** Bloom") == "Berry Bloom"
+        assert clean_profile_name("* test *") == "test"
+        assert clean_profile_name("Normal Name") == "Normal Name"
 
     def test_extract_profile_name_not_found(self):
         """Test default name when pattern not found."""
@@ -1873,11 +1873,11 @@ class TestSecurityFeatures:
 
     def test_sanitize_profile_name_for_filename(self):
         """Test that profile names are properly sanitized for filenames."""
-        from utils.sanitization import sanitize_profile_name_for_filename as _sanitize_profile_name_for_filename
+        from utils.sanitization import sanitize_profile_name_for_filename
         
         # Test path traversal attempts
-        assert ".." not in _sanitize_profile_name_for_filename("../../etc/passwd")
-        assert "/" not in _sanitize_profile_name_for_filename("path/to/file")
+        assert ".." not in sanitize_profile_name_for_filename("../../etc/passwd")
+        assert "/" not in sanitize_profile_name_for_filename("path/to/file")
         assert "\\" not in _sanitize_profile_name_for_filename("path\\to\\file")
         
         # Test special characters are removed/replaced
@@ -2019,24 +2019,24 @@ class TestHelperFunctions:
     
     def test_sanitize_profile_name_for_filename_basic(self):
         """Test basic filename sanitization."""
-        from utils.sanitization import sanitize_profile_name_for_filename as _sanitize_profile_name_for_filename
+        from utils.sanitization import sanitize_profile_name_for_filename
         
         # Normal name
-        assert _sanitize_profile_name_for_filename("My Profile") == "my_profile"
+        assert sanitize_profile_name_for_filename("My Profile") == "my_profile"
         
         # With special characters
-        result = _sanitize_profile_name_for_filename("Profile: Test!")
+        result = sanitize_profile_name_for_filename("Profile: Test!")
         assert ":" not in result
         assert "!" not in result
     
     def test_sanitize_profile_name_path_traversal(self):
         """Test path traversal prevention in filename sanitization."""
-        from utils.sanitization import sanitize_profile_name_for_filename as _sanitize_profile_name_for_filename
+        from utils.sanitization import sanitize_profile_name_for_filename
         
         # Path traversal attempts
-        assert ".." not in _sanitize_profile_name_for_filename("../../../etc/passwd")
-        assert "/" not in _sanitize_profile_name_for_filename("path/to/file")
-        assert "\\" not in _sanitize_profile_name_for_filename("path\\to\\file")
+        assert ".." not in sanitize_profile_name_for_filename("../../../etc/passwd")
+        assert "/" not in sanitize_profile_name_for_filename("path/to/file")
+        assert "\\" not in sanitize_profile_name_for_filename("path\\to\\file")
     
     def test_extract_profile_name_from_reply(self):
         """Test extraction of profile name from LLM reply."""
@@ -2265,7 +2265,7 @@ class TestShotAnalysisHelpers:
 
     def test_prepare_profile_for_llm(self):
         """Test preparing profile data for LLM."""
-        from services.analysis_service import _prepare_shot_summary_for_llm as _prepare_profile_for_llm
+        from services.analysis_service import _prepare_shot_summary_for_llm
         
         profile_data = {
             "name": "Test",
@@ -2275,7 +2275,7 @@ class TestShotAnalysisHelpers:
             "stages": [{"name": "Main", "type": "pressure"}]
         }
         
-        result = _prepare_profile_for_llm(profile_data, "Test description")
+        result = _prepare_shot_summary_for_llm(profile_data, "Test description")
         assert result["name"] == "Test"
         assert "stages" in result
         assert "variables" in result
@@ -5229,14 +5229,14 @@ class TestDataFileManagement:
     
     def test_ensure_settings_file_creates_file(self):
         """Test that _ensure_settings_file creates settings file."""
-        from services.settings_service import ensure_settings_file as _ensure_settings_file; from services.settings_service import SETTINGS_FILE
+        from services.settings_service import ensure_settings_file, SETTINGS_FILE
         
         # Delete file if it exists
         if SETTINGS_FILE.exists():
             SETTINGS_FILE.unlink()
         
         # Call ensure function
-        _ensure_settings_file()
+        ensure_settings_file()
         
         # File should now exist
         assert SETTINGS_FILE.exists()
@@ -5249,14 +5249,14 @@ class TestDataFileManagement:
     
     def test_ensure_history_file_creates_file(self):
         """Test that _ensure_history_file creates history file."""
-        from services.history_service import ensure_history_file as _ensure_history_file; from services.history_service import HISTORY_FILE
+        from services.history_service import ensure_history_file, HISTORY_FILE
         
         # Delete file if it exists
         if HISTORY_FILE.exists():
             HISTORY_FILE.unlink()
         
         # Call ensure function
-        _ensure_history_file()
+        ensure_history_file()
         
         # File should now exist
         assert HISTORY_FILE.exists()
@@ -5269,7 +5269,7 @@ class TestDataFileManagement:
     
     def test_ensure_llm_cache_file_creates_file(self):
         """Test that _ensure_llm_cache_file creates cache file."""
-        from services.cache_service import _ensure_llm_cache_file; from services.cache_service import LLM_CACHE_FILE
+        from services.cache_service import _ensure_llm_cache_file, LLM_CACHE_FILE
         
         # Delete file if it exists
         if LLM_CACHE_FILE.exists():
@@ -5289,7 +5289,7 @@ class TestDataFileManagement:
     
     def test_ensure_shot_cache_file_creates_file(self):
         """Test that _ensure_shot_cache_file creates cache file."""
-        from services.cache_service import _ensure_shot_cache_file; from services.cache_service import SHOT_CACHE_FILE
+        from services.cache_service import _ensure_shot_cache_file, SHOT_CACHE_FILE
         
         # Delete file if it exists
         if SHOT_CACHE_FILE.exists():
@@ -5450,14 +5450,14 @@ class TestHelperFunctions:
     
     def test_sanitize_profile_name(self):
         """Test profile name sanitization for filenames."""
-        from utils.sanitization import sanitize_profile_name_for_filename as _sanitize_profile_name_for_filename
+        from utils.sanitization import sanitize_profile_name_for_filename
         
         # Test various special characters (converts to lowercase)
-        assert _sanitize_profile_name_for_filename("Test/Profile") == "test_profile"
-        assert _sanitize_profile_name_for_filename("Test\\Profile") == "test_profile"
-        assert _sanitize_profile_name_for_filename("Test:Profile") == "test_profile"
-        assert _sanitize_profile_name_for_filename("Normal_Name") == "normal_name"
-        assert _sanitize_profile_name_for_filename("Test Profile") == "test_profile"
+        assert sanitize_profile_name_for_filename("Test/Profile") == "test_profile"
+        assert sanitize_profile_name_for_filename("Test\\Profile") == "test_profile"
+        assert sanitize_profile_name_for_filename("Test:Profile") == "test_profile"
+        assert sanitize_profile_name_for_filename("Normal_Name") == "normal_name"
+        assert sanitize_profile_name_for_filename("Test Profile") == "test_profile"
     
     def test_extract_profile_name_from_reply(self):
         """Test extracting profile name from LLM reply."""
