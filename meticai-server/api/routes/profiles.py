@@ -1,22 +1,16 @@
 """Profile management endpoints."""
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
 from typing import Optional
 from pathlib import Path
-from PIL import Image as PILImage
-import io
-import base64
 import json
 import subprocess
 import logging
 import os
 import tempfile
-import httpx
 
 from services.meticulous_service import get_meticulous_api
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model
-from utils.sanitization import sanitize_profile_name_for_filename
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -44,7 +38,7 @@ def process_image_for_profile(image_data: bytes, content_type: str = "image/png"
     """
     from PIL import Image as PILImage
     import io
-    import base64
+    import base64 as b64
     
     # Open image with PIL
     img = PILImage.open(io.BytesIO(image_data))
@@ -81,7 +75,7 @@ def process_image_for_profile(image_data: bytes, content_type: str = "image/png"
     png_bytes = buffer.getvalue()
     
     # Encode to base64 data URI
-    b64_data = base64.b64encode(png_bytes).decode('utf-8')
+    b64_data = b64.b64encode(png_bytes).decode('utf-8')
     return f"data:image/png;base64,{b64_data}", png_bytes
 
 
@@ -579,6 +573,7 @@ async def apply_profile_image(
         # Extract and cache the PNG bytes from the data URI
         import base64
         from PIL import Image as PILImage
+        import io
         try:
             # Format: data:image/png;base64,<data>
             header, b64_data = image_data_uri.split(',', 1)
@@ -1811,6 +1806,7 @@ async def list_machine_profiles(request: Request):
                                 for entry in entries
                             )
                 except Exception:
+                    # Ignore errors loading history file (may not exist or be corrupted)
                     pass
                 
                 # Convert profile to dict
@@ -1837,6 +1833,7 @@ async def list_machine_profiles(request: Request):
                                         profile_dict["has_description"] = True
                                     break
                     except Exception:
+                        # Ignore errors loading history (may not exist or be corrupted)
                         pass
                 
                 profiles.append(profile_dict)
@@ -2099,6 +2096,7 @@ async def import_all_profiles(request: Request):
                         entries = history if isinstance(history, list) else history.get("entries", [])
                         existing_names = {entry.get("profile_name") for entry in entries}
                 except Exception:
+                    # Ignore errors loading history file (may not exist or be corrupted)
                     pass
             
             # Filter profiles to import
@@ -2113,6 +2111,7 @@ async def import_all_profiles(request: Request):
                     else:
                         skipped.append(full_profile.name)
                 except Exception:
+                    # Ignore errors fetching individual profiles (may have been deleted)
                     pass
             
             total_to_import = len(profiles_to_import)
@@ -2274,6 +2273,7 @@ async def get_machine_profile_count(request: Request):
                     entries = history if isinstance(history, list) else history.get("entries", [])
                     existing_names = {entry.get("profile_name") for entry in entries}
             except Exception:
+                # Ignore errors loading history file (may not exist or be corrupted)
                 pass
         
         not_imported = 0
@@ -2285,6 +2285,7 @@ async def get_machine_profile_count(request: Request):
                 if full_profile.name not in existing_names:
                     not_imported += 1
             except Exception:
+                # Ignore errors fetching individual profiles (may have been deleted)
                 pass
         
         return {
@@ -2547,6 +2548,7 @@ class ScheduledShotsPersistence:
                     self.persistence_file.rename(backup_file)
                     logger.info(f"Backed up corrupt file to {backup_file}")
                 except Exception:
+                    # Ignore errors during backup (file system issues, permissions, etc.)
                     pass
                 return {}
             except Exception as e:

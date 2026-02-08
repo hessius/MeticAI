@@ -1,7 +1,6 @@
 """Shared state and helper functions for scheduling."""
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-import asyncio
 import logging
 import json
 from pathlib import Path
@@ -122,10 +121,12 @@ def get_next_occurrence(schedule: dict) -> Optional[datetime]:
             elif recurrence_type == "interval":
                 interval_days = schedule.get("interval_days", 1)
                 # Check if this day is valid based on last_run
-                last_run_str = schedule.get("last_run")
-                if last_run_str:
-                    last_run = datetime.fromisoformat(last_run_str)
-                    days_since = (candidate - last_run).days
+                last_run = schedule.get("last_run")
+                if last_run:
+                    # Handle ISO format with trailing Z (replace with +00:00 for fromisoformat)
+                    last_run_str = last_run.replace('Z', '+00:00') if isinstance(last_run, str) else last_run
+                    last_run_dt = datetime.fromisoformat(last_run_str)
+                    days_since = (candidate - last_run_dt).days
                     if days_since >= interval_days:
                         return candidate
                 else:

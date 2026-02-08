@@ -55,7 +55,7 @@ def _load_llm_cache() -> dict:
 def _save_llm_cache(cache: dict):
     """Save LLM analysis cache to file."""
     _ensure_llm_cache_file()
-    LLM_CACHE_FILE.write_text(json.dumps(cache, indent=2))
+    atomic_write_json(LLM_CACHE_FILE, cache)
 
 
 def _get_llm_cache_key(profile_name: str, shot_date: str, shot_filename: str) -> str:
@@ -127,8 +127,7 @@ def _load_shot_cache() -> dict:
 def _save_shot_cache(cache: dict):
     """Save shot cache to file."""
     _ensure_shot_cache_file()
-    with open(SHOT_CACHE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(cache, f, indent=2)
+    atomic_write_json(SHOT_CACHE_FILE, cache)
 
 
 def _get_cached_shots(profile_name: str, limit: int) -> tuple[Optional[dict], bool, Optional[float]]:

@@ -1090,9 +1090,9 @@ main() {
     fi
     
     echo ""
-    log_success "========================================="
-    log_success "      Update check complete! ✨         "
-    log_success "========================================="
+    echo "========================================="
+    echo "      Update check complete! ✨         "
+    echo "========================================="
 }
 
 # Run main function

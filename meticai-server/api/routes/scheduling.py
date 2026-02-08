@@ -2,12 +2,11 @@
 from fastapi import APIRouter, Request, HTTPException
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-import json
 import uuid
 import logging
 import asyncio
 
-from services.meticulous_service import get_meticulous_api, execute_scheduled_shot
+from services.meticulous_service import get_meticulous_api
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -391,7 +390,7 @@ async def schedule_shot(request: Request):
         )
         
         # Create async task to execute at scheduled time
-        async def execute_scheduled_shot():
+        async def _execute_shot_task():
             try:
                 task_start_time = datetime.now(timezone.utc)
                 api = get_meticulous_api()
@@ -467,7 +466,7 @@ async def schedule_shot(request: Request):
                     del _scheduled_tasks[schedule_id]
         
         # Start the background task
-        task = asyncio.create_task(execute_scheduled_shot())
+        task = asyncio.create_task(_execute_shot_task())
         _scheduled_tasks[schedule_id] = task
         
         return {

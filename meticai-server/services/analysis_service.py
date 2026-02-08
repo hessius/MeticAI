@@ -9,9 +9,7 @@ This module provides shot analysis functionality including:
 """
 
 import json
-import subprocess
 from typing import Any, Optional
-from datetime import datetime
 
 from services.gemini_service import get_vision_model
 from logging_config import get_logger
