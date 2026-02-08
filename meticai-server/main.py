@@ -44,62 +44,19 @@ from services.meticulous_service import (
     decompress_shot_data,
     fetch_shot_data
 )
-from services.settings_service import get_author_name
-
-
-def deep_convert_to_dict(obj):
-    """Recursively convert an object with __dict__ to a JSON-serializable dict.
-    
-    Handles nested objects, lists, and special types that can't be directly serialized.
-    """
-    if obj is None:
-        return None
-    elif isinstance(obj, (str, int, float, bool)):
-        return obj
-    elif isinstance(obj, dict):
-        return {k: deep_convert_to_dict(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [deep_convert_to_dict(item) for item in obj]
-    elif hasattr(obj, '__dict__'):
-        return {k: deep_convert_to_dict(v) for k, v in obj.__dict__.items() 
-                if not k.startswith('_')}
-    else:
-        # For other types, try to convert to string as fallback
-        try:
-            return str(obj)
-        except Exception:
-            return None
-
-
-def atomic_write_json(filepath: Path, data, indent: int = 2):
-    """Write JSON data to a file atomically to prevent corruption.
-    
-    Writes to a temporary file first, then renames it to the target path.
-    This ensures the file is never left in a partially-written state.
-    """
-    import tempfile as tf
-    
-    # Serialize the data first to catch any serialization errors before writing
-    json_str = json.dumps(data, indent=indent, default=str)
-    
-    # Write to a temporary file in the same directory
-    temp_fd, temp_path = tf.mkstemp(
-        dir=filepath.parent, 
-        prefix=f'.{filepath.name}.', 
-        suffix='.tmp'
-    )
-    try:
-        with os.fdopen(temp_fd, 'w') as f:
-            f.write(json_str)
-        # Atomic rename
-        os.rename(temp_path, filepath)
-    except Exception:
-        # Clean up temp file on failure
-        try:
-            os.unlink(temp_path)
-        except Exception:
-            pass
-        raise
+from utils.file_utils import deep_convert_to_dict, atomic_write_json
+from utils.sanitization import sanitize_profile_name_for_filename, clean_profile_name
+from services.cache_service import (
+    get_cached_llm_analysis, save_llm_analysis_to_cache,
+    _get_cached_shots, _set_cached_shots,
+    _get_cached_image, _set_cached_image
+)
+from services.settings_service import load_settings, save_settings, get_author_name, ensure_settings_file
+from services.history_service import load_history, save_history, save_to_history, ensure_history_file
+from services.analysis_service import (
+    _perform_local_shot_analysis, _analyze_stage_execution, _generate_profile_description,
+    _prepare_shot_summary_for_llm, _format_dynamics_description, _generate_profile_target_curves
+)
 
 
 # Data directory configuration - use environment variable or default
@@ -1199,41 +1156,6 @@ async def get_logs(
 SETTINGS_FILE = DATA_DIR / "settings.json"
 
 
-def _ensure_settings_file():
-    """Ensure the settings file and directory exist."""
-    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if not SETTINGS_FILE.exists():
-        default_settings = {
-            "geminiApiKey": "",
-            "meticulousIp": "",
-            "serverIp": "",
-            "authorName": ""
-        }
-        SETTINGS_FILE.write_text(json.dumps(default_settings, indent=2))
-
-
-def _load_settings() -> dict:
-    """Load settings from file."""
-    _ensure_settings_file()
-    try:
-        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return {
-            "geminiApiKey": "",
-            "meticulousIp": "",
-            "serverIp": "",
-            "authorName": ""
-        }
-
-
-def _save_settings(settings: dict):
-    """Save settings to file."""
-    _ensure_settings_file()
-    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
-
-
 @app.get("/api/version")
 async def get_version_info(request: Request):
     """Get version information for all MeticAI components.
@@ -1551,7 +1473,7 @@ async def get_settings(request: Request):
             extra={"request_id": request_id, "endpoint": "/api/settings"}
         )
         
-        settings = _load_settings()
+        settings = load_settings()
         
         # Read current values from environment
         env_api_key = os.environ.get("GEMINI_API_KEY", "")
@@ -1613,7 +1535,7 @@ async def save_settings(request: Request):
         )
         
         # Load current settings
-        current_settings = _load_settings()
+        current_settings = load_settings()
         
         # Update only provided fields
         if "authorName" in body:
@@ -1676,7 +1598,7 @@ async def save_settings(request: Request):
             env_updated = True
         
         # Save settings to JSON file
-        _save_settings(current_settings)
+        save_settings(current_settings)
         
         # Write .env file if updated (note: may fail if read-only mount)
         if env_updated:
@@ -1714,30 +1636,6 @@ async def save_settings(request: Request):
 HISTORY_FILE = DATA_DIR / "profile_history.json"
 
 
-def _ensure_history_file():
-    """Ensure the history file and directory exist."""
-    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if not HISTORY_FILE.exists():
-        HISTORY_FILE.write_text("[]")
-
-
-def _load_history() -> list:
-    """Load history from file."""
-    _ensure_history_file()
-    try:
-        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return []
-
-
-def _save_history(history: list):
-    """Save history to file."""
-    _ensure_history_file()
-    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=2)
-
-
 # ============================================
 # LLM Analysis Cache Management  
 # ============================================
@@ -1773,42 +1671,6 @@ def _get_llm_cache_key(profile_name: str, shot_date: str, shot_filename: str) ->
     return f"{profile_name}_{shot_date}_{shot_filename}"
 
 
-def get_cached_llm_analysis(profile_name: str, shot_date: str, shot_filename: str) -> Optional[str]:
-    """Get cached LLM analysis if it exists and is not expired."""
-    cache = _load_llm_cache()
-    key = _get_llm_cache_key(profile_name, shot_date, shot_filename)
-    
-    if key in cache:
-        entry = cache[key]
-        timestamp = entry.get("timestamp", 0)
-        now = time.time()
-        
-        if now - timestamp < LLM_CACHE_TTL_SECONDS:
-            return entry.get("analysis")
-        else:
-            # Expired - remove from cache
-            del cache[key]
-            _save_llm_cache(cache)
-    
-    return None
-
-
-def save_llm_analysis_to_cache(profile_name: str, shot_date: str, shot_filename: str, analysis: str):
-    """Save LLM analysis to cache."""
-    cache = _load_llm_cache()
-    key = _get_llm_cache_key(profile_name, shot_date, shot_filename)
-    
-    cache[key] = {
-        "analysis": analysis,
-        "timestamp": time.time(),
-        "profile_name": profile_name,
-        "shot_date": shot_date,
-        "shot_filename": shot_filename
-    }
-    
-    _save_llm_cache(cache)
-
-
 # ============================================
 # Shot History Cache Management
 # ============================================
@@ -1841,50 +1703,6 @@ def _save_shot_cache(cache: dict):
         json.dump(cache, f, indent=2)
 
 
-def _get_cached_shots(profile_name: str, limit: int) -> tuple[Optional[dict], bool, Optional[float]]:
-    """Get cached shots for a profile.
-    
-    Returns a tuple of (cached_data, is_stale, cached_at_timestamp).
-    - cached_data: The cached response data, or None if no cache exists
-    - is_stale: True if cache is older than SHOT_CACHE_STALE_SECONDS
-    - cached_at: Unix timestamp of when cache was created
-    
-    Cache is stored indefinitely but marked stale after 60 minutes.
-    """
-    cache = _load_shot_cache()
-    cache_key = profile_name.lower()
-    
-    if cache_key not in cache:
-        return None, False, None
-    
-    cached_entry = cache[cache_key]
-    cached_time = cached_entry.get("cached_at", 0)
-    cached_limit = cached_entry.get("limit", 0)
-    
-    # Check if limit matches (requesting more than cached = cache miss)
-    if limit > cached_limit:
-        return None, False, None
-    
-    # Check if cache is stale (older than 60 minutes)
-    is_stale = time.time() - cached_time > SHOT_CACHE_STALE_SECONDS
-    
-    return cached_entry.get("data"), is_stale, cached_time
-
-
-def _set_cached_shots(profile_name: str, data: dict, limit: int):
-    """Store shots in cache for a profile."""
-    cache = _load_shot_cache()
-    cache_key = profile_name.lower()
-    
-    cache[cache_key] = {
-        "cached_at": time.time(),
-        "limit": limit,
-        "data": data
-    }
-    
-    _save_shot_cache(cache)
-
-
 # ============================================
 # Profile Image Cache Management
 # ============================================
@@ -1892,84 +1710,9 @@ def _set_cached_shots(profile_name: str, data: dict, limit: int):
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
 
-def _sanitize_profile_name_for_filename(profile_name: str) -> str:
-    """Safely sanitize profile name for use in filenames.
-    
-    Args:
-        profile_name: The profile name to sanitize
-        
-    Returns:
-        A safe filename string
-        
-    Note:
-        This prevents path traversal attacks by removing/replacing
-        all potentially dangerous characters.
-    """
-    import re
-    # Remove any path separators and parent directory references
-    safe_name = profile_name.replace('/', '_').replace('\\', '_').replace('..', '_')
-    # Keep only alphanumeric, spaces, hyphens, and underscores
-    safe_name = re.sub(r'[^a-zA-Z0-9\s\-_]', '_', safe_name)
-    # Replace spaces with underscores and convert to lowercase
-    safe_name = safe_name.replace(' ', '_').lower()
-    # Limit length to prevent filesystem issues
-    return safe_name[:200]
-
-
 def _ensure_image_cache_dir():
     """Ensure the image cache directory exists."""
     IMAGE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _get_cached_image(profile_name: str) -> Optional[bytes]:
-    """Get cached image for a profile if it exists.
-    
-    Returns the image bytes or None if not cached.
-    """
-    _ensure_image_cache_dir()
-    safe_name = _sanitize_profile_name_for_filename(profile_name)
-    cache_file = IMAGE_CACHE_DIR / f"{safe_name}.png"
-    
-    # Security check: ensure the resolved path is still within IMAGE_CACHE_DIR
-    try:
-        cache_file_resolved = cache_file.resolve()
-        if not str(cache_file_resolved).startswith(str(IMAGE_CACHE_DIR.resolve())):
-            logger.warning(f"Path traversal attempt detected for profile: {profile_name}")
-            return None
-    except Exception as e:
-        logger.warning(f"Failed to resolve cache path for {profile_name}: {e}")
-        return None
-    
-    if cache_file.exists():
-        try:
-            return cache_file.read_bytes()
-        except Exception as e:
-            logger.warning(f"Failed to read cached image for {profile_name}: {e}")
-            return None
-    return None
-
-
-def _set_cached_image(profile_name: str, image_data: bytes):
-    """Store image in cache for a profile."""
-    _ensure_image_cache_dir()
-    safe_name = _sanitize_profile_name_for_filename(profile_name)
-    cache_file = IMAGE_CACHE_DIR / f"{safe_name}.png"
-    
-    # Security check: ensure the resolved path is still within IMAGE_CACHE_DIR
-    try:
-        cache_file_resolved = cache_file.resolve()
-        if not str(cache_file_resolved).startswith(str(IMAGE_CACHE_DIR.resolve())):
-            logger.warning(f"Path traversal attempt detected for profile: {profile_name}")
-            return
-    except Exception as e:
-        logger.warning(f"Failed to resolve cache path for {profile_name}: {e}")
-        return
-    
-    try:
-        cache_file.write_bytes(image_data)
-        logger.info(f"Cached image for profile: {profile_name} ({len(image_data)} bytes)")
-    except Exception as e:
-        logger.warning(f"Failed to cache image for {profile_name}: {e}")
 
 
 def _extract_profile_json(reply: str) -> Optional[dict]:
@@ -2007,78 +1750,14 @@ def _extract_profile_json(reply: str) -> Optional[dict]:
     return None
 
 
-def _clean_profile_name(name: str) -> str:
-    """Clean markdown artifacts from profile name."""
-    # Remove leading/trailing ** or *
-    cleaned = re.sub(r'^[\*]+\s*', '', name)
-    cleaned = re.sub(r'\s*[\*]+$', '', cleaned)
-    # Remove any remaining ** pairs
-    cleaned = cleaned.replace('**', '')
-    return cleaned.strip()
-
-
 def _extract_profile_name(reply: str) -> str:
     """Extract the profile name from the LLM reply."""
     import re
     # Handle both **Profile Created:** and Profile Created: formats, with 0 or 2 asterisks
     match = re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?\s*(.+?)(?:\n|$)', reply, re.IGNORECASE)
     if match:
-        return _clean_profile_name(match.group(1))
+        return clean_profile_name(match.group(1))
     return "Untitled Profile"
-
-
-def save_to_history(
-    coffee_analysis: Optional[str],
-    user_prefs: Optional[str],
-    reply: str,
-    image_preview: Optional[str] = None
-) -> dict:
-    """Save a generated profile to history.
-    
-    Args:
-        coffee_analysis: The coffee bag analysis text
-        user_prefs: User preferences provided
-        reply: The full LLM reply
-        image_preview: Optional base64 image preview (thumbnail)
-        
-    Returns:
-        The saved history entry
-    """
-    history = _load_history()
-    
-    # Generate a unique ID
-    entry_id = str(uuid.uuid4())
-    
-    # Extract profile JSON and name
-    profile_json = _extract_profile_json(reply)
-    profile_name = _extract_profile_name(reply)
-    
-    # Create history entry
-    entry = {
-        "id": entry_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "profile_name": profile_name,
-        "coffee_analysis": coffee_analysis,
-        "user_preferences": user_prefs,
-        "reply": reply,
-        "profile_json": profile_json,
-        "image_preview": image_preview  # Optional thumbnail
-    }
-    
-    # Add to beginning of list (most recent first)
-    history.insert(0, entry)
-    
-    # Keep only last 100 entries to prevent file from growing too large
-    history = history[:100]
-    
-    _save_history(history)
-    
-    logger.info(
-        f"Saved profile to history: {profile_name}",
-        extra={"entry_id": entry_id, "has_json": profile_json is not None}
-    )
-    
-    return entry
 
 
 @app.get("/api/history")
@@ -2105,7 +1784,7 @@ async def get_history(
             extra={"request_id": request_id, "limit": limit, "offset": offset}
         )
         
-        history = _load_history()
+        history = load_history()
         total = len(history)
         
         # Apply pagination
@@ -2153,7 +1832,7 @@ async def get_history_entry(request: Request, entry_id: str):
             extra={"request_id": request_id, "entry_id": entry_id}
         )
         
-        history = _load_history()
+        history = load_history()
         
         for entry in history:
             if entry.get("id") == entry_id:
@@ -2193,7 +1872,7 @@ async def delete_history_entry(request: Request, entry_id: str):
             extra={"request_id": request_id, "entry_id": entry_id}
         )
         
-        history = _load_history()
+        history = load_history()
         original_length = len(history)
         
         history = [entry for entry in history if entry.get("id") != entry_id]
@@ -2201,7 +1880,7 @@ async def delete_history_entry(request: Request, entry_id: str):
         if len(history) == original_length:
             raise HTTPException(status_code=404, detail="History entry not found")
         
-        _save_history(history)
+        save_history(history)
         
         return {"status": "success", "message": "History entry deleted"}
         
@@ -2234,7 +1913,7 @@ async def clear_history(request: Request):
             extra={"request_id": request_id}
         )
         
-        _save_history([])
+        save_history([])
         
         return {"status": "success", "message": "All history cleared"}
         
@@ -2262,7 +1941,7 @@ async def migrate_history_profile_names(request: Request):
     request_id = request.state.request_id
     
     try:
-        history = _load_history()
+        history = load_history()
         fixed_count = 0
         
         for entry in history:
@@ -2278,7 +1957,7 @@ async def migrate_history_profile_names(request: Request):
                 )
         
         if fixed_count > 0:
-            _save_history(history)
+            save_history(history)
         
         logger.info(
             f"Migration complete: {fixed_count} profile names fixed",
@@ -2321,7 +2000,7 @@ async def get_profile_json(request: Request, entry_id: str):
             extra={"request_id": request_id, "entry_id": entry_id}
         )
         
-        history = _load_history()
+        history = load_history()
         
         for entry in history:
             if entry.get("id") == entry_id:
@@ -3501,38 +3180,6 @@ async def get_profile_info(
 PREINFUSION_KEYWORDS = ['bloom', 'soak', 'preinfusion', 'pre-infusion', 'pre infusion', 'wet', 'fill', 'landing']
 
 
-def _format_dynamics_description(stage: dict) -> str:
-    """Format a human-readable description of the stage dynamics."""
-    stage_type = stage.get("type", "unknown")
-    dynamics_points = stage.get("dynamics_points", [])
-    dynamics_over = stage.get("dynamics_over", "time")
-    
-    if not dynamics_points:
-        return f"{stage_type} stage (no dynamics data)"
-    
-    unit = "bar" if stage_type == "pressure" else "ml/s"
-    over_unit = "s" if dynamics_over == "time" else "g"
-    
-    if len(dynamics_points) == 1:
-        # Constant value
-        value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
-        return f"Constant {stage_type} at {value} {unit}"
-    elif len(dynamics_points) == 2:
-        start_x, start_y = dynamics_points[0][0], dynamics_points[0][1]
-        end_x, end_y = dynamics_points[1][0], dynamics_points[1][1]
-        if start_y == end_y:
-            return f"Constant {stage_type} at {start_y} {unit} for {end_x}{over_unit}"
-        else:
-            direction = "ramp up" if end_y > start_y else "ramp down"
-            return f"{stage_type.capitalize()} {direction} from {start_y} to {end_y} {unit} over {end_x}{over_unit}"
-    else:
-        # Multiple points - describe curve
-        values = [p[1] for p in dynamics_points if len(p) > 1]
-        if values:
-            return f"{stage_type.capitalize()} curve: {' → '.join(str(v) for v in values)} {unit}"
-        return f"Multi-point {stage_type} curve"
-
-
 def _generate_execution_description(
     stage_type: str,
     duration: float,
@@ -3778,181 +3425,6 @@ def _determine_exit_trigger_hit(
     }
 
 
-def _analyze_stage_execution(
-    profile_stage: dict,
-    shot_stage_data: dict | None,
-    total_shot_duration: float,
-    variables: list | None = None
-) -> dict:
-    """Analyze how a single stage executed compared to its profile definition."""
-    variables = variables or []
-    stage_name = profile_stage.get("name", "Unknown")
-    stage_type = profile_stage.get("type", "unknown")
-    stage_key = profile_stage.get("key", "")
-    
-    # Build profile target description
-    dynamics_desc = _format_dynamics_description(profile_stage)
-    exit_triggers = _format_exit_triggers(profile_stage.get("exit_triggers", []), variables)
-    limits = _format_limits(profile_stage.get("limits", []), variables)
-    
-    result = {
-        "stage_name": stage_name,
-        "stage_key": stage_key,
-        "stage_type": stage_type,
-        "profile_target": dynamics_desc,
-        "exit_triggers": exit_triggers,
-        "limits": limits,
-        "executed": shot_stage_data is not None,
-        "execution_data": None,
-        "exit_trigger_result": None,
-        "limit_hit": None,
-        "assessment": None
-    }
-    
-    if shot_stage_data is None:
-        result["assessment"] = {
-            "status": "not_reached",
-            "message": "This stage was never executed during the shot"
-        }
-        return result
-    
-    # Stage was executed - analyze it
-    duration = _safe_float(shot_stage_data.get("duration", 0))
-    start_weight = _safe_float(shot_stage_data.get("start_weight", 0))
-    end_weight = _safe_float(shot_stage_data.get("end_weight", 0))
-    weight_gain = end_weight - start_weight
-    start_pressure = _safe_float(shot_stage_data.get("start_pressure", 0))
-    end_pressure = _safe_float(shot_stage_data.get("end_pressure", 0))
-    avg_pressure = _safe_float(shot_stage_data.get("avg_pressure", 0))
-    max_pressure = _safe_float(shot_stage_data.get("max_pressure", 0))
-    min_pressure = _safe_float(shot_stage_data.get("min_pressure", 0))
-    start_flow = _safe_float(shot_stage_data.get("start_flow", 0))
-    end_flow = _safe_float(shot_stage_data.get("end_flow", 0))
-    avg_flow = _safe_float(shot_stage_data.get("avg_flow", 0))
-    max_flow = _safe_float(shot_stage_data.get("max_flow", 0))
-    
-    # Generate execution description based on what actually happened
-    execution_description = _generate_execution_description(
-        stage_type, duration, 
-        start_pressure, end_pressure, max_pressure,
-        start_flow, end_flow, max_flow,
-        weight_gain
-    )
-    
-    result["execution_data"] = {
-        "duration": round(duration, 1),
-        "weight_gain": round(weight_gain, 1),
-        "start_weight": round(start_weight, 1),
-        "end_weight": round(end_weight, 1),
-        "start_pressure": round(start_pressure, 1),
-        "end_pressure": round(end_pressure, 1),
-        "avg_pressure": round(avg_pressure, 1),
-        "max_pressure": round(max_pressure, 1),
-        "min_pressure": round(min_pressure, 1),
-        "start_flow": round(start_flow, 1),
-        "end_flow": round(end_flow, 1),
-        "avg_flow": round(avg_flow, 1),
-        "max_flow": round(max_flow, 1),
-        "description": execution_description
-    }
-    
-    # Determine which exit trigger was hit
-    if profile_stage.get("exit_triggers"):
-        exit_result = _determine_exit_trigger_hit(
-            shot_stage_data,
-            profile_stage.get("exit_triggers", []),
-            variables=variables
-        )
-        result["exit_trigger_result"] = exit_result
-    
-    # Check if any limits were hit
-    stage_limits = profile_stage.get("limits", [])
-    for limit in stage_limits:
-        limit_type = limit.get("type", "")
-        raw_limit_value = limit.get("value", 0)
-        
-        # Resolve variable reference if present
-        resolved_limit_value, _ = _resolve_variable(raw_limit_value, variables)
-        limit_value = _safe_float(resolved_limit_value)
-        
-        actual = 0.0
-        if limit_type == "flow":
-            actual = max_flow
-        elif limit_type == "pressure":
-            actual = max_pressure
-        elif limit_type == "time":
-            actual = duration
-        elif limit_type == "weight":
-            actual = end_weight
-        
-        # Check if limit was hit (within small tolerance)
-        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s"}.get(limit_type, "")
-        if actual >= limit_value - 0.2:
-            result["limit_hit"] = {
-                "type": limit_type,
-                "limit_value": limit_value,
-                "actual_value": round(actual, 1),
-                "description": f"Hit {limit_type} limit of {limit_value}{unit}"
-            }
-            break
-    
-    # Generate assessment
-    if result["exit_trigger_result"] and result["exit_trigger_result"]["triggered"]:
-        if result["limit_hit"]:
-            result["assessment"] = {
-                "status": "hit_limit",
-                "message": f"Stage exited but hit a limit ({result['limit_hit']['description']})"
-            }
-        else:
-            result["assessment"] = {
-                "status": "reached_goal",
-                "message": f"Exited via: {result['exit_trigger_result']['triggered']['description']}"
-            }
-    elif result["exit_trigger_result"] and result["exit_trigger_result"]["not_triggered"]:
-        # No trigger was hit - stage ended prematurely, this is a failure
-        # Check if the dynamics goal was reached (e.g., target pressure)
-        goal_reached = False
-        goal_message = ""
-        
-        dynamics_points = profile_stage.get("dynamics_points", [])
-        if dynamics_points and len(dynamics_points) >= 1:
-            # Get the target value (last point in dynamics)
-            target_value = dynamics_points[-1][1] if len(dynamics_points[-1]) > 1 else dynamics_points[-1][0]
-            
-            if stage_type == "pressure":
-                # Check if we reached target pressure
-                if max_pressure >= target_value * 0.95:  # Within 5%
-                    goal_reached = True
-                    goal_message = f"Target pressure of {target_value} bar was reached ({max_pressure:.1f} bar achieved)"
-                else:
-                    goal_message = f"Target pressure of {target_value} bar was NOT reached (only {max_pressure:.1f} bar achieved)"
-            elif stage_type == "flow":
-                # For flow stages, use end_flow (not max_flow) since initial peak is just piston movement
-                if end_flow >= target_value * 0.95:
-                    goal_reached = True
-                    goal_message = f"Target flow of {target_value} ml/s was reached ({end_flow:.1f} ml/s at end)"
-                else:
-                    goal_message = f"Target flow of {target_value} ml/s was NOT reached ({end_flow:.1f} ml/s at end)"
-        
-        if goal_reached:
-            result["assessment"] = {
-                "status": "incomplete",
-                "message": f"Stage ended before exit triggers were satisfied, but {goal_message.lower()}"
-            }
-        else:
-            result["assessment"] = {
-                "status": "failed",
-                "message": f"Stage ended before exit triggers were satisfied. {goal_message}" if goal_message else "Stage ended before exit triggers were satisfied"
-            }
-    else:
-        result["assessment"] = {
-            "status": "executed",
-            "message": "Stage executed (no exit triggers defined)"
-        }
-    
-    return result
-
-
 def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
     """Extract per-stage telemetry from shot data.
     
@@ -4068,402 +3540,6 @@ def _interpolate_weight_to_time(target_weight: float, weight_time_pairs: list[tu
             
     # If not found, use last time (weight exceeds all actual weights)
     return weight_time_pairs[-1][1]
-
-
-def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, shot_data: dict) -> list[dict]:
-    """Generate target curves for profile overlay on shot chart.
-    
-    Creates data points representing what the profile was targeting at each time point.
-    Uses actual shot stage times to align the profile curves with the shot execution.
-    Supports both time-based and weight-based dynamics.
-    
-    Args:
-        profile_data: The profile configuration
-        shot_stage_times: Dict mapping stage names to (start_time, end_time) tuples
-        shot_data: The complete shot data including telemetry entries
-        
-    Returns:
-        List of data points: [{time, target_pressure, target_flow, stage_name}, ...]
-    """
-    stages = profile_data.get("stages", [])
-    variables = profile_data.get("variables", [])
-    data_points = []
-    
-    # Build weight-to-time mappings for each stage from shot data
-    # This enables weight-based dynamics interpolation
-    stage_weight_to_time = {}
-    data_entries = shot_data.get("data", [])
-    
-    for entry in data_entries:
-        status = entry.get("status", "")
-        if not status or status.lower().strip() == STAGE_STATUS_RETRACTING:
-            continue
-        
-        time_sec = entry.get("time", 0) / 1000  # Convert to seconds
-        weight = entry.get("shot", {}).get("weight", 0)
-        
-        # Normalize stage name for matching
-        normalized_status = status.lower().strip()
-        
-        if normalized_status not in stage_weight_to_time:
-            stage_weight_to_time[normalized_status] = []
-        
-        stage_weight_to_time[normalized_status].append((weight, time_sec))
-    
-    for stage in stages:
-        stage_name = stage.get("name", "")
-        stage_type = stage.get("type", "")  # pressure or flow
-        
-        # Handle both flat format (dynamics_points) and nested format (dynamics.points)
-        dynamics_points = stage.get("dynamics_points", [])
-        dynamics_over = stage.get("dynamics_over", "time")  # time or weight
-        
-        # If flat format not found, try nested dynamics object
-        if not dynamics_points:
-            dynamics_obj = stage.get("dynamics", {})
-            if isinstance(dynamics_obj, dict):
-                dynamics_points = dynamics_obj.get("points", [])
-                dynamics_over = dynamics_obj.get("over", "time")
-        
-        if not dynamics_points:
-            continue
-            
-        # Get actual stage timing from shot
-        # Match using either stage name or stage key (for consistency with main analysis)
-        identifiers = set()
-        if stage_name:
-            identifiers.add(stage_name.lower().strip())
-        stage_key_field = stage.get("key", "")
-        if stage_key_field:
-            identifiers.add(stage_key_field.lower().strip())
-
-        stage_timing = None
-        for shot_stage_name, timing in shot_stage_times.items():
-            normalized_shot_stage_name = shot_stage_name.lower().strip()
-            if normalized_shot_stage_name in identifiers:
-                stage_timing = timing
-                break
-        
-        if not stage_timing:
-            continue
-            
-        stage_start, stage_end = stage_timing
-        stage_duration = stage_end - stage_start
-        
-        if stage_duration <= 0:
-            continue
-        
-        # Generate points along the stage duration
-        # For time-based dynamics, interpolate directly
-        if dynamics_over == "time":
-            # Get the dynamics point times (x values) and target values (y values)
-            if len(dynamics_points) == 1:
-                # Constant value throughout stage
-                value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
-                # Resolve variable if needed
-                if isinstance(value, str) and value.startswith('$'):
-                    resolved, _ = _resolve_variable(value, variables)
-                    value = _safe_float(resolved)
-                else:
-                    value = _safe_float(value)
-                    
-                # Add start and end points
-                point_start = {"time": round(stage_start, 2), "stage_name": stage_name}
-                point_end = {"time": round(stage_end, 2), "stage_name": stage_name}
-                
-                if stage_type == "pressure":
-                    point_start["target_pressure"] = round(value, 1)
-                    point_end["target_pressure"] = round(value, 1)
-                elif stage_type == "flow":
-                    point_start["target_flow"] = round(value, 1)
-                    point_end["target_flow"] = round(value, 1)
-                    
-                data_points.append(point_start)
-                data_points.append(point_end)
-            else:
-                # Multiple points - interpolate based on relative time within stage
-                # dynamics_points format: [[time1, value1], [time2, value2], ...]
-                max_dynamics_time = max(p[0] for p in dynamics_points)
-                
-                # Scale factor to map dynamics time to actual stage duration
-                scale = stage_duration / max_dynamics_time if max_dynamics_time > 0 else 1
-                
-                for dp in dynamics_points:
-                    dp_time = dp[0]
-                    dp_value = dp[1] if len(dp) > 1 else dp[0]
-                    
-                    # Resolve variable if needed
-                    if isinstance(dp_value, str) and dp_value.startswith('$'):
-                        resolved, _ = _resolve_variable(dp_value, variables)
-                        dp_value = _safe_float(resolved)
-                    else:
-                        dp_value = _safe_float(dp_value)
-                    
-                    actual_time = stage_start + (dp_time * scale)
-                    
-                    point = {"time": round(actual_time, 2), "stage_name": stage_name}
-                    if stage_type == "pressure":
-                        point["target_pressure"] = round(dp_value, 1)
-                    elif stage_type == "flow":
-                        point["target_flow"] = round(dp_value, 1)
-                        
-                    data_points.append(point)
-        
-        # For weight-based dynamics, map weight values to time using actual shot data
-        elif dynamics_over == "weight":
-            # Get weight-to-time mapping for this stage
-            stage_key_normalized = None
-            for identifier in identifiers:
-                if identifier in stage_weight_to_time:
-                    stage_key_normalized = identifier
-                    break
-            
-            if not stage_key_normalized or not stage_weight_to_time[stage_key_normalized]:
-                # No weight data available for this stage
-                continue
-            
-            weight_time_pairs = stage_weight_to_time[stage_key_normalized]
-            
-            # Sort by weight to enable interpolation
-            weight_time_pairs.sort(key=lambda x: x[0])
-            
-            if len(dynamics_points) == 1:
-                # Constant value throughout stage
-                value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
-                
-                # Resolve variable if needed
-                if isinstance(value, str) and value.startswith('$'):
-                    resolved, _ = _resolve_variable(value, variables)
-                    value = _safe_float(resolved)
-                else:
-                    value = _safe_float(value)
-                
-                # Add start and end points
-                point_start = {"time": round(stage_start, 2), "stage_name": stage_name}
-                point_end = {"time": round(stage_end, 2), "stage_name": stage_name}
-                
-                if stage_type == "pressure":
-                    point_start["target_pressure"] = round(value, 1)
-                    point_end["target_pressure"] = round(value, 1)
-                elif stage_type == "flow":
-                    point_start["target_flow"] = round(value, 1)
-                    point_end["target_flow"] = round(value, 1)
-                
-                data_points.append(point_start)
-                data_points.append(point_end)
-            else:
-                # Multiple points - interpolate weight values to time
-                # dynamics_points format: [[weight1, value1], [weight2, value2], ...]
-                for dp in dynamics_points:
-                    dp_weight = dp[0]
-                    dp_value = dp[1] if len(dp) > 1 else dp[0]
-                    
-                    # Resolve variable if needed
-                    if isinstance(dp_value, str) and dp_value.startswith('$'):
-                        resolved, _ = _resolve_variable(dp_value, variables)
-                        dp_value = _safe_float(resolved)
-                    else:
-                        dp_value = _safe_float(dp_value)
-                    
-                    # Find time corresponding to this weight using linear interpolation
-                    actual_time = _interpolate_weight_to_time(dp_weight, weight_time_pairs)
-                    
-                    if actual_time is not None:
-                        point = {"time": round(actual_time, 2), "stage_name": stage_name}
-                        if stage_type == "pressure":
-                            point["target_pressure"] = round(dp_value, 1)
-                        elif stage_type == "flow":
-                            point["target_flow"] = round(dp_value, 1)
-                        
-                        data_points.append(point)
-    
-    # Sort by time
-    data_points.sort(key=lambda x: x["time"])
-    
-    return data_points
-
-
-def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
-    """Perform complete local analysis of shot vs profile.
-    
-    This is a purely algorithmic analysis - no LLM involved.
-    """
-    # Extract overall shot metrics
-    data_entries = shot_data.get("data", [])
-    
-    final_weight = 0
-    total_time = 0
-    max_pressure = 0
-    max_flow = 0
-    
-    for entry in data_entries:
-        shot = entry.get("shot", {})
-        weight = shot.get("weight", 0)
-        pressure = shot.get("pressure", 0)
-        flow = shot.get("flow", 0) or shot.get("gravimetric_flow", 0)
-        t = entry.get("time", 0) / 1000
-        
-        final_weight = max(final_weight, weight)
-        total_time = max(total_time, t)
-        max_pressure = max(max_pressure, pressure)
-        max_flow = max(max_flow, flow)
-    
-    target_weight = profile_data.get("final_weight", 0) or 0
-    
-    # Weight analysis
-    weight_deviation = 0
-    weight_status = "on_target"
-    if target_weight > 0:
-        weight_deviation = ((final_weight - target_weight) / target_weight) * 100
-        if final_weight < target_weight * 0.95:  # More than 5% under
-            weight_status = "under"
-        elif final_weight > target_weight * 1.1:  # More than 10% over
-            weight_status = "over"
-    
-    # Extract shot stage data
-    shot_stages = _extract_shot_stage_data(shot_data)
-    
-    # Build shot stage times for profile curve generation
-    shot_stage_times = {}
-    for stage_name, stage_data in shot_stages.items():
-        start_time = stage_data.get("start_time", 0)
-        end_time = stage_data.get("end_time", 0)
-        shot_stage_times[stage_name] = (start_time, end_time)
-    
-    # Generate profile target curves for chart overlay
-    profile_target_curves = _generate_profile_target_curves(profile_data, shot_stage_times, shot_data)
-    
-    # Profile stages
-    profile_stages = profile_data.get("stages", [])
-    profile_variables = profile_data.get("variables", [])
-    
-    # Analyze each profile stage
-    stage_analyses = []
-    executed_stages = set()
-    unreached_stages = []
-    preinfusion_time = 0
-    preinfusion_stages = []
-    
-    for profile_stage in profile_stages:
-        stage_name = profile_stage.get("name", "")
-        stage_key = profile_stage.get("key", "").lower()
-        
-        # Find matching shot stage (by name, case-insensitive)
-        shot_stage_data = None
-        for shot_stage_name, data in shot_stages.items():
-            if shot_stage_name.lower().strip() == stage_name.lower().strip():
-                shot_stage_data = data
-                executed_stages.add(stage_name)
-                break
-        
-        analysis = _analyze_stage_execution(profile_stage, shot_stage_data, total_time, profile_variables)
-        stage_analyses.append(analysis)
-        
-        # Track unreached
-        if not analysis["executed"]:
-            unreached_stages.append(stage_name)
-        
-        # Track preinfusion time
-        name_lower = stage_name.lower()
-        is_preinfusion = any(kw in name_lower for kw in PREINFUSION_KEYWORDS) or \
-                         any(kw in stage_key for kw in ['preinfusion', 'bloom', 'soak', 'fill'])
-        
-        if is_preinfusion and shot_stage_data:
-            preinfusion_time += _safe_float(shot_stage_data.get("duration", 0))
-            preinfusion_stages.append({
-                "name": stage_name,
-                "duration": _safe_float(shot_stage_data.get("duration", 0)),
-                "start_weight": _safe_float(shot_stage_data.get("start_weight", 0)),
-                "end_weight": _safe_float(shot_stage_data.get("end_weight", 0)),
-                "max_flow": _safe_float(shot_stage_data.get("max_flow", 0)),
-                "avg_flow": _safe_float(shot_stage_data.get("avg_flow", 0)),
-                "exit_triggers": profile_stage.get("exit_triggers", [])
-            })
-    
-    # Preinfusion analysis
-    preinfusion_proportion = (preinfusion_time / total_time * 100) if total_time > 0 else 0
-    
-    # Calculate total weight accumulated during preinfusion
-    preinfusion_weight = 0
-    for pi_stage in preinfusion_stages:
-        # Weight gained in this stage
-        stage_weight_gain = pi_stage["end_weight"] - pi_stage["start_weight"]
-        preinfusion_weight += max(0, stage_weight_gain)
-    
-    # Preinfusion weight analysis
-    preinfusion_weight_percent = (preinfusion_weight / final_weight * 100) if final_weight > 0 else 0
-    preinfusion_issues = []
-    preinfusion_recommendations = []
-    
-    if preinfusion_weight_percent > 10:
-        preinfusion_issues.append({
-            "type": "excessive_preinfusion_volume",
-            "severity": "warning" if preinfusion_weight_percent <= 15 else "concern",
-            "message": f"Pre-infusion accounted for {preinfusion_weight_percent:.1f}% of total shot volume (target: ≤10%)",
-            "detail": f"{preinfusion_weight:.1f}g of {final_weight:.1f}g total"
-        })
-        
-        # Check for high flow during preinfusion
-        max_preinfusion_flow = max((s["max_flow"] for s in preinfusion_stages), default=0)
-        avg_preinfusion_flow = sum(s["avg_flow"] for s in preinfusion_stages) / len(preinfusion_stages) if preinfusion_stages else 0
-        
-        if max_preinfusion_flow > 2.0 or avg_preinfusion_flow > 1.0:
-            preinfusion_issues.append({
-                "type": "high_preinfusion_flow",
-                "severity": "warning",
-                "message": f"High flow during pre-infusion (max: {max_preinfusion_flow:.1f} ml/s, avg: {avg_preinfusion_flow:.1f} ml/s)",
-                "detail": "May indicate grind is too coarse"
-            })
-            preinfusion_recommendations.append("Consider using a finer grind to slow early flow")
-        
-        # Check if exit triggers include weight/flow protection
-        has_weight_exit = False
-        has_flow_exit = False
-        for pi_stage in preinfusion_stages:
-            for trigger in pi_stage.get("exit_triggers", []):
-                trigger_type = trigger.get("type", "") if isinstance(trigger, dict) else ""
-                if "weight" in trigger_type.lower():
-                    has_weight_exit = True
-                if "flow" in trigger_type.lower():
-                    has_flow_exit = True
-        
-        if not has_weight_exit and not has_flow_exit:
-            preinfusion_recommendations.append("Consider adding a weight or flow exit trigger to pre-infusion stages to prevent excessive early volume")
-        elif not has_weight_exit:
-            preinfusion_recommendations.append("Consider adding a weight-based exit trigger to limit pre-infusion volume")
-    
-    return {
-        "shot_summary": {
-            "final_weight": round(final_weight, 1),
-            "target_weight": round(target_weight, 1) if target_weight else None,
-            "total_time": round(total_time, 1),
-            "max_pressure": round(max_pressure, 1),
-            "max_flow": round(max_flow, 1)
-        },
-        "weight_analysis": {
-            "status": weight_status,
-            "target": round(target_weight, 1) if target_weight else None,
-            "actual": round(final_weight, 1),
-            "deviation_percent": round(weight_deviation, 1)
-        },
-        "stage_analyses": stage_analyses,
-        "unreached_stages": unreached_stages,
-        "preinfusion_summary": {
-            "stages": [s["name"] for s in preinfusion_stages],
-            "total_time": round(preinfusion_time, 1),
-            "proportion_of_shot": round(preinfusion_proportion, 1),
-            "weight_accumulated": round(preinfusion_weight, 1),
-            "weight_percent_of_total": round(preinfusion_weight_percent, 1),
-            "issues": preinfusion_issues,
-            "recommendations": preinfusion_recommendations
-        },
-        "profile_info": {
-            "name": profile_data.get("name", "Unknown"),
-            "temperature": profile_data.get("temperature"),
-            "stage_count": len(profile_stages)
-        },
-        "profile_target_curves": profile_target_curves
-    }
 
 
 @app.post("/api/shots/analyze")
@@ -4654,112 +3730,6 @@ PROFILING_KNOWLEDGE = """# Espresso Profiling Expert Knowledge
 - **Bottom filter**: Paper filters reduce sediment but also oils (cleaner but thinner)
 - **Puck prep**: WDT, leveling, and tamp consistency affect channeling risk
 """
-
-
-def _prepare_shot_summary_for_llm(shot_data: dict, profile_data: dict, local_analysis: dict) -> dict:
-    """Prepare a token-efficient summary of shot data for LLM analysis.
-    
-    Extracts only key data points to minimize token usage while providing
-    enough context for meaningful analysis.
-    """
-    # Basic shot metrics
-    overall = local_analysis.get("overall_metrics", {})
-    weight_analysis = local_analysis.get("weight_analysis", {})
-    preinfusion = local_analysis.get("preinfusion_summary", {})
-    
-    # Stage summary (compact format)
-    stage_summaries = []
-    total_time = overall.get("total_time", 0)
-    
-    for stage in local_analysis.get("stage_analyses", []):
-        exec_data = stage.get("execution_data")
-        if exec_data:
-            duration = exec_data.get("duration", 0)
-            pct_of_shot = round((duration / total_time * 100) if total_time > 0 else 0, 1)
-            # Safely extract exit trigger and limit hit descriptions
-            exit_trigger_desc = None
-            exit_trigger_result = stage.get("exit_trigger_result")
-            if exit_trigger_result:
-                triggered = exit_trigger_result.get("triggered")
-                if triggered and isinstance(triggered, dict):
-                    exit_trigger_desc = triggered.get("description")
-            
-            limit_hit_desc = None
-            limit_hit = stage.get("limit_hit")
-            if limit_hit and isinstance(limit_hit, dict):
-                limit_hit_desc = limit_hit.get("description")
-            
-            stage_summaries.append({
-                "name": stage.get("stage_name"),
-                "duration_s": round(duration, 1),
-                "percent_of_shot": pct_of_shot,
-                "avg_pressure": exec_data.get("avg_pressure"),
-                "avg_flow": exec_data.get("avg_flow"),
-                "weight_gain": exec_data.get("weight_gain"),
-                "cumulative_weight_at_end": exec_data.get("end_weight"),  # Added: cumulative weight when stage ended
-                "exit_trigger": exit_trigger_desc,
-                "limit_hit": limit_hit_desc
-            })
-        else:
-            stage_summaries.append({
-                "name": stage.get("stage_name"),
-                "status": "NOT REACHED"
-            })
-    
-    # Profile variables (resolved values)
-    variables = []
-    for var in profile_data.get("variables", []):
-        variables.append({
-            "name": var.get("name"),
-            "type": var.get("type"),
-            "value": var.get("value")
-        })
-    
-    # Simplified graph data - sample key points from the shot
-    data_entries = shot_data.get("data", [])
-    graph_summary = []
-    
-    if data_entries:
-        # Sample at key points: start, 25%, 50%, 75%, end, and any stage transitions
-        sample_indices = [0]
-        n = len(data_entries)
-        for pct in [0.25, 0.5, 0.75]:
-            idx = int(n * pct)
-            if idx not in sample_indices:
-                sample_indices.append(idx)
-        sample_indices.append(n - 1)
-        
-        for idx in sorted(set(sample_indices)):
-            entry = data_entries[idx]
-            shot = entry.get("shot", {})
-            graph_summary.append({
-                "time_s": round(entry.get("time", 0) / 1000, 1),
-                "pressure": round(shot.get("pressure", 0), 1),
-                "flow": round(shot.get("flow", 0) or shot.get("gravimetric_flow", 0), 1),
-                "weight": round(shot.get("weight", 0), 1),
-                "stage": entry.get("status", "")
-            })
-    
-    return {
-        "shot_summary": {
-            "total_time_s": overall.get("total_time"),
-            "final_weight_g": weight_analysis.get("actual"),
-            "target_weight_g": weight_analysis.get("target"),
-            "weight_deviation_pct": weight_analysis.get("deviation_percent"),
-            "max_pressure_bar": overall.get("max_pressure"),
-            "max_flow_mls": overall.get("max_flow"),
-            "temperature_c": profile_data.get("temperature")
-        },
-        "stages": stage_summaries,
-        "unreached_stages": local_analysis.get("unreached_stages", []),
-        "preinfusion": {
-            "total_time_s": preinfusion.get("total_time"),
-            "percent_of_shot": preinfusion.get("proportion_of_shot"),
-            "weight_accumulated_g": preinfusion.get("weight_accumulated")
-        },
-        "variables": variables,
-        "graph_samples": graph_summary
-    }
 
 
 def _prepare_profile_for_llm(profile_data: dict, description: str | None) -> dict:
