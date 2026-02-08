@@ -21,14 +21,14 @@ Logs are stored in the `logs/` directory in the MeticAI installation directory:
 ```
 MeticAI/
 ├── logs/
-│   ├── coffee-relay.log           # All log entries (JSON format)
-│   ├── coffee-relay.log.1         # Rotated backup (newest)
-│   ├── coffee-relay.log.2         # Rotated backup
-│   ├── coffee-relay.log.3         # Rotated backup
-│   ├── coffee-relay.log.4         # Rotated backup
-│   ├── coffee-relay.log.5         # Rotated backup (oldest)
-│   ├── coffee-relay-errors.log    # Error-only logs (JSON format)
-│   ├── coffee-relay-errors.log.1  # Error log backups...
+│   ├── meticai-server.log           # All log entries (JSON format)
+│   ├── meticai-server.log.1         # Rotated backup (newest)
+│   ├── meticai-server.log.2         # Rotated backup
+│   ├── meticai-server.log.3         # Rotated backup
+│   ├── meticai-server.log.4         # Rotated backup
+│   ├── meticai-server.log.5         # Rotated backup (oldest)
+│   ├── meticai-server-errors.log    # Error-only logs (JSON format)
+│   ├── meticai-server-errors.log.1  # Error log backups...
 │   └── ...
 ```
 
@@ -66,7 +66,7 @@ Errors include all request info plus:
 {
   "timestamp": "2024-01-16T20:15:30.123456Z",
   "level": "ERROR",
-  "logger": "coffee-relay",
+  "logger": "meticai-server",
   "message": "Coffee analysis failed: Rate limit exceeded",
   "module": "main",
   "function": "analyze_coffee",
@@ -93,16 +93,16 @@ SSH into your MeticAI server and read log files directly:
 
 ```bash
 # View recent logs (human-readable)
-tail -f logs/coffee-relay.log | jq .
+tail -f logs/meticai-server.log | jq .
 
 # View only errors
-tail -f logs/coffee-relay-errors.log | jq .
+tail -f logs/meticai-server-errors.log | jq .
 
 # Search for specific request
-grep "a3f2d1e9-5c8b-4f1a-9d3e" logs/coffee-relay.log | jq .
+grep "a3f2d1e9-5c8b-4f1a-9d3e" logs/meticai-server.log | jq .
 
 # Filter by level
-jq 'select(.level == "ERROR")' logs/coffee-relay.log
+jq 'select(.level == "ERROR")' logs/meticai-server.log
 ```
 
 ### Method 2: HTTP API Endpoint
@@ -139,7 +139,7 @@ curl "http://YOUR_SERVER_IP:8000/api/logs?lines=200&level=ERROR&log_type=errors"
     }
   ],
   "total_lines": 100,
-  "log_file": "/app/logs/coffee-relay.log",
+  "log_file": "/app/logs/meticai-server.log",
   "filters": {
     "lines_requested": 100,
     "level": null,
@@ -231,8 +231,8 @@ Make it executable: `chmod +x collect-logs.sh`
 
 **Solutions**:
 1. Check that the logs directory mount exists in docker-compose.yml
-2. Restart the coffee-relay container: `docker restart coffee-relay`
-3. Check container logs: `docker logs coffee-relay`
+2. Restart the meticai-server container: `docker restart meticai-server`
+3. Check container logs: `docker logs meticai-server`
 4. Verify directory permissions: `ls -la logs/`
 
 ### Log files too large
@@ -241,8 +241,8 @@ Make it executable: `chmod +x collect-logs.sh`
 
 **Solution**: Log rotation should handle this automatically. If not:
 1. Check that log rotation is configured (should be by default)
-2. Manually rotate: `mv logs/coffee-relay.log logs/coffee-relay.log.old`
-3. Restart container: `docker restart coffee-relay`
+2. Manually rotate: `mv logs/meticai-server.log logs/meticai-server.log.old`
+3. Restart container: `docker restart meticai-server`
 
 ### Cannot access /api/logs endpoint
 
@@ -250,8 +250,8 @@ Make it executable: `chmod +x collect-logs.sh`
 
 **Solutions**:
 1. Ensure you're using the correct URL: `http://YOUR_IP:8000/api/logs`
-2. Check that coffee-relay container is running: `docker ps | grep coffee-relay`
-3. Check container logs for errors: `docker logs coffee-relay`
+2. Check that meticai-server container is running: `docker ps | grep meticai-server`
+3. Check container logs for errors: `docker logs meticai-server`
 
 ### Missing request context
 
@@ -292,7 +292,7 @@ docker-compose up -d
 
 1. **Regular monitoring**: Check error logs periodically
    ```bash
-   tail -f logs/coffee-relay-errors.log | jq .
+   tail -f logs/meticai-server-errors.log | jq .
    ```
 
 2. **Archive old logs**: Before major updates, back up logs
@@ -303,16 +303,16 @@ docker-compose up -d
 3. **Search efficiently**: Use `jq` for JSON filtering
    ```bash
    # Find all rate limit errors
-   jq 'select(.message | contains("rate limit"))' logs/coffee-relay.log
+   jq 'select(.message | contains("rate limit"))' logs/meticai-server.log
    
    # Find slow requests (> 5 seconds)
-   jq 'select(.duration_ms > 5000)' logs/coffee-relay.log
+   jq 'select(.duration_ms > 5000)' logs/meticai-server.log
    ```
 
 4. **Track specific users**: Use request IDs to follow a user's journey
    ```bash
    REQUEST_ID="a3f2d1e9-5c8b-4f1a-9d3e-2a7b6c8d9e0f"
-   grep "$REQUEST_ID" logs/coffee-relay.log | jq .
+   grep "$REQUEST_ID" logs/meticai-server.log | jq .
    ```
 
 ## Privacy Considerations

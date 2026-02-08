@@ -124,7 +124,7 @@ detect_running_containers() {
     
     # Check for MeticAI-related containers (running or stopped)
     local containers
-    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|meticai-server|meticai-web)" || true)
     
     if [ -n "$containers" ]; then
         echo "$containers"
@@ -148,7 +148,7 @@ stop_and_remove_containers() {
     
     # Fallback: Remove containers individually
     local containers
-    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|meticai-server|meticai-web)" || true)
     
     if [ -n "$containers" ]; then
         while IFS= read -r container; do
@@ -1420,7 +1420,7 @@ echo ""
 ################################################################################
 # Stop any existing containers, then build and start the Docker services
 # This includes:
-# - coffee-relay: FastAPI server for receiving requests
+# - meticai-server: FastAPI server for receiving requests
 # - gemini-client: AI brain using Google Gemini 2.0 Flash
 ################################################################################
 

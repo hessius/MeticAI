@@ -29,11 +29,11 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     restart: unless-stopped
 
-  # 3. Coffee Relay (The Bridge)
-  # Receives iPhone requests
-  coffee-relay:
-    build: ./coffee-relay
-    container_name: coffee-relay
+  # 3. MeticAI Server (The Bridge)
+  # Receives iPhone requests and orchestrates AI interactions
+  meticai-server:
+    build: ./meticai-server
+    container_name: meticai-server
     ports:
       - "8000:8000"
     volumes:
@@ -50,7 +50,7 @@ services:
       - ./.git:/app/.git
       # Mount docker-compose and Dockerfiles for container rebuild
       - ./docker-compose.yml:/app/docker-compose.yml:ro
-      - ./coffee-relay:/app/coffee-relay:ro
+      - ./meticai-server:/app/meticai-server:ro
       - ./gemini-client:/app/gemini-client:ro
       # Mount rebuild flag for host-side watcher
       - ./.rebuild-needed:/app/.rebuild-needed
@@ -84,4 +84,4 @@ services:
       - ./meticai-web/public/config.json:/usr/share/nginx/html/config.json:ro
     restart: unless-stopped
     depends_on:
-      - coffee-relay
+      - meticai-server

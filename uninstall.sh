@@ -132,11 +132,11 @@ if command -v docker &> /dev/null; then
     # List MeticAI-related images (matches various naming patterns: meticai-, met-ai-, meticai-web-, etc.)
     # Try without sudo first
     if docker images &> /dev/null; then
-        IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
+        IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|meticai-server|gemini-client|meticulous-mcp|meticulous-source)" || true)
         USED_SUDO_FOR_IMAGES=false
     # If the docker command failed (permission denied), try with sudo on Linux
     elif [[ "$OSTYPE" != "darwin"* ]] && sudo docker images &> /dev/null; then
-        IMAGES=$(sudo docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|coffee-relay|gemini-client|meticulous-mcp|meticulous-source)" || true)
+        IMAGES=$(sudo docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "(meticai|met-ai|meticai-server|gemini-client|meticulous-mcp|meticulous-source)" || true)
         USED_SUDO_FOR_IMAGES=true
     else
         IMAGES=""

@@ -834,7 +834,7 @@ rebuild_containers() {
 {
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "reason": "Container update triggered from web UI",
-  "containers": ["coffee-relay", "gemini-client", "meticai-web"]
+  "containers": ["meticai-server", "gemini-client", "meticai-web"]
 }
 REBUILD_EOF
         

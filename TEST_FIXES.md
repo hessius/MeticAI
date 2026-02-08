@@ -108,18 +108,18 @@ def test_load_history_with_missing_file(self, mock_open_func, mock_ensure):
 
 ### Changes Made
 
-#### File: `coffee-relay/main.py`
+#### File: `meticai-server/main.py`
 - **Lines 39-47**: Added `DATA_DIR` configuration with test mode support
 - **Lines 1016, 1235, 1266, 1337, 1413**: Updated all hardcoded paths to use `DATA_DIR`
 - **Lines 2411-2426**: Added null safety checks for `prompt_result` in `generate_profile_image()`
 - **Impact**: Enables tests to run with temporary directories, prevents NoneType errors
 
-#### File: `coffee-relay/conftest.py` (new file)
+#### File: `meticai-server/conftest.py` (new file)
 - **Purpose**: Set up test environment variables before main.py is imported
 - **Lines 10-16**: Configure TEST_MODE and DATA_DIR for all tests
 - **Impact**: All tests automatically use temporary directories
 
-#### File: `coffee-relay/test_main.py`
+#### File: `meticai-server/test_main.py`
 - **Lines 3497, 3520, 3563, 3611, 3666, 3682**: Added `force_refresh="true"` to 6 LLM analysis tests
 - **Lines 1843-1856**: Fixed `test_load_history_with_missing_file` to mock `open()` instead of `Path`
 - **Impact**: Tests properly bypass cache and handle file operations
@@ -234,7 +234,7 @@ def test_trigger_update_success(self, mock_subprocess, mock_path_class, client):
 - **Line 177**: Updated expected prompt text to match actual implementation
 - **Impact**: Minimal - single line change
 
-### File: `coffee-relay/test_main.py`
+### File: `meticai-server/test_main.py`
 - **Line 13**: Added `mock_open` import for file mocking
 - **TestStatusEndpoint (6 tests)**: 
   - Removed `subprocess.run` mocks

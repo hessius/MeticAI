@@ -4,8 +4,8 @@ This directory contains comprehensive tests for all scripts in the MeticAI repos
 
 ## Test Coverage
 
-### 1. Python Tests (coffee-relay)
-Location: `coffee-relay/test_main.py`
+### 1. Python Tests (meticai-server)
+Location: `meticai-server/test_main.py`
 
 Tests for the FastAPI coffee relay application:
 - `/analyze_coffee` endpoint functionality
@@ -52,7 +52,7 @@ Tests for the `web_install.sh` remote installation script:
 
 #### For Python Tests
 ```bash
-cd coffee-relay
+cd meticai-server
 pip install -r requirements-test.txt
 ```
 
@@ -75,7 +75,7 @@ sudo ./install.sh /usr/local
 
 ```bash
 # Run all Python tests
-cd coffee-relay
+cd meticai-server
 pytest test_main.py -v
 
 # Run with coverage report
@@ -116,7 +116,7 @@ bats -t test_web_install.bats
 - **PASSED**: Test executed successfully
 - **FAILED**: Test assertion failed, indicates a bug
 - **ERROR**: Test encountered an exception
-- Coverage reports are generated in `coffee-relay/htmlcov/`
+- Coverage reports are generated in `meticai-server/htmlcov/`
 
 ### Bash Tests
 - **✓**: Test passed
@@ -151,18 +151,18 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd coffee-relay
+          cd meticai-server
           pip install -r requirements-test.txt
       
       - name: Run Python tests
         run: |
-          cd coffee-relay
+          cd meticai-server
           pytest test_main.py -v --cov=main --cov-report=xml
       
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         with:
-          file: ./coffee-relay/coverage.xml
+          file: ./meticai-server/coverage.xml
 
   bash-tests:
     runs-on: ubuntu-latest
@@ -235,8 +235,8 @@ Example:
 
 **Issue**: Import errors
 ```bash
-# Solution: Ensure you're in the coffee-relay directory
-cd coffee-relay
+# Solution: Ensure you're in the meticai-server directory
+cd meticai-server
 export PYTHONPATH=.
 pytest test_main.py
 ```

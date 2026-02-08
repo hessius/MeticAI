@@ -5,7 +5,7 @@ This document summarizes the comprehensive test suite for MeticAI. All tests val
 
 ## Test Statistics (Updated 2026-01-25)
 
-### Python Tests (coffee-relay/)
+### Python Tests (meticai-server/)
 - **Total Tests**: 77 (main.py) + 19 (logging) = 96 total
 - **Code Coverage**: 
   - main.py: 25% (369/1504 statements)
@@ -147,7 +147,7 @@ This document summarizes the comprehensive test suite for MeticAI. All tests val
 
 #### Python Tests
 ```bash
-cd coffee-relay
+cd meticai-server
 pip install -r requirements-test.txt
 pytest test_main.py -v --cov=main --cov-report=term
 ```
