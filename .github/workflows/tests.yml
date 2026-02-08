@@ -44,7 +44,7 @@ jobs:
           pytest test_main.py test_logging.py -v --cov=main --cov=logging_config --cov-report=xml --cov-report=term-missing
       
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           file: ./coffee-relay/coverage.xml
           flags: python
