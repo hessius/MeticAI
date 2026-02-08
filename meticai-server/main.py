@@ -213,6 +213,39 @@ app.include_router(profiles.router)
 app.include_router(scheduling.router)
 
 
+# ============================================================================
+# Backward Compatibility Re-exports
+# ============================================================================
+# These re-exports allow existing tests and code to import from 'main' 
+# even though the functions have been moved to service modules.
+# TODO: Update tests to import from the new locations and remove these.
+
+from config import DATA_DIR, MAX_UPLOAD_SIZE
+from utils.file_utils import atomic_write_json, deep_convert_to_dict
+from utils.sanitization import sanitize_profile_name_for_filename as _sanitize_profile_name_for_filename
+from services.gemini_service import parse_gemini_error, get_vision_model
+from services.meticulous_service import get_meticulous_api, decompress_shot_data
+from services.cache_service import (
+    get_cached_llm_analysis, save_llm_analysis_to_cache
+)
+from services.settings_service import (
+    ensure_settings_file as _ensure_settings_file, 
+    load_settings as _load_settings, 
+    SETTINGS_FILE
+)
+from services.scheduling_state import (
+    _scheduled_shots, _scheduled_tasks, _recurring_schedules,
+    SchedulePersistence
+)
+from api.routes.profiles import (
+    ScheduledShotsPersistence, RecurringSchedulesPersistence,
+    _get_next_occurrence, process_image_for_profile
+)
+
+# Re-export genai for tests that mock it
+import google.generativeai as genai
+
+
 # Common prompt sections for profile creation
 BARISTA_PERSONA = (
     "PERSONA: You are a modern, experimental barista with deep expertise in espresso profiling. "
