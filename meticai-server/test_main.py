@@ -37,7 +37,8 @@ from services.cache_service import (
     _load_shot_cache, _save_shot_cache
 )
 from services.analysis_service import _safe_float, _perform_local_shot_analysis, _generate_profile_description
-from services.meticulous_service import get_meticulous_api, fetch_shot_data, process_image_for_profile
+from services.meticulous_service import get_meticulous_api, fetch_shot_data
+from api.routes.profiles import process_image_for_profile
 from utils.sanitization import sanitize_profile_name_for_filename, clean_profile_name
 from utils.file_utils import atomic_write_json
 

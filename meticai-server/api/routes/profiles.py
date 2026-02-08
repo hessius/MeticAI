@@ -1,27 +1,20 @@
 """Profile management endpoints."""
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
-from typing import Optional
+from typing import Optional, Any
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 import json
 import subprocess
 import logging
-import os
-import tempfile
+import asyncio
 
+from config import DATA_DIR
 from services.meticulous_service import get_meticulous_api
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Data directory configuration
-TEST_MODE = os.environ.get("TEST_MODE") == "true"
-if TEST_MODE:
-    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-else:
-    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
@@ -2469,28 +2462,21 @@ class ScheduledShotsPersistence:
     or host reboots.
     """
     
-    def __init__(self, persistence_file: str = "/app/data/scheduled_shots.json"):
+    def __init__(self, persistence_file: str | None = None):
         """Initialize the persistence layer.
         
         Args:
             persistence_file: Path to the JSON file for storing scheduled shots.
+                             Defaults to DATA_DIR/scheduled_shots.json.
         """
-        self.persistence_file = Path(persistence_file)
+        if persistence_file is None:
+            self.persistence_file = DATA_DIR / "scheduled_shots.json"
+        else:
+            self.persistence_file = Path(persistence_file)
         self._lock = asyncio.Lock()
         
         # Ensure the parent directory exists
-        try:
-            self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
-        except (PermissionError, OSError) as e:
-            # Fallback to temp directory if we can't create the default location
-            logger.warning(
-                f"Could not create persistence directory at {self.persistence_file.parent}, "
-                f"using temporary directory: {e}"
-            )
-            temp_dir = Path(tempfile.gettempdir()) / "meticai_data"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            self.persistence_file = temp_dir / "scheduled_shots.json"
-            logger.info(f"Using persistence file: {self.persistence_file}")
+        self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
     
     async def save(self, scheduled_shots: dict) -> None:
         """Save scheduled shots to disk.
@@ -2590,17 +2576,14 @@ class RecurringSchedulesPersistence:
     Recurring schedules define repeated preheat/shot times (e.g., daily, weekdays).
     """
     
-    def __init__(self, persistence_file: str = "/app/data/recurring_schedules.json"):
-        self.persistence_file = Path(persistence_file)
+    def __init__(self, persistence_file: str | None = None):
+        if persistence_file is None:
+            self.persistence_file = DATA_DIR / "recurring_schedules.json"
+        else:
+            self.persistence_file = Path(persistence_file)
         self._lock = asyncio.Lock()
         
-        try:
-            self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
-        except (PermissionError, OSError) as e:
-            logger.warning(f"Could not create persistence directory: {e}")
-            temp_dir = Path(tempfile.gettempdir()) / "meticai_data"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            self.persistence_file = temp_dir / "recurring_schedules.json"
+        self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
     
     async def save(self, schedules: dict) -> None:
         """Save recurring schedules to disk."""
