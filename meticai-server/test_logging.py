@@ -313,7 +313,7 @@ class TestLogRetrieval:
         assert "meticai-server-errors.log" in data["log_file"]
     
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.Path')
+    @patch('api.routes.system.Path')
     def test_get_logs_missing_file(self, mock_path, client):
         """Test that /api/logs handles missing log file gracefully."""
         mock_log_file = Mock()
