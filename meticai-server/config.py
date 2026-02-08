@@ -81,6 +81,7 @@ config = Config()
 
 # Backward compatibility - export commonly used constants
 DATA_DIR = config.DATA_DIR
+TEST_MODE = config.TEST_MODE
 UPDATE_CHECK_INTERVAL = config.UPDATE_CHECK_INTERVAL
 MAX_UPLOAD_SIZE = config.MAX_UPLOAD_SIZE
 VERSION_PATTERN = config.VERSION_PATTERN
