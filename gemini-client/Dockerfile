@@ -1,4 +1,4 @@
-FROM node:22-slim
+FROM node:25-slim
 
 # Install curl so we can download the official script
 RUN apt-get update && apt-get install -y curl git
