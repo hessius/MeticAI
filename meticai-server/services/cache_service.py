@@ -8,32 +8,21 @@ This module provides caching functionality for:
 
 import json
 import time
-import os
-import tempfile
 from pathlib import Path
 from typing import Optional
 from logging_config import get_logger
 
+from config import DATA_DIR, LLM_CACHE_TTL_SECONDS, SHOT_CACHE_STALE_SECONDS
 from utils.file_utils import atomic_write_json
 from utils.sanitization import sanitize_profile_name_for_filename
 
 logger = get_logger()
-
-# Data directory configuration - use environment variable or default
-# In test mode, use temporary directory to avoid permission issues
-TEST_MODE = os.environ.get("TEST_MODE") == "true"
-if TEST_MODE:
-    DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-else:
-    DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
 
 # ============================================
 # LLM Analysis Cache Configuration
 # ============================================
 
 LLM_CACHE_FILE = DATA_DIR / "llm_analysis_cache.json"
-LLM_CACHE_TTL_SECONDS = 3 * 24 * 60 * 60  # 3 days
 
 
 def _ensure_llm_cache_file():
@@ -104,7 +93,6 @@ def save_llm_analysis_to_cache(profile_name: str, shot_date: str, shot_filename:
 # ============================================
 
 SHOT_CACHE_FILE = DATA_DIR / "shot_cache.json"
-SHOT_CACHE_STALE_SECONDS = 3600  # 60 minutes - after this, data is stale but still returned
 
 
 def _ensure_shot_cache_file():
