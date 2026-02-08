@@ -30,41 +30,23 @@ Phase 4 focuses on improving API documentation and creating a unified configurat
 
 ### Step 1: Create Unified Config Module
 
-Create `meticai-server/config.py`:
+Create `meticai-server/config.py` (simple class-based approach for no new dependencies):
 ```python
-from pydantic_settings import BaseSettings
-from pydantic import Field
-from pathlib import Path
-import os
-import tempfile
-
-class Settings(BaseSettings):
-    # API Keys
-    gemini_api_key: str = Field(..., env="GEMINI_API_KEY")
+class Config:
+    # Environment-based configuration
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    METICULOUS_IP = os.environ.get("METICULOUS_IP")
     
-    # Machine Configuration  
-    meticulous_ip: str = Field(..., env="METICULOUS_IP")
-    pi_ip: str = Field(..., env="PI_IP")
+    # Application constants
+    UPDATE_CHECK_INTERVAL = 7200  # 2 hours
+    MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
     
-    # Data Directories
-    data_dir: Path = Field(default="/app/data", env="DATA_DIR")
-    log_dir: Path = Field(default="/app/logs", env="LOG_DIR")
-    
-    # Application Settings
-    update_check_interval: int = 7200  # 2 hours
-    max_upload_size: int = 10 * 1024 * 1024  # 10 MB
-    
-    # Cache Settings
-    llm_cache_ttl_seconds: int = 259200  # 3 days
-    shot_cache_stale_seconds: int = 3600  # 1 hour
-    
-    # Test Mode
-    test_mode: bool = Field(default=False, env="TEST_MODE")
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    # Cache settings
+    LLM_CACHE_TTL_SECONDS = 259200  # 3 days
+    SHOT_CACHE_STALE_SECONDS = 3600  # 1 hour
 ```
+
+Note: Using simple class instead of pydantic-settings to avoid adding new dependencies.
 
 ### Step 2: Update Code to Use Config
 
