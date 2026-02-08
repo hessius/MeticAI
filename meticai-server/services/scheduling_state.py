@@ -123,11 +123,16 @@ def get_next_occurrence(schedule: dict) -> Optional[datetime]:
                 # Check if this day is valid based on last_run
                 last_run = schedule.get("last_run")
                 if last_run:
-                    # Handle ISO format with trailing Z (replace with +00:00 for fromisoformat)
-                    last_run_str = last_run.replace('Z', '+00:00') if isinstance(last_run, str) else last_run
-                    last_run_dt = datetime.fromisoformat(last_run_str)
-                    days_since = (candidate - last_run_dt).days
-                    if days_since >= interval_days:
+                    try:
+                        # Handle ISO format with trailing Z (replace with +00:00 for fromisoformat)
+                        last_run_str = last_run.replace('Z', '+00:00') if isinstance(last_run, str) else str(last_run)
+                        last_run_dt = datetime.fromisoformat(last_run_str)
+                        days_since = (candidate - last_run_dt).days
+                        if days_since >= interval_days:
+                            return candidate
+                    except (ValueError, AttributeError):
+                        # Invalid datetime format - treat as no last run
+                        logger.warning(f"Invalid last_run format for schedule {schedule.get('id')}: {last_run}")
                         return candidate
                 else:
                     # No last run, so this is the first run
