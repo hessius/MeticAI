@@ -92,6 +92,8 @@ def get_next_occurrence(schedule: dict) -> Optional[datetime]:
     Returns:
         Next datetime when the schedule should run, or None if invalid.
     """
+    MAX_SCHEDULING_DAYS = 400  # Maximum ~1 year ahead to search for next occurrence
+    
     try:
         time_str = schedule.get("time", "07:00")
         hour, minute = map(int, time_str.split(":"))
@@ -108,7 +110,7 @@ def get_next_occurrence(schedule: dict) -> Optional[datetime]:
             candidate += timedelta(days=1)
         
         # Find the next valid day based on recurrence type
-        for _ in range(400):  # Max ~1 year ahead
+        for _ in range(MAX_SCHEDULING_DAYS):
             weekday = candidate.weekday()  # 0=Monday, 6=Sunday
             
             if recurrence_type == "daily":

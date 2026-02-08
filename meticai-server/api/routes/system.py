@@ -68,7 +68,7 @@ async def check_updates(request: Request):
         
         # Create signal file for host-side watcher
         signal_path = Path("/app/.update-check-requested")
-        signal_path.write_text(f"requested_at: {datetime.utcnow().isoformat()}\n")
+        signal_path.write_text(f"requested_at: {datetime.now(timezone.utc).isoformat()}\n")
         
         logger.info(
             "Update check signal created, waiting for host to process",

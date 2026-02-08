@@ -12,9 +12,28 @@ from services.meticulous_service import get_meticulous_api, execute_scheduled_sh
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# Constants
+PREHEAT_DURATION_MINUTES = 15
+
 # In-memory storage for scheduled shots
 _scheduled_shots = {}
+_scheduled_tasks = {}
 _recurring_schedules = {}
+
+
+async def _save_scheduled_shots():
+    """Placeholder - in production this should persist to disk."""
+    pass
+
+
+async def _save_recurring_schedules():
+    """Placeholder - in production this should persist to disk."""
+    pass
+
+
+async def _schedule_next_recurring(schedule_id: str, schedule: dict):
+    """Placeholder - in production this should schedule the next occurrence."""
+    pass
 
 
 def _get_next_occurrence(schedule: dict) -> Optional[datetime]:
