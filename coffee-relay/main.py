@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, Any
 import google.generativeai as genai
 from PIL import Image
 import io
@@ -32,10 +32,6 @@ except (PermissionError, OSError) as e:
         extra={"original_error": str(e)}
     )
 from datetime import datetime, timezone, timedelta
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def deep_convert_to_dict(obj):
@@ -3849,7 +3845,7 @@ def _safe_float(val, default: float = 0.0) -> float:
         return default
 
 
-def _resolve_variable(value, variables: list) -> tuple[any, str | None]:
+def _resolve_variable(value, variables: list) -> tuple[Any, str | None]:
     """Resolve a variable reference like '$flow_hold limit' to its actual value.
     
     Returns:
