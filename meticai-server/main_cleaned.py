@@ -258,14 +258,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register API routers
-app.include_router(coffee.router)
-app.include_router(system.router)
-app.include_router(history.router)
-app.include_router(shots.router)
-app.include_router(profiles.router)
-app.include_router(scheduling.router)
-
 
 # Common prompt sections for profile creation
 BARISTA_PERSONA = (
