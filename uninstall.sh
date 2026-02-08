@@ -108,7 +108,7 @@ if command -v docker &> /dev/null; then
                 fi
                 UNINSTALLED_ITEMS+=("Docker containers")
             else
-                log_warning "Could not stop containers (they may not be running)"
+                log_warning "Unable to stop containers - they are not running"
                 KEPT_ITEMS+=("Docker containers (not found)")
             fi
         else
