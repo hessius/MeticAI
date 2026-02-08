@@ -7393,67 +7393,67 @@ class TestSchedulingStateDirect:
     
     @pytest.mark.asyncio
     async def test_schedule_persistence_save_and_load(self, tmp_path):
-        """Test SchedulePersistence save and load operations."""
-        from services.scheduling_state import SchedulePersistence
+        """Test ScheduledShotsPersistence save and load operations."""
+        from services.scheduling_state import ScheduledShotsPersistence
         
-        with patch('services.scheduling_state.DATA_DIR', tmp_path):
-            persistence = SchedulePersistence("test_schedules.json")
-            
-            # Test save
-            test_data = {"schedule1": {"name": "Test", "time": "07:00"}}
-            await persistence.save(test_data)
-            
-            # Verify file was created
-            assert persistence.filepath.exists()
-            
-            # Test load
-            loaded_data = await persistence.load()
-            assert loaded_data == test_data
+        persistence_file = tmp_path / "test_schedules.json"
+        persistence = ScheduledShotsPersistence(persistence_file)
+        
+        # Test save - use status: scheduled to ensure it's saved
+        test_data = {"schedule1": {"name": "Test", "time": "07:00", "status": "scheduled"}}
+        await persistence.save(test_data)
+        
+        # Verify file was created
+        assert persistence.persistence_file.exists()
+        
+        # Test load
+        loaded_data = await persistence.load()
+        assert loaded_data == test_data
     
     @pytest.mark.asyncio
     async def test_schedule_persistence_load_nonexistent(self, tmp_path):
         """Test loading from nonexistent file returns empty dict."""
-        from services.scheduling_state import SchedulePersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
-        with patch('services.scheduling_state.DATA_DIR', tmp_path):
-            persistence = SchedulePersistence("nonexistent.json")
-            result = await persistence.load()
-            assert result == {}
+        persistence_file = tmp_path / "nonexistent.json"
+        persistence = ScheduledShotsPersistence(persistence_file)
+        result = await persistence.load()
+        assert result == {}
     
     @pytest.mark.asyncio
     async def test_schedule_persistence_save_error_handling(self, tmp_path):
         """Test save handles errors gracefully."""
-        from services.scheduling_state import SchedulePersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
-        with patch('services.scheduling_state.DATA_DIR', tmp_path):
-            persistence = SchedulePersistence("test.json")
-            
-            # Mock open to raise an error
-            with patch('builtins.open', side_effect=PermissionError("Permission denied")):
-                # Should not raise, just log error
-                await persistence.save({"test": "data"})
+        persistence_file = tmp_path / "test.json"
+        persistence = ScheduledShotsPersistence(persistence_file)
+        
+        # Mock open to raise an error
+        with patch('builtins.open', side_effect=PermissionError("Permission denied")):
+            # Should not raise, just log error
+            await persistence.save({"test": "data", "status": "scheduled"})
     
     @pytest.mark.asyncio
     async def test_schedule_persistence_load_error_handling(self, tmp_path):
         """Test load handles corrupted JSON gracefully."""
-        from services.scheduling_state import SchedulePersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
-        with patch('services.scheduling_state.DATA_DIR', tmp_path):
-            persistence = SchedulePersistence("bad.json")
-            
-            # Write invalid JSON
-            persistence.filepath.write_text("not valid json {{{")
-            
-            # Should return empty dict, not raise
-            result = await persistence.load()
-            assert result == {}
+        persistence_file = tmp_path / "bad.json"
+        persistence = ScheduledShotsPersistence(persistence_file)
+        
+        # Write invalid JSON
+        persistence.persistence_file.write_text("not valid json {{{")
+        
+        # Should return empty dict, not raise
+        result = await persistence.load()
+        assert result == {}
     
     @pytest.mark.asyncio
     async def test_save_scheduled_shots(self):
         """Test save_scheduled_shots function."""
         from services import scheduling_state
         
-        with patch.object(scheduling_state, '_persistence') as mock_persistence:
+        with patch.object(scheduling_state, '_scheduled_shots_persistence') as mock_persistence:
             mock_persistence.save = AsyncMock()
             scheduling_state._scheduled_shots = {"test": {"id": "test"}}
             
@@ -7465,7 +7465,7 @@ class TestSchedulingStateDirect:
         """Test load_scheduled_shots function."""
         from services import scheduling_state
         
-        with patch.object(scheduling_state, '_persistence') as mock_persistence:
+        with patch.object(scheduling_state, '_scheduled_shots_persistence') as mock_persistence:
             mock_persistence.load = AsyncMock(return_value={"loaded": {"id": "loaded"}})
             
             result = await scheduling_state.load_scheduled_shots()
@@ -7476,7 +7476,7 @@ class TestSchedulingStateDirect:
         """Test save_recurring_schedules function."""
         from services import scheduling_state
         
-        with patch.object(scheduling_state, '_recurring_persistence') as mock_persistence:
+        with patch.object(scheduling_state, '_recurring_schedules_persistence') as mock_persistence:
             mock_persistence.save = AsyncMock()
             scheduling_state._recurring_schedules = {"recurring1": {"name": "Test"}}
             
@@ -7488,7 +7488,7 @@ class TestSchedulingStateDirect:
         """Test load_recurring_schedules function."""
         from services import scheduling_state
         
-        with patch.object(scheduling_state, '_recurring_persistence') as mock_persistence:
+        with patch.object(scheduling_state, '_recurring_schedules_persistence') as mock_persistence:
             mock_persistence.load = AsyncMock(return_value={"schedule1": {"enabled": True}})
             
             await scheduling_state.load_recurring_schedules()

@@ -2456,267 +2456,32 @@ Remember: NO information should be lost in this conversion!"""
 # ============================================================================
 
 # ==============================================================================
-# Scheduled Shots Persistence Layer
+# Scheduled Shots - Import from centralized scheduling_state module
 # ==============================================================================
+# All scheduling state and persistence is managed by services.scheduling_state
+# to avoid duplicate state across modules
 
-class ScheduledShotsPersistence:
-    """Manages persistence of scheduled shots to disk.
-    
-    Scheduled shots are stored in a JSON file to survive server restarts.
-    This ensures that scheduled shots are not lost during crashes, deploys,
-    or host reboots.
-    """
-    
-    def __init__(self, persistence_file: str | None = None):
-        """Initialize the persistence layer.
-        
-        Args:
-            persistence_file: Path to the JSON file for storing scheduled shots.
-                             Defaults to DATA_DIR/scheduled_shots.json.
-        """
-        if persistence_file is None:
-            self.persistence_file = DATA_DIR / "scheduled_shots.json"
-        else:
-            self.persistence_file = Path(persistence_file)
-        self._lock = asyncio.Lock()
-        
-        # Ensure the parent directory exists
-        self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    async def save(self, scheduled_shots: dict) -> None:
-        """Save scheduled shots to disk.
-        
-        Args:
-            scheduled_shots: Dictionary of scheduled shots to persist.
-        """
-        async with self._lock:
-            try:
-                # Only save shots that are scheduled or preheating (not completed/failed/cancelled)
-                active_shots = {
-                    shot_id: shot for shot_id, shot in scheduled_shots.items()
-                    if shot.get("status") in ["scheduled", "preheating"]
-                }
-                
-                # Write atomically using a temporary file
-                temp_file = self.persistence_file.with_suffix('.tmp')
-                with open(temp_file, 'w') as f:
-                    json.dump(active_shots, f, indent=2)
-                
-                # Atomic rename
-                temp_file.replace(self.persistence_file)
-                
-                logger.debug(f"Persisted {len(active_shots)} scheduled shots to {self.persistence_file}")
-            except Exception as e:
-                logger.error(f"Failed to save scheduled shots: {e}", exc_info=True)
-    
-    async def load(self) -> dict:
-        """Load scheduled shots from disk.
-        
-        Returns:
-            Dictionary of scheduled shots, or empty dict if file doesn't exist or is invalid.
-        """
-        async with self._lock:
-            try:
-                if not self.persistence_file.exists():
-                    logger.info("No persisted scheduled shots found (first run)")
-                    return {}
-                
-                with open(self.persistence_file, 'r') as f:
-                    data = json.load(f)
-                
-                if not isinstance(data, dict):
-                    logger.warning("Invalid scheduled shots file format, ignoring")
-                    return {}
-                
-                logger.info(f"Loaded {len(data)} scheduled shots from {self.persistence_file}")
-                return data
-            except json.JSONDecodeError as e:
-                logger.error(f"Corrupt scheduled shots file, ignoring: {e}")
-                # Backup the corrupt file
-                try:
-                    backup_file = self.persistence_file.with_suffix('.corrupt')
-                    self.persistence_file.rename(backup_file)
-                    logger.info(f"Backed up corrupt file to {backup_file}")
-                except Exception:
-                    # Ignore errors during backup (file system issues, permissions, etc.)
-                    pass
-                return {}
-            except Exception as e:
-                logger.error(f"Failed to load scheduled shots: {e}", exc_info=True)
-                return {}
-    
-    async def clear(self) -> None:
-        """Clear all persisted scheduled shots."""
-        async with self._lock:
-            try:
-                if self.persistence_file.exists():
-                    self.persistence_file.unlink()
-                    logger.info("Cleared persisted scheduled shots")
-            except Exception as e:
-                logger.error(f"Failed to clear scheduled shots: {e}", exc_info=True)
-
-
-# Initialize persistence layer
-_persistence = ScheduledShotsPersistence()
-
-# Scheduled shots storage with persistence
-_scheduled_shots: dict = {}
-_scheduled_tasks: dict = {}
-
-PREHEAT_DURATION_MINUTES = 10
-
-
-async def _save_scheduled_shots():
-    """Helper to persist scheduled shots to disk."""
-    await _persistence.save(_scheduled_shots)
-
-
-# ==============================================================================
-# Recurring Schedules Persistence Layer
-# ==============================================================================
-
-class RecurringSchedulesPersistence:
-    """Manages persistence of recurring schedules to disk.
-    
-    Recurring schedules define repeated preheat/shot times (e.g., daily, weekdays).
-    """
-    
-    def __init__(self, persistence_file: str | None = None):
-        if persistence_file is None:
-            self.persistence_file = DATA_DIR / "recurring_schedules.json"
-        else:
-            self.persistence_file = Path(persistence_file)
-        self._lock = asyncio.Lock()
-        
-        self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    async def save(self, schedules: dict) -> None:
-        """Save recurring schedules to disk."""
-        async with self._lock:
-            try:
-                # Only save enabled schedules
-                active_schedules = {
-                    sid: s for sid, s in schedules.items()
-                    if s.get("enabled", True)
-                }
-                
-                temp_file = self.persistence_file.with_suffix('.tmp')
-                with open(temp_file, 'w') as f:
-                    json.dump(active_schedules, f, indent=2)
-                temp_file.replace(self.persistence_file)
-                
-                logger.debug(f"Persisted {len(active_schedules)} recurring schedules")
-            except Exception as e:
-                logger.error(f"Failed to save recurring schedules: {e}", exc_info=True)
-    
-    async def load(self) -> dict:
-        """Load recurring schedules from disk."""
-        async with self._lock:
-            try:
-                if not self.persistence_file.exists():
-                    return {}
-                
-                with open(self.persistence_file, 'r') as f:
-                    data = json.load(f)
-                
-                if not isinstance(data, dict):
-                    return {}
-                
-                logger.info(f"Loaded {len(data)} recurring schedules")
-                return data
-            except Exception as e:
-                logger.error(f"Failed to load recurring schedules: {e}", exc_info=True)
-                return {}
-
-
-# Initialize recurring schedules persistence
-_recurring_persistence = RecurringSchedulesPersistence()
-_recurring_schedules: dict = {}
-
-
-async def _save_recurring_schedules():
-    """Helper to persist recurring schedules to disk."""
-    await _recurring_persistence.save(_recurring_schedules)
-
-
-async def _load_recurring_schedules():
-    """Load recurring schedules from disk."""
-    global _recurring_schedules
-    _recurring_schedules = await _recurring_persistence.load()
-
-
-def _get_next_occurrence(schedule: dict) -> Optional[datetime]:
-    """Calculate the next occurrence of a recurring schedule.
-    
-    Args:
-        schedule: Recurring schedule dict with:
-            - time: HH:MM format
-            - recurrence_type: 'daily', 'weekdays', 'weekends', 'interval', 'specific_days'
-            - interval_days: For 'interval' type, number of days between runs
-            - days_of_week: For 'specific_days' type, list of day numbers (0=Monday)
-    
-    Returns:
-        Next datetime when the schedule should run, or None if invalid.
-    """
-    try:
-        time_str = schedule.get("time", "07:00")
-        hour, minute = map(int, time_str.split(":"))
-        recurrence_type = schedule.get("recurrence_type", "daily")
-        
-        now = datetime.now(timezone.utc)
-        today = now.date()
-        
-        # Start checking from today
-        candidate = datetime(today.year, today.month, today.day, hour, minute, tzinfo=timezone.utc)
-        
-        # If today's time has passed, start from tomorrow
-        if candidate <= now:
-            candidate += timedelta(days=1)
-        
-        # Find the next valid day based on recurrence type
-        for _ in range(400):  # Max ~1 year ahead
-            weekday = candidate.weekday()  # 0=Monday, 6=Sunday
-            
-            if recurrence_type == "daily":
-                return candidate
-            elif recurrence_type == "weekdays":
-                if weekday < 5:  # Monday-Friday
-                    return candidate
-            elif recurrence_type == "weekends":
-                if weekday >= 5:  # Saturday-Sunday
-                    return candidate
-            elif recurrence_type == "specific_days":
-                days = schedule.get("days_of_week", [])
-                if weekday in days:
-                    return candidate
-            elif recurrence_type == "interval":
-                # For interval, we need to check against last_run
-                last_run_str = schedule.get("last_run")
-                interval_days = schedule.get("interval_days", 1)
-                
-                if not last_run_str:
-                    return candidate  # First run
-                
-                last_run = datetime.fromisoformat(last_run_str.replace('Z', '+00:00'))
-                next_run = last_run + timedelta(days=interval_days)
-                next_run = next_run.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                
-                if next_run > now:
-                    return next_run
-                else:
-                    # If we missed runs, schedule for next available slot
-                    return candidate
-            
-            candidate += timedelta(days=1)
-        
-        return None
-    except Exception as e:
-        logger.error(f"Failed to calculate next occurrence: {e}")
-        return None
+from services.scheduling_state import (
+    _scheduled_shots,
+    _scheduled_tasks,
+    _recurring_schedules,
+    ScheduledShotsPersistence,
+    RecurringSchedulesPersistence,
+    save_scheduled_shots as _save_scheduled_shots,
+    save_recurring_schedules as _save_recurring_schedules,
+    load_recurring_schedules as _load_recurring_schedules,
+    restore_scheduled_shots as _restore_scheduled_shots,
+    get_next_occurrence as _get_next_occurrence,
+    PREHEAT_DURATION_MINUTES,
+)
 
 
 async def _schedule_next_recurring(schedule_id: str, schedule: dict):
-    """Schedule the next occurrence of a recurring schedule."""
+    """Schedule the next occurrence of a recurring schedule.
+    
+    This function calculates when the next occurrence should happen based on 
+    the schedule configuration and creates a scheduled shot for that time.
+    """
     next_time = _get_next_occurrence(schedule)
     
     if not next_time:

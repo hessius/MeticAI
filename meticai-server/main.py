@@ -231,12 +231,14 @@ from services.settings_service import (
 )
 from services.scheduling_state import (
     _scheduled_shots, _scheduled_tasks, _recurring_schedules,
-    SchedulePersistence
+    SchedulePersistence, ScheduledShotsPersistence, RecurringSchedulesPersistence,
+    get_next_occurrence as _get_next_occurrence,
+    restore_scheduled_shots as _restore_scheduled_shots,
+    load_recurring_schedules as _load_recurring_schedules,
+    PREHEAT_DURATION_MINUTES,
 )
 from api.routes.profiles import (
-    ScheduledShotsPersistence, RecurringSchedulesPersistence,
-    _get_next_occurrence, process_image_for_profile,
-    _restore_scheduled_shots, _load_recurring_schedules,
+    process_image_for_profile,
     _schedule_next_recurring, _recurring_schedule_checker
 )
 
