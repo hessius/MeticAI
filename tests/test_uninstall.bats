@@ -49,7 +49,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../uninstall.sh"
 }
 
 @test "Script filters MeticAI-related images" {
-    run grep -q "grep -E.*meticai.*coffee-relay" "$SCRIPT_PATH"
+    run grep -q "grep -E.*meticai.*meticai-server" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
