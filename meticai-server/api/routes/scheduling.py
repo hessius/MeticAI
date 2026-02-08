@@ -7,104 +7,59 @@ import logging
 import asyncio
 
 from services.meticulous_service import get_meticulous_api
+from services.scheduling_state import (
+    _scheduled_shots,
+    _scheduled_tasks,
+    _recurring_schedules,
+    save_scheduled_shots as _save_scheduled_shots,
+    save_recurring_schedules as _save_recurring_schedules,
+    get_next_occurrence as _get_next_occurrence,
+    PREHEAT_DURATION_MINUTES,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Constants
-PREHEAT_DURATION_MINUTES = 15
-
-# In-memory storage for scheduled shots
-_scheduled_shots = {}
-_scheduled_tasks = {}
-_recurring_schedules = {}
-
-
-async def _save_scheduled_shots():
-    """Placeholder - in production this should persist to disk."""
-    pass
-
-
-async def _save_recurring_schedules():
-    """Placeholder - in production this should persist to disk."""
-    pass
-
 
 async def _schedule_next_recurring(schedule_id: str, schedule: dict):
-    """Placeholder - in production this should schedule the next occurrence."""
-    pass
-
-
-def _get_next_occurrence(schedule: dict) -> Optional[datetime]:
-    """Calculate the next occurrence of a recurring schedule.
+    """Schedule the next occurrence of a recurring schedule."""
+    next_occurrence = _get_next_occurrence(schedule)
+    if next_occurrence is None:
+        logger.warning(f"Could not calculate next occurrence for schedule {schedule_id}")
+        return
     
-    Args:
-        schedule: Recurring schedule dict with:
-            - time: HH:MM format
-            - recurrence_type: 'daily', 'weekdays', 'weekends', 'interval', 'specific_days'
-            - interval_days: For 'interval' type, number of days between runs
-            - days_of_week: For 'specific_days' type, list of day numbers (0=Monday)
+    # Calculate delay until next occurrence
+    now = datetime.now(timezone.utc)
+    delay_seconds = (next_occurrence - now).total_seconds()
     
-    Returns:
-        Next datetime when the schedule should run, or None if invalid.
-    """
-    try:
-        time_str = schedule.get("time", "07:00")
-        hour, minute = map(int, time_str.split(":"))
-        recurrence_type = schedule.get("recurrence_type", "daily")
-        
-        now = datetime.now(timezone.utc)
-        today = now.date()
-        
-        # Start checking from today
-        candidate = datetime(today.year, today.month, today.day, hour, minute, tzinfo=timezone.utc)
-        
-        # If today's time has passed, start from tomorrow
-        if candidate <= now:
-            candidate += timedelta(days=1)
-        
-        # Find the next valid day based on recurrence type
-        for _ in range(400):  # Max ~1 year ahead
-            weekday = candidate.weekday()  # 0=Monday, 6=Sunday
-            
-            if recurrence_type == "daily":
-                return candidate
-            elif recurrence_type == "weekdays":
-                if weekday < 5:  # Monday-Friday
-                    return candidate
-            elif recurrence_type == "weekends":
-                if weekday >= 5:  # Saturday-Sunday
-                    return candidate
-            elif recurrence_type == "specific_days":
-                days = schedule.get("days_of_week", [])
-                if weekday in days:
-                    return candidate
-            elif recurrence_type == "interval":
-                # For interval, we need to check against last_run
-                last_run_str = schedule.get("last_run")
-                interval_days = schedule.get("interval_days", 1)
-                
-                if not last_run_str:
-                    return candidate  # First run
-                
-                last_run = datetime.fromisoformat(last_run_str.replace('Z', '+00:00'))
-                next_run = last_run + timedelta(days=interval_days)
-                next_run = next_run.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                
-                if next_run > now:
-                    return next_run
-                else:
-                    # If we missed runs, schedule for next available slot
-                    return candidate
-            
-            candidate += timedelta(days=1)
-        
-        return None
-    except Exception as e:
-        logger.error(f"Failed to calculate next occurrence: {e}")
-        return None
-
-
+    if delay_seconds <= 0:
+        logger.warning(f"Next occurrence for {schedule_id} is in the past, skipping")
+        return
+    
+    # Create a unique shot ID for this occurrence
+    shot_id = f"recurring-{schedule_id}-{next_occurrence.isoformat()}"
+    
+    # Get schedule details
+    profile_id = schedule.get("profile_id")
+    preheat = schedule.get("preheat", True)
+    
+    # Add to scheduled shots
+    _scheduled_shots[shot_id] = {
+        "id": shot_id,
+        "profile_id": profile_id,
+        "scheduled_time": next_occurrence.isoformat(),
+        "preheat": preheat,
+        "status": "scheduled",
+        "recurring_schedule_id": schedule_id,
+        "created_at": now.isoformat()
+    }
+    
+    await _save_scheduled_shots()
+    
+    logger.info(
+        f"Scheduled recurring shot {shot_id} for {next_occurrence.isoformat()}",
+        extra={"schedule_id": schedule_id, "shot_id": shot_id}
+    )
 
 
 @router.get("/api/machine/status")
