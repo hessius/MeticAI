@@ -29,6 +29,8 @@ from main import app
 import main  # Import main module for constants and remaining functions
 
 # Import service modules
+import services.gemini_service
+import services.meticulous_service
 from services.gemini_service import get_vision_model, parse_gemini_error
 from services.history_service import save_to_history, load_history, save_history, ensure_history_file
 from services.cache_service import (
@@ -64,7 +66,7 @@ class TestAnalyzeCoffeeEndpoint:
     """Tests for the /analyze_coffee endpoint."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_coffee_success(self, mock_vision_model, client, sample_image):
         """Test successful coffee bag analysis."""
         # Mock the Gemini response
@@ -85,7 +87,7 @@ class TestAnalyzeCoffeeEndpoint:
         mock_vision_model.return_value.generate_content.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_coffee_with_whitespace(self, mock_vision_model, client, sample_image):
         """Test that response text is properly stripped of whitespace."""
         # Mock response with extra whitespace
@@ -102,7 +104,7 @@ class TestAnalyzeCoffeeEndpoint:
         assert response.json()["analysis"] == "Colombian Supremo, Medium Roast"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_coffee_api_error(self, mock_vision_model, client, sample_image):
         """Test error handling when Gemini API fails."""
         # Mock an API error
@@ -139,7 +141,7 @@ class TestAnalyzeCoffeeEndpoint:
         assert response.status_code == 422  # Unprocessable Entity
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_coffee_different_image_formats(self, mock_vision_model, client):
         """Test analysis with different image formats (JPEG, PNG, etc.)."""
         mock_response = Mock()
@@ -165,9 +167,9 @@ class TestAnalyzeAndProfileEndpoint:
     """Tests for the /analyze_and_profile endpoint (consolidated endpoint)."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_to_history')
+    @patch('api.routes.coffee.save_to_history')
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with only an image (no user preferences)."""
         # Mock history saving
@@ -210,7 +212,7 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Ethiopian Yirgacheffe, Light Roast, Floral Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_to_history')
+    @patch('api.routes.coffee.save_to_history')
     @patch('main.subprocess.run')
     def test_analyze_and_profile_with_prefs_only(self, mock_subprocess, mock_save_history, client):
         """Test profile creation with only user preferences (no image)."""
@@ -240,9 +242,9 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Strong and intense espresso" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_to_history')
+    @patch('api.routes.coffee.save_to_history')
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with both image and user preferences."""
         # Mock history saving
@@ -286,7 +288,7 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_subprocess_error(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test error handling when subprocess fails."""
         # Mock the Gemini vision response
@@ -328,7 +330,7 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Unexpected error" in response.json()["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_image_processing_error(self, mock_vision_model, client):
         """Test error when image processing fails."""
         # Mock an exception in vision model
@@ -346,9 +348,9 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.json()["status"] == "error"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_to_history')
+    @patch('api.routes.coffee.save_to_history')
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with different user preferences."""
         # Mock history saving
@@ -382,7 +384,7 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_yolo_mode(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test that yolo mode is used for auto-approval of tool calls.
         
@@ -417,7 +419,7 @@ class TestAnalyzeAndProfileEndpoint:
         assert "gemini" in call_args
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_to_history')
+    @patch('api.routes.coffee.save_to_history')
     @patch('main.subprocess.run')
     def test_analyze_and_profile_special_characters(self, mock_subprocess, mock_save_history, client):
         """Test handling of special characters in input."""
@@ -810,7 +812,7 @@ class TestAdvancedCustomization:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_advanced_customization_with_image(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test advanced_customization with image input."""
         mock_response = Mock()
@@ -874,7 +876,7 @@ class TestAdvancedCustomization:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test advanced_customization with both image and user preferences."""
         mock_response = Mock()
@@ -1332,7 +1334,7 @@ class TestHistoryAPI:
         }
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_history_empty(self, mock_load, client):
         """Test getting history when it's empty."""
         mock_load.return_value = []
@@ -1347,7 +1349,7 @@ class TestHistoryAPI:
         assert data["offset"] == 0
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_history_with_entries(self, mock_load, client, sample_history_entry):
         """Test getting history with existing entries."""
         mock_load.return_value = [sample_history_entry]
@@ -1361,7 +1363,7 @@ class TestHistoryAPI:
         assert data["total"] == 1
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_history_pagination(self, mock_load, client, sample_history_entry):
         """Test history pagination with limit and offset."""
         # Create multiple entries
@@ -1384,7 +1386,7 @@ class TestHistoryAPI:
         assert data["offset"] == 2
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_history_removes_image_preview(self, mock_load, client, sample_history_entry):
         """Test that image_preview is removed from list view."""
         entry = sample_history_entry.copy()
@@ -1399,7 +1401,7 @@ class TestHistoryAPI:
         assert data["entries"][0]["image_preview"] is None
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_history_entry_by_id(self, mock_load, client, sample_history_entry):
         """Test getting a specific history entry by ID."""
         mock_load.return_value = [sample_history_entry]
@@ -1413,7 +1415,7 @@ class TestHistoryAPI:
         assert data["profile_json"] is not None
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_history_entry_not_found(self, mock_load, client):
         """Test 404 when history entry doesn't exist."""
         mock_load.return_value = []
@@ -1424,8 +1426,8 @@ class TestHistoryAPI:
         assert "not found" in response.json()["detail"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_delete_history_entry(self, mock_load, mock_save, client, sample_history_entry):
         """Test deleting a specific history entry."""
         mock_load.return_value = [sample_history_entry]
@@ -1438,7 +1440,7 @@ class TestHistoryAPI:
         mock_save.assert_called_once_with([])
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_delete_history_entry_not_found(self, mock_load, client):
         """Test 404 when deleting non-existent entry."""
         mock_load.return_value = []
@@ -1448,8 +1450,8 @@ class TestHistoryAPI:
         assert response.status_code == 404
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_clear_history(self, mock_load, mock_save, client, sample_history_entry):
         """Test clearing all history."""
         mock_load.return_value = [sample_history_entry]
@@ -1462,7 +1464,7 @@ class TestHistoryAPI:
         mock_save.assert_called_once_with([])
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_profile_json(self, mock_load, client, sample_history_entry):
         """Test getting profile JSON for download."""
         mock_load.return_value = [sample_history_entry]
@@ -1475,7 +1477,7 @@ class TestHistoryAPI:
         assert "ethiopian-sunrise.json" in response.headers["content-disposition"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_profile_json_not_available(self, mock_load, client, sample_history_entry):
         """Test 404 when profile JSON is not available."""
         entry = sample_history_entry.copy()
@@ -1488,7 +1490,7 @@ class TestHistoryAPI:
         assert "not available" in response.json()["detail"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_get_profile_json_entry_not_found(self, mock_load, client):
         """Test 404 when entry doesn't exist for JSON download."""
         mock_load.return_value = []
@@ -1498,8 +1500,8 @@ class TestHistoryAPI:
         assert response.status_code == 404
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_migrate_history_cleans_markdown_artifacts(self, mock_load, mock_save, client):
         """Test that migration successfully cleans profile names with markdown artifacts."""
         # Create entries with various markdown artifacts
@@ -1549,8 +1551,8 @@ class TestHistoryAPI:
         assert saved_history[4]["profile_name"] == "Clean Profile"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_migrate_history_returns_correct_count(self, mock_load, mock_save, client):
         """Test that migration returns correct count of fixed entries."""
         history_with_some_artifacts = [
@@ -1573,8 +1575,8 @@ class TestHistoryAPI:
         mock_save.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_migrate_history_handles_empty_history(self, mock_load, mock_save, client):
         """Test that migration handles empty history gracefully."""
         mock_load.return_value = []
@@ -1591,8 +1593,8 @@ class TestHistoryAPI:
         mock_save.assert_not_called()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_migrate_history_handles_missing_profile_name(self, mock_load, mock_save, client):
         """Test that migration handles entries without profile_name field."""
         history_with_missing_field = [
@@ -1630,7 +1632,7 @@ class TestHistoryAPI:
         assert saved_history[2]["profile_name"] == "Another Name"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.load_history')
     def test_migrate_history_handles_errors_gracefully(self, mock_load, client):
         """Test that migration handles errors gracefully."""
         # Simulate an error in _load_history
@@ -1644,8 +1646,8 @@ class TestHistoryAPI:
         assert "Failed to migrate history" in data["detail"]["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_migrate_history_no_changes_needed(self, mock_load, mock_save, client):
         """Test migration when all profile names are already clean."""
         clean_history = [
@@ -1666,8 +1668,8 @@ class TestHistoryAPI:
         mock_save.assert_not_called()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_migrate_history_save_error(self, mock_load, mock_save, client):
         """Test migration handles save errors gracefully."""
         history_with_artifacts = [
@@ -1783,8 +1785,8 @@ Description: A test profile
         
         assert result == "lowercase Name"
 
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_save_to_history(self, mock_load, mock_save):
         """Test saving a profile to history."""
         from services.history_service import save_to_history
@@ -1818,8 +1820,8 @@ Description: A test profile
         assert len(saved_history) == 1
         assert saved_history[0]["id"] == entry["id"]
 
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_save_to_history_limits_entries(self, mock_load, mock_save):
         """Test that history is limited to 100 entries."""
         from services.history_service import save_to_history
@@ -1843,8 +1845,8 @@ Description: A test profile
         # New entry should be first
         assert saved_history[0]["profile_name"] == "New Profile"
 
-    @patch('services.history_service.save_history')
-    @patch('services.history_service.load_history')
+    @patch('api.routes.history.save_history')
+    @patch('api.routes.history.load_history')
     def test_save_to_history_new_entry_first(self, mock_load, mock_save):
         """Test that new entries are added at the beginning."""
         from services.history_service import save_to_history
@@ -2265,9 +2267,16 @@ class TestShotAnalysisHelpers:
         assert isinstance(result, dict)
 
     def test_prepare_profile_for_llm(self):
-        """Test preparing profile data for LLM."""
+        """Test preparing shot summary data for LLM."""
         from services.analysis_service import _prepare_shot_summary_for_llm
         
+        shot_data = {
+            "time": 1705320000,
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 0, "flow": 0}},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}},
+            ]
+        }
         profile_data = {
             "name": "Test",
             "temperature": 93.0,
@@ -2275,11 +2284,17 @@ class TestShotAnalysisHelpers:
             "variables": [{"key": "dose", "value": 18.0}],
             "stages": [{"name": "Main", "type": "pressure"}]
         }
+        local_analysis = {
+            "overall_metrics": {"total_time": 25.0},
+            "weight_analysis": {"final_weight": 36.0},
+            "preinfusion_summary": {},
+            "stage_analyses": []
+        }
         
-        result = _prepare_shot_summary_for_llm(profile_data, "Test description")
-        assert result["name"] == "Test"
+        result = _prepare_shot_summary_for_llm(shot_data, profile_data, local_analysis)
+        assert "shot_summary" in result
         assert "stages" in result
-        assert "variables" in result
+        assert "graph_samples" in result
 
     def test_compute_stage_stats_includes_start_end_pressure(self):
         """Test that stage stats include start/end pressure and flow values."""
@@ -3238,7 +3253,7 @@ class TestCheckUpdatesEndpoint:
 class TestMachineProfilesEndpoint:
     """Tests for the /api/machine/profiles endpoint."""
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     @patch('services.history_service.HISTORY_FILE')
     def test_list_profiles_success(self, mock_history_file, mock_get_api, client):
         """Test successful profile listing from machine."""
@@ -3302,7 +3317,7 @@ class TestMachineProfilesEndpoint:
         profile2 = next(p for p in data["profiles"] if p["name"] == "Light Roast")
         assert profile2["in_history"] is False
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_list_profiles_api_error(self, mock_get_api, client):
         """Test error handling when machine API fails."""
         mock_api = MagicMock()
@@ -3318,7 +3333,7 @@ class TestMachineProfilesEndpoint:
         assert response.status_code == 502
         assert "Machine API error" in response.json()["detail"]
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     @patch('services.history_service.HISTORY_FILE')
     def test_list_profiles_empty(self, mock_history_file, mock_get_api, client):
         """Test listing when no profiles exist."""
@@ -3336,7 +3351,7 @@ class TestMachineProfilesEndpoint:
         assert data["total"] == 0
         assert len(data["profiles"]) == 0
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     @patch('services.history_service.HISTORY_FILE')
     def test_list_profiles_partial_failure(self, mock_history_file, mock_get_api, client):
         """Test listing continues when individual profile fetch fails."""
@@ -3375,7 +3390,7 @@ class TestMachineProfilesEndpoint:
         assert len(data["profiles"]) == 1
         assert data["profiles"][0]["name"] == "Good Profile"
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     @patch('services.history_service.HISTORY_FILE')
     def test_list_profiles_history_dict_format(self, mock_history_file, mock_get_api, client):
         """Test handling of legacy history format (dict with entries key)."""
@@ -3416,7 +3431,7 @@ class TestMachineProfilesEndpoint:
 class TestMachineProfileJsonEndpoint:
     """Tests for the /api/machine/profile/{profile_id}/json endpoint."""
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_json_success(self, mock_get_api, client):
         """Test successful profile JSON retrieval."""
         mock_api = MagicMock()
@@ -3445,7 +3460,7 @@ class TestMachineProfileJsonEndpoint:
         assert data["profile"]["author"] == "Barista Joe"
         assert data["profile"]["temperature"] == 93.0
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_json_api_error(self, mock_get_api, client):
         """Test error handling when machine API fails."""
         mock_api = MagicMock()
@@ -3460,7 +3475,7 @@ class TestMachineProfileJsonEndpoint:
         assert response.status_code == 502
         assert "Machine API error" in response.json()["detail"]
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_json_nested_objects(self, mock_get_api, client):
         """Test handling of nested objects in profile."""
         mock_api = MagicMock()
@@ -3485,7 +3500,7 @@ class TestMachineProfileJsonEndpoint:
         data = response.json()
         assert "display" in data["profile"]
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_json_list_of_objects(self, mock_get_api, client):
         """Test handling of list of objects in profile."""
         mock_api = MagicMock()
@@ -3512,7 +3527,7 @@ class TestMachineProfileJsonEndpoint:
         assert len(data["profile"]["stages"]) == 2
         assert data["profile"]["stages"][0]["name"] == "preinfusion"
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_json_exception(self, mock_get_api, client):
         """Test handling of unexpected exceptions."""
         mock_api = MagicMock()
@@ -3527,8 +3542,8 @@ class TestMachineProfileJsonEndpoint:
 class TestProfileImportEndpoint:
     """Tests for the /api/profile/import endpoint."""
 
-    @patch('utils.file_utils.atomic_write_json')
-    @patch('services.analysis_service._generate_profile_description', new_callable=AsyncMock)
+    @patch('api.routes.profiles.atomic_write_json')
+    @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
     @patch('services.history_service.HISTORY_FILE')
     def test_import_profile_success(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test successful profile import with description generation."""
@@ -3561,8 +3576,8 @@ class TestProfileImportEndpoint:
         assert "entry_id" in data
         mock_atomic_write.assert_called_once()
 
-    @patch('utils.file_utils.atomic_write_json')
-    @patch('services.analysis_service._generate_profile_description', new_callable=AsyncMock)
+    @patch('api.routes.profiles.atomic_write_json')
+    @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
     @patch('services.history_service.HISTORY_FILE')
     def test_import_profile_without_description(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test profile import without generating description."""
@@ -3634,8 +3649,8 @@ class TestProfileImportEndpoint:
         assert response.status_code == 400
         assert "No profile JSON provided" in response.json()["detail"]
 
-    @patch('utils.file_utils.atomic_write_json')
-    @patch('services.analysis_service._generate_profile_description', new_callable=AsyncMock)
+    @patch('api.routes.profiles.atomic_write_json')
+    @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
     @patch('services.history_service.HISTORY_FILE')
     def test_import_profile_description_generation_fails(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
         """Test import continues when description generation fails."""
@@ -3665,7 +3680,7 @@ class TestProfileImportEndpoint:
         assert data["has_description"] is False
         mock_atomic_write.assert_called_once()
 
-    @patch('utils.file_utils.atomic_write_json')
+    @patch('api.routes.profiles.atomic_write_json')
     @patch('services.history_service.HISTORY_FILE')
     def test_import_profile_legacy_history_format(self, mock_history_file, mock_atomic_write, client):
         """Test import with legacy history format (dict with entries)."""
@@ -3705,10 +3720,10 @@ class TestProfileImportEndpoint:
 class TestShotsByProfileEndpoint:
     """Tests for the /api/shots/by-profile/{profile_name} endpoint."""
 
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.cache_service._get_cached_shots')
-    @patch('services.cache_service._set_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots._get_cached_shots')
+    @patch('api.routes.shots._set_cached_shots')
     def test_get_shots_by_profile_success(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
         """Test successful retrieval of shots for a profile."""
         # No cache initially
@@ -3758,7 +3773,7 @@ class TestShotsByProfileEndpoint:
         assert data["shots"][0]["final_weight"] == 36.5
         assert data["shots"][1]["final_weight"] == 38.0
 
-    @patch('services.cache_service._get_cached_shots')
+    @patch('api.routes.shots._get_cached_shots')
     def test_get_shots_by_profile_from_cache(self, mock_get_cache, client):
         """Test returning cached shots when available."""
         cached_data = {
@@ -3779,8 +3794,8 @@ class TestShotsByProfileEndpoint:
         assert "cached_at" in data
         assert data["is_stale"] is False
 
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.cache_service._get_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots._get_cached_shots')
     def test_get_shots_by_profile_api_error(self, mock_get_cache, mock_get_api, client):
         """Test error handling when machine API fails."""
         mock_get_cache.return_value = (None, False, None)
@@ -3796,10 +3811,10 @@ class TestShotsByProfileEndpoint:
         
         assert response.status_code == 502
 
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.cache_service._get_cached_shots')
-    @patch('services.cache_service._set_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots._get_cached_shots')
+    @patch('api.routes.shots._set_cached_shots')
     def test_get_shots_by_profile_no_matches(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
         """Test when no shots match the profile."""
         mock_get_cache.return_value = (None, False, None)
@@ -3832,10 +3847,10 @@ class TestShotsByProfileEndpoint:
         assert data["count"] == 0
         assert len(data["shots"]) == 0
 
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.cache_service._get_cached_shots')
-    @patch('services.cache_service._set_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots._get_cached_shots')
+    @patch('api.routes.shots._set_cached_shots')
     def test_get_shots_by_profile_with_limit(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
         """Test limit parameter works correctly."""
         mock_get_cache.return_value = (None, False, None)
@@ -3874,9 +3889,9 @@ class TestShotsByProfileEndpoint:
         assert data["count"] == 2
         assert data["limit"] == 2
 
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.cache_service._get_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots._get_cached_shots')
     def test_get_shots_by_profile_include_data(self, mock_get_cache, mock_fetch_shot, mock_get_api, client):
         """Test including full shot data in response."""
         mock_get_cache.return_value = (None, False, None)
@@ -3910,10 +3925,10 @@ class TestShotsByProfileEndpoint:
         assert "data" in data["shots"][0]
         assert len(data["shots"][0]["data"]["data"]) == 2
 
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.cache_service._get_cached_shots')
-    @patch('services.cache_service._set_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots._get_cached_shots')
+    @patch('api.routes.shots._set_cached_shots')
     def test_get_shots_by_profile_case_insensitive(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
         """Test profile name matching is case-insensitive."""
         mock_get_cache.return_value = (None, False, None)
@@ -3944,9 +3959,9 @@ class TestShotsByProfileEndpoint:
         data = response.json()
         assert data["count"] == 1
 
-    @patch('services.cache_service._get_cached_shots')
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.cache_service._set_cached_shots')
+    @patch('api.routes.shots._get_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots._set_cached_shots')
     def test_get_shots_by_profile_force_refresh(self, mock_set_cache, mock_get_api, mock_get_cache, client):
         """Test force_refresh parameter bypasses cache."""
         # Cache exists but should be ignored
@@ -3967,10 +3982,10 @@ class TestShotsByProfileEndpoint:
         # Should hit API, not cache
         mock_api.get_history_dates.assert_called_once()
 
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.cache_service._get_cached_shots')
-    @patch('services.cache_service._set_cached_shots')
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots._get_cached_shots')
+    @patch('api.routes.shots._set_cached_shots')
     def test_get_shots_by_profile_partial_shot_errors(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
         """Test continues when individual shot fetch fails."""
         mock_get_cache.return_value = (None, False, None)
@@ -4010,7 +4025,7 @@ class TestShotsByProfileEndpoint:
 class TestImageProxyEndpoint:
     """Tests for the /api/profile/{profile_name}/image-proxy endpoint."""
 
-    @patch('services.cache_service._get_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
     def test_image_proxy_from_cache(self, mock_get_cache, client):
         """Test returning cached image."""
         mock_get_cache.return_value = b"fake_png_data"
@@ -4021,8 +4036,8 @@ class TestImageProxyEndpoint:
         assert response.headers["content-type"] == "image/png"
         assert response.content == b"fake_png_data"
 
-    @patch('services.cache_service._get_cached_image')
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_image_proxy_profile_not_found(self, mock_get_api, mock_get_cache, client):
         """Test error when profile not found."""
         mock_get_cache.return_value = None
@@ -4035,8 +4050,8 @@ class TestImageProxyEndpoint:
         
         assert response.status_code == 404
 
-    @patch('services.cache_service._get_cached_image')
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_image_proxy_no_image(self, mock_get_api, mock_get_cache, client):
         """Test error when profile has no image."""
         mock_get_cache.return_value = None
@@ -4077,7 +4092,7 @@ class TestAdditionalEndpoints:
 class TestGetProfileInfoEndpoint:
     """Tests for the GET /api/profile/{profile_name} endpoint."""
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_info_success(self, mock_get_api, client):
         """Test successful profile retrieval."""
         mock_api = MagicMock()
@@ -4117,7 +4132,7 @@ class TestGetProfileInfoEndpoint:
         assert data["profile"]["image"] == "data:image/png;base64,abc123"
         assert data["profile"]["accent_color"] == "#FF5733"
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_info_not_found(self, mock_get_api, client):
         """Test error when profile not found."""
         mock_api = MagicMock()
@@ -4129,7 +4144,7 @@ class TestGetProfileInfoEndpoint:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_info_no_display(self, mock_get_api, client):
         """Test profile without display/image."""
         mock_api = MagicMock()
@@ -4159,7 +4174,7 @@ class TestGetProfileInfoEndpoint:
         assert data["profile"]["image"] is None
         assert data["profile"]["accent_color"] is None
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_info_api_error(self, mock_get_api, client):
         """Test handling of machine API errors."""
         mock_api = MagicMock()
@@ -4173,7 +4188,7 @@ class TestGetProfileInfoEndpoint:
         
         assert response.status_code == 502
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.profiles.get_meticulous_api')
     def test_get_profile_info_exception(self, mock_get_api, client):
         """Test exception handling."""
         mock_api = MagicMock()
@@ -4188,8 +4203,8 @@ class TestGetProfileInfoEndpoint:
 class TestLocalShotAnalysisEndpoint:
     """Tests for the POST /api/shots/analyze endpoint."""
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
     def test_local_shot_analysis_success(self, mock_get_api, mock_fetch_shot, client):
         """Test successful local shot analysis."""
         # Mock shot data
@@ -4235,8 +4250,8 @@ class TestLocalShotAnalysisEndpoint:
         assert "shot_summary" in data["analysis"]
         assert data["analysis"]["shot_summary"]["final_weight"] == 36.0
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
     def test_local_shot_analysis_with_preinfusion(self, mock_get_api, mock_fetch_shot, client):
         """Test analysis detects preinfusion stages."""
         shot_data = {
@@ -4309,7 +4324,7 @@ class TestLocalShotAnalysisEndpoint:
         
         assert response.status_code == 422
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     def test_local_shot_analysis_shot_not_found(self, mock_fetch_shot, client):
         """Test error when shot data not found."""
         async def raise_http_exception(*args, **kwargs):
@@ -4325,8 +4340,8 @@ class TestLocalShotAnalysisEndpoint:
         
         assert response.status_code == 404
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
     def test_local_shot_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
         """Test error when profile not found."""
         mock_fetch_shot.return_value = {
@@ -4347,8 +4362,8 @@ class TestLocalShotAnalysisEndpoint:
         
         assert response.status_code == 404
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
     def test_local_shot_analysis_weight_deviation(self, mock_get_api, mock_fetch_shot, client):
         """Test analysis with weight deviation."""
         shot_data = {
@@ -4389,8 +4404,8 @@ class TestLocalShotAnalysisEndpoint:
         data = response.json()
         assert data["analysis"]["weight_analysis"]["status"] == "over"
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
     def test_local_shot_analysis_exception(self, mock_get_api, mock_fetch_shot, client):
         """Test handling of unexpected exceptions."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
@@ -4412,9 +4427,9 @@ class TestGenerateProfileImageEndpoint:
     """Tests for the POST /api/profile/{profile_name}/generate-image endpoint."""
 
     @patch('subprocess.run')
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.process_image_for_profile')
-    @patch('services.cache_service._set_cached_image')
+    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.process_image_for_profile')
+    @patch('api.routes.profiles._set_cached_image')
     def test_generate_image_preview_mode(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test image generation in preview mode."""
         # Mock subprocess for nanobanana
@@ -4442,9 +4457,9 @@ class TestGenerateProfileImageEndpoint:
         assert "prompt" in data
 
     @patch('subprocess.run')
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.process_image_for_profile')
-    @patch('services.cache_service._set_cached_image')
+    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.process_image_for_profile')
+    @patch('api.routes.profiles._set_cached_image')
     def test_generate_image_save_to_profile(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test image generation and save to profile."""
         # Mock subprocess
@@ -4524,7 +4539,7 @@ class TestGenerateProfileImageEndpoint:
         assert response.status_code == 504
 
     @patch('subprocess.run')
-    @patch('services.meticulous_service.process_image_for_profile')
+    @patch('api.routes.profiles.process_image_for_profile')
     def test_generate_image_file_not_found(self, mock_process, mock_subprocess, client):
         """Test when generated image cannot be found."""
         # Nanobanana succeeds but file not found
@@ -4544,7 +4559,7 @@ class TestGenerateProfileImageEndpoint:
         assert response.status_code == 500
 
     @patch('subprocess.run')
-    @patch('services.cache_service._set_cached_image')
+    @patch('api.routes.profiles._set_cached_image')
     def test_generate_image_invalid_style(self, mock_cache, mock_subprocess, client):
         """Test with invalid style parameter (should default to abstract)."""
         mock_result = MagicMock()
@@ -4567,9 +4582,9 @@ class TestGenerateProfileImageEndpoint:
             assert data["style"] == "abstract"  # Should default
 
     @patch('subprocess.run')
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.process_image_for_profile')
-    @patch('services.cache_service._set_cached_image')
+    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.process_image_for_profile')
+    @patch('api.routes.profiles._set_cached_image')
     def test_generate_image_profile_not_found_for_save(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test error when profile not found for saving."""
         mock_result = MagicMock()
@@ -4593,9 +4608,9 @@ class TestGenerateProfileImageEndpoint:
         assert response.status_code == 404
 
     @patch('subprocess.run')
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.meticulous_service.process_image_for_profile')
-    @patch('services.cache_service._set_cached_image')
+    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.process_image_for_profile')
+    @patch('api.routes.profiles._set_cached_image')
     def test_generate_image_save_failure(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test handling of profile save failure."""
         mock_result = MagicMock()
@@ -4657,10 +4672,10 @@ class TestGenerateProfileImageEndpoint:
 class TestLLMShotAnalysisEndpoint:
     """Tests for the POST /api/shots/analyze-llm endpoint."""
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.gemini_service.get_vision_model')
-    @patch('services.analysis_service._perform_local_shot_analysis')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.get_vision_model')
+    @patch('api.routes.shots._perform_local_shot_analysis')
     def test_llm_analysis_success(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
         """Test successful LLM shot analysis."""
         # Mock shot data
@@ -4717,8 +4732,8 @@ class TestLLMShotAnalysisEndpoint:
         assert "llm_analysis" in data
         assert "Shot Performance" in data["llm_analysis"]
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
     def test_llm_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
         """Test error when profile not found."""
         mock_fetch_shot.return_value = {"profile_name": "Unknown", "data": []}
@@ -4736,10 +4751,10 @@ class TestLLMShotAnalysisEndpoint:
         
         assert response.status_code == 404
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.gemini_service.get_vision_model')
-    @patch('services.analysis_service._perform_local_shot_analysis')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.get_vision_model')
+    @patch('api.routes.shots._perform_local_shot_analysis')
     def test_llm_analysis_model_error(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
         """Test handling of LLM errors."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
@@ -4786,10 +4801,10 @@ class TestLLMShotAnalysisEndpoint:
         
         assert response.status_code == 422
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.gemini_service.get_vision_model')
-    @patch('services.analysis_service._perform_local_shot_analysis')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.get_vision_model')
+    @patch('api.routes.shots._perform_local_shot_analysis')
     def test_llm_analysis_with_description(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
         """Test LLM analysis with profile description."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
@@ -4833,10 +4848,10 @@ class TestLLMShotAnalysisEndpoint:
         call_args = mock_model.generate_content.call_args[0][0]
         assert "gentle preinfusion" in call_args
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
-    @patch('services.meticulous_service.get_meticulous_api')
-    @patch('services.gemini_service.get_vision_model')
-    @patch('services.analysis_service._perform_local_shot_analysis')
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.get_vision_model')
+    @patch('api.routes.shots._perform_local_shot_analysis')
     def test_llm_analysis_with_variables(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
         """Test LLM analysis with profile variables."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
@@ -4883,7 +4898,7 @@ class TestLLMShotAnalysisEndpoint:
         
         assert response.status_code == 200
 
-    @patch('services.meticulous_service.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     def test_llm_analysis_shot_not_found(self, mock_fetch_shot, client):
         """Test error when shot data not found."""
         async def raise_http_exception(*args, **kwargs):
@@ -4904,7 +4919,7 @@ class TestLLMShotAnalysisEndpoint:
 class TestConvertDescriptionEndpoint:
     """Tests for the POST /api/profile/convert-description endpoint."""
 
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.profiles.get_vision_model')
     @patch('services.history_service.HISTORY_FILE')
     def test_convert_description_success(self, mock_history_file, mock_get_model, client):
         """Test successful description conversion."""
@@ -4948,7 +4963,7 @@ Adjust grind based on bean age."""
         assert "converted_description" in data
         assert "Profile Created" in data["converted_description"]
 
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.profiles.get_vision_model')
     @patch('services.history_service.HISTORY_FILE')
     def test_convert_description_with_history_update(self, mock_history_file, mock_get_model, client):
         """Test conversion updates history entry."""
@@ -4983,7 +4998,7 @@ Adjust grind based on bean age."""
         
         assert response.status_code == 400
 
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.profiles.get_vision_model')
     def test_convert_description_model_error(self, mock_get_model, client):
         """Test handling of LLM errors."""
         mock_model = MagicMock()
@@ -4997,7 +5012,7 @@ Adjust grind based on bean age."""
         
         assert response.status_code == 500
 
-    @patch('services.gemini_service.get_vision_model')
+    @patch('api.routes.profiles.get_vision_model')
     def test_convert_description_preserves_info(self, mock_get_model, client):
         """Test that conversion prompt preserves all information."""
         mock_model = MagicMock()
@@ -5228,8 +5243,8 @@ class TestImagePromptErrorHandling:
 class TestDataFileManagement:
     """Tests for data file ensure functions and management."""
     
-    def test_ensure_settings_file_creates_file(self):
-        """Test that _ensure_settings_file creates settings file."""
+    def testensure_settings_file_creates_file(self):
+        """Test that ensure_settings_file creates settings file."""
         from services.settings_service import ensure_settings_file, SETTINGS_FILE
         
         # Delete file if it exists
@@ -5406,10 +5421,10 @@ class TestSettingsManagement:
     
     def test_settings_load(self):
         """Test loading settings from file."""
-        from services.settings_service import SETTINGS_FILE, _ensure_settings_file
+        from services.settings_service import SETTINGS_FILE, ensure_settings_file
         
         # Ensure file exists
-        _ensure_settings_file()
+        ensure_settings_file()
         
         # Load and verify structure
         with open(SETTINGS_FILE) as f:
@@ -5423,9 +5438,9 @@ class TestSettingsManagement:
     
     def test_settings_update(self):
         """Test updating settings."""
-        from services.settings_service import SETTINGS_FILE, _ensure_settings_file
+        from services.settings_service import SETTINGS_FILE, ensure_settings_file
         
-        _ensure_settings_file()
+        ensure_settings_file()
         
         # Update settings
         new_settings = {
@@ -5685,7 +5700,7 @@ description = "MCP server"
 class TestRunShotEndpoints:
     """Tests for the Run Shot / Machine control endpoints."""
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_machine_status_endpoint(self, mock_get_api, client):
         """Test GET /api/machine/status endpoint."""
         # Mock the API response
@@ -5703,7 +5718,7 @@ class TestRunShotEndpoints:
         data = response.json()
         assert "machine_status" in data or "status" in data or "scheduled_shots" in data
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_machine_status_no_connection(self, mock_get_api, client):
         """Test machine status when machine is not reachable."""
         mock_api = MagicMock()
@@ -5721,7 +5736,7 @@ class TestRunShotEndpoints:
         # Connection error should be captured in the status
         assert "error" in data["machine_status"] or "state" in data["machine_status"]
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_machine_status_api_unavailable(self, mock_get_api, client):
         """Test machine status when API is not available."""
         mock_get_api.return_value = None
@@ -5731,7 +5746,7 @@ class TestRunShotEndpoints:
         # Should handle gracefully
         assert response.status_code in [200, 503]
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_preheat_endpoint_success(self, mock_get_api, client):
         """Test POST /api/machine/preheat endpoint."""
         mock_api = MagicMock()
@@ -5747,7 +5762,7 @@ class TestRunShotEndpoints:
         assert "message" in data
         assert "preheat" in data["message"].lower() or "Preheat" in data["message"]
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_preheat_connection_error(self, mock_get_api, client):
         """Test preheat when connection fails."""
         mock_api = MagicMock()
@@ -5763,7 +5778,7 @@ class TestRunShotEndpoints:
         assert "detail" in data
         # Connection errors are caught by the general exception handler
         assert response.status_code == 500
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_preheat_no_connection(self, mock_get_api, client):
         """Test preheat when machine not connected."""
         mock_get_api.return_value = None
@@ -5772,7 +5787,7 @@ class TestRunShotEndpoints:
         
         assert response.status_code == 503
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_run_profile_success(self, mock_get_api, client):
         """Test POST /api/machine/run-profile/{profile_id} endpoint."""
         mock_api = MagicMock()
@@ -5794,7 +5809,7 @@ class TestRunShotEndpoints:
         data = response.json()
         assert "message" in data
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_run_profile_not_found(self, mock_get_api, client):
         """Test running a profile that doesn't exist."""
         mock_api = MagicMock()
@@ -5808,7 +5823,7 @@ class TestRunShotEndpoints:
         
         assert response.status_code == 502
 
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_run_profile_connection_error(self, mock_get_api, client):
         """Test run profile when connection fails."""
         mock_api = MagicMock()
@@ -5824,7 +5839,7 @@ class TestRunShotEndpoints:
         assert "detail" in data
         # Connection errors are caught by the general exception handler
         assert response.status_code == 500
-    @patch('services.meticulous_service.get_meticulous_api')
+    @patch('api.routes.scheduling.get_meticulous_api')
     def test_run_profile_no_connection(self, mock_get_api, client):
         """Test run profile when machine not connected."""
         mock_get_api.return_value = None
@@ -6439,7 +6454,7 @@ class TestGetVisionModel:
     def test_get_vision_model_missing_api_key(self, monkeypatch):
         """Test get_vision_model raises error when API key is missing."""
         # Clear the cached model
-        main._vision_model = None
+        services.gemini_service._vision_model = None
         
         # Remove API key
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -6455,7 +6470,7 @@ class TestGetVisionModel:
     def test_get_vision_model_lazy_initialization(self, monkeypatch):
         """Test vision model is lazily initialized."""
         # Clear the cached model
-        main._vision_model = None
+        services.gemini_service._vision_model = None
         
         monkeypatch.setenv("GEMINI_API_KEY", "test_key_123")
         
@@ -6491,7 +6506,7 @@ class TestGetMeticulousAPI:
     def test_get_meticulous_api_lazy_init(self, monkeypatch):
         """Test get_meticulous_api lazy initialization."""
         # Clear cached API
-        main._meticulous_api = None
+        services.meticulous_service._meticulous_api = None
         
         monkeypatch.setenv("METICULOUS_IP", "192.168.1.100")
         
@@ -6517,11 +6532,11 @@ class TestGetMeticulousAPI:
         assert api1 is api2
         
         # Cleanup
-        main._meticulous_api = None
+        services.meticulous_service._meticulous_api = None
     
     def test_get_meticulous_api_adds_http_prefix(self, monkeypatch):
         """Test get_meticulous_api adds http:// prefix when missing."""
-        main._meticulous_api = None
+        services.meticulous_service._meticulous_api = None
         
         monkeypatch.setenv("METICULOUS_IP", "espresso.local")
         
@@ -6540,7 +6555,7 @@ class TestGetMeticulousAPI:
         api = main.get_meticulous_api()
         assert api.base_url == "http://espresso.local"
         
-        main._meticulous_api = None
+        services.meticulous_service._meticulous_api = None
 
 
 class TestSettingsEndpoints:

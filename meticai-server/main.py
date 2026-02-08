@@ -220,7 +220,7 @@ app.include_router(scheduling.router)
 # even though the functions have been moved to service modules.
 # TODO: Update tests to import from the new locations and remove these.
 
-from config import DATA_DIR, MAX_UPLOAD_SIZE
+from config import DATA_DIR, MAX_UPLOAD_SIZE, TEST_MODE
 from utils.file_utils import atomic_write_json, deep_convert_to_dict
 from utils.sanitization import sanitize_profile_name_for_filename as _sanitize_profile_name_for_filename
 from services.gemini_service import parse_gemini_error, get_vision_model

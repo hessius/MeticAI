@@ -7,11 +7,15 @@ import json
 import subprocess
 import logging
 import asyncio
+import tempfile
+import uuid
 
 from config import DATA_DIR
 from services.meticulous_service import get_meticulous_api
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model
+from services.history_service import HISTORY_FILE
+from utils.file_utils import atomic_write_json, deep_convert_to_dict
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
