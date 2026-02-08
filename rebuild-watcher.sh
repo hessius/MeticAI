@@ -21,14 +21,10 @@
 #
 ################################################################################
 
-# Text Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common library
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 REBUILD_FLAG="$SCRIPT_DIR/.rebuild-needed"
 UPDATE_CHECK_FLAG="$SCRIPT_DIR/.update-check-requested"
 UPDATE_REQUESTED_FLAG="$SCRIPT_DIR/.update-requested"
@@ -43,6 +39,7 @@ if [ -d "/Applications/Docker.app/Contents/Resources/bin" ]; then
     export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 fi
 
+# Custom log function that writes to file and uses colors from common.sh
 log() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
 }
@@ -285,7 +282,7 @@ install_launchd() {
     local plist_path="$HOME/Library/LaunchAgents/com.meticai.rebuild-watcher.plist"
     local script_path="$SCRIPT_DIR/rebuild-watcher.sh"
     
-    echo -e "${BLUE}Installing launchd service...${NC}"
+    log_info "Installing launchd service..."
     
     # Create LaunchAgents directory if it doesn't exist
     mkdir -p "$HOME/Library/LaunchAgents"
@@ -323,7 +320,7 @@ EOF
     launchctl unload "$plist_path" 2>/dev/null
     launchctl load "$plist_path"
     
-    echo -e "${GREEN}✓ Launchd service installed${NC}"
+    log_success "Launchd service installed"
     echo -e "  Service will automatically rebuild containers when updates are triggered."
     echo -e "  Log file: $LOG_FILE"
     echo ""
@@ -336,9 +333,9 @@ uninstall_launchd() {
     if [ -f "$plist_path" ]; then
         launchctl unload "$plist_path" 2>/dev/null
         rm -f "$plist_path"
-        echo -e "${GREEN}✓ Launchd service uninstalled${NC}"
+        log_success "Launchd service uninstalled"
     else
-        echo -e "${YELLOW}Service not installed${NC}"
+        log_warning "Service not installed"
     fi
 }
 
@@ -352,11 +349,11 @@ install_systemd() {
     local service_unit="$service_dir/meticai-rebuild-watcher.service"
     local script_path="$SCRIPT_DIR/rebuild-watcher.sh"
     
-    echo -e "${BLUE}Installing systemd service...${NC}"
+    log_info "Installing systemd service..."
     
     # Check if we have sudo access
     if ! sudo -n true 2>/dev/null; then
-        echo -e "${YELLOW}This requires sudo access. You may be prompted for your password.${NC}"
+        log_warning "This requires sudo access. You may be prompted for your password."
     fi
     
     # Create the path unit (watches the files)
@@ -403,7 +400,7 @@ EOF
     sudo systemctl enable meticai-rebuild-watcher.path
     sudo systemctl start meticai-rebuild-watcher.path
     
-    echo -e "${GREEN}✓ Systemd service installed${NC}"
+    log_success "Systemd service installed"
     echo -e "  Service will automatically rebuild containers when updates are triggered."
     echo -e "  Log file: $LOG_FILE"
     echo ""
@@ -416,7 +413,7 @@ uninstall_systemd() {
     local path_unit="$service_dir/meticai-rebuild-watcher.path"
     local service_unit="$service_dir/meticai-rebuild-watcher.service"
     
-    echo -e "${BLUE}Uninstalling systemd service...${NC}"
+    log_info "Uninstalling systemd service..."
     
     # Stop and disable
     sudo systemctl stop meticai-rebuild-watcher.path 2>/dev/null
@@ -427,9 +424,9 @@ uninstall_systemd() {
     if [ -f "$path_unit" ] || [ -f "$service_unit" ]; then
         sudo rm -f "$path_unit" "$service_unit"
         sudo systemctl daemon-reload
-        echo -e "${GREEN}✓ Systemd service uninstalled${NC}"
+        log_success "Systemd service uninstalled"
     else
-        echo -e "${YELLOW}Service not installed${NC}"
+        log_warning "Service not installed"
     fi
 }
 
@@ -440,7 +437,7 @@ install_service() {
     elif [[ "$OSTYPE" == "linux"* ]]; then
         install_systemd
     else
-        echo -e "${RED}Unsupported OS: $OSTYPE${NC}"
+        log_error "Unsupported OS: $OSTYPE"
         echo "Supported: macOS (darwin), Linux"
         exit 1
     fi
@@ -452,7 +449,7 @@ uninstall_service() {
     elif [[ "$OSTYPE" == "linux"* ]]; then
         uninstall_systemd
     else
-        echo -e "${RED}Unsupported OS: $OSTYPE${NC}"
+        log_error "Unsupported OS: $OSTYPE"
         exit 1
     fi
 }
@@ -503,11 +500,11 @@ case "${1:-}" in
         ;;
     --status)
         if check_rebuild_needed; then
-            echo -e "${YELLOW}Rebuild is needed${NC}"
+            log_warning "Rebuild is needed"
             cat "$REBUILD_FLAG"
             exit 1
         else
-            echo -e "${GREEN}No rebuild needed${NC}"
+            log_success "No rebuild needed"
             exit 0
         fi
         ;;
@@ -525,7 +522,7 @@ case "${1:-}" in
         elif check_rebuild_needed; then
             do_rebuild
         else
-            echo -e "${GREEN}No action needed${NC}"
+            log_success "No action needed"
         fi
         ;;
 esac

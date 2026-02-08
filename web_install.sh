@@ -22,39 +22,57 @@
 #
 ################################################################################
 
-# Text Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+# Determine script directory for sourcing common library
+# Since this might be piped to bash, we need to handle different scenarios
+if [ -n "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+else
+    SCRIPT_DIR="$(pwd)"
+fi
+
+# Only source common.sh if it exists (won't exist during curl | bash)
+if [ -f "$SCRIPT_DIR/scripts/lib/common.sh" ]; then
+    source "$SCRIPT_DIR/scripts/lib/common.sh"
+else
+    # Fallback color definitions for when common.sh is not available
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    YELLOW='\033[1;33m'
+    RED='\033[0;31m'
+    NC='\033[0m'
+    
+    log_info() { echo -e "${BLUE}$1${NC}"; }
+    log_success() { echo -e "${GREEN}✓ $1${NC}"; }
+    log_error() { echo -e "${RED}✗ $1${NC}" >&2; }
+    log_warning() { echo -e "${YELLOW}⚠ $1${NC}"; }
+fi
 
 # Configuration
 REPO_URL="https://github.com/hessius/MeticAI.git"
 INSTALL_DIR="MeticAI"
 BRANCH="main"
 
-echo -e "${BLUE}=========================================${NC}"
-echo -e "${BLUE}   ☕️ MeticAI Remote Installer 🤖    ${NC}"
-echo -e "${BLUE}=========================================${NC}"
+log_info "========================================="
+log_info "   ☕️ MeticAI Remote Installer 🤖    "
+log_info "========================================="
 echo ""
 
 # Detect if script is being run from a local git repository
 # If local-install.sh exists in current directory, we're likely in the repo
 if [ -f "./local-install.sh" ] && [ -d "./.git" ]; then
-    echo -e "${YELLOW}Detected local repository installation.${NC}"
-    echo -e "${YELLOW}Running local-install.sh directly...${NC}"
+    log_warning "Detected local repository installation."
+    log_warning "Running local-install.sh directly..."
     echo ""
     exec ./local-install.sh
 fi
 
 # From here on, we're running in remote/web installation mode
-echo -e "${YELLOW}Remote installation mode detected.${NC}"
+log_warning "Remote installation mode detected."
 echo "This will clone the MeticAI repository and run the installer."
 echo ""
 
 # Ask user for installation location
-echo -e "${YELLOW}Where would you like to install MeticAI?${NC}"
+log_warning "Where would you like to install MeticAI?"
 echo "1) Current directory ($(pwd))"
 echo "2) Home directory ($HOME)"
 echo "3) Custom path"
@@ -78,7 +96,7 @@ case "$LOCATION_CHOICE" in
         # Custom path
         read -r -p "Enter full path for installation: " CUSTOM_PATH </dev/tty
         while [[ -z "$CUSTOM_PATH" ]]; do
-            echo -e "${RED}Path cannot be empty.${NC}"
+            log_error "Path cannot be empty."
             read -r -p "Enter full path for installation: " CUSTOM_PATH </dev/tty
         done
         # Expand tilde if present
@@ -86,13 +104,13 @@ case "$LOCATION_CHOICE" in
         INSTALL_DIR="$CUSTOM_PATH"
         ;;
     *)
-        echo -e "${YELLOW}Invalid choice, using current directory.${NC}"
+        log_warning "Invalid choice, using current directory."
         INSTALL_DIR="$(pwd)/MeticAI"
         ;;
 esac
 
 echo ""
-echo -e "${GREEN}Installation directory: $INSTALL_DIR${NC}"
+log_success "Installation directory: $INSTALL_DIR"
 echo ""
 
 # Detect OS
@@ -115,19 +133,19 @@ detect_os() {
 install_git() {
     local os
     os=$(detect_os)
-    echo -e "${YELLOW}Installing git...${NC}"
+    log_warning "Installing git..."
     
     case "$os" in
         macos)
             if command -v brew &> /dev/null; then
                 if brew install git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git via Homebrew.${NC}"
+                    log_error "Failed to install git via Homebrew."
                     exit 1
                 fi
             else
-                echo -e "${YELLOW}Homebrew not found. Installing Homebrew first...${NC}"
+                log_warning "Homebrew not found. Installing Homebrew first..."
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
                 
                 # Source Homebrew environment for both Intel and Apple Silicon Macs
@@ -138,9 +156,9 @@ install_git() {
                 fi
                 
                 if command -v brew &> /dev/null && brew install git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    log_error "Failed to install git. Please install manually."
                     echo "Visit: https://git-scm.com/downloads"
                     exit 1
                 fi
@@ -148,42 +166,42 @@ install_git() {
             ;;
         ubuntu|debian|raspbian)
             if sudo apt-get update && sudo apt-get install -y git; then
-                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                log_success "Git installed successfully."
             else
-                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                log_error "Failed to install git. Please install manually."
                 exit 1
             fi
             ;;
         fedora|rhel|centos)
             if command -v dnf &> /dev/null; then
                 if sudo dnf install -y git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    log_error "Failed to install git. Please install manually."
                     exit 1
                 fi
             elif command -v yum &> /dev/null; then
                 if sudo yum install -y git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    log_error "Failed to install git. Please install manually."
                     exit 1
                 fi
             else
-                echo -e "${RED}No supported package manager found. Please install git manually.${NC}"
+                log_error "No supported package manager found. Please install git manually."
                 exit 1
             fi
             ;;
         arch|manjaro)
             if sudo pacman -Sy --noconfirm git; then
-                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                log_success "Git installed successfully."
             else
-                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                log_error "Failed to install git. Please install manually."
                 exit 1
             fi
             ;;
         *)
-            echo -e "${RED}Unsupported OS for automatic installation. Please install git manually.${NC}"
+            log_error "Unsupported OS for automatic installation. Please install git manually."
             echo "Visit: https://git-scm.com/downloads"
             exit 1
             ;;
@@ -192,64 +210,34 @@ install_git() {
 
 # Check for curl (should exist if user ran this script via curl)
 if ! command -v curl &> /dev/null; then
-    echo -e "${RED}Error: curl is not installed.${NC}"
+    log_error "Error: curl is not installed."
     echo "curl is required for remote installation."
     echo "Please install curl and try again."
     exit 1
 fi
-echo -e "${GREEN}✓ curl found.${NC}"
-
-# Function to checkout the latest release tag
-# This ensures users get stable, tested versions instead of potentially unstable main branch
-checkout_latest_release() {
-    local dir="$1"
-    local repo_name="$2"
-    
-    cd "$dir" || return 1
-    
-    # Fetch all tags
-    git fetch --tags 2>/dev/null
-    
-    # Get the latest version tag (format: vX.Y.Z or X.Y.Z)
-    local latest_tag
-    latest_tag=$(git tag -l --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
-    
-    if [ -n "$latest_tag" ]; then
-        echo -e "${YELLOW}Checking out latest release: $latest_tag${NC}"
-        if git checkout "$latest_tag" 2>/dev/null; then
-            echo -e "${GREEN}✓ $repo_name set to stable release $latest_tag${NC}"
-            return 0
-        else
-            echo -e "${YELLOW}Could not checkout tag, staying on main branch${NC}"
-            return 1
-        fi
-    else
-        echo -e "${YELLOW}No release tags found for $repo_name, using main branch${NC}"
-        return 1
-    fi
-}
+log_success "curl found."
 
 # Check and install git if needed
 if ! command -v git &> /dev/null; then
-    echo -e "${RED}Error: git is not installed.${NC}"
+    log_error "Error: git is not installed."
     read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
     INSTALL_GIT=${INSTALL_GIT:-y}
     
     if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
         install_git
     else
-        echo -e "${RED}Error: git is required. Please install it manually and run this script again.${NC}"
+        log_error "Error: git is required. Please install it manually and run this script again."
         exit 1
     fi
 else
-    echo -e "${GREEN}✓ Git found.${NC}"
+    log_success "Git found."
 fi
 
 echo ""
 
 # Check if directory already exists
 if [ -d "$INSTALL_DIR" ]; then
-    echo -e "${YELLOW}Warning: Directory '$INSTALL_DIR' already exists.${NC}"
+    log_warning "Warning: Directory '$INSTALL_DIR' already exists."
     
     # Check for preserved files from previous installation
     PRESERVED_FILES=""
@@ -264,7 +252,7 @@ if [ -d "$INSTALL_DIR" ]; then
     fi
     
     if [ -n "$PRESERVED_FILES" ]; then
-        echo -e "${GREEN}Found preserved files from previous installation: ${PRESERVED_FILES%,*}${NC}"
+        log_success "Found preserved files from previous installation: ${PRESERVED_FILES%,*}"
     fi
     
     read -r -p "Do you want to remove it and clone fresh? (y/n) [y]: " REMOVE_DIR </dev/tty
@@ -277,37 +265,37 @@ if [ -d "$INSTALL_DIR" ]; then
         TEMP_PRESERVE_DIR=$(mktemp -d)
         if [ -f "$INSTALL_DIR/.env" ]; then
             cp "$INSTALL_DIR/.env" "$TEMP_PRESERVE_DIR/.env"
-            echo -e "${BLUE}ℹ Preserving .env file${NC}"
+            log_info "Preserving .env file"
         fi
         if [ -d "$INSTALL_DIR/data" ]; then
             cp -r "$INSTALL_DIR/data" "$TEMP_PRESERVE_DIR/data"
-            echo -e "${BLUE}ℹ Preserving data/ directory${NC}"
+            log_info "Preserving data/ directory"
         fi
         if [ -d "$INSTALL_DIR/logs" ]; then
             cp -r "$INSTALL_DIR/logs" "$TEMP_PRESERVE_DIR/logs"
-            echo -e "${BLUE}ℹ Preserving logs/ directory${NC}"
+            log_info "Preserving logs/ directory"
         fi
         
         rm -rf "$INSTALL_DIR"
     else
-        echo -e "${YELLOW}Using existing directory. Attempting to update...${NC}"
+        log_warning "Using existing directory. Attempting to update..."
         cd "$INSTALL_DIR" || exit 1
         
         # Try to pull latest changes
         if git pull origin "$BRANCH" 2>/dev/null; then
-            echo -e "${GREEN}✓ Repository updated.${NC}"
+            log_success "Repository updated."
         else
-            echo -e "${YELLOW}Could not update repository. Continuing with existing version.${NC}"
+            log_warning "Could not update repository. Continuing with existing version."
         fi
         
         # Execute the local installer
         if [ -f "./local-install.sh" ]; then
             echo ""
-            echo -e "${GREEN}Starting local installer...${NC}"
+            log_success "Starting local installer..."
             echo ""
             exec ./local-install.sh
         else
-            echo -e "${RED}Error: local-install.sh not found in existing directory.${NC}"
+            log_error "Error: local-install.sh not found in existing directory."
             exit 1
         fi
     fi
@@ -316,42 +304,46 @@ fi
 # Create parent directory if needed (for custom paths)
 PARENT_DIR=$(dirname "$INSTALL_DIR")
 if [ ! -d "$PARENT_DIR" ]; then
-    echo -e "${YELLOW}Creating parent directory: $PARENT_DIR${NC}"
+    log_warning "Creating parent directory: $PARENT_DIR"
     if mkdir -p "$PARENT_DIR"; then
-        echo -e "${GREEN}✓ Parent directory created.${NC}"
+        log_success "Parent directory created."
     else
-        echo -e "${RED}Error: Failed to create parent directory.${NC}"
+        log_error "Error: Failed to create parent directory."
         echo "Please check permissions and try again."
         exit 1
     fi
 fi
 
 # Clone the repository
-echo -e "${YELLOW}Cloning MeticAI repository...${NC}"
+log_warning "Cloning MeticAI repository..."
 if git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR"; then
-    echo -e "${GREEN}✓ Repository cloned successfully.${NC}"
+    log_success "Repository cloned successfully."
     
     # Checkout the latest stable release instead of main branch
-    checkout_latest_release "$INSTALL_DIR" "MeticAI"
+    # Use the common.sh version if available, otherwise skip
+    if [ -f "$INSTALL_DIR/scripts/lib/common.sh" ]; then
+        source "$INSTALL_DIR/scripts/lib/common.sh"
+        checkout_latest_release "$INSTALL_DIR" "MeticAI"
+    fi
     
     # Restore preserved files from previous installation
     if [ -n "${TEMP_PRESERVE_DIR:-}" ] && [ -d "$TEMP_PRESERVE_DIR" ]; then
         if [ -f "$TEMP_PRESERVE_DIR/.env" ]; then
             cp "$TEMP_PRESERVE_DIR/.env" "$INSTALL_DIR/.env"
-            echo -e "${GREEN}✓ Restored .env file from previous installation${NC}"
+            log_success "Restored .env file from previous installation"
         fi
         if [ -d "$TEMP_PRESERVE_DIR/data" ]; then
             cp -r "$TEMP_PRESERVE_DIR/data" "$INSTALL_DIR/data"
-            echo -e "${GREEN}✓ Restored data/ directory (profile history) from previous installation${NC}"
+            log_success "Restored data/ directory (profile history) from previous installation"
         fi
         if [ -d "$TEMP_PRESERVE_DIR/logs" ]; then
             cp -r "$TEMP_PRESERVE_DIR/logs" "$INSTALL_DIR/logs"
-            echo -e "${GREEN}✓ Restored logs/ directory from previous installation${NC}"
+            log_success "Restored logs/ directory from previous installation"
         fi
         rm -rf "$TEMP_PRESERVE_DIR"
     fi
 else
-    echo -e "${RED}Error: Failed to clone repository.${NC}"
+    log_error "Error: Failed to clone repository."
     echo "Please check your internet connection and try again."
     # Clean up temp directory if cloning failed
     if [ -n "${TEMP_PRESERVE_DIR:-}" ] && [ -d "$TEMP_PRESERVE_DIR" ]; then
@@ -365,7 +357,7 @@ cd "$INSTALL_DIR" || exit 1
 
 # Verify local-install.sh exists
 if [ ! -f "./local-install.sh" ]; then
-    echo -e "${RED}Error: local-install.sh not found in cloned repository.${NC}"
+    log_error "Error: local-install.sh not found in cloned repository."
     exit 1
 fi
 
@@ -376,8 +368,8 @@ chmod +x ./uninstall.sh
 
 # Execute the local installer
 echo ""
-echo -e "${GREEN}Starting local installer...${NC}"
-echo -e "${BLUE}Note: To uninstall MeticAI later, run './uninstall.sh' from $INSTALL_DIR${NC}"
+log_success "Starting local installer..."
+log_info "Note: To uninstall MeticAI later, run './uninstall.sh' from $INSTALL_DIR"
 echo ""
 # Set environment variable to indicate we're in web install mode
 export METICAI_INSTALL_METHOD="web_install.sh"
