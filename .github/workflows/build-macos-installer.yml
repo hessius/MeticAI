@@ -4,17 +4,14 @@ on:
   push:
     paths:
       - 'macos-installer/**'
-      - 'local-install.sh'
-      - 'uninstall.sh'
-      - 'VERSION'  # Also build when version changes
+      - 'VERSION'
     branches:
       - main
       - develop
+      - version/2.0.0
   pull_request:
     paths:
       - 'macos-installer/**'
-      - 'local-install.sh'
-      - 'uninstall.sh'
   workflow_dispatch:  # Allow manual trigger
 
 permissions:
@@ -26,7 +23,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install Platypus
         run: |
