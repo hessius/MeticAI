@@ -100,4 +100,4 @@ jobs:
         if: steps.check_tag.outputs.exists == 'true'
         run: |
           echo "⏭️ Skipping release - tag v${{ steps.version.outputs.version }} already exists"
-          echo "To create a new release, increment the version in VERSION file"
+          echo "To create a new release, increment the version in root VERSION file"
