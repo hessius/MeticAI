@@ -216,15 +216,27 @@ async def save_recurring_schedules():
 
 
 async def load_recurring_schedules():
-    """Load recurring schedules from persistence."""
-    global _recurring_schedules
-    _recurring_schedules = await _recurring_schedules_persistence.load()
+    """Load recurring schedules from persistence.
+    
+    Note: We use clear()/update() to mutate the existing dict in place,
+    ensuring any module that imported _recurring_schedules directly
+    will see the loaded data.
+    """
+    loaded = await _recurring_schedules_persistence.load()
+    _recurring_schedules.clear()
+    _recurring_schedules.update(loaded)
 
 
 async def restore_scheduled_shots():
-    """Restore scheduled shots from disk on startup."""
-    global _scheduled_shots
-    _scheduled_shots = await _scheduled_shots_persistence.load()
+    """Restore scheduled shots from disk on startup.
+    
+    Note: We use clear()/update() to mutate the existing dict in place,
+    ensuring any module that imported _scheduled_shots directly
+    will see the loaded data.
+    """
+    loaded = await _scheduled_shots_persistence.load()
+    _scheduled_shots.clear()
+    _scheduled_shots.update(loaded)
     
     if _scheduled_shots:
         logger.info(f"Restored {len(_scheduled_shots)} scheduled shots from persistence")
