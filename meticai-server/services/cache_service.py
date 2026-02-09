@@ -8,7 +8,6 @@ This module provides caching functionality for:
 
 import json
 import time
-from pathlib import Path
 from typing import Optional
 from logging_config import get_logger
 

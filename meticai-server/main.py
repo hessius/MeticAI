@@ -24,7 +24,7 @@ except (PermissionError, OSError) as e:
         f"using temporary directory: {log_dir}",
         extra={"original_error": str(e)}
     )
-from datetime import datetime, timezone
+
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
     script_path = Path("/app/update.sh")
