@@ -169,7 +169,7 @@ log_message "Prerequisite check complete..."
 1. **Test Container Removal:**
    - Start MeticAI installation with containers running
    - Run uninstaller
-   - Verify with: `docker ps -a | grep -E "(meticai|coffee-relay|gemini-client|meticulous-mcp)"`
+   - Verify with: `docker ps -a | grep -E "(meticai|meticai-server|gemini-client|meticulous-mcp)"`
    - Should return no results
 
 2. **Test Multiple Scenarios:**

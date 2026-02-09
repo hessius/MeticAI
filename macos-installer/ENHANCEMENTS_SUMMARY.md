@@ -93,7 +93,7 @@ Buttons: [Cancel] [Get API Key] [Continue]
 - ✅ Background uninstallation (no Terminal)
 - ✅ Removes all components:
   - Docker containers (`docker compose down`)
-  - Docker images (meticai, coffee-relay, gemini-client, meticulous-mcp)
+  - Docker images (meticai, meticai-server, gemini-client, meticulous-mcp)
   - Repositories (meticulous-source, meticai-web)
   - Configuration files (.env, .versions.json, .rebuild-needed)
   - macOS integrations:

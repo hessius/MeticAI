@@ -101,7 +101,7 @@ def setup_logging(
     log_path.mkdir(parents=True, exist_ok=True)
     
     # Get root logger
-    logger = logging.getLogger("coffee-relay")
+    logger = logging.getLogger("meticai-server")
     logger.setLevel(getattr(logging, log_level.upper()))
     
     # Clear any existing handlers
@@ -114,7 +114,7 @@ def setup_logging(
     logger.addHandler(console_handler)
     
     # All logs file (JSON format) - rotating
-    all_logs_file = log_path / "coffee-relay.log"
+    all_logs_file = log_path / "meticai-server.log"
     all_logs_handler = logging.handlers.RotatingFileHandler(
         all_logs_file,
         maxBytes=max_bytes,
@@ -126,7 +126,7 @@ def setup_logging(
     logger.addHandler(all_logs_handler)
     
     # Error logs file (JSON format) - rotating, errors only
-    error_logs_file = log_path / "coffee-relay-errors.log"
+    error_logs_file = log_path / "meticai-server-errors.log"
     error_logs_handler = logging.handlers.RotatingFileHandler(
         error_logs_file,
         maxBytes=max_bytes,
@@ -152,4 +152,4 @@ def setup_logging(
 
 def get_logger() -> logging.Logger:
     """Get the configured logger instance."""
-    return logging.getLogger("coffee-relay")
+    return logging.getLogger("meticai-server")

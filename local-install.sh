@@ -25,12 +25,10 @@
 #
 ################################################################################
 
-# Text Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common library
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 ################################################################################
 # Non-Interactive Mode Support
@@ -108,49 +106,13 @@ run_privileged() {
     fi
 }
 
-# Function to checkout the latest release tag for a repository
-# This ensures users get stable, tested versions instead of potentially unstable main branch
-checkout_latest_release() {
-    local dir="$1"
-    local repo_name="$2"
-    local original_dir="$PWD"
-    
-    cd "$dir" || return 1
-    
-    # Fetch all tags
-    git fetch --tags 2>/dev/null
-    
-    # Get the latest version tag (format: vX.Y.Z or X.Y.Z)
-    local latest_tag
-    latest_tag=$(git tag -l --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
-    
-    if [ -n "$latest_tag" ]; then
-        if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
-            show_progress "Checking out $repo_name release $latest_tag..."
-        else
-            echo -e "${YELLOW}Checking out latest release: $latest_tag${NC}"
-        fi
-        if git checkout "$latest_tag" 2>/dev/null; then
-            echo -e "${GREEN}✓ $repo_name set to stable release $latest_tag${NC}"
-            cd "$original_dir" || true
-            return 0
-        else
-            echo -e "${YELLOW}Could not checkout tag, staying on main branch${NC}"
-            cd "$original_dir" || true
-            return 1
-        fi
-    else
-        echo -e "${YELLOW}No release tags found for $repo_name, using main branch${NC}"
-        cd "$original_dir" || true
-        return 1
-    fi
-}
+
 
 # Only show banner in interactive mode
 if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
-    echo -e "${BLUE}=========================================${NC}"
-    echo -e "${BLUE}      ☕️ Barista AI Installer 🤖      ${NC}"
-    echo -e "${BLUE}=========================================${NC}"
+    log_info "========================================="
+    log_info "      ☕️ Barista AI Installer 🤖      "
+    log_info "========================================="
     echo ""
 fi
 
@@ -162,7 +124,7 @@ detect_running_containers() {
     
     # Check for MeticAI-related containers (running or stopped)
     local containers
-    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|meticai-server|meticai-web)" || true)
     
     if [ -n "$containers" ]; then
         echo "$containers"
@@ -174,27 +136,27 @@ detect_running_containers() {
 
 # Stop and remove MeticAI containers
 stop_and_remove_containers() {
-    echo -e "${YELLOW}Stopping and removing running MeticAI containers...${NC}"
+    log_warning "Stopping and removing running MeticAI containers..."
     
     # Try docker compose down first (cleaner approach)
     if [ -f "docker-compose.yml" ]; then
         if docker compose down 2>/dev/null || docker-compose down 2>/dev/null; then
-            echo -e "${GREEN}✓ Containers stopped and removed via docker compose${NC}"
+            log_success "Containers stopped and removed via docker compose"
             return 0
         fi
     fi
     
     # Fallback: Remove containers individually
     local containers
-    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|coffee-relay|meticai-web)" || true)
+    containers=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep -E "(meticulous-mcp-server|gemini-client|meticai-server|meticai-web)" || true)
     
     if [ -n "$containers" ]; then
         while IFS= read -r container; do
-            echo -e "${YELLOW}  Stopping and removing: $container${NC}"
+            log_warning "  Stopping and removing: $container"
             docker stop "$container" 2>/dev/null || true
             docker rm "$container" 2>/dev/null || true
         done < <(echo "$containers")
-        echo -e "${GREEN}✓ Individual containers stopped and removed${NC}"
+        log_success "Individual containers stopped and removed"
     fi
 }
 
@@ -234,7 +196,7 @@ detect_previous_installation() {
 # Check for running containers and previous installations
 # Skip in non-interactive mode if SKIP_PREVIOUS_INSTALL_CHECK is set
 if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
-    echo -e "${YELLOW}Checking for existing MeticAI installations...${NC}"
+    log_warning "Checking for existing MeticAI installations..."
     echo ""
 
     CONTAINERS_FOUND=""
@@ -242,14 +204,14 @@ if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
 
     # Detect running containers
     if CONTAINERS_FOUND=$(detect_running_containers); then
-        echo -e "${YELLOW}Found running MeticAI containers:${NC}"
+        log_warning "Found running MeticAI containers:"
         echo "$CONTAINERS_FOUND" | sed 's/^/  - /'
         echo ""
     fi
 
     # Detect previous installation artifacts
     if PREVIOUS_INSTALL_FOUND=$(detect_previous_installation); then
-        echo -e "${YELLOW}Found existing MeticAI installation artifacts:${NC}"
+        log_warning "Found existing MeticAI installation artifacts:"
         # Items are returned line-separated, so we can process them directly
         echo "$PREVIOUS_INSTALL_FOUND" | while IFS= read -r item; do
             echo "  - $item"
@@ -259,17 +221,17 @@ if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
 
     # If we found either containers or previous installation, offer uninstall
     if [ -n "$CONTAINERS_FOUND" ] || [ -n "$PREVIOUS_INSTALL_FOUND" ]; then
-        echo -e "${YELLOW}=========================================${NC}"
-        echo -e "${YELLOW}  Previous Installation Detected${NC}"
-        echo -e "${YELLOW}=========================================${NC}"
+        log_warning "========================================="
+        log_warning "  Previous Installation Detected"
+        log_warning "========================================="
         echo ""
-        echo -e "${BLUE}It looks like MeticAI may already be installed or partially installed.${NC}"
+        log_info "It looks like MeticAI may already be installed or partially installed."
         echo ""
-        echo -e "${YELLOW}Recommended actions:${NC}"
+        log_warning "Recommended actions:"
         echo -e "  1) Run the uninstall script first to clean up: ${BLUE}./uninstall.sh${NC}"
         echo -e "  2) Then run this installer again for a fresh installation"
         echo ""
-        echo -e "${YELLOW}Or:${NC}"
+        log_warning "Or:"
         echo -e "  3) Continue anyway (may cause conflicts or use existing configuration)"
         echo ""
     
@@ -280,7 +242,7 @@ if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
         
             if [[ "$RUN_UNINSTALL" =~ ^[Yy]$ ]]; then
                 echo ""
-                echo -e "${GREEN}Starting uninstallation...${NC}"
+                log_success "Starting uninstallation..."
                 echo ""
                 chmod +x ./uninstall.sh
                 # Set environment variable to indicate we're calling from install script
@@ -293,25 +255,25 @@ if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
         fi
     else
         # Handle older installations that don't have uninstall.sh
-        echo -e "${YELLOW}=========================================${NC}"
-        echo -e "${YELLOW}  Uninstall Script Not Found${NC}"
-        echo -e "${YELLOW}=========================================${NC}"
+        log_warning "========================================="
+        log_warning "  Uninstall Script Not Found"
+        log_warning "========================================="
         echo ""
-        echo -e "${BLUE}This appears to be an older MeticAI installation without the uninstall script.${NC}"
+        log_info "This appears to be an older MeticAI installation without the uninstall script."
         echo ""
-        echo -e "${YELLOW}Options for cleanup:${NC}"
+        log_warning "Options for cleanup:"
         echo ""
-        echo -e "${GREEN}1) Automatic cleanup (recommended):${NC}"
+        log_success "1) Automatic cleanup (recommended):"
         echo "   - Stop and remove running containers"
         echo "   - Remove cloned repositories (meticulous-source, meticai-web)"
         echo "   - Keep your .env configuration file for reuse"
         echo ""
-        echo -e "${GREEN}2) Manual cleanup:${NC}"
+        log_success "2) Manual cleanup:"
         echo "   - Download the latest uninstall script from:"
         echo "     ${BLUE}https://raw.githubusercontent.com/hessius/MeticAI/main/uninstall.sh${NC}"
         echo "   - Or manually remove: meticulous-source/, meticai-web/, .env"
         echo ""
-        echo -e "${GREEN}3) Continue without cleanup:${NC}"
+        log_success "3) Continue without cleanup:"
         echo "   - Containers will be stopped automatically"
         echo "   - Existing configuration will be reused if available"
         echo ""
@@ -321,7 +283,7 @@ if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
         
         if [[ "$AUTO_CLEANUP" =~ ^[Yy]$ ]]; then
             echo ""
-            echo -e "${GREEN}Performing automatic cleanup...${NC}"
+            log_success "Performing automatic cleanup..."
             echo ""
             
             # Stop and remove containers
@@ -332,24 +294,24 @@ if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
             
             # Remove cloned repositories
             if [ -d "meticulous-source" ]; then
-                echo -e "${YELLOW}Removing meticulous-source directory...${NC}"
+                log_warning "Removing meticulous-source directory..."
                 rm -rf meticulous-source
-                echo -e "${GREEN}✓ Removed meticulous-source${NC}"
+                log_success "Removed meticulous-source"
             fi
             
             if [ -d "meticai-web" ]; then
-                echo -e "${YELLOW}Removing meticai-web directory...${NC}"
+                log_warning "Removing meticai-web directory..."
                 rm -rf meticai-web
-                echo -e "${GREEN}✓ Removed meticai-web${NC}"
+                log_success "Removed meticai-web"
             fi
             
             # Keep .env file for configuration reuse
             if [ -f ".env" ]; then
-                echo -e "${BLUE}ℹ Keeping .env file for configuration reuse${NC}"
+                log_info "ℹ Keeping .env file for configuration reuse"
             fi
             
             echo ""
-            echo -e "${GREEN}Cleanup complete! Proceeding with fresh installation...${NC}"
+            log_success "Cleanup complete! Proceeding with fresh installation..."
             echo ""
             
             # Skip the "continue anyway" prompt since we've cleaned up
@@ -363,13 +325,13 @@ if [ "$SKIP_PREVIOUS_INSTALL_CHECK" != "true" ]; then
         CONTINUE_ANYWAY=${CONTINUE_ANYWAY:-n}
         
         if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
-            echo -e "${GREEN}Installation cancelled. Please clean up first and try again.${NC}"
+            log_success "Installation cancelled. Please clean up first and try again."
             exit 0
         fi
     fi
     
     echo ""
-    echo -e "${YELLOW}Continuing with installation...${NC}"
+    log_warning "Continuing with installation..."
     
     # If user chose to continue, stop and remove containers now
     if [ -n "$CONTAINERS_FOUND" ]; then
@@ -389,7 +351,7 @@ fi  # End of SKIP_PREVIOUS_INSTALL_CHECK block
 
 # Check for existing data directory (preserved from previous installation)
 if [ -d "data" ] && [ "$(ls -A data 2>/dev/null)" ]; then
-    echo -e "${GREEN}✓ Found existing data directory with profile history - will preserve it${NC}"
+    log_success "Found existing data directory with profile history - will preserve it"
 fi
 
 # In non-interactive mode, skip .env check prompts
@@ -397,7 +359,7 @@ if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     # Non-interactive mode: always create new .env from environment variables
     SKIP_ENV_CREATION=false
 elif [ -f ".env" ]; then
-    echo -e "${YELLOW}Found existing .env file (preserved from previous installation).${NC}"
+    log_warning "Found existing .env file (preserved from previous installation)."
     echo ""
     cat .env
     echo ""
@@ -405,12 +367,12 @@ elif [ -f ".env" ]; then
     USE_EXISTING_ENV=${USE_EXISTING_ENV:-y}
     
     if [[ "$USE_EXISTING_ENV" =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}✓ Using existing .env file.${NC}"
-        echo -e "${YELLOW}Skipping configuration step...${NC}"
+        log_success "Using existing .env file."
+        log_warning "Skipping configuration step..."
         echo ""
         SKIP_ENV_CREATION=true
     else
-        echo -e "${YELLOW}Will create new .env file during configuration.${NC}"
+        log_warning "Will create new .env file during configuration."
         echo ""
         SKIP_ENV_CREATION=false
     fi
@@ -426,12 +388,12 @@ install_qrencode() {
     case "$os" in
         macos)
             if command -v brew &> /dev/null; then
-                echo -e "${YELLOW}Installing qrencode...${NC}"
+                log_warning "Installing qrencode..."
                 if brew install qrencode &> /dev/null; then
-                    echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                    log_success "qrencode installed successfully."
                     return 0
                 else
-                    echo -e "${YELLOW}Failed to install qrencode via Homebrew.${NC}"
+                    log_warning "Failed to install qrencode via Homebrew."
                     return 1
                 fi
             else
@@ -439,40 +401,40 @@ install_qrencode() {
             fi
             ;;
         ubuntu|debian|raspbian)
-            echo -e "${YELLOW}Installing qrencode...${NC}"
+            log_warning "Installing qrencode..."
             # Update package cache for more reliable installation
             if run_privileged apt-get update &> /dev/null && run_privileged apt-get install -y qrencode &> /dev/null; then
-                echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                log_success "qrencode installed successfully."
                 return 0
             else
-                echo -e "${YELLOW}Failed to install qrencode.${NC}"
+                log_warning "Failed to install qrencode."
                 return 1
             fi
             ;;
         fedora|rhel|centos)
-            echo -e "${YELLOW}Installing qrencode...${NC}"
+            log_warning "Installing qrencode..."
             if command -v dnf &> /dev/null; then
                 if run_privileged dnf install -y qrencode &> /dev/null; then
-                    echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                    log_success "qrencode installed successfully."
                     return 0
                 fi
             elif command -v yum &> /dev/null; then
                 if run_privileged yum install -y qrencode &> /dev/null; then
-                    echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                    log_success "qrencode installed successfully."
                     return 0
                 fi
             fi
-            echo -e "${YELLOW}Failed to install qrencode.${NC}"
+            log_warning "Failed to install qrencode."
             return 1
             ;;
         arch|manjaro)
-            echo -e "${YELLOW}Installing qrencode...${NC}"
+            log_warning "Installing qrencode..."
             # Use -S instead of -Sy to avoid slow database sync
             if run_privileged pacman -S --noconfirm qrencode &> /dev/null; then
-                echo -e "${GREEN}✓ qrencode installed successfully.${NC}"
+                log_success "qrencode installed successfully."
                 return 0
             else
-                echo -e "${YELLOW}Failed to install qrencode.${NC}"
+                log_warning "Failed to install qrencode."
                 return 1
             fi
             ;;
@@ -487,29 +449,29 @@ generate_qr_code() {
     local url="$1"
     
     echo ""
-    echo -e "${GREEN}=========================================${NC}"
-    echo -e "${GREEN}     📱 Scan to Access Web App 📱      ${NC}"
-    echo -e "${GREEN}=========================================${NC}"
+    log_success "========================================="
+    log_success "     📱 Scan to Access Web App 📱      "
+    log_success "========================================="
     echo ""
     
     # Try to use qrencode if available (common on many Linux systems)
     if command -v qrencode &> /dev/null; then
         qrencode -t ansiutf8 "$url" 2>/dev/null
         echo ""
-        echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
-        echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
+        log_warning "Scan the QR code above to open MeticAI Web App"
+        log_warning "Or visit directly: ${BLUE}${url}${NC}"
         echo ""
         return
     fi
     
     # If qrencode not found, try to install it automatically
-    echo -e "${YELLOW}QR code generator not found. Attempting to install...${NC}"
+    log_warning "QR code generator not found. Attempting to install..."
     if install_qrencode && command -v qrencode &> /dev/null; then
         # Installation succeeded, generate QR code
         qrencode -t ansiutf8 "$url" 2>/dev/null
         echo ""
-        echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
-        echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
+        log_warning "Scan the QR code above to open MeticAI Web App"
+        log_warning "Or visit directly: ${BLUE}${url}${NC}"
         echo ""
         return
     fi
@@ -531,23 +493,23 @@ except:
         if echo "$python_result" | grep -q "SUCCESS"; then
             echo "$python_result" | grep -v "SUCCESS"
             echo ""
-            echo -e "${YELLOW}Scan the QR code above to open MeticAI Web App${NC}"
-            echo -e "${YELLOW}Or visit directly: ${BLUE}${url}${NC}"
+            log_warning "Scan the QR code above to open MeticAI Web App"
+            log_warning "Or visit directly: ${BLUE}${url}${NC}"
             echo ""
             return
         fi
     fi
     
     # Fallback: Show a simple box with the URL
-    echo -e "${YELLOW}┌──────────────────────────────────────────────┐${NC}"
-    echo -e "${YELLOW}│                                              │${NC}"
-    echo -e "${YELLOW}│  Open this URL on your mobile device:       │${NC}"
-    echo -e "${YELLOW}│                                              │${NC}"
-    echo -e "${YELLOW}│  ${BLUE}${url}${YELLOW}│${NC}"
-    echo -e "${YELLOW}│                                              │${NC}"
-    echo -e "${YELLOW}│  💡 QR code not available on this system    │${NC}"
-    echo -e "${YELLOW}│                                              │${NC}"
-    echo -e "${YELLOW}└──────────────────────────────────────────────┘${NC}"
+    log_warning "┌──────────────────────────────────────────────┐"
+    log_warning "│                                              │"
+    log_warning "│  Open this URL on your mobile device:       │"
+    log_warning "│                                              │"
+    log_warning "│  ${BLUE}${url}${YELLOW}│"
+    log_warning "│                                              │"
+    log_warning "│  💡 QR code not available on this system    │"
+    log_warning "│                                              │"
+    log_warning "└──────────────────────────────────────────────┘"
     echo ""
 }
 
@@ -557,12 +519,12 @@ install_rebuild_watcher() {
     local watcher_script="${script_dir}/rebuild-watcher.sh"
     
     if [ ! -f "$watcher_script" ]; then
-        echo -e "${YELLOW}Warning: rebuild-watcher.sh not found, skipping.${NC}"
+        log_warning "Warning: rebuild-watcher.sh not found, skipping."
         return 1
     fi
     
-    echo -e "${YELLOW}Installing rebuild watcher service...${NC}"
-    echo -e "${BLUE}This enables fully automatic updates from the web interface.${NC}"
+    log_warning "Installing rebuild watcher service..."
+    log_info "This enables fully automatic updates from the web interface."
     
     # Ensure the script is executable
     chmod +x "$watcher_script"
@@ -576,19 +538,19 @@ install_rebuild_watcher() {
     
     # Configure git safe.directory for root (needed when systemd runs as root)
     # This prevents "dubious ownership" errors
-    echo -e "${BLUE}Configuring git safe directories for systemd...${NC}"
+    log_info "Configuring git safe directories for systemd..."
     run_privileged git config --global --add safe.directory "${script_dir}" 2>/dev/null || true
     run_privileged git config --global --add safe.directory "${script_dir}/meticulous-source" 2>/dev/null || true
     run_privileged git config --global --add safe.directory "${script_dir}/meticai-web" 2>/dev/null || true
     
     # Run the install command
     if "$watcher_script" --install; then
-        echo -e "${GREEN}✓ Rebuild watcher installed successfully${NC}"
-        echo -e "${BLUE}  Updates triggered from the web UI will now automatically rebuild containers.${NC}"
+        log_success "Rebuild watcher installed successfully"
+        log_info "  Updates triggered from the web UI will now automatically rebuild containers."
         return 0
     else
-        echo -e "${YELLOW}Warning: Failed to install rebuild watcher service.${NC}"
-        echo -e "${YELLOW}  You can install it manually later with: ./rebuild-watcher.sh --install${NC}"
+        log_warning "Warning: Failed to install rebuild watcher service."
+        log_warning "  You can install it manually later with: ./rebuild-watcher.sh --install"
         return 1
     fi
 }
@@ -603,12 +565,12 @@ create_macos_dock_shortcut() {
     
     # Validate URL format (basic check for http/https)
     if [[ ! "$url" =~ ^https?:// ]]; then
-        echo -e "${RED}Error: Invalid URL format. Skipping dock shortcut creation.${NC}"
+        log_error "Error: Invalid URL format. Skipping dock shortcut creation."
         return 1
     fi
     
     echo ""
-    echo -e "${YELLOW}Creating macOS application and adding to Dock...${NC}"
+    log_warning "Creating macOS application and adding to Dock..."
     
     # Create application bundle structure (may need elevated permissions for /Applications)
     if ! mkdir -p "${app_path}/Contents/MacOS" 2>/dev/null; then
@@ -679,7 +641,7 @@ open \"${url}\"
         echo "$plist_content" > "${app_path}/Contents/Info.plist"
     fi
     
-    echo -e "${GREEN}✓ Application created at: ${app_path}${NC}"
+    log_success "Application created at: ${app_path}"
     
     # Add to Dock using defaults command
     # First check if it's already in the Dock
@@ -702,9 +664,9 @@ open \"${url}\"
         # Restart the Dock to apply changes
         killall Dock
         
-        echo -e "${GREEN}✓ MeticAI added to your Dock${NC}"
+        log_success "MeticAI added to your Dock"
     else
-        echo -e "${YELLOW}  MeticAI is already in your Dock${NC}"
+        log_warning "  MeticAI is already in your Dock"
     fi
 }
 
@@ -728,19 +690,19 @@ detect_os() {
 install_git() {
     local os
     os=$(detect_os)
-    echo -e "${YELLOW}Installing git...${NC}"
+    log_warning "Installing git..."
     
     case "$os" in
         macos)
             if command -v brew &> /dev/null; then
                 if brew install git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git via Homebrew.${NC}"
+                    log_error "Failed to install git via Homebrew."
                     exit 1
                 fi
             else
-                echo -e "${YELLOW}Homebrew not found. Installing Homebrew first...${NC}"
+                log_warning "Homebrew not found. Installing Homebrew first..."
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
                 
                 # Source Homebrew environment for both Intel and Apple Silicon Macs
@@ -751,9 +713,9 @@ install_git() {
                 fi
                 
                 if command -v brew &> /dev/null && brew install git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    log_error "Failed to install git. Please install manually."
                     echo "Visit: https://git-scm.com/downloads"
                     exit 1
                 fi
@@ -761,42 +723,42 @@ install_git() {
             ;;
         ubuntu|debian|raspbian)
             if run_privileged apt-get update && run_privileged apt-get install -y git; then
-                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                log_success "Git installed successfully."
             else
-                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                log_error "Failed to install git. Please install manually."
                 exit 1
             fi
             ;;
         fedora|rhel|centos)
             if command -v dnf &> /dev/null; then
                 if run_privileged dnf install -y git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    log_error "Failed to install git. Please install manually."
                     exit 1
                 fi
             elif command -v yum &> /dev/null; then
                 if run_privileged yum install -y git; then
-                    echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                    log_success "Git installed successfully."
                 else
-                    echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                    log_error "Failed to install git. Please install manually."
                     exit 1
                 fi
             else
-                echo -e "${RED}No supported package manager found. Please install git manually.${NC}"
+                log_error "No supported package manager found. Please install git manually."
                 exit 1
             fi
             ;;
         arch|manjaro)
             if run_privileged pacman -Sy --noconfirm git; then
-                echo -e "${GREEN}✓ Git installed successfully.${NC}"
+                log_success "Git installed successfully."
             else
-                echo -e "${RED}Failed to install git. Please install manually.${NC}"
+                log_error "Failed to install git. Please install manually."
                 exit 1
             fi
             ;;
         *)
-            echo -e "${RED}Unsupported OS for automatic installation. Please install git manually.${NC}"
+            log_error "Unsupported OS for automatic installation. Please install git manually."
             echo "Visit: https://git-scm.com/downloads"
             exit 1
             ;;
@@ -807,12 +769,12 @@ install_git() {
 install_docker() {
     local os
     os=$(detect_os)
-    echo -e "${YELLOW}Installing Docker...${NC}"
+    log_warning "Installing Docker..."
     
     if [[ "$os" == "macos" ]]; then
-        echo -e "${YELLOW}On macOS, Docker Desktop must be installed manually.${NC}"
-        echo -e "${YELLOW}Please visit: https://www.docker.com/products/docker-desktop${NC}"
-        echo -e "${YELLOW}After installing Docker Desktop, make sure it's running and try again.${NC}"
+        log_warning "On macOS, Docker Desktop must be installed manually."
+        log_warning "Please visit: https://www.docker.com/products/docker-desktop"
+        log_warning "After installing Docker Desktop, make sure it's running and try again."
         exit 1
     fi
     
@@ -831,22 +793,11 @@ install_docker() {
         run_privileged systemctl enable docker || true
         run_privileged systemctl start docker || true
         
-        echo -e "${GREEN}✓ Docker installed successfully.${NC}"
-        echo -e "${YELLOW}Note: You may need to log out and back in for docker group changes to take effect.${NC}"
+        log_success "Docker installed successfully."
+        log_warning "Note: You may need to log out and back in for docker group changes to take effect."
     else
-        echo -e "${RED}curl is required to install Docker. Please install curl first.${NC}"
+        log_error "curl is required to install Docker. Please install curl first."
         exit 1
-    fi
-}
-
-# Check if docker compose is available
-check_docker_compose() {
-    if docker compose version &> /dev/null; then
-        return 0
-    elif command -v docker-compose &> /dev/null; then
-        return 0
-    else
-        return 1
     fi
 }
 
@@ -854,17 +805,17 @@ check_docker_compose() {
 install_docker_compose() {
     local os
     os=$(detect_os)
-    echo -e "${YELLOW}Installing Docker Compose...${NC}"
+    log_warning "Installing Docker Compose..."
     
     if [[ "$os" == "macos" ]]; then
-        echo -e "${YELLOW}On macOS, Docker Compose comes bundled with Docker Desktop.${NC}"
-        echo -e "${YELLOW}If Docker Desktop is installed and running, Docker Compose should be available.${NC}"
+        log_warning "On macOS, Docker Compose comes bundled with Docker Desktop."
+        log_warning "If Docker Desktop is installed and running, Docker Compose should be available."
         if check_docker_compose; then
-            echo -e "${GREEN}✓ Docker Compose is available.${NC}"
+            log_success "Docker Compose is available."
             return 0
         else
-            echo -e "${RED}Docker Compose not found. Please make sure Docker Desktop is installed and running.${NC}"
-            echo -e "${YELLOW}Visit: https://www.docker.com/products/docker-desktop${NC}"
+            log_error "Docker Compose not found. Please make sure Docker Desktop is installed and running."
+            log_warning "Visit: https://www.docker.com/products/docker-desktop"
             exit 1
         fi
     fi
@@ -874,7 +825,7 @@ install_docker_compose() {
         ubuntu|debian|raspbian)
             if run_privileged apt-get update; then
                 if run_privileged apt-get install -y docker-compose-plugin; then
-                    echo -e "${GREEN}✓ Docker Compose plugin installed.${NC}"
+                    log_success "Docker Compose plugin installed."
                 fi
             fi
             ;;
@@ -887,16 +838,16 @@ install_docker_compose() {
             ;;
         *)
             # Fallback to standalone docker-compose
-            echo -e "${YELLOW}Installing standalone docker-compose...${NC}"
+            log_warning "Installing standalone docker-compose..."
             run_privileged curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             run_privileged chmod +x /usr/local/bin/docker-compose
             ;;
     esac
     
     if check_docker_compose; then
-        echo -e "${GREEN}✓ Docker Compose installed successfully.${NC}"
+        log_success "Docker Compose installed successfully."
     else
-        echo -e "${RED}Failed to install Docker Compose. Please install manually.${NC}"
+        log_error "Failed to install Docker Compose. Please install manually."
         exit 1
     fi
 }
@@ -1116,7 +1067,7 @@ scan_for_meticulous() {
 if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Checking prerequisites..." 10
 else
-    echo -e "${YELLOW}[1/4] Checking and installing prerequisites...${NC}"
+    log_warning "[1/4] Checking and installing prerequisites..."
 fi
 
 # Check and install git
@@ -1126,19 +1077,19 @@ if ! command -v git &> /dev/null; then
         show_progress "Installing git..." 12
         install_git
     else
-        echo -e "${RED}Error: git is not installed.${NC}"
+        log_error "Error: git is not installed."
         read -r -p "Would you like to install git now? (y/n) [y]: " INSTALL_GIT </dev/tty
         INSTALL_GIT=${INSTALL_GIT:-y}
         
         if [[ "$INSTALL_GIT" =~ ^[Yy]$ ]]; then
             install_git
         else
-            echo -e "${RED}Error: git is required. Please install it manually and run this script again.${NC}"
+            log_error "Error: git is required. Please install it manually and run this script again."
             exit 1
         fi
     fi
 else
-    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Git found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && log_success "Git found."
 fi
 
 # Check and install docker
@@ -1147,19 +1098,19 @@ if ! command -v docker &> /dev/null; then
         echo "ERROR: Docker is not installed. Please install Docker Desktop first."
         exit 1
     else
-        echo -e "${RED}Error: docker is not installed.${NC}"
+        log_error "Error: docker is not installed."
         read -r -p "Would you like to install Docker now? (y/n) [y]: " INSTALL_DOCKER </dev/tty
         INSTALL_DOCKER=${INSTALL_DOCKER:-y}
         
         if [[ "$INSTALL_DOCKER" =~ ^[Yy]$ ]]; then
             install_docker
         else
-            echo -e "${RED}Error: Docker is required. Please install it manually and run this script again.${NC}"
+            log_error "Error: Docker is required. Please install it manually and run this script again."
             exit 1
         fi
     fi
 else
-    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Docker found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && log_success "Docker found."
 fi
 
 # Check and install docker compose
@@ -1169,19 +1120,19 @@ if ! check_docker_compose; then
         echo "ERROR: Docker Compose is not available. Please ensure Docker Desktop is properly installed."
         exit 1
     else
-        echo -e "${YELLOW}Docker Compose is not installed.${NC}"
+        log_warning "Docker Compose is not installed."
         read -r -p "Would you like to install Docker Compose now? (y/n) [y]: " INSTALL_COMPOSE </dev/tty
         INSTALL_COMPOSE=${INSTALL_COMPOSE:-y}
         
         if [[ "$INSTALL_COMPOSE" =~ ^[Yy]$ ]]; then
             install_docker_compose
         else
-            echo -e "${RED}Error: Docker Compose is required. Please install it manually and run this script again.${NC}"
+            log_error "Error: Docker Compose is required. Please install it manually and run this script again."
             exit 1
         fi
     fi
 else
-    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ Docker Compose found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && log_success "Docker Compose found."
 fi
 
 # Check and install qrencode (optional, for QR code generation)
@@ -1190,24 +1141,24 @@ if ! command -v qrencode &> /dev/null; then
         # Skip qrencode in non-interactive mode - it's optional
         : # no-op
     else
-        echo -e "${YELLOW}qrencode is not installed (used for QR code generation).${NC}"
+        log_warning "qrencode is not installed (used for QR code generation)."
         read -r -p "Would you like to install qrencode now? (y/n) [y]: " INSTALL_QRENCODE </dev/tty
         INSTALL_QRENCODE=${INSTALL_QRENCODE:-y}
         
         if [[ "$INSTALL_QRENCODE" =~ ^[Yy]$ ]]; then
             if ! install_qrencode; then
-                echo -e "${YELLOW}Warning: qrencode installation failed. QR code may not be available at the end.${NC}"
-                echo -e "${YELLOW}Installation will continue - you can still access the web interface via URL.${NC}"
+                log_warning "Warning: qrencode installation failed. QR code may not be available at the end."
+                log_warning "Installation will continue - you can still access the web interface via URL."
             fi
         else
-            echo -e "${YELLOW}Skipping qrencode installation. QR code will not be available.${NC}"
+            log_warning "Skipping qrencode installation. QR code will not be available."
         fi
     fi
 else
-    [ "$METICAI_NON_INTERACTIVE" != "true" ] && echo -e "${GREEN}✓ qrencode found.${NC}"
+    [ "$METICAI_NON_INTERACTIVE" != "true" ] && log_success "qrencode found."
 fi
 
-echo -e "${GREEN}✓ All prerequisites satisfied.${NC}"
+log_success "All prerequisites satisfied."
 echo ""
 
 # 2. Configure Environment Variables
@@ -1220,8 +1171,8 @@ echo ""
 
 # Skip configuration if using existing .env file
 if [ "$SKIP_ENV_CREATION" = true ]; then
-    echo -e "${YELLOW}[2/4] Configuration${NC}"
-    echo -e "${GREEN}✓ Using existing .env configuration.${NC}"
+    log_warning "[2/4] Configuration"
+    log_success "Using existing .env configuration."
     # Source the .env file to load variables for later use
     set -a
     source .env
@@ -1244,7 +1195,7 @@ PI_IP=$PI_IP
 EOF
     show_progress "Configuration created" 25
 else
-    echo -e "${YELLOW}[2/4] Configuration${NC}"
+    log_warning "[2/4] Configuration"
     echo "We need to create a .env file with your specific settings."
     echo ""
 
@@ -1253,13 +1204,13 @@ else
     echo "Get your free API key at: https://aistudio.google.com/app/api-keys"
     read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
     while [[ -z "$GEMINI_KEY" ]]; do
-        echo -e "${RED}API Key cannot be empty.${NC}"
+        log_error "API Key cannot be empty."
         read -r -p "Enter your Google Gemini API Key: " GEMINI_KEY </dev/tty
     done
 
     # --- Meticulous IP (Auto-detect) ---
     echo ""
-    echo -e "${YELLOW}Scanning network for Meticulous machines...${NC}"
+    log_warning "Scanning network for Meticulous machines..."
     
     # Scan for Meticulous devices (using portable while-read loop instead of mapfile for Bash 3.2 compatibility)
     METICULOUS_DEVICES=()
@@ -1270,7 +1221,7 @@ else
     MET_IP=""
     
     if [ ${#METICULOUS_DEVICES[@]} -gt 0 ]; then
-        echo -e "${GREEN}Found ${#METICULOUS_DEVICES[@]} Meticulous device(s):${NC}"
+        log_success "Found ${#METICULOUS_DEVICES[@]} Meticulous device(s):"
         echo ""
         
         # Present choices if multiple devices found
@@ -1290,7 +1241,7 @@ else
                 selected_device="${METICULOUS_DEVICES[$((DEVICE_CHOICE-1))]}"
                 MET_IP=$(echo "$selected_device" | cut -d',' -f2)
                 selected_hostname=$(echo "$selected_device" | cut -d',' -f1)
-                echo -e "${GREEN}✓ Selected: $selected_hostname ($MET_IP)${NC}"
+                log_success "Selected: $selected_hostname ($MET_IP)"
             fi
         else
             # Only one device found
@@ -1304,11 +1255,11 @@ else
             
             if [[ "$USE_DETECTED" =~ ^[Yy]$ ]]; then
                 MET_IP="$ip"
-                echo -e "${GREEN}✓ Using: $hostname ($MET_IP)${NC}"
+                log_success "Using: $hostname ($MET_IP)"
             fi
         fi
     else
-        echo -e "${YELLOW}No Meticulous devices found automatically.${NC}"
+        log_warning "No Meticulous devices found automatically."
     fi
     
     # Fallback to manual input if not detected or not selected
@@ -1316,7 +1267,7 @@ else
         echo ""
         read -r -p "Enter the IP address of your Meticulous Machine (e.g., 192.168.50.168): " MET_IP </dev/tty
         while [[ -z "$MET_IP" ]]; do
-            echo -e "${RED}IP Address cannot be empty.${NC}"
+            log_error "IP Address cannot be empty."
             read -r -p "Enter the IP address of your Meticulous Machine: " MET_IP </dev/tty
         done
     fi
@@ -1326,7 +1277,7 @@ else
     DETECTED_IP=$(detect_ip)
     
     if [[ -n "$DETECTED_IP" ]]; then
-        echo -e "${GREEN}Detected server IP: $DETECTED_IP${NC}"
+        log_success "Detected server IP: $DETECTED_IP"
         read -r -p "Use this IP address? (y/n) [y]: " USE_DETECTED_IP </dev/tty
         USE_DETECTED_IP=${USE_DETECTED_IP:-y}
         
@@ -1335,14 +1286,14 @@ else
         else
             read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
             while [[ -z "$PI_IP" ]]; do
-                echo -e "${RED}IP Address cannot be empty.${NC}"
+                log_error "IP Address cannot be empty."
                 read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
             done
         fi
     else
         read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
         while [[ -z "$PI_IP" ]]; do
-            echo -e "${RED}IP Address cannot be empty.${NC}"
+            log_error "IP Address cannot be empty."
             read -r -p "Enter the IP address of this server: " PI_IP </dev/tty
         done
     fi
@@ -1355,7 +1306,7 @@ GEMINI_API_KEY=$GEMINI_KEY
 METICULOUS_IP=$MET_IP
 PI_IP=$PI_IP
 EOF
-    echo -e "${GREEN}✓ .env file created.${NC}"
+    log_success ".env file created."
     echo ""
 fi
 
@@ -1366,7 +1317,7 @@ fi
 # And the MeticAI Web Interface
 # Repository: https://github.com/hessius/MeticAI-web.git
 ################################################################################
-echo -e "${YELLOW}[3/4] Setting up Meticulous Source and Web App...${NC}"
+log_warning "[3/4] Setting up Meticulous Source and Web App..."
 
 # Clone MCP Source
 if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
@@ -1401,7 +1352,7 @@ else
     fi
     git clone https://github.com/hessius/meticulous-mcp.git meticulous-source
 fi
-echo -e "${GREEN}✓ MCP source code ready.${NC}"
+log_success "MCP source code ready."
 
 # Clone Web App
 if [ -d "meticai-web" ]; then
@@ -1436,7 +1387,7 @@ else
     git clone https://github.com/hessius/MeticAI-web.git meticai-web
     checkout_latest_release "$PWD/meticai-web" "MeticAI-web"
 fi
-echo -e "${GREEN}✓ Web app source code ready.${NC}"
+log_success "Web app source code ready."
 
 # Create web app config directory if it doesn't exist
 mkdir -p meticai-web/public
@@ -1462,14 +1413,14 @@ cat <<WEBCONFIG > meticai-web/public/config.json
 WEBCONFIG
 # Also create in meticai-web root for standalone docker-compose usage
 cp meticai-web/public/config.json meticai-web/config.json
-echo -e "${GREEN}✓ Web app configured.${NC}"
+log_success "Web app configured."
 echo ""
 
 # 4. Build and Launch
 ################################################################################
 # Stop any existing containers, then build and start the Docker services
 # This includes:
-# - coffee-relay: FastAPI server for receiving requests
+# - meticai-server: FastAPI server for receiving requests
 # - gemini-client: AI brain using Google Gemini 2.0 Flash
 ################################################################################
 
@@ -1488,7 +1439,7 @@ fi
 if [ "$METICAI_NON_INTERACTIVE" = "true" ]; then
     show_progress "Building and launching containers..." 60
 else
-    echo -e "${YELLOW}[4/4] Building and Launching Containers...${NC}"
+    log_warning "[4/4] Building and Launching Containers..."
     if [ "$(id -u)" -eq 0 ]; then
         echo "Note: Running as root."
     elif command -v sudo &> /dev/null; then
@@ -1502,7 +1453,7 @@ fi
 # Docker will create a directory if the file doesn't exist, causing mount errors
 if [ -d ".versions.json" ]; then
     if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
-        echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+        log_warning "Fixing .versions.json (was directory, converting to file)..."
     fi
     rm -rf .versions.json
 fi
@@ -1566,7 +1517,7 @@ if [ -d "meticai-web/public/config.json" ]; then
 fi
 
 if [ "$METICAI_NON_INTERACTIVE" != "true" ]; then
-    echo -e "${GREEN}✓ Data directories created with correct ownership${NC}"
+    log_success "Data directories created with correct ownership"
 fi
 
 # Stop existing containers if running (safety net in case any were missed earlier)
@@ -1626,9 +1577,9 @@ if $DOCKER_CMD up -d --build; then
         show_progress "Installation complete!" 100
     else
         echo ""
-        echo -e "${GREEN}=========================================${NC}"
-        echo -e "${GREEN}      🎉 Installation Complete! 🎉       ${NC}"
-        echo -e "${GREEN}=========================================${NC}"
+        log_success "========================================="
+        log_success "      🎉 Installation Complete! 🎉       "
+        log_success "========================================="
         echo ""
     fi
     echo "Your Barista Agent is running."
@@ -1652,7 +1603,7 @@ if $DOCKER_CMD up -d --build; then
             if [[ "$CREATE_DOCK_SHORTCUT" =~ ^[Yy]$ ]]; then
                 create_macos_dock_shortcut "http://$PI_IP:3550"
             else
-                echo -e "${YELLOW}Skipping Dock shortcut creation.${NC}"
+                log_warning "Skipping Dock shortcut creation."
             fi
         fi
     fi
@@ -1664,10 +1615,10 @@ if $DOCKER_CMD up -d --build; then
     fi
     
     echo "To test the connection, copy/paste this command:"
-    echo -e "${BLUE}curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/analyze_and_profile${NC}"
+    log_info "curl -X POST -F 'coffee_info=System Test' -F 'user_prefs=Default' http://$PI_IP:8000/analyze_and_profile"
     echo ""
-    echo -e "${YELLOW}💡 Tip: Run './update.sh' anytime to check for updates to MeticAI and dependencies${NC}"
-    echo -e "${YELLOW}💡 To uninstall MeticAI later, run './uninstall.sh'${NC}"
+    log_warning "💡 Tip: Run './update.sh' anytime to check for updates to MeticAI and dependencies"
+    log_warning "💡 To uninstall MeticAI later, run './uninstall.sh'"
     echo ""
     
     # Run startup update check
@@ -1676,6 +1627,6 @@ if $DOCKER_CMD up -d --build; then
     fi
 else
     echo ""
-    echo -e "${RED}❌ Installation failed during Docker build.${NC}"
+    log_error "❌ Installation failed during Docker build."
     exit 1
 fi

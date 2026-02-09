@@ -9,14 +9,10 @@
 #
 ################################################################################
 
-# Text Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common library
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # Quick check for updates (non-interactive)
 if [ -f "$SCRIPT_DIR/update.sh" ]; then

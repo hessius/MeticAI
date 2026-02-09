@@ -1,5 +1,5 @@
 """
-Pytest configuration and shared fixtures for coffee-relay tests.
+Pytest configuration and shared fixtures for meticai-server tests.
 
 This module MUST be loaded before main.py to set up test environment variables.
 """

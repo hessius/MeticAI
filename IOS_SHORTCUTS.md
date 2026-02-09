@@ -152,7 +152,7 @@ For when you just want to identify your coffee without creating a profile:
 **"Connection Failed" or timeout errors:**
 - Verify your iPhone is on the same network as your MeticAI server
 - Double-check the IP address in your shortcut matches your server's IP
-- Ensure MeticAI is running: `docker ps` should show the coffee-relay container
+- Ensure MeticAI is running: `docker ps` should show the meticai-server container
 - Test the connection in Safari: navigate to `http://<PI_IP>:8000/docs`
 
 **"Invalid Response" or unexpected results:**

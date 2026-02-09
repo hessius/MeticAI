@@ -16,10 +16,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# Source common library
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 
 # Ensure required files exist before Docker runs
 prepare_files() {
@@ -35,21 +33,14 @@ prepare_files() {
 
 # Fix permissions after Docker operations
 fix_permissions() {
-    echo -e "${YELLOW}Fixing file permissions...${NC}"
+    log_warning "Fixing file permissions..."
     sudo chown -R "$(id -u):$(id -g)" data logs .versions.json .rebuild-needed \
         meticulous-source meticai-web 2>/dev/null || true
-    echo -e "${GREEN}✓ Permissions fixed${NC}"
+    log_success "Permissions fixed"
 }
 
 # Determine docker compose command
-if docker compose version &> /dev/null; then
-    COMPOSE_CMD="docker compose"
-elif command -v docker-compose &> /dev/null; then
-    COMPOSE_CMD="docker-compose"
-else
-    echo "Error: Docker Compose not found"
-    exit 1
-fi
+COMPOSE_CMD=$(get_compose_command) || exit 1
 
 # Check if we need sudo
 SUDO_PREFIX=""
@@ -57,7 +48,7 @@ if ! docker info &> /dev/null; then
     if sudo docker info &> /dev/null; then
         SUDO_PREFIX="sudo"
     else
-        echo "Error: Cannot access Docker daemon"
+        log_error "Cannot access Docker daemon"
         exit 1
     fi
 fi
