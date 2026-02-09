@@ -175,6 +175,10 @@ docker compose up -d
 If you enabled Watchtower during installation, MeticAI will automatically check for updates every 6 hours and update seamlessly.
 
 **Manual trigger via API:**
+
+To use this endpoint, your Watchtower container must:
+- be started with the HTTP API enabled (for example using `--http-api-update` and a token via `--http-api-token` or `WATCHTOWER_HTTP_API_TOKEN`), and
+- publish its API port to the host (for example `-p 8080:8080` or `ports: ["8080:8080"]` in Docker Compose so that `http://localhost:8080` is reachable).
 ```bash
 curl -X POST http://localhost:8080/v1/update \
   -H "Authorization: Bearer YOUR_WATCHTOWER_TOKEN"
