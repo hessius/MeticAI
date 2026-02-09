@@ -14,22 +14,19 @@
 # ------------------------------------------------------------------------------
 # Stage 1: Build Web Frontend
 # ------------------------------------------------------------------------------
-FROM node:22-slim AS web-builder
+FROM oven/bun:1-alpine AS web-builder
 
 WORKDIR /build
 
-# Install bun for faster builds
-RUN npm install -g bun
-
 # Copy web app source
-COPY apps/web/package.json apps/web/bun.lock* apps/web/package-lock.json* ./
+COPY apps/web/package.json apps/web/bun.lock* ./
 
 # Install dependencies
-RUN bun install --frozen-lockfile || npm ci
+RUN bun install --frozen-lockfile
 
 # Copy source and build
 COPY apps/web/ ./
-RUN bun run build || npm run build
+RUN bun run build
 
 
 # ------------------------------------------------------------------------------

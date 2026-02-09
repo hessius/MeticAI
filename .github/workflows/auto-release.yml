@@ -75,12 +75,20 @@ jobs:
             
             ### Installation
             
-            **Quick Install (Raspberry Pi / Linux):**
+            **Quick Install:**
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/v${{ steps.version.outputs.version }}/web_install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
             ```
             
-            **macOS:** Download the DMG from the [latest macOS installer release](https://github.com/hessius/MeticAI/releases?q=macos-installer&expanded=true).
+            **Docker:**
+            ```bash
+            docker pull ghcr.io/hessius/meticai:v${{ steps.version.outputs.version }}
+            ```
+            
+            **Upgrading from v1.x:**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/migrate-to-unified.sh | bash
+            ```
             
             ---
             Built from commit: ${{ github.sha }}
