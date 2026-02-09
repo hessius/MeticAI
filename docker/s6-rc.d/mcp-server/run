@@ -1,0 +1,4 @@
+#!/command/execlineb -P
+cd /app/mcp-server
+s6-env METICULOUS_IP=${METICULOUS_IP}
+python -m uvicorn src.server_http:app --host 0.0.0.0 --port 8080 --workers 1
