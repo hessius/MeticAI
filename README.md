@@ -10,7 +10,7 @@
 *1. Take a photo or describe your coffee. Get a perfect espresso profile. Automatically.*
 *2. Understand your profiles, shot graphs by enabling shot comparison, analysis and AI-coaching*
 
-[Get Started](#-quick-start) • [Features](#-what-it-does) • [Web Interface](#-using-meticai) • [Updates](UPDATE_GUIDE.md)
+[Get Started](#-quick-start) • [Features](#-what-it-does) • [Web Interface](#-using-meticai) • [API](API.md)
 
 </div>
 
@@ -44,15 +44,13 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 ### For Power Users
 - 🔌 **REST API** - Integrate with any automation system
-- 🐳 **Self-Hosted** - Runs on Raspberry Pi or any Unix server
+- 🐳 **Single Docker Container** - Simple deployment and updates
 - 🔓 **Open Source** - Customize and extend as you like
-- 📡 **Update System** - One-command updates for all components
+- 🔄 **Auto Updates** - Optional Watchtower integration
 
 ### Additional Features
-- 🍎 **macOS Dock Integration** - Optional dock shortcut for quick access
-- 📱 **QR Code Setup** - Easy mobile access during installation  
-- 🔄 **Automatic Updates** - Built-in update system with web UI support
-- 🌍 **URL Integration** - Control via curl from any HTTP-capable device
+- 📱 **iOS Shortcuts** - One-tap brewing from your iPhone
+- 🌍 **Remote Access** - Optional Tailscale integration
 - 🔐 **Secure** - Self-hosted means your data stays private
 - 🎨 **Modern UI** - Built with React and shadcn/ui for a polished experience
 
@@ -60,65 +58,62 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 ### What You Need
 - ☑️ A **Meticulous Espresso Machine** (connected to your network)
-- ☑️ A server to run MeticAI (Raspberry Pi, Mac, or Linux computer)
+- ☑️ A server to run MeticAI (Raspberry Pi, Mac, Linux, or Windows with Docker)
 - ☑️ A **free Google Gemini API key** → [Get yours here](https://aistudio.google.com/app/apikey) (takes 30 seconds)
 
-### Installation (5 minutes)
+### Installation (2 minutes)
 
-**Option 1: macOS Installer App** (Easiest for Mac users)
-
-Download and run the standalone installer app - **completely GUI-based, no terminal at all!**
-
-1. Download the installer: [MeticAI-Installer.dmg](https://github.com/hessius/MeticAI/releases/latest) *(coming soon)*
-2. Open the DMG and drag "MeticAI Installer" to Applications
-3. Launch the app and follow the graphical prompts
-
-The app will guide you through everything via dialogs:
-- ✅ Checking prerequisites (with helpful install links)
-- ✅ Choosing installation location
-- ✅ Entering API key and IP addresses
-- ✅ Background installation with progress feedback
-- ✅ Auto-opens web interface when complete
-
-**No Terminal window - 100% graphical!**
-
-[→ Learn more about the macOS installer](macos-installer/README.md)
-
-**Option 2: One-Line Install** (Recommended for terminal users)
+**One-Line Install:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
 ```
 
 That's it! The installer will:
-- ✅ Check for and install prerequisites (git, docker, docker-compose)
-- ✅ Detect and handle any existing MeticAI installations
-- ✅ Stop and remove running MeticAI containers if found
+- ✅ Check for and install Docker if needed
 - ✅ Guide you through setup (just paste your API key and machine IP)
-- ✅ Download and start all services
-- ✅ Show a QR code to access the web interface from your phone
-- ✅ *[macOS only]* Optionally create a Dock icon for quick access
+- ✅ Optionally enable Tailscale (remote access) and Watchtower (auto-updates)
+- ✅ Pull and start the unified container
 
-**Option 3: Manual Install**
+**Upgrading from v1.x?**
 ```bash
-git clone https://github.com/hessius/MeticAI.git
-cd MeticAI
-./local-install.sh
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/migrate-to-unified.sh | bash
 ```
 
-After installation completes, scan the QR code with your phone or visit `http://YOUR_SERVER_IP:3550` in a browser!
+The migration script will:
+- ✅ Back up your existing configuration
+- ✅ Stop and remove old containers
+- ✅ Migrate your data to the new volume
+- ✅ Start the new unified container
 
-**Reinstalling or Upgrading?**
+### Manual Installation
 
-If you already have MeticAI installed, the installer will:
-- Detect existing containers and installation artifacts
-- Offer to run the uninstall script first for a clean installation
-- Allow you to continue anyway if you prefer to reuse existing configuration
+For those who prefer manual setup:
 
-For a clean reinstall, it's recommended to run `./uninstall.sh` first.
+```bash
+# Create configuration directory
+mkdir -p ~/.meticai && cd ~/.meticai
+
+# Create .env file
+cat > .env << EOF
+GEMINI_API_KEY=your_key_here
+METICULOUS_IP=meticulous.local
+EOF
+
+# Download compose file
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.unified.yml -o docker-compose.yml
+
+# Start MeticAI
+docker compose pull
+docker compose up -d
+```
+
+### After Installation
+
+Open `http://YOUR_SERVER_IP:3550` in any browser to access the web interface!
 
 ### Need Help?
-- 📖 [Detailed installation guide](TECHNICAL.md#manual-setup-alternative)
-- 🔧 [Troubleshooting common issues](#troubleshooting)
+- 📖 [Technical documentation](TECHNICAL.md)
+- 🔧 [Troubleshooting](#troubleshooting)
 
 ## 📱 Using MeticAI
 
@@ -139,229 +134,146 @@ For automation and integration:
 
 **With a photo:**
 ```bash
-curl -X POST http://YOUR_IP:8000/analyze_and_profile \
+curl -X POST http://YOUR_IP:3550/api/v1/analyze_and_profile \
   -F "file=@coffee_bag.jpg"
 ```
 
 **With text preferences:**
 ```bash
-curl -X POST http://YOUR_IP:8000/analyze_and_profile \
+curl -X POST http://YOUR_IP:3550/api/v1/analyze_and_profile \
   -F "user_prefs=Bold and chocolatey"
 ```
 
 **With both:**
 ```bash
-curl -X POST http://YOUR_IP:8000/analyze_and_profile \
+curl -X POST http://YOUR_IP:3550/api/v1/analyze_and_profile \
   -F "file=@coffee_bag.jpg" \
   -F "user_prefs=Traditional extraction"
 ```
 
 [→ Full API documentation](API.md)
 
-### Advanced: iOS Shortcuts
+### iOS Shortcuts
 
 For power users who want one-tap brewing from their iPhone, you can create custom shortcuts.
 
 [→ iOS Shortcuts setup guide](IOS_SHORTCUTS.md)
 
-## 🔄 Keeping MeticAI Updated
+## 🔄 Updating MeticAI
 
-MeticAI has automatic updates built in!
+MeticAI v2.0 uses Docker for simple updates:
 
 **Quick update:**
 ```bash
-./update.sh
+cd ~/.meticai
+docker compose pull
+docker compose up -d
 ```
 
-**Check without updating:**
+**With Watchtower (automatic updates):**
+
+If you enabled Watchtower during installation, MeticAI will automatically check for updates every 6 hours and update seamlessly.
+
+**Manual trigger via API:**
 ```bash
-./update.sh --check-only
+curl -X POST http://localhost:8080/v1/update \
+  -H "Authorization: Bearer YOUR_WATCHTOWER_TOKEN"
 ```
-
-The system automatically:
-- ✅ Checks all components for updates
-- ✅ Shows what's new
-- ✅ Updates and rebuilds containers
-- ✅ Can even update from the web interface!
-
-[→ Full update system documentation](UPDATE_GUIDE.md)
 
 ## 🗑️ Uninstalling MeticAI
 
-Need to remove MeticAI? We've got you covered with a clean uninstallation process.
-
-**Run the uninstaller:**
 ```bash
-./uninstall.sh
-```
-
-The uninstaller will:
-- ✅ Stop and remove all Docker containers
-- ✅ Remove Docker images built by MeticAI
-- ✅ Remove cloned repositories (meticulous-source, meticai-web)
-- ✅ Remove configuration files (.env, settings)
-- ✅ Remove macOS integrations (Dock shortcut, rebuild watcher)
-- ✅ Ask about external dependencies (Docker, git, qrencode)
-
-**Safe by default:**
-- External dependencies are **NOT** automatically removed
-- You'll be asked to confirm before removing anything
-- Summary shows what was removed and what was kept
-
-**Note:** The uninstaller doesn't remove Docker, git, or other tools unless you explicitly choose to do so. This is safe if you use these tools for other projects.
-
----
-
-## 🎨 What Makes MeticAI Special
-
-### The AI Barista Persona
-
-MeticAI doesn't just create recipes—it creates *experiences* with:
-
-**🎯 Witty Profile Names**
-- "Slow-Mo Blossom" for gentle light roasts
-- "Choco-Lot Going On" for bold chocolatey extractions  
-- "Warp Speed Espresso" for turbo shots
-
-**📊 Complete Guidance**
-Every profile includes:
-- ☕️ Recommended dose and grind settings
-- 🌡️ Temperature recommendations
-- 🔬 Scientific explanation of why it works
-- ⚙️ Any special equipment notes
-
-**🚀 Modern Techniques**
-Supports advanced espresso methods:
-- Multi-stage extractions
-- Pre-infusion and blooming
-- Pressure profiling and flow control
-- Turbo shots and more
-
-[→ See example profiles and dialogues](TECHNICAL.md#enhanced-barista-experience)
-
----
-
-## 📚 Additional Resources
-
-### For Users
-- 📱 [iOS Shortcuts Setup Guide](IOS_SHORTCUTS.md)
-- 🔄 [Update System Guide](UPDATE_GUIDE.md)
-- 📊 [Logging & Diagnostics](LOGGING.md)
-- 🔧 [Troubleshooting](#troubleshooting)
-
-### For Developers
-- 🔌 [API Documentation](API.md)
-- 🏗️ [Technical Architecture](TECHNICAL.md)
-- 🧪 [Testing Guide](TEST_COVERAGE.md)
-- 🔒 [Security Notes](SECURITY_FIXES.md)
-
----
-
-## 🆘 Troubleshooting
-
-### Installation Issues
-
-**Prerequisites not installing:**
-- The script auto-detects your OS and installs what's needed
-- On unsupported systems, manually install: git, docker, docker-compose
-- See [TECHNICAL.md](TECHNICAL.md#manual-setup-alternative) for manual setup
-
-**Can't connect to machine:**
-- Verify your Meticulous machine is on the network
-- Check the IP address is correct in your `.env` file
-- Ensure both devices are on the same network
-
-### Usage Issues
-
-**"Connection Failed" errors:**
-- Make sure MeticAI is running: `docker ps`
-- Check you're on the same network as the server
-- Verify the IP address in your requests
-
-**Profiles not appearing on machine:**
-- Check the MCP server logs: `docker logs meticulous-mcp -f`
-- Verify `METICULOUS_IP` in `.env` is correct
-- Ensure the machine's API is accessible
-
-**Poor coffee analysis:**
-- Take photos in good lighting
-- Ensure the label is clear and in focus
-- Try adding text preferences to guide the AI
-
-### Getting Help
-
-**Check detailed logs:**
-```bash
-# View structured error logs
-tail -f logs/meticai-server-errors.log | jq .
-
-# View all logs
-tail -f logs/meticai-server.log | jq .
-
-# Or via API
-curl "http://localhost:8000/api/logs?level=ERROR&lines=100"
-
-# See LOGGING.md for more details
-```
-
-**Check container logs:**
-```bash
-# All services
-docker compose logs -f
-
-# Specific service
-docker logs meticai-server -f
-docker logs gemini-client -f
-docker logs meticulous-mcp -f
-```
-
-**Restart services:**
-```bash
-docker compose restart
-```
-
-**Full reset (recommended - uses wrapper script for correct permissions):**
-```bash
-./docker-up.sh
-```
-
-**Full reset (manual - may require permission fix on Linux):**
-```bash
+cd ~/.meticai
 docker compose down
-docker compose up -d --build
-# If you used sudo, fix permissions:
-sudo chown -R $(id -u):$(id -g) data logs meticulous-source meticai-web
+docker volume rm meticai-data  # Optional: removes all data
+rm -rf ~/.meticai
 ```
 
-For comprehensive troubleshooting and log analysis, see [LOGGING.md](LOGGING.md).
+## 🌐 Optional: Remote Access with Tailscale
 
----
+Access MeticAI from anywhere using Tailscale:
 
-## 🙏 Credits & Attribution
+1. Get an auth key from [Tailscale Admin](https://login.tailscale.com/admin/settings/keys)
+2. Enable during installation, or add manually:
 
-MeticAI is built on the excellent [Meticulous MCP](https://github.com/twchad/meticulous-mcp) project by **twchad** and its [containerized fork](https://github.com/hessius/meticulous-mcp) (originally by **manonstreet**), which provides the essential interface for controlling the Meticulous Espresso Machine.
+```bash
+cd ~/.meticai
+echo "TAILSCALE_AUTHKEY=your_key_here" >> .env
+docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
+```
 
-### Technology Stack
-- **Google Gemini 2.0 Flash** - Vision AI and reasoning
-- **FastAPI** - Backend API framework  
-- **Docker** - Containerization and deployment
-- **React** - Web interface
-- **Python** - Core application logic
+## 🏗️ Architecture
 
-### Open Source
+MeticAI v2.0 runs as a single unified container:
 
-MeticAI is open source and welcomes contributions!
+```
+┌─────────────────────────────────────────────────────────┐
+│                    MeticAI Container                     │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │                    nginx (:3550)                    │ │
+│  │            Web UI + API Reverse Proxy               │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                          │                               │
+│          ┌───────────────┼───────────────┐               │
+│          ▼               ▼               ▼               │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐        │
+│  │   Relay     │ │ MCP Server  │ │ Gemini CLI  │        │
+│  │  (FastAPI)  │ │ (Meticulous)│ │    (AI)     │        │
+│  │   :8000     │ │   :8080     │ │             │        │
+│  └─────────────┘ └─────────────┘ └─────────────┘        │
+└─────────────────────────────────────────────────────────┘
+```
 
-- 📖 [View the code on GitHub](https://github.com/hessius/MeticAI)
-- 🐛 [Report issues](https://github.com/hessius/MeticAI/issues)
-- 💡 [Contribute improvements](https://github.com/hessius/MeticAI/pulls)
+**Optional sidecars:**
+- **Tailscale** - Secure remote access
+- **Watchtower** - Automatic container updates
+
+## 🛠️ Troubleshooting
+
+### Container won't start
+
+```bash
+# Check logs
+cd ~/.meticai && docker compose logs -f
+
+# Check container status
+docker compose ps
+```
+
+### Can't connect to Meticulous machine
+
+1. Verify the machine is on and connected to your network
+2. Check the IP address in your `.env` file
+3. Try using the IP address instead of `meticulous.local`
+
+### API returns errors
+
+```bash
+# Check relay logs specifically
+docker compose logs meticai | grep -i error
+```
+
+### Reset everything
+
+```bash
+cd ~/.meticai
+docker compose down -v  # -v removes volumes
+docker compose pull
+docker compose up -d
+```
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- [Meticulous](https://meticulous.coffee/) for creating an amazing machine
+- [Google Gemini](https://ai.google.dev/) for AI capabilities
+- [meticulous-mcp](https://github.com/meticulous/meticulous-mcp) for machine communication
 
 ---
 
 <div align="center">
-
-**Made with ☕️, ❤️, and 🤖**
-
-[Get Started](#-quick-start) • [Features](#-what-it-does) • [Documentation](#-additional-resources)
-
+Made with ☕ by <a href="https://github.com/hessius">@hessius</a>
 </div>
