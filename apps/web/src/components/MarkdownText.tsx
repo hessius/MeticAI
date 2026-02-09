@@ -40,6 +40,51 @@ export function cleanProfileName(name: string): string {
     .trim()
 }
 
+/**
+ * Sanitize a URL to prevent XSS attacks.
+ * Only allows safe protocols: http:, https:, and mailto:
+ * Returns the sanitized URL or '#' if the URL is unsafe.
+ */
+export function sanitizeUrl(url: string): string {
+  if (!url || typeof url !== 'string') {
+    return '#'
+  }
+  
+  // Trim whitespace and decode URL-encoded characters to prevent bypass attempts
+  const trimmedUrl = url.trim()
+  
+  // Check for allowed protocols (case-insensitive)
+  const allowedProtocols = /^(https?|mailto):/i
+  
+  // Check for protocol-relative URLs (starting with //)
+  const protocolRelative = /^\/\//
+  
+  // Check for relative URLs (starting with / or ./)
+  const relativeUrl = /^(\/|\.\/)/
+  
+  // Allow relative URLs
+  if (relativeUrl.test(trimmedUrl)) {
+    return trimmedUrl
+  }
+  
+  // Allow protocol-relative URLs (will use same protocol as page)
+  if (protocolRelative.test(trimmedUrl)) {
+    return trimmedUrl
+  }
+  
+  // For absolute URLs, check if protocol is allowed
+  if (trimmedUrl.includes(':')) {
+    if (allowedProtocols.test(trimmedUrl)) {
+      return trimmedUrl
+    }
+    // Dangerous protocol detected (javascript:, data:, vbscript:, etc.)
+    return '#'
+  }
+  
+  // If no protocol specified, treat as relative URL
+  return trimmedUrl
+}
+
 export function MarkdownText({ children, text, className = '' }: MarkdownTextProps) {
   const content = cleanMalformedMarkdown(text ?? children ?? '')
   
@@ -188,11 +233,12 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
       }
 
       if (match[2] && match[3]) {
-        // [link text](url)
+        // [link text](url) - sanitize URL to prevent XSS
+        const sanitizedUrl = sanitizeUrl(match[3])
         parts.push(
           <a 
             key={`a-${lineIndex}-${key++}`} 
-            href={match[3]} 
+            href={sanitizedUrl} 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-primary hover:underline"

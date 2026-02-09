@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { MarkdownText, cleanProfileName, cleanMalformedMarkdown } from './MarkdownText'
+import { MarkdownText, cleanProfileName, cleanMalformedMarkdown, sanitizeUrl } from './MarkdownText'
 
 describe('MarkdownText utilities', () => {
   describe('cleanProfileName', () => {
@@ -80,6 +80,75 @@ describe('MarkdownText utilities', () => {
       expect(result).toBe('First\n\nSecond')
     })
   })
+
+  describe('sanitizeUrl', () => {
+    it('should allow http URLs', () => {
+      expect(sanitizeUrl('http://example.com')).toBe('http://example.com')
+    })
+
+    it('should allow https URLs', () => {
+      expect(sanitizeUrl('https://example.com')).toBe('https://example.com')
+    })
+
+    it('should allow mailto URLs', () => {
+      expect(sanitizeUrl('mailto:test@example.com')).toBe('mailto:test@example.com')
+    })
+
+    it('should allow relative URLs starting with /', () => {
+      expect(sanitizeUrl('/path/to/page')).toBe('/path/to/page')
+    })
+
+    it('should allow relative URLs starting with ./', () => {
+      expect(sanitizeUrl('./relative/path')).toBe('./relative/path')
+    })
+
+    it('should allow protocol-relative URLs', () => {
+      expect(sanitizeUrl('//example.com/path')).toBe('//example.com/path')
+    })
+
+    it('should block javascript: protocol (XSS attack)', () => {
+      expect(sanitizeUrl('javascript:alert(1)')).toBe('#')
+    })
+
+    it('should block javascript: protocol with uppercase', () => {
+      expect(sanitizeUrl('JavaScript:alert(1)')).toBe('#')
+    })
+
+    it('should block data: protocol', () => {
+      expect(sanitizeUrl('data:text/html,<script>alert(1)</script>')).toBe('#')
+    })
+
+    it('should block vbscript: protocol', () => {
+      expect(sanitizeUrl('vbscript:msgbox(1)')).toBe('#')
+    })
+
+    it('should block file: protocol', () => {
+      expect(sanitizeUrl('file:///etc/passwd')).toBe('#')
+    })
+
+    it('should handle empty string', () => {
+      expect(sanitizeUrl('')).toBe('#')
+    })
+
+    it('should handle null/undefined input', () => {
+      expect(sanitizeUrl(null as any)).toBe('#')
+      expect(sanitizeUrl(undefined as any)).toBe('#')
+    })
+
+    it('should trim whitespace from URLs', () => {
+      expect(sanitizeUrl('  https://example.com  ')).toBe('https://example.com')
+    })
+
+    it('should allow URLs without protocol (treated as relative)', () => {
+      expect(sanitizeUrl('example.com')).toBe('example.com')
+    })
+
+    it('should be case-insensitive for protocol matching', () => {
+      expect(sanitizeUrl('HTTPS://EXAMPLE.COM')).toBe('HTTPS://EXAMPLE.COM')
+      expect(sanitizeUrl('HTTP://example.com')).toBe('HTTP://example.com')
+      expect(sanitizeUrl('MAILTO:test@example.com')).toBe('MAILTO:test@example.com')
+    })
+  })
 })
 
 describe('MarkdownText component', () => {
@@ -120,5 +189,49 @@ describe('MarkdownText component', () => {
   it('should render headers', () => {
     render(<MarkdownText>### My Header</MarkdownText>)
     expect(screen.getByRole('heading', { level: 4 })).toHaveTextContent('My Header')
+  })
+
+  it('should render safe links with https', () => {
+    render(<MarkdownText>{'[Click here](https://example.com)'}</MarkdownText>)
+    const link = screen.getByRole('link', { name: 'Click here' })
+    expect(link).toHaveAttribute('href', 'https://example.com')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('should render safe links with http', () => {
+    render(<MarkdownText>{'[Link](http://example.com)'}</MarkdownText>)
+    const link = screen.getByRole('link', { name: 'Link' })
+    expect(link).toHaveAttribute('href', 'http://example.com')
+  })
+
+  it('should render mailto links', () => {
+    render(<MarkdownText>{'[Email](mailto:test@example.com)'}</MarkdownText>)
+    const link = screen.getByRole('link', { name: 'Email' })
+    expect(link).toHaveAttribute('href', 'mailto:test@example.com')
+  })
+
+  it('should sanitize javascript: protocol (XSS protection)', () => {
+    render(<MarkdownText>{'[Malicious](javascript:alert(1))'}</MarkdownText>)
+    const link = screen.getByRole('link', { name: 'Malicious' })
+    expect(link).toHaveAttribute('href', '#')
+  })
+
+  it('should sanitize data: protocol URLs', () => {
+    render(<MarkdownText>{'[Data URL](data:text/html,<script>alert(1)</script>)'}</MarkdownText>)
+    const link = screen.getByRole('link', { name: 'Data URL' })
+    expect(link).toHaveAttribute('href', '#')
+  })
+
+  it('should sanitize vbscript: protocol URLs', () => {
+    render(<MarkdownText>{'[VBScript](vbscript:msgbox(1))'}</MarkdownText>)
+    const link = screen.getByRole('link', { name: 'VBScript' })
+    expect(link).toHaveAttribute('href', '#')
+  })
+
+  it('should allow relative URLs', () => {
+    render(<MarkdownText>{'[Relative](/path/to/page)'}</MarkdownText>)
+    const link = screen.getByRole('link', { name: 'Relative' })
+    expect(link).toHaveAttribute('href', '/path/to/page')
   })
 })
