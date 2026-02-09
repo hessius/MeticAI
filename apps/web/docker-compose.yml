@@ -1,0 +1,24 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3550:80"
+    volumes:
+      # Mount a custom config.json if it exists
+      # Create this file to override the default server URL
+      - ./config.json:/usr/share/nginx/html/config.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - meticai-network
+
+networks:
+  meticai-network:
+    driver: bridge

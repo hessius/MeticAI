@@ -1,0 +1,274 @@
+@import 'tailwindcss';
+@import "tw-animate-css";
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  /* Prevent horizontal overflow on mobile, especially iOS PWA mode */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+    position: relative;
+  }
+  
+  /* iOS PWA safe area handling */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* Prevent scroll jump when Radix UI dialogs/selects open */
+  body[data-scroll-locked] {
+    overflow: hidden !important;
+    touch-action: none;
+    -webkit-overflow-scrolling: auto;
+  }
+  
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  body {
+    font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+  
+  h1, h2, h3, h4 {
+    font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* Meticulous-inspired color palette - Pure dark with warm neutrals */
+:root {
+  /* Background colors - Pure black like Meticulous app */
+  --background: oklch(0.05 0 0);
+  --foreground: oklch(0.98 0 0);
+  
+  /* Card - Noticeably elevated dark surface */
+  --card: oklch(0.16 0.006 250);
+  --card-foreground: oklch(0.98 0 0);
+  
+  /* Popover */
+  --popover: oklch(0.18 0.006 250);
+  --popover-foreground: oklch(0.98 0 0);
+  
+  /* Primary - Warm amber/gold accent (like coffee, matches Meticulous warmth) */
+  --primary: oklch(0.78 0.14 75);
+  --primary-foreground: oklch(0.12 0 0);
+  
+  /* Secondary - Fields, items, interactive areas */
+  --secondary: oklch(0.24 0.006 250);
+  --secondary-foreground: oklch(0.95 0 0);
+  
+  /* Muted - For subtle text and borders */
+  --muted: oklch(0.28 0.006 250);
+  --muted-foreground: oklch(0.60 0 0);
+  
+  /* Accent - Same as primary for consistency */
+  --accent: oklch(0.78 0.14 75);
+  --accent-foreground: oklch(0.12 0 0);
+  
+  /* Destructive - Soft red */
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  
+  /* Borders and inputs - more visible */
+  --border: oklch(0.32 0.006 250);
+  --input: oklch(0.26 0.006 250);
+  --ring: oklch(0.78 0.14 75);
+  
+  /* Semantic colors */
+  --success: oklch(0.7 0.18 145);
+  --warning: oklch(0.78 0.16 75);
+  --info: oklch(0.7 0.15 230);
+  
+  /* Accent colors for profile sections */
+  --neon-pink: oklch(0.72 0.19 350);
+  --neon-green: oklch(0.75 0.17 150);
+  
+  /* Border radius - Matching Meticulous app rounded corners */
+  --radius: 0.875rem;
+}
+
+.dark {
+  --background: oklch(0.05 0 0);
+  --foreground: oklch(0.98 0 0);
+  
+  --card: oklch(0.16 0.006 250);
+  --card-foreground: oklch(0.98 0 0);
+  
+  --popover: oklch(0.18 0.006 250);
+  --popover-foreground: oklch(0.98 0 0);
+  
+  --primary: oklch(0.78 0.14 75);
+  --primary-foreground: oklch(0.12 0 0);
+  
+  --secondary: oklch(0.24 0.006 250);
+  --secondary-foreground: oklch(0.95 0 0);
+  
+  --muted: oklch(0.28 0.006 250);
+  --muted-foreground: oklch(0.60 0 0);
+  
+  --accent: oklch(0.78 0.14 75);
+  --accent-foreground: oklch(0.12 0 0);
+  
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  
+  --border: oklch(0.32 0.006 250);
+  --input: oklch(0.26 0.006 250);
+  --ring: oklch(0.78 0.14 75);
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  
+  --color-neon-pink: var(--neon-pink);
+  --color-neon-green: var(--neon-green);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --radius-xl: calc(var(--radius) * 2);
+  --radius-2xl: calc(var(--radius) * 3);
+  --radius-full: 9999px;
+}
+
+/* Subtle glow effects - more refined */
+.subtle-glow {
+  box-shadow: 0 0 15px rgba(var(--primary), 0.15);
+}
+
+.neon-glow {
+  box-shadow: 0 0 12px var(--primary), 0 0 24px rgba(var(--primary), 0.3);
+}
+
+.neon-text {
+  text-shadow: 0 0 8px currentColor, 0 0 16px rgba(currentColor, 0.4);
+}
+
+/* Refined pulse animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--primary), 0 0 16px rgba(var(--primary), 0.4);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 16px var(--primary), 0 0 32px rgba(var(--primary), 0.5);
+    opacity: 0.9;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Smooth fade-in animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+/* Scale tap effect */
+@keyframes tap-scale {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+.tap-scale:active {
+  animation: tap-scale 0.15s ease-out;
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--secondary) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Sonner toast safe area handling for iOS dynamic island */
+[data-sonner-toaster][data-y-position="top"] {
+  top: max(1rem, env(safe-area-inset-top)) !important;
+}
