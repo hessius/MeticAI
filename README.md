@@ -188,10 +188,11 @@ curl -X POST http://localhost:8080/v1/update \
 
 ```bash
 cd ~/.meticai
-docker compose down
-docker volume rm meticai-data  # Optional: removes all data
+docker compose down -v  # -v removes all volumes and data
 rm -rf ~/.meticai
 ```
+
+**Note:** To verify volume names before removal, use `docker volume ls`
 
 ## 🌐 Optional: Remote Access with Tailscale
 
