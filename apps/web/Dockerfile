@@ -1,25 +1,22 @@
 # Multi-stage build for MeticAI web application
 
-# Stage 1: Build the application using Node.js (universal ARM compatibility)
-FROM node:20-alpine AS builder
+# Stage 1: Build the application using Bun
+FROM oven/bun:1-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files first for better layer caching
-COPY package.json package-lock.json* ./
+COPY package.json bun.lock* ./
 
 # Install dependencies
-# First remove bun from package.json since it causes issues on ARM during npm install
-# Then install with legacy peer deps for compatibility
-RUN sed -i '/"bun":/d' package.json && \
-    npm install --legacy-peer-deps
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN bun run build
 
 # Stage 2: Production server with nginx
 FROM nginx:alpine
