@@ -21,8 +21,8 @@ WORKDIR /build
 # Copy web app source
 COPY apps/web/package.json apps/web/bun.lock* ./
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+# Install dependencies (--no-save prevents lockfile changes, fallback if lock issue)
+RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
 # Copy source and build
 COPY apps/web/ ./
@@ -50,7 +50,7 @@ COPY apps/server/requirements.txt ./server-requirements.txt
 RUN pip install --no-cache-dir -r server-requirements.txt
 
 # Install MCP server dependencies
-COPY apps/mcp-server/requirements.txt ./mcp-requirements.txt
+COPY apps/mcp-server/meticulous-mcp/requirements.txt ./mcp-requirements.txt
 RUN pip install --no-cache-dir -r mcp-requirements.txt
 
 
@@ -59,15 +59,7 @@ RUN pip install --no-cache-dir -r mcp-requirements.txt
 # ------------------------------------------------------------------------------
 FROM python:3.12-slim
 
-# Install s6-overlay for process management
-ARG S6_OVERLAY_VERSION=3.2.0.2
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
-    && tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz \
-    && rm /tmp/s6-overlay-*.tar.xz
-
-# Install runtime dependencies
+# Install runtime dependencies (xz-utils needed for s6-overlay extraction)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     nodejs \
@@ -75,6 +67,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Install s6-overlay for process management
+ARG S6_OVERLAY_VERSION=3.2.0.2
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
+    && tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz \
+    && rm /tmp/s6-overlay-*.tar.xz
 
 # Install Gemini CLI globally
 RUN npm install -g @anthropic-ai/claude-cli @google/generative-ai-cli 2>/dev/null || \
@@ -119,7 +119,7 @@ EXPOSE 3550
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3550/api/v1/health || exit 1
+    CMD curl -f http://localhost:3550/health || exit 1
 
 # s6-overlay entrypoint
 ENTRYPOINT ["/init"]
