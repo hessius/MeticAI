@@ -3,9 +3,9 @@
 
 version: 2
 updates:
-  # Python dependencies for coffee-relay
+  # Python dependencies for meticai-server
   - package-ecosystem: "pip"
-    directory: "/coffee-relay"
+    directory: "/meticai-server"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -55,7 +55,7 @@ updates:
 
   # Docker base images
   - package-ecosystem: "docker"
-    directory: "/coffee-relay"
+    directory: "/meticai-server"
     schedule:
       interval: "weekly"
       day: "monday"

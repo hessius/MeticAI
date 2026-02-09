@@ -293,10 +293,10 @@ Supports advanced espresso methods:
 **Check detailed logs:**
 ```bash
 # View structured error logs
-tail -f logs/coffee-relay-errors.log | jq .
+tail -f logs/meticai-server-errors.log | jq .
 
 # View all logs
-tail -f logs/coffee-relay.log | jq .
+tail -f logs/meticai-server.log | jq .
 
 # Or via API
 curl "http://localhost:8000/api/logs?level=ERROR&lines=100"
@@ -310,7 +310,7 @@ curl "http://localhost:8000/api/logs?level=ERROR&lines=100"
 docker compose logs -f
 
 # Specific service
-docker logs coffee-relay -f
+docker logs meticai-server -f
 docker logs gemini-client -f
 docker logs meticulous-mcp -f
 ```

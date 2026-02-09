@@ -34,15 +34,14 @@
 #
 ################################################################################
 
-# Text Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+# Text Colors removed - now using common.sh
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common library
+source "$SCRIPT_DIR/scripts/lib/common.sh"
+
 VERSION_FILE="$SCRIPT_DIR/.versions.json"
 CONFIG_URL="https://raw.githubusercontent.com/hessius/MeticAI/main/.update-config.json"
 LOCAL_CONFIG_FILE="$SCRIPT_DIR/.update-config.json"
@@ -89,16 +88,16 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo -e "${RED}Unknown option: $1${NC}"
+            log_error "Unknown option: $1"
             echo "Run with --help for usage information"
             exit 1
             ;;
     esac
 done
 
-echo -e "${BLUE}=========================================${NC}"
-echo -e "${BLUE}      ☕️ MeticAI Update Manager 🔄     ${NC}"
-echo -e "${BLUE}=========================================${NC}"
+log_info "========================================="
+log_info "      ☕️ MeticAI Update Manager 🔄     "
+log_info "========================================="
 echo ""
 
 # Function to get current git commit hash
@@ -309,12 +308,12 @@ check_and_switch_mcp_repo() {
     
     # Handle case where remote is not configured (unknown)
     if [ "$current_url" = "unknown" ]; then
-        echo -e "${YELLOW}MCP repository has no remote configured. Setting up remote...${NC}"
+        log_warning "MCP repository has no remote configured. Setting up remote..."
         if cd "$SCRIPT_DIR/meticulous-source" && git remote add origin "$preferred_url" 2>/dev/null; then
-            echo -e "${GREEN}✓ Remote 'origin' configured to: $preferred_url${NC}"
+            log_success "Remote 'origin' configured to: $preferred_url"
             git fetch origin 2>/dev/null || true
         elif cd "$SCRIPT_DIR/meticulous-source" && git remote set-url origin "$preferred_url" 2>/dev/null; then
-            echo -e "${GREEN}✓ Remote 'origin' updated to: $preferred_url${NC}"
+            log_success "Remote 'origin' updated to: $preferred_url"
             git fetch origin 2>/dev/null || true
         fi
         cd "$SCRIPT_DIR"
@@ -326,7 +325,7 @@ check_and_switch_mcp_repo() {
     local preferred_normalized=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
     
     if [ "$current_normalized" != "$preferred_normalized" ]; then
-        echo -e "${YELLOW}Repository switch detected!${NC}"
+        log_warning "Repository switch detected!"
         echo "Current:  $current_url"
         echo "Required: $preferred_url"
         echo ""
@@ -348,7 +347,7 @@ check_and_switch_mcp_repo() {
             perform_mcp_repo_switch "$preferred_url"
             return $?
         else
-            echo -e "${YELLOW}Keeping current repository${NC}"
+            log_warning "Keeping current repository"
             return 0
         fi
     fi
@@ -361,7 +360,7 @@ perform_mcp_repo_switch() {
     local new_url="$1"
     
     echo ""
-    echo -e "${YELLOW}Switching MCP repository to: $new_url${NC}"
+    log_warning "Switching MCP repository to: $new_url"
     
     # Backup current state
     echo "Backing up current installation..."
@@ -372,13 +371,13 @@ perform_mcp_repo_switch() {
     rm -rf "$SCRIPT_DIR/meticulous-source"
     
     if git clone "$new_url" "$SCRIPT_DIR/meticulous-source"; then
-        echo -e "${GREEN}✓ Repository switched successfully${NC}"
+        log_success "Repository switched successfully"
         echo "Backup saved to: $backup_dir"
         echo ""
-        echo -e "${YELLOW}Note: Containers will be rebuilt to apply changes${NC}"
+        log_warning "Note: Containers will be rebuilt to apply changes"
         return 0
     else
-        echo -e "${RED}✗ Failed to clone new repository${NC}"
+        log_error "Failed to clone new repository"
         echo "Restoring backup..."
         mv "$backup_dir" "$SCRIPT_DIR/meticulous-source"
         return 1
@@ -397,12 +396,12 @@ check_and_switch_web_repo() {
     
     # Handle case where remote is not configured (unknown)
     if [ "$current_url" = "unknown" ]; then
-        echo -e "${YELLOW}Web App repository has no remote configured. Setting up remote...${NC}"
+        log_warning "Web App repository has no remote configured. Setting up remote..."
         if cd "$SCRIPT_DIR/meticai-web" && git remote add origin "$preferred_url" 2>/dev/null; then
-            echo -e "${GREEN}✓ Remote 'origin' configured to: $preferred_url${NC}"
+            log_success "Remote 'origin' configured to: $preferred_url"
             git fetch origin 2>/dev/null || true
         elif cd "$SCRIPT_DIR/meticai-web" && git remote set-url origin "$preferred_url" 2>/dev/null; then
-            echo -e "${GREEN}✓ Remote 'origin' updated to: $preferred_url${NC}"
+            log_success "Remote 'origin' updated to: $preferred_url"
             git fetch origin 2>/dev/null || true
         fi
         cd "$SCRIPT_DIR"
@@ -414,7 +413,7 @@ check_and_switch_web_repo() {
     local preferred_normalized=$(echo "$preferred_url" | sed 's/\.git$//' | sed 's/\/$//')
     
     if [ "$current_normalized" != "$preferred_normalized" ]; then
-        echo -e "${YELLOW}Web App repository switch detected!${NC}"
+        log_warning "Web App repository switch detected!"
         echo "Current:  $current_url"
         echo "Required: $preferred_url"
         echo ""
@@ -436,7 +435,7 @@ check_and_switch_web_repo() {
             perform_web_repo_switch "$preferred_url"
             return $?
         else
-            echo -e "${YELLOW}Keeping current repository${NC}"
+            log_warning "Keeping current repository"
             return 0
         fi
     fi
@@ -449,7 +448,7 @@ perform_web_repo_switch() {
     local new_url="$1"
     
     echo ""
-    echo -e "${YELLOW}Switching Web App repository to: $new_url${NC}"
+    log_warning "Switching Web App repository to: $new_url"
     
     # Backup current state
     echo "Backing up current installation..."
@@ -460,7 +459,7 @@ perform_web_repo_switch() {
     rm -rf "$SCRIPT_DIR/meticai-web"
     
     if git clone "$new_url" "$SCRIPT_DIR/meticai-web"; then
-        echo -e "${GREEN}✓ Repository switched successfully${NC}"
+        log_success "Repository switched successfully"
         echo "Backup saved to: $backup_dir"
         
         # Regenerate config.json if .env exists
@@ -482,14 +481,14 @@ perform_web_repo_switch() {
 WEBCONFIG
             # Also create in meticai-web root for standalone docker-compose usage
             cp meticai-web/public/config.json meticai-web/config.json
-            echo -e "${GREEN}✓ Web app configured${NC}"
+            log_success "Web app configured"
         fi
         
         echo ""
-        echo -e "${YELLOW}Note: Containers will be rebuilt to apply changes${NC}"
+        log_warning "Note: Containers will be rebuilt to apply changes"
         return 0
     else
-        echo -e "${RED}✗ Failed to clone new repository${NC}"
+        log_error "Failed to clone new repository"
         echo "Restoring backup..."
         mv "$backup_dir" "$SCRIPT_DIR/meticai-web"
         return 1
@@ -520,7 +519,7 @@ initialize_versions_file() {
   }
 }
 EOF
-        echo -e "${GREEN}✓ Version tracking initialized${NC}"
+        log_success "Version tracking initialized"
     fi
 }
 
@@ -528,7 +527,7 @@ EOF
 check_for_updates() {
     local has_updates=false
     
-    echo -e "${YELLOW}Checking for updates...${NC}"
+    log_warning "Checking for updates..."
     echo ""
     
     # Check main MeticAI repo (using semantic versioning)
@@ -537,13 +536,13 @@ check_for_updates() {
     METICAI_REMOTE_VERSION=$(get_remote_version "hessius" "MeticAI" "main")
     
     if version_greater_than "$METICAI_REMOTE_VERSION" "$METICAI_LOCAL_VERSION"; then
-        echo -e "   ${YELLOW}⚠ Update available${NC}"
+        log_warning "   Update available"
         echo "   Current: v${METICAI_LOCAL_VERSION}"
         echo "   Latest:  v${METICAI_REMOTE_VERSION}"
         has_updates=true
         METICAI_UPDATE_AVAILABLE=true
     else
-        echo -e "   ${GREEN}✓ Up to date${NC} (v${METICAI_LOCAL_VERSION})"
+        log_success "   Up to date (v${METICAI_LOCAL_VERSION})"
         METICAI_UPDATE_AVAILABLE=false
     fi
     echo ""
@@ -559,18 +558,18 @@ check_for_updates() {
         
         echo "   Repository: $mcp_url"
         if [ "$mcp_current" != "$mcp_remote" ] && [ "$mcp_remote" != "not-a-git-repo" ]; then
-            echo -e "   ${YELLOW}⚠ Update available${NC}"
+            log_warning "   Update available"
             echo "   Current: ${mcp_current:0:8}"
             echo "   Latest:  ${mcp_remote:0:8}"
             has_updates=true
             MCP_UPDATE_AVAILABLE=true
         else
-            echo -e "   ${GREEN}✓ Up to date${NC}"
+            log_success "   Up to date"
             MCP_UPDATE_AVAILABLE=false
         fi
     else
         echo "📦 Meticulous MCP"
-        echo -e "   ${RED}✗ Not installed${NC}"
+        log_error "   Not installed"
         has_updates=true
         MCP_UPDATE_AVAILABLE=true
         MCP_REMOTE_HASH="not-installed"
@@ -584,18 +583,18 @@ check_for_updates() {
         WEB_REMOTE_VERSION=$(get_remote_version "hessius" "MeticAI-web" "main")
         
         if version_greater_than "$WEB_REMOTE_VERSION" "$WEB_LOCAL_VERSION"; then
-            echo -e "   ${YELLOW}⚠ Update available${NC}"
+            log_warning "   Update available"
             echo "   Current: v${WEB_LOCAL_VERSION}"
             echo "   Latest:  v${WEB_REMOTE_VERSION}"
             has_updates=true
             WEB_UPDATE_AVAILABLE=true
         else
-            echo -e "   ${GREEN}✓ Up to date${NC} (v${WEB_LOCAL_VERSION})"
+            log_success "   Up to date (v${WEB_LOCAL_VERSION})"
             WEB_UPDATE_AVAILABLE=false
         fi
     else
         echo "📦 MeticAI Web Interface"
-        echo -e "   ${RED}✗ Not installed${NC}"
+        log_error "   Not installed"
         has_updates=true
         WEB_UPDATE_AVAILABLE=true
         WEB_REMOTE_VERSION="not-installed"
@@ -614,35 +613,35 @@ check_for_updates() {
 
 # Function to update main repository
 update_main_repo() {
-    echo -e "${YELLOW}Updating MeticAI main repository...${NC}"
+    log_warning "Updating MeticAI main repository..."
     cd "$SCRIPT_DIR"
     
     local current_branch=$(get_current_branch "$SCRIPT_DIR")
     
     # Check for uncommitted changes
     if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-        echo -e "${YELLOW}Warning: You have uncommitted changes. Stashing them...${NC}"
+        log_warning "Warning: You have uncommitted changes. Stashing them..."
         git stash push -m "Auto-stash before MeticAI update $(date +%Y-%m-%d_%H:%M:%S)"
         local stashed=true
     fi
     
     # Try fast-forward first, then rebase if needed
     if git pull --ff-only origin "$current_branch" 2>/dev/null; then
-        echo -e "${GREEN}✓ MeticAI updated successfully${NC}"
+        log_success "MeticAI updated successfully"
         [ "$stashed" = true ] && git stash pop 2>/dev/null || true
         return 0
     fi
     
     # Fast-forward failed, try rebase
-    echo -e "${YELLOW}Fast-forward not possible, attempting rebase...${NC}"
+    log_warning "Fast-forward not possible, attempting rebase..."
     if git pull --rebase origin "$current_branch"; then
-        echo -e "${GREEN}✓ MeticAI updated successfully (with rebase)${NC}"
+        log_success "MeticAI updated successfully (with rebase)"
         [ "$stashed" = true ] && git stash pop 2>/dev/null || true
         return 0
     else
-        echo -e "${RED}✗ Failed to update MeticAI${NC}"
-        echo -e "${YELLOW}You may have local changes that conflict with remote.${NC}"
-        echo -e "${YELLOW}Please resolve manually: git pull --rebase origin $current_branch${NC}"
+        log_error "Failed to update MeticAI"
+        log_warning "You may have local changes that conflict with remote."
+        log_warning "Please resolve manually: git pull --rebase origin $current_branch"
         [ "$stashed" = true ] && git stash pop 2>/dev/null || true
         return 1
     fi
@@ -651,29 +650,29 @@ update_main_repo() {
 # Function to update or install meticulous-mcp
 update_mcp() {
     if [ -d "$SCRIPT_DIR/meticulous-source" ]; then
-        echo -e "${YELLOW}Updating Meticulous MCP...${NC}"
+        log_warning "Updating Meticulous MCP..."
         cd "$SCRIPT_DIR/meticulous-source"
         
         local current_branch=$(get_current_branch "$SCRIPT_DIR/meticulous-source")
         if git pull origin "$current_branch"; then
-            echo -e "${GREEN}✓ Meticulous MCP updated successfully${NC}"
+            log_success "Meticulous MCP updated successfully"
             return 0
         else
-            echo -e "${RED}✗ Failed to update Meticulous MCP${NC}"
+            log_error "Failed to update Meticulous MCP"
             return 1
         fi
     else
-        echo -e "${YELLOW}Installing Meticulous MCP...${NC}"
+        log_warning "Installing Meticulous MCP..."
         cd "$SCRIPT_DIR"
         
         # Use preferred URL from central config
         local preferred_url=$(get_preferred_mcp_url)
         
         if git clone "$preferred_url" meticulous-source; then
-            echo -e "${GREEN}✓ Meticulous MCP installed successfully${NC}"
+            log_success "Meticulous MCP installed successfully"
             return 0
         else
-            echo -e "${RED}✗ Failed to install Meticulous MCP${NC}"
+            log_error "Failed to install Meticulous MCP"
             return 1
         fi
     fi
@@ -682,26 +681,26 @@ update_mcp() {
 # Function to update or install meticai-web
 update_web() {
     if [ -d "$SCRIPT_DIR/meticai-web" ]; then
-        echo -e "${YELLOW}Updating MeticAI Web Interface...${NC}"
+        log_warning "Updating MeticAI Web Interface..."
         cd "$SCRIPT_DIR/meticai-web"
         
         local current_branch=$(get_current_branch "$SCRIPT_DIR/meticai-web")
         if git pull origin "$current_branch"; then
-            echo -e "${GREEN}✓ MeticAI Web updated successfully${NC}"
+            log_success "MeticAI Web updated successfully"
             return 0
         else
-            echo -e "${RED}✗ Failed to update MeticAI Web${NC}"
+            log_error "Failed to update MeticAI Web"
             return 1
         fi
     else
-        echo -e "${YELLOW}Installing MeticAI Web Interface...${NC}"
+        log_warning "Installing MeticAI Web Interface..."
         cd "$SCRIPT_DIR"
         
         # Use preferred URL from central config
         local preferred_url=$(get_preferred_web_url)
         
         if git clone "$preferred_url" meticai-web; then
-            echo -e "${GREEN}✓ MeticAI Web installed successfully${NC}"
+            log_success "MeticAI Web installed successfully"
             
             # Generate config.json if needed
             if [ -f "$SCRIPT_DIR/.env" ]; then
@@ -722,11 +721,11 @@ update_web() {
 WEBCONFIG
                 # Also create in meticai-web root for standalone docker-compose usage
                 cp meticai-web/public/config.json meticai-web/config.json
-                echo -e "${GREEN}✓ Web app configured${NC}"
+                log_success "Web app configured"
             fi
             return 0
         else
-            echo -e "${RED}✗ Failed to install MeticAI Web${NC}"
+            log_error "Failed to install MeticAI Web"
             return 1
         fi
     fi
@@ -734,13 +733,13 @@ WEBCONFIG
 
 # Function to rebuild and restart containers
 rebuild_containers() {
-    echo -e "${YELLOW}Rebuilding and restarting containers...${NC}"
+    log_warning "Rebuilding and restarting containers..."
     cd "$SCRIPT_DIR"
     
     # Ensure .versions.json exists as a file (not directory) before Docker mounts it
     # Docker will create a directory if the file doesn't exist, causing mount errors
     if [ -d "$SCRIPT_DIR/.versions.json" ]; then
-        echo -e "${YELLOW}Fixing .versions.json (was directory, converting to file)...${NC}"
+        log_warning "Fixing .versions.json (was directory, converting to file)..."
         rm -rf "$SCRIPT_DIR/.versions.json"
     fi
     if [ ! -f "$SCRIPT_DIR/.versions.json" ]; then
@@ -749,7 +748,7 @@ rebuild_containers() {
     
     # Ensure .rebuild-needed exists as a file for the trigger-update endpoint
     if [ -d "$SCRIPT_DIR/.rebuild-needed" ]; then
-        echo -e "${YELLOW}Fixing .rebuild-needed (was directory, converting to file)...${NC}"
+        log_warning "Fixing .rebuild-needed (was directory, converting to file)..."
         rm -rf "$SCRIPT_DIR/.rebuild-needed"
     fi
     if [ ! -f "$SCRIPT_DIR/.rebuild-needed" ]; then
@@ -786,7 +785,7 @@ rebuild_containers() {
     elif command -v docker-compose &> /dev/null; then
         COMPOSE_CMD="docker-compose"
     else
-        echo -e "${RED}Error: Docker Compose not found${NC}"
+        log_error "Error: Docker Compose not found"
         return 1
     fi
     
@@ -797,7 +796,7 @@ rebuild_containers() {
         if command -v sudo &> /dev/null && sudo docker info &> /dev/null; then
             SUDO_PREFIX="sudo"
         else
-            echo -e "${RED}Error: Cannot access Docker daemon${NC}"
+            log_error "Error: Cannot access Docker daemon"
             return 1
         fi
     fi
@@ -806,7 +805,7 @@ rebuild_containers() {
     INSIDE_CONTAINER=false
     if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
         INSIDE_CONTAINER=true
-        echo -e "${YELLOW}Running inside container - will rebuild without stopping self${NC}"
+        log_warning "Running inside container - will rebuild without stopping self"
     fi
     
     if [ "$INSIDE_CONTAINER" = true ]; then
@@ -823,9 +822,9 @@ rebuild_containers() {
         # Build and restart meticulous-mcp (no problematic mounts)
         echo "  Building meticulous-mcp..."
         if $SUDO_PREFIX $COMPOSE_CMD -p "$PROJECT_NAME" up -d --build --force-recreate --no-deps meticulous-mcp 2>&1; then
-            echo -e "${GREEN}  ✓ meticulous-mcp rebuilt${NC}"
+            log_success "  meticulous-mcp rebuilt"
         else
-            echo -e "${YELLOW}  Warning: Failed to rebuild meticulous-mcp${NC}"
+            log_warning "  Warning: Failed to rebuild meticulous-mcp"
         fi
         
         # Create a flag file to signal the host-side rebuild watcher
@@ -835,28 +834,28 @@ rebuild_containers() {
 {
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "reason": "Container update triggered from web UI",
-  "containers": ["coffee-relay", "gemini-client", "meticai-web"]
+  "containers": ["meticai-server", "gemini-client", "meticai-web"]
 }
 REBUILD_EOF
         
         echo ""
-        echo -e "${YELLOW}Note: Some containers require host-side rebuild.${NC}"
-        echo -e "${YELLOW}Rebuild flag created at: $REBUILD_FLAG${NC}"
+        log_warning "Note: Some containers require host-side rebuild."
+        log_warning "Rebuild flag created at: $REBUILD_FLAG"
         echo ""
-        echo -e "${BLUE}Options to complete the update:${NC}"
+        log_info "Options to complete the update:"
         echo -e "  1. If rebuild-watcher is installed, it will auto-rebuild"
         echo -e "  2. Run on host: ./rebuild-watcher.sh"
         echo -e "  3. Run on host: docker compose up -d --build"
         echo ""
-        echo -e "${GREEN}✓ Available containers rebuilt${NC}"
+        log_success "Available containers rebuilt"
         return 0
     else
         # Standard rebuild when running on host
         echo "Stopping containers..."
         if $SUDO_PREFIX $COMPOSE_CMD down --remove-orphans 2>/dev/null; then
-            echo -e "${GREEN}✓ Containers stopped${NC}"
+            log_success "Containers stopped"
         else
-            echo -e "${YELLOW}Warning: Failed to stop containers (they may not be running)${NC}"
+            log_warning "Warning: Failed to stop containers (they may not be running)"
         fi
         
         # Pre-create directories so Docker doesn't create them as root
@@ -888,7 +887,7 @@ REBUILD_EOF
         # Rebuild and start
         echo "Building and starting containers..."
         if $SUDO_PREFIX $COMPOSE_CMD up -d --build; then
-            echo -e "${GREEN}✓ Containers rebuilt and started${NC}"
+            log_success "Containers rebuilt and started"
             
             # Fix permissions if we used sudo
             if [ -n "$SUDO_PREFIX" ]; then
@@ -900,7 +899,7 @@ REBUILD_EOF
             
             return 0
         else
-            echo -e "${RED}✗ Failed to rebuild containers${NC}"
+            log_error "Failed to rebuild containers"
             return 1
         fi
     fi
@@ -982,7 +981,7 @@ main() {
         if [ -d "$SCRIPT_DIR/$subdir/.git" ]; then
             # Check if current user can write to .git directory
             if ! touch "$SCRIPT_DIR/$subdir/.git/.permission-test" 2>/dev/null; then
-                echo -e "${YELLOW}Fixing permissions for $subdir...${NC}"
+                log_warning "Fixing permissions for $subdir..."
                 if command -v sudo &>/dev/null; then
                     sudo chown -R "$(id -u):$(id -g)" "$SCRIPT_DIR/$subdir" 2>/dev/null || true
                 fi
@@ -997,8 +996,8 @@ main() {
     
     # Handle MCP repository switch if requested (deprecated - now automatic)
     if $SWITCH_MCP_REPO; then
-        echo -e "${YELLOW}Note: Repository switching is now automatic based on central configuration.${NC}"
-        echo -e "${YELLOW}Checking for required repositories...${NC}"
+        log_warning "Note: Repository switching is now automatic based on central configuration."
+        log_warning "Checking for required repositories..."
         echo ""
         check_and_switch_mcp_repo
         check_and_switch_web_repo
@@ -1015,7 +1014,7 @@ main() {
         update_version_file
         
         if $CHECK_ONLY; then
-            echo -e "${YELLOW}Updates are available. Run without --check-only to apply them.${NC}"
+            log_warning "Updates are available. Run without --check-only to apply them."
             exit 0
         fi
         
@@ -1032,7 +1031,7 @@ main() {
         fi
         
         echo ""
-        echo -e "${YELLOW}Applying updates...${NC}"
+        log_warning "Applying updates..."
         echo ""
         
         # Update each component
@@ -1060,7 +1059,7 @@ main() {
         
         if $update_success; then
             echo ""
-            echo -e "${GREEN}✓ All updates applied successfully${NC}"
+            log_success "All updates applied successfully"
             echo ""
             
             # Ask about rebuilding containers
@@ -1078,22 +1077,22 @@ main() {
             fi
         else
             echo ""
-            echo -e "${RED}Some updates failed. Please check the errors above.${NC}"
+            log_error "Some updates failed. Please check the errors above."
             exit 1
         fi
         
     else
         # No updates available
-        echo -e "${GREEN}✓ Everything is up to date!${NC}"
+        log_success "Everything is up to date!"
         
         # Update version file with current check time
         update_version_file
     fi
     
     echo ""
-    echo -e "${GREEN}=========================================${NC}"
-    echo -e "${GREEN}      Update check complete! ✨         ${NC}"
-    echo -e "${GREEN}=========================================${NC}"
+    echo "========================================="
+    echo "      Update check complete! ✨         "
+    echo "========================================="
 }
 
 # Run main function

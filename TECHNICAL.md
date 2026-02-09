@@ -59,7 +59,7 @@ The `local-install.sh` script includes several safety features to ensure a clean
 #### Previous Installation Detection
 
 Before starting the installation, the script automatically checks for:
-- Running MeticAI containers (`meticulous-mcp-server`, `gemini-client`, `coffee-relay`, `meticai-web`)
+- Running MeticAI containers (`meticulous-mcp-server`, `gemini-client`, `meticai-server`, `meticai-web`)
 - Existing installation artifacts (`.env`, `meticulous-source/`, `meticai-web/`, etc.)
 - macOS-specific integrations (Dock shortcuts, rebuild watcher service)
 
@@ -101,7 +101,7 @@ MeticAI includes a comprehensive test suite to ensure code quality and reliabili
 
 **Python Tests (FastAPI Application):**
 ```bash
-cd coffee-relay
+cd meticai-server
 pip install -r requirements-test.txt
 pytest test_main.py -v --cov=main
 ```
@@ -318,6 +318,6 @@ The persistence layer includes comprehensive test coverage:
 
 Run persistence tests:
 ```bash
-cd coffee-relay
+cd meticai-server
 pytest test_main.py::TestScheduledShotsPersistence -v
 ```

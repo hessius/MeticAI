@@ -6,7 +6,7 @@ MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. I
 ## Technology Stack
 
 ### Core Technologies
-- **Python 3.x** (FastAPI backend - coffee-relay)
+- **Python 3.x** (FastAPI backend - meticai-server)
 - **Node.js 22** (Gemini CLI client - gemini-client)
 - **Docker & Docker Compose** (Containerization)
 - **Google Gemini 2.0 Flash** (AI/Vision model)
@@ -24,7 +24,7 @@ MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. I
 
 The system consists of three main containers:
 
-1. **coffee-relay** (Port 8000) - FastAPI application that receives image/text requests
+1. **meticai-server** (Port 8000) - FastAPI application that receives image/text requests
 2. **gemini-client** - Node.js container running the Gemini CLI
 3. **meticulous-mcp** (Port 8090) - MCP server for machine communication
 
@@ -47,7 +47,7 @@ The system consists of three main containers:
 
 ### Test Commands
 ```bash
-# Python tests (run from coffee-relay directory)
+# Python tests (run from meticai-server directory)
 pip install -r requirements-test.txt
 pytest test_main.py -v --cov=main
 
@@ -78,7 +78,7 @@ See `SECURITY_FIXES.md` for details.
 MeticAI/
 ├── .github/
 │   └── workflows/          # CI/CD workflows
-├── coffee-relay/           # FastAPI application
+├── meticai-server/           # FastAPI application
 │   ├── main.py            # Main application code
 │   ├── test_main.py       # Comprehensive tests
 │   ├── requirements.txt   # Production dependencies
@@ -206,7 +206,7 @@ Must include:
 - Configuration is mounted at `/root/.gemini/settings.json`
 
 ### Debugging
-- View logs: `docker logs coffee-relay -f`
+- View logs: `docker logs meticai-server -f`
 - Check container status: `docker ps`
 - Access API docs: `http://<PI_IP>:8000/docs`
 - Test endpoints: Use curl or FastAPI interactive docs
