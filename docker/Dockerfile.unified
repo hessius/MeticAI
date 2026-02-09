@@ -2,7 +2,7 @@
 # MeticAI Unified Docker Image
 # ==============================================================================
 # This image contains all MeticAI components:
-# - Relay Server (FastAPI backend)
+# - Server (FastAPI backend)
 # - Web Frontend (React, served via nginx)
 # - MCP Server (Meticulous machine communication)
 # - Gemini CLI (AI integration)
@@ -45,9 +45,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install relay dependencies
-COPY apps/relay/requirements.txt ./relay-requirements.txt
-RUN pip install --no-cache-dir -r relay-requirements.txt
+# Install server dependencies
+COPY apps/server/requirements.txt ./server-requirements.txt
+RUN pip install --no-cache-dir -r server-requirements.txt
 
 # Install MCP server dependencies
 COPY apps/mcp-server/requirements.txt ./mcp-requirements.txt
@@ -86,13 +86,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 # Create app directories
-RUN mkdir -p /app/relay /app/mcp-server /var/www/html /data
+RUN mkdir -p /app/server /app/mcp-server /var/www/html /data
 
 # Copy built web frontend
 COPY --from=web-builder /build/dist /var/www/html
 
-# Copy relay server
-COPY apps/relay/ /app/relay/
+# Copy server
+COPY apps/server/ /app/server/
 
 # Copy MCP server
 COPY apps/mcp-server/ /app/mcp-server/
@@ -111,7 +111,7 @@ ENV DATA_DIR=/data
 ENV METICULOUS_IP=meticulous.local
 ENV GEMINI_API_KEY=""
 ENV MCP_SERVER_PORT=8080
-ENV RELAY_PORT=8000
+ENV SERVER_PORT=8000
 
 # Expose ports
 # 3550: nginx (web UI + API proxy) - main entry point
