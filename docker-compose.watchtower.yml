@@ -24,7 +24,11 @@ services:
       - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}
       - WATCHTOWER_HTTP_API_UPDATE=true
     volumes:
+      # Linux/macOS: /var/run/docker.sock
+      # Windows (Docker Desktop): //./pipe/docker_engine:/var/run/docker.sock
+      # Uncomment the appropriate line for your platform:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # - //./pipe/docker_engine:/var/run/docker.sock:ro  # Windows
     ports:
       - "8080:8080"  # HTTP API for manual trigger
     command: --http-api-metrics

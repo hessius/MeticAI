@@ -286,3 +286,41 @@ jobs:
         run: |
           sudo apt-get install -y shellcheck
           shellcheck scripts/*.sh || true
+
+  # ============================================================================
+  # Windows Installer Tests (PowerShell/Pester)
+  # ============================================================================
+  windows-installer-tests:
+    name: Windows Installer Tests (Pester)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -MinimumVersion 5.0 -Force -Scope CurrentUser
+
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = "./scripts/install.Tests.ps1"
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = "Detailed"
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = "pester-results.xml"
+          $config.TestResult.OutputFormat = "JUnitXml"
+          Invoke-Pester -Configuration $config
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-test-results
+          path: pester-results.xml
+          retention-days: 30

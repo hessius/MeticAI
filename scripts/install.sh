@@ -54,6 +54,23 @@ esac
 
 log_info "Detected platform: $PLATFORM"
 
+# Redirect Windows users to the PowerShell installer
+if [[ "$PLATFORM" == "windows" ]]; then
+    echo ""
+    log_warning "This bash installer is not recommended on Windows."
+    echo ""
+    echo "  For the best Windows experience, use the PowerShell installer:"
+    echo ""
+    echo "    irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 -OutFile install.ps1; .\\install.ps1"
+    echo ""
+    echo "  Or run it directly:"
+    echo ""
+    echo "    irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 | iex"
+    echo ""
+    log_info "Continuing with bash installer anyway..."
+    echo ""
+fi
+
 # ==============================================================================
 # Check/Install Docker
 # ==============================================================================
