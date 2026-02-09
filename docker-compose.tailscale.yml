@@ -1,0 +1,40 @@
+# ==============================================================================
+# MeticAI Tailscale Sidecar
+# ==============================================================================
+# Adds Tailscale VPN for secure remote access.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
+#
+# Prerequisites:
+#   - TAILSCALE_AUTHKEY set in .env
+#   - Get auth key from: https://login.tailscale.com/admin/settings/keys
+# ==============================================================================
+
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: meticai-tailscale
+    hostname: meticai
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale-serve.json:/config/serve.json:ro
+    network_mode: service:meticai
+
+  # Create serve config for Tailscale Serve
+  meticai:
+    depends_on:
+      - tailscale
+
+volumes:
+  tailscale-state:
+    name: meticai-tailscale-state
