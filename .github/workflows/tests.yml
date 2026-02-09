@@ -2,151 +2,287 @@ name: Test Suite
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop, version/2.0.0]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop, version/2.0.0]
 
 jobs:
-  python-tests:
-    name: Python Tests (FastAPI)
+  # ============================================================================
+  # Relay Server Tests (Python/FastAPI)
+  # ============================================================================
+  server-tests:
+    name: Server Tests (Python)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/server
     permissions:
       contents: read
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
-      
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+        uses: actions/checkout@v4
         with:
-          python-version: '3.11'
-      
-      - name: Cache pip packages
-        uses: actions/cache@v3
+          submodules: recursive
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('meticai-server/requirements-test.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: apps/server/requirements-test.txt
+
       - name: Install dependencies
         run: |
-          cd meticai-server
           pip install --upgrade pip
           pip install -r requirements-test.txt
-      
+
       - name: Run Python tests with coverage
         env:
           GEMINI_API_KEY: test_key_for_ci
         run: |
-          cd meticai-server
-          pytest test_main.py test_logging.py -v --cov=main --cov=logging_config --cov=config --cov=prompt_builder --cov=api --cov=services --cov=utils --cov=models --cov-report=xml --cov-report=term-missing
-      
+          pytest test_main.py test_logging.py -v \
+            --cov=main --cov=logging_config --cov=config \
+            --cov=prompt_builder --cov=api --cov=services \
+            --cov=utils --cov=models \
+            --cov-report=xml --cov-report=term-missing
+
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v4
         with:
-          file: ./meticai-server/coverage.xml
-          flags: python
-          name: python-coverage
-      
+          file: ./apps/server/coverage.xml
+          flags: relay
+          name: server-coverage
+
       - name: Check coverage threshold
-        run: |
-          cd meticai-server
-          coverage report --fail-under=68
+        run: coverage report --fail-under=68
 
-  bash-tests:
-    name: Bash Tests (Install Scripts)
+  # ============================================================================
+  # Web Frontend Tests (TypeScript/React)
+  # ============================================================================
+  web-tests:
+    name: Web Tests (TypeScript)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
     permissions:
       contents: read
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-      
-      - name: Install BATS
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bats
-      
-      - name: Make install scripts executable
-        run: |
-          chmod +x local-install.sh
-          chmod +x web_install.sh
-          chmod +x uninstall.sh
-      
-      - name: Run Bash tests
-        run: |
-          bats tests/test_local_install.bats
-          bats tests/test_web_install.bats
-          bats tests/test_uninstall.bats
-          bats tests/test_macos_installer.bats
-          bats tests/test_macos_uninstaller.bats
-      
-      - name: Verify script syntax
-        run: |
-          bash -n local-install.sh
-          bash -n web_install.sh
-          bash -n uninstall.sh
-          bash -n macos-installer/install-wrapper.sh
-          bash -n macos-installer/build-macos-app.sh
-          bash -n macos-installer/uninstall-wrapper.sh
-          bash -n macos-installer/build-uninstaller-app.sh
 
-  integration-check:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: [python-tests, bash-tests]
-    permissions:
-      contents: read
-    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
-      
-      - name: Verify Dockerfiles syntax
-        run: |
-          docker build --no-cache -f meticai-server/Dockerfile -t test-meticai-server meticai-server || exit 1
-          docker build --no-cache -f gemini-client/Dockerfile -t test-gemini-client gemini-client || exit 1
-      
-      - name: Test docker-compose syntax
-        run: |
-          docker compose config
-
-  lint-check:
-    name: Code Quality Checks
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-      
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+        uses: actions/checkout@v4
         with:
-          python-version: '3.11'
-      
-      - name: Install linting tools
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run linter
+        run: bun run lint
+
+      - name: Run unit tests
+        run: bun run test:run
+
+      - name: Generate coverage report
+        run: bun run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./apps/web/coverage/coverage-final.json
+          flags: web
+          name: web-coverage
+
+  # ============================================================================
+  # Web E2E Tests (Playwright)
+  # ============================================================================
+  web-e2e-tests:
+    name: Web E2E Tests
+    runs-on: ubuntu-latest
+    needs: [web-tests]
+    defaults:
+      run:
+        working-directory: apps/web
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: bunx playwright install --with-deps
+
+      - name: Run E2E tests
+        run: bun run e2e
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 30
+
+  # ============================================================================
+  # MCP Server Tests (Python)
+  # ============================================================================
+  mcp-server-tests:
+    name: MCP Server Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mcp-server
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/mcp-server/requirements.txt
+
+      - name: Install dependencies
         run: |
-          pip install flake8 black
-      
-      - name: Run flake8
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
         run: |
-          flake8 meticai-server/main.py meticai-server/logging_config.py --max-line-length=100 --ignore=E501,W503
+          PYTHONPATH=${{ github.workspace }}/apps/mcp-server/src \
+          python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-test-results
+          path: apps/mcp-server/test-results.xml
+
+  # ============================================================================
+  # Docker Build Tests
+  # ============================================================================
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [server-tests, web-tests]
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build unified image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.unified
+          push: false
+          tags: meticai:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test container starts
+        run: |
+          docker run -d --name test-container \
+            -e GEMINI_API_KEY=test \
+            -e METICULOUS_IP=127.0.0.1 \
+            meticai:test
+
+          # Wait for container to start
+          sleep 15
+
+          # Check container is running
+          docker ps | grep test-container
+
+          # Check health endpoint
+          docker exec test-container curl -f http://localhost:3550/health || exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop test-container || true
+          docker rm test-container || true
+
+  # ============================================================================
+  # Code Quality
+  # ============================================================================
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python linting tools
+        run: pip install ruff black
+
+      - name: Run ruff on relay
+        run: ruff check apps/server/
         continue-on-error: true
-      
-      - name: Check code formatting with black
-        run: |
-          black --check meticai-server/main.py meticai-server/logging_config.py
+
+      - name: Check Python formatting
+        run: black --check apps/server/
         continue-on-error: true
-      
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install web dependencies
+        run: |
+          cd apps/web
+          bun install --frozen-lockfile
+
+      - name: Lint web
+        run: |
+          cd apps/web
+          bun run lint
+        continue-on-error: true
+
       - name: Lint shell scripts
         run: |
           sudo apt-get install -y shellcheck
-          shellcheck local-install.sh || true
-          shellcheck web_install.sh || true
-          shellcheck macos-installer/install-wrapper.sh || true
-          shellcheck macos-installer/build-macos-app.sh || true
+          shellcheck scripts/*.sh || true

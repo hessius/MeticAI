@@ -1,0 +1,125 @@
+# ==============================================================================
+# MeticAI Unified Docker Image
+# ==============================================================================
+# This image contains all MeticAI components:
+# - Server (FastAPI backend)
+# - Web Frontend (React, served via nginx)
+# - MCP Server (Meticulous machine communication)
+# - Gemini CLI (AI integration)
+#
+# Process management: s6-overlay
+# Port 3550: nginx (web UI + API proxy)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Build Web Frontend
+# ------------------------------------------------------------------------------
+FROM oven/bun:1-alpine AS web-builder
+
+WORKDIR /build
+
+# Copy web app source
+COPY apps/web/package.json apps/web/bun.lock* ./
+
+# Install dependencies (--no-save prevents lockfile changes, fallback if lock issue)
+RUN bun install --frozen-lockfile 2>/dev/null || bun install
+
+# Copy source and build
+COPY apps/web/ ./
+RUN bun run build
+
+
+# ------------------------------------------------------------------------------
+# Stage 2: Build Python Dependencies
+# ------------------------------------------------------------------------------
+FROM python:3.12-slim AS python-builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install server dependencies
+COPY apps/server/requirements.txt ./server-requirements.txt
+RUN pip install --no-cache-dir -r server-requirements.txt
+
+# Install MCP server dependencies
+COPY apps/mcp-server/meticulous-mcp/requirements.txt ./mcp-requirements.txt
+RUN pip install --no-cache-dir -r mcp-requirements.txt
+
+
+# ------------------------------------------------------------------------------
+# Stage 3: Final Runtime Image
+# ------------------------------------------------------------------------------
+FROM python:3.12-slim
+
+# Install runtime dependencies (xz-utils needed for s6-overlay extraction)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
+    nodejs \
+    npm \
+    curl \
+    xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install s6-overlay for process management
+ARG S6_OVERLAY_VERSION=3.2.0.2
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
+    && tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz \
+    && rm /tmp/s6-overlay-*.tar.xz
+
+# Install Gemini CLI globally
+RUN npm install -g @anthropic-ai/claude-cli @google/generative-ai-cli 2>/dev/null || \
+    npm install -g @google/generative-ai-cli || true
+
+# Copy Python virtual environment from builder
+COPY --from=python-builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+
+# Create app directories
+RUN mkdir -p /app/server /app/mcp-server /var/www/html /data
+
+# Copy built web frontend
+COPY --from=web-builder /build/dist /var/www/html
+
+# Copy server
+COPY apps/server/ /app/server/
+
+# Copy MCP server
+COPY apps/mcp-server/ /app/mcp-server/
+
+# Copy nginx configuration
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# Copy s6 service definitions
+COPY docker/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+
+# Create data directory for persistent storage
+VOLUME ["/data"]
+
+# Environment variables
+ENV DATA_DIR=/data
+ENV METICULOUS_IP=meticulous.local
+ENV GEMINI_API_KEY=""
+ENV MCP_SERVER_PORT=8080
+ENV SERVER_PORT=8000
+
+# Expose ports
+# 3550: nginx (web UI + API proxy) - main entry point
+EXPOSE 3550
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3550/health || exit 1
+
+# s6-overlay entrypoint
+ENTRYPOINT ["/init"]

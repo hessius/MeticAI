@@ -1,0 +1,30 @@
+# ==============================================================================
+# MeticAI Watchtower Sidecar
+# ==============================================================================
+# Adds automatic Docker image updates via Watchtower.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
+#
+# Features:
+#   - Automatic updates check every 6 hours
+#   - Manual update trigger via HTTP API
+#   - Only updates containers with watchtower.enable=true label
+# ==============================================================================
+
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: meticai-watchtower
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=21600  # 6 hours
+      - WATCHTOWER_LABEL_ENABLE=true     # Only update labeled containers
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}
+      - WATCHTOWER_HTTP_API_UPDATE=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "8080:8080"  # HTTP API for manual trigger
+    command: --http-api-metrics
