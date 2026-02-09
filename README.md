@@ -82,7 +82,7 @@ cd MeticAI
 # 2. Create .env file with your configuration
 cat > .env << EOF
 GEMINI_API_KEY=your_api_key_here
-METICULOUS_IP=your_meticulous_ip
+METICULOUS_IP=meticulous.local  # or IP address like 192.168.1.100
 EOF
 
 # 3. Start MeticAI
@@ -101,7 +101,8 @@ mkdir -p ~/.meticai && cd ~/.meticai
 
 # Download and inspect the compose file BEFORE running it
 # Use a specific commit hash for reproducibility and security
-COMMIT_HASH="104d7c5"  # Update this to the latest stable commit
+# Find the latest commit at: https://github.com/hessius/MeticAI/commits/main
+COMMIT_HASH="104d7c5"  # Example: update this to your chosen commit
 curl -fsSL "https://raw.githubusercontent.com/hessius/MeticAI/${COMMIT_HASH}/docker-compose.yml" -o docker-compose.yml
 
 # IMPORTANT: Review the downloaded file before proceeding
@@ -114,7 +115,7 @@ sha256sum docker-compose.yml
 # Create .env file
 cat > .env << EOF
 GEMINI_API_KEY=your_api_key_here
-METICULOUS_IP=your_meticulous_ip
+METICULOUS_IP=meticulous.local  # or IP address like 192.168.1.100
 EOF
 
 # Start MeticAI only after verifying the compose file
