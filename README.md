@@ -61,51 +61,68 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 - ☑️ A server to run MeticAI (Raspberry Pi, Mac, Linux, or Windows with Docker)
 - ☑️ A **free Google Gemini API key** → [Get yours here](https://aistudio.google.com/app/apikey) (takes 30 seconds)
 
-### Installation (2 minutes)
+### Installation (5 minutes)
 
-**One-Line Install:**
+**Prerequisites:**
+- Docker and Docker Compose installed ([Get Docker](https://docs.docker.com/get-docker/))
+- Git
+
+**Recommended: Git Clone Method**
+
+This is the safest and most transparent installation method:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
+# 1. Clone the repository (recommended: use a specific release tag when available)
+git clone https://github.com/hessius/MeticAI.git
+cd MeticAI
+
+# Optional: Checkout a specific release for stability
+# git checkout v2.0.0  # (use when tagged releases are available)
+
+# 2. Create .env file with your configuration
+cat > .env << EOF
+GEMINI_API_KEY=your_api_key_here
+METICULOUS_IP=meticulous.local  # or IP address like 192.168.1.100
+EOF
+
+# 3. Start MeticAI
+docker compose up -d
 ```
 
-That's it! The installer will:
-- ✅ Check for and install Docker if needed
-- ✅ Guide you through setup (just paste your API key and machine IP)
-- ✅ Optionally enable Tailscale (remote access) and Watchtower (auto-updates)
-- ✅ Pull and start the unified container
+**Alternative: Direct Download (Advanced Users)**
 
-**Upgrading from v1.x?**
-```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/migrate-to-unified.sh | bash
-```
+> ⚠️ **Security Warning**: Downloading and executing scripts or configuration files directly from the internet carries security risks. Only use this method if you trust the source and have verified the file contents.
 
-The migration script will:
-- ✅ Back up your existing configuration
-- ✅ Stop and remove old containers
-- ✅ Migrate your data to the new volume
-- ✅ Start the new unified container
-
-### Manual Installation
-
-For those who prefer manual setup:
+If you prefer not to clone the entire repository, you can download just the compose file:
 
 ```bash
 # Create configuration directory
 mkdir -p ~/.meticai && cd ~/.meticai
 
+# Download and inspect the compose file BEFORE running it
+# Use a specific commit hash for reproducibility and security
+# Find the latest commit at: https://github.com/hessius/MeticAI/commits/main
+COMMIT_HASH="104d7c5"  # Example: update this to your chosen commit
+curl -fsSL "https://raw.githubusercontent.com/hessius/MeticAI/${COMMIT_HASH}/docker-compose.yml" -o docker-compose.yml
+
+# IMPORTANT: Review the downloaded file before proceeding
+cat docker-compose.yml
+
+# Verify file integrity (optional but recommended)
+# Compare the file hash with the one published in the release notes
+sha256sum docker-compose.yml
+
 # Create .env file
 cat > .env << EOF
-GEMINI_API_KEY=your_key_here
-METICULOUS_IP=meticulous.local
+GEMINI_API_KEY=your_api_key_here
+METICULOUS_IP=meticulous.local  # or IP address like 192.168.1.100
 EOF
 
-# Download compose file
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.unified.yml -o docker-compose.yml
-
-# Start MeticAI
-docker compose pull
+# Start MeticAI only after verifying the compose file
 docker compose up -d
 ```
+
+> **Best Practice**: Always review configuration files before running them, especially when downloaded from the internet. The git clone method above is recommended as it provides full transparency and version control.
 
 ### After Installation
 
