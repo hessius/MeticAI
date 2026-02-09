@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { ArrowClockwise, DownloadSimple, X, CheckCircle, Warning } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface UpdateBannerProps {
   updateAvailable: boolean
@@ -26,22 +26,58 @@ export function UpdateBanner({
   onDismiss,
 }: UpdateBannerProps) {
   const [progress, setProgress] = useState(0)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Clear timers helper function
+  const clearTimers = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }
+
+  // Clean up timers on unmount or when isUpdating changes
+  useEffect(() => {
+    if (!isUpdating) {
+      // Reset progress and clear timers when update finishes
+      setProgress(0)
+      clearTimers()
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      clearTimers()
+    }
+  }, [isUpdating])
 
   // Simulate progress during update
   const handleUpdate = () => {
+    // Clear any existing timers before starting new ones
+    clearTimers()
+    
+    // Reset progress for new update
+    setProgress(0)
+    
     onUpdate()
     
     // Animate progress bar
     const startTime = Date.now()
     
-    const interval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime
       const percentage = Math.min((elapsed / MAX_UPDATE_DURATION) * 100, 95)
       setProgress(percentage)
     }, PROGRESS_UPDATE_INTERVAL)
 
     // Clear interval when update completes
-    setTimeout(() => clearInterval(interval), MAX_UPDATE_DURATION)
+    timeoutRef.current = setTimeout(() => {
+      clearTimers()
+    }, MAX_UPDATE_DURATION)
   }
 
   if (!updateAvailable && !isUpdating && !updateError) {
