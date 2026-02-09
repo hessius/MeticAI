@@ -1,0 +1,41 @@
+# ==============================================================================
+# MeticAI Docker Compose Configuration
+# ==============================================================================
+# Single unified container for all MeticAI services.
+#
+# Usage:
+#   docker compose up -d
+#
+# Optional add-ons (see #152):
+#   docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
+# ==============================================================================
+
+services:
+  meticai:
+    image: ghcr.io/hessius/meticai:latest
+    container_name: meticai
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.unified
+    restart: unless-stopped
+    ports:
+      - "3550:3550"   # Web UI (nginx proxy)
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - METICULOUS_IP=${METICULOUS_IP:-meticulous.local}
+      - DATA_DIR=/data
+    volumes:
+      - meticai-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3550/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  meticai-data:
+    name: meticai-data

@@ -1,0 +1,6 @@
+#!/command/with-contenv sh
+cd /app/mcp-server
+export PYTHONPATH=/app/mcp-server/meticulous-mcp/src
+export FASTMCP_HOST=0.0.0.0
+export FASTMCP_PORT=8080
+exec python run_http.py
