@@ -360,13 +360,12 @@ async def analyze_and_profile(
             }
         )
         
-        # Execute profile creation via docker
+        # Execute profile creation via Gemini CLI
         # Note: Using -y (yolo mode) to auto-approve tool calls.
         # The --allowed-tools flag doesn't work with MCP-provided tools.
         # Security is maintained because the MCP server only exposes safe tools.
         result = subprocess.run(
             [
-                "docker", "exec", "-i", "gemini-client", 
                 "gemini", "-y",
                 final_prompt
             ],

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from typing import Optional, Any
 from datetime import datetime, timezone
 import json
+import os
 import subprocess
 import logging
 import asyncio
@@ -309,12 +310,11 @@ async def generate_profile_image(
         
         # Create a temporary directory for the output
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Execute image generation via gemini CLI
+            # Execute image generation via Gemini CLI (available in PATH)
             # The prompt should ask to generate an image directly
             image_prompt = f"generate an image: {full_prompt}"
             result = subprocess.run(
                 [
-                    "docker", "exec", "-i", "gemini-client",
                     "gemini", "-y", image_prompt
                 ],
                 capture_output=True,
@@ -361,12 +361,8 @@ async def generate_profile_image(
             backtick_matches = re.findall(r'`([^`]+\.png)`', output)
             if backtick_matches:
                 for match in backtick_matches:
-                    # The path is already absolute
-                    check_result = subprocess.run(
-                        ["docker", "exec", "gemini-client", "test", "-f", match],
-                        capture_output=True
-                    )
-                    if check_result.returncode == 0:
+                    # The path is already absolute — check locally
+                    if os.path.isfile(match):
                         image_path = match
                         logger.info(f"Found image at: {image_path}", extra={"request_id": request_id})
                         break
@@ -375,25 +371,22 @@ async def generate_profile_image(
             if not image_path:
                 png_matches = re.findall(r'(/[\w\-/\.]+\.png)', output)
                 for match in png_matches:
-                    check_result = subprocess.run(
-                        ["docker", "exec", "gemini-client", "test", "-f", match],
-                        capture_output=True
-                    )
-                    if check_result.returncode == 0:
+                    if os.path.isfile(match):
                         image_path = match
                         logger.info(f"Found image at: {image_path}", extra={"request_id": request_id})
                         break
             
             # If no path found, try to list the output directory
             if not image_path:
-                list_result = subprocess.run(
-                    ["docker", "exec", "gemini-client", "ls", "-t", "/nanobanana-output/"],
-                    capture_output=True,
-                    text=True
-                )
-                if list_result.returncode == 0 and list_result.stdout.strip():
-                    newest_file = list_result.stdout.strip().split('\n')[0]
-                    image_path = f"/nanobanana-output/{newest_file}"
+                nanobanana_dir = "/nanobanana-output"
+                if os.path.isdir(nanobanana_dir):
+                    files = sorted(
+                        [f for f in os.listdir(nanobanana_dir) if f.endswith('.png')],
+                        key=lambda f: os.path.getmtime(os.path.join(nanobanana_dir, f)),
+                        reverse=True
+                    )
+                    if files:
+                        image_path = os.path.join(nanobanana_dir, files[0])
             
             if not image_path:
                 raise HTTPException(
@@ -401,19 +394,15 @@ async def generate_profile_image(
                     detail="Image generation completed but could not find output file"
                 )
             
-            # Read the image from the container
-            cat_result = subprocess.run(
-                ["docker", "exec", "gemini-client", "cat", image_path],
-                capture_output=True
-            )
-            
-            if cat_result.returncode != 0:
+            # Read the image from local filesystem
+            try:
+                with open(image_path, "rb") as f:
+                    image_data = f.read()
+            except (IOError, OSError) as e:
                 raise HTTPException(
                     status_code=500,
-                    detail="Failed to read generated image"
+                    detail=f"Failed to read generated image: {e}"
                 )
-            
-            image_data = cat_result.stdout
             
             # Process the image (crop/resize) and upload to profile
             image_data_uri, png_bytes = process_image_for_profile(image_data, "image/png")

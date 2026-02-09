@@ -203,8 +203,7 @@ class TestAnalyzeAndProfileEndpoint:
         # Verify subprocess was called with correct arguments
         mock_subprocess.assert_called_once()
         call_args = mock_subprocess.call_args[0][0]
-        assert "docker" in call_args
-        assert "gemini-client" in call_args
+        assert "gemini" in call_args
         assert "-y" in call_args  # yolo mode for auto-approval
         
         # Verify the prompt contains the analysis
@@ -411,12 +410,9 @@ class TestAnalyzeAndProfileEndpoint:
         # Verify that yolo mode flag is present for auto-approval
         assert "-y" in call_args
         
-        # Verify the command structure is correct
-        assert "docker" in call_args
-        assert "exec" in call_args
-        assert "-i" in call_args
-        assert "gemini-client" in call_args
-        assert "gemini" in call_args
+        # Verify the command structure is correct (direct gemini CLI call)
+        assert call_args[0] == "gemini"
+        assert "-y" in call_args
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
@@ -4430,24 +4426,27 @@ class TestGenerateProfileImageEndpoint:
     @patch('api.routes.profiles.get_meticulous_api')
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_generate_image_preview_mode(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    @patch('api.routes.profiles.os.path.isfile')
+    def test_generate_image_preview_mode(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test image generation in preview mode."""
-        # Mock subprocess for nanobanana
+        # Mock subprocess for gemini CLI
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
         mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
         
-        mock_subprocess.side_effect = [
-            mock_result,  # nanobanana execution
-            MagicMock(returncode=0),  # test -f check
-            MagicMock(returncode=0, stdout=b"fake_png_data")  # cat image
-        ]
+        # Mock local file check
+        mock_isfile.return_value = True
+        
+        # Mock reading the generated image
+        mock_image_data = b"fake_png_data"
         
         # Mock image processing
         mock_process.return_value = ("data:image/png;base64,abc123", b"png_bytes")
         
-        response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
+        with patch('builtins.open', mock_open(read_data=mock_image_data)):
+            response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
         
         assert response.status_code == 200
         data = response.json()
@@ -4460,18 +4459,17 @@ class TestGenerateProfileImageEndpoint:
     @patch('api.routes.profiles.get_meticulous_api')
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_generate_image_save_to_profile(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    @patch('api.routes.profiles.os.path.isfile')
+    def test_generate_image_save_to_profile(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test image generation and save to profile."""
-        # Mock subprocess
+        # Mock subprocess for gemini CLI
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        mock_subprocess.return_value = mock_result
         
-        mock_subprocess.side_effect = [
-            mock_result,
-            MagicMock(returncode=0),
-            MagicMock(returncode=0, stdout=b"fake_png")
-        ]
+        # Mock local file check
+        mock_isfile.return_value = True
         
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
         
@@ -4496,7 +4494,8 @@ class TestGenerateProfileImageEndpoint:
         save_result.error = None
         mock_api.save_profile.return_value = save_result
         
-        response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
+        with patch('builtins.open', mock_open(read_data=b"fake_png")):
+            response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
         
         assert response.status_code == 200
         data = response.json()
@@ -4532,7 +4531,7 @@ class TestGenerateProfileImageEndpoint:
     @patch('subprocess.run')
     def test_generate_image_timeout(self, mock_subprocess, client):
         """Test handling of generation timeout."""
-        mock_subprocess.side_effect = subprocess.TimeoutExpired("docker", 120)
+        mock_subprocess.side_effect = subprocess.TimeoutExpired("gemini", 120)
         
         response = client.post("/api/profile/Test/generate-image")
         
@@ -4540,19 +4539,19 @@ class TestGenerateProfileImageEndpoint:
 
     @patch('subprocess.run')
     @patch('api.routes.profiles.process_image_for_profile')
-    def test_generate_image_file_not_found(self, mock_process, mock_subprocess, client):
+    @patch('api.routes.profiles.os.path.isfile')
+    @patch('api.routes.profiles.os.path.isdir')
+    def test_generate_image_file_not_found(self, mock_isdir, mock_isfile, mock_process, mock_subprocess, client):
         """Test when generated image cannot be found."""
-        # Nanobanana succeeds but file not found
+        # Gemini CLI succeeds but file not found
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "Done but no file path"
+        mock_subprocess.return_value = mock_result
         
-        # All file checks fail
-        mock_subprocess.side_effect = [
-            mock_result,
-            MagicMock(returncode=1),  # File not found
-            MagicMock(returncode=1, stdout="")  # ls also fails
-        ]
+        # All local file checks fail
+        mock_isfile.return_value = False
+        mock_isdir.return_value = False
         
         response = client.post("/api/profile/Test/generate-image")
         
@@ -4560,22 +4559,20 @@ class TestGenerateProfileImageEndpoint:
 
     @patch('subprocess.run')
     @patch('api.routes.profiles._set_cached_image')
-    def test_generate_image_invalid_style(self, mock_cache, mock_subprocess, client):
+    @patch('api.routes.profiles.os.path.isfile')
+    def test_generate_image_invalid_style(self, mock_isfile, mock_cache, mock_subprocess, client):
         """Test with invalid style parameter (should default to abstract)."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        
-        mock_subprocess.side_effect = [
-            mock_result,
-            MagicMock(returncode=0),
-            MagicMock(returncode=0, stdout=b"fake_png")
-        ]
+        mock_subprocess.return_value = mock_result
+        mock_isfile.return_value = True
         
         with patch('api.routes.profiles.process_image_for_profile') as mock_process:
             mock_process.return_value = ("data:image/png;base64,xyz", b"png")
             
-            response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
+            with patch('builtins.open', mock_open(read_data=b"fake_png")):
+                response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
             
             assert response.status_code == 200
             data = response.json()
@@ -4585,17 +4582,14 @@ class TestGenerateProfileImageEndpoint:
     @patch('api.routes.profiles.get_meticulous_api')
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_generate_image_profile_not_found_for_save(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    @patch('api.routes.profiles.os.path.isfile')
+    def test_generate_image_profile_not_found_for_save(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test error when profile not found for saving."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        
-        mock_subprocess.side_effect = [
-            mock_result,
-            MagicMock(returncode=0),
-            MagicMock(returncode=0, stdout=b"fake_png")
-        ]
+        mock_subprocess.return_value = mock_result
+        mock_isfile.return_value = True
         
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
         
@@ -4603,7 +4597,8 @@ class TestGenerateProfileImageEndpoint:
         mock_get_api.return_value = mock_api
         mock_api.list_profiles.return_value = []
         
-        response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
+        with patch('builtins.open', mock_open(read_data=b"fake_png")):
+            response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
         
         assert response.status_code == 404
 
@@ -4611,17 +4606,14 @@ class TestGenerateProfileImageEndpoint:
     @patch('api.routes.profiles.get_meticulous_api')
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_generate_image_save_failure(self, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    @patch('api.routes.profiles.os.path.isfile')
+    def test_generate_image_save_failure(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
         """Test handling of profile save failure."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        
-        mock_subprocess.side_effect = [
-            mock_result,
-            MagicMock(returncode=0),
-            MagicMock(returncode=0, stdout=b"fake_png")
-        ]
+        mock_subprocess.return_value = mock_result
+        mock_isfile.return_value = True
         
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
         
@@ -4646,25 +4638,25 @@ class TestGenerateProfileImageEndpoint:
         save_result.error = "Failed to save"
         mock_api.save_profile.return_value = save_result
         
-        response = client.post("/api/profile/Test/generate-image?preview=false")
+        with patch('builtins.open', mock_open(read_data=b"fake_png")):
+            response = client.post("/api/profile/Test/generate-image?preview=false")
         
         assert response.status_code == 502
 
     @patch('subprocess.run')
-    def test_generate_image_read_failure(self, mock_subprocess, client):
+    @patch('api.routes.profiles.os.path.isfile')
+    def test_generate_image_read_failure(self, mock_isfile, mock_subprocess, client):
         """Test when reading generated image fails."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
+        mock_subprocess.return_value = mock_result
         
-        # File exists but cat fails
-        mock_subprocess.side_effect = [
-            mock_result,
-            MagicMock(returncode=0),  # test -f succeeds
-            MagicMock(returncode=1, stderr="Read error")  # cat fails
-        ]
+        # File exists but read fails
+        mock_isfile.return_value = True
         
-        response = client.post("/api/profile/Test/generate-image")
+        with patch('builtins.open', side_effect=IOError("Read error")):
+            response = client.post("/api/profile/Test/generate-image")
         
         assert response.status_code == 500
 
@@ -5223,7 +5215,7 @@ class TestImagePromptErrorHandling:
         # Mock subprocess to return error (to stop execution after validation)
         mock_result = MagicMock()
         mock_result.returncode = 1
-        mock_result.stderr = "docker error"
+        mock_result.stderr = "gemini error"
         mock_subprocess.return_value = mock_result
         
         with patch('prompt_builder.build_image_prompt_with_metadata', return_value=valid_prompt):
@@ -5233,7 +5225,7 @@ class TestImagePromptErrorHandling:
             )
             
             # Should not fail with prompt validation error
-            # May fail later for other reasons (docker, etc.)
+            # May fail later for other reasons (gemini CLI, etc.)
             if response.status_code == 500:
                 error_detail = str(response.json().get("detail", ""))
                 assert "Failed to build image generation prompt" not in error_detail

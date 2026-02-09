@@ -1,4 +1,3 @@
-#!/command/execlineb -P
+#!/command/with-contenv sh
 cd /app/server
-s6-env DATA_DIR=/data
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
+exec uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
