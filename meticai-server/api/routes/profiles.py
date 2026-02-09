@@ -1,8 +1,7 @@
 """Profile management endpoints."""
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from typing import Optional, Any
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import json
 import subprocess
 import logging
@@ -309,8 +308,6 @@ async def generate_profile_image(
         )
         
         # Create a temporary directory for the output
-        import shutil
-        
         with tempfile.TemporaryDirectory() as temp_dir:
             # Execute image generation via gemini CLI
             # The prompt should ask to generate an image directly
@@ -2465,11 +2462,8 @@ from services.scheduling_state import (
     _scheduled_shots,
     _scheduled_tasks,
     _recurring_schedules,
-    ScheduledShotsPersistence,
-    RecurringSchedulesPersistence,
     save_scheduled_shots as _save_scheduled_shots,
     save_recurring_schedules as _save_recurring_schedules,
-    load_recurring_schedules as _load_recurring_schedules,
     restore_scheduled_shots as _restore_scheduled_shots,
     get_next_occurrence as _get_next_occurrence,
     PREHEAT_DURATION_MINUTES,

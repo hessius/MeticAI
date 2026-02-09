@@ -1,7 +1,6 @@
 """Machine status and scheduling endpoints."""
 from fastapi import APIRouter, Request, HTTPException
-from typing import Optional
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import uuid
 import logging
 import asyncio
