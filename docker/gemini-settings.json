@@ -1,7 +1,8 @@
 {
   "mcpServers": {
     "meticulous": {
-      "uri": "http://localhost:8080/mcp"
+      "httpUrl": "http://localhost:8080/mcp",
+      "trust": true
     }
   }
 }
