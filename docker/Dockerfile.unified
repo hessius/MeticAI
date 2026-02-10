@@ -107,6 +107,9 @@ COPY VERSION /app/server/VERSION
 # Copy MCP server
 COPY apps/mcp-server/ /app/mcp-server/
 
+# Clone espresso profile schema (required by MCP server for profile validation)
+RUN git clone --depth 1 https://github.com/MeticulousHome/espresso-profile-schema.git /app/espresso-profile-schema
+
 # Copy nginx configuration
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
