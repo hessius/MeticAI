@@ -960,13 +960,13 @@ async def save_settings_endpoint(request: Request):
         # Handle API key update
         if body.get("geminiApiKey") and not body.get("geminiApiKeyMasked"):
             new_api_key = body["geminiApiKey"].strip()
-            if new_api_key and "..." not in new_api_key:  # Not a masked value
+            if new_api_key and "..." not in new_api_key and "*" not in new_api_key:  # Not a masked value
                 current_settings["geminiApiKey"] = new_api_key
-                # Update .env file
+                # Update .env file — use re.escape to handle special chars in keys
                 if "GEMINI_API_KEY=" in env_content:
                     env_content = re.sub(
                         r'GEMINI_API_KEY=.*',
-                        f'GEMINI_API_KEY={new_api_key}',
+                        f'GEMINI_API_KEY={re.escape(new_api_key)}',
                         env_content
                     )
                 else:
@@ -1052,6 +1052,14 @@ async def save_settings_endpoint(request: Request):
             new_api_key = body["geminiApiKey"].strip()
             if new_api_key and "..." not in new_api_key and "*" not in new_api_key:
                 os.environ["GEMINI_API_KEY"] = new_api_key
+                # Reset cached vision model so it re-configures with the new key
+                try:
+                    from services.gemini_service import reset_vision_model
+                    reset_vision_model()
+                    services_restarted.append("vision_model")
+                except Exception as e:
+                    logger.warning(f"Failed to reset vision model: {e}",
+                                 extra={"request_id": request_id})
                 services_restarted.append("gemini_env")
                 logger.info("Updated GEMINI_API_KEY in process environment",
                           extra={"request_id": request_id})

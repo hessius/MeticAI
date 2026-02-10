@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Request, Form, HTTPException
 from typing import Optional
 import json
+import re
 import time
 import logging
 
@@ -104,6 +105,10 @@ async def get_shot_files(request: Request, date: str):
     Returns:
         List of shot filenames for that date
     """
+    # Validate date format to prevent path traversal
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
+        raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
+    
     request_id = request.state.request_id
     
     try:
@@ -152,6 +157,12 @@ async def get_shot_data(request: Request, date: str, filename: str):
     Returns:
         Decompressed shot data with telemetry
     """
+    # Validate inputs to prevent path traversal / SSRF
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
+        raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
+    if '..' in filename or filename.startswith('/'):
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+    
     request_id = request.state.request_id
     
     try:

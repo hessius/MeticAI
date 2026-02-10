@@ -161,6 +161,16 @@ def parse_gemini_error(error_text: str) -> str:
     return f"Profile generation failed: {error_text}" if error_text else "Profile generation failed unexpectedly."
 
 
+def reset_vision_model():
+    """Reset the cached vision model.
+    
+    Call this when the GEMINI_API_KEY changes so the next call to
+    get_vision_model() will re-configure with the new key.
+    """
+    global _vision_model
+    _vision_model = None
+
+
 def get_vision_model():
     """Lazily initialize and return the vision model."""
     global _vision_model

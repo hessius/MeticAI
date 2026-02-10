@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from config import DATA_DIR
+from utils.file_utils import atomic_write_json
 
 SETTINGS_FILE = DATA_DIR / "settings.json"
 
@@ -37,10 +38,9 @@ def load_settings() -> dict:
 
 
 def save_settings(settings: dict):
-    """Save settings to file."""
+    """Save settings to file atomically to prevent corruption."""
     ensure_settings_file()
-    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
+    atomic_write_json(SETTINGS_FILE, settings)
 
 
 def get_author_name() -> str:

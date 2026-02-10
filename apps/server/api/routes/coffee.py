@@ -373,7 +373,8 @@ async def analyze_and_profile(
                 final_prompt
             ],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=300  # 5 minute timeout to prevent hanging forever
         )
         
         if result.returncode != 0:
@@ -420,6 +421,25 @@ async def analyze_and_profile(
             "history_id": history_entry.get("id")
         }
 
+    except subprocess.TimeoutExpired:
+        logger.error(
+            "Gemini CLI timed out after 300s",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_and_profile",
+                "coffee_analysis": coffee_analysis
+            }
+        )
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "status": "error",
+                "analysis": coffee_analysis if coffee_analysis else None,
+                "message": "Profile creation timed out. The AI took too long to respond. Please try again."
+            }
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             f"Profile creation failed: {str(e)}",
@@ -433,8 +453,11 @@ async def analyze_and_profile(
                 "has_preferences": user_prefs is not None
             }
         )
-        return {
-            "status": "error",
-            "analysis": coffee_analysis if coffee_analysis else None,
-            "message": str(e)
-        }
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "analysis": coffee_analysis if coffee_analysis else None,
+                "message": str(e)
+            }
+        )
