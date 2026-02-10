@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -16,12 +17,16 @@ import {
   ArrowClockwise,
   DownloadSimple,
   CaretDown,
-  CaretUp
+  CaretUp,
+  Globe,
+  WifiHigh,
+  WifiSlash
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
+import { LanguageSelector } from '@/components/LanguageSelector'
 
 interface SettingsViewProps {
   onBack: () => void
@@ -36,12 +41,9 @@ interface Settings {
 }
 
 interface VersionInfo {
-  meticai: string
-  meticaiWeb: string
-  meticaiWebCommit?: string
-  mcpServer: string
-  mcpCommit?: string
-  mcpRepoUrl: string
+  version: string
+  commit?: string
+  repoUrl: string
 }
 
 interface ReleaseNote {
@@ -50,11 +52,29 @@ interface ReleaseNote {
   body: string
 }
 
+interface UpdateMethod {
+  method: 'watchtower' | 'watcher' | 'manual'
+  watchtower_running: boolean
+  watcher_running: boolean
+  can_trigger_update: boolean
+}
+
+interface TailscaleStatus {
+  installed: boolean
+  connected: boolean
+  hostname: string | null
+  ip: string | null
+  auth_key_expired: boolean
+  login_url: string | null
+}
+
 // Maximum expected update duration (3 minutes)
 const MAX_UPDATE_DURATION = 180000
 const PROGRESS_UPDATE_INTERVAL = 500
 
 export function SettingsView({ onBack }: SettingsViewProps) {
+  const { t } = useTranslation()
+  
   const [settings, setSettings] = useState<Settings>({
     geminiApiKey: '',
     meticulousIp: '',
@@ -83,8 +103,13 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const { triggerUpdate, isUpdating, updateError } = useUpdateTrigger()
   const [updateProgress, setUpdateProgress] = useState(0)
   
-  // Watcher status
-  const [watcherStatus, setWatcherStatus] = useState<{ running: boolean; message: string } | null>(null)
+  // Watcher status (legacy - now handled by updateMethod)
+  
+  // Update method detection
+  const [updateMethod, setUpdateMethod] = useState<UpdateMethod | null>(null)
+  
+  // Tailscale status
+  const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null)
 
   // Load current settings on mount
   useEffect(() => {
@@ -109,21 +134,35 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       }
     }
     
-    const loadWatcherStatus = async () => {
+    const loadUpdateMethod = async () => {
       try {
         const serverUrl = await getServerUrl()
-        const response = await fetch(`${serverUrl}/api/watcher-status`)
+        const response = await fetch(`${serverUrl}/api/update-method`)
         if (response.ok) {
           const data = await response.json()
-          setWatcherStatus(data)
+          setUpdateMethod(data)
         }
       } catch (err) {
-        console.error('Failed to load watcher status:', err)
+        console.error('Failed to load update method:', err)
+      }
+    }
+    
+    const loadTailscaleStatus = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/tailscale-status`)
+        if (response.ok) {
+          const data = await response.json()
+          setTailscaleStatus(data)
+        }
+      } catch (err) {
+        console.error('Failed to load tailscale status:', err)
       }
     }
     
     loadSettings()
-    loadWatcherStatus()
+    loadUpdateMethod()
+    loadTailscaleStatus()
   }, [])
 
   // Load version info
@@ -135,12 +174,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         if (response.ok) {
           const data = await response.json()
           setVersionInfo({
-            meticai: data.meticai || 'unknown',
-            meticaiWeb: data.meticai_web || data.meticaiWeb || 'unknown',
-            meticaiWebCommit: data.meticai_web_commit || undefined,
-            mcpServer: data.mcp_server || data.mcpServer || 'unknown',
-            mcpCommit: data.mcp_commit || undefined,
-            mcpRepoUrl: data.mcp_repo_url || 'https://github.com/hessius/meticulous-mcp'
+            version: data.version || 'unknown',
+            commit: data.commit || undefined,
+            repoUrl: data.repo_url || 'https://github.com/hessius/MeticAI'
           })
         }
       } catch (err) {
@@ -218,24 +254,43 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
     try {
       const serverUrl = await getServerUrl()
+      
+      // Build the payload, only including fields that should be sent
+      const payload: Record<string, string | boolean | undefined> = {
+        authorName: settings.authorName,
+        meticulousIp: settings.meticulousIp,
+      }
+      
+      // Only send API key if user actually typed a new value (not the masked stars)
+      if (settings.geminiApiKey && !settings.geminiApiKey.startsWith('*')) {
+        payload.geminiApiKey = settings.geminiApiKey
+        payload.geminiApiKeyMasked = false
+      }
+      
       const response = await fetch(`${serverUrl}/api/settings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(payload)
       })
 
       if (response.ok) {
         setSaveStatus('success')
         setTimeout(() => setSaveStatus('idle'), 3000)
       } else {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to save settings')
+        let errorMsg = t('settings.settingsSaveFailed')
+        try {
+          const error = await response.json()
+          errorMsg = error.detail?.message || error.detail || errorMsg
+        } catch {
+          // Use default message
+        }
+        throw new Error(errorMsg)
       }
     } catch (err) {
       setSaveStatus('error')
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to save settings')
+      setErrorMessage(err instanceof Error ? err.message : t('settings.settingsSaveFailed'))
     } finally {
       setIsSaving(false)
     }
@@ -268,7 +323,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   }
 
   const handleRestart = async () => {
-    if (!confirm('Are you sure you want to restart MeticAI? The system will be unavailable for a few seconds.')) {
+    if (!confirm(t('settings.restartConfirm'))) {
       return
     }
     
@@ -285,15 +340,17 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         setRestartStatus('success')
       } else {
         const error = await response.json()
-        throw new Error(error.detail?.message || 'Failed to trigger restart')
+        throw new Error(error.detail?.message || t('settings.restartFailed'))
       }
     } catch (err) {
       setRestartStatus('error')
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to restart')
+      setErrorMessage(err instanceof Error ? err.message : t('settings.restartFailed'))
     } finally {
       setIsRestarting(false)
     }
   }
+
+  const canTriggerUpdate = updateMethod?.can_trigger_update ?? false
 
   return (
     <motion.div
@@ -310,11 +367,11 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           size="icon"
           onClick={onBack}
           className="shrink-0"
-          title="Back"
+          title={t('common.back')}
         >
           <CaretLeft size={22} weight="bold" />
         </Button>
-        <h2 className="text-xl font-bold">Settings</h2>
+        <h2 className="text-xl font-bold">{t('settings.title')}</h2>
       </div>
 
       {/* About Section - Collapsible, collapsed by default */}
@@ -325,7 +382,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           aria-expanded={aboutExpanded}
           aria-controls="about-content"
         >
-          <h3 className="text-lg font-semibold text-primary">About MeticAI</h3>
+          <h3 className="text-lg font-semibold text-primary">{t('settings.aboutMeticAI')}</h3>
           {aboutExpanded ? (
             <CaretUp size={20} className="text-muted-foreground" />
           ) : (
@@ -343,16 +400,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               className="overflow-hidden space-y-4"
             >
               <p className="text-sm text-muted-foreground leading-relaxed">
-                When I got my Meticulous, after a loooong wait, I was overwhelmed with the options — 
-                dialing in was no longer just adjusting grind size, the potential was (and is) basically 
-                limitless — my knowledge and time not so.
+                {t('settings.aboutDescription1')}
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                This, "MeticAI", is a growing set of AI tools to enable me, and you, to get the most 
-                out of a Meticulous Espresso machine. Among other things it lets you automatically 
-                create espresso profiles tailored to your preferences and coffee at hand, understand 
-                your espresso profiles and shot data like never before, and ultimately — lets you 
-                unleash your Meticulous.
+                {t('settings.aboutDescription2')}
               </p>
               <Button
                 variant="outline"
@@ -360,7 +411,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 onClick={() => window.open('https://github.com/hessius/MeticAI', '_blank')}
               >
                 <GithubLogo size={18} className="mr-2" weight="bold" />
-                View on GitHub
+                {t('settings.viewOnGitHub')}
               </Button>
             </motion.div>
           )}
@@ -369,24 +420,32 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Configuration Section */}
       <Card className="p-6 space-y-5">
-        <h3 className="text-lg font-semibold text-primary">Configuration</h3>
+        <h3 className="text-lg font-semibold text-primary">{t('settings.configuration')}</h3>
         
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-pulse text-muted-foreground text-sm">Loading settings...</div>
+            <div className="animate-pulse text-muted-foreground text-sm">{t('settings.loadingSettings')}</div>
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Language Selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {t('settings.language.label')}
+              </Label>
+              <LanguageSelector variant="outline" showLabel={true} />
+            </div>
+
             {/* Gemini API Key */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="apiKey" className="text-sm font-medium">
-                  Gemini API Key
+                  {t('settings.geminiApiKey')}
                 </Label>
                 {settings.geminiApiKeyConfigured && (
                   <span className="text-xs text-success flex items-center gap-1">
                     <CheckCircle size={12} weight="fill" />
-                    Configured
+                    {t('settings.configured')}
                   </span>
                 )}
               </div>
@@ -396,7 +455,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                   type="password"
                   value={settings.geminiApiKey}
                   onChange={(e) => handleChange('geminiApiKey', e.target.value)}
-                  placeholder={settings.geminiApiKeyConfigured ? "Enter new key to change" : "Enter your Gemini API key"}
+                  placeholder={settings.geminiApiKeyConfigured ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
                   className="pr-10"
                   readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
                   onClick={() => {
@@ -408,15 +467,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               </div>
               <p className="text-xs text-muted-foreground">
                 {settings.geminiApiKeyConfigured 
-                  ? "API key is configured. Click the field to enter a new key."
-                  : <>Get your API key from{' '}
+                  ? t('settings.apiKeyConfigured')
+                  : <>{t('settings.getApiKey')}{' '}
                     <a 
                       href="https://aistudio.google.com/app/apikey" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-primary hover:underline"
                     >
-                      Google AI Studio
+                      {t('settings.googleAIStudio')}
                     </a>
                   </>
                 }
@@ -426,34 +485,34 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             {/* Meticulous IP */}
             <div className="space-y-2">
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
-                Meticulous Machine IP
+                {t('settings.meticulousIp')}
               </Label>
               <Input
                 id="meticulousIp"
                 type="text"
                 value={settings.meticulousIp}
                 onChange={(e) => handleChange('meticulousIp', e.target.value)}
-                placeholder="e.g., 192.168.1.100"
+                placeholder={t('settings.meticulousIpPlaceholder')}
               />
               <p className="text-xs text-muted-foreground">
-                The IP address of your Meticulous espresso machine on your local network
+                {t('settings.meticulousIpDescription')}
               </p>
             </div>
 
             {/* Author Name */}
             <div className="space-y-2">
               <Label htmlFor="authorName" className="text-sm font-medium">
-                Author Name
+                {t('settings.authorName')}
               </Label>
               <Input
                 id="authorName"
                 type="text"
                 value={settings.authorName}
                 onChange={(e) => handleChange('authorName', e.target.value)}
-                placeholder="MeticAI"
+                placeholder={t('settings.authorNamePlaceholder')}
               />
               <p className="text-xs text-muted-foreground">
-                Your name for the author field in generated profile JSON. Defaults to "MeticAI" if left empty.
+                {t('settings.authorNameDescription')}
               </p>
             </div>
 
@@ -464,11 +523,11 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               className="w-full"
             >
               {isSaving ? (
-                'Saving...'
+                t('settings.saving')
               ) : (
                 <>
                   <FloppyDisk size={18} className="mr-2" weight="bold" />
-                  Save Settings
+                  {t('settings.saveSettings')}
                 </>
               )}
             </Button>
@@ -478,7 +537,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               <Alert className="bg-success/10 border-success/20">
                 <CheckCircle size={16} className="text-success" weight="fill" />
                 <AlertDescription className="text-sm text-success">
-                  Settings saved successfully!
+                  {t('settings.settingsSaved')}
                 </AlertDescription>
               </Alert>
             )}
@@ -503,7 +562,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           aria-expanded={changelogExpanded}
           aria-controls="changelog-content"
         >
-          <h3 className="text-lg font-semibold text-primary">Changelog</h3>
+          <h3 className="text-lg font-semibold text-primary">{t('settings.changelog')}</h3>
           {changelogExpanded ? (
             <CaretUp size={20} className="text-muted-foreground" />
           ) : (
@@ -526,7 +585,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 </div>
               ) : releaseNotes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No release notes available.
+                  {t('settings.noReleaseNotes')}
                 </p>
               ) : (
                 <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
@@ -553,35 +612,78 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </AnimatePresence>
       </Card>
 
-      {/* Version Info Section */}
+      {/* Tailscale Section — only show if installed */}
+      {tailscaleStatus?.installed && (
+        <Card className="p-6 space-y-4">
+          <h3 className="text-lg font-semibold text-primary">{t('settings.tailscale.title')}</h3>
+          
+          <div className="space-y-3">
+            <div className="flex items-center justify-between py-2 border-b border-border/50">
+              <div className="flex items-center gap-2">
+                {tailscaleStatus.connected ? (
+                  <WifiHigh size={18} className="text-green-500" weight="bold" />
+                ) : (
+                  <WifiSlash size={18} className="text-red-500" weight="bold" />
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {tailscaleStatus.connected 
+                    ? t('settings.tailscale.connected')
+                    : t('settings.tailscale.disconnected')
+                  }
+                </span>
+              </div>
+              <div className={`w-2 h-2 rounded-full ${tailscaleStatus.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+            </div>
+            
+            {tailscaleStatus.hostname && (
+              <div className="flex justify-between items-center py-2 border-b border-border/50">
+                <span className="text-sm text-muted-foreground">{t('settings.tailscale.hostname')}</span>
+                <span className="text-sm font-mono">{tailscaleStatus.hostname}</span>
+              </div>
+            )}
+            
+            {tailscaleStatus.ip && (
+              <div className="flex justify-between items-center py-2 border-b border-border/50">
+                <span className="text-sm text-muted-foreground">{t('settings.tailscale.ip')}</span>
+                <span className="text-sm font-mono">{tailscaleStatus.ip}</span>
+              </div>
+            )}
+            
+            {tailscaleStatus.auth_key_expired && (
+              <>
+                <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                  <Warning size={16} className="text-yellow-600" weight="fill" />
+                  <AlertDescription className="text-sm text-yellow-700">
+                    {t('settings.tailscale.authKeyExpired')}
+                  </AlertDescription>
+                </Alert>
+                {tailscaleStatus.login_url && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => window.open(tailscaleStatus.login_url!, '_blank')}
+                  >
+                    <Globe size={18} className="mr-2" />
+                    {t('settings.tailscale.renewKey')}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Version Info Section - Unified */}
       <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-primary">Version Info</h3>
+        <h3 className="text-lg font-semibold text-primary">{t('settings.versionInfo')}</h3>
         
         <div className="space-y-3">
-          <div className="flex justify-between items-center py-2 border-b border-border/50">
-            <span className="text-sm text-muted-foreground">MeticAI (Backend)</span>
-            <span className="text-sm font-mono">{versionInfo?.meticai || '...'}</span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b border-border/50">
-            <span className="text-sm text-muted-foreground">MeticAI-web (Frontend)</span>
-            <span className="text-sm font-mono">{versionInfo?.meticaiWeb || '...'}</span>
-          </div>
           <div className="flex justify-between items-center py-2">
-            <div className="flex flex-col">
-              <span className="text-sm text-muted-foreground">MCP Server</span>
-              <a 
-                href={versionInfo?.mcpRepoUrl || '#'} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline"
-              >
-                {versionInfo?.mcpRepoUrl?.replace('https://github.com/', '') || 'hessius/meticulous-mcp'}
-              </a>
-            </div>
+            <span className="text-sm text-muted-foreground">{t('settings.version')}</span>
             <div className="text-right">
-              <span className="text-sm font-mono">{versionInfo?.mcpServer || '...'}</span>
-              {versionInfo?.mcpCommit && versionInfo.mcpServer !== versionInfo.mcpCommit && (
-                <span className="text-xs text-muted-foreground/60 ml-1">({versionInfo.mcpCommit})</span>
+              <span className="text-sm font-mono">{versionInfo?.version || '...'}</span>
+              {versionInfo?.commit && (
+                <span className="text-xs text-muted-foreground/60 ml-1">({versionInfo.commit})</span>
               )}
             </div>
           </div>
@@ -590,56 +692,71 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Updates Section */}
       <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-primary">Updates</h3>
+        <h3 className="text-lg font-semibold text-primary">{t('settings.updates')}</h3>
+        
+        {/* Update method indicator */}
+        {updateMethod && (
+          <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/50">
+            <div className={`w-2 h-2 rounded-full ${updateMethod.can_trigger_update ? 'bg-green-500' : 'bg-yellow-500'}`} />
+            <div className="flex-1">
+              <span className="text-xs font-medium">
+                {t(`settings.updateMethod.${updateMethod.method}`)}
+              </span>
+              <p className="text-xs text-muted-foreground">
+                {t(`settings.updateMethod.${updateMethod.method}Description`)}
+              </p>
+            </div>
+          </div>
+        )}
         
         {isUpdating ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <ArrowClockwise size={18} className="animate-spin text-primary" />
-              <span className="text-sm font-medium">Updating MeticAI...</span>
+              <span className="text-sm font-medium">{t('settings.updatingMeticAI')}</span>
             </div>
             <Progress value={updateProgress} className="h-2" />
             <p className="text-xs text-muted-foreground">
-              {updateProgress < 30 && 'Starting update...'}
-              {updateProgress >= 30 && updateProgress < 60 && 'Pulling latest updates...'}
-              {updateProgress >= 60 && updateProgress < 80 && 'Rebuilding containers...'}
-              {updateProgress >= 80 && 'Restarting services...'}
+              {updateProgress < 30 && t('settings.startingUpdate')}
+              {updateProgress >= 30 && updateProgress < 60 && t('settings.pullingUpdates')}
+              {updateProgress >= 60 && updateProgress < 80 && t('settings.rebuildingContainers')}
+              {updateProgress >= 80 && t('settings.restartingServices')}
             </p>
           </div>
         ) : updateError ? (
           <Alert variant="destructive">
             <Warning size={16} weight="fill" />
             <AlertDescription className="text-sm">
-              Update failed: {updateError}
+              {t('settings.updateFailed', { error: updateError })}
             </AlertDescription>
           </Alert>
         ) : updateAvailable ? (
           <Alert className="bg-primary/10 border-primary/30">
             <DownloadSimple size={16} className="text-primary" />
             <AlertDescription className="text-sm">
-              A new version of MeticAI is available!
+              {t('settings.updateAvailable')}
             </AlertDescription>
           </Alert>
         ) : (
           <p className="text-sm text-muted-foreground">
-            You're running the latest version.
+            {t('settings.latestVersion')}
           </p>
         )}
         
         <div className="flex gap-2">
           <Button
             onClick={handleUpdate}
-            disabled={isUpdating || !updateAvailable}
+            disabled={isUpdating || !updateAvailable || !canTriggerUpdate}
             className="flex-1"
           >
             <DownloadSimple size={18} className="mr-2" />
-            {updateAvailable ? 'Update Now' : 'No Updates Available'}
+            {updateAvailable ? t('settings.updateNow') : t('settings.noUpdatesAvailable')}
           </Button>
           <Button
             onClick={() => checkForUpdates()}
             disabled={isChecking || isUpdating}
             variant="outline"
-            aria-label="Check for updates"
+            aria-label={t('settings.checkForUpdates')}
           >
             <ArrowClockwise size={18} className={isChecking ? 'animate-spin' : ''} />
           </Button>
@@ -648,34 +765,11 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* System Section */}
       <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-primary">System</h3>
+        <h3 className="text-lg font-semibold text-primary">{t('settings.system')}</h3>
         
         <div className="space-y-3">
-          {/* Watcher Status */}
-          {watcherStatus && (
-            <div className="flex items-center justify-between py-2 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${watcherStatus.running ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-sm text-muted-foreground">Background Watcher</span>
-              </div>
-              <span className={`text-xs ${watcherStatus.running ? 'text-green-600' : 'text-red-600'}`}>
-                {watcherStatus.running ? 'Running' : 'Not Running'}
-              </span>
-            </div>
-          )}
-          
-          {!watcherStatus?.running && watcherStatus && (
-            <Alert className="bg-yellow-500/10 border-yellow-500/20">
-              <Warning size={16} className="text-yellow-600" weight="fill" />
-              <AlertDescription className="text-sm text-yellow-700">
-                The background watcher is not running. Restart and update buttons may not work.
-                Run <code className="bg-muted px-1 rounded">./rebuild-watcher.sh --install</code> on the host.
-              </AlertDescription>
-            </Alert>
-          )}
-          
           <p className="text-sm text-muted-foreground">
-            Restart all MeticAI services. Use this if you're experiencing issues.
+            {t('settings.restartDescription')}
           </p>
           
           <Button
@@ -685,11 +779,11 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             className="w-full border-destructive/30 hover:border-destructive/50 hover:bg-destructive/5 text-destructive hover:text-destructive"
           >
             {isRestarting ? (
-              'Restarting...'
+              t('settings.restarting')
             ) : (
               <>
                 <ArrowsClockwise size={18} className="mr-2" weight="bold" />
-                Restart MeticAI
+                {t('settings.restartMeticAI')}
               </>
             )}
           </Button>
@@ -698,7 +792,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <Alert className="bg-success/10 border-success/20">
               <CheckCircle size={16} className="text-success" weight="fill" />
               <AlertDescription className="text-sm text-success">
-                Restart triggered! The system will restart momentarily.
+                {t('settings.restartTriggered')}
               </AlertDescription>
             </Alert>
           )}
@@ -714,9 +808,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </div>
       </Card>
 
-      {/* Version Info Footer */}
+      {/* Footer */}
       <div className="text-center text-xs text-muted-foreground/50 pb-4">
-        MeticAI • Built with ❤️ for coffee lovers
+        {t('settings.footer')}
       </div>
     </motion.div>
   )

@@ -14,7 +14,8 @@
     "dismiss": "Descartar",
     "retry": "Reintentar",
     "or": "O",
-    "and": "Y"
+    "and": "Y",
+    "selected": "Seleccionado"
   },
   "greetings": {
     "morning": [
@@ -243,6 +244,29 @@
     "restartConfirm": "¿Estás seguro de que quieres reiniciar MeticAI? El sistema no estará disponible durante unos segundos.",
     "restartTriggered": "¡Reinicio activado! El sistema se reiniciará momentáneamente.",
     "restartFailed": "Error al activar reinicio",
+    "language": {
+      "select": "Seleccionar idioma",
+      "label": "Idioma"
+    },
+    "tailscale": {
+      "title": "Tailscale",
+      "connected": "Conectado",
+      "disconnected": "Desconectado",
+      "authKeyExpired": "Clave de autenticación expirada",
+      "hostname": "Nombre de host",
+      "ip": "Dirección IP",
+      "renewKey": "Renovar clave de autenticación",
+      "notInstalled": "Tailscale no está instalado"
+    },
+    "updateMethod": {
+      "watchtower": "Actualizaciones automáticas vía Watchtower",
+      "watcher": "Actualizaciones gestionadas por el host vía watcher",
+      "manual": "Solo actualizaciones manuales",
+      "watchtowerDescription": "Las actualizaciones se aplican automáticamente cuando hay nuevas versiones disponibles.",
+      "watcherDescription": "Las actualizaciones se activan desde la interfaz y son aplicadas por el watcher del host.",
+      "manualDescription": "No se detectó ningún mecanismo de actualización automática. Actualiza manualmente vía docker pull."
+    },
+    "version": "Versión",
     "footer": "MeticAI • Construido con ❤️ para amantes del café"
   },
   "profileBreakdown": {

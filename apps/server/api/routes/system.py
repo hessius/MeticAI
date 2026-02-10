@@ -142,7 +142,7 @@ async def check_updates(request: Request):
         }
 
 
-@router.get("/status")
+@router.get("/api/status")
 async def get_status(request: Request):
     """Get system status including update availability.
     
@@ -283,6 +283,199 @@ async def get_watcher_status(request: Request):
             "last_activity": None,
             "error": str(e),
             "message": "Failed to check watcher status"
+        }
+
+
+@router.get("/api/update-method")
+async def get_update_method(request: Request):
+    """Detect how MeticAI updates are managed.
+    
+    Checks whether Watchtower is running (automatic Docker image updates)
+    or whether the host-side watcher/manual approach is used.
+    
+    Returns:
+        - method: "watchtower" | "watcher" | "manual"
+        - watchtower_running: bool
+        - watcher_running: bool
+        - can_trigger_update: bool
+    """
+    request_id = request.state.request_id
+    
+    try:
+        watchtower_running = False
+        watcher_running = False
+        
+        # Check for Watchtower: try to reach its HTTP API on port 8080
+        # or detect the container via docker socket
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                # Watchtower in the compose stack listens on 8080
+                resp = await client.get("http://localhost:8080/v1/update", timeout=2.0)
+                # Any response (even 401) means watchtower is there
+                watchtower_running = True
+        except Exception:
+            # Also check if watchtower container exists via docker
+            try:
+                result = subprocess.run(
+                    ["docker", "ps", "--filter", "name=watchtower", "--format", "{{.Names}}"],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0 and "watchtower" in result.stdout:
+                    watchtower_running = True
+            except Exception:
+                pass
+        
+        # Check for host-side watcher
+        log_file = Path("/app/.rebuild-watcher.log")
+        if log_file.exists():
+            log_mtime = os.path.getmtime(log_file)
+            age_seconds = (datetime.now(timezone.utc) - datetime.fromtimestamp(log_mtime, tz=timezone.utc)).total_seconds()
+            if age_seconds < 600:  # Active in last 10 minutes
+                watcher_running = True
+        
+        if watchtower_running:
+            method = "watchtower"
+        elif watcher_running:
+            method = "watcher"
+        else:
+            method = "manual"
+        
+        return {
+            "method": method,
+            "watchtower_running": watchtower_running,
+            "watcher_running": watcher_running,
+            "can_trigger_update": watchtower_running or watcher_running
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to detect update method: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        return {
+            "method": "manual",
+            "watchtower_running": False,
+            "watcher_running": False,
+            "can_trigger_update": False
+        }
+
+
+@router.get("/api/tailscale-status")
+async def get_tailscale_status(request: Request):
+    """Get Tailscale connection status.
+    
+    Checks if Tailscale is running and provides status information.
+    Works both when Tailscale runs as a sidecar container and when
+    it runs natively on the host.
+    
+    Returns:
+        - installed: Whether Tailscale is available
+        - connected: Whether Tailscale is connected
+        - hostname: Tailscale hostname if connected
+        - ip: Tailscale IP if connected
+        - auth_key_expired: Whether the auth key has expired
+        - login_url: URL to re-authenticate if needed
+    """
+    request_id = request.state.request_id
+    
+    try:
+        status = {
+            "installed": False,
+            "connected": False,
+            "hostname": None,
+            "ip": None,
+            "auth_key_expired": False,
+            "login_url": None
+        }
+        
+        # Try tailscale status command
+        try:
+            result = subprocess.run(
+                ["tailscale", "status", "--json"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                ts_data = json.loads(result.stdout)
+                status["installed"] = True
+                
+                backend_state = ts_data.get("BackendState", "")
+                status["connected"] = backend_state == "Running"
+                
+                self_info = ts_data.get("Self", {})
+                status["hostname"] = self_info.get("HostName")
+                
+                # Get Tailscale IPs
+                ts_ips = self_info.get("TailscaleIPs", [])
+                if ts_ips:
+                    status["ip"] = ts_ips[0]  # Primary IP
+                
+                # Check if auth key is expired (NeedsLogin state)
+                if backend_state == "NeedsLogin":
+                    status["auth_key_expired"] = True
+                    status["connected"] = False
+                    
+                    # Get login URL
+                    try:
+                        login_result = subprocess.run(
+                            ["tailscale", "up", "--json"],
+                            capture_output=True, text=True, timeout=5
+                        )
+                        if login_result.returncode == 0:
+                            login_data = json.loads(login_result.stdout)
+                            status["login_url"] = login_data.get("AuthURL")
+                    except Exception:
+                        status["login_url"] = "https://login.tailscale.com/admin/settings/keys"
+                        
+            elif result.returncode == 1 and "not running" in result.stderr.lower():
+                status["installed"] = True
+                status["connected"] = False
+        except FileNotFoundError:
+            # tailscale binary not available
+            pass
+        except Exception as e:
+            logger.debug(f"Tailscale status check failed: {e}", extra={"request_id": request_id})
+        
+        # If not found natively, try via docker exec on sidecar
+        if not status["installed"]:
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", "meticai-tailscale", "tailscale", "status", "--json"],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    ts_data = json.loads(result.stdout)
+                    status["installed"] = True
+                    backend_state = ts_data.get("BackendState", "")
+                    status["connected"] = backend_state == "Running"
+                    self_info = ts_data.get("Self", {})
+                    status["hostname"] = self_info.get("HostName")
+                    ts_ips = self_info.get("TailscaleIPs", [])
+                    if ts_ips:
+                        status["ip"] = ts_ips[0]
+                    if backend_state == "NeedsLogin":
+                        status["auth_key_expired"] = True
+                        status["connected"] = False
+                        status["login_url"] = "https://login.tailscale.com/admin/settings/keys"
+            except Exception:
+                pass
+        
+        return status
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to check Tailscale status: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        return {
+            "installed": False,
+            "connected": False,
+            "hostname": None,
+            "ip": None,
+            "auth_key_expired": False,
+            "login_url": None,
+            "error": str(e)
         }
 
 
@@ -513,171 +706,38 @@ async def get_logs(
 
 @router.get("/api/version")
 async def get_version_info(request: Request):
-    """Get version information for all MeticAI components.
+    """Get unified version information for MeticAI.
     
-    Returns version info for:
-    - MeticAI (backend)
-    - MeticAI-web (frontend)
-    - MCP Server
+    In v2 all components run in a single container, so there is one version.
     """
     request_id = request.state.request_id
     
     try:
-        # Read MeticAI version from VERSION file
-        meticai_version = "unknown"
+        # Read unified version from VERSION file
+        version = "unknown"
         version_file = Path(__file__).parent.parent.parent / "VERSION"
         if version_file.exists():
-            meticai_version = version_file.read_text().strip()
+            version = version_file.read_text().strip()
         
-        # Read MeticAI-web version from meticai-web/VERSION
-        meticai_web_version = "unknown"
-        # In container: meticai-web is at /app/meticai-web (same level as main.py)
-        web_version_file = Path(__file__).parent.parent / "meticai-web" / "VERSION"
-        if web_version_file.exists():
-            meticai_web_version = web_version_file.read_text().strip()
-        
-        # Try to get git commit hash for meticai-web if version not found or to supplement
-        meticai_web_commit = None
-        web_git_dir = Path(__file__).parent.parent / "meticai-web" / ".git"
-        if web_git_dir.exists():
-            try:
-                result = subprocess.run(
-                    ["git", "rev-parse", "--short", "HEAD"],
-                    cwd=Path(__file__).parent.parent / "meticai-web",
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    meticai_web_commit = result.stdout.strip()
-            except Exception:
-                # Ignore errors getting commit hash (git may not be available or not in a repo)
-                pass
-        
-        # Read MCP server version and repo URL from meticulous-source
-        mcp_version = "unknown"
-        mcp_commit = None
-        mcp_repo_url = "https://github.com/hessius/meticulous-mcp"  # Default fallback
-        # In container: meticulous-source is at /app/meticulous-source (same level as main.py)
-        mcp_source_dir = Path(__file__).parent.parent / "meticulous-source"
-        
-        # Try to get git commit hash for MCP
-        mcp_git_dir = mcp_source_dir / ".git"
-        if mcp_git_dir.exists():
-            try:
-                result = subprocess.run(
-                    ["git", "rev-parse", "--short", "HEAD"],
-                    cwd=mcp_source_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    mcp_commit = result.stdout.strip()
-            except Exception:
-                # Ignore errors getting commit hash (git may not be available or not in a repo)
-                pass
-        
-        # Try to get repo URL from .versions.json first (mounted by docker-compose)
-        # In container: .versions.json is at /app/.versions.json (same level as main.py)
-        versions_file = Path(__file__).parent.parent / ".versions.json"
-        if versions_file.exists():
-            try:
-                versions_data = json.loads(versions_file.read_text())
-                if "repositories" in versions_data and "meticulous-mcp" in versions_data["repositories"]:
-                    repo_url_from_file = versions_data["repositories"]["meticulous-mcp"].get("repo_url")
-                    if repo_url_from_file and repo_url_from_file != "unknown":
-                        mcp_repo_url = repo_url_from_file
-                        # Remove .git suffix if present for cleaner URL
-                        if mcp_repo_url.endswith('.git'):
-                            mcp_repo_url = mcp_repo_url[:-4]
-            except Exception as e:
-                logger.debug(
-                    f"Failed to read MCP repo URL from .versions.json: {str(e)}",
-                    extra={"request_id": request_id}
-                )
-        
-        # If not found in .versions.json, try git remote from meticulous-source
-        if mcp_repo_url == "https://github.com/hessius/meticulous-mcp" and mcp_source_dir.exists():
-            git_dir = mcp_source_dir / ".git"
-            if git_dir.exists():
-                try:
-                    # Validate that mcp_source_dir is within expected bounds to prevent path traversal
-                    base_dir = Path(__file__).parent.parent.parent.resolve()
-                    resolved_mcp_dir = mcp_source_dir.resolve()
-                    if not str(resolved_mcp_dir).startswith(str(base_dir)):
-                        # Security: Skip subprocess call if path is outside expected bounds
-                        logger.warning(
-                            f"Skipping git remote check: MCP source directory is outside base directory: {resolved_mcp_dir}",
-                            extra={"request_id": request_id}
-                        )
-                    else:
-                        result = subprocess.run(
-                            ["git", "config", "--get", "remote.origin.url"],
-                            cwd=resolved_mcp_dir,
-                            capture_output=True,
-                            text=True,
-                            timeout=5
-                        )
-                        if result.returncode == 0 and result.stdout.strip():
-                            mcp_repo_url = result.stdout.strip()
-                            # Remove .git suffix if present for cleaner URL
-                            if mcp_repo_url.endswith('.git'):
-                                mcp_repo_url = mcp_repo_url[:-4]
-                except Exception as e:
-                    logger.debug(
-                        f"Failed to read MCP repo URL from git remote: {str(e)}",
-                        extra={"request_id": request_id}
-                    )
-        
-        # Get MCP version from pyproject.toml
-        if mcp_source_dir.exists():
-            # Try to get version from pyproject.toml or setup.py
-            version_found = False
-            pyproject = mcp_source_dir / "pyproject.toml"
-            if pyproject.exists():
-                try:
-                    content = pyproject.read_text()
-                    # Look for version = "x.y.z" pattern in pyproject.toml
-                    version_match = VERSION_PATTERN.search(content)
-                    if version_match:
-                        mcp_version = version_match.group(1)
-                        version_found = True
-                except Exception as e:
-                    logger.debug(
-                        f"Failed to read version from pyproject.toml: {str(e)}",
-                        extra={"request_id": request_id},
-                        exc_info=True
-                    )
-            
-            # Fallback to setup.py if version not found in pyproject.toml
-            if not version_found:
-                setup_py = mcp_source_dir / "setup.py"
-                if setup_py.exists():
-                    try:
-                        content = setup_py.read_text()
-                        # Look for version = "x.y.z" pattern in setup.py
-                        version_match = VERSION_PATTERN.search(content)
-                        if version_match:
-                            mcp_version = version_match.group(1)
-                    except Exception as e:
-                        logger.debug(
-                            f"Failed to read version from setup.py: {str(e)}",
-                            extra={"request_id": request_id},
-                            exc_info=True
-                        )
-        
-        # Use commit hash as version fallback if no version found
-        if mcp_version == "unknown" and mcp_commit:
-            mcp_version = mcp_commit
+        # Try to get git commit hash
+        commit = None
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=Path(__file__).parent.parent.parent,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                commit = result.stdout.strip()
+        except Exception:
+            pass
         
         return {
-            "meticai": meticai_version,
-            "meticai_web": meticai_web_version,
-            "meticai_web_commit": meticai_web_commit,
-            "mcp_server": mcp_version,
-            "mcp_commit": mcp_commit,
-            "mcp_repo_url": mcp_repo_url
+            "version": version,
+            "commit": commit,
+            "repo_url": "https://github.com/hessius/MeticAI"
         }
     except Exception as e:
         logger.error(
@@ -686,12 +746,9 @@ async def get_version_info(request: Request):
             exc_info=True
         )
         return {
-            "meticai": "unknown",
-            "meticai_web": "unknown",
-            "meticai_web_commit": None,
-            "mcp_server": "unknown",
-            "mcp_commit": None,
-            "mcp_repo_url": "https://github.com/hessius/meticulous-mcp"
+            "version": "unknown",
+            "commit": None,
+            "repo_url": "https://github.com/hessius/MeticAI"
         }
 
 

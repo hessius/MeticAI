@@ -14,7 +14,8 @@
     "dismiss": "Avfärda",
     "retry": "Försök igen",
     "or": "ELLER",
-    "and": "OCH"
+    "and": "OCH",
+    "selected": "Vald"
   },
   "greetings": {
     "morning": [
@@ -243,6 +244,29 @@
     "restartConfirm": "Är du säker på att du vill starta om MeticAI? Systemet kommer att vara otillgängligt i några sekunder.",
     "restartTriggered": "Omstart utlöst! Systemet kommer att starta om omedelbart.",
     "restartFailed": "Misslyckades utlösa omstart",
+    "language": {
+      "select": "Välj språk",
+      "label": "Språk"
+    },
+    "tailscale": {
+      "title": "Tailscale",
+      "connected": "Ansluten",
+      "disconnected": "Frånkopplad",
+      "authKeyExpired": "Autentiseringsnyckel har gått ut",
+      "hostname": "Värdnamn",
+      "ip": "IP-adress",
+      "renewKey": "Förnya autentiseringsnyckel",
+      "notInstalled": "Tailscale är inte installerat"
+    },
+    "updateMethod": {
+      "watchtower": "Automatiska uppdateringar via Watchtower",
+      "watcher": "Värdbaserade uppdateringar via watcher",
+      "manual": "Endast manuella uppdateringar",
+      "watchtowerDescription": "Uppdateringar tillämpas automatiskt när nya versioner är tillgängliga.",
+      "watcherDescription": "Uppdateringar utlöses från gränssnittet och tillämpas av värd-watchern.",
+      "manualDescription": "Ingen automatisk uppdateringsmekanism hittades. Uppdatera manuellt via docker pull."
+    },
+    "version": "Version",
     "footer": "MeticAI • Byggd med ❤️ för kaffeälskare"
   },
   "profileBreakdown": {

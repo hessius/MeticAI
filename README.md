@@ -67,7 +67,8 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 - Docker and Docker Compose installed ([Get Docker](https://docs.docker.com/get-docker/))
 - Git
 
-**Recommended: Git Clone Method**
+<details>
+<summary><strong>🐧🍎 Linux / macOS (Recommended: Git Clone)</strong></summary>
 
 This is the safest and most transparent installation method:
 
@@ -88,6 +89,48 @@ EOF
 # 3. Start MeticAI
 docker compose up -d
 ```
+
+</details>
+
+<details>
+<summary><strong>🪟 Windows (PowerShell)</strong></summary>
+
+> ⚠️ **Windows support is community-tested only.** The PowerShell installer has been validated with automated tests but has not been verified on a real Windows environment. If you encounter issues, please [report them](https://github.com/hessius/MeticAI/issues).
+
+**Prerequisites:** [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) installed and running.
+
+**Option A: Interactive installer (recommended)**
+
+```powershell
+# Download and run the installer
+irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 -OutFile install.ps1
+.\install.ps1
+```
+
+The installer will guide you through configuration, including optional Tailscale and Watchtower setup.
+
+**Option B: Manual setup**
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/hessius/MeticAI.git
+cd MeticAI
+
+# 2. Create .env file
+@"
+GEMINI_API_KEY=your_api_key_here
+METICULOUS_IP=meticulous.local
+"@ | Set-Content .env
+
+# 3. Start MeticAI
+docker compose up -d
+```
+
+**Windows notes:**
+- mDNS (`meticulous.local`) may require [Bonjour Print Services](https://support.apple.com/kb/DL999) — using the machine's IP address directly is recommended on Windows.
+- If you get an execution policy error, run: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`
+
+</details>
 
 **Alternative: Direct Download (Advanced Users)**
 
