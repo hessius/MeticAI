@@ -10,7 +10,8 @@ from services.gemini_service import (
     parse_gemini_error,
     get_vision_model,
     get_author_instruction,
-    build_advanced_customization_section
+    build_advanced_customization_section,
+    clean_gemini_output
 )
 from services.history_service import save_to_history
 
@@ -400,17 +401,20 @@ async def analyze_and_profile(
             }
         )
         
+        # Clean up Gemini CLI noise from the output
+        reply = clean_gemini_output(result.stdout)
+        
         # Save to history
         history_entry = save_to_history(
             coffee_analysis=coffee_analysis,
             user_prefs=user_prefs,
-            reply=result.stdout
+            reply=reply
         )
             
         return {
             "status": "success",
             "analysis": coffee_analysis,
-            "reply": result.stdout,
+            "reply": reply,
             "history_id": history_entry.get("id")
         }
 
