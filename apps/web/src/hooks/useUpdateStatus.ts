@@ -30,7 +30,7 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
   const readCachedStatus = useCallback(async (): Promise<{ updateAvailable: boolean; error: string | null }> => {
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/status`)
+      const response = await fetch(`${serverUrl}/api/status`)
 
       if (!response.ok) {
         throw new Error(`Failed to read status: ${response.status}`)

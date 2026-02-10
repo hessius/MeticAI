@@ -101,6 +101,9 @@ COPY --from=web-builder /build/dist /var/www/html
 # Copy server
 COPY apps/server/ /app/server/
 
+# Copy VERSION file so the /api/version endpoint can read it
+COPY VERSION /app/server/VERSION
+
 # Copy MCP server
 COPY apps/mcp-server/ /app/mcp-server/
 

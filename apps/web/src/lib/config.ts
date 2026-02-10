@@ -27,6 +27,14 @@ export async function loadConfig(): Promise<AppConfig> {
       return cachedConfig;
     }
     
+    // Guard against SPA fallback returning index.html instead of JSON
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      console.warn('config.json returned non-JSON content, using default configuration');
+      cachedConfig = getDefaultConfig();
+      return cachedConfig;
+    }
+    
     const config: AppConfig = await response.json();
     cachedConfig = { ...getDefaultConfig(), ...config };
     return cachedConfig!;
@@ -43,7 +51,7 @@ export async function loadConfig(): Promise<AppConfig> {
  */
 function getDefaultConfig(): AppConfig {
   return {
-    serverUrl: 'http://localhost:8000'
+    serverUrl: ''
   };
 }
 
@@ -53,5 +61,5 @@ function getDefaultConfig(): AppConfig {
  */
 export async function getServerUrl(): Promise<string> {
   const config = await loadConfig();
-  return config.serverUrl || getDefaultConfig().serverUrl!;
+  return config.serverUrl ?? '';
 }

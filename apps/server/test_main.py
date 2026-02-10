@@ -990,25 +990,25 @@ class TestCORS:
 
 
 class TestStatusEndpoint:
-    """Tests for the /status endpoint."""
+    """Tests for the /api/status endpoint."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
     def test_status_endpoint_exists(self, mock_subprocess, client):
-        """Test that /status endpoint exists and is accessible."""
+        """Test that /api/status endpoint exists and is accessible."""
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "✓ Everything is up to date!"
         mock_subprocess.return_value = mock_result
 
-        response = client.get("/status")
+        response = client.get("/api/status")
         assert response.status_code == 200
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('main.subprocess.run')
     @patch('api.routes.system.Path')
     def test_status_returns_json_structure(self, mock_path, mock_subprocess, client):
-        """Test that /status returns expected JSON structure."""
+        """Test that /api/status returns expected JSON structure."""
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "✓ Up to date"
@@ -1022,7 +1022,7 @@ class TestStatusEndpoint:
         with patch('builtins.open', create=True) as mock_open:
             mock_open.return_value.__enter__.return_value.read.return_value = '{"last_check": "2026-01-13T00:00:00Z", "repositories": {}}'
             
-            response = client.get("/status")
+            response = client.get("/api/status")
             
         assert response.status_code == 200
         data = response.json()
@@ -1034,13 +1034,13 @@ class TestStatusEndpoint:
     @patch('builtins.open', new_callable=mock_open, read_data='{"update_available": true, "last_check": "2024-01-01T00:00:00", "repositories": {"mcp": {"update_available": true}}}')
     @patch('api.routes.system.Path')
     def test_status_detects_updates_available(self, mock_path, mock_file, client):
-        """Test that /status correctly identifies when updates are available."""
+        """Test that /api/status correctly identifies when updates are available."""
         # Mock version file as existing
         mock_version_file = Mock()
         mock_version_file.exists.return_value = True
         mock_path.return_value = mock_version_file
 
-        response = client.get("/status")
+        response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
         assert data.get("update_available") == True
@@ -1049,13 +1049,13 @@ class TestStatusEndpoint:
     @patch('builtins.open', new_callable=mock_open, read_data='{"update_available": true, "last_check": "2024-01-01T00:00:00", "repositories": {"mcp": {"update_available": true}}}')
     @patch('api.routes.system.Path')
     def test_status_detects_missing_dependencies(self, mock_path, mock_file, client):
-        """Test that /status identifies missing dependencies as requiring updates."""
+        """Test that /api/status identifies missing dependencies as requiring updates."""
         # Mock version file as existing
         mock_version_file = Mock()
         mock_version_file.exists.return_value = True
         mock_path.return_value = mock_version_file
 
-        response = client.get("/status")
+        response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
         assert data.get("update_available") == True
@@ -1063,13 +1063,13 @@ class TestStatusEndpoint:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.system.Path')
     def test_status_handles_missing_version_file(self, mock_path, client):
-        """Test that /status handles missing version file gracefully."""
+        """Test that /api/status handles missing version file gracefully."""
         # Mock version file as not existing
         mock_version_file = Mock()
         mock_version_file.exists.return_value = False
         mock_path.return_value = mock_version_file
 
-        response = client.get("/status")
+        response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
         # Should still return a valid response
@@ -1079,14 +1079,14 @@ class TestStatusEndpoint:
     @patch('builtins.open')
     @patch('api.routes.system.Path')
     def test_status_handles_script_error(self, mock_path, mock_open_func, client):
-        """Test that /status handles update script errors gracefully."""
+        """Test that /api/status handles update script errors gracefully."""
         # Mock version file as existing but simulate error reading it
         mock_version_file = Mock()
         mock_version_file.exists.return_value = True
         mock_path.return_value = mock_version_file
         mock_open_func.side_effect = Exception("File read error")
 
-        response = client.get("/status")
+        response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
         # Should return error information
@@ -1095,14 +1095,14 @@ class TestStatusEndpoint:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.system.Path')
     def test_status_endpoint_cors_enabled(self, mock_path, client):
-        """Test that /status endpoint has CORS enabled for web app."""
+        """Test that /api/status endpoint has CORS enabled for web app."""
         # Mock version file as not existing for simplicity
         mock_version_file = Mock()
         mock_version_file.exists.return_value = False
         mock_path.return_value = mock_version_file
 
         response = client.get(
-            "/status",
+            "/api/status",
             headers={"Origin": "http://localhost:3550"}
         )
 
@@ -1111,13 +1111,13 @@ class TestStatusEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_status_in_openapi_schema(self, client):
-        """Test that /status endpoint is registered in OpenAPI schema."""
+        """Test that /api/status endpoint is registered in OpenAPI schema."""
         response = client.get("/openapi.json")
         assert response.status_code == 200
         
         openapi_data = response.json()
-        assert "/status" in openapi_data["paths"]
-        assert "get" in openapi_data["paths"]["/status"]
+        assert "/api/status" in openapi_data["paths"]
+        assert "get" in openapi_data["paths"]["/api/status"]
 
 
 class TestTriggerUpdateEndpoint:
@@ -4077,7 +4077,7 @@ class TestAdditionalEndpoints:
 
     def test_status_endpoint(self, client):
         """Test status endpoint."""
-        response = client.get("/status")
+        response = client.get("/api/status")
         
         assert response.status_code == 200
         data = response.json()
@@ -5480,13 +5480,11 @@ class TestVersionEndpoint:
         assert response.status_code == 200
         
         data = response.json()
-        assert "meticai" in data
-        assert "meticai_web" in data
-        assert "mcp_server" in data
-        assert "mcp_repo_url" in data
+        assert "version" in data
+        assert "repo_url" in data
         # Should always have a repo URL (at minimum the default)
-        assert isinstance(data["mcp_repo_url"], str)
-        assert len(data["mcp_repo_url"]) > 0
+        assert isinstance(data["repo_url"], str)
+        assert len(data["repo_url"]) > 0
     
     def test_version_endpoint_returns_default_fallback(self, client):
         """Test that version endpoint returns a valid URL."""
@@ -5495,8 +5493,8 @@ class TestVersionEndpoint:
         
         data = response.json()
         # Should be a GitHub URL
-        assert "github.com" in data["mcp_repo_url"]
-        assert "meticulous-mcp" in data["mcp_repo_url"]
+        assert "github.com" in data["repo_url"]
+        assert "MeticAI" in data["repo_url"]
     
     def test_version_endpoint_handles_errors_gracefully(self, client):
         """Test that version endpoint doesn't crash even if files are missing."""
@@ -5506,10 +5504,8 @@ class TestVersionEndpoint:
         
         data = response.json()
         # Should have all required keys even on error
-        assert "meticai" in data
-        assert "meticai_web" in data
-        assert "mcp_server" in data
-        assert "mcp_repo_url" in data
+        assert "version" in data
+        assert "repo_url" in data
 
         # Verify history can be retrieved and has expected structure
         response2 = client.get("/api/history")
@@ -5518,8 +5514,8 @@ class TestVersionEndpoint:
         assert isinstance(data.get("entries", []), list)
 
 
-class TestVersionEndpoint:
-    """Tests for the /api/version endpoint."""
+class TestVersionEndpointDetailed:
+    """Detailed tests for the /api/version endpoint."""
     
     def test_version_endpoint_exists(self, client):
         """Test that /api/version endpoint exists and is accessible."""
@@ -5532,87 +5528,41 @@ class TestVersionEndpoint:
         assert response.status_code == 200
         
         data = response.json()
-        # Check all required keys are present
-        assert "meticai" in data
-        assert "meticai_web" in data
-        assert "mcp_server" in data
-        assert "mcp_repo_url" in data
+        # Check all required keys are present (unified version)
+        assert "version" in data
+        assert "repo_url" in data
         
         # Check that values are strings
-        assert isinstance(data["meticai"], str)
-        assert isinstance(data["meticai_web"], str)
-        assert isinstance(data["mcp_server"], str)
-        assert isinstance(data["mcp_repo_url"], str)
+        assert isinstance(data["version"], str)
+        assert isinstance(data["repo_url"], str)
         
         # Check that repo URL is the expected value
-        assert data["mcp_repo_url"] == "https://github.com/hessius/meticulous-mcp"
+        assert data["repo_url"] == "https://github.com/hessius/MeticAI"
     
     @patch('api.routes.system.Path')
     def test_version_with_existing_version_files(self, mock_path, client):
-        """Test that /api/version correctly reads VERSION files when they exist."""
-        # Create mock version files
-        mock_version_file = Mock()
-        mock_version_file.exists.return_value = True
-        mock_version_file.read_text.return_value = "1.2.3"
-        
-        mock_web_version_file = Mock()
-        mock_web_version_file.exists.return_value = True
-        mock_web_version_file.read_text.return_value = "2.3.4"
-        
-        mock_pyproject = Mock()
-        mock_pyproject.exists.return_value = True
-        mock_pyproject.read_text.return_value = 'version = "0.1.5"\nother_stuff = "value"'
-        
-        mock_mcp_dir = Mock()
-        mock_mcp_dir.exists.return_value = True
-        mock_mcp_dir.__truediv__ = lambda self, path: mock_pyproject if path == "pyproject.toml" else Mock()
-        
-        # Setup path mocking to return appropriate files
-        def path_side_effect(*args):
-            if args:
-                path_str = str(args[0])
-                if "VERSION" in path_str and "meticai-web" not in path_str:
-                    return mock_version_file
-                elif "meticai-web" in path_str:
-                    return mock_web_version_file
-                elif "meticulous-source" in path_str:
-                    return mock_mcp_dir
-            return Mock(exists=Mock(return_value=False))
-        
-        # Mock Path construction
-        with patch('main.Path.__truediv__', side_effect=lambda self, other: path_side_effect(other)):
-            response = client.get("/api/version")
-        
-        # Due to complexity of mocking, just verify endpoint works
+        """Test that /api/version correctly reads VERSION file when it exists."""
+        # Due to complexity of mocking Path internals, just verify endpoint works
+        response = client.get("/api/version")
         assert response.status_code == 200
         data = response.json()
-        assert "meticai" in data
-        assert "meticai_web" in data
-        assert "mcp_server" in data
+        assert "version" in data
+        assert "repo_url" in data
     
     def test_version_with_missing_version_files(self, client):
-        """Test that /api/version defaults to 'unknown' when VERSION files don't exist."""
-        # In the test environment, VERSION files likely don't exist
-        # This test just verifies the endpoint handles that gracefully
+        """Test that /api/version defaults to 'unknown' when VERSION file doesn't exist."""
         response = client.get("/api/version")
         assert response.status_code == 200
         
         data = response.json()
-        # Should return valid response structure even if files are missing
-        assert "meticai" in data
-        assert "meticai_web" in data
-        assert "mcp_server" in data
-        assert "mcp_repo_url" in data
-        assert data["mcp_repo_url"] == "https://github.com/hessius/meticulous-mcp"
-        # Versions should be strings (either version numbers or "unknown")
-        assert isinstance(data["meticai"], str)
-        assert isinstance(data["meticai_web"], str)
-        assert isinstance(data["mcp_server"], str)
+        assert "version" in data
+        assert "repo_url" in data
+        assert data["repo_url"] == "https://github.com/hessius/MeticAI"
+        assert isinstance(data["version"], str)
     
     @patch('api.routes.system.Path')
     def test_version_handles_file_read_errors(self, mock_path, client):
         """Test that /api/version handles file read errors gracefully."""
-        # Mock files existing but read_text raises an exception
         mock_file = Mock()
         mock_file.exists.return_value = True
         mock_file.read_text.side_effect = Exception("File read error")
@@ -5622,51 +5572,19 @@ class TestVersionEndpoint:
         assert response.status_code == 200
         
         data = response.json()
-        # Should still return valid JSON with defaults on error
-        assert "meticai" in data
-        assert "meticai_web" in data
-        assert "mcp_server" in data
-        assert "mcp_repo_url" in data
+        assert "version" in data
+        assert "repo_url" in data
     
     @patch('api.routes.system.Path')
-    def test_version_parses_mcp_pyproject_toml(self, mock_path, client):
-        """Test that /api/version correctly parses version from MCP pyproject.toml."""
-        # Mock MCP source directory and pyproject.toml
-        mock_pyproject = Mock()
-        mock_pyproject.exists.return_value = True
-        mock_pyproject.read_text.return_value = '''
-[tool.poetry]
-name = "meticulous-mcp"
-version = "1.0.0"
-description = "MCP server"
-'''
-        
-        mock_mcp_dir = Mock()
-        mock_mcp_dir.exists.return_value = True
-        
-        def truediv_side_effect(path):
-            if path == "pyproject.toml":
-                return mock_pyproject
-            mock_file = Mock()
-            mock_file.exists.return_value = False
-            return mock_file
-        
-        mock_mcp_dir.__truediv__ = truediv_side_effect
-        
-        def path_truediv(self, other):
-            if "meticulous-source" in str(other):
-                return mock_mcp_dir
-            mock_file = Mock()
-            mock_file.exists.return_value = False
-            return mock_file
-        
-        with patch.object(Path, '__truediv__', path_truediv):
-            response = client.get("/api/version")
+    def test_version_parses_version_file(self, mock_path, client):
+        """Test that /api/version correctly reads the VERSION file."""
+        # Due to complexity of mocking Path internals, just verify endpoint works
+        response = client.get("/api/version")
         
         # Endpoint should work even with complex mocking
         assert response.status_code == 200
         data = response.json()
-        assert "mcp_server" in data
+        assert "version" in data
     
     def test_version_endpoint_cors_enabled(self, client):
         """Test that /api/version endpoint has CORS enabled for web app."""

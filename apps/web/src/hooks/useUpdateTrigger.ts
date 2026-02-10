@@ -34,7 +34,7 @@ export function useUpdateTrigger(): UseUpdateTriggerReturn {
 
   const checkUpdateStatus = useCallback(async (serverUrl: string): Promise<{ isUp: boolean; updateComplete: boolean }> => {
     try {
-      const response = await fetch(`${serverUrl}/status`, {
+      const response = await fetch(`${serverUrl}/api/status`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000), // 5 second timeout
       })
