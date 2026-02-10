@@ -13,7 +13,7 @@ import uuid
 from config import DATA_DIR, MAX_UPLOAD_SIZE
 from services.meticulous_service import get_meticulous_api
 from services.cache_service import _get_cached_image, _set_cached_image
-from services.gemini_service import get_vision_model
+from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
 from services.history_service import HISTORY_FILE
 from utils.file_utils import atomic_write_json, deep_convert_to_dict
 
@@ -1383,33 +1383,6 @@ async def analyze_shot(
 # LLM Shot Analysis
 # ============================================================================
 
-# Espresso profiling knowledge for LLM context
-PROFILING_KNOWLEDGE = """# Espresso Profiling Expert Knowledge
-
-## Core Variables
-- **Flow Rate (ml/s)**: Controls extraction speed. Higher = more acidity/clarity, Lower = more body/sweetness
-- **Pressure (bar)**: Result of flow vs resistance. Creates texture and crema. 6-9 bar typical.
-- **Temperature (°C)**: Lighter roasts need higher temps (92-96°C), darker need lower (82-90°C)
-
-## Shot Phases
-1. **Pre-infusion**: Gently saturate puck (2-4 ml/s, <2 bar). Prevents channeling.
-2. **Bloom** (optional): Rest at low pressure to release CO2 (5-30s for fresh coffee)
-3. **Infusion**: Main extraction (6-9 bar or 1.5-3 ml/s). Most critical for flavor.
-4. **Taper**: Gradual decline to minimize bitterness (drop to 4-5 bar)
-
-## Troubleshooting Guide
-- **Sour/thin/acidic**: Under-extracted. Increase pressure, extend infusion, raise temp
-- **Bitter/harsh/astringent**: Over-extracted. Lower pressure, taper earlier, lower temp
-- **Gushing/fast shot**: Grind too coarse, or pre-infusion too aggressive
-- **Choking/slow shot**: Grind too fine, add bloom phase, or increase initial pressure
-
-## Equipment Factors
-- **Grind setting**: Primary extraction control. Fine = slower, more extraction
-- **Basket type**: VST/IMS precision baskets vs stock baskets affect flow distribution
-- **Bottom filter**: Paper filters reduce sediment but also oils (cleaner but thinner)
-- **Puck prep**: WDT, leveling, and tamp consistency affect channeling risk
-"""
-
 
 def _prepare_profile_for_llm(profile_data: dict, description: str | None) -> dict:
     """Prepare profile data for LLM, removing image and limiting description."""
@@ -2293,12 +2266,17 @@ async def get_machine_profile_count(request: Request):
 
 
 async def _generate_profile_description(profile_json: dict, request_id: str) -> str:
-    """Generate a description for a profile using the LLM."""
+    """Generate a description for a profile using the LLM with profiling knowledge."""
     
     profile_name = profile_json.get("name", "Unknown Profile")
     
-    # Build a prompt with the profile details
-    prompt = f"""Analyze this Meticulous Espresso profile and generate a description in the standard MeticAI format.
+    # Build a prompt with profiling knowledge and profile details
+    prompt = f"""You are an expert espresso barista analysing profiles for the Meticulous Espresso Machine.
+
+## Expert Profiling Knowledge
+{PROFILING_KNOWLEDGE}
+
+Analyze this Meticulous Espresso profile and generate a description in the standard MeticAI format.
 
 PROFILE JSON:
 ```json
@@ -2357,7 +2335,12 @@ async def convert_profile_description(request: Request):
             extra={"request_id": request_id, "profile_name": profile_name}
         )
         
-        prompt = f"""Analyze this Meticulous Espresso profile and convert its description to the standard MeticAI format.
+        prompt = f"""You are an expert espresso barista analysing profiles for the Meticulous Espresso Machine.
+
+## Expert Profiling Knowledge
+{PROFILING_KNOWLEDGE}
+
+Analyze this Meticulous Espresso profile and convert its description to the standard MeticAI format.
 
 IMPORTANT: Preserve ALL information from the original description. Do not lose any details - only reformat them.
 

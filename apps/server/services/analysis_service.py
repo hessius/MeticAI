@@ -11,7 +11,7 @@ This module provides shot analysis functionality including:
 import json
 from typing import Any, Optional
 
-from services.gemini_service import get_vision_model
+from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
 from logging_config import get_logger
 
 logger = get_logger()
@@ -1105,12 +1105,17 @@ def _prepare_shot_summary_for_llm(shot_data: dict, profile_data: dict, local_ana
 # ============================================================================
 
 async def _generate_profile_description(profile_json: dict, request_id: str) -> str:
-    """Generate a description for a profile using the LLM."""
+    """Generate a description for a profile using the LLM with profiling knowledge."""
     
     profile_name = profile_json.get("name", "Unknown Profile")
     
-    # Build a prompt with the profile details
-    prompt = f"""Analyze this Meticulous Espresso profile and generate a description in the standard MeticAI format.
+    # Build a prompt with profiling knowledge and profile details
+    prompt = f"""You are an expert espresso barista analysing profiles for the Meticulous Espresso Machine.
+
+## Expert Profiling Knowledge
+{PROFILING_KNOWLEDGE}
+
+Analyze this Meticulous Espresso profile and generate a description in the standard MeticAI format.
 
 PROFILE JSON:
 ```json
