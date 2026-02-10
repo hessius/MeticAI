@@ -151,9 +151,11 @@ OUTPUT_FORMAT = (
 
 USER_SUMMARY_INSTRUCTIONS = (
     "INSTRUCTIONS:\n"
-    "1. Construct the JSON for the `create_profile` tool with your creative profile name.\n"
-    "2. EXECUTE the tool immediately.\n"
-    "3. After successful creation, provide a user summary with:\n"
+    "1. FIRST call `get_profiling_knowledge` with topic='rfc' to load the Open Espresso Profile Format reference. "
+    "Use this knowledge to inform your stage design, dynamics, exit triggers, and limits.\n"
+    "2. Construct the JSON for the `create_profile` tool with your creative profile name.\n"
+    "3. EXECUTE the tool immediately.\n"
+    "4. After successful creation, provide a user summary with:\n"
     "   • Profile Name & Brief Description: What was created\n"
     "   • Preparation Instructions: How it should be prepared (dose, temp, timing)\n"
     "   • Design Rationale: Why the recipe/profile is designed this way\n"

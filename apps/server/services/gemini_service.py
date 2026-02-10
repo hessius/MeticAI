@@ -22,6 +22,34 @@ _GEMINI_NOISE_PREFIXES = (
 # ANSI escape code pattern
 _ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
 
+# Shared espresso profiling knowledge for LLM context.
+# Used by shot analysis, profile description generation, and description conversion.
+PROFILING_KNOWLEDGE = """# Espresso Profiling Expert Knowledge
+
+## Core Variables
+- **Flow Rate (ml/s)**: Controls extraction speed. Higher = more acidity/clarity, Lower = more body/sweetness
+- **Pressure (bar)**: Result of flow vs resistance. Creates texture and crema. 6-9 bar typical.
+- **Temperature (°C)**: Lighter roasts need higher temps (92-96°C), darker need lower (82-90°C)
+
+## Shot Phases
+1. **Pre-infusion**: Gently saturate puck (2-4 ml/s, <2 bar). Prevents channeling.
+2. **Bloom** (optional): Rest at low pressure to release CO2 (5-30s for fresh coffee)
+3. **Infusion**: Main extraction (6-9 bar or 1.5-3 ml/s). Most critical for flavor.
+4. **Taper**: Gradual decline to minimize bitterness (drop to 4-5 bar)
+
+## Troubleshooting Guide
+- **Sour/thin/acidic**: Under-extracted. Increase pressure, extend infusion, raise temp
+- **Bitter/harsh/astringent**: Over-extracted. Lower pressure, taper earlier, lower temp
+- **Gushing/fast shot**: Grind too coarse, or pre-infusion too aggressive
+- **Choking/slow shot**: Grind too fine, add bloom phase, or increase initial pressure
+
+## Equipment Factors
+- **Grind setting**: Primary extraction control. Fine = slower, more extraction
+- **Basket type**: VST/IMS precision baskets vs stock baskets affect flow distribution
+- **Bottom filter**: Paper filters reduce sediment but also oils (cleaner but thinner)
+- **Puck prep**: WDT, leveling, and tamp consistency affect channeling risk
+"""
+
 
 def clean_gemini_output(text: str) -> str:
     """Strip Gemini CLI noise lines and ANSI codes from output.
