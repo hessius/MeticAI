@@ -9,6 +9,7 @@ from typing import Optional
 
 from logging_config import get_logger
 from config import DATA_DIR
+from utils.file_utils import atomic_write_json
 from utils.sanitization import clean_profile_name
 
 logger = get_logger()
@@ -34,10 +35,9 @@ def load_history() -> list:
 
 
 def save_history(history: list):
-    """Save history to file."""
+    """Save history to file atomically to prevent corruption."""
     ensure_history_file()
-    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=2)
+    atomic_write_json(HISTORY_FILE, history)
 
 
 def _extract_profile_json(reply: str) -> Optional[dict]:

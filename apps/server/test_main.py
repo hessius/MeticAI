@@ -324,9 +324,22 @@ class TestAnalyzeAndProfileEndpoint:
             data={"user_prefs": "Default"}
         )
 
-        assert response.status_code == 200
-        assert response.json()["status"] == "error"
-        assert "Unexpected error" in response.json()["message"]
+        assert response.status_code == 500
+        assert "Unexpected error" in response.json()["detail"]["message"]
+
+    @patch('api.routes.coffee.subprocess.run')
+    def test_analyze_and_profile_timeout(self, mock_subprocess, client):
+        """Test handling of subprocess timeout."""
+        import subprocess as sp
+        mock_subprocess.side_effect = sp.TimeoutExpired(cmd="gemini", timeout=300)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Default"}
+        )
+
+        assert response.status_code == 504
+        assert "timed out" in response.json()["detail"]["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.get_vision_model')
@@ -343,8 +356,8 @@ class TestAnalyzeAndProfileEndpoint:
             files={"file": ("test.txt", invalid_data, "text/plain")}
         )
 
-        assert response.status_code == 200
-        assert response.json()["status"] == "error"
+        assert response.status_code == 500
+        assert "error" in response.json()["detail"]["status"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
@@ -6687,8 +6700,8 @@ class TestRecurringSchedulesPersistence:
         assert loaded["schedule-2"]["recurrence_type"] == "weekends"
     
     @pytest.mark.asyncio
-    async def test_persistence_filters_disabled_schedules(self, temp_persistence_file):
-        """Test that disabled schedules are not persisted."""
+    async def test_persistence_saves_all_schedules_including_disabled(self, temp_persistence_file):
+        """Test that both enabled and disabled schedules are persisted."""
         persistence = main.RecurringSchedulesPersistence(temp_persistence_file)
         
         test_schedules = {
@@ -6707,10 +6720,11 @@ class TestRecurringSchedulesPersistence:
         await persistence.save(test_schedules)
         loaded = await persistence.load()
         
-        # Only enabled schedule should be saved
-        assert len(loaded) == 1
+        # Both schedules should be saved (disabled schedules survive restarts)
+        assert len(loaded) == 2
         assert "enabled-schedule" in loaded
-        assert "disabled-schedule" not in loaded
+        assert "disabled-schedule" in loaded
+        assert loaded["disabled-schedule"]["enabled"] is False
     
     @pytest.mark.asyncio
     async def test_persistence_load_nonexistent_file(self, tmp_path):
@@ -7881,6 +7895,30 @@ class TestShotDataEndpoint:
         assert response.status_code == 500
         assert "error" in response.json()["detail"]
 
+    def test_get_shot_data_invalid_date(self, client):
+        """Test path traversal prevention on date param."""
+        response = client.get("/api/shots/data/not-a-date/shot.json")
+        assert response.status_code == 400
+
+    def test_get_shot_data_invalid_filename(self, client):
+        """Test path traversal prevention on filename param."""
+        response = client.get("/api/shots/data/2024-01-15/..%2F..%2Fetc%2Fpasswd")
+        assert response.status_code == 400
+
+
+class TestShotFilesInputValidation:
+    """Tests for input validation on shot file endpoints."""
+
+    def test_get_shot_files_invalid_date_format(self, client):
+        """Test that invalid date format is rejected."""
+        response = client.get("/api/shots/files/not-a-date")
+        assert response.status_code == 400
+
+    def test_get_shot_files_date_traversal(self, client):
+        """Test that path traversal in date is rejected."""
+        response = client.get("/api/shots/files/20240115")
+        assert response.status_code == 400
+
 
 class TestPrepareProfileForLLM:
     """Tests for the _prepare_profile_for_llm helper function."""
@@ -8351,6 +8389,19 @@ class TestGeminiServiceCoverage:
         except Exception:
             # May fail without API key, which is expected
             pass
+
+    def test_reset_vision_model(self):
+        """Test reset_vision_model clears the cached model."""
+        import services.gemini_service as gs
+        
+        # Set the cached model to a sentinel value
+        gs._vision_model = "cached_model"
+        
+        # Reset it
+        gs.reset_vision_model()
+        
+        # Should be None now
+        assert gs._vision_model is None
 
 
 class TestHistoryServiceCoverage:

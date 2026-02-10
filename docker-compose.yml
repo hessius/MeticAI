@@ -1,86 +1,41 @@
+# ==============================================================================
+# MeticAI Docker Compose Configuration
+# ==============================================================================
+# Single unified container for all MeticAI services (v2.0).
+#
+# Usage:
+#   docker compose up -d
+#
+# Optional add-ons:
+#   docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
+# ==============================================================================
+
 services:
-  # 1. Meticulous MCP Server (The Tool)
-  # Runs the HTTP server, but we will connect via 'docker exec' for stdio
-  meticulous-mcp:
-    container_name: meticulous-mcp-server
-    build: ./meticulous-source
+  meticai:
+    image: ghcr.io/hessius/meticai:latest
+    container_name: meticai
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.unified
+    restart: unless-stopped
     ports:
-      - "8090:8080"
+      - "3550:3550"   # Web UI (nginx proxy)
     environment:
-      - FASTMCP_HOST=0.0.0.0
-      - FASTMCP_PORT=8080
-      - METICULOUS_API_URL=http://${METICULOUS_IP}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - METICULOUS_IP=${METICULOUS_IP:-meticulous.local}
+      - DATA_DIR=/data
+    volumes:
+      - meticai-data:/data
     healthcheck:
-      test: ["CMD", "python3", "-c", "import socket, sys; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(5); result = s.connect_ex(('localhost', 8080)); s.close(); sys.exit(result)"]
+      test: ["CMD", "curl", "-f", "http://localhost:3550/health"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-    restart: unless-stopped
+      start_period: 15s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
-  # 2. Gemini Client (The Brain) - Node.js Version
-  gemini-client:
-    build: ./gemini-client
-    container_name: gemini-client
-    volumes:
-      # Mount config to the standard Node CLI location
-      - ./gemini-client/settings.json:/root/.gemini/settings.json
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    restart: unless-stopped
-
-  # 3. MeticAI Server (The Bridge)
-  # Receives iPhone requests and orchestrates AI interactions
-  meticai-server:
-    build: ./meticai-server
-    container_name: meticai-server
-    ports:
-      - "8000:8000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./.versions.json:/app/.versions.json
-      # Mount VERSION files for version info endpoint
-      - ./VERSION:/VERSION:ro
-      # Mount update infrastructure for trigger-update endpoint
-      - ./update.sh:/app/update.sh:ro
-      - ./.env:/app/.env:ro
-      - ./.update-config.json:/app/.update-config.json:ro
-      - ./meticulous-source:/app/meticulous-source
-      - ./meticai-web:/app/meticai-web
-      - ./.git:/app/.git
-      # Mount docker-compose and Dockerfiles for container rebuild
-      - ./docker-compose.yml:/app/docker-compose.yml:ro
-      - ./gemini-client:/app/gemini-client:ro
-      # Mount rebuild flag for host-side watcher
-      - ./.rebuild-needed:/app/.rebuild-needed
-      # Mount update check signal file for host-side watcher
-      - ./.update-check-requested:/app/.update-check-requested
-      # Mount full update signal file for host-side watcher
-      - ./.update-requested:/app/.update-requested
-      # Mount restart signal file for host-side watcher
-      - ./.restart-requested:/app/.restart-requested
-      # Mount watcher log file for status endpoint
-      - ./.rebuild-watcher.log:/app/.rebuild-watcher.log:ro
-      # Mount logs directory for persistent log storage
-      - ./logs:/app/logs
-      # Mount data directory for profile history
-      - ./data:/app/data
-    working_dir: /app
-    environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - METICULOUS_IP=${METICULOUS_IP}
-      - PI_IP=${PI_IP}
-    restart: unless-stopped
-
-  # 4. MeticAI Web Interface
-  # Web application for controlling coffee machine
-  meticai-web:
-    build: ./meticai-web
-    container_name: meticai-web
-    ports:
-      - "3550:80"
-    volumes:
-      - ./meticai-web/public/config.json:/usr/share/nginx/html/config.json:ro
-    restart: unless-stopped
-    depends_on:
-      - meticai-server
+volumes:
+  meticai-data:
+    name: meticai-data

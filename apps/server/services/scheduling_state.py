@@ -150,21 +150,20 @@ class RecurringSchedulesPersistence:
         self.persistence_file.parent.mkdir(parents=True, exist_ok=True)
     
     async def save(self, schedules: dict) -> None:
-        """Save recurring schedules to disk."""
+        """Save recurring schedules to disk.
+        
+        Persists ALL schedules (enabled and disabled) so that disabled
+        schedules survive restarts and can be re-enabled later.
+        """
         async with self._lock:
             try:
-                # Only save enabled schedules
-                active_schedules = {
-                    sid: s for sid, s in schedules.items()
-                    if s.get("enabled", True)
-                }
-                
                 temp_file = self.persistence_file.with_suffix('.tmp')
                 with open(temp_file, 'w') as f:
-                    json.dump(active_schedules, f, indent=2)
+                    json.dump(schedules, f, indent=2)
                 temp_file.replace(self.persistence_file)
                 
-                logger.debug(f"Persisted {len(active_schedules)} recurring schedules")
+                enabled_count = sum(1 for s in schedules.values() if s.get("enabled", True))
+                logger.debug(f"Persisted {len(schedules)} recurring schedules ({enabled_count} enabled)")
             except Exception as e:
                 logger.error(f"Failed to save recurring schedules: {e}", exc_info=True)
     
