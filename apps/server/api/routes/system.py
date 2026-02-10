@@ -1015,10 +1015,52 @@ async def save_settings_endpoint(request: Request):
                     extra={"request_id": request_id}
                 )
         
+        # Hot-reload: update running process environment and restart services
+        services_restarted = []
+        
+        if body.get("meticulousIp"):
+            new_ip = body["meticulousIp"].strip()
+            os.environ["METICULOUS_IP"] = new_ip
+            
+            # Reset cached FastAPI Meticulous client
+            try:
+                from services.meticulous_service import reset_meticulous_api
+                reset_meticulous_api()
+                services_restarted.append("meticulous_api")
+            except Exception as e:
+                logger.warning(f"Failed to reset Meticulous API client: {e}",
+                             extra={"request_id": request_id})
+            
+            # Restart MCP server s6 service so it picks up the new IP
+            try:
+                result = subprocess.run(
+                    ["s6-svc", "-r", "/run/service/mcp-server"],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    services_restarted.append("mcp-server")
+                    logger.info("Restarted MCP server with new METICULOUS_IP",
+                              extra={"request_id": request_id, "new_ip": new_ip})
+                else:
+                    logger.warning(f"Failed to restart MCP server: {result.stderr}",
+                                 extra={"request_id": request_id})
+            except Exception as e:
+                logger.warning(f"Could not restart MCP server: {e}",
+                             extra={"request_id": request_id})
+        
+        if body.get("geminiApiKey") and not body.get("geminiApiKeyMasked"):
+            new_api_key = body["geminiApiKey"].strip()
+            if new_api_key and "..." not in new_api_key and "*" not in new_api_key:
+                os.environ["GEMINI_API_KEY"] = new_api_key
+                services_restarted.append("gemini_env")
+                logger.info("Updated GEMINI_API_KEY in process environment",
+                          extra={"request_id": request_id})
+        
         return {
             "status": "success",
             "message": "Settings saved successfully",
-            "env_updated": env_updated
+            "env_updated": env_updated,
+            "services_restarted": services_restarted
         }
         
     except Exception as e:

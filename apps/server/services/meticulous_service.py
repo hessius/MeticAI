@@ -27,6 +27,16 @@ def get_meticulous_api():
     return _meticulous_api
 
 
+def reset_meticulous_api():
+    """Reset the cached API client so the next call picks up new settings.
+    
+    Called when METICULOUS_IP is changed via the settings UI.
+    """
+    global _meticulous_api
+    _meticulous_api = None
+    logger.info("Meticulous API client reset — will reinitialize on next request")
+
+
 async def execute_scheduled_shot(
     schedule_id: str,
     shot_delay: float,

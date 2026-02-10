@@ -12,6 +12,45 @@ logger = get_logger()
 # Lazy-loaded vision model
 _vision_model = None
 
+# Lines the Gemini CLI may leak into stdout that are not part of the response
+_GEMINI_NOISE_PREFIXES = (
+    "YOLO mode is enabled",
+    "Hook registry initialized",
+    "Error executing tool ",
+)
+
+# ANSI escape code pattern
+_ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
+
+def clean_gemini_output(text: str) -> str:
+    """Strip Gemini CLI noise lines and ANSI codes from output.
+    
+    The Gemini CLI sometimes leaks diagnostic lines (YOLO mode, hook registry,
+    MCP tool error retries) into stdout. This function removes them so only
+    the actual LLM response is returned to the user.
+    
+    Args:
+        text: Raw stdout from the Gemini CLI
+        
+    Returns:
+        Cleaned text with only the LLM response
+    """
+    if not text:
+        return text
+    
+    # Strip ANSI escape codes
+    text = _ANSI_ESCAPE.sub('', text)
+    
+    # Filter out noise lines
+    lines = text.split('\n')
+    clean_lines = [
+        line for line in lines
+        if not any(line.strip().startswith(prefix) for prefix in _GEMINI_NOISE_PREFIXES)
+    ]
+    
+    return '\n'.join(clean_lines).strip()
+
 
 def parse_gemini_error(error_text: str) -> str:
     """Parse Gemini CLI error output and return a user-friendly message.
