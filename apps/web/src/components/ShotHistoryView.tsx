@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useTheme } from 'next-themes'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -69,25 +70,47 @@ const CHART_COLORS = {
 
 // Stage colors for background areas (matching tag colors)
 const STAGE_COLORS = [
-  'rgba(239, 68, 68, 0.15)',   // Red
-  'rgba(249, 115, 22, 0.15)',  // Orange  
-  'rgba(234, 179, 8, 0.15)',   // Yellow
-  'rgba(34, 197, 94, 0.15)',   // Green
-  'rgba(59, 130, 246, 0.15)',  // Blue
-  'rgba(168, 85, 247, 0.15)',  // Purple
-  'rgba(236, 72, 153, 0.15)',  // Pink
-  'rgba(20, 184, 166, 0.15)',  // Teal
+  'rgba(239, 68, 68, 0.25)',   // Red
+  'rgba(249, 115, 22, 0.25)',  // Orange  
+  'rgba(234, 179, 8, 0.25)',   // Yellow
+  'rgba(34, 197, 94, 0.25)',   // Green
+  'rgba(59, 130, 246, 0.25)',  // Blue
+  'rgba(168, 85, 247, 0.25)',  // Purple
+  'rgba(236, 72, 153, 0.25)',  // Pink
+  'rgba(20, 184, 166, 0.25)',  // Teal
 ]
 
 const STAGE_BORDER_COLORS = [
-  'rgba(239, 68, 68, 0.4)',
-  'rgba(249, 115, 22, 0.4)',
-  'rgba(234, 179, 8, 0.4)',
-  'rgba(34, 197, 94, 0.4)',
-  'rgba(59, 130, 246, 0.4)',
-  'rgba(168, 85, 247, 0.4)',
-  'rgba(236, 72, 153, 0.4)',
-  'rgba(20, 184, 166, 0.4)',
+  'rgba(239, 68, 68, 0.5)',
+  'rgba(249, 115, 22, 0.5)',
+  'rgba(234, 179, 8, 0.5)',
+  'rgba(34, 197, 94, 0.5)',
+  'rgba(59, 130, 246, 0.5)',
+  'rgba(168, 85, 247, 0.5)',
+  'rgba(236, 72, 153, 0.5)',
+  'rgba(20, 184, 166, 0.5)',
+]
+
+// Darker text colors for stage pills — legible on both light and dark backgrounds
+const STAGE_TEXT_COLORS_LIGHT = [
+  'rgb(153, 27, 27)',    // Red-800
+  'rgb(154, 52, 18)',    // Orange-800
+  'rgb(133, 77, 14)',    // Yellow-800
+  'rgb(22, 101, 52)',    // Green-800
+  'rgb(30, 64, 175)',    // Blue-800
+  'rgb(107, 33, 168)',   // Purple-800
+  'rgb(157, 23, 77)',    // Pink-800
+  'rgb(17, 94, 89)',     // Teal-800
+]
+const STAGE_TEXT_COLORS_DARK = [
+  'rgb(252, 165, 165)',  // Red-300
+  'rgb(253, 186, 116)',  // Orange-300
+  'rgb(253, 224, 71)',   // Yellow-300
+  'rgb(134, 239, 172)',  // Green-300
+  'rgb(147, 197, 253)',  // Blue-300
+  'rgb(216, 180, 254)',  // Purple-300
+  'rgb(249, 168, 212)',  // Pink-300
+  'rgb(94, 234, 212)',   // Teal-300
 ]
 
 // Playback speed options - defined outside component to avoid re-creation
@@ -362,6 +385,8 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
 }
 
 export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
   const { shots, isLoading, isBackgroundRefreshing, error, lastFetched, fetchShotsByProfile, backgroundRefresh, fetchShotData } = useShotHistory()
   const [selectedShot, setSelectedShot] = useState<ShotInfo | null>(null)
   const [shotData, setShotData] = useState<ShotData | null>(null)
@@ -1597,10 +1622,11 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         <Badge 
                           key={idx}
                           variant="outline"
-                          className="text-[10px] px-2 py-0.5"
+                          className="text-[10px] px-2 py-0.5 font-medium"
                           style={{
                             backgroundColor: STAGE_COLORS[stage.colorIndex],
-                            borderColor: STAGE_BORDER_COLORS[stage.colorIndex]
+                            borderColor: STAGE_BORDER_COLORS[stage.colorIndex],
+                            color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex]
                           }}
                         >
                           {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
@@ -2352,7 +2378,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                       style={{
                                         backgroundColor: STAGE_COLORS[stage.colorIndex],
                                         borderColor: STAGE_BORDER_COLORS[stage.colorIndex],
-                                        color: 'rgba(255,255,255,0.9)'
+                                        color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex]
                                       }}
                                     >
                                       {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
@@ -2595,12 +2621,12 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                   <Badge 
                                     variant="secondary" 
                                     className={`text-[10px] w-fit shrink-0 ${
-                                      stage.assessment.status === 'reached_goal' ? 'bg-green-500/20 text-green-400' :
-                                      stage.assessment.status === 'hit_limit' ? 'bg-amber-500/20 text-amber-400' :
-                                      stage.assessment.status === 'not_reached' ? 'bg-red-500/20 text-red-400' :
-                                      stage.assessment.status === 'failed' ? 'bg-red-500/20 text-red-400' :
-                                      stage.assessment.status === 'incomplete' ? 'bg-orange-500/20 text-orange-400' :
-                                      'bg-blue-500/20 text-blue-400'
+                                      stage.assessment.status === 'reached_goal' ? 'bg-green-500/20 text-green-700 dark:text-green-300' :
+                                      stage.assessment.status === 'hit_limit' ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' :
+                                      stage.assessment.status === 'not_reached' ? 'bg-red-500/20 text-red-700 dark:text-red-300' :
+                                      stage.assessment.status === 'failed' ? 'bg-red-500/20 text-red-700 dark:text-red-300' :
+                                      stage.assessment.status === 'incomplete' ? 'bg-orange-500/20 text-orange-700 dark:text-orange-300' :
+                                      'bg-blue-500/20 text-blue-700 dark:text-blue-300'
                                     }`}
                                   >
                                     {stage.assessment.status === 'reached_goal' ? '✓ Reached Goal' :
