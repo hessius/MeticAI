@@ -127,7 +127,7 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
       
       // Handle horizontal rules
       if (line.trim() === '---' || line.trim() === '***') {
-        result.push(<hr key={`hr-${lineIndex}`} className="my-3 border-border/50" />)
+        result.push(<hr key={`hr-${lineIndex}`} className="my-3 border-t border-foreground/20" />)
         return
       }
       
