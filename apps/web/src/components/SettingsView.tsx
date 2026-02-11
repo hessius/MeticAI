@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { 
@@ -20,7 +21,9 @@ import {
   CaretUp,
   Globe,
   WifiHigh,
-  WifiSlash
+  WifiSlash,
+  Sun,
+  Moon
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -30,6 +33,12 @@ import { LanguageSelector } from '@/components/LanguageSelector'
 
 interface SettingsViewProps {
   onBack: () => void
+  showBlobs?: boolean
+  onToggleBlobs?: () => void
+  isDark?: boolean
+  isFollowSystem?: boolean
+  onToggleTheme?: () => void
+  onSetFollowSystem?: (follow: boolean) => void
 }
 
 interface Settings {
@@ -72,7 +81,7 @@ interface TailscaleStatus {
 const MAX_UPDATE_DURATION = 180000
 const PROGRESS_UPDATE_INTERVAL = 500
 
-export function SettingsView({ onBack }: SettingsViewProps) {
+export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
   
   const [settings, setSettings] = useState<Settings>({
@@ -515,6 +524,61 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 {t('settings.authorNameDescription')}
               </p>
             </div>
+
+            {/* Appearance */}
+            {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (
+              <div className="space-y-3 pt-2 border-t border-border">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Appearance</h3>
+                
+                {/* Theme toggle */}
+                {onToggleTheme !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="theme-toggle" className="text-sm font-medium flex items-center gap-2">
+                        {isDark ? <Moon size={16} weight="duotone" /> : <Sun size={16} weight="duotone" />}
+                        {isDark ? 'Dark mode' : 'Light mode'}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Toggle between light and dark theme</p>
+                    </div>
+                    <Switch
+                      id="theme-toggle"
+                      checked={isDark}
+                      onCheckedChange={onToggleTheme}
+                    />
+                  </div>
+                )}
+
+                {/* Follow system setting */}
+                {onSetFollowSystem !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="system-theme-toggle" className="text-sm font-medium">Follow system theme</Label>
+                      <p className="text-xs text-muted-foreground">Automatically match your device settings</p>
+                    </div>
+                    <Switch
+                      id="system-theme-toggle"
+                      checked={isFollowSystem}
+                      onCheckedChange={(checked) => onSetFollowSystem(checked as boolean)}
+                    />
+                  </div>
+                )}
+
+                {/* Background blobs */}
+                {onToggleBlobs !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="blob-toggle" className="text-sm font-medium">Background animations</Label>
+                      <p className="text-xs text-muted-foreground">Animated ambient blobs behind content</p>
+                    </div>
+                    <Switch
+                      id="blob-toggle"
+                      checked={showBlobs}
+                      onCheckedChange={onToggleBlobs}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Save Button */}
             <Button 
