@@ -22,6 +22,12 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         liquid:
           "liquid-button rounded-full font-semibold hover:-translate-y-0.5",
+        "dark-brew":
+          "dark-brew-button rounded-full font-semibold hover:-translate-y-0.5",
+        frosted:
+          "frosted-button rounded-full font-semibold hover:-translate-y-0.5",
+        ember:
+          "ember-button rounded-full font-semibold hover:-translate-y-0.5",
       },
       size: {
         default: "h-10 px-5 py-2.5",

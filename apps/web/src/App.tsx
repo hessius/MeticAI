@@ -27,6 +27,9 @@ import { AdvancedCustomizationOptions } from '@/components/AdvancedCustomization
 import type { APIResponse, ViewState } from '@/types'
 
 import { AmbientBackground } from '@/components/AmbientBackground'
+import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
+import { useThemePreference } from '@/hooks/useThemePreference'
+import { Sun, Moon } from '@phosphor-icons/react'
 
 function App() {
   const [isInitializing, setIsInitializing] = useState(true)
@@ -56,6 +59,14 @@ function App() {
   // Desktop detection for QR code feature
   const isDesktop = useIsDesktop()
   const isMobile = useIsMobile()
+
+  // Background blobs preference (localStorage)
+  const { showBlobs, toggleBlobs } = useBackgroundBlobs()
+
+  // Theme preference (light/dark/system)
+  const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
+
+  const isHome = viewState === 'start'
 
   // Check for existing profiles on mount
   useEffect(() => {
@@ -520,40 +531,56 @@ Special Notes: For maximum clarity and to really make those delicate floral note
   const canSubmit = !!(imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0)
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-5 overflow-x-hidden">
-      <AmbientBackground />
+    <>
+      {showBlobs && <AmbientBackground />}
+      <div className="min-h-screen text-foreground flex items-center justify-center p-5 overflow-x-hidden relative" style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md relative overflow-hidden">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="text-center mb-10"
+          className={isHome ? "text-center mb-10" : "text-center mb-6"}
         >
-          <div className="flex items-center justify-center gap-3 mb-3 relative">
+          <div className="flex items-center justify-center gap-3 mb-1 relative">
             <div 
               className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={handleTitleClick}
               title="Tap to go home"
             >
-              <MeticAILogo size={44} variant="white" />
-              <h1 className="text-4xl font-bold tracking-tight">
-                Metic<span className="bg-clip-text text-transparent bg-[var(--gold-gradient)]">AI</span>
+              <MeticAILogo size={isHome ? 48 : 28} variant={isDark ? 'white' : 'default'} />
+              <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-5xl' : 'text-2xl'}`}>
+                Metic<span className="gold-text">AI</span>
               </h1>
             </div>
-            {isDesktop && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
-                onClick={() => setQrDialogOpen(true)}
-                title="Open on mobile"
-              >
-                <QrCode size={22} weight="duotone" />
-              </Button>
-            )}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {themeMounted && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                  onClick={toggleTheme}
+                  title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
+                </Button>
+              )}
+              {isDesktop && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                  onClick={() => setQrDialogOpen(true)}
+                  title="Open on mobile"
+                >
+                  <QrCode size={18} weight="duotone" />
+                </Button>
+              )}
+            </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium tracking-wide">Meticulous Espresso AI Profiler</p>
+          {!isHome && (
+            <p className="text-muted-foreground text-xs font-medium tracking-wide">Meticulous Espresso AI Profiler</p>
+          )}
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -632,6 +659,12 @@ Special Notes: For maximum clarity and to really make those delicate floral note
           {viewState === 'settings' && (
             <SettingsView
               onBack={handleBackToStart}
+              showBlobs={showBlobs}
+              onToggleBlobs={toggleBlobs}
+              isDark={isDark}
+              isFollowSystem={isFollowSystem}
+              onToggleTheme={toggleTheme}
+              onSetFollowSystem={setFollowSystem}
             />
           )}
 
@@ -681,6 +714,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
         <QRCodeDialog open={qrDialogOpen} onOpenChange={setQrDialogOpen} />
       </div>
     </div>
+    </>
   )
 }
 

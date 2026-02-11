@@ -73,45 +73,8 @@
   }
 }
 
-/* Golden Extraction — Premium espresso-inspired palette */
+/* Golden Extraction — shared tokens (not theme-dependent) */
 :root {
-  /* Background colors - Deep Espresso (#12100E) */
-  --background: oklch(0.09 0.005 50);
-  --foreground: oklch(0.96 0.005 90);
-  
-  /* Card - Glassmorphism: translucent warm surface */
-  --card: oklch(0.14 0.008 50);
-  --card-foreground: oklch(0.96 0.005 90);
-  
-  /* Popover */
-  --popover: oklch(0.16 0.008 50);
-  --popover-foreground: oklch(0.96 0.005 90);
-  
-  /* Primary - Liquid Gold (amber/gold like fresh crema) */
-  --primary: oklch(0.80 0.155 80);
-  --primary-foreground: oklch(0.18 0.03 50);
-  
-  /* Secondary - Warm dark surface */
-  --secondary: oklch(0.22 0.01 50);
-  --secondary-foreground: oklch(0.93 0.005 90);
-  
-  /* Muted - Subtle warm tones */
-  --muted: oklch(0.26 0.01 50);
-  --muted-foreground: oklch(0.62 0.01 80);
-  
-  /* Accent - Gold matching primary */
-  --accent: oklch(0.80 0.155 80);
-  --accent-foreground: oklch(0.18 0.03 50);
-  
-  /* Destructive - Warm red */
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  
-  /* Borders and inputs - warm translucent */
-  --border: oklch(0.30 0.01 50);
-  --input: oklch(0.18 0.01 50);
-  --ring: oklch(0.80 0.155 80);
-  
   /* Semantic colors */
   --success: oklch(0.7 0.18 145);
   --warning: oklch(0.80 0.155 80);
@@ -129,17 +92,24 @@
   --gold-glow: rgba(255, 143, 0, 0.4);
   --gold-glow-strong: rgba(255, 143, 0, 0.6);
   
-  /* Glassmorphism tokens */
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  /* Glassmorphism tokens — light mode defaults */
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(0, 0, 0, 0.08);
   --glass-blur: 16px;
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --glass-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
   
   /* Border radius - Premium rounded corners */
   --radius: 1.25rem;
 }
 
 .dark {
+  /* Dark-mode overrides for glass */
+  --glass-bg: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-blur: 20px;
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+  /* Dark espresso palette */
   --background: oklch(0.09 0.005 50);
   --foreground: oklch(0.96 0.005 90);
   
@@ -156,7 +126,7 @@
   --secondary-foreground: oklch(0.93 0.005 90);
   
   --muted: oklch(0.26 0.01 50);
-  --muted-foreground: oklch(0.62 0.01 80);
+  --muted-foreground: oklch(0.80 0.015 80);
   
   --accent: oklch(0.80 0.155 80);
   --accent-foreground: oklch(0.18 0.03 50);
@@ -391,6 +361,36 @@
   }
 }
 
+/* ── Gold gradient text (animated) ──────────────────────────── */
+@keyframes gold-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gold-text {
+  background: linear-gradient(
+    135deg,
+    var(--gold-start) 0%,
+    var(--gold-mid) 25%,
+    var(--gold-end) 50%,
+    var(--gold-mid) 75%,
+    var(--gold-start) 100%
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gold-shift 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-text {
+    animation: none;
+    background-size: 100% 100%;
+  }
+}
+
 /* ── Liquid gold button ────────────────────────────────────── */
 .liquid-button {
   background: var(--gold-gradient);
@@ -407,6 +407,59 @@
 
 .liquid-button:disabled {
   filter: saturate(0.5) brightness(0.7);
+}
+
+/* ── Dark brew button (deep brown, gold text) ──────────────── */
+.dark-brew-button {
+  background: linear-gradient(135deg, #3E2723 0%, #4E342E 50%, #3E2723 100%);
+  color: #FFB300;
+  border: 1px solid rgba(255, 179, 0, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.dark-brew-button:hover {
+  background: linear-gradient(135deg, #4E342E 0%, #5D4037 50%, #4E342E 100%);
+  border-color: rgba(255, 179, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 6px 24px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(255, 143, 0, 0.15);
+}
+
+/* ── Frosted button (backdrop-filter glass effect) ─────────── */
+.frosted-button {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--foreground);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px) saturate(1.5);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.frosted-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Ember button (warm border glow) ───────────────────────── */
+.ember-button {
+  background: rgba(255, 143, 0, 0.08);
+  color: var(--foreground);
+  border: 1px solid rgba(255, 143, 0, 0.3);
+  box-shadow:
+    inset 0 0 20px rgba(255, 143, 0, 0.06),
+    0 0 12px rgba(255, 143, 0, 0.1);
+}
+
+.ember-button:hover {
+  background: rgba(255, 143, 0, 0.14);
+  border-color: rgba(255, 143, 0, 0.5);
+  box-shadow:
+    inset 0 0 24px rgba(255, 143, 0, 0.1),
+    0 0 20px rgba(255, 143, 0, 0.2);
 }
 
 /* ── Ambient background blobs ─────────────────────────────── */
@@ -481,4 +534,46 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 143, 0, 0.5);
+}
+
+/* ── Light mode overrides ─────────────────────────────────── */
+:root:not(.dark) .dark-brew-button {
+  background: linear-gradient(135deg, #EFEBE9 0%, #D7CCC8 50%, #EFEBE9 100%);
+  color: #4E342E;
+  border: 1px solid rgba(78, 52, 46, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+:root:not(.dark) .dark-brew-button:hover {
+  background: linear-gradient(135deg, #D7CCC8 0%, #BCAAA4 50%, #D7CCC8 100%);
+  border-color: rgba(78, 52, 46, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+:root:not(.dark) .ember-button {
+  background: rgba(255, 143, 0, 0.06);
+  color: var(--foreground);
+  border: 1px solid rgba(255, 143, 0, 0.25);
+}
+
+:root:not(.dark) .ember-button:hover {
+  background: rgba(255, 143, 0, 0.12);
+  border-color: rgba(255, 143, 0, 0.4);
+}
+
+:root:not(.dark) .ambient-blob {
+  opacity: 0.15;
+  filter: blur(100px);
+}
+
+:root:not(.dark) ::-webkit-scrollbar-thumb {
+  background: rgba(78, 52, 46, 0.2);
+}
+
+:root:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(78, 52, 46, 0.35);
 }

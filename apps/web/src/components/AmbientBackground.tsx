@@ -6,7 +6,8 @@ export function AmbientBackground() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      className="pointer-events-none fixed inset-0 overflow-hidden"
+      style={{ zIndex: 0 }}
     >
       {/* Warm amber — top-left */}
       <div className="ambient-blob ambient-blob--amber" />
