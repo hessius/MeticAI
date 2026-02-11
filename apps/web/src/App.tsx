@@ -26,6 +26,8 @@ import { ErrorView } from '@/views/ErrorView'
 import { AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
 import type { APIResponse, ViewState } from '@/types'
 
+import { AmbientBackground } from '@/components/AmbientBackground'
+
 function App() {
   const [isInitializing, setIsInitializing] = useState(true)
   const [viewState, setViewState] = useState<ViewState>('start')
@@ -519,6 +521,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-5 overflow-x-hidden">
+      <AmbientBackground />
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md relative overflow-hidden">
         <motion.div
@@ -535,7 +538,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
             >
               <MeticAILogo size={44} variant="white" />
               <h1 className="text-4xl font-bold tracking-tight">
-                Metic<span className="text-primary">AI</span>
+                Metic<span className="bg-clip-text text-transparent bg-[var(--gold-gradient)]">AI</span>
               </h1>
             </div>
             {isDesktop && (

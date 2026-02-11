@@ -62,7 +62,8 @@ export function StartView({
         <div className="space-y-3">
           <Button
             onClick={onGenerateNew}
-            className="w-full h-14 text-base font-semibold bg-primary hover:bg-primary/90"
+            variant="liquid"
+            className="w-full h-14 text-base"
           >
             <Plus size={20} className="mr-2" weight="bold" />
             {t('navigation.generateNewProfile')}
@@ -70,7 +71,8 @@ export function StartView({
           
           <Button
             onClick={onViewHistory}
-            className="w-full h-14 text-base font-semibold bg-primary hover:bg-primary/90"
+            variant="liquid"
+            className="w-full h-14 text-base"
           >
             <Coffee size={20} className="mr-2" weight="fill" />
             {t('navigation.profileCatalogue')}
@@ -78,7 +80,8 @@ export function StartView({
           
           <Button
             onClick={onRunShot}
-            className="w-full h-14 text-base font-semibold bg-primary hover:bg-primary/90"
+            variant="liquid"
+            className="w-full h-14 text-base"
           >
             <Play size={20} className="mr-2" weight="fill" />
             {t('navigation.runSchedule')}
@@ -86,7 +89,8 @@ export function StartView({
           
           <Button
             onClick={onSettings}
-            className="w-full h-14 text-base font-semibold bg-muted hover:bg-muted/80 text-foreground"
+            variant="outline"
+            className="w-full h-14 text-base text-foreground rounded-full border-[rgba(255,255,255,0.1)]"
           >
             <Gear size={20} className="mr-2" weight="duotone" />
             {t('navigation.settings')}

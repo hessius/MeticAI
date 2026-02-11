@@ -36,7 +36,8 @@ export function ErrorView({ errorMessage, onRetry, onBack }: ErrorViewProps) {
         <div className="flex gap-3">
           <Button
             onClick={onRetry}
-            className="flex-1 h-12 text-sm font-semibold"
+            variant="liquid"
+            className="flex-1 h-12 text-sm"
           >
             <ArrowClockwise size={18} weight="bold" className="mr-2" />
             Retry
@@ -44,7 +45,7 @@ export function ErrorView({ errorMessage, onRetry, onBack }: ErrorViewProps) {
           <Button
             onClick={onBack}
             variant="outline"
-            className="flex-1 h-12 text-sm font-semibold"
+            className="flex-1 h-12 text-sm font-semibold rounded-full border-[rgba(255,255,255,0.1)]"
           >
             Back to Form
           </Button>

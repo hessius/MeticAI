@@ -53,7 +53,7 @@ export function LoadingView({ currentMessage }: LoadingViewProps) {
             transition={{ 
               rotate: { duration: 3, repeat: Infinity, ease: "linear" },
             }}
-            className="rounded-full p-5 bg-primary/10 border border-primary/20"
+            className="rounded-full p-5 bg-primary/10 border border-primary/20 shadow-[var(--gold-glow)]"
           >
             <Sparkle size={40} className="text-primary" weight="fill" />
           </motion.div>
@@ -76,9 +76,9 @@ export function LoadingView({ currentMessage }: LoadingViewProps) {
             </p>
           </div>
 
-          <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-[rgba(0,0,0,0.3)] rounded-full h-1.5 overflow-hidden">
             <motion.div
-              className="h-full bg-gradient-to-r from-primary via-amber-400 to-primary rounded-full"
+              className="h-full bg-[var(--gold-gradient)] rounded-full"
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
               transition={{ duration: 75, ease: "linear" }}

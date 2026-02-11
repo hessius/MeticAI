@@ -259,8 +259,8 @@ export function ResultsView({
 
               <Button
                 onClick={onViewHistory}
-                variant={createdProfileId ? "outline" : "default"}
-                className="w-full h-12 text-sm font-semibold"
+                variant={createdProfileId ? "outline" : "liquid"}
+                className={`w-full h-12 text-sm font-semibold ${createdProfileId ? 'rounded-full border-[rgba(255,255,255,0.1)]' : ''}`}
               >
                 <Coffee size={18} className="mr-1.5" weight="fill" />
                 Profile Catalogue
