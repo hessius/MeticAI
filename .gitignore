@@ -51,3 +51,4 @@ macos-installer/build/
 *.dmg
 *.app
 .vscode/
+apps/server/data/

@@ -2,8 +2,11 @@
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from typing import Optional
 from PIL import Image
+import asyncio
 import io
+import os
 import subprocess
+import time
 import logging
 
 # Register HEIC/HEIF support with Pillow
@@ -24,6 +27,24 @@ from services.history_service import save_to_history
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# ── Load OEPF RFC once at import time ──────────────────────────────────────────
+# Embedding the RFC directly in the prompt eliminates a round-trip where the
+# Gemini CLI would call the get_profiling_knowledge MCP tool, saving ~3-5s.
+_OEPF_RFC: str = ""
+try:
+    # In Docker the schema repo is cloned to /app/espresso-profile-schema
+    _rfc_paths = [
+        "/app/espresso-profile-schema/rfc.md",
+        os.path.join(os.path.dirname(__file__), "..", "..", "data", "oepf_rfc.md"),
+    ]
+    for _p in _rfc_paths:
+        if os.path.isfile(_p):
+            with open(_p, "r", encoding="utf-8") as _f:
+                _OEPF_RFC = _f.read()
+            break
+except Exception:
+    pass  # Non-fatal – the prompt works without the RFC, just less informed
 
 # Common prompt sections for profile creation
 BARISTA_PERSONA = (
@@ -158,8 +179,7 @@ OUTPUT_FORMAT = (
 
 USER_SUMMARY_INSTRUCTIONS = (
     "INSTRUCTIONS:\n"
-    "1. FIRST call `get_profiling_knowledge` with topic='rfc' to load the Open Espresso Profile Format reference. "
-    "Use this knowledge to inform your stage design, dynamics, exit triggers, and limits.\n"
+    "1. Use the OEPF Reference below to inform your stage design, dynamics, exit triggers, and limits.\n"
     "2. Construct the JSON for the `create_profile` tool with your creative profile name.\n"
     "3. EXECUTE the tool immediately.\n"
     "4. After successful creation, provide a user summary with:\n"
@@ -168,6 +188,13 @@ USER_SUMMARY_INSTRUCTIONS = (
     "   • Design Rationale: Why the recipe/profile is designed this way\n"
     "   • Special Requirements: Any special gear needed (bottom filter, specific dosage, unique prep steps)\n\n"
 )
+
+# Build the OEPF reference section once
+_OEPF_REFERENCE = (
+    f"OPEN ESPRESSO PROFILE FORMAT (OEPF) REFERENCE:\n"
+    f"Use the following specification to ensure your profile JSON is valid and well-structured.\n\n"
+    f"{_OEPF_RFC}\n\n"
+) if _OEPF_RFC else ""
 
 
 @router.post("/analyze_coffee")
@@ -294,18 +321,21 @@ async def analyze_and_profile(
                 image = image.convert('RGB')
             
             # Analyze the coffee bag
+            analysis_start = time.monotonic()
             analysis_response = get_vision_model().generate_content([
                 "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
                 "Return ONLY a single concise sentence describing the coffee.", 
                 image
             ])
             coffee_analysis = analysis_response.text.strip()
+            analysis_elapsed = time.monotonic() - analysis_start
             
             logger.info(
                 "Coffee analysis completed",
                 extra={
                     "request_id": request_id,
-                    "analysis": coffee_analysis
+                    "analysis": coffee_analysis,
+                    "analysis_seconds": round(analysis_elapsed, 1),
                 }
             )
         
@@ -332,7 +362,8 @@ async def analyze_and_profile(
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
-                OUTPUT_FORMAT
+                OUTPUT_FORMAT +
+                _OEPF_REFERENCE
             )
         elif coffee_analysis:
             # Only image provided (may still have advanced customization)
@@ -348,7 +379,8 @@ async def analyze_and_profile(
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
-                OUTPUT_FORMAT
+                OUTPUT_FORMAT +
+                _OEPF_REFERENCE
             )
         else:
             # Only user preferences provided (may still have advanced customization)
@@ -365,7 +397,8 @@ async def analyze_and_profile(
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
-                OUTPUT_FORMAT
+                OUTPUT_FORMAT +
+                _OEPF_REFERENCE
             )
         
         logger.debug(
@@ -380,7 +413,9 @@ async def analyze_and_profile(
         # Note: Using -y (yolo mode) to auto-approve tool calls.
         # The --allowed-tools flag doesn't work with MCP-provided tools.
         # Security is maintained because the MCP server only exposes safe tools.
-        result = subprocess.run(
+        cli_start = time.monotonic()
+        result = await asyncio.to_thread(
+            subprocess.run,
             [
                 "gemini", "-y",
                 final_prompt
@@ -388,6 +423,15 @@ async def analyze_and_profile(
             capture_output=True,
             text=True,
             timeout=300  # 5 minute timeout to prevent hanging forever
+        )
+        cli_elapsed = time.monotonic() - cli_start
+        logger.info(
+            "Gemini CLI completed",
+            extra={
+                "request_id": request_id,
+                "cli_seconds": round(cli_elapsed, 1),
+                "returncode": result.returncode,
+            }
         )
         
         if result.returncode != 0:
