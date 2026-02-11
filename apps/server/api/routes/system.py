@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import json
 import asyncio
+import socket
 import subprocess
 import logging
 import os
@@ -750,6 +751,38 @@ async def get_version_info(request: Request):
             "commit": None,
             "repo_url": "https://github.com/hessius/MeticAI"
         }
+
+
+@router.get("/api/network-ip")
+async def get_network_ip(request: Request):
+    """Auto-detect the server's LAN IP address for cross-device QR codes.
+
+    Uses a UDP socket trick (no data is actually sent) to discover
+    the default-route interface address.  Falls back to hostname
+    resolution and finally to ``127.0.0.1``.
+    """
+    request_id = request.state.request_id
+    ip = "127.0.0.1"
+
+    try:
+        # Preferred: open a UDP socket to a public IP (no traffic sent)
+        # This gives us the address of the interface with the default route.
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(1)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+    except Exception:
+        # Fallback: hostname lookup
+        try:
+            hostname = socket.gethostname()
+            resolved = socket.gethostbyname(hostname)
+            if resolved and not resolved.startswith("127."):
+                ip = resolved
+        except Exception:
+            pass
+
+    logger.debug("Network IP detected", extra={"request_id": request_id, "ip": ip})
+    return {"ip": ip}
 
 
 @router.get("/api/changelog")
