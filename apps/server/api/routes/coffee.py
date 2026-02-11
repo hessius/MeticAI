@@ -43,8 +43,8 @@ try:
             with open(_p, "r", encoding="utf-8") as _f:
                 _OEPF_RFC = _f.read()
             break
-except Exception:
-    pass  # Non-fatal – the prompt works without the RFC, just less informed
+except Exception as e:
+    logger.warning(f"Failed to load OEPF RFC: {e}")  # Non-fatal
 
 # Common prompt sections for profile creation
 BARISTA_PERSONA = (
@@ -228,7 +228,7 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
             }
         )
         
-        response = get_vision_model().generate_content([
+        response = await get_vision_model().async_generate_content([
             "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
             "Return ONLY a single concise sentence describing the coffee.", 
             image
@@ -322,7 +322,7 @@ async def analyze_and_profile(
             
             # Analyze the coffee bag
             analysis_start = time.monotonic()
-            analysis_response = get_vision_model().generate_content([
+            analysis_response = await get_vision_model().async_generate_content([
                 "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
                 "Return ONLY a single concise sentence describing the coffee.", 
                 image

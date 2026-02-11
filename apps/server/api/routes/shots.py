@@ -760,7 +760,7 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
         
         # Call LLM
         model = get_vision_model()
-        response = model.generate_content(prompt)
+        response = await model.async_generate_content(prompt)
         
         llm_analysis = response.text if response else "Analysis generation failed"
         

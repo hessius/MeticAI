@@ -650,10 +650,10 @@ async def get_logs(
                 "message": "Log file not found - logging may not be initialized yet"
             }
         
-        # Read log file (last N lines)
+        # Read log file (last N lines) — use deque for memory-efficient tail
+        from collections import deque
         with open(log_file, 'r', encoding='utf-8') as f:
-            all_lines = f.readlines()
-            recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+            recent_lines = deque(f, maxlen=lines)
         
         # Parse JSON log entries
         log_entries = []

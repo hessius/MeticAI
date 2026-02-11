@@ -1,6 +1,7 @@
 """Gemini service for AI model configuration and prompt building."""
 
 from google import genai
+import asyncio
 import os
 import re
 from typing import Optional
@@ -204,7 +205,7 @@ class _GeminiModelWrapper:
         self._client = client
     
     def generate_content(self, contents):
-        """Call generate_content on the Gemini API.
+        """Call generate_content on the Gemini API (synchronous).
         
         Args:
             contents: A string, list of strings, PIL images, or mixed list
@@ -216,6 +217,17 @@ class _GeminiModelWrapper:
         return self._client.models.generate_content(
             model=_MODEL_NAME,
             contents=contents,
+        )
+
+    async def async_generate_content(self, contents):
+        """Non-blocking wrapper around generate_content.
+        
+        Runs the synchronous Gemini SDK call in a thread pool executor
+        so it doesn't block the asyncio event loop.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self.generate_content, contents
         )
 
 

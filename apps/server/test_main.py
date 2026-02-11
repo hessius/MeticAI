@@ -73,6 +73,7 @@ class TestAnalyzeCoffeeEndpoint:
         mock_response = Mock()
         mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral and Citrus Notes"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
 
         # Send request
         response = client.post(
@@ -84,7 +85,7 @@ class TestAnalyzeCoffeeEndpoint:
         assert response.status_code == 200
         assert "analysis" in response.json()
         assert "Ethiopian" in response.json()["analysis"]
-        mock_vision_model.return_value.generate_content.assert_called_once()
+        mock_vision_model.return_value.async_generate_content.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.get_vision_model')
@@ -94,6 +95,7 @@ class TestAnalyzeCoffeeEndpoint:
         mock_response = Mock()
         mock_response.text = "  Colombian Supremo, Medium Roast  \n"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
 
         response = client.post(
             "/analyze_coffee",
@@ -109,6 +111,7 @@ class TestAnalyzeCoffeeEndpoint:
         """Test error handling when Gemini API fails."""
         # Mock an API error
         mock_vision_model.return_value.generate_content.side_effect = Exception("API Error: Rate limit exceeded")
+        mock_vision_model.return_value.async_generate_content = AsyncMock(side_effect=Exception("API Error: Rate limit exceeded"))
 
         response = client.post(
             "/analyze_coffee",
@@ -147,6 +150,7 @@ class TestAnalyzeCoffeeEndpoint:
         mock_response = Mock()
         mock_response.text = "Test coffee analysis"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
 
         for format_type in ['PNG', 'JPEG']:
             img = Image.new('RGB', (100, 100), color='blue')
@@ -179,6 +183,7 @@ class TestAnalyzeAndProfileEndpoint:
         mock_response = Mock()
         mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         # Mock successful subprocess execution
         mock_result = Mock()
@@ -198,7 +203,7 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Profile uploaded" in response.json()["reply"]
         
         # Verify vision model was called
-        mock_vision_model.return_value.generate_content.assert_called_once()
+        mock_vision_model.return_value.async_generate_content.assert_called_once()
         
         # Verify subprocess was called with correct arguments
         mock_subprocess.assert_called_once()
@@ -253,6 +258,7 @@ class TestAnalyzeAndProfileEndpoint:
         mock_response = Mock()
         mock_response.text = "Colombian Supremo, Medium Roast, Nutty"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         # Mock successful subprocess execution
         mock_result = Mock()
@@ -294,6 +300,7 @@ class TestAnalyzeAndProfileEndpoint:
         mock_response = Mock()
         mock_response.text = "Test Coffee"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         # Mock subprocess failure
         mock_result = Mock()
@@ -347,6 +354,7 @@ class TestAnalyzeAndProfileEndpoint:
         """Test error when image processing fails."""
         # Mock an exception in vision model
         mock_vision_model.return_value.generate_content.side_effect = Exception("Vision API error")
+        mock_vision_model.return_value.async_generate_content = AsyncMock(side_effect=Exception("Vision API error"))
         
         # Send invalid image data
         invalid_data = BytesIO(b"not an image")
@@ -371,6 +379,7 @@ class TestAnalyzeAndProfileEndpoint:
         mock_response = Mock()
         mock_response.text = "Test Coffee"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -407,6 +416,7 @@ class TestAnalyzeAndProfileEndpoint:
         mock_response = Mock()
         mock_response.text = "Test Coffee"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -482,6 +492,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.text = "Analysis result"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
 
         # Create a larger image
         img = Image.new('RGB', (4000, 3000), color='green')
@@ -504,6 +515,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.text = "A" * 10000  # Very long response
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
 
         response = client.post(
             "/analyze_coffee",
@@ -525,6 +537,7 @@ class TestEnhancedBaristaPersona:
         mock_response = Mock()
         mock_response.text = "Ethiopian Coffee, Light Roast"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -646,6 +659,7 @@ class TestEnhancedBaristaPersona:
         mock_response = Mock()
         mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -827,6 +841,7 @@ class TestAdvancedCustomization:
         mock_response = Mock()
         mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral notes"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -891,6 +906,7 @@ class TestAdvancedCustomization:
         mock_response = Mock()
         mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
         
         mock_result = Mock()
         mock_result.returncode = 0
@@ -935,6 +951,7 @@ class TestCORS:
         mock_response = Mock()
         mock_response.text = "Test coffee"
         mock_vision_model.return_value.generate_content.return_value = mock_response
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
 
         response = client.post(
             "/analyze_coffee",
@@ -4660,6 +4677,7 @@ class TestLLMShotAnalysisEndpoint:
         mock_response = MagicMock()
         mock_response.text = "## 1. Shot Performance\n\n**What Happened:**\n- Excellent extraction\n\n**Assessment:** Good"
         mock_model.generate_content.return_value = mock_response
+        mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
         response = client.post("/api/shots/analyze-llm", data={
@@ -4725,6 +4743,7 @@ class TestLLMShotAnalysisEndpoint:
         
         mock_model = MagicMock()
         mock_model.generate_content.side_effect = Exception("API rate limit")
+        mock_model.async_generate_content = AsyncMock(side_effect=Exception("API rate limit"))
         mock_get_model.return_value = mock_model
         
         response = client.post("/api/shots/analyze-llm", data={
@@ -4777,6 +4796,7 @@ class TestLLMShotAnalysisEndpoint:
         mock_response = MagicMock()
         mock_response.text = "Analysis with description context"
         mock_model.generate_content.return_value = mock_response
+        mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
         response = client.post("/api/shots/analyze-llm", data={
@@ -4789,7 +4809,7 @@ class TestLLMShotAnalysisEndpoint:
         
         assert response.status_code == 200
         # Verify description was passed to LLM
-        call_args = mock_model.generate_content.call_args[0][0]
+        call_args = mock_model.async_generate_content.call_args[0][0]
         assert "gentle preinfusion" in call_args
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
@@ -4831,6 +4851,7 @@ class TestLLMShotAnalysisEndpoint:
         mock_response = MagicMock()
         mock_response.text = "Analysis"
         mock_model.generate_content.return_value = mock_response
+        mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
         response = client.post("/api/shots/analyze-llm", data={
@@ -4887,6 +4908,7 @@ Special Notes:
 Adjust grind based on bean age."""
         
         mock_model.generate_content.return_value = mock_response
+        mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
         mock_history_file.exists.return_value = False
@@ -4915,6 +4937,7 @@ Adjust grind based on bean age."""
         mock_response = MagicMock()
         mock_response.text = "Converted description"
         mock_model.generate_content.return_value = mock_response
+        mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
         # Mock history file
@@ -4947,6 +4970,7 @@ Adjust grind based on bean age."""
         """Test handling of LLM errors."""
         mock_model = MagicMock()
         mock_model.generate_content.side_effect = Exception("API error")
+        mock_model.async_generate_content = AsyncMock(side_effect=Exception("API error"))
         mock_get_model.return_value = mock_model
         
         response = client.post("/api/profile/convert-description", json={
@@ -4963,6 +4987,7 @@ Adjust grind based on bean age."""
         mock_response = MagicMock()
         mock_response.text = "Converted"
         mock_model.generate_content.return_value = mock_response
+        mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
         response = client.post("/api/profile/convert-description", json={
@@ -4977,7 +5002,7 @@ Adjust grind based on bean age."""
         
         assert response.status_code == 200
         # Verify prompt included original description
-        call_args = mock_model.generate_content.call_args[0][0]
+        call_args = mock_model.async_generate_content.call_args[0][0]
         assert "Detailed original description" in call_args
         assert "Complex Profile" in call_args
 
@@ -6416,6 +6441,7 @@ class TestGetVisionModel:
         with patch('services.gemini_service.genai.Client', return_value=mock_client_instance):
             model = main.get_vision_model()
             assert hasattr(model, 'generate_content')
+            assert hasattr(model, 'async_generate_content')
             
             # Call generate_content and verify it delegates to client
             model.generate_content('test prompt')

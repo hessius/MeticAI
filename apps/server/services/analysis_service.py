@@ -1145,6 +1145,6 @@ Special Notes:
 Be concise but informative. Focus on actionable barista guidance."""
 
     model = get_vision_model()
-    response = model.generate_content(prompt)
+    response = await model.async_generate_content(prompt)
     
     return response.text.strip()
