@@ -533,9 +533,9 @@ Special Notes: For maximum clarity and to really make those delicate floral note
   return (
     <>
       {showBlobs && <AmbientBackground />}
-      <div className={`min-h-screen text-foreground flex justify-center px-5 overflow-x-hidden relative ${isHome ? 'items-center py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
+      <div className={`min-h-screen text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-center py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
-      <div className="w-full max-w-md relative">
+      <div className="w-full max-w-md lg:max-w-5xl relative">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}

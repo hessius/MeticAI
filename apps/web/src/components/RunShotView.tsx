@@ -557,6 +557,11 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
         )}
       </AnimatePresence>
 
+      {/* Desktop two-column layout */}
+      <div className="desktop-two-col">
+      {/* Left column: Profile + Options + Action */}
+      <div className="space-y-6 desktop-panel-left">
+
       {/* Profile Selection */}
       <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -709,6 +714,43 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           )}
         </AnimatePresence>
       </Card>
+
+      {/* Action Button */}
+      <Button
+        size="lg"
+        className="w-full"
+        onClick={scheduleMode ? handleSchedule : handleRunNow}
+        disabled={isRunning || (!selectedProfile && !preheat)}
+      >
+        {isRunning ? (
+          <SpinnerGap size={20} className="animate-spin mr-2" />
+        ) : scheduleMode ? (
+          <Clock size={20} className="mr-2" />
+        ) : (
+          <Play size={20} className="mr-2" weight="fill" />
+        )}
+        {isRunning 
+          ? 'Starting...' 
+          : scheduleMode 
+            ? 'Schedule Shot'
+            : preheat && selectedProfile 
+              ? 'Preheat & Run' 
+              : preheat 
+                ? 'Start Preheat' 
+                : 'Run Now'}
+      </Button>
+
+      {/* Help Text */}
+      <p className="text-xs text-muted-foreground text-center">
+        {!selectedProfile && preheat && 'Preheat only - no profile will be run'}
+        {selectedProfile && !preheat && !scheduleMode && 'Profile will start immediately'}
+        {selectedProfile && preheat && !scheduleMode && `Preheat will start now, profile runs in ${PREHEAT_DURATION_MINUTES} min`}
+        {scheduleMode && preheat && `Preheat starts ${PREHEAT_DURATION_MINUTES} min before scheduled time`}
+      </p>
+      </div>{/* end left column */}
+
+      {/* Right column: Schedules */}
+      <div className="space-y-6 desktop-panel-right">
 
       {/* Scheduled Shots */}
       {scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (
@@ -953,39 +995,8 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           </p>
         )}
       </Card>
-
-      {/* Action Button */}
-      <Button
-        size="lg"
-        className="w-full"
-        onClick={scheduleMode ? handleSchedule : handleRunNow}
-        disabled={isRunning || (!selectedProfile && !preheat)}
-      >
-        {isRunning ? (
-          <SpinnerGap size={20} className="animate-spin mr-2" />
-        ) : scheduleMode ? (
-          <Clock size={20} className="mr-2" />
-        ) : (
-          <Play size={20} className="mr-2" weight="fill" />
-        )}
-        {isRunning 
-          ? 'Starting...' 
-          : scheduleMode 
-            ? 'Schedule Shot'
-            : preheat && selectedProfile 
-              ? 'Preheat & Run' 
-              : preheat 
-                ? 'Start Preheat' 
-                : 'Run Now'}
-      </Button>
-
-      {/* Help Text */}
-      <p className="text-xs text-muted-foreground text-center">
-        {!selectedProfile && preheat && 'Preheat only - no profile will be run'}
-        {selectedProfile && !preheat && !scheduleMode && 'Profile will start immediately'}
-        {selectedProfile && preheat && !scheduleMode && `Preheat will start now, profile runs in ${PREHEAT_DURATION_MINUTES} min`}
-        {scheduleMode && preheat && `Preheat starts ${PREHEAT_DURATION_MINUTES} min before scheduled time`}
-      </p>
+      </div>{/* end right column */}
+      </div>{/* end two-column wrapper */}
     </motion.div>
   )
 }
