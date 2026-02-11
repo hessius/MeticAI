@@ -981,6 +981,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
             </div>
           )}
 
+        {/* Two-column layout wrapper for desktop */}
+        <div className="desktop-two-col">
+        {/* Left column: Content */}
+        <div className="space-y-4 desktop-panel-left">
         <div className="space-y-4">
           {entry.coffee_analysis && (
             <motion.div 
@@ -1039,7 +1043,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
           {entry.profile_json && (
             <ProfileBreakdown profile={entry.profile_json as ProfileData} />
           )}
+        </div>{/* end left column */}
 
+        {/* Right column: Actions */}
+        <div className="desktop-panel-right">
         {!isCapturing && (
           <div className="space-y-2.5">
             {/* Shot History Button */}
@@ -1209,6 +1216,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
             </div>
           </div>
         )}
+        </div>{/* end right column */}
+        </div>{/* end two-column wrapper */}
         </Card>
       </div>
       
