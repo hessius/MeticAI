@@ -166,7 +166,7 @@ export function ResultsView({
                 <Label className="text-sm font-semibold tracking-wide text-primary">
                   Coffee Analysis
                 </Label>
-                <div className="p-4 bg-secondary/50 rounded-xl border border-primary/15">
+                <div className="p-4 bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] rounded-xl border border-[var(--glass-border)] shadow-[var(--glass-shadow)]">
                   <p className="text-sm leading-relaxed text-foreground/90">
                     <MarkdownText>{apiResponse.analysis}</MarkdownText>
                   </p>
@@ -187,7 +187,7 @@ export function ResultsView({
                     <Label className="text-sm font-semibold tracking-wide text-primary">
                       {section.title}
                     </Label>
-                    <div className="p-4 bg-secondary/50 rounded-xl border border-primary/15">
+                    <div className="p-4 bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] rounded-xl border border-[var(--glass-border)] shadow-[var(--glass-shadow)]">
                       <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
                         <MarkdownText>{section.content}</MarkdownText>
                       </p>
@@ -200,7 +200,7 @@ export function ResultsView({
                 <Label className="text-sm font-semibold tracking-wide text-primary">
                   Profile
                 </Label>
-                <div className="p-4 bg-secondary/50 rounded-xl border border-primary/15">
+                <div className="p-4 bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] rounded-xl border border-[var(--glass-border)] shadow-[var(--glass-shadow)]">
                   <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
                     <MarkdownText>{apiResponse.reply}</MarkdownText>
                   </p>
