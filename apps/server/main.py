@@ -219,7 +219,7 @@ app.include_router(scheduling.router)
 from config import DATA_DIR, MAX_UPLOAD_SIZE, TEST_MODE
 from utils.file_utils import atomic_write_json, deep_convert_to_dict
 from utils.sanitization import sanitize_profile_name_for_filename as _sanitize_profile_name_for_filename
-from services.gemini_service import parse_gemini_error, get_vision_model
+from services.gemini_service import parse_gemini_error, get_vision_model, get_gemini_client
 from services.meticulous_service import get_meticulous_api, decompress_shot_data
 from services.cache_service import (
     get_cached_llm_analysis, save_llm_analysis_to_cache
@@ -242,6 +242,6 @@ from api.routes.profiles import (
     _schedule_next_recurring, _recurring_schedule_checker
 )
 
-# Re-export genai for tests that mock it
-import google.generativeai as genai
+# Re-export gemini_service functions for tests that mock them
+from services.gemini_service import get_gemini_client as _get_gemini_client  # noqa: F811
 

@@ -295,24 +295,17 @@ async def generate_profile_image(
             }
         )
         
-        # Generate image using google-genai SDK with Nano Banana model
-        try:
-            from google import genai
-            from google.genai import types as genai_types
-        except ImportError:
-            raise HTTPException(
-                status_code=501,
-                detail="Image generation requires the 'google-genai' package. Install it with: pip install google-genai"
-            )
+        # Generate image using Imagen via google-genai SDK
+        from google.genai import types as genai_types
+        from services.gemini_service import get_gemini_client
         
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
+        try:
+            client = get_gemini_client()
+        except ValueError:
             raise HTTPException(
                 status_code=402,
                 detail="Image generation requires GEMINI_API_KEY to be set."
             )
-        
-        client = genai.Client(api_key=api_key)
         
         response = client.models.generate_images(
             model="imagen-4.0-fast-generate-001",
