@@ -78,7 +78,8 @@ export function LoadingView({ currentMessage }: LoadingViewProps) {
 
           <div className="w-full bg-[rgba(0,0,0,0.3)] rounded-full h-1.5 overflow-hidden">
             <motion.div
-              className="h-full bg-[var(--gold-gradient)] rounded-full"
+              className="h-full rounded-full"
+              style={{ background: 'linear-gradient(135deg, #FFC107 0%, #FF8F00 50%, #FF6F00 100%)' }}
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
               transition={{ duration: 75, ease: "linear" }}
