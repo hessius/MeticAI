@@ -6,6 +6,13 @@ import io
 import subprocess
 import logging
 
+# Register HEIC/HEIF support with Pillow
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass  # pillow-heif not installed; HEIC files will fail gracefully
+
 from services.gemini_service import (
     parse_gemini_error,
     get_vision_model,
@@ -181,6 +188,9 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
+        # Convert to RGB if needed (e.g. HEIC may be RGBA or other modes)
+        if image.mode not in ('RGB', 'L'):
+            image = image.convert('RGB')
         
         logger.debug(
             "Image loaded successfully",
@@ -279,6 +289,9 @@ async def analyze_and_profile(
             logger.debug("Reading and analyzing image", extra={"request_id": request_id})
             contents = await file.read()
             image = Image.open(io.BytesIO(contents))
+            # Convert to RGB if needed (e.g. HEIC may be RGBA or other modes)
+            if image.mode not in ('RGB', 'L'):
+                image = image.convert('RGB')
             
             # Analyze the coffee bag
             analysis_response = get_vision_model().generate_content([
