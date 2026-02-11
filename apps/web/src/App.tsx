@@ -578,9 +578,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
               )}
             </div>
           </div>
-          {!isHome && (
-            <p className="text-muted-foreground text-xs font-medium tracking-wide">Meticulous Espresso AI Profiler</p>
-          )}
+
         </motion.div>
 
         <AnimatePresence mode="wait">

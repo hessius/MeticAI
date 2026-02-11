@@ -21,9 +21,7 @@ import {
   CaretUp,
   Globe,
   WifiHigh,
-  WifiSlash,
-  Sun,
-  Moon
+  WifiSlash
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -534,8 +532,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 {onToggleTheme !== undefined && (
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="theme-toggle" className="text-sm font-medium flex items-center gap-2">
-                        {isDark ? <Moon size={16} weight="duotone" /> : <Sun size={16} weight="duotone" />}
+                      <Label htmlFor="theme-toggle" className="text-sm font-medium">
                         {isDark ? 'Dark mode' : 'Light mode'}
                       </Label>
                       <p className="text-xs text-muted-foreground">Toggle between light and dark theme</p>
@@ -811,6 +808,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           <Button
             onClick={handleUpdate}
             disabled={isUpdating || !updateAvailable || !canTriggerUpdate}
+            variant="dark-brew"
             className="flex-1"
           >
             <DownloadSimple size={18} className="mr-2" />
@@ -840,7 +838,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             onClick={handleRestart}
             disabled={isRestarting}
             variant="outline"
-            className="w-full border-destructive/30 hover:border-destructive/50 hover:bg-destructive/5 text-destructive hover:text-destructive"
+            className="w-full bg-destructive/15 border-destructive/25 backdrop-blur-md text-white hover:bg-destructive/25 hover:border-destructive/40"
           >
             {isRestarting ? (
               t('settings.restarting')
