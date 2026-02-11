@@ -8,6 +8,13 @@ import logging
 import asyncio
 import uuid
 
+# Register HEIC/HEIF support with Pillow
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass  # pillow-heif not installed; HEIC files will fail gracefully
+
 from config import DATA_DIR, MAX_UPLOAD_SIZE
 from services.meticulous_service import get_meticulous_api
 from services.cache_service import _get_cached_image, _set_cached_image
