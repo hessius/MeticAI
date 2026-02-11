@@ -535,7 +535,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
       {showBlobs && <AmbientBackground />}
       <div className="min-h-screen text-foreground flex items-center justify-center p-5 overflow-x-hidden relative" style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
-      <div className="w-full max-w-md relative overflow-hidden">
+      <div className="w-full max-w-md relative">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
