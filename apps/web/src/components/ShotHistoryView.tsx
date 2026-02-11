@@ -39,7 +39,7 @@ import {
 } from '@phosphor-icons/react'
 import { domToPng } from 'modern-screenshot'
 import { useShotHistory, ShotInfo, ShotData } from '@/hooks/useShotHistory'
-import { LlmAnalysisModal } from '@/components/LlmAnalysisModal'
+import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { getServerUrl } from '@/lib/config'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
@@ -396,13 +396,13 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
   const [llmAnalysisResult, setLlmAnalysisResult] = useState<string | null>(null)
   const [isLlmAnalyzing, setIsLlmAnalyzing] = useState(false)
   const [llmAnalysisError, setLlmAnalysisError] = useState<string | null>(null)
-  const [showLlmModal, setShowLlmModal] = useState(false)
+  const [showLlmView, setShowLlmView] = useState(false)
   const [isLlmCached, setIsLlmCached] = useState(false)
   
-  // Debug: Log when showLlmModal state changes
+  // Debug: Log when showLlmView state changes
   useEffect(() => {
-    console.log('[ShotHistoryView] *** showLlmModal STATE CHANGED TO:', showLlmModal)
-  }, [showLlmModal])
+    console.log('[ShotHistoryView] *** showLlmView STATE CHANGED TO:', showLlmView)
+  }, [showLlmView])
   
   // Check server-side LLM analysis cache when shot changes
   useEffect(() => {
@@ -770,9 +770,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
       return
     }
     
-    // Open modal immediately and start loading
-    console.log('[ShotHistoryView] Setting showLlmModal to TRUE')
-    setShowLlmModal(true)
+    // Open view immediately and start loading
+    console.log('[ShotHistoryView] Setting showLlmView to TRUE')
+    setShowLlmView(true)
     setIsLlmAnalyzing(true)
     setLlmAnalysisError(null)
     
@@ -819,9 +819,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
     }
   }
   
-  // Open LLM modal to view cached result
+  // Open LLM view to see cached result
   const handleViewLlmAnalysis = async () => {
-    console.log('[ShotHistoryView] handleViewLlmAnalysis called - opening modal')
+    console.log('[ShotHistoryView] handleViewLlmAnalysis called - opening view')
     
     // If we don't have the result in state but it's cached on server, load it now
     if (!llmAnalysisResult && selectedShot && isLlmCached) {
@@ -837,7 +837,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
         if (response.ok) {
           const data = await response.json()
           if (data.cached && data.analysis) {
-            console.log('[ShotHistoryView] Loaded cached analysis from server for modal view')
+            console.log('[ShotHistoryView] Loaded cached analysis from server for view')
             setLlmAnalysisResult(data.analysis)
           }
         }
@@ -846,7 +846,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
       }
     }
     
-    setShowLlmModal(true)
+    setShowLlmView(true)
   }
   
   // Re-analyze (force fresh analysis, ignore cache)
@@ -902,10 +902,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
     }
   }
   
-  // Close LLM modal handler
-  const handleCloseLlmModal = () => {
-    console.log('[ShotHistoryView] Closing LLM modal')
-    setShowLlmModal(false)
+  // Close LLM view handler
+  const handleCloseLlmView = () => {
+    console.log('[ShotHistoryView] Closing LLM view')
+    setShowLlmView(false)
   }
 
   // Transform shot data into chart-compatible format
@@ -1311,6 +1311,22 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
   }, [shotData, comparisonShotData])
 
   if (selectedShot) {
+    // Show Expert Analysis view when active, otherwise show Shot Details
+    if (showLlmView) {
+      return (
+        <ExpertAnalysisView
+          isLoading={isLlmAnalyzing}
+          analysisResult={llmAnalysisResult}
+          error={llmAnalysisError}
+          onBack={handleCloseLlmView}
+          onReAnalyze={handleReAnalyze}
+          profileName={profileName}
+          shotDate={selectedShot?.date}
+          isCached={isLlmCached}
+        />
+      );
+    }
+
     return (
       <motion.div
         initial={{ opacity: 0, x: 20 }}
@@ -2722,7 +2738,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             variant="default"
                             size="sm"
                             onClick={handleViewLlmAnalysis}
-                            className="gap-1.5 w-full bg-violet-600 hover:bg-violet-700 border-0"
+                            className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
                             View Expert Analysis (AI)
@@ -2733,7 +2749,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             size="sm"
                             onClick={handleLlmAnalysis}
                             disabled={isLlmAnalyzing}
-                            className="gap-1.5 w-full bg-violet-600 hover:bg-violet-700 border-0"
+                            className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
                             Get Expert Analysis (AI)
@@ -2753,19 +2769,6 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
             </p>
           )}
         </Card>
-        
-        {/* LLM Analysis Modal - Must be inside selectedShot block! */}
-        <LlmAnalysisModal
-          isOpen={showLlmModal}
-          isLoading={isLlmAnalyzing}
-          analysisResult={llmAnalysisResult}
-          error={llmAnalysisError}
-          onClose={handleCloseLlmModal}
-          onReAnalyze={handleReAnalyze}
-          profileName={profileName}
-          shotDate={selectedShot?.date}
-          isCached={isLlmCached}
-        />
       </motion.div>
     )
   }

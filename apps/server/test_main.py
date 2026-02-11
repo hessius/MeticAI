@@ -4435,31 +4435,33 @@ class TestLocalShotAnalysisEndpoint:
 class TestGenerateProfileImageEndpoint:
     """Tests for the POST /api/profile/{profile_name}/generate-image endpoint."""
 
-    @patch('subprocess.run')
-    @patch('api.routes.profiles.get_meticulous_api')
-    @patch('api.routes.profiles.process_image_for_profile')
+    def _make_mock_genai_response(self, image_data=b"fake_png_data"):
+        """Helper to create a mock genai generate_images response."""
+        mock_response = MagicMock()
+        mock_image = MagicMock()
+        mock_image.image.image_bytes = image_data
+        mock_response.generated_images = [mock_image]
+        return mock_response
+
+    def _make_mock_genai_empty_response(self):
+        """Helper to create a mock genai response with no images."""
+        mock_response = MagicMock()
+        mock_response.generated_images = []
+        return mock_response
+
     @patch('api.routes.profiles._set_cached_image')
-    @patch('api.routes.profiles.os.path.isfile')
-    def test_generate_image_preview_mode(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    @patch('api.routes.profiles.process_image_for_profile')
+    def test_generate_image_preview_mode(self, mock_process, mock_cache, client):
         """Test image generation in preview mode."""
-        # Mock subprocess for gemini CLI
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
-        
-        # Mock local file check
-        mock_isfile.return_value = True
-        
-        # Mock reading the generated image
-        mock_image_data = b"fake_png_data"
-        
-        # Mock image processing
         mock_process.return_value = ("data:image/png;base64,abc123", b"png_bytes")
+        mock_response = self._make_mock_genai_response()
         
-        with patch('builtins.open', mock_open(read_data=mock_image_data)):
-            response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
+        mock_client = MagicMock()
+        mock_client.models.generate_images.return_value = mock_response
+        
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            with patch('google.genai.Client', return_value=mock_client):
+                response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
         
         assert response.status_code == 200
         data = response.json()
@@ -4468,23 +4470,16 @@ class TestGenerateProfileImageEndpoint:
         assert data["style"] == "abstract"
         assert "prompt" in data
 
-    @patch('subprocess.run')
-    @patch('api.routes.profiles.get_meticulous_api')
-    @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    @patch('api.routes.profiles.os.path.isfile')
-    def test_generate_image_save_to_profile(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    @patch('api.routes.profiles.process_image_for_profile')
+    @patch('api.routes.profiles.get_meticulous_api')
+    def test_generate_image_save_to_profile(self, mock_get_api, mock_process, mock_cache, client):
         """Test image generation and save to profile."""
-        # Mock subprocess for gemini CLI
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        mock_subprocess.return_value = mock_result
-        
-        # Mock local file check
-        mock_isfile.return_value = True
-        
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        mock_response = self._make_mock_genai_response()
+        
+        mock_client = MagicMock()
+        mock_client.models.generate_images.return_value = mock_response
         
         # Mock API
         mock_api = MagicMock()
@@ -4507,128 +4502,73 @@ class TestGenerateProfileImageEndpoint:
         save_result.error = None
         mock_api.save_profile.return_value = save_result
         
-        with patch('builtins.open', mock_open(read_data=b"fake_png")):
-            response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            with patch('google.genai.Client', return_value=mock_client):
+                response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
         
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
         assert data["profile_id"] == "p-123"
 
-    @patch('subprocess.run')
-    def test_generate_image_nanobanana_auth_error(self, mock_subprocess, client):
-        """Test handling of API key errors."""
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_result.stderr = "API key authentication failed"
-        mock_result.stdout = ""
-        mock_subprocess.return_value = mock_result
-        
-        response = client.post("/api/profile/Test/generate-image")
+    def test_generate_image_no_api_key(self, client):
+        """Test error when GEMINI_API_KEY is not set."""
+        env = os.environ.copy()
+        env.pop("GEMINI_API_KEY", None)
+        with patch.dict(os.environ, env, clear=True):
+            response = client.post("/api/profile/Test/generate-image")
         
         assert response.status_code == 402
 
-    @patch('subprocess.run')
-    def test_generate_image_nanobanana_generic_error(self, mock_subprocess, client):
-        """Test handling of generic generation errors."""
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_result.stderr = "Unknown error occurred"
-        mock_result.stdout = ""
-        mock_subprocess.return_value = mock_result
-        
-        response = client.post("/api/profile/Test/generate-image")
-        
-        assert response.status_code == 500
-
-    @patch('subprocess.run')
-    def test_generate_image_timeout(self, mock_subprocess, client):
-        """Test handling of generation timeout."""
-        mock_subprocess.side_effect = subprocess.TimeoutExpired("gemini", 120)
-        
-        response = client.post("/api/profile/Test/generate-image")
-        
-        assert response.status_code == 504
-
-    @patch('subprocess.run')
-    @patch('api.routes.profiles.process_image_for_profile')
-    @patch('api.routes.profiles.os.path.isfile')
-    @patch('api.routes.profiles.os.path.isdir')
-    def test_generate_image_file_not_found(self, mock_isdir, mock_isfile, mock_process, mock_subprocess, client):
-        """Test when generated image cannot be found."""
-        # Gemini CLI succeeds but file not found
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Done but no file path"
-        mock_subprocess.return_value = mock_result
-        
-        # All local file checks fail
-        mock_isfile.return_value = False
-        mock_isdir.return_value = False
-        
-        response = client.post("/api/profile/Test/generate-image")
-        
-        assert response.status_code == 500
-
-    @patch('subprocess.run')
     @patch('api.routes.profiles._set_cached_image')
-    @patch('api.routes.profiles.os.path.isfile')
-    def test_generate_image_invalid_style(self, mock_isfile, mock_cache, mock_subprocess, client):
+    @patch('api.routes.profiles.process_image_for_profile')
+    def test_generate_image_invalid_style(self, mock_process, mock_cache, client):
         """Test with invalid style parameter (should default to abstract)."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        mock_subprocess.return_value = mock_result
-        mock_isfile.return_value = True
+        mock_process.return_value = ("data:image/png;base64,xyz", b"png")
+        mock_response = self._make_mock_genai_response()
         
-        with patch('api.routes.profiles.process_image_for_profile') as mock_process:
-            mock_process.return_value = ("data:image/png;base64,xyz", b"png")
-            
-            with patch('builtins.open', mock_open(read_data=b"fake_png")):
+        mock_client = MagicMock()
+        mock_client.models.generate_images.return_value = mock_response
+        
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            with patch('google.genai.Client', return_value=mock_client):
                 response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["style"] == "abstract"  # Should default
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["style"] == "abstract"  # Should default
 
-    @patch('subprocess.run')
     @patch('api.routes.profiles.get_meticulous_api')
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    @patch('api.routes.profiles.os.path.isfile')
-    def test_generate_image_profile_not_found_for_save(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    def test_generate_image_profile_not_found_for_save(self, mock_cache, mock_process, mock_get_api, client):
         """Test error when profile not found for saving."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        mock_subprocess.return_value = mock_result
-        mock_isfile.return_value = True
-        
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        mock_response = self._make_mock_genai_response()
+        
+        mock_client = MagicMock()
+        mock_client.models.generate_images.return_value = mock_response
         
         mock_api = MagicMock()
         mock_get_api.return_value = mock_api
         mock_api.list_profiles.return_value = []
         
-        with patch('builtins.open', mock_open(read_data=b"fake_png")):
-            response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            with patch('google.genai.Client', return_value=mock_client):
+                response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
         
         assert response.status_code == 404
 
-    @patch('subprocess.run')
     @patch('api.routes.profiles.get_meticulous_api')
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    @patch('api.routes.profiles.os.path.isfile')
-    def test_generate_image_save_failure(self, mock_isfile, mock_cache, mock_process, mock_get_api, mock_subprocess, client):
+    def test_generate_image_save_failure(self, mock_cache, mock_process, mock_get_api, client):
         """Test handling of profile save failure."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        mock_subprocess.return_value = mock_result
-        mock_isfile.return_value = True
-        
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
+        mock_response = self._make_mock_genai_response()
+        
+        mock_client = MagicMock()
+        mock_client.models.generate_images.return_value = mock_response
         
         mock_api = MagicMock()
         mock_get_api.return_value = mock_api
@@ -4651,25 +4591,33 @@ class TestGenerateProfileImageEndpoint:
         save_result.error = "Failed to save"
         mock_api.save_profile.return_value = save_result
         
-        with patch('builtins.open', mock_open(read_data=b"fake_png")):
-            response = client.post("/api/profile/Test/generate-image?preview=false")
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            with patch('google.genai.Client', return_value=mock_client):
+                response = client.post("/api/profile/Test/generate-image?preview=false")
         
         assert response.status_code == 502
 
-    @patch('subprocess.run')
-    @patch('api.routes.profiles.os.path.isfile')
-    def test_generate_image_read_failure(self, mock_isfile, mock_subprocess, client):
-        """Test when reading generated image fails."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "saved it to `/root/nanobanana-output/test.png`"
-        mock_subprocess.return_value = mock_result
+    def test_generate_image_no_image_in_response(self, client):
+        """Test when model returns no image data."""
+        mock_response = self._make_mock_genai_empty_response()
         
-        # File exists but read fails
-        mock_isfile.return_value = True
+        mock_client = MagicMock()
+        mock_client.models.generate_images.return_value = mock_response
         
-        with patch('builtins.open', side_effect=IOError("Read error")):
-            response = client.post("/api/profile/Test/generate-image")
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            with patch('google.genai.Client', return_value=mock_client):
+                response = client.post("/api/profile/Test/generate-image")
+        
+        assert response.status_code == 500
+
+    def test_generate_image_api_error(self, client):
+        """Test handling of Gemini API errors."""
+        mock_client = MagicMock()
+        mock_client.models.generate_images.side_effect = Exception("API rate limit exceeded")
+        
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+            with patch('google.genai.Client', return_value=mock_client):
+                response = client.post("/api/profile/Test/generate-image")
         
         assert response.status_code == 500
 
