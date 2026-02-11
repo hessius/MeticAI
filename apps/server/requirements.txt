@@ -1,6 +1,5 @@
 fastapi==0.109.1
 uvicorn==0.40.0
-google-generativeai==0.8.6
 google-genai>=1.0.0
 pillow>=10.3.0
 python-multipart==0.0.22

@@ -31,7 +31,7 @@ import main  # Import main module for constants and remaining functions
 # Import service modules
 import services.gemini_service
 import services.meticulous_service
-from services.gemini_service import get_vision_model, parse_gemini_error
+from services.gemini_service import get_vision_model, get_gemini_client, parse_gemini_error
 from services.history_service import save_to_history, load_history, save_history, ensure_history_file
 from services.cache_service import (
     _get_cached_image, _set_cached_image,
@@ -4459,9 +4459,8 @@ class TestGenerateProfileImageEndpoint:
         mock_client = MagicMock()
         mock_client.models.generate_images.return_value = mock_response
         
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch('google.genai.Client', return_value=mock_client):
-                response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
+        with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
+            response = client.post("/api/profile/Test%20Profile/generate-image?preview=true&style=abstract")
         
         assert response.status_code == 200
         data = response.json()
@@ -4502,9 +4501,8 @@ class TestGenerateProfileImageEndpoint:
         save_result.error = None
         mock_api.save_profile.return_value = save_result
         
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch('google.genai.Client', return_value=mock_client):
-                response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
+        with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
+            response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
         
         assert response.status_code == 200
         data = response.json()
@@ -4513,9 +4511,7 @@ class TestGenerateProfileImageEndpoint:
 
     def test_generate_image_no_api_key(self, client):
         """Test error when GEMINI_API_KEY is not set."""
-        env = os.environ.copy()
-        env.pop("GEMINI_API_KEY", None)
-        with patch.dict(os.environ, env, clear=True):
+        with patch('services.gemini_service.get_gemini_client', side_effect=ValueError("GEMINI_API_KEY environment variable is required")):
             response = client.post("/api/profile/Test/generate-image")
         
         assert response.status_code == 402
@@ -4530,9 +4526,8 @@ class TestGenerateProfileImageEndpoint:
         mock_client = MagicMock()
         mock_client.models.generate_images.return_value = mock_response
         
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch('google.genai.Client', return_value=mock_client):
-                response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
+        with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
+            response = client.post("/api/profile/Test/generate-image?style=invalid&preview=true")
         
         assert response.status_code == 200
         data = response.json()
@@ -4553,9 +4548,8 @@ class TestGenerateProfileImageEndpoint:
         mock_get_api.return_value = mock_api
         mock_api.list_profiles.return_value = []
         
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch('google.genai.Client', return_value=mock_client):
-                response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
+        with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
+            response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
         
         assert response.status_code == 404
 
@@ -4591,9 +4585,8 @@ class TestGenerateProfileImageEndpoint:
         save_result.error = "Failed to save"
         mock_api.save_profile.return_value = save_result
         
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch('google.genai.Client', return_value=mock_client):
-                response = client.post("/api/profile/Test/generate-image?preview=false")
+        with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
+            response = client.post("/api/profile/Test/generate-image?preview=false")
         
         assert response.status_code == 502
 
@@ -4604,9 +4597,8 @@ class TestGenerateProfileImageEndpoint:
         mock_client = MagicMock()
         mock_client.models.generate_images.return_value = mock_response
         
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch('google.genai.Client', return_value=mock_client):
-                response = client.post("/api/profile/Test/generate-image")
+        with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
+            response = client.post("/api/profile/Test/generate-image")
         
         assert response.status_code == 500
 
@@ -4615,9 +4607,8 @@ class TestGenerateProfileImageEndpoint:
         mock_client = MagicMock()
         mock_client.models.generate_images.side_effect = Exception("API rate limit exceeded")
         
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch('google.genai.Client', return_value=mock_client):
-                response = client.post("/api/profile/Test/generate-image")
+        with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
+            response = client.post("/api/profile/Test/generate-image")
         
         assert response.status_code == 500
 
@@ -6319,12 +6310,12 @@ class TestParseGeminiErrorExtended:
 
 
 class TestGetVisionModel:
-    """Test vision model initialization."""
+    """Test vision model / Gemini client initialization."""
     
     def test_get_vision_model_missing_api_key(self, monkeypatch):
         """Test get_vision_model raises error when API key is missing."""
-        # Clear the cached model
-        services.gemini_service._vision_model = None
+        # Clear the cached client
+        services.gemini_service._gemini_client = None
         
         # Remove API key
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -6337,37 +6328,51 @@ class TestGetVisionModel:
         # Restore for other tests
         monkeypatch.setenv("GEMINI_API_KEY", "test_key")
     
-    def test_get_vision_model_lazy_initialization(self, monkeypatch):
-        """Test vision model is lazily initialized."""
-        # Clear the cached model
-        services.gemini_service._vision_model = None
+    def test_get_gemini_client_lazy_initialization(self, monkeypatch):
+        """Test Gemini client is lazily initialized."""
+        # Clear the cached client
+        services.gemini_service._gemini_client = None
         
         monkeypatch.setenv("GEMINI_API_KEY", "test_key_123")
         
-        # Mock genai.configure and GenerativeModel
-        configure_called = []
-        model_created = []
+        # Track Client constructor calls
+        client_calls = []
+        mock_client_instance = MagicMock()
         
-        def mock_configure(api_key):
-            configure_called.append(api_key)
+        def mock_client_constructor(**kwargs):
+            client_calls.append(kwargs)
+            return mock_client_instance
         
-        class MockModel:
-            def __init__(self, model_name):
-                model_created.append(model_name)
+        with patch('services.gemini_service.genai.Client', side_effect=mock_client_constructor):
+            # First call should initialize
+            client1 = main.get_gemini_client()
+            assert len(client_calls) == 1
+            assert client_calls[0]['api_key'] == 'test_key_123'
+            
+            # Second call should reuse cached client
+            client2 = main.get_gemini_client()
+            assert len(client_calls) == 1  # Not called again
+            assert client1 is client2
         
-        monkeypatch.setattr(main.genai, "configure", mock_configure)
-        monkeypatch.setattr(main.genai, "GenerativeModel", MockModel)
+        # Cleanup
+        services.gemini_service._gemini_client = None
+    
+    def test_get_vision_model_returns_wrapper(self, monkeypatch):
+        """Test get_vision_model returns a wrapper with generate_content."""
+        services.gemini_service._gemini_client = None
+        monkeypatch.setenv("GEMINI_API_KEY", "test_key")
         
-        # First call should initialize
-        model1 = main.get_vision_model()
-        assert len(configure_called) == 1
-        assert configure_called[0] == "test_key_123"
-        assert len(model_created) == 1
+        mock_client_instance = MagicMock()
+        with patch('services.gemini_service.genai.Client', return_value=mock_client_instance):
+            model = main.get_vision_model()
+            assert hasattr(model, 'generate_content')
+            
+            # Call generate_content and verify it delegates to client
+            model.generate_content('test prompt')
+            mock_client_instance.models.generate_content.assert_called_once()
         
-        # Second call should reuse cached model
-        model2 = main.get_vision_model()
-        assert len(configure_called) == 1  # Not called again
-        assert model1 is model2
+        # Cleanup
+        services.gemini_service._gemini_client = None
 
 
 class TestGetMeticulousAPI:
@@ -8339,17 +8344,17 @@ class TestGeminiServiceCoverage:
             pass
 
     def test_reset_vision_model(self):
-        """Test reset_vision_model clears the cached model."""
+        """Test reset_vision_model clears the cached client."""
         import services.gemini_service as gs
         
-        # Set the cached model to a sentinel value
-        gs._vision_model = "cached_model"
+        # Set the cached client to a sentinel value
+        gs._gemini_client = "cached_client"
         
         # Reset it
         gs.reset_vision_model()
         
         # Should be None now
-        assert gs._vision_model is None
+        assert gs._gemini_client is None
 
 
 class TestHistoryServiceCoverage:

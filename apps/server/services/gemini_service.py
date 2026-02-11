@@ -1,6 +1,6 @@
 """Gemini service for AI model configuration and prompt building."""
 
-import google.generativeai as genai
+from google import genai
 import os
 import re
 from typing import Optional
@@ -9,8 +9,9 @@ from logging_config import get_logger
 
 logger = get_logger()
 
-# Lazy-loaded vision model
-_vision_model = None
+# Lazy-loaded Gemini client
+_gemini_client: Optional[genai.Client] = None
+_MODEL_NAME = "gemini-2.0-flash"
 
 # Lines the Gemini CLI may leak into stdout that are not part of the response
 _GEMINI_NOISE_PREFIXES = (
@@ -162,28 +163,60 @@ def parse_gemini_error(error_text: str) -> str:
 
 
 def reset_vision_model():
-    """Reset the cached vision model.
+    """Reset the cached Gemini client.
     
     Call this when the GEMINI_API_KEY changes so the next call to
-    get_vision_model() will re-configure with the new key.
+    get_gemini_client() will re-create with the new key.
     """
-    global _vision_model
-    _vision_model = None
+    global _gemini_client
+    _gemini_client = None
 
 
-def get_vision_model():
-    """Lazily initialize and return the vision model."""
-    global _vision_model
-    if _vision_model is None:
+def get_gemini_client() -> genai.Client:
+    """Lazily initialize and return the Gemini client."""
+    global _gemini_client
+    if _gemini_client is None:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise ValueError(
                 "GEMINI_API_KEY environment variable is required but not set. "
                 "Please set it before starting the server."
             )
-        genai.configure(api_key=api_key)
-        _vision_model = genai.GenerativeModel('gemini-2.0-flash')
-    return _vision_model
+        _gemini_client = genai.Client(api_key=api_key)
+    return _gemini_client
+
+
+def get_vision_model():
+    """Return a wrapper that provides the old model.generate_content() interface.
+    
+    This exists for backward compatibility. Callers can do:
+        model = get_vision_model()
+        response = model.generate_content([prompt, image])
+        text = response.text
+    """
+    return _GeminiModelWrapper(get_gemini_client())
+
+
+class _GeminiModelWrapper:
+    """Thin wrapper around google.genai.Client to provide the old GenerativeModel interface."""
+    
+    def __init__(self, client: genai.Client):
+        self._client = client
+    
+    def generate_content(self, contents):
+        """Call generate_content on the Gemini API.
+        
+        Args:
+            contents: A string, list of strings, PIL images, or mixed list
+                     (same format accepted by both old and new SDK).
+        
+        Returns:
+            GenerateContentResponse with .text attribute.
+        """
+        return self._client.models.generate_content(
+            model=_MODEL_NAME,
+            contents=contents,
+        )
 
 
 def get_author_instruction() -> str:
