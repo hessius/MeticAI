@@ -36,14 +36,14 @@ export type TagCategory = typeof PRESET_TAGS[number]['category']
 
 // Refined color palette - more subtle and professional
 export const CATEGORY_COLORS: Record<TagCategory, string> = {
-  body: 'bg-amber-500/8 border-amber-500/25 hover:bg-amber-500/15 hover:border-amber-500/40 text-amber-700 dark:text-amber-300',
-  flavor: 'bg-rose-500/8 border-rose-500/25 hover:bg-rose-500/15 hover:border-rose-500/40 text-rose-700 dark:text-rose-300',
-  mouthfeel: 'bg-sky-500/8 border-sky-500/25 hover:bg-sky-500/15 hover:border-sky-500/40 text-sky-700 dark:text-sky-300',
-  style: 'bg-violet-500/8 border-violet-500/25 hover:bg-violet-500/15 hover:border-violet-500/40 text-violet-700 dark:text-violet-300',
-  extraction: 'bg-emerald-500/8 border-emerald-500/25 hover:bg-emerald-500/15 hover:border-emerald-500/40 text-emerald-700 dark:text-emerald-300',
-  roast: 'bg-orange-500/8 border-orange-500/25 hover:bg-orange-500/15 hover:border-orange-500/40 text-orange-700 dark:text-orange-300',
-  characteristic: 'bg-teal-500/8 border-teal-500/25 hover:bg-teal-500/15 hover:border-teal-500/40 text-teal-700 dark:text-teal-300',
-  process: 'bg-indigo-500/8 border-indigo-500/25 hover:bg-indigo-500/15 hover:border-indigo-500/40 text-indigo-700 dark:text-indigo-300',
+  body: 'bg-amber-500/15 border-amber-500/35 hover:bg-amber-500/25 hover:border-amber-500/50 text-amber-800 dark:text-amber-200',
+  flavor: 'bg-rose-500/15 border-rose-500/35 hover:bg-rose-500/25 hover:border-rose-500/50 text-rose-800 dark:text-rose-200',
+  mouthfeel: 'bg-sky-500/15 border-sky-500/35 hover:bg-sky-500/25 hover:border-sky-500/50 text-sky-800 dark:text-sky-200',
+  style: 'bg-violet-500/15 border-violet-500/35 hover:bg-violet-500/25 hover:border-violet-500/50 text-violet-800 dark:text-violet-200',
+  extraction: 'bg-emerald-500/15 border-emerald-500/35 hover:bg-emerald-500/25 hover:border-emerald-500/50 text-emerald-800 dark:text-emerald-200',
+  roast: 'bg-orange-500/15 border-orange-500/35 hover:bg-orange-500/25 hover:border-orange-500/50 text-orange-800 dark:text-orange-200',
+  characteristic: 'bg-teal-500/15 border-teal-500/35 hover:bg-teal-500/25 hover:border-teal-500/50 text-teal-800 dark:text-teal-200',
+  process: 'bg-indigo-500/15 border-indigo-500/35 hover:bg-indigo-500/25 hover:border-indigo-500/50 text-indigo-800 dark:text-indigo-200',
 }
 
 export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
@@ -66,7 +66,7 @@ export function getTagCategory(label: string): TagCategory | null {
 // Get color classes for a tag
 export function getTagColorClass(label: string, selected = false): string {
   const category = getTagCategory(label)
-  if (!category) return 'bg-gray-500/10 border-gray-500/30 text-gray-700 dark:text-gray-200'
+  if (!category) return 'bg-gray-500/15 border-gray-500/35 text-gray-800 dark:text-gray-200'
   return selected ? CATEGORY_COLORS_SELECTED[category] : CATEGORY_COLORS[category]
 }
 
