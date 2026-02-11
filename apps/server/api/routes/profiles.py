@@ -1596,9 +1596,9 @@ CRITICAL FORMATTING RULES:
 Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
 """
         
-        # Call LLM
+        # Call LLM (non-blocking)
         model = get_vision_model()
-        response = model.generate_content(prompt)
+        response = await model.async_generate_content(prompt)
         
         llm_analysis = response.text if response else "Analysis generation failed"
         
@@ -2231,7 +2231,7 @@ Special Notes:
 Be concise but informative. Focus on actionable barista guidance."""
 
     model = get_vision_model()
-    response = model.generate_content(prompt)
+    response = await model.async_generate_content(prompt)
     
     return response.text.strip()
 
@@ -2300,7 +2300,7 @@ Special Notes:
 Remember: NO information should be lost in this conversion!"""
 
         model = get_vision_model()
-        response = model.generate_content(prompt)
+        response = await model.async_generate_content(prompt)
         converted_description = response.text.strip()
         
         # Update the history entry if it exists
