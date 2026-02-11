@@ -315,7 +315,7 @@ async def generate_profile_image(
         client = genai.Client(api_key=api_key)
         
         response = client.models.generate_images(
-            model="imagen-3.0-generate-002",
+            model="imagen-4.0-fast-generate-001",
             prompt=full_prompt,
             config=genai_types.GenerateImagesConfig(
                 number_of_images=1,
