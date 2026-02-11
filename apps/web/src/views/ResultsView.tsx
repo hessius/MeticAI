@@ -166,7 +166,7 @@ export function ResultsView({
                 <Label className="text-sm font-semibold tracking-wide text-primary">
                   Coffee Analysis
                 </Label>
-                <div className="p-4 bg-secondary/60 rounded-xl border border-primary/20">
+                <div className="p-4 bg-secondary/50 rounded-xl border border-primary/15">
                   <p className="text-sm leading-relaxed text-foreground/90">
                     <MarkdownText>{apiResponse.analysis}</MarkdownText>
                   </p>
@@ -184,10 +184,10 @@ export function ResultsView({
                     transition={{ delay: 0.15 + index * 0.05 }}
                     className="space-y-2"
                   >
-                    <Label className="text-sm font-semibold tracking-wide text-amber-400">
+                    <Label className="text-sm font-semibold tracking-wide text-primary">
                       {section.title}
                     </Label>
-                    <div className="p-4 bg-secondary/60 rounded-xl border border-amber-500/15">
+                    <div className="p-4 bg-secondary/50 rounded-xl border border-primary/15">
                       <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
                         <MarkdownText>{section.content}</MarkdownText>
                       </p>
@@ -197,10 +197,10 @@ export function ResultsView({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label className="text-sm font-semibold tracking-wide text-amber-400">
+                <Label className="text-sm font-semibold tracking-wide text-primary">
                   Profile
                 </Label>
-                <div className="p-4 bg-secondary/60 rounded-xl border border-amber-500/15">
+                <div className="p-4 bg-secondary/50 rounded-xl border border-primary/15">
                   <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
                     <MarkdownText>{apiResponse.reply}</MarkdownText>
                   </p>
@@ -225,7 +225,8 @@ export function ResultsView({
               {createdProfileId && currentProfileJson?.name && (
                 <Button
                   onClick={onRunProfile}
-                  className="w-full h-12 text-sm font-semibold bg-success hover:bg-success/90"
+                  variant="dark-brew"
+                  className="w-full h-12 text-sm font-semibold"
                 >
                   <Play size={18} className="mr-1.5" weight="fill" />
                   Run / Schedule Shot
@@ -259,8 +260,8 @@ export function ResultsView({
 
               <Button
                 onClick={onViewHistory}
-                variant={createdProfileId ? "outline" : "liquid"}
-                className={`w-full h-12 text-sm font-semibold ${createdProfileId ? 'rounded-full border-[rgba(255,255,255,0.1)]' : ''}`}
+                variant={createdProfileId ? "outline" : "dark-brew"}
+                className="w-full h-12 text-sm font-semibold"
               >
                 <Coffee size={18} className="mr-1.5" weight="fill" />
                 Profile Catalogue
