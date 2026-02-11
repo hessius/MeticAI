@@ -92,7 +92,7 @@ export function FormView({
               <motion.div 
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                className="border-2 border-dashed border-[rgba(255,255,255,0.08)] hover:border-primary/50 rounded-2xl p-10 cursor-pointer transition-all duration-200 group bg-[rgba(0,0,0,0.2)] hover:bg-[rgba(0,0,0,0.3)]"
+                className="border-2 border-dashed border-border/50 hover:border-primary/50 rounded-2xl p-10 cursor-pointer transition-all duration-200 group bg-secondary/40 hover:bg-secondary/60"
               >
                 <div className="flex flex-col items-center gap-4 text-muted-foreground group-hover:text-foreground transition-colors duration-200">
                   <div className="flex gap-3">
@@ -201,7 +201,7 @@ export function FormView({
           <Button
             onClick={onSubmit}
             disabled={!canSubmit}
-            variant="liquid"
+            variant="dark-brew"
             className="w-full h-13 text-base transition-all duration-200"
           >
             <Sparkle size={18} weight="fill" className="mr-1" />
