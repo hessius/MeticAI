@@ -58,7 +58,7 @@ export function QRCodeDialog({ open, onOpenChange }: QRCodeDialogProps) {
                   <Alert className="bg-amber-500/10 border-amber-500/30 text-left">
                     <Info className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      This is a localhost URL. Configure a network IP in config.json (serverUrl) to enable cross-device access.
+                      Could not auto-detect a network IP. The QR encodes a localhost URL which won't work from another device. Set a network IP in Settings to enable cross-device access.
                     </AlertDescription>
                   </Alert>
                 )}

@@ -5558,6 +5558,56 @@ class TestVersionEndpointDetailed:
         assert "get" in openapi_data["paths"]["/api/version"]
 
 
+class TestNetworkIpEndpoint:
+    """Tests for the /api/network-ip endpoint."""
+
+    def test_network_ip_returns_200(self, client):
+        """Test that /api/network-ip responds with 200."""
+        response = client.get("/api/network-ip")
+        assert response.status_code == 200
+
+    def test_network_ip_returns_ip_field(self, client):
+        """Test that /api/network-ip returns an 'ip' field."""
+        response = client.get("/api/network-ip")
+        data = response.json()
+        assert "ip" in data
+        assert isinstance(data["ip"], str)
+
+    @patch('api.routes.system.socket')
+    def test_network_ip_uses_udp_socket(self, mock_socket_mod, client):
+        """Test that the endpoint tries the UDP socket trick first."""
+        mock_sock = Mock()
+        mock_sock.getsockname.return_value = ("192.168.1.42", 0)
+        mock_sock.__enter__ = Mock(return_value=mock_sock)
+        mock_sock.__exit__ = Mock(return_value=False)
+        mock_socket_mod.socket.return_value = mock_sock
+        mock_socket_mod.AF_INET = 2
+        mock_socket_mod.SOCK_DGRAM = 2
+
+        response = client.get("/api/network-ip")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ip"] == "192.168.1.42"
+
+    @patch('api.routes.system.socket')
+    def test_network_ip_fallback_to_hostname(self, mock_socket_mod, client):
+        """Test fallback to hostname resolution when UDP fails."""
+        mock_sock = Mock()
+        mock_sock.__enter__ = Mock(return_value=mock_sock)
+        mock_sock.__exit__ = Mock(return_value=False)
+        mock_sock.connect.side_effect = OSError("No network")
+        mock_socket_mod.socket.return_value = mock_sock
+        mock_socket_mod.AF_INET = 2
+        mock_socket_mod.SOCK_DGRAM = 2
+        mock_socket_mod.gethostname.return_value = "myhost"
+        mock_socket_mod.gethostbyname.return_value = "10.0.0.5"
+
+        response = client.get("/api/network-ip")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ip"] == "10.0.0.5"
+
+
 class TestRunShotEndpoints:
     """Tests for the Run Shot / Machine control endpoints."""
 

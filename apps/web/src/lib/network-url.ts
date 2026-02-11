@@ -5,38 +5,53 @@
 import { getServerUrl } from './config'
 
 /**
- * Gets the current page URL with network-accessible hostname
- * If the current URL uses localhost and a server URL is configured with a non-localhost hostname,
- * replaces localhost with the configured server's hostname/IP for network access.
- * @returns Promise<string> The network-accessible URL
+ * Gets the current page URL with network-accessible hostname.
+ *
+ * Resolution order when the page is served from localhost:
+ *  1. Ask the backend for its auto-detected LAN IP  (/api/network-ip)
+ *  2. Fall back to the serverUrl in config.json
+ *  3. Return the current (localhost) URL as a last resort
  */
 export async function getNetworkUrl(): Promise<string> {
   const currentUrl = new URL(window.location.href);
   
-  // If not localhost, return as-is
+  // If not localhost, the URL is already network-accessible
   if (!isLocalhostUrl()) {
     return currentUrl.href;
   }
   
+  // 1. Try auto-detected LAN IP from the backend
   try {
-    // Get configured server URL
-    const serverUrl = await getServerUrl();
-    const serverUrlObj = new URL(serverUrl);
-    
-    // If server URL is also localhost, return current URL
-    const serverHostname = serverUrlObj.hostname;
-    if (serverHostname === 'localhost' || serverHostname === '127.0.0.1' || serverHostname === '::1') {
-      return currentUrl.href;
+    const res = await fetch('/api/network-ip');
+    if (res.ok) {
+      const data = await res.json();
+      const ip: string | undefined = data?.ip;
+      if (ip && ip !== '127.0.0.1' && ip !== '::1') {
+        currentUrl.hostname = ip;
+        return currentUrl.href;
+      }
     }
-    
-    // Replace localhost with server's hostname/IP
-    currentUrl.hostname = serverHostname;
-    return currentUrl.href;
-  } catch (error) {
-    // If config loading fails, return current URL
-    console.warn('Failed to get server URL for network access:', error);
-    return currentUrl.href;
+  } catch {
+    // Non-fatal – try config.json next
   }
+  
+  // 2. Fall back to configured serverUrl
+  try {
+    const serverUrl = await getServerUrl();
+    if (serverUrl) {
+      const serverUrlObj = new URL(serverUrl);
+      const serverHostname = serverUrlObj.hostname;
+      if (serverHostname && serverHostname !== 'localhost' && serverHostname !== '127.0.0.1' && serverHostname !== '::1') {
+        currentUrl.hostname = serverHostname;
+        return currentUrl.href;
+      }
+    }
+  } catch {
+    // Non-fatal
+  }
+  
+  // 3. Last resort – return localhost URL
+  return currentUrl.href;
 }
 
 /**
