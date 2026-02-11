@@ -125,9 +125,8 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
         return
       }
       
-      // Handle horizontal rules
+      // Skip horizontal rules — they add visual noise in card-based layouts
       if (line.trim() === '---' || line.trim() === '***') {
-        result.push(<hr key={`hr-${lineIndex}`} className="my-3 border-t border-foreground/20" />)
         return
       }
       
@@ -164,9 +163,9 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
         const indent = line.length - line.trimStart().length
         const listContent = line.trimStart().substring(2)
         result.push(
-          <div key={`li-${lineIndex}`} className="flex items-start gap-2" style={{ paddingLeft: `${indent * 8}px` }}>
-            <span className="text-muted-foreground">•</span>
-            <span>{processInlineMarkdown(listContent, lineIndex)}</span>
+          <div key={`li-${lineIndex}`} className="flex items-start gap-2.5 py-0.5" style={{ paddingLeft: `${indent * 8}px` }}>
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
+            <span className="leading-relaxed">{processInlineMarkdown(listContent, lineIndex)}</span>
           </div>
         )
         return
@@ -177,9 +176,9 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
       if (numberedMatch) {
         const indent = line.length - line.trimStart().length
         result.push(
-          <div key={`oli-${lineIndex}`} className="flex items-start gap-2" style={{ paddingLeft: `${indent * 8}px` }}>
-            <span className="text-muted-foreground min-w-[1.5em]">{numberedMatch[1]}.</span>
-            <span>{processInlineMarkdown(numberedMatch[2], lineIndex)}</span>
+          <div key={`oli-${lineIndex}`} className="flex items-start gap-2.5 py-0.5" style={{ paddingLeft: `${indent * 8}px` }}>
+            <span className="text-primary/60 font-medium min-w-[1.5em] tabular-nums">{numberedMatch[1]}.</span>
+            <span className="leading-relaxed">{processInlineMarkdown(numberedMatch[2], lineIndex)}</span>
           </div>
         )
         return
