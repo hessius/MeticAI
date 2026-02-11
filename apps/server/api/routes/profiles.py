@@ -4,10 +4,8 @@ from typing import Optional, Any
 from datetime import datetime, timezone
 import json
 import os
-import subprocess
 import logging
 import asyncio
-import tempfile
 import uuid
 
 from config import DATA_DIR, MAX_UPLOAD_SIZE
@@ -227,12 +225,10 @@ async def generate_profile_image(
     tags: str = "",
     preview: bool = False
 ):
-    """Generate an AI image for a profile using the nanobanana extension.
+    """Generate an AI image for a profile using Gemini's native image generation.
     
-    This uses the Gemini CLI with the nanobanana extension to generate
-    a square image based on the profile name and optional tags.
-    
-    IMPORTANT: This feature requires a paid Gemini API key.
+    Uses the google-genai SDK with the gemini-2.5-flash-image model (Nano Banana)
+    to generate a square image based on the profile name and optional tags.
     
     Args:
         profile_name: Name of the profile
@@ -242,14 +238,6 @@ async def generate_profile_image(
         
     Returns:
         Success status with generated image info (and image data if preview=true)
-    
-    Args:
-        profile_name: Name of the profile
-        style: Image style (abstract, minimalist, pixel-art, watercolor, modern, vintage)
-        tags: Comma-separated tags to include in the prompt
-        
-    Returns:
-        Success status with generated image info
     """
     request_id = request.state.request_id
     
@@ -280,7 +268,6 @@ async def generate_profile_image(
             tags=tag_list
         )
         
-        # Validate prompt_result to avoid NoneType subscript errors
         if not prompt_result or not isinstance(prompt_result, dict):
             logger.error(
                 "Failed to build image prompt - prompt_result is invalid",
@@ -308,196 +295,134 @@ async def generate_profile_image(
             }
         )
         
-        # Create a temporary directory for the output
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Execute image generation via Gemini CLI (available in PATH)
-            # The prompt should ask to generate an image directly
-            image_prompt = f"generate an image: {full_prompt}"
-            result = subprocess.run(
-                [
-                    "gemini", "-y", image_prompt
-                ],
-                capture_output=True,
-                text=True,
-                timeout=120  # 2 minute timeout for image generation
+        # Generate image using google-genai SDK with Nano Banana model
+        try:
+            from google import genai
+            from google.genai import types as genai_types
+        except ImportError:
+            raise HTTPException(
+                status_code=501,
+                detail="Image generation requires the 'google-genai' package. Install it with: pip install google-genai"
             )
-            
-            if result.returncode != 0:
-                logger.error(
-                    f"Image generation failed",
-                    extra={
-                        "request_id": request_id,
-                        "returncode": result.returncode,
-                        "stderr": result.stderr,
-                        "stdout": result.stdout
-                    }
-                )
-                
-                # Check for common errors
-                error_output = result.stderr or result.stdout or ""
-                if "API key" in error_output.lower() or "authentication" in error_output.lower():
-                    raise HTTPException(
-                        status_code=402,
-                        detail="Image generation requires a paid Gemini API key. Please set GEMINI_API_KEY in your environment."
-                    )
-                
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Image generation failed: {error_output[:200]}"
-                )
-            
-            # Find the generated image in nanobanana-output
-            # The output path is typically mentioned in the result like:
-            # "saved it to `/root/nanobanana-output/filename.png`"
-            output = result.stdout
-            logger.info(f"Nanobanana output: {output}", extra={"request_id": request_id})
-            
-            # Try to find the image path in the output
-            # nanobanana saves to /nanobanana-output/ (not /root/nanobanana-output/)
-            image_path = None
-            
-            # Look for paths in backticks first (common format)
-            import re
-            backtick_matches = re.findall(r'`([^`]+\.png)`', output)
-            if backtick_matches:
-                for match in backtick_matches:
-                    # The path is already absolute — check locally
-                    if os.path.isfile(match):
-                        image_path = match
-                        logger.info(f"Found image at: {image_path}", extra={"request_id": request_id})
-                        break
-            
-            # Fallback: Look for any .png file path
-            if not image_path:
-                png_matches = re.findall(r'(/[\w\-/\.]+\.png)', output)
-                for match in png_matches:
-                    if os.path.isfile(match):
-                        image_path = match
-                        logger.info(f"Found image at: {image_path}", extra={"request_id": request_id})
-                        break
-            
-            # If no path found, try to list the output directory
-            if not image_path:
-                nanobanana_dir = "/nanobanana-output"
-                if os.path.isdir(nanobanana_dir):
-                    files = sorted(
-                        [f for f in os.listdir(nanobanana_dir) if f.endswith('.png')],
-                        key=lambda f: os.path.getmtime(os.path.join(nanobanana_dir, f)),
-                        reverse=True
-                    )
-                    if files:
-                        image_path = os.path.join(nanobanana_dir, files[0])
-            
-            if not image_path:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Image generation completed but could not find output file"
-                )
-            
-            # Read the image from local filesystem
-            try:
-                with open(image_path, "rb") as f:
-                    image_data = f.read()
-            except (IOError, OSError) as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to read generated image: {e}"
-                )
-            
-            # Process the image (crop/resize) and upload to profile
-            image_data_uri, png_bytes = process_image_for_profile(image_data, "image/png")
-            
-            # Cache the processed image for fast retrieval
-            _set_cached_image(profile_name, png_bytes)
-            
-            logger.info(
-                f"Processed generated image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
+        
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=402,
+                detail="Image generation requires GEMINI_API_KEY to be set."
+            )
+        
+        client = genai.Client(api_key=api_key)
+        
+        response = client.models.generate_images(
+            model="imagen-3.0-generate-002",
+            prompt=full_prompt,
+            config=genai_types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="1:1",
+                output_mime_type="image/png",
+            ),
+        )
+        
+        # Extract image data from response
+        if not response.generated_images or len(response.generated_images) == 0:
+            logger.error(
+                "Image generation returned no images",
                 extra={"request_id": request_id}
             )
-            
-            # If preview mode, return the image without saving
-            if preview:
-                logger.info(
-                    f"Returning preview image for profile: {profile_name}",
-                    extra={"request_id": request_id, "style": style}
-                )
-                return {
-                    "status": "preview",
-                    "message": f"Preview image generated for profile '{profile_name}'",
-                    "style": style,
-                    "prompt": full_prompt,
-                    "prompt_metadata": prompt_metadata,
-                    "image_data": image_data_uri
-                }
-            
-            # Find the profile and update it
-            api = get_meticulous_api()
-            profiles_result = api.list_profiles()
-            
-            if hasattr(profiles_result, 'error') and profiles_result.error:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Machine API error: {profiles_result.error}"
-                )
-            
-            matching_profile = None
-            for partial_profile in profiles_result:
-                if partial_profile.name == profile_name:
-                    full_profile = api.get_profile(partial_profile.id)
-                    if hasattr(full_profile, 'error') and full_profile.error:
-                        continue
-                    matching_profile = full_profile
-                    break
-            
-            if not matching_profile:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Profile '{profile_name}' not found on machine"
-                )
-            
-            # Update the display image
-            from meticulous.profile import Display
-            
-            existing_accent = None
-            if matching_profile.display:
-                existing_accent = matching_profile.display.accentColor
-            
-            matching_profile.display = Display(
-                image=image_data_uri,
-                accentColor=existing_accent
+            raise HTTPException(
+                status_code=500,
+                detail="Image generation completed but no image was returned by the model"
             )
-            
-            save_result = api.save_profile(matching_profile)
-            
-            if hasattr(save_result, 'error') and save_result.error:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Failed to save profile: {save_result.error}"
-                )
-            
+        
+        generated = response.generated_images[0]
+        image_data = generated.image.image_bytes
+        
+        # Process the image (crop/resize) and prepare for profile
+        image_data_uri, png_bytes = process_image_for_profile(image_data, "image/png")
+        
+        # Cache the processed image for fast retrieval
+        _set_cached_image(profile_name, png_bytes)
+        
+        logger.info(
+            f"Processed generated image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
+            extra={"request_id": request_id}
+        )
+        
+        # If preview mode, return the image without saving
+        if preview:
             logger.info(
-                f"Successfully generated and saved profile image: {profile_name}",
+                f"Returning preview image for profile: {profile_name}",
                 extra={"request_id": request_id, "style": style}
             )
-            
             return {
-                "status": "success",
-                "message": f"Image generated for profile '{profile_name}'",
-                "profile_id": matching_profile.id,
+                "status": "preview",
+                "message": f"Preview image generated for profile '{profile_name}'",
                 "style": style,
                 "prompt": full_prompt,
-                "prompt_metadata": prompt_metadata
+                "prompt_metadata": prompt_metadata,
+                "image_data": image_data_uri
             }
-            
-    except subprocess.TimeoutExpired:
-        logger.error(
-            f"Image generation timed out",
-            extra={"request_id": request_id, "profile_name": profile_name}
+        
+        # Find the profile and update it
+        api = get_meticulous_api()
+        profiles_result = api.list_profiles()
+        
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}"
+            )
+        
+        matching_profile = None
+        for partial_profile in profiles_result:
+            if partial_profile.name == profile_name:
+                full_profile = api.get_profile(partial_profile.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+                matching_profile = full_profile
+                break
+        
+        if not matching_profile:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile '{profile_name}' not found on machine"
+            )
+        
+        # Update the display image
+        from meticulous.profile import Display
+        
+        existing_accent = None
+        if matching_profile.display:
+            existing_accent = matching_profile.display.accentColor
+        
+        matching_profile.display = Display(
+            image=image_data_uri,
+            accentColor=existing_accent
         )
-        raise HTTPException(
-            status_code=504,
-            detail="Image generation timed out. Please try again."
+        
+        save_result = api.save_profile(matching_profile)
+        
+        if hasattr(save_result, 'error') and save_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to save profile: {save_result.error}"
+            )
+        
+        logger.info(
+            f"Successfully generated and saved profile image: {profile_name}",
+            extra={"request_id": request_id, "style": style}
         )
+        
+        return {
+            "status": "success",
+            "message": f"Image generated for profile '{profile_name}'",
+            "profile_id": matching_profile.id,
+            "style": style,
+            "prompt": full_prompt,
+            "prompt_metadata": prompt_metadata
+        }
+        
     except HTTPException:
         raise
     except Exception as e:
