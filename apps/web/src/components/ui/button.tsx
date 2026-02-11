@@ -20,6 +20,8 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-secondary/60 text-muted-foreground hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        liquid:
+          "liquid-button rounded-full font-semibold hover:-translate-y-0.5",
       },
       size: {
         default: "h-10 px-5 py-2.5",

@@ -73,86 +73,100 @@
   }
 }
 
-/* Meticulous-inspired color palette - Pure dark with warm neutrals */
+/* Golden Extraction — Premium espresso-inspired palette */
 :root {
-  /* Background colors - Pure black like Meticulous app */
-  --background: oklch(0.05 0 0);
-  --foreground: oklch(0.98 0 0);
+  /* Background colors - Deep Espresso (#12100E) */
+  --background: oklch(0.09 0.005 50);
+  --foreground: oklch(0.96 0.005 90);
   
-  /* Card - Noticeably elevated dark surface */
-  --card: oklch(0.16 0.006 250);
-  --card-foreground: oklch(0.98 0 0);
+  /* Card - Glassmorphism: translucent warm surface */
+  --card: oklch(0.14 0.008 50);
+  --card-foreground: oklch(0.96 0.005 90);
   
   /* Popover */
-  --popover: oklch(0.18 0.006 250);
-  --popover-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.16 0.008 50);
+  --popover-foreground: oklch(0.96 0.005 90);
   
-  /* Primary - Warm amber/gold accent (like coffee, matches Meticulous warmth) */
-  --primary: oklch(0.78 0.14 75);
-  --primary-foreground: oklch(0.12 0 0);
+  /* Primary - Liquid Gold (amber/gold like fresh crema) */
+  --primary: oklch(0.80 0.155 80);
+  --primary-foreground: oklch(0.18 0.03 50);
   
-  /* Secondary - Fields, items, interactive areas */
-  --secondary: oklch(0.24 0.006 250);
-  --secondary-foreground: oklch(0.95 0 0);
+  /* Secondary - Warm dark surface */
+  --secondary: oklch(0.22 0.01 50);
+  --secondary-foreground: oklch(0.93 0.005 90);
   
-  /* Muted - For subtle text and borders */
-  --muted: oklch(0.28 0.006 250);
-  --muted-foreground: oklch(0.60 0 0);
+  /* Muted - Subtle warm tones */
+  --muted: oklch(0.26 0.01 50);
+  --muted-foreground: oklch(0.62 0.01 80);
   
-  /* Accent - Same as primary for consistency */
-  --accent: oklch(0.78 0.14 75);
-  --accent-foreground: oklch(0.12 0 0);
+  /* Accent - Gold matching primary */
+  --accent: oklch(0.80 0.155 80);
+  --accent-foreground: oklch(0.18 0.03 50);
   
-  /* Destructive - Soft red */
+  /* Destructive - Warm red */
   --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(0.98 0 0);
   
-  /* Borders and inputs - more visible */
-  --border: oklch(0.32 0.006 250);
-  --input: oklch(0.26 0.006 250);
-  --ring: oklch(0.78 0.14 75);
+  /* Borders and inputs - warm translucent */
+  --border: oklch(0.30 0.01 50);
+  --input: oklch(0.18 0.01 50);
+  --ring: oklch(0.80 0.155 80);
   
   /* Semantic colors */
   --success: oklch(0.7 0.18 145);
-  --warning: oklch(0.78 0.16 75);
+  --warning: oklch(0.80 0.155 80);
   --info: oklch(0.7 0.15 230);
   
   /* Accent colors for profile sections */
   --neon-pink: oklch(0.72 0.19 350);
   --neon-green: oklch(0.75 0.17 150);
   
-  /* Border radius - Matching Meticulous app rounded corners */
-  --radius: 0.875rem;
+  /* Golden Extraction gradient tokens */
+  --gold-start: #FFC107;
+  --gold-mid: #FF8F00;
+  --gold-end: #FF6F00;
+  --gold-gradient: linear-gradient(135deg, var(--gold-start) 0%, var(--gold-mid) 50%, var(--gold-end) 100%);
+  --gold-glow: rgba(255, 143, 0, 0.4);
+  --gold-glow-strong: rgba(255, 143, 0, 0.6);
+  
+  /* Glassmorphism tokens */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  
+  /* Border radius - Premium rounded corners */
+  --radius: 1.25rem;
 }
 
 .dark {
-  --background: oklch(0.05 0 0);
-  --foreground: oklch(0.98 0 0);
+  --background: oklch(0.09 0.005 50);
+  --foreground: oklch(0.96 0.005 90);
   
-  --card: oklch(0.16 0.006 250);
-  --card-foreground: oklch(0.98 0 0);
+  --card: oklch(0.14 0.008 50);
+  --card-foreground: oklch(0.96 0.005 90);
   
-  --popover: oklch(0.18 0.006 250);
-  --popover-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.16 0.008 50);
+  --popover-foreground: oklch(0.96 0.005 90);
   
-  --primary: oklch(0.78 0.14 75);
-  --primary-foreground: oklch(0.12 0 0);
+  --primary: oklch(0.80 0.155 80);
+  --primary-foreground: oklch(0.18 0.03 50);
   
-  --secondary: oklch(0.24 0.006 250);
-  --secondary-foreground: oklch(0.95 0 0);
+  --secondary: oklch(0.22 0.01 50);
+  --secondary-foreground: oklch(0.93 0.005 90);
   
-  --muted: oklch(0.28 0.006 250);
-  --muted-foreground: oklch(0.60 0 0);
+  --muted: oklch(0.26 0.01 50);
+  --muted-foreground: oklch(0.62 0.01 80);
   
-  --accent: oklch(0.78 0.14 75);
-  --accent-foreground: oklch(0.12 0 0);
+  --accent: oklch(0.80 0.155 80);
+  --accent-foreground: oklch(0.18 0.03 50);
   
   --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(0.98 0 0);
   
-  --border: oklch(0.32 0.006 250);
-  --input: oklch(0.26 0.006 250);
-  --ring: oklch(0.78 0.14 75);
+  --border: oklch(0.30 0.01 50);
+  --input: oklch(0.18 0.01 50);
+  --ring: oklch(0.80 0.155 80);
 }
 
 @theme {
@@ -375,4 +389,96 @@
   [role="button"] {
     border: 1px solid ButtonText;
   }
+}
+
+/* ── Liquid gold button ────────────────────────────────────── */
+.liquid-button {
+  background: var(--gold-gradient);
+  color: #2E221B;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 4px 20px rgba(255, 143, 0, 0.4);
+}
+
+.liquid-button:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 8px 30px rgba(255, 143, 0, 0.6);
+}
+
+.liquid-button:disabled {
+  filter: saturate(0.5) brightness(0.7);
+}
+
+/* ── Ambient background blobs ─────────────────────────────── */
+.ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  will-change: transform, opacity;
+  animation: ambient-pulse 8s ease-in-out infinite alternate;
+}
+
+.ambient-blob--amber {
+  top: -10%;
+  left: -5%;
+  width: 45vw;
+  height: 45vw;
+  background: #FF8F00;
+  animation-delay: 0s;
+}
+
+.ambient-blob--brown {
+  bottom: -15%;
+  right: -10%;
+  width: 50vw;
+  height: 50vw;
+  background: #5D4037;
+  animation-delay: -3s;
+}
+
+.ambient-blob--gold {
+  top: 40%;
+  left: 35%;
+  width: 35vw;
+  height: 35vw;
+  background: #FFC107;
+  opacity: 0.2;
+  animation-delay: -5s;
+}
+
+@keyframes ambient-pulse {
+  0% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1.15) translate(2%, -3%);
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-blob {
+    animation: none !important;
+  }
+}
+
+/* ── Custom scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 143, 0, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 143, 0, 0.5);
 }
