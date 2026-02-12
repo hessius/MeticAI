@@ -109,7 +109,7 @@ Location: `src/hooks/use-swipe-navigation.test.ts`
 
 Run tests with:
 ```bash
-npm run test:run src/hooks/use-swipe-navigation.test.ts
+bun run test:run src/hooks/use-swipe-navigation.test.ts
 ```
 
 ### Manual Testing

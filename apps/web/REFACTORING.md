@@ -269,13 +269,13 @@ src/
 ### Build & Run
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Build production
-npm run build
+bun run build
 
 # Run development server
-npm run dev
+bun run dev
 ```
 
 ### Language Testing

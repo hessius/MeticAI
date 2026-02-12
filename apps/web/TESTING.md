@@ -26,56 +26,56 @@ The MeticAI-web application has four layers of testing:
 
 ```bash
 # Run all unit and integration tests
-npm test
+bun test
 
 # Run tests in watch mode (recommended during development)
-npm test
+bun test
 
 # Run tests once (CI mode)
-npm run test:run
+bun run test:run
 
 # Run tests with coverage report
-npm run test:coverage
+bun run test:coverage
 
 # Run tests with UI
-npm run test:ui
+bun run test:ui
 ```
 
 ### Running E2E Tests
 
 ```bash
 # Run E2E tests
-npm run e2e
+bun run e2e
 
 # Run E2E tests with UI mode
-npm run e2e:ui
+bun run e2e:ui
 
 # Run E2E tests in headed mode (see the browser)
-npm run e2e:headed
+bun run e2e:headed
 
 # Run accessibility tests
-npm run e2e -- e2e/accessibility.spec.ts
+bun run e2e -- e2e/accessibility.spec.ts
 
 # Run specific accessibility test suite
-npm run e2e -- e2e/accessibility.spec.ts -g "Keyboard Navigation"
+bun run e2e -- e2e/accessibility.spec.ts -g "Keyboard Navigation"
 ```
 
 ### Running Accessibility Tests
 
 ```bash
 # Run all accessibility tests
-npm run e2e -- e2e/accessibility.spec.ts
+bun run e2e -- e2e/accessibility.spec.ts
 
 # Run specific test category
-npm run e2e -- e2e/accessibility.spec.ts -g "Color Contrast"
-npm run e2e -- e2e/accessibility.spec.ts -g "ARIA Attributes"
-npm run e2e -- e2e/accessibility.spec.ts -g "Multi-language"
+bun run e2e -- e2e/accessibility.spec.ts -g "Color Contrast"
+bun run e2e -- e2e/accessibility.spec.ts -g "ARIA Attributes"
+bun run e2e -- e2e/accessibility.spec.ts -g "Multi-language"
 
 # Run with UI mode (interactive)
-npm run e2e:ui -- e2e/accessibility.spec.ts
+bun run e2e:ui -- e2e/accessibility.spec.ts
 
 # Run on specific browser
-npm run e2e -- e2e/accessibility.spec.ts --project=chromium
+bun run e2e -- e2e/accessibility.spec.ts --project=chromium
 ```
 
 For detailed accessibility testing information, see [ACCESSIBILITY_TESTING.md](./ACCESSIBILITY_TESTING.md).
@@ -368,22 +368,22 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
-      - run: npm ci
-      - run: npm run test:run
-      - run: npm run e2e
+      - run: bun install --frozen-lockfile
+      - run: bun run test:run
+      - run: bun run e2e
 ```
 
 ## Debugging Tests
 
 ### Vitest UI
 ```bash
-npm run test:ui
+bun run test:ui
 ```
 Opens a browser interface for exploring and debugging tests.
 
 ### Playwright UI
 ```bash
-npm run e2e:ui
+bun run e2e:ui
 ```
 Opens Playwright's UI mode for step-by-step debugging.
 
@@ -395,7 +395,7 @@ Add to `.vscode/launch.json`:
   "type": "node",
   "request": "launch",
   "name": "Debug Tests",
-  "runtimeExecutable": "npm",
+  "runtimeExecutable": "bun",
   "runtimeArgs": ["test"],
   "console": "integratedTerminal"
 }
@@ -403,7 +403,7 @@ Add to `.vscode/launch.json`:
 
 ## Coverage Reports
 
-After running `npm run test:coverage`, view the coverage report:
+After running `bun run test:coverage`, view the coverage report:
 
 ```bash
 # Open HTML coverage report
@@ -426,7 +426,7 @@ Coverage thresholds are not enforced but aim for:
 ```bash
 # Clear node modules and reinstall
 rm -rf node_modules package-lock.json
-npm install
+bun install
 ```
 
 #### Tests timeout

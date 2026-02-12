@@ -10,8 +10,8 @@ This guide provides step-by-step instructions for capturing screenshots of the M
 1. **Start the development server**:
    ```bash
    cd /home/runner/work/MeticAI-web/MeticAI-web
-   npm install
-   npm run dev
+   bun install
+   bun run dev
    ```
 
 2. **Open browser**: Navigate to `http://localhost:5173`
@@ -297,7 +297,7 @@ test('Screenshot language menu', async ({ page }) => {
 
 Run with:
 ```bash
-npx playwright test scripts/take-screenshots.spec.ts
+bunx playwright test scripts/take-screenshots.spec.ts
 ```
 
 ---

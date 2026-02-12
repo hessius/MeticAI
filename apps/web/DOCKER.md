@@ -424,9 +424,9 @@ docker logs meticai-prod
 
 ## Troubleshooting
 
-### Build Fails During npm install
+### Build Fails During bun install
 
-If you encounter errors during the Docker build process when npm is installing dependencies:
+If you encounter errors during the Docker build process when bun is installing dependencies:
 
 **Common causes:**
 - Network connectivity issues
