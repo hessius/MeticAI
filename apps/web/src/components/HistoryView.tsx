@@ -982,7 +982,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
           )}
 
         {/* Two-column layout wrapper for desktop */}
-        <div className="desktop-two-col">
+        <div className="space-y-4 lg:space-y-0 desktop-two-col">
         {/* Left column: Content */}
         <div className="space-y-4 desktop-panel-left">
         <div className="space-y-4">
