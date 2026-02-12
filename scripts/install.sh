@@ -261,7 +261,7 @@ log_success "Configuration saved to ${INSTALL_DIR}/.env"
 
 log_info "Downloading Docker Compose files..."
 
-curl -fsSL "${REPO_URL}/docker-compose.unified.yml" -o docker-compose.yml
+curl -fsSL "${REPO_URL}/docker-compose.yml" -o docker-compose.yml
 curl -fsSL "${REPO_URL}/docker-compose.tailscale.yml" -o docker-compose.tailscale.yml 2>/dev/null || true
 curl -fsSL "${REPO_URL}/docker-compose.watchtower.yml" -o docker-compose.watchtower.yml 2>/dev/null || true
 
