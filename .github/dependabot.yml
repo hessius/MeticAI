@@ -1,11 +1,11 @@
-# Dependabot configuration for MeticAI
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+# Dependabot configuration for MeticAI v2.0
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates
 
 version: 2
 updates:
-  # Python dependencies for meticai-server
+  # Python — FastAPI server
   - package-ecosystem: "pip"
-    directory: "/meticai-server"
+    directory: "/apps/server"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -16,22 +16,22 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
-  # Python dependencies for meticulous-source (MCP server)
+  # Python — MCP server
   - package-ecosystem: "pip"
-    directory: "/meticulous-source"
+    directory: "/apps/mcp-server"
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "python"
     commit-message:
       prefix: "chore(deps)"
 
-  # Node.js dependencies for meticai-web
+  # npm — Web frontend (Bun uses package.json)
   - package-ecosystem: "npm"
-    directory: "/meticai-web"
+    directory: "/apps/web"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -42,20 +42,16 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
-      # Group minor/patch updates to reduce PR noise
       dev-dependencies:
         dependency-type: "development"
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: ["minor", "patch"]
       production-dependencies:
         dependency-type: "production"
-        update-types:
-          - "patch"
+        update-types: ["patch"]
 
-  # Docker base images
+  # Docker — unified Dockerfile
   - package-ecosystem: "docker"
-    directory: "/meticai-server"
+    directory: "/docker"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -65,40 +61,7 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
-  - package-ecosystem: "docker"
-    directory: "/meticai-web"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    labels:
-      - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "chore(deps)"
-
-  - package-ecosystem: "docker"
-    directory: "/gemini-client"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    labels:
-      - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "chore(deps)"
-
-  - package-ecosystem: "docker"
-    directory: "/meticulous-source"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    labels:
-      - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "chore(deps)"
-
-  # GitHub Actions workflows
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
