@@ -558,7 +558,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       </AnimatePresence>
 
       {/* Desktop two-column layout */}
-      <div className="desktop-two-col">
+      <div className="desktop-two-col space-y-6 lg:space-y-0">
       {/* Left column: Profile + Options + Action */}
       <div className="space-y-6 desktop-panel-left">
 
