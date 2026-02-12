@@ -30,3 +30,24 @@ def cleanup_test_data():
             # If cleanup fails, it's not critical for tests
             pass
 
+
+@pytest.fixture(autouse=True)
+def _reset_in_memory_caches():
+    """Reset all in-memory service caches between tests.
+    
+    This prevents stale data from leaking across test boundaries when
+    tests write directly to on-disk files and expect fresh reads.
+    """
+    import services.cache_service as _cs
+    import services.settings_service as _ss
+    import services.history_service as _hs
+    import services.meticulous_service as _ms
+
+    _cs._llm_cache = None
+    _cs._shot_cache = None
+    _ss._settings_cache = None
+    _hs._history_cache = None
+    _ms._profile_list_cache = None
+    _ms._profile_list_cache_time = 0.0
+    yield
+

@@ -25,6 +25,24 @@ _scheduled_shots: dict = {}
 _scheduled_tasks: dict = {}
 _recurring_schedules: dict = {}
 
+# Module-level lock protecting mutations to the above dicts.
+# Callers that read-modify-write any of these dicts across an ``await``
+# boundary MUST hold this lock to prevent interleaved mutations.
+# Created lazily so it binds to the correct running event loop.
+_state_lock: Optional[asyncio.Lock] = None
+
+
+def _get_state_lock() -> asyncio.Lock:
+    """Return the module-level state lock, creating it on first call.
+    
+    This avoids binding the lock to a loop at import time, which causes
+    issues when tests create a new event loop per test function.
+    """
+    global _state_lock
+    if _state_lock is None:
+        _state_lock = asyncio.Lock()
+    return _state_lock
+
 # Constant for preheat duration
 PREHEAT_DURATION_MINUTES = 10
 
@@ -222,8 +240,9 @@ async def load_recurring_schedules():
     will see the loaded data.
     """
     loaded = await _recurring_schedules_persistence.load()
-    _recurring_schedules.clear()
-    _recurring_schedules.update(loaded)
+    async with _get_state_lock():
+        _recurring_schedules.clear()
+        _recurring_schedules.update(loaded)
 
 
 async def restore_scheduled_shots():
@@ -234,8 +253,9 @@ async def restore_scheduled_shots():
     will see the loaded data.
     """
     loaded = await _scheduled_shots_persistence.load()
-    _scheduled_shots.clear()
-    _scheduled_shots.update(loaded)
+    async with _get_state_lock():
+        _scheduled_shots.clear()
+        _scheduled_shots.update(loaded)
     
     if _scheduled_shots:
         logger.info(f"Restored {len(_scheduled_shots)} scheduled shots from persistence")

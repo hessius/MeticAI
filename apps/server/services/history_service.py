@@ -16,6 +16,9 @@ logger = get_logger()
 
 HISTORY_FILE = DATA_DIR / "profile_history.json"
 
+# In-memory cache (loaded from disk on first access, write-through on save)
+_history_cache: Optional[list] = None
+
 
 def ensure_history_file():
     """Ensure the history file and directory exist."""
@@ -25,17 +28,23 @@ def ensure_history_file():
 
 
 def load_history() -> list:
-    """Load history from file."""
+    """Load history, using in-memory copy when available."""
+    global _history_cache
+    if _history_cache is not None:
+        return _history_cache
     ensure_history_file()
     try:
         with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            _history_cache = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
-        return []
+        _history_cache = []
+    return _history_cache
 
 
 def save_history(history: list):
-    """Save history to file atomically to prevent corruption."""
+    """Write-through: update in-memory cache and persist to disk."""
+    global _history_cache
+    _history_cache = history
     ensure_history_file()
     atomic_write_json(HISTORY_FILE, history)
 

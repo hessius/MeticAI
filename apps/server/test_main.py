@@ -3284,14 +3284,11 @@ class TestCheckUpdatesEndpoint:
 class TestMachineProfilesEndpoint:
     """Tests for the /api/machine/profiles endpoint."""
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_success(self, mock_history_file, mock_get_api, client):
+    def test_list_profiles_success(self, mock_history_file, mock_list_profiles, mock_get_profile, client):
         """Test successful profile listing from machine."""
-        # Mock API responses
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         # Mock list_profiles result - return simple objects
         mock_profile1 = type('Profile', (), {})()
         mock_profile1.id = "profile-1"
@@ -3303,7 +3300,7 @@ class TestMachineProfilesEndpoint:
         mock_profile2.name = "Light Roast"
         mock_profile2.error = None
         
-        mock_api.list_profiles.return_value = [mock_profile1, mock_profile2]
+        mock_list_profiles.return_value = [mock_profile1, mock_profile2]
         
         # Mock get_profile results - return simple objects with all required attributes
         full_profile1 = type('FullProfile', (), {})()
@@ -3322,7 +3319,7 @@ class TestMachineProfilesEndpoint:
         full_profile2.final_weight = 40.0
         full_profile2.error = None
         
-        mock_api.get_profile.side_effect = [full_profile1, full_profile2]
+        mock_get_profile.side_effect = [full_profile1, full_profile2]
         
         # Mock history file
         mock_history_file.exists.return_value = True
@@ -3348,29 +3345,24 @@ class TestMachineProfilesEndpoint:
         profile2 = next(p for p in data["profiles"] if p["name"] == "Light Roast")
         assert profile2["in_history"] is False
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_list_profiles_api_error(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_list_profiles_api_error(self, mock_list_profiles, client):
         """Test error handling when machine API fails."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         # Mock API error
         mock_result = MagicMock()
         mock_result.error = "Connection timeout"
-        mock_api.list_profiles.return_value = mock_result
+        mock_list_profiles.return_value = mock_result
         
         response = client.get("/api/machine/profiles")
         
         assert response.status_code == 502
         assert "Machine API error" in response.json()["detail"]
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_empty(self, mock_history_file, mock_get_api, client):
+    def test_list_profiles_empty(self, mock_history_file, mock_list_profiles, client):
         """Test listing when no profiles exist."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         mock_history_file.exists.return_value = False
         
@@ -3382,13 +3374,11 @@ class TestMachineProfilesEndpoint:
         assert data["total"] == 0
         assert len(data["profiles"]) == 0
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_partial_failure(self, mock_history_file, mock_get_api, client):
+    def test_list_profiles_partial_failure(self, mock_history_file, mock_list_profiles, mock_get_profile, client):
         """Test listing continues when individual profile fetch fails."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_profile1 = type('Profile', (), {})()
         mock_profile1.id = "profile-1"
         mock_profile1.name = "Good Profile"
@@ -3399,7 +3389,7 @@ class TestMachineProfilesEndpoint:
         mock_profile2.name = "Bad Profile"
         mock_profile2.error = None
         
-        mock_api.list_profiles.return_value = [mock_profile1, mock_profile2]
+        mock_list_profiles.return_value = [mock_profile1, mock_profile2]
         
         full_profile1 = type('FullProfile', (), {})()
         full_profile1.id = "profile-1"
@@ -3408,7 +3398,7 @@ class TestMachineProfilesEndpoint:
         full_profile1.error = None
         
         # Second profile fetch fails
-        mock_api.get_profile.side_effect = [full_profile1, Exception("Network error")]
+        mock_get_profile.side_effect = [full_profile1, Exception("Network error")]
         
         mock_history_file.exists.return_value = False
         
@@ -3421,19 +3411,17 @@ class TestMachineProfilesEndpoint:
         assert len(data["profiles"]) == 1
         assert data["profiles"][0]["name"] == "Good Profile"
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_history_dict_format(self, mock_history_file, mock_get_api, client):
+    def test_list_profiles_history_dict_format(self, mock_history_file, mock_list_profiles, mock_get_profile, client):
         """Test handling of legacy history format (dict with entries key)."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_profile = type('Profile', (), {})()
         mock_profile.id = "profile-1"
         mock_profile.name = "Test Profile"
         mock_profile.error = None
         
-        mock_api.list_profiles.return_value = [mock_profile]
+        mock_list_profiles.return_value = [mock_profile]
         
         full_profile = type('FullProfile', (), {})()
         full_profile.id = "profile-1"
@@ -3441,7 +3429,7 @@ class TestMachineProfilesEndpoint:
         full_profile.author = "Barista"
         full_profile.error = None
         
-        mock_api.get_profile.return_value = full_profile
+        mock_get_profile.return_value = full_profile
         
         mock_history_file.exists.return_value = True
         # Legacy format: dict with entries key
@@ -3462,12 +3450,9 @@ class TestMachineProfilesEndpoint:
 class TestMachineProfileJsonEndpoint:
     """Tests for the /api/machine/profile/{profile_id}/json endpoint."""
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_json_success(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_success(self, mock_get_profile, client):
         """Test successful profile JSON retrieval."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         # Mock profile object with various attributes
         mock_profile = MagicMock()
         mock_profile.id = "profile-123"
@@ -3479,7 +3464,7 @@ class TestMachineProfileJsonEndpoint:
         mock_profile.variables = {"key": "value"}
         mock_profile.error = None
         
-        mock_api.get_profile.return_value = mock_profile
+        mock_get_profile.return_value = mock_profile
         
         response = client.get("/api/machine/profile/profile-123/json")
         
@@ -3491,27 +3476,21 @@ class TestMachineProfileJsonEndpoint:
         assert data["profile"]["author"] == "Barista Joe"
         assert data["profile"]["temperature"] == 93.0
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_json_api_error(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_api_error(self, mock_get_profile, client):
         """Test error handling when machine API fails."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_result = MagicMock()
         mock_result.error = "Profile not found"
-        mock_api.get_profile.return_value = mock_result
+        mock_get_profile.return_value = mock_result
         
         response = client.get("/api/machine/profile/invalid-id/json")
         
         assert response.status_code == 502
         assert "Machine API error" in response.json()["detail"]
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_json_nested_objects(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_nested_objects(self, mock_get_profile, client):
         """Test handling of nested objects in profile."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         # Create mock profile with nested object using simple class
         mock_profile = type('Profile', (), {})()
         mock_profile.id = "profile-456"
@@ -3523,7 +3502,7 @@ class TestMachineProfileJsonEndpoint:
         nested_obj.nested_key = "nested_value"
         mock_profile.display = nested_obj
         
-        mock_api.get_profile.return_value = mock_profile
+        mock_get_profile.return_value = mock_profile
         
         response = client.get("/api/machine/profile/profile-456/json")
         
@@ -3531,12 +3510,9 @@ class TestMachineProfileJsonEndpoint:
         data = response.json()
         assert "display" in data["profile"]
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_json_list_of_objects(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_list_of_objects(self, mock_get_profile, client):
         """Test handling of list of objects in profile."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         stage1 = MagicMock()
         stage1.__dict__ = {"name": "preinfusion", "duration": 5}
         
@@ -3549,7 +3525,7 @@ class TestMachineProfileJsonEndpoint:
         mock_profile.stages = [stage1, stage2]
         mock_profile.error = None
         
-        mock_api.get_profile.return_value = mock_profile
+        mock_get_profile.return_value = mock_profile
         
         response = client.get("/api/machine/profile/profile-789/json")
         
@@ -3558,12 +3534,10 @@ class TestMachineProfileJsonEndpoint:
         assert len(data["profile"]["stages"]) == 2
         assert data["profile"]["stages"][0]["name"] == "preinfusion"
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_json_exception(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_exception(self, mock_get_profile, client):
         """Test handling of unexpected exceptions."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.get_profile.side_effect = Exception("Unexpected error")
+        mock_get_profile.side_effect = Exception("Unexpected error")
         
         response = client.get("/api/machine/profile/error-id/json")
         
@@ -3751,29 +3725,27 @@ class TestProfileImportEndpoint:
 class TestShotsByProfileEndpoint:
     """Tests for the /api/shots/by-profile/{profile_name} endpoint."""
 
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     @patch('api.routes.shots._get_cached_shots')
     @patch('api.routes.shots._set_cached_shots')
-    def test_get_shots_by_profile_success(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+    def test_get_shots_by_profile_success(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_dates, mock_get_files, client):
         """Test successful retrieval of shots for a profile."""
         # No cache initially
         mock_get_cache.return_value = (None, False, None)
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         # Mock dates
         date1 = MagicMock()
         date1.name = "2024-01-15"
-        mock_api.get_history_dates.return_value = [date1]
+        mock_get_dates.return_value = [date1]
         
         # Mock files
         file1 = MagicMock()
         file1.name = "shot_001.json"
         file2 = MagicMock()
         file2.name = "shot_002.json"
-        mock_api.get_shot_files.return_value = [file1, file2]
+        mock_get_files.return_value = [file1, file2]
         
         # Mock shot data
         shot_data_1 = {
@@ -3825,43 +3797,38 @@ class TestShotsByProfileEndpoint:
         assert "cached_at" in data
         assert data["is_stale"] is False
 
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots._get_cached_shots')
-    def test_get_shots_by_profile_api_error(self, mock_get_cache, mock_get_api, client):
+    def test_get_shots_by_profile_api_error(self, mock_get_cache, mock_get_dates, client):
         """Test error handling when machine API fails."""
         mock_get_cache.return_value = (None, False, None)
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_result = MagicMock()
         mock_result.error = "Connection timeout"
-        mock_api.get_history_dates.return_value = mock_result
+        mock_get_dates.return_value = mock_result
         
         response = client.get("/api/shots/by-profile/Test%20Profile")
         
         assert response.status_code == 502
 
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     @patch('api.routes.shots._get_cached_shots')
     @patch('api.routes.shots._set_cached_shots')
-    def test_get_shots_by_profile_no_matches(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+    def test_get_shots_by_profile_no_matches(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_dates, mock_get_files, client):
         """Test when no shots match the profile."""
         mock_get_cache.return_value = (None, False, None)
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         date1 = type('Date', (), {})()
         date1.name = "2024-01-15"
         date1.error = None
-        mock_api.get_history_dates.return_value = [date1]
+        mock_get_dates.return_value = [date1]
         
         file1 = type('File', (), {})()
         file1.name = "shot_001.json"
         file1.error = None
-        mock_api.get_shot_files.return_value = [file1]
+        mock_get_files.return_value = [file1]
         
         # Shot with different profile name
         shot_data = {
@@ -3878,21 +3845,19 @@ class TestShotsByProfileEndpoint:
         assert data["count"] == 0
         assert len(data["shots"]) == 0
 
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     @patch('api.routes.shots._get_cached_shots')
     @patch('api.routes.shots._set_cached_shots')
-    def test_get_shots_by_profile_with_limit(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+    def test_get_shots_by_profile_with_limit(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_dates, mock_get_files, client):
         """Test limit parameter works correctly."""
         mock_get_cache.return_value = (None, False, None)
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         date1 = type('Date', (), {})()
         date1.name = "2024-01-15"
         date1.error = None
-        mock_api.get_history_dates.return_value = [date1]
+        mock_get_dates.return_value = [date1]
         
         # Create file objects properly
         files = []
@@ -3901,7 +3866,7 @@ class TestShotsByProfileEndpoint:
             f.name = f"shot_{i:03d}.json"
             f.error = None
             files.append(f)
-        mock_api.get_shot_files.return_value = files
+        mock_get_files.return_value = files
         
         # All shots match
         def create_shot_data(i):
@@ -3920,23 +3885,21 @@ class TestShotsByProfileEndpoint:
         assert data["count"] == 2
         assert data["limit"] == 2
 
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     @patch('api.routes.shots._get_cached_shots')
-    def test_get_shots_by_profile_include_data(self, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+    def test_get_shots_by_profile_include_data(self, mock_get_cache, mock_fetch_shot, mock_get_dates, mock_get_files, client):
         """Test including full shot data in response."""
         mock_get_cache.return_value = (None, False, None)
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         date1 = MagicMock()
         date1.name = "2024-01-15"
-        mock_api.get_history_dates.return_value = [date1]
+        mock_get_dates.return_value = [date1]
         
         file1 = MagicMock()
         file1.name = "shot_001.json"
-        mock_api.get_shot_files.return_value = [file1]
+        mock_get_files.return_value = [file1]
         
         shot_data = {
             "profile_name": "Full Data Profile",
@@ -3956,26 +3919,24 @@ class TestShotsByProfileEndpoint:
         assert "data" in data["shots"][0]
         assert len(data["shots"][0]["data"]["data"]) == 2
 
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     @patch('api.routes.shots._get_cached_shots')
     @patch('api.routes.shots._set_cached_shots')
-    def test_get_shots_by_profile_case_insensitive(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+    def test_get_shots_by_profile_case_insensitive(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_dates, mock_get_files, client):
         """Test profile name matching is case-insensitive."""
         mock_get_cache.return_value = (None, False, None)
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         date1 = type('Date', (), {})()
         date1.name = "2024-01-15"
         date1.error = None
-        mock_api.get_history_dates.return_value = [date1]
+        mock_get_dates.return_value = [date1]
         
         file1 = type('File', (), {})()
         file1.name = "shot_001.json"
         file1.error = None
-        mock_api.get_shot_files.return_value = [file1]
+        mock_get_files.return_value = [file1]
         
         shot_data = {
             "profile_name": "ESPRESSO CLASSIC",
@@ -3991,9 +3952,9 @@ class TestShotsByProfileEndpoint:
         assert data["count"] == 1
 
     @patch('api.routes.shots._get_cached_shots')
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots._set_cached_shots')
-    def test_get_shots_by_profile_force_refresh(self, mock_set_cache, mock_get_api, mock_get_cache, client):
+    def test_get_shots_by_profile_force_refresh(self, mock_set_cache, mock_get_dates, mock_get_cache, client):
         """Test force_refresh parameter bypasses cache."""
         # Cache exists but should be ignored
         cached_data = {
@@ -4003,31 +3964,27 @@ class TestShotsByProfileEndpoint:
         }
         mock_get_cache.return_value = (cached_data, False, 1705320000.0)
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.get_history_dates.return_value = []
+        mock_get_dates.return_value = []
         
         response = client.get("/api/shots/by-profile/Test?force_refresh=true")
         
         assert response.status_code == 200
         # Should hit API, not cache
-        mock_api.get_history_dates.assert_called_once()
+        mock_get_dates.assert_called_once()
 
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
     @patch('api.routes.shots._get_cached_shots')
     @patch('api.routes.shots._set_cached_shots')
-    def test_get_shots_by_profile_partial_shot_errors(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_api, client):
+    def test_get_shots_by_profile_partial_shot_errors(self, mock_set_cache, mock_get_cache, mock_fetch_shot, mock_get_dates, mock_get_files, client):
         """Test continues when individual shot fetch fails."""
         mock_get_cache.return_value = (None, False, None)
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         date1 = type('Date', (), {})()
         date1.name = "2024-01-15"
         date1.error = None
-        mock_api.get_history_dates.return_value = [date1]
+        mock_get_dates.return_value = [date1]
         
         file1 = type('File', (), {})()
         file1.name = "good.json"
@@ -4035,7 +3992,7 @@ class TestShotsByProfileEndpoint:
         file2 = type('File', (), {})()
         file2.name = "bad.json"
         file2.error = None
-        mock_api.get_shot_files.return_value = [file1, file2]
+        mock_get_files.return_value = [file1, file2]
         
         good_shot = {
             "profile_name": "Test",
@@ -4068,39 +4025,35 @@ class TestImageProxyEndpoint:
         assert response.content == b"fake_png_data"
 
     @patch('api.routes.profiles._get_cached_image')
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_image_proxy_profile_not_found(self, mock_get_api, mock_get_cache, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_profile_not_found(self, mock_list_profiles, mock_get_cache, client):
         """Test error when profile not found."""
         mock_get_cache.return_value = None
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/Nonexistent/image-proxy")
         
         assert response.status_code == 404
 
     @patch('api.routes.profiles._get_cached_image')
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_image_proxy_no_image(self, mock_get_api, mock_get_cache, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_no_image(self, mock_list_profiles, mock_get_profile, mock_get_cache, client):
         """Test error when profile has no image."""
         mock_get_cache.return_value = None
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         mock_profile = type('Profile', (), {})()
         mock_profile.name = "No Image"
         mock_profile.id = "profile-456"
         mock_profile.error = None
-        mock_api.list_profiles.return_value = [mock_profile]
+        mock_list_profiles.return_value = [mock_profile]
         
         full_profile = type('FullProfile', (), {})()
         full_profile.name = "No Image"
         full_profile.display = None
         full_profile.error = None
-        mock_api.get_profile.return_value = full_profile
+        mock_get_profile.return_value = full_profile
         
         response = client.get("/api/profile/No%20Image/image-proxy")
         
@@ -4123,18 +4076,16 @@ class TestAdditionalEndpoints:
 class TestGetProfileInfoEndpoint:
     """Tests for the GET /api/profile/{profile_name} endpoint."""
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_info_success(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_get_profile_info_success(self, mock_list_profiles, mock_get_profile, client):
         """Test successful profile retrieval."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         # Mock list profiles
         partial_profile = type('PartialProfile', (), {})()
         partial_profile.name = "Test Profile"
         partial_profile.id = "profile-123"
         partial_profile.error = None
-        mock_api.list_profiles.return_value = [partial_profile]
+        mock_list_profiles.return_value = [partial_profile]
         
         # Mock get full profile
         full_profile = type('FullProfile', (), {})()
@@ -4150,7 +4101,7 @@ class TestGetProfileInfoEndpoint:
         display.accentColor = "#FF5733"
         full_profile.display = display
         
-        mock_api.get_profile.return_value = full_profile
+        mock_get_profile.return_value = full_profile
         
         response = client.get("/api/profile/Test%20Profile")
         
@@ -4163,29 +4114,25 @@ class TestGetProfileInfoEndpoint:
         assert data["profile"]["image"] == "data:image/png;base64,abc123"
         assert data["profile"]["accent_color"] == "#FF5733"
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_info_not_found(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_get_profile_info_not_found(self, mock_list_profiles, client):
         """Test error when profile not found."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/Nonexistent")
         
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_info_no_display(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_get_profile_info_no_display(self, mock_list_profiles, mock_get_profile, client):
         """Test profile without display/image."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         partial_profile = type('PartialProfile', (), {})()
         partial_profile.name = "Simple"
         partial_profile.id = "profile-456"
         partial_profile.error = None
-        mock_api.list_profiles.return_value = [partial_profile]
+        mock_list_profiles.return_value = [partial_profile]
         
         full_profile = type('FullProfile', (), {})()
         full_profile.id = "profile-456"
@@ -4196,7 +4143,7 @@ class TestGetProfileInfoEndpoint:
         full_profile.display = None
         full_profile.error = None
         
-        mock_api.get_profile.return_value = full_profile
+        mock_get_profile.return_value = full_profile
         
         response = client.get("/api/profile/Simple")
         
@@ -4205,26 +4152,21 @@ class TestGetProfileInfoEndpoint:
         assert data["profile"]["image"] is None
         assert data["profile"]["accent_color"] is None
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_info_api_error(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_get_profile_info_api_error(self, mock_list_profiles, client):
         """Test handling of machine API errors."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         error_result = type('ErrorResult', (), {})()
         error_result.error = "Connection failed"
-        mock_api.list_profiles.return_value = error_result
+        mock_list_profiles.return_value = error_result
         
         response = client.get("/api/profile/Test")
         
         assert response.status_code == 502
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_info_exception(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_get_profile_info_exception(self, mock_list_profiles, client):
         """Test exception handling."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.side_effect = Exception("Unexpected error")
+        mock_list_profiles.side_effect = Exception("Unexpected error")
         
         response = client.get("/api/profile/Test")
         
@@ -4235,8 +4177,9 @@ class TestLocalShotAnalysisEndpoint:
     """Tests for the POST /api/shots/analyze endpoint."""
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_local_shot_analysis_success(self, mock_get_api, mock_fetch_shot, client):
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    def test_local_shot_analysis_success(self, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
         """Test successful local shot analysis."""
         # Mock shot data
         shot_data = {
@@ -4250,14 +4193,11 @@ class TestLocalShotAnalysisEndpoint:
         mock_fetch_shot.return_value = shot_data
         
         # Mock profile data
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         partial_profile = type('PartialProfile', (), {})()
         partial_profile.name = "Test Profile"
         partial_profile.id = "profile-123"
         partial_profile.error = None
-        mock_api.list_profiles.return_value = [partial_profile]
+        mock_list_profiles.return_value = [partial_profile]
         
         full_profile = type('FullProfile', (), {})()
         full_profile.name = "Test Profile"
@@ -4266,7 +4206,7 @@ class TestLocalShotAnalysisEndpoint:
         full_profile.variables = []
         full_profile.stages = []
         full_profile.error = None
-        mock_api.get_profile.return_value = full_profile
+        mock_get_profile.return_value = full_profile
         
         response = client.post("/api/shots/analyze", data={
             "profile_name": "Test Profile",
@@ -4282,8 +4222,9 @@ class TestLocalShotAnalysisEndpoint:
         assert data["analysis"]["shot_summary"]["final_weight"] == 36.0
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_local_shot_analysis_with_preinfusion(self, mock_get_api, mock_fetch_shot, client):
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    def test_local_shot_analysis_with_preinfusion(self, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
         """Test analysis detects preinfusion stages."""
         shot_data = {
             "profile_name": "Complex",
@@ -4296,14 +4237,11 @@ class TestLocalShotAnalysisEndpoint:
         }
         mock_fetch_shot.return_value = shot_data
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         partial = type('P', (), {})()
         partial.name = "Complex"
         partial.id = "p-456"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         full = type('F', (), {})()
         full.name = "Complex"
@@ -4334,7 +4272,7 @@ class TestLocalShotAnalysisEndpoint:
         
         full.stages = [stage1, stage2]
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         response = client.post("/api/shots/analyze", data={
             "profile_name": "Complex",
@@ -4372,8 +4310,8 @@ class TestLocalShotAnalysisEndpoint:
         assert response.status_code == 404
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_local_shot_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    def test_local_shot_analysis_profile_not_found(self, mock_list_profiles, mock_fetch_shot, client):
         """Test error when profile not found."""
         mock_fetch_shot.return_value = {
             "profile_name": "Unknown",
@@ -4381,9 +4319,7 @@ class TestLocalShotAnalysisEndpoint:
             "data": []
         }
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         response = client.post("/api/shots/analyze", data={
             "profile_name": "Unknown",
@@ -4394,8 +4330,9 @@ class TestLocalShotAnalysisEndpoint:
         assert response.status_code == 404
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_local_shot_analysis_weight_deviation(self, mock_get_api, mock_fetch_shot, client):
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    def test_local_shot_analysis_weight_deviation(self, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
         """Test analysis with weight deviation."""
         shot_data = {
             "profile_name": "Test",
@@ -4407,14 +4344,11 @@ class TestLocalShotAnalysisEndpoint:
         }
         mock_fetch_shot.return_value = shot_data
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         partial = type('P', (), {})()
         partial.name = "Test"
         partial.id = "p-123"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         full = type('F', (), {})()
         full.name = "Test"
@@ -4423,7 +4357,7 @@ class TestLocalShotAnalysisEndpoint:
         full.variables = []
         full.stages = []
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         response = client.post("/api/shots/analyze", data={
             "profile_name": "Test",
@@ -4436,14 +4370,12 @@ class TestLocalShotAnalysisEndpoint:
         assert data["analysis"]["weight_analysis"]["status"] == "over"
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_local_shot_analysis_exception(self, mock_get_api, mock_fetch_shot, client):
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    def test_local_shot_analysis_exception(self, mock_list_profiles, mock_fetch_shot, client):
         """Test handling of unexpected exceptions."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.side_effect = Exception("Unexpected error")
+        mock_list_profiles.side_effect = Exception("Unexpected error")
         
         response = client.post("/api/shots/analyze", data={
             "profile_name": "Test",
@@ -4493,8 +4425,10 @@ class TestGenerateProfileImageEndpoint:
 
     @patch('api.routes.profiles._set_cached_image')
     @patch('api.routes.profiles.process_image_for_profile')
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_generate_image_save_to_profile(self, mock_get_api, mock_process, mock_cache, client):
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_generate_image_save_to_profile(self, mock_list_profiles, mock_get_profile, mock_save_profile, mock_process, mock_cache, client):
         """Test image generation and save to profile."""
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
         mock_response = self._make_mock_genai_response()
@@ -4503,25 +4437,22 @@ class TestGenerateProfileImageEndpoint:
         mock_client.models.generate_images.return_value = mock_response
         
         # Mock API
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         partial = type('P', (), {})()
         partial.name = "Test Profile"
         partial.id = "p-123"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         full = type('F', (), {})()
         full.id = "p-123"
         full.name = "Test Profile"
         full.display = None
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         save_result = type('SaveResult', (), {})()
         save_result.error = None
-        mock_api.save_profile.return_value = save_result
+        mock_save_profile.return_value = save_result
         
         with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
             response = client.post("/api/profile/Test%20Profile/generate-image?preview=false")
@@ -4555,10 +4486,10 @@ class TestGenerateProfileImageEndpoint:
         data = response.json()
         assert data["style"] == "abstract"  # Should default
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_generate_image_profile_not_found_for_save(self, mock_cache, mock_process, mock_get_api, client):
+    def test_generate_image_profile_not_found_for_save(self, mock_cache, mock_process, mock_list_profiles, client):
         """Test error when profile not found for saving."""
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
         mock_response = self._make_mock_genai_response()
@@ -4566,19 +4497,19 @@ class TestGenerateProfileImageEndpoint:
         mock_client = MagicMock()
         mock_client.models.generate_images.return_value = mock_response
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
             response = client.post("/api/profile/Nonexistent/generate-image?preview=false")
         
         assert response.status_code == 404
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_generate_image_save_failure(self, mock_cache, mock_process, mock_get_api, client):
+    def test_generate_image_save_failure(self, mock_cache, mock_process, mock_list_profiles, mock_get_profile, mock_save_profile, client):
         """Test handling of profile save failure."""
         mock_process.return_value = ("data:image/png;base64,xyz", b"png_bytes")
         mock_response = self._make_mock_genai_response()
@@ -4586,26 +4517,23 @@ class TestGenerateProfileImageEndpoint:
         mock_client = MagicMock()
         mock_client.models.generate_images.return_value = mock_response
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         partial = type('P', (), {})()
         partial.name = "Test"
         partial.id = "p-123"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         full = type('F', (), {})()
         full.id = "p-123"
         full.name = "Test"
         full.display = None
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         # Save fails
         save_result = type('SaveResult', (), {})()
         save_result.error = "Failed to save"
-        mock_api.save_profile.return_value = save_result
+        mock_save_profile.return_value = save_result
         
         with patch('services.gemini_service.get_gemini_client', return_value=mock_client):
             response = client.post("/api/profile/Test/generate-image?preview=false")
@@ -4639,10 +4567,11 @@ class TestLLMShotAnalysisEndpoint:
     """Tests for the POST /api/shots/analyze-llm endpoint."""
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.shots.get_vision_model')
     @patch('api.routes.shots._perform_local_shot_analysis')
-    def test_llm_analysis_success(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+    def test_llm_analysis_success(self, mock_local_analysis, mock_get_model, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
         """Test successful LLM shot analysis."""
         # Mock shot data
         shot_data = {
@@ -4653,14 +4582,11 @@ class TestLLMShotAnalysisEndpoint:
         mock_fetch_shot.return_value = shot_data
         
         # Mock profile
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         partial = type('P', (), {})()
         partial.name = "Test"
         partial.id = "p-123"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         full = type('F', (), {})()
         full.name = "Test"
@@ -4669,7 +4595,7 @@ class TestLLMShotAnalysisEndpoint:
         full.variables = []
         full.stages = []
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         # Mock local analysis
         mock_local_analysis.return_value = {
@@ -4700,14 +4626,12 @@ class TestLLMShotAnalysisEndpoint:
         assert "Shot Performance" in data["llm_analysis"]
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_llm_analysis_profile_not_found(self, mock_get_api, mock_fetch_shot, client):
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    def test_llm_analysis_profile_not_found(self, mock_list_profiles, mock_fetch_shot, client):
         """Test error when profile not found."""
         mock_fetch_shot.return_value = {"profile_name": "Unknown", "data": []}
         
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         response = client.post("/api/shots/analyze-llm", data={
             "profile_name": "Unknown",
@@ -4719,21 +4643,19 @@ class TestLLMShotAnalysisEndpoint:
         assert response.status_code == 404
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.shots.get_vision_model')
     @patch('api.routes.shots._perform_local_shot_analysis')
-    def test_llm_analysis_model_error(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+    def test_llm_analysis_model_error(self, mock_local_analysis, mock_get_model, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
         """Test handling of LLM errors."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         partial = type('P', (), {})()
         partial.name = "Test"
         partial.id = "p-123"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         full = type('F', (), {})()
         full.name = "Test"
@@ -4742,7 +4664,7 @@ class TestLLMShotAnalysisEndpoint:
         full.variables = []
         full.stages = []
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         mock_local_analysis.return_value = {"summary": {}, "stages": []}
         
@@ -4770,21 +4692,19 @@ class TestLLMShotAnalysisEndpoint:
         assert response.status_code == 422
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.shots.get_vision_model')
     @patch('api.routes.shots._perform_local_shot_analysis')
-    def test_llm_analysis_with_description(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+    def test_llm_analysis_with_description(self, mock_local_analysis, mock_get_model, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
         """Test LLM analysis with profile description."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         partial = type('P', (), {})()
         partial.name = "Test"
         partial.id = "p-123"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         full = type('F', (), {})()
         full.name = "Test"
@@ -4793,7 +4713,7 @@ class TestLLMShotAnalysisEndpoint:
         full.variables = []
         full.stages = []
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         mock_local_analysis.return_value = {"summary": {}, "stages": []}
         
@@ -4818,21 +4738,19 @@ class TestLLMShotAnalysisEndpoint:
         assert "gentle preinfusion" in call_args
 
     @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
-    @patch('api.routes.shots.get_meticulous_api')
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.shots.get_vision_model')
     @patch('api.routes.shots._perform_local_shot_analysis')
-    def test_llm_analysis_with_variables(self, mock_local_analysis, mock_get_model, mock_get_api, mock_fetch_shot, client):
+    def test_llm_analysis_with_variables(self, mock_local_analysis, mock_get_model, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
         """Test LLM analysis with profile variables."""
         mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
-        
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
         
         partial = type('P', (), {})()
         partial.name = "Test"
         partial.id = "p-123"
         partial.error = None
-        mock_api.list_profiles.return_value = [partial]
+        mock_list_profiles.return_value = [partial]
         
         # Create variable
         var = type('Var', (), {})()
@@ -4848,7 +4766,7 @@ class TestLLMShotAnalysisEndpoint:
         full.variables = [var]
         full.stages = []
         full.error = None
-        mock_api.get_profile.return_value = full
+        mock_get_profile.return_value = full
         
         mock_local_analysis.return_value = {"summary": {}, "stages": []}
         
@@ -5015,10 +4933,10 @@ Adjust grind based on bean age."""
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_api_connection_error(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_api_connection_error(self, mock_list_profiles, client):
         """Test handling of machine connection errors."""
-        mock_get_api.side_effect = Exception("Connection refused")
+        mock_list_profiles.side_effect = Exception("Connection refused")
         
         response = client.get("/api/machine/profiles")
         
@@ -5641,16 +5559,20 @@ class TestNetworkIpEndpoint:
 class TestRunShotEndpoints:
     """Tests for the Run Shot / Machine control endpoints."""
 
-    @patch('api.routes.scheduling.get_meticulous_api')
-    def test_machine_status_endpoint(self, mock_get_api, client):
+    @patch('api.routes.scheduling.async_get_last_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_settings', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_session_get', new_callable=AsyncMock)
+    def test_machine_status_endpoint(self, mock_session_get, mock_get_settings, mock_get_last_profile, client):
         """Test GET /api/machine/status endpoint."""
-        # Mock the API response
-        mock_api = MagicMock()
-        mock_api.get_settings.return_value = MagicMock(auto_preheat=0)
-        mock_api.get_last_profile.return_value = MagicMock(
+        # Mock the async wrapper responses
+        mock_status_response = MagicMock()
+        mock_status_response.status_code = 200
+        mock_status_response.json.return_value = {"state": "idle"}
+        mock_session_get.return_value = mock_status_response
+        mock_get_settings.return_value = MagicMock(auto_preheat=0)
+        mock_get_last_profile.return_value = MagicMock(
             profile=MagicMock(id="test-123", name="Test Profile")
         )
-        mock_get_api.return_value = mock_api
 
         response = client.get("/api/machine/status")
         
@@ -5659,14 +5581,15 @@ class TestRunShotEndpoints:
         data = response.json()
         assert "machine_status" in data or "status" in data or "scheduled_shots" in data
 
-    @patch('api.routes.scheduling.get_meticulous_api')
-    def test_machine_status_no_connection(self, mock_get_api, client):
+    @patch('api.routes.scheduling.async_get_last_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_settings', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_session_get', new_callable=AsyncMock)
+    def test_machine_status_no_connection(self, mock_session_get, mock_get_settings, mock_get_last_profile, client):
         """Test machine status when machine is not reachable."""
-        mock_api = MagicMock()
         # Simulate connection error when trying to fetch status
-        mock_api.session.get.side_effect = requests.exceptions.ConnectionError("Connection refused")
-        mock_api.base_url = "http://test-machine"
-        mock_get_api.return_value = mock_api
+        mock_session_get.side_effect = requests.exceptions.ConnectionError("Connection refused")
+        mock_get_settings.return_value = MagicMock(auto_preheat=0)
+        mock_get_last_profile.return_value = MagicMock(profile=None)
 
         response = client.get("/api/machine/status")
         
@@ -5677,24 +5600,28 @@ class TestRunShotEndpoints:
         # Connection error should be captured in the status
         assert "error" in data["machine_status"] or "state" in data["machine_status"]
 
-    @patch('api.routes.scheduling.get_meticulous_api')
-    def test_machine_status_api_unavailable(self, mock_get_api, client):
+    @patch('api.routes.scheduling.async_get_last_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_settings', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_session_get', new_callable=AsyncMock)
+    def test_machine_status_api_unavailable(self, mock_session_get, mock_get_settings, mock_get_last_profile, client):
         """Test machine status when API is not available."""
-        mock_get_api.return_value = None
+        mock_session_get.side_effect = AttributeError("'NoneType' object has no attribute 'base_url'")
+        mock_get_settings.side_effect = AttributeError("'NoneType' object has no attribute 'get_settings'")
+        mock_get_last_profile.side_effect = AttributeError("'NoneType' object has no attribute 'get_last_profile'")
 
         response = client.get("/api/machine/status")
         
         # Should handle gracefully
         assert response.status_code in [200, 503]
 
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
-    def test_preheat_endpoint_success(self, mock_get_api, client):
+    def test_preheat_endpoint_success(self, mock_get_api, mock_execute_action, client):
         """Test POST /api/machine/preheat endpoint."""
-        mock_api = MagicMock()
+        mock_get_api.return_value = MagicMock()  # Not None = connected
         # Ensure the mock response doesn't have an error attribute
         mock_result = MagicMock(spec=[])  # Empty spec means no 'error' attribute
-        mock_api.execute_action.return_value = mock_result
-        mock_get_api.return_value = mock_api
+        mock_execute_action.return_value = mock_result
 
         response = client.post("/api/machine/preheat")
         
@@ -5703,13 +5630,13 @@ class TestRunShotEndpoints:
         assert "message" in data
         assert "preheat" in data["message"].lower() or "Preheat" in data["message"]
 
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
-    def test_preheat_connection_error(self, mock_get_api, client):
+    def test_preheat_connection_error(self, mock_get_api, mock_execute_action, client):
         """Test preheat when connection fails."""
-        mock_api = MagicMock()
+        mock_get_api.return_value = MagicMock()  # Not None = connected
         # Simulate a connection error when trying to execute action
-        mock_api.execute_action.side_effect = Exception("Connection refused")
-        mock_get_api.return_value = mock_api
+        mock_execute_action.side_effect = Exception("Connection refused")
 
         response = client.post("/api/machine/preheat")
         
@@ -5728,21 +5655,22 @@ class TestRunShotEndpoints:
         
         assert response.status_code == 503
 
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_load_profile_by_id', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
-    def test_run_profile_success(self, mock_get_api, client):
+    def test_run_profile_success(self, mock_get_api, mock_load_profile, mock_execute_action, client):
         """Test POST /api/machine/run-profile/{profile_id} endpoint."""
-        mock_api = MagicMock()
+        mock_get_api.return_value = MagicMock()  # Not None = connected
         # Create mock results without 'error' attribute
         mock_load_result = MagicMock(spec=['id', 'name'])
         mock_load_result.id = "test-123"
         mock_load_result.name = "Test"
-        mock_api.load_profile_by_id.return_value = mock_load_result
+        mock_load_profile.return_value = mock_load_result
         
         mock_action_result = MagicMock(spec=['status', 'action'])
         mock_action_result.status = "ok"
         mock_action_result.action = "start"
-        mock_api.execute_action.return_value = mock_action_result
-        mock_get_api.return_value = mock_api
+        mock_execute_action.return_value = mock_action_result
 
         response = client.post("/api/machine/run-profile/test-123")
         
@@ -5750,27 +5678,27 @@ class TestRunShotEndpoints:
         data = response.json()
         assert "message" in data
 
+    @patch('api.routes.scheduling.async_load_profile_by_id', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
-    def test_run_profile_not_found(self, mock_get_api, client):
+    def test_run_profile_not_found(self, mock_get_api, mock_load_profile, client):
         """Test running a profile that doesn't exist."""
-        mock_api = MagicMock()
+        mock_get_api.return_value = MagicMock()  # Not None = connected
         # Create a mock result with error attribute
         mock_result = MagicMock()
         mock_result.error = "Profile not found"
-        mock_api.load_profile_by_id.return_value = mock_result
-        mock_get_api.return_value = mock_api
+        mock_load_profile.return_value = mock_result
 
         response = client.post("/api/machine/run-profile/nonexistent")
         
         assert response.status_code == 502
 
+    @patch('api.routes.scheduling.async_load_profile_by_id', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
-    def test_run_profile_connection_error(self, mock_get_api, client):
+    def test_run_profile_connection_error(self, mock_get_api, mock_load_profile, client):
         """Test run profile when connection fails."""
-        mock_api = MagicMock()
+        mock_get_api.return_value = MagicMock()  # Not None = connected
         # Simulate a connection error when trying to load the profile
-        mock_api.load_profile_by_id.side_effect = Exception("Connection refused")
-        mock_get_api.return_value = mock_api
+        mock_load_profile.side_effect = Exception("Connection refused")
 
         response = client.post("/api/machine/run-profile/test-123")
         
@@ -7736,10 +7664,11 @@ class TestMeticulousServiceDirect:
         mock_response.content = compressed
         mock_response.raise_for_status = MagicMock()
         
+        mock_client = MagicMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        
         with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
-            with patch('httpx.AsyncClient') as mock_client:
-                mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
-                
+            with patch('services.meticulous_service._get_http_client', return_value=mock_client):
                 result = await fetch_shot_data("2024-01-01", "shot.zst")
                 
                 assert result == test_data
@@ -7758,10 +7687,11 @@ class TestMeticulousServiceDirect:
         mock_response.json.return_value = test_data
         mock_response.raise_for_status = MagicMock()
         
+        mock_client = MagicMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        
         with patch('services.meticulous_service.get_meticulous_api', return_value=mock_api):
-            with patch('httpx.AsyncClient') as mock_client:
-                mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
-                
+            with patch('services.meticulous_service._get_http_client', return_value=mock_client):
                 result = await fetch_shot_data("2024-01-01", "shot.json")
                 
                 assert result == test_data
@@ -7823,12 +7753,9 @@ class TestMainLifespanCoverage:
 class TestShotsDatesEndpoint:
     """Tests for the /api/shots/dates endpoint."""
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_dates_success(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_get_shot_dates_success(self, mock_get_dates, client):
         """Test successful retrieval of shot dates."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         # Mock dates
         date1 = MagicMock()
         date1.name = "2024-01-15"
@@ -7836,7 +7763,7 @@ class TestShotsDatesEndpoint:
         date2.name = "2024-01-14"
         date3 = MagicMock()
         date3.name = "2024-01-16"
-        mock_api.get_history_dates.return_value = [date1, date2, date3]
+        mock_get_dates.return_value = [date1, date2, date3]
         
         response = client.get("/api/shots/dates")
         
@@ -7846,12 +7773,10 @@ class TestShotsDatesEndpoint:
         # Should be sorted in reverse order
         assert data["dates"] == ["2024-01-16", "2024-01-15", "2024-01-14"]
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_dates_empty(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_get_shot_dates_empty(self, mock_get_dates, client):
         """Test retrieval when no dates exist."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.get_history_dates.return_value = []
+        mock_get_dates.return_value = []
         
         response = client.get("/api/shots/dates")
         
@@ -7859,12 +7784,10 @@ class TestShotsDatesEndpoint:
         data = response.json()
         assert data["dates"] == []
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_dates_none_result(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_get_shot_dates_none_result(self, mock_get_dates, client):
         """Test retrieval when API returns None."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.get_history_dates.return_value = None
+        mock_get_dates.return_value = None
         
         response = client.get("/api/shots/dates")
         
@@ -7872,27 +7795,22 @@ class TestShotsDatesEndpoint:
         data = response.json()
         assert data["dates"] == []
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_dates_api_error(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_get_shot_dates_api_error(self, mock_get_dates, client):
         """Test error handling when API returns error."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_result = MagicMock()
         mock_result.error = "Connection failed"
-        mock_api.get_history_dates.return_value = mock_result
+        mock_get_dates.return_value = mock_result
         
         response = client.get("/api/shots/dates")
         
         assert response.status_code == 502
         assert "Machine API error" in response.json()["detail"]
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_dates_exception(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_get_shot_dates_exception(self, mock_get_dates, client):
         """Test exception handling in shot dates endpoint."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.get_history_dates.side_effect = Exception("Network error")
+        mock_get_dates.side_effect = Exception("Network error")
         
         response = client.get("/api/shots/dates")
         
@@ -8056,13 +7974,12 @@ class TestWatcherStatusPaths:
 class TestProfileImageUpload:
     """Tests for profile image upload endpoint."""
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_upload_profile_image_not_found(self, mock_set_cache, mock_process, mock_get_api, client):
+    def test_upload_profile_image_not_found(self, mock_set_cache, mock_process, mock_list_profiles, client):
         """Test uploading image for non-existent profile."""
-        mock_get_api.return_value = MagicMock()
-        mock_get_api.return_value.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         mock_process.return_value = ("data:image/png;base64,abc123", b"png_bytes")
         
@@ -8083,17 +8000,14 @@ class TestProfileImageUpload:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
-    @patch('api.routes.profiles.get_meticulous_api')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     @patch('api.routes.profiles.process_image_for_profile')
     @patch('api.routes.profiles._set_cached_image')
-    def test_upload_profile_image_api_error(self, mock_set_cache, mock_process, mock_get_api, client):
+    def test_upload_profile_image_api_error(self, mock_set_cache, mock_process, mock_list_profiles, client):
         """Test uploading image when API returns error."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_result = MagicMock()
         mock_result.error = "Machine error"
-        mock_api.list_profiles.return_value = mock_result
+        mock_list_profiles.return_value = mock_result
         
         mock_process.return_value = ("data:image/png;base64,abc123", b"png_bytes")
         
@@ -8205,17 +8119,14 @@ class TestHistoryEndpointPaths:
 class TestShotFilesEndpoint:
     """Tests for the /api/shots/files/{date} endpoint."""
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_files_success(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    def test_get_shot_files_success(self, mock_get_files, client):
         """Test successful retrieval of shot files."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         file1 = MagicMock()
         file1.name = "shot_001.json"
         file2 = MagicMock()
         file2.name = "shot_002.json"
-        mock_api.get_shot_files.return_value = [file1, file2]
+        mock_get_files.return_value = [file1, file2]
         
         response = client.get("/api/shots/files/2024-01-15")
         
@@ -8224,12 +8135,10 @@ class TestShotFilesEndpoint:
         assert "files" in data
         assert len(data["files"]) == 2
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_files_empty(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    def test_get_shot_files_empty(self, mock_get_files, client):
         """Test retrieval when no files exist."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.get_shot_files.return_value = []
+        mock_get_files.return_value = []
         
         response = client.get("/api/shots/files/2024-01-15")
         
@@ -8237,26 +8146,21 @@ class TestShotFilesEndpoint:
         data = response.json()
         assert data["files"] == []
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_files_api_error(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    def test_get_shot_files_api_error(self, mock_get_files, client):
         """Test error handling when API returns error."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_result = MagicMock()
         mock_result.error = "Connection failed"
-        mock_api.get_shot_files.return_value = mock_result
+        mock_get_files.return_value = mock_result
         
         response = client.get("/api/shots/files/2024-01-15")
         
         assert response.status_code == 502
 
-    @patch('api.routes.shots.get_meticulous_api')
-    def test_get_shot_files_exception(self, mock_get_api, client):
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    def test_get_shot_files_exception(self, mock_get_files, client):
         """Test exception handling."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.get_shot_files.side_effect = Exception("Network error")
+        mock_get_files.side_effect = Exception("Network error")
         
         response = client.get("/api/shots/files/2024-01-15")
         
@@ -8279,12 +8183,10 @@ class TestSystemEndpointsCoverage:
 class TestProfileEndpointsCoverage:
     """Additional tests for profile endpoints coverage."""
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_not_found(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_get_profile_not_found(self, mock_list_profiles, client):
         """Test get profile when profile doesn't exist."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/NonExistent")
         
@@ -8294,27 +8196,30 @@ class TestProfileEndpointsCoverage:
 class TestMachineControlEndpoints:
     """Tests for machine control endpoints."""
 
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
-    def test_preheat_endpoint(self, mock_get_api, client):
+    def test_preheat_endpoint(self, mock_get_api, mock_execute_action, client):
         """Test preheat endpoint."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
+        mock_get_api.return_value = MagicMock()  # Not None = connected
         
         mock_result = MagicMock()
         mock_result.error = None
-        mock_api.preheat.return_value = mock_result
+        mock_execute_action.return_value = mock_result
         
         response = client.post("/api/machine/preheat")
         
         # Should succeed or return appropriate error
         assert response.status_code in [200, 400, 500, 502]
 
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_load_profile_by_id', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
-    def test_run_profile_endpoint(self, mock_get_api, client):
+    def test_run_profile_endpoint(self, mock_get_api, mock_load_profile, mock_execute_action, client):
         """Test running a profile endpoint."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        mock_api.list_profiles.return_value = []
+        mock_get_api.return_value = MagicMock()  # Not None = connected
+        mock_result = MagicMock()
+        mock_result.error = "Profile not found"
+        mock_load_profile.return_value = mock_result
         
         response = client.post("/api/machine/run-profile/nonexistent-id")
         
@@ -8520,15 +8425,12 @@ class TestPromptBuilderCoverage:
 class TestMoreProfileEndpoints:
     """Additional profile endpoint tests."""
 
-    @patch('api.routes.profiles.get_meticulous_api')
-    def test_get_profile_api_error(self, mock_get_api, client):
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_get_profile_api_error(self, mock_list_profiles, client):
         """Test get profile when API returns error."""
-        mock_api = MagicMock()
-        mock_get_api.return_value = mock_api
-        
         mock_result = MagicMock()
         mock_result.error = "Machine error"
-        mock_api.list_profiles.return_value = mock_result
+        mock_list_profiles.return_value = mock_result
         
         response = client.get("/api/profile/TestProfile")
         
@@ -8538,8 +8440,7 @@ class TestMoreProfileEndpoints:
 class TestMoreSchedulingEndpoints:
     """Additional scheduling endpoint tests."""
 
-    @patch('api.routes.scheduling.get_meticulous_api')
-    def test_schedule_shot_missing_fields(self, mock_get_api, client):
+    def test_schedule_shot_missing_fields(self, client):
         """Test schedule shot with missing required fields."""
         response = client.post(
             "/api/machine/schedule-shot",
