@@ -1392,7 +1392,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
               <AlertDescription className="text-sm">{dataError}</AlertDescription>
             </Alert>
           ) : shotData ? (
-            <div className="space-y-4">
+            <div className="space-y-4 lg:space-y-0 desktop-two-col">
+              {/* Left column: Stats + Chart */}
+              <div className="space-y-4 desktop-panel-left">
               {/* Shot Summary Stats */}
               <div className="grid grid-cols-3 gap-3">
                 {typeof selectedShot.total_time === 'number' && (
@@ -1636,8 +1638,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   )
                 })()}
               </div>
+              </div>{/* end left column */}
 
-              {/* Action Tabs */}
+              {/* Right column: Action Tabs */}
+              <div className="desktop-panel-right">
               <Tabs value={activeAction} onValueChange={(v) => setActiveAction(v as typeof activeAction)} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 h-11 bg-secondary/60">
                   <TabsTrigger 
@@ -2788,6 +2792,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   </motion.div>
                 </TabsContent>
               </Tabs>
+              </div>{/* end right column */}
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-8">
