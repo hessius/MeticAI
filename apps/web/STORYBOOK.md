@@ -6,19 +6,19 @@ This project uses Storybook for component documentation and development.
 
 ### Install Dependencies
 ```bash
-npm install
+bun install
 ```
 
 ### Run Storybook
 ```bash
-npm run storybook
+bun run storybook
 ```
 
 Storybook will start at http://localhost:6006/
 
 ### Build Storybook
 ```bash
-npm run build-storybook
+bun run build-storybook
 ```
 
 This builds a static Storybook to the `storybook-static` directory.

@@ -127,23 +127,23 @@ Comprehensive guide including:
 
 ```bash
 # All accessibility tests
-npm run e2e -- e2e/accessibility.spec.ts
+bun run e2e -- e2e/accessibility.spec.ts
 
 # Specific category
-npm run e2e -- e2e/accessibility.spec.ts -g "Keyboard Navigation"
-npm run e2e -- e2e/accessibility.spec.ts -g "Color Contrast"
-npm run e2e -- e2e/accessibility.spec.ts -g "Multi-language"
+bun run e2e -- e2e/accessibility.spec.ts -g "Keyboard Navigation"
+bun run e2e -- e2e/accessibility.spec.ts -g "Color Contrast"
+bun run e2e -- e2e/accessibility.spec.ts -g "Multi-language"
 
 # Interactive UI mode
-npm run e2e:ui -- e2e/accessibility.spec.ts
+bun run e2e:ui -- e2e/accessibility.spec.ts
 
 # With headed browser
-npm run e2e:headed -- e2e/accessibility.spec.ts
+bun run e2e:headed -- e2e/accessibility.spec.ts
 
 # Specific browser
-npm run e2e -- e2e/accessibility.spec.ts --project=chromium
-npm run e2e -- e2e/accessibility.spec.ts --project=firefox
-npm run e2e -- e2e/accessibility.spec.ts --project=webkit
+bun run e2e -- e2e/accessibility.spec.ts --project=chromium
+bun run e2e -- e2e/accessibility.spec.ts --project=firefox
+bun run e2e -- e2e/accessibility.spec.ts --project=webkit
 ```
 
 ## 🔧 Recommended Next Steps

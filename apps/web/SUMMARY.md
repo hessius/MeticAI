@@ -343,7 +343,7 @@ function MyComponent() {
 - [x] Format functions handle edge cases
 
 ### ✅ Build & Deployment
-- [x] `npm run build` succeeds
+- [x] `bun run build` succeeds
 - [x] No console errors in production build
 - [x] Bundle size acceptable
 - [x] Source maps generated
@@ -355,16 +355,16 @@ function MyComponent() {
 ### 1. Build & Run
 ```bash
 # Install dependencies
-npm install
+bun install
 
 # Development server
-npm run dev
+bun run dev
 
 # Production build
-npm run build
+bun run build
 
 # Preview production build
-npm run preview
+bun run preview
 ```
 
 ### 2. Test Language Switching
@@ -456,10 +456,10 @@ VO+Right      - Next element
 
 ### Screenshot Procedure
 
-#### Using npm run dev
+#### Using bun run dev
 ```bash
 # 1. Start dev server
-npm run dev
+bun run dev
 
 # 2. Open browser to http://localhost:5173
 
@@ -508,7 +508,7 @@ for (const lang of languages) {
 
 Run with:
 ```bash
-npx playwright test scripts/take-screenshots.ts
+bunx playwright test scripts/take-screenshots.ts
 ```
 
 ---

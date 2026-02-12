@@ -7,8 +7,8 @@ This directory contains screenshots of the MeticAI web application in all suppor
 Due to the requirement for a running backend server to capture all application states, screenshots can be generated using the Playwright script:
 
 ```bash
-npm run dev  # Start dev server
-npm run e2e -- e2e/screenshots.spec.ts  # Generate screenshots
+bun run dev  # Start dev server
+bun run e2e -- e2e/screenshots.spec.ts  # Generate screenshots
 ```
 
 ## Expected Screenshots

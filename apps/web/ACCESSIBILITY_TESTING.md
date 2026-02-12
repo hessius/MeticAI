@@ -157,36 +157,36 @@ Real accessibility issues have been identified that need to be fixed:
 
 ### Run All Accessibility Tests
 ```bash
-npm run e2e -- e2e/accessibility.spec.ts
+bun run e2e -- e2e/accessibility.spec.ts
 ```
 
 ### Run Specific Test Suite
 ```bash
 # Keyboard navigation only
-npm run e2e -- e2e/accessibility.spec.ts -g "Keyboard Navigation"
+bun run e2e -- e2e/accessibility.spec.ts -g "Keyboard Navigation"
 
 # Color contrast only
-npm run e2e -- e2e/accessibility.spec.ts -g "Color Contrast"
+bun run e2e -- e2e/accessibility.spec.ts -g "Color Contrast"
 
 # Multi-language only
-npm run e2e -- e2e/accessibility.spec.ts -g "Multi-language"
+bun run e2e -- e2e/accessibility.spec.ts -g "Multi-language"
 ```
 
 ### Run in UI Mode (Interactive)
 ```bash
-npm run e2e:ui -- e2e/accessibility.spec.ts
+bun run e2e:ui -- e2e/accessibility.spec.ts
 ```
 
 ### Run in Headed Mode (See Browser)
 ```bash
-npm run e2e:headed -- e2e/accessibility.spec.ts
+bun run e2e:headed -- e2e/accessibility.spec.ts
 ```
 
 ### Run on Specific Browser
 ```bash
-npm run e2e -- e2e/accessibility.spec.ts --project=chromium
-npm run e2e -- e2e/accessibility.spec.ts --project=firefox
-npm run e2e -- e2e/accessibility.spec.ts --project=webkit
+bun run e2e -- e2e/accessibility.spec.ts --project=chromium
+bun run e2e -- e2e/accessibility.spec.ts --project=firefox
+bun run e2e -- e2e/accessibility.spec.ts --project=webkit
 ```
 
 ## Priority Fix Recommendations
@@ -246,13 +246,13 @@ These tests can be integrated into CI/CD pipelines:
 ```yaml
 # GitHub Actions example
 - name: Install dependencies
-  run: npm install
+  run: bun install
 
 - name: Install Playwright browsers
-  run: npx playwright install --with-deps
+  run: bunx playwright install --with-deps
 
 - name: Run accessibility tests
-  run: npm run e2e -- e2e/accessibility.spec.ts
+  run: bun run e2e -- e2e/accessibility.spec.ts
 
 - name: Upload test results
   if: always()

@@ -46,7 +46,7 @@ export default defineConfig({
   projects,
 
   webServer: {
-    command: 'npx vite --host',
+    command: 'bunx vite --host',
     url: 'http://localhost:5173',
     reuseExistingServer: !isCI,
     timeout: 120_000,
