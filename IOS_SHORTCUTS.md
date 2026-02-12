@@ -2,9 +2,9 @@
 
 For power users who want one-tap brewing from their iPhone, MeticAI can be controlled via Apple Shortcuts.
 
-**Note:** Throughout these instructions, `<PI_IP>` refers to your MeticAI server's IP address (e.g., `192.168.1.100`).
+**Note:** Throughout these instructions, `<SERVER_IP>` refers to your MeticAI server's IP address (e.g., `192.168.1.100`).
 
-**Tip:** For most users, the web interface at `http://<PI_IP>:3550` is easier and more feature-rich!
+**Tip:** For most users, the web interface at `http://<SERVER_IP>:3550` is easier and more feature-rich!
 
 ## Quick Start: Pre-Built Shortcut (Coming Soon)
 A ready-to-use shortcut will be available for download. Check back soon for the direct link!
@@ -25,7 +25,7 @@ Take a photo of your coffee bag and let MeticAI create the perfect profile.
 
    **Action 2: Get Contents of URL**
    - Search for and add "Get Contents of URL"
-   - Set URL: `http://<PI_IP>:8000/analyze_and_profile`
+   - Set URL: `http://<SERVER_IP>:3550/api/analyze_and_profile`
    - Set Method: **POST**
    - Add Request Body: **Form**
    - Add form field: Key = `file`, Value = `Photo` (from Action 1)
@@ -64,7 +64,7 @@ Combine photo analysis with your own preferences for the best results.
 
    **Action 3: Get Contents of URL**
    - Search for and add "Get Contents of URL"
-   - Set URL: `http://<PI_IP>:8000/analyze_and_profile`
+   - Set URL: `http://<SERVER_IP>:3550/api/analyze_and_profile`
    - Set Method: **POST**
    - Add Request Body: **Form**
    - Add two form fields:
@@ -100,7 +100,7 @@ Describe what you want without taking a photo.
 
    **Action 2: Get Contents of URL**
    - Add "Get Contents of URL"
-   - URL: `http://<PI_IP>:8000/analyze_and_profile`
+   - URL: `http://<SERVER_IP>:3550/api/analyze_and_profile`
    - Method: **POST**
    - Request Body: **Form**
    - Add form field: Key = `user_prefs`, Value = `Provided Input` (from Action 1)
@@ -131,7 +131,7 @@ For when you just want to identify your coffee without creating a profile:
 
    **Action 2: Get Contents of URL**
    - Add "Get Contents of URL"
-   - URL: `http://<PI_IP>:8000/analyze_coffee`
+   - URL: `http://<SERVER_IP>:3550/api/analyze_coffee`
    - Method: **POST**
    - Request Body: **Form**
    - Add form field: Key = `file`, Value = `Photo` (from Action 1)
@@ -152,8 +152,8 @@ For when you just want to identify your coffee without creating a profile:
 **"Connection Failed" or timeout errors:**
 - Verify your iPhone is on the same network as your MeticAI server
 - Double-check the IP address in your shortcut matches your server's IP
-- Ensure MeticAI is running: `docker ps` should show the meticai-server container
-- Test the connection in Safari: navigate to `http://<PI_IP>:8000/docs`
+- Ensure MeticAI is running: `docker ps` should show the `meticai` container
+- Test the connection in Safari: navigate to `http://<SERVER_IP>:3550/api/docs`
 
 **"Invalid Response" or unexpected results:**
 - Make sure you're using the correct endpoint (`/analyze_and_profile` or `/analyze_coffee`)
@@ -183,4 +183,4 @@ For when you just want to identify your coffee without creating a profile:
 - **Good lighting for photos:** Take clear photos in well-lit areas
 - **Be specific with preferences:** "Bold and chocolatey" or "bright and fruity"
 - **Try different styles:** "turbo shot", "traditional", "ristretto"
-- **Remember:** The web interface at `http://<PI_IP>:3550` offers more features and is easier to use!
+- **Remember:** The web interface at `http://<SERVER_IP>:3550` offers more features and is easier to use!

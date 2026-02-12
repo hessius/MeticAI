@@ -101,7 +101,6 @@ bats tests/test_local_install.bats
 - Only whitelist safe MCP tools (`create_profile`, `apply_profile`)
 - No dangerous operations allowed (e.g., `delete_profile`)
 
-See `SECURITY_FIXES.md` for details on past vulnerability fixes.
 
 ## Project Structure
 
@@ -318,7 +317,6 @@ Must include:
 - `apps/server/services/gemini_service.py` — AI model configuration and output cleaning
 - `apps/server/services/meticulous_service.py` — Machine API client (lazy singleton with reset)
 - `apps/mcp-server/run_http.py` — MCP server entry point
-- `SECURITY_FIXES.md` — Security vulnerability tracking
 - `API.md` — Full API endpoint documentation
 - `PROFILING_AXIOMS.md` — Coffee profiling knowledge base
 
