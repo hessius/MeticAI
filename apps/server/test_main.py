@@ -26,11 +26,16 @@ import requests
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from main import app
-import main  # Import main module for constants and remaining functions
+import main  # Import main module for lifespan and remaining functions
 
 # Import service modules
 import services.gemini_service
 import services.meticulous_service
+import services.analysis_service
+import services.scheduling_state
+import utils.file_utils
+import utils.sanitization
+import config
 from services.gemini_service import get_vision_model, get_gemini_client, parse_gemini_error
 from services.history_service import save_to_history, load_history, save_history, ensure_history_file
 from services.cache_service import (
@@ -172,7 +177,7 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with only an image (no user preferences)."""
@@ -217,7 +222,7 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_analyze_and_profile_with_prefs_only(self, mock_subprocess, mock_save_history, client):
         """Test profile creation with only user preferences (no image)."""
         # Mock history saving
@@ -247,7 +252,7 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with both image and user preferences."""
@@ -292,7 +297,7 @@ class TestAnalyzeAndProfileEndpoint:
         assert "at least one" in response.json()["detail"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_subprocess_error(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test error handling when subprocess fails."""
@@ -320,7 +325,7 @@ class TestAnalyzeAndProfileEndpoint:
         assert "Docker container not found" in response.json()["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_analyze_and_profile_exception(self, mock_subprocess, client):
         """Test handling of unexpected exceptions."""
         # Mock an exception in subprocess
@@ -369,7 +374,7 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
         """Test profile creation with different user preferences."""
@@ -404,7 +409,7 @@ class TestAnalyzeAndProfileEndpoint:
             assert response.json()["status"] == "success"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_analyze_and_profile_yolo_mode(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test that yolo mode is used for auto-approval of tool calls.
@@ -439,7 +444,7 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_analyze_and_profile_special_characters(self, mock_subprocess, mock_save_history, client):
         """Test handling of special characters in input."""
         # Mock history saving
@@ -530,7 +535,7 @@ class TestEnhancedBaristaPersona:
     """Tests for enhanced barista persona and profile creation features."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test that the prompt includes the modern experimental barista persona."""
@@ -559,7 +564,7 @@ class TestEnhancedBaristaPersona:
         assert "creative" in prompt or "puns" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_prompt_includes_complex_profile_support(self, mock_subprocess, client):
         """Test that the prompt includes instructions for complex profile creation."""
         mock_result = Mock()
@@ -582,7 +587,7 @@ class TestEnhancedBaristaPersona:
         assert "blooming" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_prompt_includes_naming_convention(self, mock_subprocess, client):
         """Test that the prompt includes witty naming convention instructions."""
         mock_result = Mock()
@@ -604,7 +609,7 @@ class TestEnhancedBaristaPersona:
         assert "Examples:" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_prompt_includes_user_summary_instructions(self, mock_subprocess, client):
         """Test that the prompt includes instructions for post-creation user summary."""
         mock_result = Mock()
@@ -628,7 +633,7 @@ class TestEnhancedBaristaPersona:
         assert "Special Requirements" in prompt or "Special Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_prompt_includes_output_format(self, mock_subprocess, client):
         """Test that the prompt includes the output format template."""
         mock_result = Mock()
@@ -652,7 +657,7 @@ class TestEnhancedBaristaPersona:
         assert "Why This Works:" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test enhanced prompt when both image and preferences are provided."""
@@ -693,7 +698,7 @@ class TestAdvancedCustomization:
     """Tests for advanced_customization parameter functionality."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_advanced_customization_parameter_parsed(self, mock_subprocess, client):
         """Test that advanced_customization parameter is correctly parsed."""
         mock_result = Mock()
@@ -719,7 +724,7 @@ class TestAdvancedCustomization:
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_prompt_includes_advanced_customization_when_provided(self, mock_subprocess, client):
         """Test that prompt includes advanced customization section when provided."""
         mock_result = Mock()
@@ -751,7 +756,7 @@ class TestAdvancedCustomization:
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_prompt_omits_advanced_customization_when_not_provided(self, mock_subprocess, client):
         """Test that prompt omits advanced customization section when not provided."""
         mock_result = Mock()
@@ -774,7 +779,7 @@ class TestAdvancedCustomization:
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." not in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_advanced_customization_section_formatting(self, mock_subprocess, client):
         """Test that advanced customization section has correct formatting."""
         mock_result = Mock()
@@ -805,7 +810,7 @@ class TestAdvancedCustomization:
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_advanced_customization_mandatory_instructions_included(self, mock_subprocess, client):
         """Test that MANDATORY instructions are included in the advanced customization section."""
         mock_result = Mock()
@@ -834,7 +839,7 @@ class TestAdvancedCustomization:
         assert "• If bottom filter is specified, mention it in preparation notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_advanced_customization_with_image(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test advanced_customization with image input."""
@@ -868,7 +873,7 @@ class TestAdvancedCustomization:
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_advanced_customization_with_user_prefs(self, mock_subprocess, client):
         """Test advanced_customization with user preferences."""
         mock_result = Mock()
@@ -899,7 +904,7 @@ class TestAdvancedCustomization:
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
     def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_subprocess, client, sample_image):
         """Test advanced_customization with both image and user preferences."""
@@ -965,7 +970,7 @@ class TestCORS:
         assert response.headers["access-control-allow-origin"] == "*"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_cors_headers_on_analyze_and_profile(self, mock_subprocess, client):
         """Test that CORS headers are present on /analyze_and_profile responses."""
         mock_result = Mock()
@@ -1023,7 +1028,7 @@ class TestStatusEndpoint:
     """Tests for the /api/status endpoint."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_status_endpoint_exists(self, mock_subprocess, client):
         """Test that /api/status endpoint exists and is accessible."""
         mock_result = Mock()
@@ -1035,7 +1040,7 @@ class TestStatusEndpoint:
         assert response.status_code == 200
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.system.Path')
     def test_status_returns_json_structure(self, mock_path, mock_subprocess, client):
         """Test that /api/status returns expected JSON structure."""
@@ -1951,7 +1956,7 @@ class TestSecurityFeatures:
     @patch('services.meticulous_service.get_meticulous_api')
     def test_upload_profile_image_validates_size(self, mock_api, client):
         """Test that image upload validates file size."""
-        from main import MAX_UPLOAD_SIZE
+        from config import MAX_UPLOAD_SIZE
         
         # Create a large image (simulate exceeding limit)
         large_image = BytesIO(b"x" * (MAX_UPLOAD_SIZE + self.TEST_SIZE_EXCESS))
@@ -1981,7 +1986,7 @@ class TestSecurityFeatures:
     def test_apply_profile_image_validates_base64_size(self, mock_api, client):
         """Test that apply-image endpoint validates decoded size."""
         import base64
-        from main import MAX_UPLOAD_SIZE
+        from config import MAX_UPLOAD_SIZE
         
         # Create oversized base64 data
         large_data = b"x" * (MAX_UPLOAD_SIZE + self.TEST_SIZE_EXCESS)
@@ -3055,7 +3060,7 @@ class TestBasicEndpoints:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_parse_gemini_error(self):
         """Test Gemini error parsing."""
-        from main import parse_gemini_error
+        from services.gemini_service import parse_gemini_error
         
         error_text = """Some error occurred
         Error details here
@@ -3106,7 +3111,7 @@ class TestProcessImageForProfile:
     
     def test_process_image_for_profile_valid_png(self):
         """Test processing a valid PNG image."""
-        from main import process_image_for_profile
+        from api.routes.profiles import process_image_for_profile
         from PIL import Image
         import io
         
@@ -3127,7 +3132,7 @@ class TestProcessImageForProfile:
     
     def test_process_image_for_profile_jpeg(self):
         """Test processing a JPEG image."""
-        from main import process_image_for_profile
+        from api.routes.profiles import process_image_for_profile
         from PIL import Image
         import io
         
@@ -3151,7 +3156,7 @@ class TestCheckUpdatesEndpoint:
     """Tests for the /api/check-updates endpoint."""
 
     @patch('api.routes.system.Path')
-    @patch('main.asyncio.sleep', new_callable=AsyncMock)
+    @patch('api.routes.system.asyncio.sleep', new_callable=AsyncMock)
     def test_check_updates_success_with_updates(self, mock_sleep, mock_path, client):
         """Test successful update check with updates available."""
         # Mock version file exists and has update data
@@ -3177,7 +3182,7 @@ class TestCheckUpdatesEndpoint:
         assert "repositories" in data
 
     @patch('api.routes.system.Path')
-    @patch('main.asyncio.sleep', new_callable=AsyncMock)
+    @patch('api.routes.system.asyncio.sleep', new_callable=AsyncMock)
     def test_check_updates_no_updates(self, mock_sleep, mock_path, client):
         """Test update check with no updates available."""
         mock_version_file = MagicMock()
@@ -3215,7 +3220,7 @@ class TestCheckUpdatesEndpoint:
         assert "Version file not found" in data["error"]
 
     @patch('api.routes.system.Path')
-    @patch('main.asyncio.sleep', new_callable=AsyncMock)
+    @patch('api.routes.system.asyncio.sleep', new_callable=AsyncMock)
     def test_check_updates_fresh_check(self, mock_sleep, mock_path, client):
         """Test that update check triggers fresh check and waits for update."""
         mock_version_file = MagicMock()
@@ -5032,7 +5037,7 @@ class TestErrorHandling:
 
     def test_parse_gemini_error_rate_limit(self):
         """Test parsing of Gemini rate limit errors."""
-        from main import parse_gemini_error
+        from services.gemini_service import parse_gemini_error
         
         error_text = "429 RESOURCE_EXHAUSTED: Quota exceeded"
         result = parse_gemini_error(error_text)
@@ -5041,7 +5046,7 @@ class TestErrorHandling:
 
     def test_parse_gemini_error_generic(self):
         """Test parsing of generic errors."""
-        from main import parse_gemini_error
+        from services.gemini_service import parse_gemini_error
         
         error_text = "Unknown error occurred"
         result = parse_gemini_error(error_text)
@@ -5123,7 +5128,7 @@ class TestImagePromptErrorHandling:
     """Tests for image prompt generation error handling."""
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_generate_image_with_invalid_prompt_result_none(self, mock_subprocess, mock_get_api, client):
         """Test image generation when prompt builder returns None."""
         # Mock API to return profile exists
@@ -5147,7 +5152,7 @@ class TestImagePromptErrorHandling:
             assert "Failed to build image generation prompt" in response.json()["detail"]
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_generate_image_with_invalid_prompt_result_not_dict(self, mock_subprocess, mock_get_api, client):
         """Test image generation when prompt builder returns non-dict."""
         # Mock API to return profile exists
@@ -5171,7 +5176,7 @@ class TestImagePromptErrorHandling:
             assert "Failed to build image generation prompt" in response.json()["detail"]
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('main.subprocess.run')
+    @patch('api.routes.coffee.subprocess.run')
     def test_generate_image_with_valid_prompt_result(self, mock_subprocess, mock_get_api, client):
         """Test image generation with valid prompt result doesn't fail at validation."""
         # Mock API to return profile exists
@@ -5340,7 +5345,7 @@ class TestCacheManagementFunctions:
     
     def test_llm_cache_save_and_load(self):
         """Test LLM cache save and load operations."""
-        from main import save_llm_analysis_to_cache, get_cached_llm_analysis
+        from services.cache_service import save_llm_analysis_to_cache, get_cached_llm_analysis
         
         # Save an analysis
         save_llm_analysis_to_cache("TestProfile", "2024-01-15", "shot.json", "Test analysis result")
@@ -5352,7 +5357,7 @@ class TestCacheManagementFunctions:
     
     def test_llm_cache_miss(self):
         """Test LLM cache miss returns None."""
-        from main import get_cached_llm_analysis
+        from services.cache_service import get_cached_llm_analysis
         
         # Try to get non-existent cache entry
         result = get_cached_llm_analysis("NonExistent", "2024-01-15", "missing.json")
@@ -5906,7 +5911,7 @@ class TestScheduledShotsPersistence:
     def test_persistence_save_and_load(self, tmp_path):
         """Test saving and loading scheduled shots from disk."""
         import asyncio
-        from main import ScheduledShotsPersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
         # Create persistence instance with temp file
         persistence_file = tmp_path / "test_scheduled_shots.json"
@@ -5951,7 +5956,7 @@ class TestScheduledShotsPersistence:
     def test_persistence_filters_inactive_shots(self, tmp_path):
         """Test that only active (scheduled/preheating) shots are persisted."""
         import asyncio
-        from main import ScheduledShotsPersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
         persistence_file = tmp_path / "test_scheduled_shots.json"
         persistence = ScheduledShotsPersistence(str(persistence_file))
@@ -5981,7 +5986,7 @@ class TestScheduledShotsPersistence:
     def test_persistence_handles_missing_file(self, tmp_path):
         """Test that loading from non-existent file returns empty dict."""
         import asyncio
-        from main import ScheduledShotsPersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
         persistence_file = tmp_path / "nonexistent.json"
         persistence = ScheduledShotsPersistence(str(persistence_file))
@@ -5994,7 +5999,7 @@ class TestScheduledShotsPersistence:
     def test_persistence_handles_corrupt_file(self, tmp_path):
         """Test that corrupt JSON file is handled gracefully."""
         import asyncio
-        from main import ScheduledShotsPersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
         persistence_file = tmp_path / "corrupt.json"
         
@@ -6014,7 +6019,7 @@ class TestScheduledShotsPersistence:
     def test_persistence_clear(self, tmp_path):
         """Test clearing persisted scheduled shots."""
         import asyncio
-        from main import ScheduledShotsPersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
         persistence_file = tmp_path / "test_scheduled_shots.json"
         persistence = ScheduledShotsPersistence(str(persistence_file))
@@ -6033,7 +6038,7 @@ class TestScheduledShotsPersistence:
     def test_persistence_atomic_write(self, tmp_path):
         """Test that writes are atomic (use temp file + rename)."""
         import asyncio
-        from main import ScheduledShotsPersistence
+        from services.scheduling_state import ScheduledShotsPersistence
         
         persistence_file = tmp_path / "test_scheduled_shots.json"
         persistence = ScheduledShotsPersistence(str(persistence_file))
@@ -6111,26 +6116,26 @@ class TestUtilityFunctions:
     
     def test_deep_convert_to_dict_with_none(self):
         """Test deep_convert_to_dict with None."""
-        result = main.deep_convert_to_dict(None)
+        result = utils.file_utils.deep_convert_to_dict(None)
         assert result is None
     
     def test_deep_convert_to_dict_with_primitives(self):
         """Test deep_convert_to_dict with primitive types."""
-        assert main.deep_convert_to_dict("string") == "string"
-        assert main.deep_convert_to_dict(42) == 42
-        assert main.deep_convert_to_dict(3.14) == 3.14
-        assert main.deep_convert_to_dict(True) is True
+        assert utils.file_utils.deep_convert_to_dict("string") == "string"
+        assert utils.file_utils.deep_convert_to_dict(42) == 42
+        assert utils.file_utils.deep_convert_to_dict(3.14) == 3.14
+        assert utils.file_utils.deep_convert_to_dict(True) is True
     
     def test_deep_convert_to_dict_with_dict(self):
         """Test deep_convert_to_dict with nested dict."""
         data = {"a": 1, "b": {"c": 2}}
-        result = main.deep_convert_to_dict(data)
+        result = utils.file_utils.deep_convert_to_dict(data)
         assert result == {"a": 1, "b": {"c": 2}}
     
     def test_deep_convert_to_dict_with_list(self):
         """Test deep_convert_to_dict with list and tuple."""
-        assert main.deep_convert_to_dict([1, 2, 3]) == [1, 2, 3]
-        assert main.deep_convert_to_dict((1, 2, 3)) == [1, 2, 3]
+        assert utils.file_utils.deep_convert_to_dict([1, 2, 3]) == [1, 2, 3]
+        assert utils.file_utils.deep_convert_to_dict((1, 2, 3)) == [1, 2, 3]
     
     def test_deep_convert_to_dict_with_object(self):
         """Test deep_convert_to_dict with object having __dict__."""
@@ -6140,7 +6145,7 @@ class TestUtilityFunctions:
                 self._private = "hidden"
         
         obj = TestObj()
-        result = main.deep_convert_to_dict(obj)
+        result = utils.file_utils.deep_convert_to_dict(obj)
         assert result == {"public": "value"}
         assert "_private" not in result
     
@@ -6148,7 +6153,7 @@ class TestUtilityFunctions:
         """Test deep_convert_to_dict with type that can be stringified."""
         import datetime
         dt = datetime.datetime(2024, 1, 1, 12, 0, 0)
-        result = main.deep_convert_to_dict(dt)
+        result = utils.file_utils.deep_convert_to_dict(dt)
         assert isinstance(result, str)
         assert "2024" in result
     
@@ -6158,7 +6163,7 @@ class TestUtilityFunctions:
             def __str__(self):
                 raise ValueError("Cannot convert")
         
-        result = main.deep_convert_to_dict(BadStr())
+        result = utils.file_utils.deep_convert_to_dict(BadStr())
         # Object has __dict__, so it returns empty dict
         assert result == {}
     
@@ -6167,7 +6172,7 @@ class TestUtilityFunctions:
         filepath = tmp_path / "test.json"
         data = {"key": "value", "number": 42}
         
-        main.atomic_write_json(filepath, data)
+        utils.file_utils.atomic_write_json(filepath, data)
         
         assert filepath.exists()
         with open(filepath) as f:
@@ -6186,7 +6191,7 @@ class TestUtilityFunctions:
         data = {"key": "value"}
         
         with pytest.raises((OSError, FileNotFoundError, AttributeError)):
-            main.atomic_write_json(invalid_path, data)
+            utils.file_utils.atomic_write_json(invalid_path, data)
     
     def test_atomic_write_json_cleanup_on_failure(self, tmp_path, monkeypatch):
         """Test atomic_write_json cleans up temp file on failure."""
@@ -6201,7 +6206,7 @@ class TestUtilityFunctions:
         monkeypatch.setattr(os, "rename", failing_rename)
         
         with pytest.raises(OSError):
-            main.atomic_write_json(filepath, data)
+            utils.file_utils.atomic_write_json(filepath, data)
         
         # Original file should not exist
         assert not filepath.exists()
@@ -6325,62 +6330,62 @@ class TestParseGeminiErrorExtended:
     def test_parse_gemini_error_quota_exhausted(self):
         """Test quota exhausted error."""
         error = "Error: Quota exhausted for the day"
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "quota" in result.lower()
         assert "tomorrow" in result.lower()
     
     def test_parse_gemini_error_rate_limit(self):
         """Test rate limit error."""
         error = "Error: Rate limit exceeded - too many requests"
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "rate limit" in result.lower()
         assert "wait" in result.lower()
     
     def test_parse_gemini_error_api_key(self):
         """Test API key error."""
         error = "Error: Invalid API key provided"
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "api" in result.lower() or "authentication" in result.lower()
     
     def test_parse_gemini_error_network(self):
         """Test network error."""
         error = "Error: Network timeout connecting to API"
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "network" in result.lower()
     
     def test_parse_gemini_error_mcp_connection(self):
         """Test MCP connection error."""
         error = "MCP error: Connection refused to meticulous machine"
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "connect" in result.lower() or "meticulous" in result.lower()
     
     def test_parse_gemini_error_safety_filter(self):
         """Test content safety filter error."""
         error = "Error: Content blocked by safety filters"
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "safety" in result.lower() or "blocked" in result.lower()
     
     def test_parse_gemini_error_extract_clean_message(self):
         """Test extracting clean error message from verbose output."""
         error = "Stack trace...\nError: Profile validation failed - invalid temperature\nmore details..."
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "validation failed" in result.lower() or "invalid temperature" in result.lower()
     
     def test_parse_gemini_error_truncate_long_message(self):
         """Test truncating very long error messages."""
         error = "x" * 300
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert len(result) < 300
     
     def test_parse_gemini_error_generic_fallback(self):
         """Test generic fallback for unknown errors."""
         error = "Something unexpected happened"
-        result = main.parse_gemini_error(error)
+        result = services.gemini_service.parse_gemini_error(error)
         assert "failed" in result.lower()
     
     def test_parse_gemini_error_empty_string(self):
         """Test empty error string."""
-        result = main.parse_gemini_error("")
+        result = services.gemini_service.parse_gemini_error("")
         assert "unexpectedly" in result.lower()
 
 
@@ -6396,7 +6401,7 @@ class TestGetVisionModel:
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         
         with pytest.raises(ValueError) as exc_info:
-            main.get_vision_model()
+            services.gemini_service.get_vision_model()
         
         assert "GEMINI_API_KEY" in str(exc_info.value)
         
@@ -6420,12 +6425,12 @@ class TestGetVisionModel:
         
         with patch('services.gemini_service.genai.Client', side_effect=mock_client_constructor):
             # First call should initialize
-            client1 = main.get_gemini_client()
+            client1 = services.gemini_service.get_gemini_client()
             assert len(client_calls) == 1
             assert client_calls[0]['api_key'] == 'test_key_123'
             
             # Second call should reuse cached client
-            client2 = main.get_gemini_client()
+            client2 = services.gemini_service.get_gemini_client()
             assert len(client_calls) == 1  # Not called again
             assert client1 is client2
         
@@ -6439,7 +6444,7 @@ class TestGetVisionModel:
         
         mock_client_instance = MagicMock()
         with patch('services.gemini_service.genai.Client', return_value=mock_client_instance):
-            model = main.get_vision_model()
+            model = services.gemini_service.get_vision_model()
             assert hasattr(model, 'generate_content')
             assert hasattr(model, 'async_generate_content')
             
@@ -6474,12 +6479,12 @@ class TestGetMeticulousAPI:
         sys.modules['meticulous'] = mock_module
         sys.modules['meticulous.api'] = mock_module
         
-        api1 = main.get_meticulous_api()
+        api1 = services.meticulous_service.get_meticulous_api()
         assert api1 is not None
         assert api1.base_url == "http://192.168.1.100"
         
         # Second call should return cached instance
-        api2 = main.get_meticulous_api()
+        api2 = services.meticulous_service.get_meticulous_api()
         assert api1 is api2
         
         # Cleanup
@@ -6503,7 +6508,7 @@ class TestGetMeticulousAPI:
         sys.modules['meticulous'] = mock_module
         sys.modules['meticulous.api'] = mock_module
         
-        api = main.get_meticulous_api()
+        api = services.meticulous_service.get_meticulous_api()
         assert api.base_url == "http://espresso.local"
         
         services.meticulous_service._meticulous_api = None
@@ -6619,7 +6624,7 @@ class TestDecompressShotData:
         compressed = compressor.compress(json_str.encode('utf-8'))
         
         # Decompress using the function
-        result = main.decompress_shot_data(compressed)
+        result = services.meticulous_service.decompress_shot_data(compressed)
         
         assert result == original_data
 
@@ -6632,7 +6637,7 @@ class TestLLMAnalysisCacheFunctions:
         cache_file = tmp_path / "llm_cache.json"
         cache_file.write_text("{}")
         
-        monkeypatch.setattr(main, "DATA_DIR", tmp_path)
+        monkeypatch.setattr(config, "DATA_DIR", tmp_path)
         
         # Verify cache file exists
         assert cache_file.exists()
@@ -6648,20 +6653,20 @@ class TestAdditionalCoveragePaths:
     def testsanitize_profile_name_for_filename(self):
         """Test sanitize_profile_name_for_filename with various inputs."""
         # Test with special characters
-        result = main.sanitize_profile_name_for_filename("Test/Profile\\Name:123")
+        result = utils.sanitization.sanitize_profile_name_for_filename("Test/Profile\\Name:123")
         assert "/" not in result and "\\" not in result
         
         # Test with spaces
-        result = main.sanitize_profile_name_for_filename("My Cool Profile")
+        result = utils.sanitization.sanitize_profile_name_for_filename("My Cool Profile")
         assert isinstance(result, str)
     
     def test_safe_float_with_various_types(self):
         """Test safe_float helper function."""
         # These might not exist, so wrap in try/except
         try:
-            assert main.safe_float("3.14") == 3.14
-            assert main.safe_float(42) == 42.0
-            assert main.safe_float(None) == 0.0
+            assert services.analysis_service._safe_float("3.14") == 3.14
+            assert services.analysis_service._safe_float(42) == 42.0
+            assert services.analysis_service._safe_float(None) == 0.0
         except AttributeError:
             pass  # Function doesn't exist
     
@@ -6677,8 +6682,8 @@ class TestAdditionalCoveragePaths:
     def test_data_directory_configuration_paths(self, monkeypatch):
         """Test data directory path resolution."""
         # Test that DATA_DIR is set
-        assert main.DATA_DIR is not None
-        assert isinstance(main.DATA_DIR, Path)
+        assert config.DATA_DIR is not None
+        assert isinstance(config.DATA_DIR, Path)
 
 
 # ==============================================================================
@@ -6696,7 +6701,7 @@ class TestRecurringSchedulesPersistence:
     @pytest.mark.asyncio
     async def test_persistence_save_and_load(self, temp_persistence_file):
         """Test saving and loading recurring schedules."""
-        persistence = main.RecurringSchedulesPersistence(temp_persistence_file)
+        persistence = services.scheduling_state.RecurringSchedulesPersistence(temp_persistence_file)
         
         test_schedules = {
             "schedule-1": {
@@ -6731,7 +6736,7 @@ class TestRecurringSchedulesPersistence:
     @pytest.mark.asyncio
     async def test_persistence_saves_all_schedules_including_disabled(self, temp_persistence_file):
         """Test that both enabled and disabled schedules are persisted."""
-        persistence = main.RecurringSchedulesPersistence(temp_persistence_file)
+        persistence = services.scheduling_state.RecurringSchedulesPersistence(temp_persistence_file)
         
         test_schedules = {
             "enabled-schedule": {
@@ -6758,7 +6763,7 @@ class TestRecurringSchedulesPersistence:
     @pytest.mark.asyncio
     async def test_persistence_load_nonexistent_file(self, tmp_path):
         """Test loading when file doesn't exist."""
-        persistence = main.RecurringSchedulesPersistence(str(tmp_path / "nonexistent.json"))
+        persistence = services.scheduling_state.RecurringSchedulesPersistence(str(tmp_path / "nonexistent.json"))
         
         loaded = await persistence.load()
         
@@ -6771,7 +6776,7 @@ class TestRecurringSchedulesPersistence:
         with open(temp_persistence_file, 'w') as f:
             f.write("not valid json {{{")
         
-        persistence = main.RecurringSchedulesPersistence(temp_persistence_file)
+        persistence = services.scheduling_state.RecurringSchedulesPersistence(temp_persistence_file)
         loaded = await persistence.load()
         
         assert loaded == {}
@@ -6783,7 +6788,7 @@ class TestRecurringSchedulesPersistence:
         with open(temp_persistence_file, 'w') as f:
             f.write('["item1", "item2"]')
         
-        persistence = main.RecurringSchedulesPersistence(temp_persistence_file)
+        persistence = services.scheduling_state.RecurringSchedulesPersistence(temp_persistence_file)
         loaded = await persistence.load()
         
         assert loaded == {}
@@ -6792,7 +6797,7 @@ class TestRecurringSchedulesPersistence:
     async def test_persistence_creates_directory(self, tmp_path):
         """Test that persistence creates parent directory if needed."""
         nested_path = tmp_path / "nested" / "dir" / "schedules.json"
-        persistence = main.RecurringSchedulesPersistence(str(nested_path))
+        persistence = services.scheduling_state.RecurringSchedulesPersistence(str(nested_path))
         
         await persistence.save({"test": {"enabled": True}})
         
@@ -6809,7 +6814,7 @@ class TestGetNextOccurrence:
             "recurrence_type": "daily"
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         assert result is not None
         assert result.hour == 7
@@ -6822,7 +6827,7 @@ class TestGetNextOccurrence:
             "recurrence_type": "weekdays"
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         assert result is not None
         assert result.weekday() < 5  # Monday-Friday
@@ -6836,7 +6841,7 @@ class TestGetNextOccurrence:
             "recurrence_type": "weekends"
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         assert result is not None
         assert result.weekday() >= 5  # Saturday or Sunday
@@ -6850,7 +6855,7 @@ class TestGetNextOccurrence:
             "days_of_week": [0, 2, 4]  # Monday, Wednesday, Friday
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         assert result is not None
         assert result.weekday() in [0, 2, 4]
@@ -6863,7 +6868,7 @@ class TestGetNextOccurrence:
             "interval_days": 3
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         assert result is not None
         assert result.hour == 6
@@ -6881,7 +6886,7 @@ class TestGetNextOccurrence:
             "last_run": last_run.isoformat()
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         assert result is not None
         # Should be approximately 2 more days from now
@@ -6894,7 +6899,7 @@ class TestGetNextOccurrence:
             "recurrence_type": "daily"
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         assert result is None
     
@@ -6904,7 +6909,7 @@ class TestGetNextOccurrence:
             "recurrence_type": "daily"
         }
         
-        result = main._get_next_occurrence(schedule)
+        result = services.scheduling_state.get_next_occurrence(schedule)
         
         # Should use default 07:00
         assert result is not None
