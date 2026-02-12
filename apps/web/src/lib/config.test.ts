@@ -38,6 +38,7 @@ describe('config loader', () => {
       // Mock fetch to return a valid config
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
         json: async () => ({ serverUrl: 'http://192.168.1.100:8080' })
       })
       
@@ -49,6 +50,7 @@ describe('config loader', () => {
       // Mock fetch to return partial config
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
         json: async () => ({ serverUrl: 'http://custom.server:3000' })
       })
       
@@ -68,6 +70,7 @@ describe('config loader', () => {
     it('should return configured server URL from config.json', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
         json: async () => ({ serverUrl: 'http://example.com:9000' })
       })
       

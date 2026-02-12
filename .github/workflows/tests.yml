@@ -165,16 +165,18 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: apps/mcp-server/requirements.txt
+          cache-dependency-path: apps/mcp-server/meticulous-mcp/requirements.txt
 
       - name: Install dependencies
         run: |
+          cd meticulous-mcp
           pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run tests
         run: |
-          PYTHONPATH=${{ github.workspace }}/apps/mcp-server/src \
+          cd meticulous-mcp
+          PYTHONPATH=${{ github.workspace }}/apps/mcp-server/meticulous-mcp/src \
           python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
 
       - name: Upload test results
@@ -182,7 +184,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mcp-test-results
-          path: apps/mcp-server/test-results.xml
+          path: apps/mcp-server/meticulous-mcp/test-results.xml
 
   # ============================================================================
   # Docker Build Tests
