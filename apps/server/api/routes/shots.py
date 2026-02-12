@@ -1,12 +1,17 @@
 """Shot history and analysis endpoints."""
 from fastapi import APIRouter, Request, Form, HTTPException
 from typing import Optional
+import asyncio
 import json
 import re
 import time
 import logging
 
-from services.meticulous_service import get_meticulous_api, fetch_shot_data
+from services.meticulous_service import (
+    fetch_shot_data,
+    async_list_profiles, async_get_history_dates,
+    async_get_shot_files, async_get_profile
+)
 from services.cache_service import (
     get_cached_llm_analysis, save_llm_analysis_to_cache,
     _get_cached_shots, _set_cached_shots
@@ -66,8 +71,7 @@ async def get_shot_dates(request: Request):
             extra={"request_id": request_id}
         )
         
-        api = get_meticulous_api()
-        result = api.get_history_dates()
+        result = await async_get_history_dates()
         
         # Check for API error
         if hasattr(result, 'error') and result.error:
@@ -117,8 +121,7 @@ async def get_shot_files(request: Request, date: str):
             extra={"request_id": request_id, "date": date}
         )
         
-        api = get_meticulous_api()
-        result = api.get_shot_files(date)
+        result = await async_get_shot_files(date)
         
         # Check for API error
         if hasattr(result, 'error') and result.error:
@@ -236,10 +239,8 @@ async def get_shots_by_profile(
                 cached_data["is_stale"] = is_stale
                 return cached_data
         
-        api = get_meticulous_api()
-        
         # Get all available dates
-        dates_result = api.get_history_dates()
+        dates_result = await async_get_history_dates()
         if hasattr(dates_result, 'error') and dates_result.error:
             raise HTTPException(
                 status_code=502,
@@ -249,68 +250,78 @@ async def get_shots_by_profile(
         dates = [d.name for d in dates_result] if dates_result else []
         matching_shots = []
         
-        # Search through dates (most recent first)
-        for date in sorted(dates, reverse=True):
-            if len(matching_shots) >= limit:
-                break
-                
-            # Get files for this date
-            files_result = api.get_shot_files(date)
-            if hasattr(files_result, 'error') and files_result.error:
-                logger.warning(f"Could not get files for {date}: {files_result.error}")
-                continue
-            
-            files = [f.name for f in files_result] if files_result else []
-            
-            # Check each shot file
-            for filename in files:
-                if len(matching_shots) >= limit:
-                    break
-                    
+        # Concurrency limiter — avoid overwhelming the machine with requests
+        sem = asyncio.Semaphore(6)
+        
+        async def _fetch_and_match(date: str, filename: str):
+            """Fetch a single shot and return info dict if it matches, else None."""
+            async with sem:
                 try:
                     shot_data = await fetch_shot_data(date, filename)
-                    
-                    # Extract profile name from shot data
-                    # Can be in "profile_name" or "profile.name" depending on firmware
-                    shot_profile_name = shot_data.get("profile_name", "")
-                    if not shot_profile_name and isinstance(shot_data.get("profile"), dict):
-                        shot_profile_name = shot_data.get("profile", {}).get("name", "")
-                    
-                    # Case-insensitive match
-                    if shot_profile_name.lower() == profile_name.lower():
-                        # Extract final weight and time from the data array
-                        data_entries = shot_data.get("data", [])
-                        final_weight = None
-                        total_time_ms = None
-                        
-                        if data_entries:
-                            last_entry = data_entries[-1]
-                            # Weight is in shot.weight
-                            if isinstance(last_entry.get("shot"), dict):
-                                final_weight = last_entry["shot"].get("weight")
-                            # Time is in milliseconds
-                            total_time_ms = last_entry.get("time")
-                        
-                        shot_info = {
-                            "date": date,
-                            "filename": filename,
-                            "timestamp": shot_data.get("time"),  # Unix timestamp
-                            "profile_name": shot_profile_name,
-                            "final_weight": final_weight,
-                            "total_time": total_time_ms / 1000 if total_time_ms else None,  # Convert to seconds
-                        }
-                        
-                        if include_data:
-                            shot_info["data"] = shot_data
-                        
-                        matching_shots.append(shot_info)
-                        
                 except Exception as e:
                     logger.warning(
                         f"Could not process shot {date}/{filename}: {str(e)}",
                         extra={"request_id": request_id}
                     )
-                    continue
+                    return None
+                
+                # Extract profile name from shot data
+                shot_profile_name = shot_data.get("profile_name", "")
+                if not shot_profile_name and isinstance(shot_data.get("profile"), dict):
+                    shot_profile_name = shot_data.get("profile", {}).get("name", "")
+                
+                if shot_profile_name.lower() != profile_name.lower():
+                    return None
+                
+                data_entries = shot_data.get("data", [])
+                final_weight = None
+                total_time_ms = None
+                
+                if data_entries:
+                    last_entry = data_entries[-1]
+                    if isinstance(last_entry.get("shot"), dict):
+                        final_weight = last_entry["shot"].get("weight")
+                    total_time_ms = last_entry.get("time")
+                
+                shot_info = {
+                    "date": date,
+                    "filename": filename,
+                    "timestamp": shot_data.get("time"),
+                    "profile_name": shot_profile_name,
+                    "final_weight": final_weight,
+                    "total_time": total_time_ms / 1000 if total_time_ms else None,
+                }
+                
+                if include_data:
+                    shot_info["data"] = shot_data
+                
+                return shot_info
+        
+        # Search through dates (most recent first), fetch files concurrently per date
+        for date in sorted(dates, reverse=True):
+            if len(matching_shots) >= limit:
+                break
+                
+            # Get file listing for this date (lightweight, sequential is fine)
+            files_result = await async_get_shot_files(date)
+            if hasattr(files_result, 'error') and files_result.error:
+                logger.warning(f"Could not get files for {date}: {files_result.error}")
+                continue
+            
+            files = [f.name for f in files_result] if files_result else []
+            if not files:
+                continue
+            
+            # Fire off all shot fetches for this date concurrently
+            tasks = [_fetch_and_match(date, fn) for fn in files]
+            results = await asyncio.gather(*tasks)
+            
+            # Collect matches (preserve chronological order)
+            for result in results:
+                if result is not None:
+                    matching_shots.append(result)
+                    if len(matching_shots) >= limit:
+                        break
         
         logger.info(
             f"Found {len(matching_shots)} shots for profile '{profile_name}'",
@@ -386,8 +397,7 @@ async def analyze_shot(
         shot_data = await fetch_shot_data(shot_date, shot_filename)
         
         # Fetch profile from machine
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         logger.debug(f"Looking for profile '{profile_name}' in {len(profiles_result)} profiles")
         
@@ -396,7 +406,7 @@ async def analyze_shot(
             # Compare ignoring case and whitespace
             if partial_profile.name.lower().strip() == profile_name.lower().strip():
                 logger.debug(f"Found matching profile: {partial_profile.name} (id={partial_profile.id})")
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if not (hasattr(full_profile, 'error') and full_profile.error):
                     # Convert profile object to dict
                     profile_data = {
@@ -612,13 +622,12 @@ async def analyze_shot_with_llm(
         shot_data = await fetch_shot_data(shot_date, shot_filename)
         
         # Fetch profile from machine (with variables)
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         profile_data = None
         for partial_profile in profiles_result:
             if partial_profile.name.lower() == profile_name.lower():
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if not (hasattr(full_profile, 'error') and full_profile.error):
                     profile_data = {
                         "name": full_profile.name,

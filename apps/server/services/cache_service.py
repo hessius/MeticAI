@@ -23,6 +23,9 @@ logger = get_logger()
 
 LLM_CACHE_FILE = DATA_DIR / "llm_analysis_cache.json"
 
+# In-memory cache (loaded from disk on first access, write-through on save)
+_llm_cache: Optional[dict] = None
+
 
 def _ensure_llm_cache_file():
     """Ensure the LLM cache file and directory exist."""
@@ -32,16 +35,22 @@ def _ensure_llm_cache_file():
 
 
 def _load_llm_cache() -> dict:
-    """Load LLM analysis cache from file."""
+    """Load LLM analysis cache, using in-memory copy when available."""
+    global _llm_cache
+    if _llm_cache is not None:
+        return _llm_cache
     _ensure_llm_cache_file()
     try:
-        return json.loads(LLM_CACHE_FILE.read_text())
+        _llm_cache = json.loads(LLM_CACHE_FILE.read_text())
     except (json.JSONDecodeError, IOError):
-        return {}
+        _llm_cache = {}
+    return _llm_cache
 
 
 def _save_llm_cache(cache: dict):
-    """Save LLM analysis cache to file."""
+    """Write-through: update in-memory cache and persist to disk."""
+    global _llm_cache
+    _llm_cache = cache
     _ensure_llm_cache_file()
     atomic_write_json(LLM_CACHE_FILE, cache)
 
@@ -93,6 +102,9 @@ def save_llm_analysis_to_cache(profile_name: str, shot_date: str, shot_filename:
 
 SHOT_CACHE_FILE = DATA_DIR / "shot_cache.json"
 
+# In-memory cache (loaded from disk on first access, write-through on save)
+_shot_cache: Optional[dict] = None
+
 
 def _ensure_shot_cache_file():
     """Ensure the shot cache file and directory exist."""
@@ -102,17 +114,23 @@ def _ensure_shot_cache_file():
 
 
 def _load_shot_cache() -> dict:
-    """Load shot cache from file."""
+    """Load shot cache, using in-memory copy when available."""
+    global _shot_cache
+    if _shot_cache is not None:
+        return _shot_cache
     _ensure_shot_cache_file()
     try:
         with open(SHOT_CACHE_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            _shot_cache = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
-        return {}
+        _shot_cache = {}
+    return _shot_cache
 
 
 def _save_shot_cache(cache: dict):
-    """Save shot cache to file."""
+    """Write-through: update in-memory cache and persist to disk."""
+    global _shot_cache
+    _shot_cache = cache
     _ensure_shot_cache_file()
     atomic_write_json(SHOT_CACHE_FILE, cache)
 

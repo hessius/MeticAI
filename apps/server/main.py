@@ -115,6 +115,10 @@ async def lifespan(app: FastAPI):
     if _scheduled_tasks:
         await asyncio.gather(*_scheduled_tasks.values(), return_exceptions=True)
         logger.info("All scheduled shot tasks cancelled")
+    
+    # Close the singleton httpx client
+    from services.meticulous_service import close_http_client
+    await close_http_client()
 
 
 app = FastAPI(lifespan=lifespan)

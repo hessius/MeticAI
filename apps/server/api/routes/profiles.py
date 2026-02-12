@@ -16,7 +16,13 @@ except ImportError:
     pass  # pillow-heif not installed; HEIC files will fail gracefully
 
 from config import DATA_DIR, MAX_UPLOAD_SIZE
-from services.meticulous_service import get_meticulous_api
+from services.meticulous_service import (
+    async_list_profiles,
+    async_get_profile,
+    async_save_profile,
+    async_load_profile_by_id,
+    async_execute_action,
+)
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
 from services.history_service import HISTORY_FILE
@@ -129,8 +135,11 @@ async def upload_profile_image(
                 detail=f"Image too large. Maximum size is {MAX_UPLOAD_SIZE / (1024*1024):.0f}MB"
             )
         
-        # Process image: crop, resize, encode
-        image_data_uri, png_bytes = process_image_for_profile(image_data, file.content_type)
+        # Process image: crop, resize, encode (CPU-bound, offload to thread)
+        loop = asyncio.get_event_loop()
+        image_data_uri, png_bytes = await loop.run_in_executor(
+            None, process_image_for_profile, image_data, file.content_type
+        )
         
         # Cache the processed image for fast retrieval
         _set_cached_image(profile_name, png_bytes)
@@ -141,8 +150,7 @@ async def upload_profile_image(
         )
         
         # Find the profile by name
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         if hasattr(profiles_result, 'error') and profiles_result.error:
             raise HTTPException(
@@ -155,7 +163,7 @@ async def upload_profile_image(
         for partial_profile in profiles_result:
             if partial_profile.name == profile_name:
                 # Get full profile
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
                     continue
                 matching_profile = full_profile
@@ -181,7 +189,7 @@ async def upload_profile_image(
         )
         
         # Save the updated profile
-        save_result = api.save_profile(matching_profile)
+        save_result = await async_save_profile(matching_profile)
         
         if hasattr(save_result, 'error') and save_result.error:
             raise HTTPException(
@@ -340,8 +348,11 @@ async def generate_profile_image(
         generated = response.generated_images[0]
         image_data = generated.image.image_bytes
         
-        # Process the image (crop/resize) and prepare for profile
-        image_data_uri, png_bytes = process_image_for_profile(image_data, "image/png")
+        # Process the image (crop/resize) — CPU-bound, offload to thread
+        loop = asyncio.get_event_loop()
+        image_data_uri, png_bytes = await loop.run_in_executor(
+            None, process_image_for_profile, image_data, "image/png"
+        )
         
         # Cache the processed image for fast retrieval
         _set_cached_image(profile_name, png_bytes)
@@ -367,8 +378,7 @@ async def generate_profile_image(
             }
         
         # Find the profile and update it
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         if hasattr(profiles_result, 'error') and profiles_result.error:
             raise HTTPException(
@@ -379,7 +389,7 @@ async def generate_profile_image(
         matching_profile = None
         for partial_profile in profiles_result:
             if partial_profile.name == profile_name:
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
                     continue
                 matching_profile = full_profile
@@ -403,7 +413,7 @@ async def generate_profile_image(
             accentColor=existing_accent
         )
         
-        save_result = api.save_profile(matching_profile)
+        save_result = await async_save_profile(matching_profile)
         
         if hasattr(save_result, 'error') and save_result.error:
             raise HTTPException(
@@ -528,8 +538,7 @@ async def apply_profile_image(
             )
         
         # Find the profile and update it
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         if hasattr(profiles_result, 'error') and profiles_result.error:
             raise HTTPException(
@@ -540,7 +549,7 @@ async def apply_profile_image(
         matching_profile = None
         for partial_profile in profiles_result:
             if partial_profile.name == profile_name:
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
                     continue
                 matching_profile = full_profile
@@ -564,7 +573,7 @@ async def apply_profile_image(
             accentColor=existing_accent
         )
         
-        save_result = api.save_profile(matching_profile)
+        save_result = await async_save_profile(matching_profile)
         
         if hasattr(save_result, 'error') and save_result.error:
             raise HTTPException(
@@ -634,8 +643,7 @@ async def proxy_profile_image(
     
     try:
         # First get the profile to find the image path
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         if hasattr(profiles_result, 'error') and profiles_result.error:
             raise HTTPException(
@@ -646,7 +654,7 @@ async def proxy_profile_image(
         # Find matching profile
         for partial_profile in profiles_result:
             if partial_profile.name == profile_name:
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
                     continue
                 
@@ -722,8 +730,7 @@ async def get_profile_info(
             extra={"request_id": request_id, "profile_name": profile_name}
         )
         
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         if hasattr(profiles_result, 'error') and profiles_result.error:
             raise HTTPException(
@@ -735,7 +742,7 @@ async def get_profile_info(
         for partial_profile in profiles_result:
             if partial_profile.name == profile_name:
                 # Get full profile
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
                     continue
                 
@@ -818,8 +825,7 @@ async def analyze_shot(
         shot_data = await fetch_shot_data(shot_date, shot_filename)
         
         # Fetch profile from machine
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         logger.debug(f"Looking for profile '{profile_name}' in {len(profiles_result)} profiles")
         
@@ -828,7 +834,7 @@ async def analyze_shot(
             # Compare ignoring case and whitespace
             if partial_profile.name.lower().strip() == profile_name.lower().strip():
                 logger.debug(f"Found matching profile: {partial_profile.name} (id={partial_profile.id})")
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if not (hasattr(full_profile, 'error') and full_profile.error):
                     # Convert profile object to dict
                     profile_data = {
@@ -1050,13 +1056,12 @@ async def analyze_shot_with_llm(
         shot_data = await fetch_shot_data(shot_date, shot_filename)
         
         # Fetch profile from machine (with variables)
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         profile_data = None
         for partial_profile in profiles_result:
             if partial_profile.name.lower() == profile_name.lower():
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if not (hasattr(full_profile, 'error') and full_profile.error):
                     profile_data = {
                         "name": full_profile.name,
@@ -1258,8 +1263,7 @@ async def list_machine_profiles(request: Request):
             extra={"request_id": request_id}
         )
         
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         if hasattr(profiles_result, 'error') and profiles_result.error:
             raise HTTPException(
@@ -1270,7 +1274,7 @@ async def list_machine_profiles(request: Request):
         profiles = []
         for partial_profile in profiles_result:
             try:
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
                     continue
                 
@@ -1367,8 +1371,7 @@ async def get_machine_profile_json(profile_id: str, request: Request):
             extra={"request_id": request_id, "profile_id": profile_id}
         )
         
-        api = get_meticulous_api()
-        profile = api.get_profile(profile_id)
+        profile = await async_get_profile(profile_id)
         
         if hasattr(profile, 'error') and profile.error:
             raise HTTPException(
@@ -1558,8 +1561,7 @@ async def import_all_profiles(request: Request):
         
         try:
             # Get list of machine profiles
-            api = get_meticulous_api()
-            profiles_result = api.list_profiles()
+            profiles_result = await async_list_profiles()
             
             if hasattr(profiles_result, 'error') and profiles_result.error:
                 yield json.dumps({
@@ -1584,7 +1586,7 @@ async def import_all_profiles(request: Request):
             profiles_to_import = []
             for partial_profile in profiles_result:
                 try:
-                    full_profile = api.get_profile(partial_profile.id)
+                    full_profile = await async_get_profile(partial_profile.id)
                     if hasattr(full_profile, 'error') and full_profile.error:
                         continue
                     if full_profile.name not in existing_names:
@@ -1731,8 +1733,7 @@ async def get_machine_profile_count(request: Request):
     request_id = request.state.request_id
     
     try:
-        api = get_meticulous_api()
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         if hasattr(profiles_result, 'error') and profiles_result.error:
             raise HTTPException(
@@ -1743,7 +1744,7 @@ async def get_machine_profile_count(request: Request):
         total_on_machine = len(list(profiles_result))
         
         # Re-fetch to count (iterator was consumed)
-        profiles_result = api.list_profiles()
+        profiles_result = await async_list_profiles()
         
         # Get existing profile names from history
         existing_names = set()
@@ -1760,7 +1761,7 @@ async def get_machine_profile_count(request: Request):
         not_imported = 0
         for partial_profile in profiles_result:
             try:
-                full_profile = api.get_profile(partial_profile.id)
+                full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
                     continue
                 if full_profile.name not in existing_names:
@@ -2061,7 +2062,6 @@ async def _restore_scheduled_shots():
             # Create the execution task that handles restoration properly
             async def execute_scheduled_shot(sid=schedule_id, pid=profile_id, ph=preheat, delay=shot_delay, was_preheating=(current_status == "preheating")):
                 try:
-                    api = get_meticulous_api()
                     
                     # If we were already preheating when restored, skip preheat logic
                     # and just wait for the shot time
@@ -2084,7 +2084,7 @@ async def _restore_scheduled_shots():
                             # Start preheat using ActionType.PREHEAT
                             try:
                                 from meticulous.api_types import ActionType
-                                api.execute_action(ActionType.PREHEAT)
+                                await async_execute_action(ActionType.PREHEAT)
                             except Exception as e:
                                 logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
                             
@@ -2096,7 +2096,7 @@ async def _restore_scheduled_shots():
                             await _save_scheduled_shots()
                             try:
                                 from meticulous.api_types import ActionType
-                                api.execute_action(ActionType.PREHEAT)
+                                await async_execute_action(ActionType.PREHEAT)
                             except Exception as e:
                                 logger.warning(f"Preheat failed for scheduled shot {sid}: {e}")
                             await asyncio.sleep(delay)
@@ -2108,10 +2108,10 @@ async def _restore_scheduled_shots():
                     
                     # Load and run the profile (if profile_id was provided)
                     if pid:
-                        load_result = api.load_profile_by_id(pid)
+                        load_result = await async_load_profile_by_id(pid)
                         if not (hasattr(load_result, 'error') and load_result.error):
                             from meticulous.api_types import ActionType
-                            api.execute_action(ActionType.START)
+                            await async_execute_action(ActionType.START)
                             _scheduled_shots[sid]["status"] = "completed"
                         else:
                             _scheduled_shots[sid]["status"] = "failed"

@@ -214,10 +214,16 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         )
         
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
-        # Convert to RGB if needed (e.g. HEIC may be RGBA or other modes)
-        if image.mode not in ('RGB', 'L'):
-            image = image.convert('RGB')
+        
+        # Offload CPU-bound PIL ops to a thread
+        def _open_image(data: bytes):
+            img = Image.open(io.BytesIO(data))
+            if img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
+            return img
+        
+        loop = asyncio.get_event_loop()
+        image = await loop.run_in_executor(None, _open_image, contents)
         
         logger.debug(
             "Image loaded successfully",
@@ -315,10 +321,16 @@ async def analyze_and_profile(
         if file:
             logger.debug("Reading and analyzing image", extra={"request_id": request_id})
             contents = await file.read()
-            image = Image.open(io.BytesIO(contents))
-            # Convert to RGB if needed (e.g. HEIC may be RGBA or other modes)
-            if image.mode not in ('RGB', 'L'):
-                image = image.convert('RGB')
+            
+            # Offload CPU-bound PIL ops to a thread
+            def _open_image(data: bytes):
+                img = Image.open(io.BytesIO(data))
+                if img.mode not in ('RGB', 'L'):
+                    img = img.convert('RGB')
+                return img
+            
+            loop = asyncio.get_event_loop()
+            image = await loop.run_in_executor(None, _open_image, contents)
             
             # Analyze the coffee bag
             analysis_start = time.monotonic()

@@ -5,11 +5,20 @@ import uuid
 import logging
 import asyncio
 
-from services.meticulous_service import get_meticulous_api
+from services.meticulous_service import (
+    get_meticulous_api,
+    async_get_settings,
+    async_get_last_profile,
+    async_execute_action,
+    async_load_profile_by_id,
+    async_session_get,
+    async_session_post,
+)
 from services.scheduling_state import (
     _scheduled_shots,
     _scheduled_tasks,
     _recurring_schedules,
+    _get_state_lock,
     save_scheduled_shots as _save_scheduled_shots,
     save_recurring_schedules as _save_recurring_schedules,
     get_next_occurrence as _get_next_occurrence,
@@ -42,16 +51,17 @@ async def _schedule_next_recurring(schedule_id: str, schedule: dict):
     profile_id = schedule.get("profile_id")
     preheat = schedule.get("preheat", True)
     
-    # Add to scheduled shots
-    _scheduled_shots[shot_id] = {
-        "id": shot_id,
-        "profile_id": profile_id,
-        "scheduled_time": next_occurrence.isoformat(),
-        "preheat": preheat,
-        "status": "scheduled",
-        "recurring_schedule_id": schedule_id,
-        "created_at": now.isoformat()
-    }
+    # Add to scheduled shots (lock protects dict mutation)
+    async with _get_state_lock():
+        _scheduled_shots[shot_id] = {
+            "id": shot_id,
+            "profile_id": profile_id,
+            "scheduled_time": next_occurrence.isoformat(),
+            "preheat": preheat,
+            "status": "scheduled",
+            "recurring_schedule_id": schedule_id,
+            "created_at": now.isoformat()
+        }
     
     await _save_scheduled_shots()
     
@@ -75,11 +85,9 @@ async def get_machine_status(request: Request):
             extra={"request_id": request_id}
         )
         
-        api = get_meticulous_api()
-        
         # Get current shot/status (live machine state)
         try:
-            status = api.session.get(f"{api.base_url}/api/v1/status")
+            status = await async_session_get("/api/v1/status")
             if status.status_code == 200:
                 status_data = status.json()
             else:
@@ -90,7 +98,7 @@ async def get_machine_status(request: Request):
         
         # Get settings to check preheat state
         try:
-            settings = api.get_settings()
+            settings = await async_get_settings()
             if hasattr(settings, 'error') and settings.error:
                 settings_data = {}
             elif hasattr(settings, 'model_dump'):
@@ -103,7 +111,7 @@ async def get_machine_status(request: Request):
         
         # Get last loaded profile
         try:
-            last_profile = api.get_last_profile()
+            last_profile = await async_get_last_profile()
             if hasattr(last_profile, 'error') and last_profile.error:
                 last_profile_data = None
             elif hasattr(last_profile, 'profile'):
@@ -151,9 +159,7 @@ async def start_preheat(request: Request):
             extra={"request_id": request_id}
         )
         
-        api = get_meticulous_api()
-        
-        if api is None:
+        if get_meticulous_api() is None:
             raise HTTPException(
                 status_code=503,
                 detail="Meticulous machine not connected"
@@ -162,7 +168,7 @@ async def start_preheat(request: Request):
         # Use ActionType.PREHEAT to start the preheat cycle
         try:
             from meticulous.api_types import ActionType
-            result = api.execute_action(ActionType.PREHEAT)
+            result = await async_execute_action(ActionType.PREHEAT)
             
             if hasattr(result, 'error') and result.error:
                 raise HTTPException(
@@ -171,9 +177,9 @@ async def start_preheat(request: Request):
                 )
         except ImportError:
             # Fallback: direct API call
-            result = api.session.post(
-                f"{api.base_url}/api/v1/action",
-                json={"action": "preheat"}
+            result = await async_session_post(
+                "/api/v1/action",
+                {"action": "preheat"}
             )
             if result.status_code != 200:
                 raise HTTPException(
@@ -215,16 +221,14 @@ async def run_profile(profile_id: str, request: Request):
             extra={"request_id": request_id, "profile_id": profile_id}
         )
         
-        api = get_meticulous_api()
-        
-        if api is None:
+        if get_meticulous_api() is None:
             raise HTTPException(
                 status_code=503,
                 detail="Meticulous machine not connected"
             )
         
         # Load the profile
-        load_result = api.load_profile_by_id(profile_id)
+        load_result = await async_load_profile_by_id(profile_id)
         if hasattr(load_result, 'error') and load_result.error:
             raise HTTPException(
                 status_code=502,
@@ -233,7 +237,7 @@ async def run_profile(profile_id: str, request: Request):
         
         # Start the extraction
         from meticulous.api_types import ActionType
-        action_result = api.execute_action(ActionType.START)
+        action_result = await async_execute_action(ActionType.START)
         if hasattr(action_result, 'error') and action_result.error:
             raise HTTPException(
                 status_code=502,
@@ -327,7 +331,8 @@ async def schedule_shot(request: Request):
             "status": "scheduled",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        _scheduled_shots[schedule_id] = scheduled_shot
+        async with _get_state_lock():
+            _scheduled_shots[schedule_id] = scheduled_shot
         
         # Persist to disk
         await _save_scheduled_shots()
@@ -347,7 +352,6 @@ async def schedule_shot(request: Request):
         async def _execute_shot_task():
             try:
                 task_start_time = datetime.now(timezone.utc)
-                api = get_meticulous_api()
                 
                 # Track whether we've already waited the full delay
                 full_delay_waited = False
@@ -357,13 +361,14 @@ async def schedule_shot(request: Request):
                     preheat_delay = shot_delay - (PREHEAT_DURATION_MINUTES * 60)
                     if preheat_delay > 0:
                         await asyncio.sleep(preheat_delay)
-                        _scheduled_shots[schedule_id]["status"] = "preheating"
+                        async with _get_state_lock():
+                            _scheduled_shots[schedule_id]["status"] = "preheating"
                         await _save_scheduled_shots()
                         
                         # Start preheat using ActionType.PREHEAT
                         try:
                             from meticulous.api_types import ActionType as AT
-                            api.execute_action(AT.PREHEAT)
+                            await async_execute_action(AT.PREHEAT)
                         except Exception as e:
                             logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
                         
@@ -372,11 +377,12 @@ async def schedule_shot(request: Request):
                         full_delay_waited = True
                     else:
                         # Not enough time for full preheat, start immediately
-                        _scheduled_shots[schedule_id]["status"] = "preheating"
+                        async with _get_state_lock():
+                            _scheduled_shots[schedule_id]["status"] = "preheating"
                         await _save_scheduled_shots()
                         try:
                             from meticulous.api_types import ActionType as AT
-                            api.execute_action(AT.PREHEAT)
+                            await async_execute_action(AT.PREHEAT)
                         except Exception as e:
                             logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
                 
@@ -386,42 +392,50 @@ async def schedule_shot(request: Request):
                     remaining_delay = max(0, shot_delay - elapsed)
                     await asyncio.sleep(remaining_delay)
                 
-                _scheduled_shots[schedule_id]["status"] = "running"
+                async with _get_state_lock():
+                    _scheduled_shots[schedule_id]["status"] = "running"
                 await _save_scheduled_shots()
                 
                 # Load and run the profile (if profile_id was provided)
                 if profile_id:
-                    load_result = api.load_profile_by_id(profile_id)
+                    load_result = await async_load_profile_by_id(profile_id)
                     if not (hasattr(load_result, 'error') and load_result.error):
                         from meticulous.api_types import ActionType
-                        api.execute_action(ActionType.START)
-                        _scheduled_shots[schedule_id]["status"] = "completed"
+                        await async_execute_action(ActionType.START)
+                        async with _get_state_lock():
+                            _scheduled_shots[schedule_id]["status"] = "completed"
                         await _save_scheduled_shots()
                     else:
-                        _scheduled_shots[schedule_id]["status"] = "failed"
-                        _scheduled_shots[schedule_id]["error"] = load_result.error
+                        async with _get_state_lock():
+                            _scheduled_shots[schedule_id]["status"] = "failed"
+                            _scheduled_shots[schedule_id]["error"] = load_result.error
                         await _save_scheduled_shots()
                 else:
                     # Preheat only mode - mark as completed
-                    _scheduled_shots[schedule_id]["status"] = "completed"
+                    async with _get_state_lock():
+                        _scheduled_shots[schedule_id]["status"] = "completed"
                     await _save_scheduled_shots()
                     
             except asyncio.CancelledError:
-                _scheduled_shots[schedule_id]["status"] = "cancelled"
+                async with _get_state_lock():
+                    _scheduled_shots[schedule_id]["status"] = "cancelled"
                 await _save_scheduled_shots()
             except Exception as e:
                 logger.error(f"Scheduled shot {schedule_id} failed: {e}")
-                _scheduled_shots[schedule_id]["status"] = "failed"
-                _scheduled_shots[schedule_id]["error"] = str(e)
+                async with _get_state_lock():
+                    _scheduled_shots[schedule_id]["status"] = "failed"
+                    _scheduled_shots[schedule_id]["error"] = str(e)
                 await _save_scheduled_shots()
             finally:
                 # Clean up task reference
-                if schedule_id in _scheduled_tasks:
-                    del _scheduled_tasks[schedule_id]
+                async with _get_state_lock():
+                    if schedule_id in _scheduled_tasks:
+                        del _scheduled_tasks[schedule_id]
         
         # Start the background task
         task = asyncio.create_task(_execute_shot_task())
-        _scheduled_tasks[schedule_id] = task
+        async with _get_state_lock():
+            _scheduled_tasks[schedule_id] = task
         
         return {
             "status": "success",
@@ -449,18 +463,19 @@ async def cancel_scheduled_shot(schedule_id: str, request: Request):
     request_id = request.state.request_id
     
     try:
-        if schedule_id not in _scheduled_shots:
-            raise HTTPException(
-                status_code=404,
-                detail="Scheduled shot not found"
-            )
-        
-        # Cancel the task if it exists
-        if schedule_id in _scheduled_tasks:
-            _scheduled_tasks[schedule_id].cancel()
-            del _scheduled_tasks[schedule_id]
-        
-        _scheduled_shots[schedule_id]["status"] = "cancelled"
+        async with _get_state_lock():
+            if schedule_id not in _scheduled_shots:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Scheduled shot not found"
+                )
+            
+            # Cancel the task if it exists
+            if schedule_id in _scheduled_tasks:
+                _scheduled_tasks[schedule_id].cancel()
+                del _scheduled_tasks[schedule_id]
+            
+            _scheduled_shots[schedule_id]["status"] = "cancelled"
         
         # Persist to disk
         await _save_scheduled_shots()
@@ -498,15 +513,18 @@ async def list_scheduled_shots(request: Request):
     try:
         # Clean up completed/cancelled shots older than 1 hour
         now = datetime.now(timezone.utc)
-        to_remove = []
-        for schedule_id, shot in _scheduled_shots.items():
-            if shot["status"] in ["completed", "cancelled", "failed"]:
-                created_at = datetime.fromisoformat(shot["created_at"].replace('Z', '+00:00'))
-                if (now - created_at).total_seconds() > 3600:
-                    to_remove.append(schedule_id)
-        
-        for schedule_id in to_remove:
-            del _scheduled_shots[schedule_id]
+        async with _get_state_lock():
+            to_remove = []
+            for schedule_id, shot in _scheduled_shots.items():
+                if shot["status"] in ["completed", "cancelled", "failed"]:
+                    created_at = datetime.fromisoformat(shot["created_at"].replace('Z', '+00:00'))
+                    if (now - created_at).total_seconds() > 3600:
+                        to_remove.append(schedule_id)
+            
+            for schedule_id in to_remove:
+                del _scheduled_shots[schedule_id]
+            
+            result = list(_scheduled_shots.values())
         
         # Persist changes if any shots were removed
         if to_remove:
@@ -514,7 +532,7 @@ async def list_scheduled_shots(request: Request):
         
         return {
             "status": "success",
-            "scheduled_shots": list(_scheduled_shots.values())
+            "scheduled_shots": result
         }
         
     except Exception as e:
@@ -632,7 +650,8 @@ async def create_recurring_schedule(request: Request):
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
-        _recurring_schedules[schedule_id] = schedule
+        async with _get_state_lock():
+            _recurring_schedules[schedule_id] = schedule
         await _save_recurring_schedules()
         
         # Schedule the next occurrence immediately
@@ -667,41 +686,43 @@ async def update_recurring_schedule(schedule_id: str, request: Request):
     request_id = request.state.request_id
     
     try:
-        if schedule_id not in _recurring_schedules:
-            raise HTTPException(status_code=404, detail="Recurring schedule not found")
-        
         body = await request.json()
-        schedule = _recurring_schedules[schedule_id]
         
-        # Update allowed fields
-        if "name" in body:
-            schedule["name"] = body["name"]
-        if "time" in body:
-            time_str = body["time"]
-            try:
-                hour, minute = map(int, time_str.split(":"))
-                if not (0 <= hour <= 23 and 0 <= minute <= 59):
-                    raise ValueError("Invalid time")
-                schedule["time"] = time_str
-            except (ValueError, AttributeError):
-                raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
-        if "recurrence_type" in body:
-            valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
-            if body["recurrence_type"] not in valid_types:
-                raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
-            schedule["recurrence_type"] = body["recurrence_type"]
-        if "interval_days" in body:
-            schedule["interval_days"] = body["interval_days"]
-        if "days_of_week" in body:
-            schedule["days_of_week"] = body["days_of_week"]
-        if "profile_id" in body:
-            schedule["profile_id"] = body["profile_id"]
-        if "preheat" in body:
-            schedule["preheat"] = body["preheat"]
-        if "enabled" in body:
-            schedule["enabled"] = body["enabled"]
-        
-        schedule["updated_at"] = datetime.now(timezone.utc).isoformat()
+        async with _get_state_lock():
+            if schedule_id not in _recurring_schedules:
+                raise HTTPException(status_code=404, detail="Recurring schedule not found")
+            
+            schedule = _recurring_schedules[schedule_id]
+            
+            # Update allowed fields
+            if "name" in body:
+                schedule["name"] = body["name"]
+            if "time" in body:
+                time_str = body["time"]
+                try:
+                    hour, minute = map(int, time_str.split(":"))
+                    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                        raise ValueError("Invalid time")
+                    schedule["time"] = time_str
+                except (ValueError, AttributeError):
+                    raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
+            if "recurrence_type" in body:
+                valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
+                if body["recurrence_type"] not in valid_types:
+                    raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
+                schedule["recurrence_type"] = body["recurrence_type"]
+            if "interval_days" in body:
+                schedule["interval_days"] = body["interval_days"]
+            if "days_of_week" in body:
+                schedule["days_of_week"] = body["days_of_week"]
+            if "profile_id" in body:
+                schedule["profile_id"] = body["profile_id"]
+            if "preheat" in body:
+                schedule["preheat"] = body["preheat"]
+            if "enabled" in body:
+                schedule["enabled"] = body["enabled"]
+            
+            schedule["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         await _save_recurring_schedules()
         
@@ -733,21 +754,23 @@ async def delete_recurring_schedule(schedule_id: str, request: Request):
     request_id = request.state.request_id
     
     try:
-        if schedule_id not in _recurring_schedules:
-            raise HTTPException(status_code=404, detail="Recurring schedule not found")
-        
-        # Cancel any pending shots for this schedule
-        for shot_id, shot in list(_scheduled_shots.items()):
-            if shot.get("recurring_schedule_id") == schedule_id and shot.get("status") == "scheduled":
-                if shot_id in _scheduled_tasks:
-                    _scheduled_tasks[shot_id].cancel()
-                    del _scheduled_tasks[shot_id]
-                _scheduled_shots[shot_id]["status"] = "cancelled"
+        async with _get_state_lock():
+            if schedule_id not in _recurring_schedules:
+                raise HTTPException(status_code=404, detail="Recurring schedule not found")
+            
+            # Cancel any pending shots for this schedule
+            for shot_id, shot in list(_scheduled_shots.items()):
+                if shot.get("recurring_schedule_id") == schedule_id and shot.get("status") == "scheduled":
+                    if shot_id in _scheduled_tasks:
+                        _scheduled_tasks[shot_id].cancel()
+                        del _scheduled_tasks[shot_id]
+                    _scheduled_shots[shot_id]["status"] = "cancelled"
         
         await _save_scheduled_shots()
         
         # Delete the recurring schedule
-        del _recurring_schedules[schedule_id]
+        async with _get_state_lock():
+            del _recurring_schedules[schedule_id]
         await _save_recurring_schedules()
         
         logger.info(f"Deleted recurring schedule: {schedule_id}", extra={"request_id": request_id})
