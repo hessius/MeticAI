@@ -271,7 +271,7 @@ Describe "Install-MeticAI - Full Flow (Non-Interactive)" {
                         -MeticulousIp "1.2.3.4" `
                         -NonInteractive
 
-        ($script:downloadCalls -join ",") | Should -Match "docker-compose.unified.yml" -Because "should download main compose file"
+        ($script:downloadCalls -join ",") | Should -Match "docker-compose.yml" -Because "should download main compose file"
     }
 
     It "Should call docker compose pull and up" {

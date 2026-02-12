@@ -130,7 +130,7 @@ fi
 
 # Download new compose file
 log_info "Downloading docker-compose.yml..."
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.unified.yml -o docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.yml -o docker-compose.yml
 log_success "Downloaded docker-compose.yml"
 
 # Migrate data to Docker volume

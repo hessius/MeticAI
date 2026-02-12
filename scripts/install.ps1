@@ -361,7 +361,7 @@ COMPOSE_FILES="$composeFilesString"
     # ------------------------------------------------------------------
     Write-LogInfo "Downloading Docker Compose files..."
 
-    Invoke-DownloadFile -Url "$RepoUrl/docker-compose.unified.yml" -OutFile (Join-Path $InstallDir "docker-compose.yml")
+    Invoke-DownloadFile -Url "$RepoUrl/docker-compose.yml" -OutFile (Join-Path $InstallDir "docker-compose.yml")
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.tailscale.yml" -OutFile (Join-Path $InstallDir "docker-compose.tailscale.yml") -Optional
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.watchtower.yml" -OutFile (Join-Path $InstallDir "docker-compose.watchtower.yml") -Optional
 

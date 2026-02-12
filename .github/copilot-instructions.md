@@ -157,8 +157,7 @@ MeticAI/
 ├── data/                       # Persistent data (profiles, caches, settings)
 ├── scripts/                    # Install scripts (bash, PowerShell)
 ├── tests/                      # BATS tests for installers
-├── docker-compose.unified.yml  # Primary compose file (renamed from legacy)
-├── docker-compose.yml          # Current default compose file
+├── docker-compose.yml          # Primary compose file (unified container)
 ├── docker-compose.tailscale.yml
 ├── docker-compose.watchtower.yml
 ├── VERSION                     # Semver version string (2.0.0)
