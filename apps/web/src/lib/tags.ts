@@ -34,16 +34,16 @@ export const PRESET_TAGS = [
 
 export type TagCategory = typeof PRESET_TAGS[number]['category']
 
-// Refined color palette - more subtle and professional
+// Refined color palette - high contrast for readability
 export const CATEGORY_COLORS: Record<TagCategory, string> = {
-  body: 'bg-amber-500/15 border-amber-500/35 hover:bg-amber-500/25 hover:border-amber-500/50 text-amber-800 dark:text-amber-200',
-  flavor: 'bg-rose-500/15 border-rose-500/35 hover:bg-rose-500/25 hover:border-rose-500/50 text-rose-800 dark:text-rose-200',
-  mouthfeel: 'bg-sky-500/15 border-sky-500/35 hover:bg-sky-500/25 hover:border-sky-500/50 text-sky-800 dark:text-sky-200',
-  style: 'bg-violet-500/15 border-violet-500/35 hover:bg-violet-500/25 hover:border-violet-500/50 text-violet-800 dark:text-violet-200',
-  extraction: 'bg-emerald-500/15 border-emerald-500/35 hover:bg-emerald-500/25 hover:border-emerald-500/50 text-emerald-800 dark:text-emerald-200',
-  roast: 'bg-orange-500/15 border-orange-500/35 hover:bg-orange-500/25 hover:border-orange-500/50 text-orange-800 dark:text-orange-200',
-  characteristic: 'bg-teal-500/15 border-teal-500/35 hover:bg-teal-500/25 hover:border-teal-500/50 text-teal-800 dark:text-teal-200',
-  process: 'bg-indigo-500/15 border-indigo-500/35 hover:bg-indigo-500/25 hover:border-indigo-500/50 text-indigo-800 dark:text-indigo-200',
+  body: 'bg-amber-100 border-amber-400/60 hover:bg-amber-200 hover:border-amber-500/70 text-amber-900 dark:bg-amber-500/20 dark:border-amber-500/40 dark:hover:bg-amber-500/30 dark:hover:border-amber-500/55 dark:text-amber-200',
+  flavor: 'bg-rose-100 border-rose-400/60 hover:bg-rose-200 hover:border-rose-500/70 text-rose-900 dark:bg-rose-500/20 dark:border-rose-500/40 dark:hover:bg-rose-500/30 dark:hover:border-rose-500/55 dark:text-rose-200',
+  mouthfeel: 'bg-sky-100 border-sky-400/60 hover:bg-sky-200 hover:border-sky-500/70 text-sky-900 dark:bg-sky-500/20 dark:border-sky-500/40 dark:hover:bg-sky-500/30 dark:hover:border-sky-500/55 dark:text-sky-200',
+  style: 'bg-violet-100 border-violet-400/60 hover:bg-violet-200 hover:border-violet-500/70 text-violet-900 dark:bg-violet-500/20 dark:border-violet-500/40 dark:hover:bg-violet-500/30 dark:hover:border-violet-500/55 dark:text-violet-200',
+  extraction: 'bg-emerald-100 border-emerald-400/60 hover:bg-emerald-200 hover:border-emerald-500/70 text-emerald-900 dark:bg-emerald-500/20 dark:border-emerald-500/40 dark:hover:bg-emerald-500/30 dark:hover:border-emerald-500/55 dark:text-emerald-200',
+  roast: 'bg-orange-100 border-orange-400/60 hover:bg-orange-200 hover:border-orange-500/70 text-orange-900 dark:bg-orange-500/20 dark:border-orange-500/40 dark:hover:bg-orange-500/30 dark:hover:border-orange-500/55 dark:text-orange-200',
+  characteristic: 'bg-teal-100 border-teal-400/60 hover:bg-teal-200 hover:border-teal-500/70 text-teal-900 dark:bg-teal-500/20 dark:border-teal-500/40 dark:hover:bg-teal-500/30 dark:hover:border-teal-500/55 dark:text-teal-200',
+  process: 'bg-indigo-100 border-indigo-400/60 hover:bg-indigo-200 hover:border-indigo-500/70 text-indigo-900 dark:bg-indigo-500/20 dark:border-indigo-500/40 dark:hover:bg-indigo-500/30 dark:hover:border-indigo-500/55 dark:text-indigo-200',
 }
 
 export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
