@@ -94,7 +94,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          image: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
 
   test:
     runs-on: ubuntu-latest

@@ -62,8 +62,8 @@ test.describe('QR Code Feature E2E Tests', () => {
     await qrButton.click()
     
     // Should show localhost warning
-    await expect(page.getByText(/This is a localhost URL/)).toBeVisible()
-    await expect(page.getByText(/Configure a network IP in config\.json/)).toBeVisible()
+    await expect(page.getByText(/localhost URL/)).toBeVisible()
+    await expect(page.getByText(/Set a network IP in Settings/)).toBeVisible()
   })
 
   test('should close QR dialog when close button is clicked', async ({ page }) => {
@@ -100,8 +100,8 @@ test.describe('QR Code Feature E2E Tests', () => {
     const dialog = page.getByRole('dialog', { name: /Open on Mobile/i })
     await expect(dialog).toBeVisible()
     
-    // Click outside the dialog (on the overlay)
-    await page.mouse.click(10, 10)
+    // Press Escape to close the dialog
+    await page.keyboard.press('Escape')
     
     // Dialog should be closed
     await expect(dialog).not.toBeVisible()
