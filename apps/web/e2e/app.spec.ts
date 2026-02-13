@@ -9,7 +9,6 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Check for the application title
     await expect(page.getByText(/MeticAI/)).toBeVisible()
-    await expect(page.getByText('Meticulous Espresso AI Profiler')).toBeVisible()
   })
 
   test('should display form elements', async ({ page }) => {

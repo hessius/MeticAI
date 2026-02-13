@@ -332,7 +332,7 @@ class TestRequestLogging:
     """Tests for request logging middleware."""
     
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('main.get_vision_model')
+    @patch('api.routes.coffee.get_vision_model')
     def test_request_includes_correlation_id(self, mock_vision_model, client, temp_log_dir):
         """Test that requests include a correlation ID for tracking."""
         # Setup mock
