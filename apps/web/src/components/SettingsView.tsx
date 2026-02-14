@@ -21,7 +21,8 @@ import {
   CaretUp,
   Globe,
   WifiHigh,
-  WifiSlash
+  WifiSlash,
+  House
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -424,6 +425,42 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 <GithubLogo size={18} className="mr-2" weight="bold" />
                 {t('settings.viewOnGitHub')}
               </Button>
+
+              {/* Powered By */}
+              <div className="pt-3 border-t border-border/50">
+                <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-2">
+                  {t('settings.poweredBy')}
+                </h4>
+                <div className="space-y-1.5">
+                  <a
+                    href="https://github.com/nicpottier/pyMeticulous"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <GithubLogo size={14} weight="bold" />
+                    <span><strong>pyMeticulous</strong> — {t('settings.credits.pyMeticulous')}</span>
+                  </a>
+                  <a
+                    href="https://github.com/manonstreet/meticulous-mcp"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <GithubLogo size={14} weight="bold" />
+                    <span><strong>meticulous-mcp</strong> — {t('settings.credits.meticulousMcp')}</span>
+                  </a>
+                  <a
+                    href="https://github.com/nickwilsonr/meticulous-addon"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <GithubLogo size={14} weight="bold" />
+                    <span><strong>meticulous-addon</strong> — {t('settings.credits.meticulousAddon')}</span>
+                  </a>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -548,6 +585,21 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   }}
                 />
               </div>
+              {settings.mqttEnabled && (
+                <div className="space-y-2 pt-1">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => window.open('https://my.home-assistant.io/redirect/config_flow_start?domain=mqtt', '_blank')}
+                  >
+                    <House size={18} className="mr-2" weight="bold" />
+                    {t('settings.addToHomeAssistant')}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.homeAssistantDescription')}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Appearance */}
@@ -898,8 +950,15 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       </Card>
 
       {/* Footer */}
-      <div className="text-center text-xs text-muted-foreground/50 pb-4">
-        {t('settings.footer')}
+      <div className="text-center text-xs text-muted-foreground/50 pb-4 space-y-1">
+        <p>{t('settings.footer')}</p>
+        <p>
+          {t('settings.runsOn')}{' '}
+          <a href="https://github.com/nicpottier/pyMeticulous" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">pyMeticulous</a>,{' '}
+          <a href="https://github.com/manonstreet/meticulous-mcp" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">meticulous-mcp</a>,{' '}
+          <a href="https://github.com/nickwilsonr/meticulous-addon" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">meticulous-addon</a>,{' '}
+          {t('settings.andCaffeine')}
+        </p>
       </div>
     </motion.div>
   )

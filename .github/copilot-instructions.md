@@ -33,9 +33,11 @@ Everything runs inside a **single Docker container** (`meticai`), managed by **s
 
 Internal services:
 1. **nginx** (port 3550) — Serves the React SPA and proxies `/api/*` to the FastAPI server
-2. **server** (port 8000, internal) — FastAPI application: coffee analysis, profile management, settings, shot history, scheduling
+2. **server** (port 8000, internal) — FastAPI application: coffee analysis, profile management, settings, shot history, scheduling, MQTT commands
 3. **mcp-server** (port 8080, internal) — FastMCP streamable-http server providing `create_profile` and `apply_profile` tools to the Gemini CLI
-4. **Gemini CLI** — Invoked as a subprocess by the FastAPI server when profile creation is needed; connects to the MCP server at `http://localhost:8080/mcp`
+4. **mosquitto** (port 1883, internal) — Lightweight MQTT broker for real-time machine telemetry
+5. **meticulous-bridge** — Socket.IO → MQTT bridge based on `@nickwilsonr/meticulous-addon`; connects to the Meticulous machine and publishes sensor data to mosquitto
+6. **Gemini CLI** — Invoked as a subprocess by the FastAPI server when profile creation is needed; connects to the MCP server at `http://localhost:8080/mcp`
 
 ### Request Flow
 ```
@@ -43,20 +45,26 @@ User/iOS Shortcut → :3550 (nginx) → /api/* → :8000 (FastAPI)
                                    → /*    → React SPA
 
 FastAPI → subprocess: gemini CLI → MCP tools → :8080 (FastMCP) → Meticulous machine
+
+Meticulous machine ← Socket.IO → meticulous-bridge → MQTT → mosquitto (:1883)
+FastAPI → WebSocket /api/ws/live ← subscribes to MQTT topics → browser
 ```
 
 ### s6-overlay Services
 Located in `docker/s6-rc.d/`:
 - `server/` — FastAPI backend (uvicorn)
 - `mcp-server/` — FastMCP HTTP server
+- `mosquitto/` — MQTT broker
+- `meticulous-bridge/` — Socket.IO → MQTT bridge
 - `nginx/` — Reverse proxy
-- `user/` — s6 user bundle (depends on above three)
+- `user/` — s6 user bundle (depends on above services)
 
 ### Settings Hot-Reload
 When `METICULOUS_IP` or `GEMINI_API_KEY` are changed via the settings UI:
 - `os.environ` is updated in-process
 - The cached Meticulous API client is reset (`reset_meticulous_api()`)
 - The MCP server s6 service is restarted via `s6-svc -r /run/service/mcp-server`
+- The meticulous-bridge s6 service is restarted via `s6-svc -r /run/service/meticulous-bridge`
 - No full container restart is required
 
 ## Coding Standards
@@ -215,6 +223,12 @@ All endpoints are served through nginx at port 3550 under the `/api` prefix.
 - `GET /api/last-shot` — Last shot data
 - `GET /api/history` — Analysis history
 - `GET /api/scheduled-shots` — Scheduled shots
+
+### MQTT Bridge & Control Center
+- `GET /api/bridge/status` — Bridge and MQTT broker health
+- `POST /api/bridge/restart` — Restart bridge service
+- `WS /api/ws/live` — WebSocket for real-time machine telemetry
+- `POST /api/machine/command/{cmd}` — Machine commands via MQTT (start, stop, abort, continue, preheat, tare, home-plunger, purge, load-profile, brightness, sounds)
 
 ### System
 - `GET /api/status` — Machine connection status
