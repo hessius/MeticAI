@@ -16,8 +16,7 @@ import {
   Lightbulb,
   TrendingUp,
   XCircle,
-  AlertCircle,
-  ChevronRight
+  AlertCircle
 } from "lucide-react";
 
 interface ExpertAnalysisViewProps {
@@ -127,6 +126,9 @@ function parseStructuredAnalysis(text: string): ParsedSection[] {
   return sections;
 }
 
+// Circled number characters for section numbering
+const CIRCLED_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳'];
+
 function SectionCard({ section }: { section: ParsedSection }) {
   const config = SECTION_CONFIG[section.title] || {
     icon: <Info className="h-5 w-5" />,
@@ -136,7 +138,7 @@ function SectionCard({ section }: { section: ParsedSection }) {
   
   return (
     <Card className={`${config.borderColor} border-2 overflow-hidden`}>
-      <CardHeader className="pb-3 border-b border-border/30">
+      <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2 flex-wrap">
           <span className={`shrink-0 ${config.color}`}>{config.icon}</span>
           <span className="text-foreground font-semibold">{section.title}</span>
@@ -151,13 +153,13 @@ function SectionCard({ section }: { section: ParsedSection }) {
         {section.subsections.map((subsection, idx) => (
           <div key={idx} className="space-y-2">
             <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className={`text-base shrink-0 ${config.color}`}>{CIRCLED_NUMBERS[idx] || `${idx + 1}.`}</span>
               <span className="break-words">{subsection.title}</span>
             </h4>
             <ul className="space-y-1.5 pl-6">
               {subsection.items.map((item, itemIdx) => (
                 <li key={itemIdx} className="text-sm text-muted-foreground flex items-start gap-2">
-                  <span className="text-primary mt-1.5 shrink-0">•</span>
+                  <span className="text-primary shrink-0 leading-relaxed">•</span>
                   <span className="leading-relaxed">{item}</span>
                 </li>
               ))}
@@ -219,7 +221,7 @@ export function ExpertAnalysisView({
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary shrink-0" />
               <h2 className="text-lg font-bold text-foreground truncate">
-                Expert Shot Analysis
+                AI Shot Analysis
               </h2>
               {isCached && (
                 <Badge variant="secondary" className="shrink-0">
@@ -268,7 +270,7 @@ export function ExpertAnalysisView({
         
         {/* Analysis Content */}
         {!isLoading && !error && sections.length > 0 && (
-          <div className="space-y-6">
+          <div className="space-y-6 lg:columns-2 lg:gap-6 lg:[&>*]:break-inside-avoid lg:[&>*]:mb-6 lg:space-y-0">
             {sections.map((section, index) => (
               <SectionCard key={index} section={section} />
             ))}

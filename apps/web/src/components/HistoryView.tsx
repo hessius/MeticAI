@@ -981,6 +981,35 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
             </div>
           )}
 
+        {/* Action buttons — full width above two-column layout */}
+        {!isCapturing && (
+          <div className="flex flex-wrap gap-2.5">
+            {/* Shot History Button */}
+            <Button
+              onClick={() => setShowShotHistory(true)}
+              className="flex-1 min-w-[180px] h-12 text-sm font-semibold"
+            >
+              <ChartLine size={18} className="mr-2" weight="bold" />
+              Shot History & Analysis
+            </Button>
+            
+            {/* Run / Schedule Button */}
+            {onRunProfile && machineProfileId && (
+              <Button
+                onClick={() => onRunProfile(machineProfileId, entry.profile_name)}
+                className="flex-1 min-w-[180px] h-12 text-sm font-semibold bg-success hover:bg-success/90"
+              >
+                <Play size={18} className="mr-2" weight="fill" />
+                Run / Schedule Shot
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Two-column layout wrapper for desktop */}
+        <div className="space-y-4 lg:space-y-0 desktop-two-col">
+        {/* Left column: Content */}
+        <div className="space-y-4 desktop-panel-left">
         <div className="space-y-4">
           {entry.coffee_analysis && (
             <motion.div 
@@ -1035,35 +1064,22 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
           )}
         </div>
 
+        </div>{/* end left column */}
+
+        {/* Right column: Profile Details */}
+        <div className="desktop-panel-right">
           {/* Profile Technical Breakdown */}
           {entry.profile_json && (
             <ProfileBreakdown profile={entry.profile_json as ProfileData} />
           )}
+        </div>{/* end right column */}
+        </div>{/* end two-column wrapper */}
 
+        {/* Full-width actions below two-column layout */}
         {!isCapturing && (
-          <div className="space-y-2.5">
-            {/* Shot History Button */}
-            <Button
-              onClick={() => setShowShotHistory(true)}
-              className="w-full h-12 text-sm font-semibold"
-            >
-              <ChartLine size={18} className="mr-2" weight="bold" />
-              Shot History & Analysis
-            </Button>
-            
-            {/* Run / Schedule Button */}
-            {onRunProfile && machineProfileId && (
-              <Button
-                onClick={() => onRunProfile(machineProfileId, entry.profile_name)}
-                className="w-full h-12 text-sm font-semibold bg-success hover:bg-success/90"
-              >
-                <Play size={18} className="mr-2" weight="fill" />
-                Run / Schedule Shot
-              </Button>
-            )}
-            
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Profile Image Upload */}
-            <div className="space-y-1.5 mt-4 pt-4 border-t border-border/20">
+            <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground block text-center">Profile Picture</Label>
               <input
                 ref={imageInputRef}
@@ -1182,7 +1198,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
             </div>
             
             {/* Export Buttons */}
-            <div className="space-y-1.5 mt-4 pt-4 border-t border-border/20">
+            <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground block text-center">Export as</Label>
               <div className={`grid gap-2.5 ${entry.profile_json ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <Button
