@@ -152,7 +152,7 @@ interface ReplayChartProps {
   isShowingReplay: boolean
   currentTime: number
   isPlaying: boolean
-  playbackSpeed: string
+  playbackSpeed: number
   isDark: boolean
   variant?: 'mobile' | 'desktop'
 }
