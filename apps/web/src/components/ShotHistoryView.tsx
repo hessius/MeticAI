@@ -41,6 +41,7 @@ import {
 import { domToPng } from 'modern-screenshot'
 import { useShotHistory, ShotInfo, ShotData } from '@/hooks/useShotHistory'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
+import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
@@ -1490,78 +1491,24 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         ? stageRanges.filter(s => s.startTime <= currentTime).map(s => ({ ...s, endTime: Math.min(s.endTime, currentTime) }))
                         : stageRanges
                       return (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold tracking-wide text-primary flex items-center gap-2">
-                              <ChartLine size={16} weight="bold" />
-                              Extraction Graph
-                            </Label>
-                            {isPlaying && (
-                              <Badge variant="secondary" className="animate-pulse">
-                                <Play size={10} weight="fill" className="mr-1" />
-                                Replaying {playbackSpeed}x
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="p-1 bg-secondary/40 rounded-xl border border-border/20">
-                            <div className="h-64">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={displayData} margin={{ top: 5, right: 0, left: -5, bottom: 5 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                                  {displayStageRanges.map((stage, idx) => (
-                                    <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
-                                  ))}
-                                  {isShowingReplay && <ReferenceLine yAxisId="left" x={currentTime} stroke="#fff" strokeWidth={2} strokeDasharray="4 2" />}
-                                  <XAxis dataKey="time" stroke="#666" fontSize={10} tickFormatter={(value) => `${Math.round(value)}s`} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
-                                  <YAxis yAxisId="left" stroke="#666" fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} width={35} allowDataOverflow={false} />
-                                  <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} width={35} allowDataOverflow={false} />
-                                  <Tooltip content={<CustomTooltip />} />
-                                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
-                                  <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
-                                  <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" isAnimationActive={false} />
-                                  {hasGravFlow && <Line yAxisId="left" type="monotone" dataKey="gravimetricFlow" stroke={CHART_COLORS.gravimetricFlow} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="Grav. Flow (g/s)" isAnimationActive={false} />}
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
-                          </div>
-                          {/* Stage Legend */}
-                          {(() => {
-                            const sr = getStageRanges(getChartData(shotData))
-                            if (sr.length === 0) return null
-                            return (
-                              <div className="flex flex-wrap gap-1.5 pt-1">
-                                {sr.map((stage, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-[10px] px-2 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
-                                    {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )
-                          })()}
-                        </div>
+                        <ReplayChart
+                          displayData={displayData}
+                          displayStageRanges={displayStageRanges}
+                          stageRanges={stageRanges}
+                          dataMaxTime={dataMaxTime}
+                          maxLeftAxis={maxLeftAxis}
+                          maxRightAxis={maxRightAxis}
+                          hasGravFlow={hasGravFlow}
+                          isShowingReplay={isShowingReplay}
+                          currentTime={currentTime}
+                          isPlaying={isPlaying}
+                          playbackSpeed={playbackSpeed}
+                          isDark={isDark}
+                          variant="mobile"
+                        />
                       )
                     })()}
                   </div>
-                  <TabsTrigger 
-                    value="analyze" 
-                    className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
-                  >
-                    <MagnifyingGlass size={14} weight={activeAction === 'analyze' ? 'fill' : 'bold'} />
-                    Analyze
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Replay Tab Content */}
-                <TabsContent value="replay" className="mt-4 overflow-hidden">
-                  <motion.div
-                    key="replay-content"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="space-y-4"
-                  >
                   {/* Progress Bar */}
                   {maxTime > 0 && (
                     <div className="space-y-2">
@@ -2691,55 +2638,21 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         ? stageRanges.filter(s => s.startTime <= currentTime).map(s => ({ ...s, endTime: Math.min(s.endTime, currentTime) }))
                         : stageRanges
                       return (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold tracking-wide text-primary flex items-center gap-2">
-                              <ChartLine size={16} weight="bold" />
-                              Extraction Graph
-                            </Label>
-                            {isPlaying && (
-                              <Badge variant="secondary" className="animate-pulse">
-                                <Play size={10} weight="fill" className="mr-1" />
-                                Replaying {playbackSpeed}x
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="bg-secondary/40 rounded-xl border border-border/20 p-2">
-                            <div className="h-[60vh] min-h-[400px]">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={displayData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                                  {displayStageRanges.map((stage, idx) => (
-                                    <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
-                                  ))}
-                                  {isShowingReplay && <ReferenceLine yAxisId="left" x={currentTime} stroke="#fff" strokeWidth={2} strokeDasharray="4 2" />}
-                                  <XAxis dataKey="time" stroke="#666" fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
-                                  <YAxis yAxisId="left" stroke="#666" fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} width={35} allowDataOverflow={false} />
-                                  <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} width={35} allowDataOverflow={false} />
-                                  <Tooltip content={<CustomTooltip />} />
-                                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
-                                  <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
-                                  <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" isAnimationActive={false} />
-                                  {hasGravFlow && <Line yAxisId="left" type="monotone" dataKey="gravimetricFlow" stroke={CHART_COLORS.gravimetricFlow} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="Grav. Flow (g/s)" isAnimationActive={false} />}
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
-                          </div>
-                          {/* Stage Legend */}
-                          {(() => {
-                            if (stageRanges.length === 0) return null
-                            return (
-                              <div className="flex flex-wrap gap-1.5 pt-1">
-                                {stageRanges.map((stage, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-[10px] px-2 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
-                                    {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )
-                          })()}
-                        </>
+                        <ReplayChart
+                          displayData={displayData}
+                          displayStageRanges={displayStageRanges}
+                          stageRanges={stageRanges}
+                          dataMaxTime={dataMaxTime}
+                          maxLeftAxis={maxLeftAxis}
+                          maxRightAxis={maxRightAxis}
+                          hasGravFlow={hasGravFlow}
+                          isShowingReplay={isShowingReplay}
+                          currentTime={currentTime}
+                          isPlaying={isPlaying}
+                          playbackSpeed={playbackSpeed}
+                          isDark={isDark}
+                          variant="desktop"
+                        />
                       )
                     })()}
 
@@ -2753,47 +2666,18 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       const leftDomain = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
                       const rightDomain = Math.ceil(maxWeight * 1.1)
                       const isShowingReplay = comparisonCurrentTime > 0 && comparisonCurrentTime < dataMaxTime
-                      const displayData = isShowingReplay ? combinedData.filter(d => d.time <= comparisonCurrentTime) : combinedData
                       return (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold text-primary flex items-center gap-1.5">
-                              <ChartLine size={16} weight="bold" />
-                              Extraction Comparison
-                            </Label>
-                            {comparisonIsPlaying && (
-                              <Badge variant="secondary" className="animate-pulse text-[10px]">
-                                <Play size={8} weight="fill" className="mr-1" />
-                                {comparisonPlaybackSpeed}x
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="bg-secondary/40 rounded-xl border border-border/20 p-2">
-                            <div className="h-[60vh] min-h-[400px]">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={displayData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                                  {isShowingReplay && <ReferenceLine yAxisId="left" x={comparisonCurrentTime} stroke="#fff" strokeWidth={2} strokeDasharray="4 2" />}
-                                  <XAxis dataKey="time" stroke="#666" fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
-                                  <YAxis yAxisId="left" stroke="#666" fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={false} />
-                                  <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={false} />
-                                  <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid #333', borderRadius: '8px', fontSize: '10px' }} />
-                                  <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '4px' }} iconSize={7} />
-                                  <Line yAxisId="left" type="monotone" dataKey="pressureA" stroke={COMPARISON_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure A" isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="flowA" stroke={COMPARISON_COLORS.flow} strokeWidth={2} dot={false} name="Flow A" isAnimationActive={false} />
-                                  <Line yAxisId="right" type="monotone" dataKey="weightA" stroke={COMPARISON_COLORS.weight} strokeWidth={2} dot={false} name="Weight A" isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="pressureB" stroke={COMPARISON_COLORS.pressure} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Pressure B" opacity={0.6} isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="flowB" stroke={COMPARISON_COLORS.flow} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Flow B" opacity={0.6} isAnimationActive={false} />
-                                  <Line yAxisId="right" type="monotone" dataKey="weightB" stroke={COMPARISON_COLORS.weight} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Weight B" opacity={0.6} isAnimationActive={false} />
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
-                            <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> Shot A (solid)</span>
-                            <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> Shot B (dashed)</span>
-                          </div>
-                        </>
+                        <CompareChart
+                          combinedData={combinedData}
+                          dataMaxTime={dataMaxTime}
+                          leftDomain={leftDomain}
+                          rightDomain={rightDomain}
+                          isShowingReplay={isShowingReplay}
+                          comparisonCurrentTime={comparisonCurrentTime}
+                          comparisonIsPlaying={comparisonIsPlaying}
+                          comparisonPlaybackSpeed={comparisonPlaybackSpeed}
+                          variant="desktop"
+                        />
                       )
                     })()}
 
@@ -2815,86 +2699,17 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       const maxFlow = Math.max(...chartData.map(d => d.flow || 0), ...(analysisResult.profile_target_curves?.map(d => d.target_flow || 0) || []), 5)
                       const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
                       return (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold text-primary flex items-center gap-1.5">
-                              <ChartLine size={16} weight="bold" />
-                              Shot vs Profile Target
-                            </Label>
-                            {hasTargetCurves && (
-                              <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20">Target overlay</Badge>
-                            )}
-                          </div>
-                          <div className="bg-secondary/40 rounded-xl border border-border/20 p-2">
-                            <div className="h-[60vh] min-h-[400px]">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                  {stageRanges.map((stage, idx) => (
-                                    <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
-                                  ))}
-                                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: '#444' }} type="number" domain={[0, dataMaxTime]} />
-                                  <YAxis yAxisId="left" domain={[0, maxLeftAxis]} tick={{ fontSize: 10, fill: '#888' }} axisLine={{ stroke: '#444' }} width={25} />
-                                  <YAxis yAxisId="right" orientation="right" domain={[0, Math.ceil(maxFlow * 1.1)]} hide width={0} />
-                                  <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: '1px solid #333', borderRadius: '8px', fontSize: '11px' }} formatter={(value: number, name: string) => [`${value?.toFixed(1) || '-'}`, name]} labelFormatter={(label) => `${Number(label).toFixed(1)}s`} />
-                                  <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
-                                  {hasTargetCurves && analysisResult.profile_target_curves && (
-                                    <Customized
-                                      component={({ xAxisMap, yAxisMap }: { xAxisMap?: Record<string, { scale: (v: number) => number }>; yAxisMap?: Record<string, { scale: (v: number) => number }> }) => {
-                                        if (!xAxisMap || !yAxisMap) return null
-                                        const xAxis = Object.values(xAxisMap)[0]
-                                        const yAxis = yAxisMap['left']
-                                        if (!xAxis?.scale || !yAxis?.scale) return null
-                                        const curves = analysisResult.profile_target_curves!
-                                        const pressurePoints = curves.filter(p => p.target_pressure !== undefined).sort((a, b) => a.time - b.time)
-                                        const flowPoints = curves.filter(p => p.target_flow !== undefined).sort((a, b) => a.time - b.time)
-                                        let pressurePath = ''
-                                        if (pressurePoints.length >= 2) pressurePath = pressurePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_pressure!)}`).join(' ')
-                                        let flowPath = ''
-                                        if (flowPoints.length >= 2) flowPath = flowPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_flow!)}`).join(' ')
-                                        return (
-                                          <g className="target-curves">
-                                            {pressurePath && <>
-                                              <path d={pressurePath} fill="none" stroke={CHART_COLORS.targetPressure} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
-                                              {pressurePoints.map((p, i) => <circle key={`tp-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_pressure!)} r={4} fill={CHART_COLORS.targetPressure} />)}
-                                            </>}
-                                            {flowPath && <>
-                                              <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
-                                              {flowPoints.map((p, i) => <circle key={`tf-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_flow!)} r={4} fill={CHART_COLORS.targetFlow} />)}
-                                            </>}
-                                          </g>
-                                        )
-                                      }}
-                                    />
-                                  )}
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
-                          </div>
-                          {/* Legend */}
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.pressure }} /><span>Pressure</span></div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.flow }} /><span>Flow</span></div>
-                            {hasTargetCurves && <>
-                              <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPressure, borderStyle: 'dashed' }} /><span>Target Pressure</span></div>
-                              <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetFlow, borderStyle: 'dashed' }} /><span>Target Flow</span></div>
-                            </>}
-                          </div>
-                          {/* Stage Legend */}
-                          {(() => {
-                            if (stageRanges.length === 0) return null
-                            return (
-                              <div className="flex flex-wrap gap-1.5">
-                                {stageRanges.map((stage, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
-                                    {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )
-                          })()}
-                        </>
+                        <AnalyzeChart
+                          chartData={chartData}
+                          stageRanges={stageRanges}
+                          hasTargetCurves={hasTargetCurves}
+                          dataMaxTime={dataMaxTime}
+                          maxLeftAxis={maxLeftAxis}
+                          maxFlow={maxFlow}
+                          profileTargetCurves={analysisResult.profile_target_curves}
+                          isDark={isDark}
+                          variant="desktop"
+                        />
                       )
                     })()}
 
