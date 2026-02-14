@@ -211,6 +211,7 @@ jobs:
           context: .
           file: docker/Dockerfile.unified
           push: false
+          load: true
           tags: meticai:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
