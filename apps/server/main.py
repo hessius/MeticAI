@@ -124,7 +124,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Import route modules
-from api.routes import coffee, system, history, shots, profiles, scheduling
+from api.routes import coffee, system, history, shots, profiles, scheduling, bridge
 
 # Middleware for request logging and tracking
 @app.middleware("http")
@@ -211,6 +211,7 @@ app.include_router(history.router)
 app.include_router(shots.router)
 app.include_router(profiles.router)
 app.include_router(scheduling.router)
+app.include_router(bridge.router)
 
 
 # ============================================================================
