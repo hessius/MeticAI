@@ -5371,6 +5371,30 @@ class TestHelperFunctions:
         from services.history_service import _extract_profile_name
         
 
+class TestHealthEndpoint:
+    """Tests for the /api/health endpoint."""
+
+    def test_health_endpoint_returns_200(self, client):
+        """Test health endpoint returns 200 OK."""
+        response = client.get("/api/health")
+        assert response.status_code == 200
+
+    def test_health_endpoint_returns_status_ok(self, client):
+        """Test health endpoint returns correct JSON body."""
+        response = client.get("/api/health")
+        data = response.json()
+        assert data == {"status": "ok"}
+
+    def test_health_endpoint_is_fast(self, client):
+        """Test health endpoint responds quickly (no heavy logic)."""
+        import time
+        start = time.time()
+        response = client.get("/api/health")
+        elapsed = time.time() - start
+        assert response.status_code == 200
+        assert elapsed < 1.0  # Should be near-instant
+
+
 class TestVersionEndpoint:
     """Tests for the /api/version endpoint."""
     
