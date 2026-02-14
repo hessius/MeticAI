@@ -44,6 +44,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 ### For Power Users
 - 🔌 **REST API** - Integrate with any automation system
+- 🏠 **Home Assistant** - MQTT bridge for HA automations and entities
 - 🐳 **Single Docker Container** - Simple deployment and updates
 - 🔓 **Open Source** - Customize and extend as you like
 - 🔄 **Auto Updates** - Optional Watchtower integration
@@ -219,6 +220,23 @@ For power users who want one-tap brewing from their iPhone, you can create custo
 
 [→ iOS Shortcuts setup guide](IOS_SHORTCUTS.md)
 
+## 🎛️ Control Center
+
+MeticAI includes a real-time Control Center powered by the [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT bridge:
+
+- **Live telemetry** — Real-time pressure, flow, weight, and temperature gauges
+- **Machine control** — Preheat, tare, purge, abort, brightness, sounds, and more
+- **Live Shot View** — Watch your extraction in real-time with live charts
+- **Auto-detection** — Automatically detects when a shot starts and prompts you to watch
+- **Last Shot Banner** — After a shot, offers one-tap analysis with AI coaching
+- **Home Assistant** — MQTT bridge enables auto-discovery of 24 sensors + 11 commands in HA
+
+The Control Center appears as a side panel on desktop and a full page on mobile. Enable it in Settings → Control Center → MQTT Bridge.
+
+### Home Assistant Integration
+
+When the MQTT bridge is enabled, your Meticulous machine is automatically discoverable in Home Assistant. Add the MQTT integration in HA and point it to your MeticAI server's IP on port 1883. This enables automations like "notify me when my shot is done" or "preheat at 7am on weekdays".
+
 ## 🔄 Updating MeticAI
 
 MeticAI v2.0 uses Docker for simple updates:
@@ -269,25 +287,34 @@ docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 
 ## 🏗️ Architecture
 
-MeticAI v2.0 runs as a single unified container:
+MeticAI v2.0 runs as a single unified container with five internal services managed by s6-overlay:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    MeticAI Container                     │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │                    nginx (:3550)                    │ │
-│  │            Web UI + API Reverse Proxy               │ │
-│  └─────────────────────────────────────────────────────┘ │
-│                          │                               │
-│          ┌───────────────┼───────────────┐               │
-│          ▼               ▼               ▼               │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐        │
-│  │   Relay     │ │ MCP Server  │ │ Gemini CLI  │        │
-│  │  (FastAPI)  │ │ (Meticulous)│ │    (AI)     │        │
-│  │   :8000     │ │   :8080     │ │             │        │
-│  └─────────────┘ └─────────────┘ └─────────────┘        │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      MeticAI Container                       │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │                    nginx (:3550)                       │  │
+│  │             Web UI + API Reverse Proxy                 │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                           │                                  │
+│       ┌───────────────────┼───────────────┐                  │
+│       ▼                   ▼               ▼                  │
+│  ┌──────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │  Server  │  │ MCP Server  │  │ Gemini CLI  │             │
+│  │ (FastAPI) │  │(Meticulous) │  │    (AI)     │             │
+│  │  :8000   │  │   :8080     │  │             │             │
+│  └──────────┘  └─────────────┘  └─────────────┘             │
+│       │                                                      │
+│       │ MQTT                                                 │
+│       ▼                                                      │
+│  ┌──────────┐  ┌─────────────────┐                           │
+│  │Mosquitto │◄─│Meticulous Bridge│◄── Machine (Socket.IO)    │
+│  │  :1883   │  │  (MQTT Bridge)  │                           │
+│  └──────────┘  └─────────────────┘                           │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+**Real-time telemetry**: The [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) bridge connects to your machine via Socket.IO and publishes live sensor data (pressure, flow, weight, temperature) to the internal MQTT broker. The FastAPI server subscribes and pushes updates to the web UI via WebSocket.
 
 **Optional sidecars:**
 - **Tailscale** - Secure remote access
@@ -335,10 +362,15 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - [Meticulous](https://meticulous.coffee/) for creating an amazing machine
 - [Google Gemini](https://ai.google.dev/) for AI capabilities
-- [meticulous-mcp](https://github.com/meticulous/meticulous-mcp) for machine communication
+- [pyMeticulous](https://github.com/nicpottier/pyMeticulous) by @nicpottier — Python client for the Meticulous API
+- [meticulous-mcp](https://github.com/manonstreet/meticulous-mcp) by @manonstreet — MCP server for machine profile management
+- [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) by @nickwilsonr — MQTT bridge for real-time telemetry and Home Assistant integration
 
 ---
 
 <div align="center">
-Made with ☕ by <a href="https://github.com/hessius">@hessius</a>
+
+Runs on [pyMeticulous](https://github.com/nicpottier/pyMeticulous), [meticulous-mcp](https://github.com/manonstreet/meticulous-mcp), [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon), and caffeine ☕
+
+Made with ❤️ by <a href="https://github.com/hessius">@hessius</a>
 </div>

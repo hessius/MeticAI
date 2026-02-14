@@ -211,6 +211,16 @@
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"MeticAI\" if left empty.",
     "mqttEnabled": "MQTT Bridge",
     "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
+    "addToHomeAssistant": "Add to Home Assistant",
+    "homeAssistantDescription": "Connect Home Assistant to MeticAI's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
+    "poweredBy": "Powered by",
+    "credits": {
+      "pyMeticulous": "Python client for the Meticulous API by @nicpottier",
+      "meticulousMcp": "MCP server for profile management by @manonstreet",
+      "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
+    },
+    "runsOn": "Runs on",
+    "andCaffeine": "and caffeine ☕",
     "saveSettings": "Save Settings",
     "saving": "Saving...",
     "settingsSaved": "Settings saved successfully!",

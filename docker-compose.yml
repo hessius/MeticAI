@@ -27,6 +27,7 @@ services:
       - DATA_DIR=/data
     volumes:
       - meticai-data:/data
+      - mosquitto-data:/var/lib/mosquitto
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3550/health"]
       interval: 30s
@@ -39,3 +40,5 @@ services:
 volumes:
   meticai-data:
     name: meticai-data
+  mosquitto-data:
+    name: mosquitto-data

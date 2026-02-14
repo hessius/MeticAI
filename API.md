@@ -64,6 +64,7 @@ curl -X POST http://<SERVER_IP>:3550/api/analyze_coffee \
 | GET | `/api/shots/data/{date}/{filename}` | Shot data file |
 | GET | `/api/shots/by-profile/{profile_name}` | Shots filtered by profile |
 | GET | `/api/shots/llm-analysis-cache` | Cached LLM analyses |
+| GET | `/api/last-shot` | Most recent shot metadata (powers the "Analyze your last shot?" banner) |
 | POST | `/api/shots/analyze` | Analyze shot data |
 | POST | `/api/shots/analyze-llm` | LLM-powered shot analysis |
 
@@ -91,6 +92,56 @@ curl -X POST http://<SERVER_IP>:3550/api/machine/preheat
 ```bash
 curl -X POST http://<SERVER_IP>:3550/api/machine/run-profile/my-profile-id
 ```
+
+---
+
+## MQTT Bridge & Control Center
+
+### Bridge Status
+`GET /api/bridge/status`
+
+Returns MQTT broker and bridge service health.
+
+```bash
+curl http://<SERVER_IP>:3550/api/bridge/status
+```
+
+### Restart Bridge
+`POST /api/bridge/restart`
+
+Restarts the meticulous-bridge s6 service.
+
+```bash
+curl -X POST http://<SERVER_IP>:3550/api/bridge/restart
+```
+
+### Live Telemetry WebSocket
+`WS /api/ws/live`
+
+WebSocket endpoint for real-time machine telemetry. Subscribes to MQTT topics and forwards sensor updates (pressure, flow, weight, temperature, machine state) to the browser.
+
+```javascript
+const ws = new WebSocket('ws://<SERVER_IP>:3550/api/ws/live')
+ws.onmessage = (event) => console.log(JSON.parse(event.data))
+```
+
+### Machine Commands (via MQTT)
+
+All commands are fire-and-forget — they publish to the MQTT broker which forwards to the machine.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/machine/command/start` | Start a shot |
+| POST | `/api/machine/command/stop` | Gracefully stop current shot |
+| POST | `/api/machine/command/abort` | Immediately abort shot (retracts plunger) |
+| POST | `/api/machine/command/continue` | Resume a paused shot |
+| POST | `/api/machine/command/preheat` | Start machine preheat |
+| POST | `/api/machine/command/tare` | Tare (zero) the scale |
+| POST | `/api/machine/command/home-plunger` | Home the plunger |
+| POST | `/api/machine/command/purge` | Run a purge cycle |
+| POST | `/api/machine/command/load-profile` | Load a profile by ID |
+| POST | `/api/machine/command/brightness` | Set display brightness (`{ "value": 0-100 }`) |
+| POST | `/api/machine/command/sounds` | Enable/disable sounds (`{ "enabled": true }`) |
 
 ---
 
