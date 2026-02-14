@@ -9031,3 +9031,287 @@ class TestSettingsMQTTEnabled:
         data = response.json()
         assert "meticulous-bridge" in data.get("services_restarted", [])
 
+
+# ============================================================================
+# Last-Shot Endpoint Tests
+# ============================================================================
+
+
+class TestLastShotEndpoint:
+    """Tests for GET /api/last-shot."""
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_success(self, mock_dates, mock_files, mock_data, client):
+        """Returns metadata for the most recent shot."""
+        d1 = MagicMock(); d1.name = "2026-02-14"
+        d2 = MagicMock(); d2.name = "2026-02-13"
+        mock_dates.return_value = [d1, d2]
+        f1 = MagicMock(); f1.name = "07:30:00.shot.json.zst"
+        f2 = MagicMock(); f2.name = "06:00:00.shot.json.zst"
+        mock_files.return_value = [f1, f2]
+        mock_data.return_value = {
+            "profile_name": "Berry Blast Bloom",
+            "time": "2026-02-14T07:30:00Z",
+            "data": [
+                {"time": 42300, "shot": {"weight": 36.5, "pressure": 9.0}}
+            ]
+        }
+        response = client.get("/api/last-shot")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_name"] == "Berry Blast Bloom"
+        assert data["date"] == "2026-02-14"
+        assert data["filename"] == "07:30:00.shot.json.zst"
+        assert data["final_weight"] == 36.5
+        assert data["total_time"] == 42.3
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_no_dates(self, mock_dates, client):
+        """Returns 404 when no shot dates exist."""
+        mock_dates.return_value = []
+        response = client.get("/api/last-shot")
+        assert response.status_code == 404
+
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_empty_files(self, mock_dates, mock_files, client):
+        """Returns 404 when dates exist but no files."""
+        d = MagicMock(); d.name = "2026-02-14"
+        mock_dates.return_value = [d]
+        mock_files.return_value = []
+        response = client.get("/api/last-shot")
+        assert response.status_code == 404
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_profile_from_nested_profile(self, mock_dates, mock_files, mock_data, client):
+        """Falls back to profile.name when profile_name is missing."""
+        d = MagicMock(); d.name = "2026-02-14"
+        mock_dates.return_value = [d]
+        f = MagicMock(); f.name = "08:00:00.shot.json.zst"
+        mock_files.return_value = [f]
+        mock_data.return_value = {
+            "profile": {"name": "Slow-Mo Blossom"},
+            "time": "2026-02-14T08:00:00Z",
+            "data": []
+        }
+        response = client.get("/api/last-shot")
+        assert response.status_code == 200
+        assert response.json()["profile_name"] == "Slow-Mo Blossom"
+        assert response.json()["final_weight"] is None
+        assert response.json()["total_time"] is None
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_api_error(self, mock_dates, client):
+        """Returns 502 on machine API error."""
+        result = MagicMock()
+        result.error = "connection timeout"
+        mock_dates.return_value = result
+        response = client.get("/api/last-shot")
+        assert response.status_code == 502
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_exception(self, mock_dates, client):
+        """Returns 500 on unexpected error."""
+        mock_dates.side_effect = RuntimeError("disk full")
+        response = client.get("/api/last-shot")
+        assert response.status_code == 500
+
+
+# ============================================================================
+# Machine Command Endpoint Tests
+# ============================================================================
+
+
+class TestMachineCommandEndpoints:
+    """Tests for POST /api/machine/command/* endpoints."""
+
+    def test_command_start_success(self, client):
+        """Start command succeeds when machine idle."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False
+            }
+            response = client.post("/api/machine/command/start")
+            assert response.status_code == 200
+            assert response.json()["command"] == "start_shot"
+
+    def test_command_start_rejected_when_brewing(self, client):
+        """Start command rejected when a shot is already running."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": True
+            }
+            response = client.post("/api/machine/command/start")
+            assert response.status_code == 409
+
+    def test_command_start_rejected_when_offline(self, client):
+        """Start command rejected when machine is offline."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "offline", "connected": False
+            }
+            response = client.post("/api/machine/command/start")
+            assert response.status_code == 409
+
+    def test_command_stop_success(self, client):
+        """Stop command succeeds when brewing."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": True
+            }
+            response = client.post("/api/machine/command/stop")
+            assert response.status_code == 200
+            assert response.json()["command"] == "stop_shot"
+
+    def test_command_stop_rejected_not_brewing(self, client):
+        """Stop command rejected when not brewing."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False
+            }
+            response = client.post("/api/machine/command/stop")
+            assert response.status_code == 409
+
+    def test_command_abort_success(self, client):
+        """Abort command succeeds when brewing."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": True
+            }
+            response = client.post("/api/machine/command/abort")
+            assert response.status_code == 200
+            assert response.json()["command"] == "abort_shot"
+
+    def test_command_continue(self, client):
+        """Continue command always succeeds (no precondition)."""
+        response = client.post("/api/machine/command/continue")
+        assert response.status_code == 200
+        assert response.json()["command"] == "continue_shot"
+
+    def test_command_preheat_success(self, client):
+        """Preheat command succeeds when idle."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False
+            }
+            response = client.post("/api/machine/command/preheat")
+            assert response.status_code == 200
+            assert response.json()["command"] == "preheat"
+
+    def test_command_tare_success(self, client):
+        """Tare command succeeds when connected."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True
+            }
+            response = client.post("/api/machine/command/tare")
+            assert response.status_code == 200
+            assert response.json()["command"] == "tare_scale"
+
+    def test_command_home_plunger(self, client):
+        """Home plunger command succeeds when idle."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False
+            }
+            response = client.post("/api/machine/command/home-plunger")
+            assert response.status_code == 200
+            assert response.json()["command"] == "home_plunger"
+
+    def test_command_purge(self, client):
+        """Purge command succeeds when idle."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False
+            }
+            response = client.post("/api/machine/command/purge")
+            assert response.status_code == 200
+            assert response.json()["command"] == "purge"
+
+    def test_command_load_profile(self, client):
+        """Load profile command sends profile name."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True
+            }
+            response = client.post(
+                "/api/machine/command/load-profile",
+                json={"name": "Berry Blast Bloom"}
+            )
+            assert response.status_code == 200
+            assert response.json()["command"] == "load_profile"
+
+    def test_command_brightness(self, client):
+        """Brightness command sends value."""
+        response = client.post(
+            "/api/machine/command/brightness",
+            json={"value": 75}
+        )
+        assert response.status_code == 200
+        assert response.json()["command"] == "set_brightness"
+
+    def test_command_brightness_validation(self, client):
+        """Brightness rejects out-of-range values."""
+        response = client.post(
+            "/api/machine/command/brightness",
+            json={"value": 150}
+        )
+        assert response.status_code == 422
+
+    def test_command_sounds(self, client):
+        """Sounds command toggles sounds."""
+        response = client.post(
+            "/api/machine/command/sounds",
+            json={"enabled": False}
+        )
+        assert response.status_code == 200
+        assert response.json()["command"] == "enable_sounds"
+
+    def test_command_publish_failure(self, client):
+        """Returns 503 when MQTT publish fails."""
+        with patch('api.routes.commands._publish_command', return_value=False):
+            response = client.post("/api/machine/command/continue")
+            assert response.status_code == 503
+
+
+class TestPublishCommandFunction:
+    """Tests for the _publish_command helper."""
+
+    def test_publish_test_mode(self):
+        """In TEST_MODE, _publish_command returns True without connecting."""
+        from api.routes.commands import _publish_command
+        assert _publish_command("meticulous_espresso/command/tare_scale") is True
+
+    def test_require_connected_offline(self):
+        """_require_connected raises 409 for offline machine."""
+        from api.routes.commands import _require_connected
+        with pytest.raises(HTTPException) as exc_info:
+            _require_connected({"availability": "offline"})
+        assert exc_info.value.status_code == 409
+
+    def test_require_connected_disconnected(self):
+        """_require_connected raises 409 for disconnected machine."""
+        from api.routes.commands import _require_connected
+        with pytest.raises(HTTPException) as exc_info:
+            _require_connected({"connected": False})
+        assert exc_info.value.status_code == 409
+
+    def test_require_idle_brewing(self):
+        """_require_idle raises 409 when brewing."""
+        from api.routes.commands import _require_idle
+        with pytest.raises(HTTPException) as exc_info:
+            _require_idle({"availability": "online", "connected": True, "brewing": True})
+        assert exc_info.value.status_code == 409
+
+    def test_require_brewing_not_brewing(self):
+        """_require_brewing raises 409 when not brewing."""
+        from api.routes.commands import _require_brewing
+        with pytest.raises(HTTPException) as exc_info:
+            _require_brewing({"availability": "online", "connected": True, "brewing": False})
+        assert exc_info.value.status_code == 409
+
+
