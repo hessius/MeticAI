@@ -943,6 +943,13 @@ async def get_settings(request: Request):
         if env_server_ip:
             settings["serverIp"] = env_server_ip
         
+        # MQTT enabled flag (env var takes precedence over stored setting)
+        mqtt_env = os.environ.get("MQTT_ENABLED", "")
+        if mqtt_env:
+            settings["mqttEnabled"] = mqtt_env.lower() == "true"
+        elif "mqttEnabled" not in settings:
+            settings["mqttEnabled"] = True
+        
         return settings
         
     except Exception as e:
@@ -1087,6 +1094,15 @@ async def save_settings_endpoint(request: Request):
             except Exception as e:
                 logger.warning(f"Could not restart MCP server: {e}",
                              extra={"request_id": request_id})
+            
+            # Also restart the bridge (it needs the new IP for Socket.IO)
+            try:
+                from services.bridge_service import restart_bridge_service
+                if restart_bridge_service():
+                    services_restarted.append("meticulous-bridge")
+            except Exception as e:
+                logger.warning(f"Could not restart bridge: {e}",
+                             extra={"request_id": request_id})
         
         if body.get("geminiApiKey") and not body.get("geminiApiKeyMasked"):
             new_api_key = body["geminiApiKey"].strip()
@@ -1103,6 +1119,47 @@ async def save_settings_endpoint(request: Request):
                 services_restarted.append("gemini_env")
                 logger.info("Updated GEMINI_API_KEY in process environment",
                           extra={"request_id": request_id})
+        
+        # Handle MQTT enabled toggle
+        if "mqttEnabled" in body:
+            mqtt_enabled = bool(body["mqttEnabled"])
+            current_settings["mqttEnabled"] = mqtt_enabled
+            os.environ["MQTT_ENABLED"] = str(mqtt_enabled).lower()
+            
+            # Update .env file
+            if "MQTT_ENABLED=" in env_content:
+                env_content = re.sub(
+                    r'MQTT_ENABLED=.*',
+                    f'MQTT_ENABLED={str(mqtt_enabled).lower()}',
+                    env_content
+                )
+            else:
+                env_content += f"\nMQTT_ENABLED={str(mqtt_enabled).lower()}"
+            env_updated = True
+            
+            # Restart bridge and reset MQTT subscriber
+            try:
+                from services.bridge_service import restart_bridge_service
+                restart_bridge_service()
+                services_restarted.append("meticulous-bridge")
+            except Exception as e:
+                logger.warning(f"Failed to restart bridge: {e}",
+                             extra={"request_id": request_id})
+            
+            try:
+                from services.mqtt_service import reset_mqtt_subscriber, get_mqtt_subscriber
+                reset_mqtt_subscriber()
+                if mqtt_enabled:
+                    import asyncio
+                    sub = get_mqtt_subscriber()
+                    sub.start(asyncio.get_running_loop())
+                services_restarted.append("mqtt_subscriber")
+            except Exception as e:
+                logger.warning(f"Failed to reset MQTT subscriber: {e}",
+                             extra={"request_id": request_id})
+            
+            logger.info("MQTT enabled=%s", mqtt_enabled,
+                       extra={"request_id": request_id})
         
         return {
             "status": "success",

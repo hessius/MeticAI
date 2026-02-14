@@ -209,6 +209,8 @@
     "authorName": "Author Name",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"MeticAI\" if left empty.",
+    "mqttEnabled": "MQTT Bridge",
+    "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
     "saveSettings": "Save Settings",
     "saving": "Saving...",
     "settingsSaved": "Settings saved successfully!",

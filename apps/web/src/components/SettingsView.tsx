@@ -43,6 +43,7 @@ interface Settings {
   geminiApiKey: string
   meticulousIp: string
   authorName: string
+  mqttEnabled?: boolean
   geminiApiKeyMasked?: boolean
   geminiApiKeyConfigured?: boolean
 }
@@ -85,7 +86,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [settings, setSettings] = useState<Settings>({
     geminiApiKey: '',
     meticulousIp: '',
-    authorName: ''
+    authorName: '',
+    mqttEnabled: true
   })
   const [isSaving, setIsSaving] = useState(false)
   const [isRestarting, setIsRestarting] = useState(false)
@@ -130,6 +132,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             geminiApiKey: data.geminiApiKey || '',
             meticulousIp: data.meticulousIp || '',
             authorName: data.authorName || '',
+            mqttEnabled: data.mqttEnabled !== false,
             geminiApiKeyMasked: data.geminiApiKeyMasked || false,
             geminiApiKeyConfigured: data.geminiApiKeyConfigured || false
           })
@@ -266,6 +269,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       const payload: Record<string, string | boolean | undefined> = {
         authorName: settings.authorName,
         meticulousIp: settings.meticulousIp,
+        mqttEnabled: settings.mqttEnabled,
       }
       
       // Only send API key if user actually typed a new value (not the masked stars)
@@ -521,6 +525,29 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               <p className="text-xs text-muted-foreground">
                 {t('settings.authorNameDescription')}
               </p>
+            </div>
+
+            {/* MQTT Bridge */}
+            <div className="space-y-3 pt-2 border-t border-border">
+              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Control Center</h3>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="mqtt-toggle" className="text-sm font-medium">
+                    {t('settings.mqttEnabled')}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.mqttEnabledDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="mqtt-toggle"
+                  checked={settings.mqttEnabled}
+                  onCheckedChange={(checked) => {
+                    setSettings(prev => ({ ...prev, mqttEnabled: checked as boolean }))
+                    setSaveStatus('idle')
+                  }}
+                />
+              </div>
             </div>
 
             {/* Appearance */}

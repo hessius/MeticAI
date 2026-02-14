@@ -209,6 +209,8 @@
     "authorName": "Författarnamn",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Ditt namn för författarfältet i genererad profil-JSON. Standardvärde \"MeticAI\" om det lämnas tomt.",
+    "mqttEnabled": "MQTT-brygga",
+    "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
     "saveSettings": "Spara inställningar",
     "saving": "Sparar...",
     "settingsSaved": "Inställningar sparade framgångsrikt!",

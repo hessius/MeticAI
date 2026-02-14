@@ -209,6 +209,8 @@
     "authorName": "Nombre del autor",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Tu nombre para el campo de autor en el JSON de perfil generado. Por defecto \"MeticAI\" si se deja vacío.",
+    "mqttEnabled": "Puente MQTT",
+    "mqttEnabledDescription": "Telemetría en tiempo real de la máquina vía MQTT. Alimenta el panel de control en vivo.",
     "saveSettings": "Guardar configuración",
     "saving": "Guardando...",
     "settingsSaved": "¡Configuración guardada exitosamente!",
