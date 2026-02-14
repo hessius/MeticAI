@@ -92,6 +92,11 @@ async def lifespan(app: FastAPI):
     # Start recurring schedule checker (runs every hour to ensure schedules stay current)
     recurring_task = asyncio.create_task(_recurring_schedule_checker())
     
+    # Start MQTT subscriber for live telemetry
+    from services.mqtt_service import get_mqtt_subscriber
+    mqtt_sub = get_mqtt_subscriber()
+    mqtt_sub.start(asyncio.get_running_loop())
+    
     yield
     
     # Cleanup on shutdown
@@ -119,12 +124,15 @@ async def lifespan(app: FastAPI):
     # Close the singleton httpx client
     from services.meticulous_service import close_http_client
     await close_http_client()
+    
+    # Stop MQTT subscriber
+    mqtt_sub.stop()
 
 
 app = FastAPI(lifespan=lifespan)
 
 # Import route modules
-from api.routes import coffee, system, history, shots, profiles, scheduling, bridge
+from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket
 
 # Middleware for request logging and tracking
 @app.middleware("http")
@@ -212,6 +220,7 @@ app.include_router(shots.router)
 app.include_router(profiles.router)
 app.include_router(scheduling.router)
 app.include_router(bridge.router)
+app.include_router(websocket.router)
 
 
 # ============================================================================

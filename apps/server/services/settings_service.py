@@ -16,7 +16,8 @@ _DEFAULT_SETTINGS = {
     "geminiApiKey": "",
     "meticulousIp": "",
     "serverIp": "",
-    "authorName": ""
+    "authorName": "",
+    "mqttEnabled": True
 }
 
 

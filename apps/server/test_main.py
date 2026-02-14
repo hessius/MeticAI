@@ -3272,11 +3272,23 @@ class TestCheckUpdatesEndpoint:
         """Test handling of corrupted version file."""
         mock_version_file = MagicMock()
         mock_version_file.exists.return_value = True
-        mock_path.return_value = mock_version_file
-        
+
+        # Each call to Path(...) returns a fresh mock, but we need the
+        # signal path's exists() to return False so the polling loop
+        # exits immediately.  Use side_effect to distinguish paths.
+        mock_signal = MagicMock()
+        mock_signal.exists.return_value = False  # signal "already processed"
+
+        def path_factory(p, *a, **kw):
+            if ".update-check-requested" in str(p):
+                return mock_signal
+            return mock_version_file
+
+        mock_path.side_effect = path_factory
+
         with patch('builtins.open', mock_open(read_data="invalid json {")):
             response = client.post("/api/check-updates")
-        
+
         # Should handle gracefully
         assert response.status_code in [200, 500]
 
@@ -8792,4 +8804,230 @@ class TestBridgeServiceFunctions:
         """restart_bridge_service returns False on timeout."""
         from services.bridge_service import restart_bridge_service
         assert restart_bridge_service() is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — MQTT Service, WebSocket, Settings integration
+# ---------------------------------------------------------------------------
+
+class TestMQTTServiceCoercion:
+    """Tests for _coerce_value type conversion."""
+
+    def test_coerce_float_sensor(self):
+        from services.mqtt_service import _coerce_value
+        assert _coerce_value("pressure", "9.05") == 9.05
+        assert _coerce_value("flow_rate", "2.123") == 2.12
+        assert _coerce_value("boiler_temperature", "93.5") == 93.5
+
+    def test_coerce_float_invalid(self):
+        from services.mqtt_service import _coerce_value
+        assert _coerce_value("pressure", "n/a") == "n/a"
+
+    def test_coerce_bool_sensor(self):
+        from services.mqtt_service import _coerce_value
+        assert _coerce_value("brewing", "true") is True
+        assert _coerce_value("brewing", "false") is False
+        assert _coerce_value("connected", "True") is True
+        assert _coerce_value("connected", "0") is False
+
+    def test_coerce_int_sensor(self):
+        from services.mqtt_service import _coerce_value
+        assert _coerce_value("total_shots", "1234") == 1234
+        assert _coerce_value("voltage", "230.0") == 230
+
+    def test_coerce_int_invalid(self):
+        from services.mqtt_service import _coerce_value
+        assert _coerce_value("total_shots", "unknown") == "unknown"
+
+    def test_coerce_string_sensor(self):
+        from services.mqtt_service import _coerce_value
+        assert _coerce_value("state", "Idle") == "Idle"
+        assert _coerce_value("active_profile", "My Profile") == "My Profile"
+
+
+class TestMQTTSubscriberLifecycle:
+    """Tests for MQTTSubscriber in TEST_MODE."""
+
+    def test_subscriber_start_test_mode(self):
+        """Subscriber skips connection in TEST_MODE."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        import asyncio
+        loop = asyncio.new_event_loop()
+        try:
+            sub.start(loop)
+            # Should not create a thread
+            assert sub._thread is None
+        finally:
+            sub.stop()
+            loop.close()
+
+    def test_subscriber_get_snapshot_empty(self):
+        """Empty subscriber returns empty dict."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        assert sub.get_snapshot() == {}
+
+    def test_subscriber_ws_tracking(self):
+        """WebSocket client count tracking."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        assert sub.ws_client_count == 0
+        sub.register_ws(1)
+        sub.register_ws(2)
+        assert sub.ws_client_count == 2
+        sub.unregister_ws(1)
+        assert sub.ws_client_count == 1
+        sub.unregister_ws(999)  # no-op
+        assert sub.ws_client_count == 1
+
+    def test_get_mqtt_subscriber_singleton(self):
+        """get_mqtt_subscriber returns the same instance."""
+        from services.mqtt_service import get_mqtt_subscriber, reset_mqtt_subscriber
+        reset_mqtt_subscriber()
+        a = get_mqtt_subscriber()
+        b = get_mqtt_subscriber()
+        assert a is b
+        reset_mqtt_subscriber()
+
+    def test_reset_mqtt_subscriber(self):
+        """reset_mqtt_subscriber clears the singleton."""
+        from services.mqtt_service import get_mqtt_subscriber, reset_mqtt_subscriber
+        a = get_mqtt_subscriber()
+        reset_mqtt_subscriber()
+        b = get_mqtt_subscriber()
+        assert a is not b
+        reset_mqtt_subscriber()
+
+
+class TestMQTTSubscriberOnMessage:
+    """Tests for MQTTSubscriber._on_message parsing."""
+
+    def _make_msg(self, topic: str, payload: str):
+        msg = MagicMock()
+        msg.topic = topic
+        msg.payload = payload.encode("utf-8")
+        return msg
+
+    def test_sensor_message(self):
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        msg = self._make_msg("meticulous_espresso/sensor/pressure/state", "9.1")
+        sub._on_message(None, None, msg)
+        assert sub.snapshot["pressure"] == 9.1
+
+    def test_availability_message(self):
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        msg = self._make_msg("meticulous_espresso/availability", "online")
+        sub._on_message(None, None, msg)
+        assert sub.snapshot["availability"] == "online"
+
+    def test_health_message_json(self):
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        payload = json.dumps({"uptime_seconds": 100, "api_connected": True})
+        msg = self._make_msg("meticulous_espresso/health", payload)
+        sub._on_message(None, None, msg)
+        assert sub.snapshot["health"]["uptime_seconds"] == 100
+
+    def test_health_message_invalid_json(self):
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        msg = self._make_msg("meticulous_espresso/health", "not-json")
+        sub._on_message(None, None, msg)
+        assert sub.snapshot["health"] == "not-json"
+
+    def test_bool_sensor_message(self):
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        msg = self._make_msg("meticulous_espresso/sensor/brewing/state", "true")
+        sub._on_message(None, None, msg)
+        assert sub.snapshot["brewing"] is True
+
+    def test_non_state_topic_ignored(self):
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        msg = self._make_msg("meticulous_espresso/sensor/pressure/config", "9.1")
+        sub._on_message(None, None, msg)
+        assert "pressure" not in sub.snapshot
+
+
+class TestWebSocketEndpoint:
+    """Tests for the /api/ws/live WebSocket endpoint."""
+
+    def test_websocket_connect_disconnect(self, client):
+        """WebSocket can connect and disconnect cleanly."""
+        with client.websocket_connect("/api/ws/live") as ws:
+            # Connection accepted — close immediately by exiting context
+            ws.close()
+
+    def test_websocket_connect_no_crash(self, client):
+        """WebSocket endpoint does not error on connect."""
+        try:
+            with client.websocket_connect("/api/ws/live") as ws:
+                ws.close()
+        except Exception as exc:
+            pytest.fail(f"WebSocket connection raised: {exc}")
+
+
+class TestSettingsMQTTEnabled:
+    """Tests for mqttEnabled in GET/POST /api/settings."""
+
+    def test_get_settings_includes_mqtt_enabled(self, client):
+        """GET /api/settings returns mqttEnabled flag."""
+        response = client.get("/api/settings")
+        assert response.status_code == 200
+        data = response.json()
+        assert "mqttEnabled" in data
+
+    def test_get_settings_mqtt_default_true(self, client):
+        """mqttEnabled defaults to True."""
+        response = client.get("/api/settings")
+        data = response.json()
+        assert data["mqttEnabled"] is True
+
+    @patch.dict(os.environ, {"MQTT_ENABLED": "false"})
+    def test_get_settings_mqtt_env_override(self, client):
+        """MQTT_ENABLED env var overrides stored setting."""
+        response = client.get("/api/settings")
+        data = response.json()
+        assert data["mqttEnabled"] is False
+
+    def test_post_settings_mqtt_toggle(self, client):
+        """POST /api/settings with mqttEnabled saves it."""
+        response = client.post(
+            "/api/settings",
+            json={"mqttEnabled": False}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "mqtt_subscriber" in data.get("services_restarted", [])
+
+    def test_post_settings_mqtt_toggle_true(self, client):
+        """POST /api/settings with mqttEnabled=true restarts bridge."""
+        response = client.post(
+            "/api/settings",
+            json={"mqttEnabled": True}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "meticulous-bridge" in data.get("services_restarted", [])
+
+    @patch('api.routes.system.subprocess.run')
+    @patch('api.routes.system.Path')
+    def test_post_settings_ip_restarts_bridge(self, mock_path_cls, mock_run, client):
+        """Changing meticulousIp also restarts the bridge."""
+        mock_run.return_value = MagicMock(returncode=0)
+        # Make .env path mock writable so the endpoint doesn't crash
+        mock_env = MagicMock()
+        mock_env.exists.return_value = False
+        mock_path_cls.return_value = mock_env
+        response = client.post(
+            "/api/settings",
+            json={"meticulousIp": "10.0.0.99"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "meticulous-bridge" in data.get("services_restarted", [])
 
