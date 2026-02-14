@@ -1,0 +1,13 @@
+# ==============================================================================
+# MeticAI Bridge Dependencies
+# ==============================================================================
+# Additional Python packages needed by the meticulous-addon bridge.
+# pymeticulous is already installed via the server/MCP requirements.
+# ==============================================================================
+
+# MQTT client for broker communication
+paho-mqtt==1.6.1
+
+# Async HTTP (required by addon top-level import, used for HA Supervisor API
+# which is unused in our context but must be importable)
+aiohttp==3.9.1
