@@ -129,19 +129,24 @@ ws.onmessage = (event) => console.log(JSON.parse(event.data))
 
 All commands are fire-and-forget — they publish to the MQTT broker which forwards to the machine.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/machine/command/start` | Start a shot |
-| POST | `/api/machine/command/stop` | Gracefully stop current shot |
-| POST | `/api/machine/command/abort` | Immediately abort shot (retracts plunger) |
-| POST | `/api/machine/command/continue` | Resume a paused shot |
-| POST | `/api/machine/command/preheat` | Start machine preheat |
-| POST | `/api/machine/command/tare` | Tare (zero) the scale |
-| POST | `/api/machine/command/home-plunger` | Home the plunger |
-| POST | `/api/machine/command/purge` | Run a purge cycle |
-| POST | `/api/machine/command/load-profile` | Load a profile by ID |
-| POST | `/api/machine/command/brightness` | Set display brightness (`{ "value": 0-100 }`) |
-| POST | `/api/machine/command/sounds` | Enable/disable sounds (`{ "enabled": true }`) |
+| Method | Endpoint | Description | Precondition |
+|--------|----------|-------------|--------------|
+| POST | `/api/machine/command/start` | Start a shot | Machine idle |
+| POST | `/api/machine/command/stop` | Gracefully stop current shot | Shot running |
+| POST | `/api/machine/command/abort` | Immediately abort shot (retracts plunger) | Shot running |
+| POST | `/api/machine/command/continue` | Resume a paused shot | — |
+| POST | `/api/machine/command/preheat` | Start machine preheat | Machine idle |
+| POST | `/api/machine/command/tare` | Tare (zero) the scale | Machine connected |
+| POST | `/api/machine/command/home-plunger` | Home the plunger | Machine idle |
+| POST | `/api/machine/command/purge` | Run a purge cycle | Machine idle |
+| POST | `/api/machine/command/load-profile` | Load a profile (`{ "name": "..." }`) | Machine connected |
+| POST | `/api/machine/command/brightness` | Set display brightness (`{ "value": 0-100 }`) | Machine connected |
+| POST | `/api/machine/command/sounds` | Enable/disable sounds (`{ "enabled": true }`) | Machine connected |
+
+**Error responses:**
+- `409 Conflict` — precondition not met (machine offline, brewing, or idle depending on command)
+- `422 Unprocessable Entity` — invalid request body (e.g. brightness > 100, empty profile name)
+- `503 Service Unavailable` — MQTT publish failed
 
 ---
 

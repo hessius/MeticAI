@@ -376,5 +376,103 @@
     "updateAvailable": "Mise à jour disponible",
     "newVersionReady": "Une nouvelle version de MeticAI est prête à être installée",
     "updateNow": "Mettre à jour maintenant"
+  },
+  "controlCenter": {
+    "offline": "La machine est hors ligne",
+    "stale": "Périmé",
+    "noProfile": "Aucun profil chargé",
+    "totalShots": "{{count}} extractions",
+    "showAll": "Tout afficher",
+    "collapse": "Réduire",
+    "states": {
+      "idle": "En attente",
+      "brewing": "Extraction en cours",
+      "heating": "Chauffe",
+      "preheating": "Préchauffage",
+      "steaming": "Vapeur",
+      "descaling": "Détartrage",
+      "unknown": "Inconnu"
+    },
+    "metrics": {
+      "time": "Temps (s)",
+      "weight": "Poids (g)",
+      "pressure": "Pression (bar)",
+      "flow": "Débit (ml/s)"
+    },
+    "actions": {
+      "start": "Démarrer",
+      "stop": "Arrêter",
+      "abort": "Abandonner",
+      "continue": "Reprendre",
+      "preheat": "Préchauffer",
+      "tare": "Tarer",
+      "home": "Position initiale",
+      "purge": "Purger",
+      "live": "En direct"
+    },
+    "toasts": {
+      "startingShot": "Démarrage de l'extraction…",
+      "stopping": "Arrêt de l'extraction…",
+      "aborting": "Abandon de l'extraction…",
+      "continuing": "Reprise de l'extraction…",
+      "preheating": "Préchauffage…",
+      "tared": "Balance tarée",
+      "homed": "Piston en retour…",
+      "purging": "Purge en cours…",
+      "soundsOn": "Sons activés",
+      "soundsOff": "Sons désactivés",
+      "error": "Échec de la commande"
+    },
+    "confirm": {
+      "stopTitle": "Arrêter l'extraction ?",
+      "stopDesc": "Ceci arrêtera l'extraction en cours de manière contrôlée.",
+      "abortTitle": "Abandonner l'extraction ?",
+      "abortDesc": "Ceci abandonnera immédiatement l'extraction. Utilisez Arrêter pour une fin contrôlée.",
+      "purgeTitle": "Lancer la purge ?",
+      "purgeDesc": "Ceci lancera un cycle de purge. Assurez-vous que le bac de récupération est en place."
+    },
+    "sections": {
+      "temperatures": "Températures",
+      "info": "Info machine",
+      "settings": "Réglages machine",
+      "actions": "Actions"
+    },
+    "labels": {
+      "brewHead": "Tête de groupe",
+      "boiler": "Chaudière",
+      "target": "Cible",
+      "profile": "Profil actif",
+      "shots": "Extractions totales",
+      "voltage": "Tension",
+      "sounds": "Sons"
+    },
+    "lastShot": {
+      "title": "Extraction il y a {{time}}",
+      "minutesAgo": "il y a {{count}} min",
+      "minutesAgo_one": "il y a 1 min",
+      "hoursAgo": "il y a {{count}} h",
+      "hoursAgo_one": "il y a 1 h",
+      "analyze": "Analyser l'extraction"
+    },
+    "shotDetected": {
+      "title": "Une extraction est en cours !",
+      "watch": "Voir en direct →"
+    },
+    "liveShot": {
+      "title": "Extraction en direct",
+      "stage": "Étape",
+      "goal": "Objectif",
+      "limit": "Limite",
+      "exit": "Quitter",
+      "shotComplete": "Extraction terminée",
+      "totalTime": "Temps total",
+      "finalWeight": "Poids final",
+      "avgPressure": "Pression moy.",
+      "avgFlow": "Débit moy.",
+      "analyzeShot": "Analyser cette extraction",
+      "backHome": "Retour à l'accueil",
+      "profileOverlay": "Profil",
+      "shotOverlay": "Comparer"
+    }
   }
 }

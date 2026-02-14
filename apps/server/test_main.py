@@ -9246,13 +9246,17 @@ class TestMachineCommandEndpoints:
             assert response.json()["command"] == "load_profile"
 
     def test_command_brightness(self, client):
-        """Brightness command sends value."""
-        response = client.post(
-            "/api/machine/command/brightness",
-            json={"value": 75}
-        )
-        assert response.status_code == 200
-        assert response.json()["command"] == "set_brightness"
+        """Brightness command sends value (with connectivity check)."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True
+            }
+            response = client.post(
+                "/api/machine/command/brightness",
+                json={"value": 75}
+            )
+            assert response.status_code == 200
+            assert response.json()["command"] == "set_brightness"
 
     def test_command_brightness_validation(self, client):
         """Brightness rejects out-of-range values."""
@@ -9263,13 +9267,17 @@ class TestMachineCommandEndpoints:
         assert response.status_code == 422
 
     def test_command_sounds(self, client):
-        """Sounds command toggles sounds."""
-        response = client.post(
-            "/api/machine/command/sounds",
-            json={"enabled": False}
-        )
-        assert response.status_code == 200
-        assert response.json()["command"] == "enable_sounds"
+        """Sounds command toggles sounds (with connectivity check)."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True
+            }
+            response = client.post(
+                "/api/machine/command/sounds",
+                json={"enabled": False}
+            )
+            assert response.status_code == 200
+            assert response.json()["command"] == "enable_sounds"
 
     def test_command_publish_failure(self, client):
         """Returns 503 when MQTT publish fails."""
@@ -9313,5 +9321,149 @@ class TestPublishCommandFunction:
         with pytest.raises(HTTPException) as exc_info:
             _require_brewing({"availability": "online", "connected": True, "brewing": False})
         assert exc_info.value.status_code == 409
+
+
+class TestCommandConnectivityGaps:
+    """Tests for connectivity checks added to brightness/sounds + validation."""
+
+    def test_command_brightness_rejected_when_offline(self, client):
+        """Brightness returns 409 when machine is offline."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "offline"
+            }
+            response = client.post(
+                "/api/machine/command/brightness",
+                json={"value": 50}
+            )
+            assert response.status_code == 409
+
+    def test_command_sounds_rejected_when_offline(self, client):
+        """Sounds returns 409 when machine is offline."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "offline"
+            }
+            response = client.post(
+                "/api/machine/command/sounds",
+                json={"enabled": True}
+            )
+            assert response.status_code == 409
+
+    def test_command_load_profile_empty_name_rejected(self, client):
+        """Load profile rejects an empty profile name."""
+        response = client.post(
+            "/api/machine/command/load-profile",
+            json={"name": ""}
+        )
+        assert response.status_code == 422
+
+
+class TestMQTTSubscriberAdvanced:
+    """Tests for thread-safety, callbacks, and stop behaviour."""
+
+    def test_subscriber_stop_graceful(self):
+        """stop() doesn't crash when client is None."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        sub.stop()  # Should not raise
+
+    def test_ws_tracking_thread_safe(self):
+        """register/unregister from concurrent calls stays consistent."""
+        import threading
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        errors = []
+
+        def register_many(start):
+            try:
+                for i in range(start, start + 100):
+                    sub.register_ws(i)
+            except Exception as e:
+                errors.append(e)
+
+        def unregister_many(start):
+            try:
+                for i in range(start, start + 50):
+                    sub.unregister_ws(i)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [
+            threading.Thread(target=register_many, args=(0,)),
+            threading.Thread(target=register_many, args=(100,)),
+            threading.Thread(target=unregister_many, args=(0,)),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert not errors
+        # 200 registered - 50 unregistered = 150
+        assert sub.ws_client_count == 150
+
+    def test_on_connect_success_subscribes(self):
+        """_on_connect with rc=0 subscribes to 3 topics."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        mock_client = MagicMock()
+        sub._on_connect(mock_client, None, None, 0)
+        assert mock_client.subscribe.call_count == 3
+
+    def test_on_connect_failure_logs(self):
+        """_on_connect with rc!=0 does not subscribe."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        mock_client = MagicMock()
+        sub._on_connect(mock_client, None, None, 5)
+        mock_client.subscribe.assert_not_called()
+
+    def test_on_disconnect_unexpected_no_crash(self):
+        """_on_disconnect with rc!=0 logs but doesn't crash."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        sub._on_disconnect(MagicMock(), None, 1)  # Should not raise
+
+    def test_on_disconnect_clean(self):
+        """_on_disconnect with rc=0 is a clean disconnect."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        sub._on_disconnect(MagicMock(), None, 0)  # Should not raise
+
+    def test_signal_update_no_loop_noop(self):
+        """_signal_update with no loop set does nothing."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        sub._signal_update()  # Should not raise
+
+    def test_get_mqtt_subscriber_same_instance(self):
+        """get_mqtt_subscriber returns same instance on repeated calls."""
+        from services.mqtt_service import get_mqtt_subscriber, reset_mqtt_subscriber
+        reset_mqtt_subscriber()
+        try:
+            a = get_mqtt_subscriber()
+            b = get_mqtt_subscriber()
+            assert a is b
+        finally:
+            reset_mqtt_subscriber()
+
+    def test_stop_with_mocked_client(self):
+        """stop() calls loop_stop and disconnect on the client."""
+        from services.mqtt_service import MQTTSubscriber
+        sub = MQTTSubscriber()
+        mock_client = MagicMock()
+        sub._client = mock_client
+        sub.stop()
+        mock_client.loop_stop.assert_called_once_with(force=True)
+        mock_client.disconnect.assert_called_once()
+
+
+class TestBridgeServiceLogging:
+    """Tests for bridge_service restart logging paths."""
+
+    def test_restart_bridge_service_test_mode(self):
+        """restart_bridge_service returns True in TEST_MODE."""
+        from services.bridge_service import restart_bridge_service
+        assert restart_bridge_service() is True
 
 

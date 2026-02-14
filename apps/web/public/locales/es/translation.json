@@ -376,5 +376,103 @@
     "updateAvailable": "Actualización disponible",
     "newVersionReady": "Una nueva versión de MeticAI está lista para instalar",
     "updateNow": "Actualizar ahora"
+  },
+  "controlCenter": {
+    "offline": "La máquina está desconectada",
+    "stale": "Obsoleto",
+    "noProfile": "Sin perfil cargado",
+    "totalShots": "{{count}} extracciones",
+    "showAll": "Mostrar todo",
+    "collapse": "Contraer",
+    "states": {
+      "idle": "En espera",
+      "brewing": "Extrayendo",
+      "heating": "Calentando",
+      "preheating": "Precalentando",
+      "steaming": "Vaporizando",
+      "descaling": "Descalcificando",
+      "unknown": "Desconocido"
+    },
+    "metrics": {
+      "time": "Tiempo (s)",
+      "weight": "Peso (g)",
+      "pressure": "Presión (bar)",
+      "flow": "Flujo (ml/s)"
+    },
+    "actions": {
+      "start": "Iniciar",
+      "stop": "Detener",
+      "abort": "Abortar",
+      "continue": "Continuar",
+      "preheat": "Precalentar",
+      "tare": "Tarar",
+      "home": "Inicio",
+      "purge": "Purgar",
+      "live": "En vivo"
+    },
+    "toasts": {
+      "startingShot": "Iniciando extracción…",
+      "stopping": "Deteniendo extracción…",
+      "aborting": "Abortando extracción…",
+      "continuing": "Continuando extracción…",
+      "preheating": "Precalentando…",
+      "tared": "Báscula tarada",
+      "homed": "Émbolo retornando…",
+      "purging": "Purgando…",
+      "soundsOn": "Sonidos activados",
+      "soundsOff": "Sonidos desactivados",
+      "error": "El comando falló"
+    },
+    "confirm": {
+      "stopTitle": "¿Detener extracción?",
+      "stopDesc": "Esto detendrá la extracción actual de forma controlada.",
+      "abortTitle": "¿Abortar extracción?",
+      "abortDesc": "Esto abortará la extracción inmediatamente. Usa Detener para un final controlado.",
+      "purgeTitle": "¿Ejecutar purga?",
+      "purgeDesc": "Esto ejecutará un ciclo de purga. Asegúrate de que la bandeja de goteo esté colocada."
+    },
+    "sections": {
+      "temperatures": "Temperaturas",
+      "info": "Info de la máquina",
+      "settings": "Ajustes de la máquina",
+      "actions": "Acciones"
+    },
+    "labels": {
+      "brewHead": "Cabezal",
+      "boiler": "Caldera",
+      "target": "Objetivo",
+      "profile": "Perfil activo",
+      "shots": "Total de extracciones",
+      "voltage": "Voltaje",
+      "sounds": "Sonidos"
+    },
+    "lastShot": {
+      "title": "Extracción hecha {{time}}",
+      "minutesAgo": "hace {{count}} min",
+      "minutesAgo_one": "hace 1 min",
+      "hoursAgo": "hace {{count}} horas",
+      "hoursAgo_one": "hace 1 hora",
+      "analyze": "Analizar extracción"
+    },
+    "shotDetected": {
+      "title": "¡Una extracción está en curso!",
+      "watch": "Ver en vivo →"
+    },
+    "liveShot": {
+      "title": "Extracción en vivo",
+      "stage": "Etapa",
+      "goal": "Meta",
+      "limit": "Límite",
+      "exit": "Salir",
+      "shotComplete": "Extracción completada",
+      "totalTime": "Tiempo total",
+      "finalWeight": "Peso final",
+      "avgPressure": "Presión promedio",
+      "avgFlow": "Flujo promedio",
+      "analyzeShot": "Analizar esta extracción",
+      "backHome": "Volver al inicio",
+      "profileOverlay": "Perfil",
+      "shotOverlay": "Comparar"
+    }
   }
 }

@@ -376,5 +376,103 @@
     "updateAvailable": "Update verfügbar",
     "newVersionReady": "Eine neue Version von MeticAI ist zur Installation bereit",
     "updateNow": "Jetzt aktualisieren"
+  },
+  "controlCenter": {
+    "offline": "Maschine ist offline",
+    "stale": "Veraltet",
+    "noProfile": "Kein Profil geladen",
+    "totalShots": "{{count}} Bezüge",
+    "showAll": "Alle anzeigen",
+    "collapse": "Einklappen",
+    "states": {
+      "idle": "Bereit",
+      "brewing": "Brüht",
+      "heating": "Heizt",
+      "preheating": "Vorheizt",
+      "steaming": "Dampft",
+      "descaling": "Entkalkt",
+      "unknown": "Unbekannt"
+    },
+    "metrics": {
+      "time": "Zeit (s)",
+      "weight": "Gewicht (g)",
+      "pressure": "Druck (bar)",
+      "flow": "Durchfluss (ml/s)"
+    },
+    "actions": {
+      "start": "Starten",
+      "stop": "Stoppen",
+      "abort": "Abbrechen",
+      "continue": "Fortsetzen",
+      "preheat": "Vorheizen",
+      "tare": "Tarieren",
+      "home": "Ausgangsposition",
+      "purge": "Spülen",
+      "live": "Live"
+    },
+    "toasts": {
+      "startingShot": "Bezug wird gestartet…",
+      "stopping": "Bezug wird gestoppt…",
+      "aborting": "Bezug wird abgebrochen…",
+      "continuing": "Bezug wird fortgesetzt…",
+      "preheating": "Vorheizt…",
+      "tared": "Waage tariert",
+      "homed": "Kolben fährt zurück…",
+      "purging": "Spült…",
+      "soundsOn": "Töne aktiviert",
+      "soundsOff": "Töne deaktiviert",
+      "error": "Befehl fehlgeschlagen"
+    },
+    "confirm": {
+      "stopTitle": "Bezug stoppen?",
+      "stopDesc": "Dies stoppt den aktuellen Bezug kontrolliert.",
+      "abortTitle": "Bezug abbrechen?",
+      "abortDesc": "Dies bricht den Bezug sofort ab. Verwende Stoppen für ein kontrolliertes Ende.",
+      "purgeTitle": "Spülung starten?",
+      "purgeDesc": "Dies führt einen Spülzyklus durch. Stelle sicher, dass die Abtropfschale eingesetzt ist."
+    },
+    "sections": {
+      "temperatures": "Temperaturen",
+      "info": "Maschineninfo",
+      "settings": "Maschineneinstellungen",
+      "actions": "Aktionen"
+    },
+    "labels": {
+      "brewHead": "Brühkopf",
+      "boiler": "Boiler",
+      "target": "Ziel",
+      "profile": "Aktives Profil",
+      "shots": "Bezüge gesamt",
+      "voltage": "Spannung",
+      "sounds": "Töne"
+    },
+    "lastShot": {
+      "title": "Bezug vor {{time}}",
+      "minutesAgo": "vor {{count}} Min.",
+      "minutesAgo_one": "vor 1 Min.",
+      "hoursAgo": "vor {{count}} Std.",
+      "hoursAgo_one": "vor 1 Std.",
+      "analyze": "Bezug analysieren"
+    },
+    "shotDetected": {
+      "title": "Ein Bezug läuft!",
+      "watch": "Live ansehen →"
+    },
+    "liveShot": {
+      "title": "Live-Bezug",
+      "stage": "Phase",
+      "goal": "Ziel",
+      "limit": "Limit",
+      "exit": "Beenden",
+      "shotComplete": "Bezug abgeschlossen",
+      "totalTime": "Gesamtzeit",
+      "finalWeight": "Endgewicht",
+      "avgPressure": "Ø-Druck",
+      "avgFlow": "Ø-Durchfluss",
+      "analyzeShot": "Diesen Bezug analysieren",
+      "backHome": "Zurück zur Startseite",
+      "profileOverlay": "Profil",
+      "shotOverlay": "Vergleichen"
+    }
   }
 }
