@@ -17,6 +17,13 @@ from services.settings_service import load_settings, save_settings
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+@router.get("/api/health")
+async def health_check():
+    """Health check endpoint for Docker and load balancer probes."""
+    return {"status": "ok"}
+
+
 # Data directory configuration
 TEST_MODE = os.environ.get("TEST_MODE") == "true"
 if TEST_MODE:

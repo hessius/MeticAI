@@ -1543,25 +1543,6 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       )
                     })()}
                   </div>
-                  <TabsTrigger 
-                    value="analyze" 
-                    className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
-                  >
-                    <MagnifyingGlass size={14} weight={activeAction === 'analyze' ? 'fill' : 'bold'} />
-                    Analyze
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Replay Tab Content */}
-                <TabsContent value="replay" className="mt-4 overflow-hidden">
-                  <motion.div
-                    key="replay-content"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="space-y-4"
-                  >
                   {/* Progress Bar */}
                   {maxTime > 0 && (
                     <div className="space-y-2">
