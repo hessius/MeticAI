@@ -57,72 +57,17 @@ import {
   ReferenceLine,
   Customized
 } from 'recharts'
-
-// Chart colors matching Meticulous app style (muted to fit dark theme)
-const CHART_COLORS = {
-  pressure: '#4ade80',      // Green (muted)
-  flow: '#67e8f9',          // Light cyan/blue (muted)
-  weight: '#fbbf24',        // Amber/Yellow (muted)
-  gravimetricFlow: '#c2855a', // Brown-orange (muted to fit dark theme)
-  // Profile target curves (lighter/dashed versions of main colors)
-  targetPressure: '#86efac',  // Lighter green for target pressure
-  targetFlow: '#a5f3fc'       // Lighter cyan for target flow
-}
-
-// Stage colors for background areas (matching tag colors)
-const STAGE_COLORS = [
-  'rgba(239, 68, 68, 0.25)',   // Red
-  'rgba(249, 115, 22, 0.25)',  // Orange  
-  'rgba(234, 179, 8, 0.25)',   // Yellow
-  'rgba(34, 197, 94, 0.25)',   // Green
-  'rgba(59, 130, 246, 0.25)',  // Blue
-  'rgba(168, 85, 247, 0.25)',  // Purple
-  'rgba(236, 72, 153, 0.25)',  // Pink
-  'rgba(20, 184, 166, 0.25)',  // Teal
-]
-
-const STAGE_BORDER_COLORS = [
-  'rgba(239, 68, 68, 0.5)',
-  'rgba(249, 115, 22, 0.5)',
-  'rgba(234, 179, 8, 0.5)',
-  'rgba(34, 197, 94, 0.5)',
-  'rgba(59, 130, 246, 0.5)',
-  'rgba(168, 85, 247, 0.5)',
-  'rgba(236, 72, 153, 0.5)',
-  'rgba(20, 184, 166, 0.5)',
-]
-
-// Darker text colors for stage pills — legible on both light and dark backgrounds
-const STAGE_TEXT_COLORS_LIGHT = [
-  'rgb(153, 27, 27)',    // Red-800
-  'rgb(154, 52, 18)',    // Orange-800
-  'rgb(133, 77, 14)',    // Yellow-800
-  'rgb(22, 101, 52)',    // Green-800
-  'rgb(30, 64, 175)',    // Blue-800
-  'rgb(107, 33, 168)',   // Purple-800
-  'rgb(157, 23, 77)',    // Pink-800
-  'rgb(17, 94, 89)',     // Teal-800
-]
-const STAGE_TEXT_COLORS_DARK = [
-  'rgb(252, 165, 165)',  // Red-300
-  'rgb(253, 186, 116)',  // Orange-300
-  'rgb(253, 224, 71)',   // Yellow-300
-  'rgb(134, 239, 172)',  // Green-300
-  'rgb(147, 197, 253)',  // Blue-300
-  'rgb(216, 180, 254)',  // Purple-300
-  'rgb(249, 168, 212)',  // Pink-300
-  'rgb(94, 234, 212)',   // Teal-300
-]
+import {
+  CHART_COLORS,
+  STAGE_COLORS,
+  STAGE_BORDER_COLORS,
+  STAGE_TEXT_COLORS_LIGHT,
+  STAGE_TEXT_COLORS_DARK,
+  COMPARISON_COLORS
+} from '@/lib/chartStyles'
 
 // Playback speed options - defined outside component to avoid re-creation
 const SPEED_OPTIONS: number[] = [0.5, 1, 2, 3, 5]
-
-// Comparison chart colors
-const COMPARISON_COLORS = {
-  pressure: '#4ade80',
-  flow: '#67e8f9',
-  weight: '#fbbf24'
-}
 
 interface ShotHistoryViewProps {
   profileName: string
@@ -1709,88 +1654,31 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   {/* Comparison Chart with Replay */}
                   {comparisonShotData && (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs font-semibold text-primary flex items-center gap-1.5">
-                          <ChartLine size={14} weight="bold" />
-                          Extraction Comparison
-                        </Label>
-                        {comparisonIsPlaying && (
-                          <Badge variant="secondary" className="animate-pulse text-[10px]">
-                            <Play size={8} weight="fill" className="mr-1" />
-                            {comparisonPlaybackSpeed}x
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="p-1 bg-secondary/40 rounded-xl border border-border/20">
-                        <div className="h-64">
-                          {(() => {
-                            const combinedData = getCombinedChartData()
-                            const dataMaxTime = combinedData.length > 0 ? combinedData[combinedData.length - 1].time : 0
-                            const maxPressure = Math.max(...combinedData.map(d => Math.max(d.pressureA || 0, d.pressureB || 0)), 12)
-                            const maxFlow = Math.max(...combinedData.map(d => Math.max(d.flowA || 0, d.flowB || 0)), 8)
-                            const maxWeight = Math.max(...combinedData.map(d => Math.max(d.weightA || 0, d.weightB || 0)), 50)
-                            const leftDomain = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
-                            const rightDomain = Math.ceil(maxWeight * 1.1)
-                            
-                            // Filter data for replay - show data when playing or paused at a position
-                            const isShowingReplay = comparisonCurrentTime > 0 && comparisonCurrentTime < dataMaxTime
-                            const displayData = isShowingReplay
-                              ? combinedData.filter(d => d.time <= comparisonCurrentTime)
-                              : combinedData
-                            
-                            return (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={displayData} margin={{ top: 5, right: 0, left: -5, bottom: 5 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                                  
-                                  {/* Playhead during replay */}
-                                  {isShowingReplay && (
-                                    <ReferenceLine
-                                      yAxisId="left"
-                                      x={comparisonCurrentTime}
-                                      stroke="#fff"
-                                      strokeWidth={2}
-                                      strokeDasharray="4 2"
-                                    />
-                                  )}
-                                  
-                                  <XAxis 
-                                    dataKey="time" 
-                                    stroke="#666" 
-                                    fontSize={10}
-                                    tickFormatter={(v) => `${Math.round(v)}s`}
-                                    domain={[0, dataMaxTime]}
-                                    type="number"
-                                    allowDataOverflow={false}
-                                  />
-                                  <YAxis yAxisId="left" stroke="#666" fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={false} />
-                                  <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={false} />
-                                  <Tooltip 
-                                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid #333', borderRadius: '8px', fontSize: '10px' }}
-                                  />
-                                  <Legend wrapperStyle={{ fontSize: '8px', paddingTop: '4px' }} iconSize={6} />
-                                  
-                                  {/* Shot A - Solid */}
-                                  <Line yAxisId="left" type="monotone" dataKey="pressureA" stroke={COMPARISON_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure A" isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="flowA" stroke={COMPARISON_COLORS.flow} strokeWidth={2} dot={false} name="Flow A" isAnimationActive={false} />
-                                  <Line yAxisId="right" type="monotone" dataKey="weightA" stroke={COMPARISON_COLORS.weight} strokeWidth={2} dot={false} name="Weight A" isAnimationActive={false} />
-                                  
-                                  {/* Shot B - Dashed */}
-                                  <Line yAxisId="left" type="monotone" dataKey="pressureB" stroke={COMPARISON_COLORS.pressure} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Pressure B" opacity={0.6} isAnimationActive={false} />
-                                  <Line yAxisId="left" type="monotone" dataKey="flowB" stroke={COMPARISON_COLORS.flow} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Flow B" opacity={0.6} isAnimationActive={false} />
-                                  <Line yAxisId="right" type="monotone" dataKey="weightB" stroke={COMPARISON_COLORS.weight} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Weight B" opacity={0.6} isAnimationActive={false} />
-                                </LineChart>
-                              </ResponsiveContainer>
-                            )
-                          })()}
-                        </div>
-                      </div>
-                      
-                      {/* Legend */}
-                      <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> Shot A (solid)</span>
-                        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> Shot B (dashed)</span>
-                      </div>
+                      {/* Chart */}
+                      {(() => {
+                        const combinedData = getCombinedChartData()
+                        const dataMaxTime = combinedData.length > 0 ? combinedData[combinedData.length - 1].time : 0
+                        const maxPressure = Math.max(...combinedData.map(d => Math.max(d.pressureA || 0, d.pressureB || 0)), 12)
+                        const maxFlow = Math.max(...combinedData.map(d => Math.max(d.flowA || 0, d.flowB || 0)), 8)
+                        const maxWeight = Math.max(...combinedData.map(d => Math.max(d.weightA || 0, d.weightB || 0)), 50)
+                        const leftDomain = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+                        const rightDomain = Math.ceil(maxWeight * 1.1)
+                        const isShowingReplay = comparisonCurrentTime > 0 && comparisonCurrentTime < dataMaxTime
+                        
+                        return (
+                          <CompareChart
+                            combinedData={combinedData}
+                            dataMaxTime={dataMaxTime}
+                            leftDomain={leftDomain}
+                            rightDomain={rightDomain}
+                            isShowingReplay={isShowingReplay}
+                            comparisonCurrentTime={comparisonCurrentTime}
+                            comparisonIsPlaying={comparisonIsPlaying}
+                            comparisonPlaybackSpeed={comparisonPlaybackSpeed}
+                            variant="mobile"
+                          />
+                        )
+                      })()}
                       
                       {/* Replay Controls */}
                       <div className="space-y-3 pt-2 border-t border-border/20">
