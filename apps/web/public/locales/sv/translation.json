@@ -376,5 +376,103 @@
     "updateAvailable": "Uppdatering tillgänglig",
     "newVersionReady": "En ny version av MeticAI är redo att installera",
     "updateNow": "Uppdatera nu"
+  },
+  "controlCenter": {
+    "offline": "Maskinen är offline",
+    "stale": "Inaktuell",
+    "noProfile": "Ingen profil laddad",
+    "totalShots": "{{count}} bryggningar",
+    "showAll": "Visa alla",
+    "collapse": "Dölj",
+    "states": {
+      "idle": "Viloläge",
+      "brewing": "Brygger",
+      "heating": "Värmer",
+      "preheating": "Förvärmer",
+      "steaming": "Ångar",
+      "descaling": "Avkalkar",
+      "unknown": "Okänd"
+    },
+    "metrics": {
+      "time": "Tid (s)",
+      "weight": "Vikt (g)",
+      "pressure": "Tryck (bar)",
+      "flow": "Flöde (ml/s)"
+    },
+    "actions": {
+      "start": "Starta",
+      "stop": "Stoppa",
+      "abort": "Avbryt",
+      "continue": "Fortsätt",
+      "preheat": "Förvärm",
+      "tare": "Tarera",
+      "home": "Hem",
+      "purge": "Spola",
+      "live": "Live"
+    },
+    "toasts": {
+      "startingShot": "Startar bryggning…",
+      "stopping": "Stoppar bryggning…",
+      "aborting": "Avbryter bryggning…",
+      "continuing": "Fortsätter bryggning…",
+      "preheating": "Förvärmer…",
+      "tared": "Våg tarerad",
+      "homed": "Kolv återställs…",
+      "purging": "Spolar…",
+      "soundsOn": "Ljud aktiverat",
+      "soundsOff": "Ljud inaktiverat",
+      "error": "Kommandot misslyckades"
+    },
+    "confirm": {
+      "stopTitle": "Stoppa bryggning?",
+      "stopDesc": "Detta stoppar den pågående bryggningen kontrollerat.",
+      "abortTitle": "Avbryt bryggning?",
+      "abortDesc": "Detta avbryter bryggningen omedelbart. Använd Stoppa för ett kontrollerat avslut.",
+      "purgeTitle": "Kör spolning?",
+      "purgeDesc": "Detta kör en spolningscykel. Se till att droppbrickan är på plats."
+    },
+    "sections": {
+      "temperatures": "Temperaturer",
+      "info": "Maskininformation",
+      "settings": "Maskininställningar",
+      "actions": "Åtgärder"
+    },
+    "labels": {
+      "brewHead": "Brygghuvud",
+      "boiler": "Panna",
+      "target": "Mål",
+      "profile": "Aktiv profil",
+      "shots": "Totalt antal bryggningar",
+      "voltage": "Spänning",
+      "sounds": "Ljud"
+    },
+    "lastShot": {
+      "title": "Bryggning gjord {{time}}",
+      "minutesAgo": "{{count}} min sedan",
+      "minutesAgo_one": "1 min sedan",
+      "hoursAgo": "{{count}} timmar sedan",
+      "hoursAgo_one": "1 timme sedan",
+      "analyze": "Analysera bryggning"
+    },
+    "shotDetected": {
+      "title": "En bryggning pågår!",
+      "watch": "Se live →"
+    },
+    "liveShot": {
+      "title": "Live-bryggning",
+      "stage": "Steg",
+      "goal": "Mål",
+      "limit": "Gräns",
+      "exit": "Avsluta",
+      "shotComplete": "Bryggning klar",
+      "totalTime": "Total tid",
+      "finalWeight": "Slutvikt",
+      "avgPressure": "Snittryck",
+      "avgFlow": "Snittflöde",
+      "analyzeShot": "Analysera denna bryggning",
+      "backHome": "Tillbaka till start",
+      "profileOverlay": "Profil",
+      "shotOverlay": "Jämför"
+    }
   }
 }

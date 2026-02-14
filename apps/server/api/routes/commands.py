@@ -7,9 +7,9 @@ server is the single gateway.
 
 import logging
 import os
-from typing import Optional
+import uuid
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from services.mqtt_service import get_mqtt_subscriber
@@ -47,7 +47,7 @@ def _publish_command(topic: str, payload: str = "") -> bool:
             payload=payload or None,
             hostname=mqtt_host,
             port=mqtt_port,
-            client_id="meticai-cmd",
+            client_id=f"meticai-cmd-{uuid.uuid4().hex[:8]}",
             qos=1,
         )
         return True
@@ -107,7 +107,7 @@ def _do_publish(action: str, payload: str = "") -> dict:
 
 
 class LoadProfileRequest(BaseModel):
-    name: str = Field(..., description="Profile name to load on the machine")
+    name: str = Field(..., min_length=1, description="Profile name to load on the machine")
 
 
 class BrightnessRequest(BaseModel):
@@ -124,7 +124,7 @@ class SoundsRequest(BaseModel):
 
 
 @router.post("/api/machine/command/start")
-async def command_start(request: Request):
+async def command_start():
     """Start a shot (load & execute the active profile)."""
     snapshot = _get_snapshot()
     _require_idle(snapshot)
@@ -132,7 +132,7 @@ async def command_start(request: Request):
 
 
 @router.post("/api/machine/command/stop")
-async def command_stop(request: Request):
+async def command_stop():
     """Stop the plunger immediately mid-shot."""
     snapshot = _get_snapshot()
     _require_brewing(snapshot)
@@ -140,7 +140,7 @@ async def command_stop(request: Request):
 
 
 @router.post("/api/machine/command/abort")
-async def command_abort(request: Request):
+async def command_abort():
     """Abort the current shot and retract the plunger."""
     snapshot = _get_snapshot()
     _require_brewing(snapshot)
@@ -148,13 +148,13 @@ async def command_abort(request: Request):
 
 
 @router.post("/api/machine/command/continue")
-async def command_continue(request: Request):
+async def command_continue():
     """Resume a paused shot."""
     return _do_publish("continue_shot")
 
 
 @router.post("/api/machine/command/preheat")
-async def command_preheat(request: Request):
+async def command_preheat():
     """Preheat the water in the chamber."""
     snapshot = _get_snapshot()
     _require_idle(snapshot)
@@ -162,7 +162,7 @@ async def command_preheat(request: Request):
 
 
 @router.post("/api/machine/command/tare")
-async def command_tare(request: Request):
+async def command_tare():
     """Zero the scale."""
     snapshot = _get_snapshot()
     _require_connected(snapshot)
@@ -170,7 +170,7 @@ async def command_tare(request: Request):
 
 
 @router.post("/api/machine/command/home-plunger")
-async def command_home_plunger(request: Request):
+async def command_home_plunger():
     """Reset plunger to home position."""
     snapshot = _get_snapshot()
     _require_idle(snapshot)
@@ -178,7 +178,7 @@ async def command_home_plunger(request: Request):
 
 
 @router.post("/api/machine/command/purge")
-async def command_purge(request: Request):
+async def command_purge():
     """Flush water through the group head."""
     snapshot = _get_snapshot()
     _require_idle(snapshot)
@@ -186,7 +186,7 @@ async def command_purge(request: Request):
 
 
 @router.post("/api/machine/command/load-profile")
-async def command_load_profile(request: Request, body: LoadProfileRequest):
+async def command_load_profile(body: LoadProfileRequest):
     """Switch the machine to a different profile."""
     snapshot = _get_snapshot()
     _require_connected(snapshot)
@@ -194,12 +194,16 @@ async def command_load_profile(request: Request, body: LoadProfileRequest):
 
 
 @router.post("/api/machine/command/brightness")
-async def command_brightness(request: Request, body: BrightnessRequest):
+async def command_brightness(body: BrightnessRequest):
     """Adjust the display brightness (0–100)."""
+    snapshot = _get_snapshot()
+    _require_connected(snapshot)
     return _do_publish("set_brightness", str(body.value))
 
 
 @router.post("/api/machine/command/sounds")
-async def command_sounds(request: Request, body: SoundsRequest):
+async def command_sounds(body: SoundsRequest):
     """Toggle machine sound effects."""
+    snapshot = _get_snapshot()
+    _require_connected(snapshot)
     return _do_publish("enable_sounds", str(body.enabled).lower())

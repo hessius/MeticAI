@@ -8,7 +8,6 @@ Route: ws://host:3550/api/ws/live
 """
 
 import asyncio
-import json
 import logging
 import os
 import time
@@ -31,7 +30,7 @@ async def live_telemetry(ws: WebSocket):
 
     Protocol (server → client):
       Each message is a JSON object with the full sensor snapshot,
-      plus a `_ts` field (Unix epoch float) for client-side staleness
+      plus a ``_ts`` field (Unix epoch float) for client-side staleness
       detection.
 
     The server rate-limits to ~10 FPS. If no new data arrives from MQTT
@@ -39,6 +38,7 @@ async def live_telemetry(ws: WebSocket):
     """
     await ws.accept()
 
+    # Fetch subscriber fresh each time — survives MQTT hot-reload/reset
     subscriber = get_mqtt_subscriber()
     ws_id = id(ws)
     subscriber.register_ws(ws_id)
@@ -50,6 +50,9 @@ async def live_telemetry(ws: WebSocket):
         last_sent: dict = {}
 
         while True:
+            # Re-fetch subscriber to survive hot-reloads (reset_mqtt_subscriber)
+            subscriber = get_mqtt_subscriber()
+
             # In TEST_MODE there's no MQTT data — just wait for the
             # client to close.  We use receive_text() which will raise
             # WebSocketDisconnect when the client closes the socket.
@@ -74,6 +77,8 @@ async def live_telemetry(ws: WebSocket):
                     break
                 continue
 
+            # Clear *before* reading snapshot so we don't miss signals that
+            # arrive between get_snapshot() and the next wait().
             subscriber.data_event.clear()
 
             # Rate-limit: sleep until at least FRAME_INTERVAL since last send
@@ -99,3 +104,7 @@ async def live_telemetry(ws: WebSocket):
         subscriber.unregister_ws(ws_id)
         logger.info("WebSocket client disconnected (id=%d, remaining=%d)",
                     ws_id, subscriber.ws_client_count)
+        try:
+            await ws.close()
+        except Exception:
+            pass  # Already closed by client or error

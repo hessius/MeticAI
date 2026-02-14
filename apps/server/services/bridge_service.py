@@ -1,10 +1,8 @@
 """Bridge service — monitors MQTT broker and meticulous-bridge health."""
-import asyncio
 import logging
 import os
 import subprocess
-import tempfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +95,25 @@ def restart_bridge_service() -> bool:
     if TEST_MODE:
         return True
     try:
+        logger.info("Restarting meticulous-bridge s6 service…")
         result = subprocess.run(
             ["s6-svc", "-r", "/run/service/meticulous-bridge"],
             capture_output=True,
             text=True,
             timeout=10,
         )
+        if result.returncode == 0:
+            logger.info("Bridge service restart initiated successfully")
+        else:
+            logger.warning(
+                "Bridge restart failed (rc=%d): %s",
+                result.returncode,
+                result.stderr.strip() or result.stdout.strip(),
+            )
         return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except subprocess.TimeoutExpired:
+        logger.error("Bridge restart timed out after 10 s")
+        return False
+    except FileNotFoundError:
+        logger.error("s6-svc not found — not running inside s6-overlay container")
         return False

@@ -79,6 +79,7 @@ class MQTTSubscriber:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._ws_lock = threading.Lock()
         self.snapshot: Dict[str, Any] = {}
         self._availability: Optional[str] = None
         self._health: Optional[dict] = None
@@ -134,11 +135,17 @@ class MQTTSubscriber:
         self._running = False
         if self._client is not None:
             try:
+                self._client.loop_stop(force=True)
+            except Exception:
+                pass
+            try:
                 self._client.disconnect()
             except Exception:
                 pass
         if self._thread is not None:
             self._thread.join(timeout=5)
+            if self._thread.is_alive():
+                logger.warning("MQTT subscriber thread did not exit within 5 s")
             self._thread = None
         logger.info("MQTT subscriber stopped")
 
@@ -211,13 +218,16 @@ class MQTTSubscriber:
 
     @property
     def ws_client_count(self) -> int:
-        return len(self._connected_ws)
+        with self._ws_lock:
+            return len(self._connected_ws)
 
     def register_ws(self, ws_id: int) -> None:
-        self._connected_ws.add(ws_id)
+        with self._ws_lock:
+            self._connected_ws.add(ws_id)
 
     def unregister_ws(self, ws_id: int) -> None:
-        self._connected_ws.discard(ws_id)
+        with self._ws_lock:
+            self._connected_ws.discard(ws_id)
 
 
 # ---------------------------------------------------------------------------
@@ -225,19 +235,23 @@ class MQTTSubscriber:
 # ---------------------------------------------------------------------------
 
 _subscriber: Optional[MQTTSubscriber] = None
+_subscriber_lock = threading.Lock()
 
 
 def get_mqtt_subscriber() -> MQTTSubscriber:
-    """Return the global MQTTSubscriber (lazy-created)."""
+    """Return the global MQTTSubscriber (lazy-created, thread-safe)."""
     global _subscriber
     if _subscriber is None:
-        _subscriber = MQTTSubscriber()
+        with _subscriber_lock:
+            if _subscriber is None:
+                _subscriber = MQTTSubscriber()
     return _subscriber
 
 
 def reset_mqtt_subscriber() -> None:
     """Stop and discard the current subscriber (for hot-reload)."""
     global _subscriber
-    if _subscriber is not None:
-        _subscriber.stop()
-        _subscriber = None
+    with _subscriber_lock:
+        if _subscriber is not None:
+            _subscriber.stop()
+            _subscriber = None

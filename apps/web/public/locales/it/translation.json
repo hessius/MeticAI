@@ -376,5 +376,103 @@
     "updateAvailable": "Aggiornamento disponibile",
     "newVersionReady": "Una nuova versione di MeticAI è pronta per l'installazione",
     "updateNow": "Aggiorna ora"
+  },
+  "controlCenter": {
+    "offline": "La macchina è offline",
+    "stale": "Obsoleto",
+    "noProfile": "Nessun profilo caricato",
+    "totalShots": "{{count}} estrazioni",
+    "showAll": "Mostra tutto",
+    "collapse": "Comprimi",
+    "states": {
+      "idle": "In attesa",
+      "brewing": "Estrazione in corso",
+      "heating": "Riscaldamento",
+      "preheating": "Preriscaldamento",
+      "steaming": "Vapore",
+      "descaling": "Decalcificazione",
+      "unknown": "Sconosciuto"
+    },
+    "metrics": {
+      "time": "Tempo (s)",
+      "weight": "Peso (g)",
+      "pressure": "Pressione (bar)",
+      "flow": "Flusso (ml/s)"
+    },
+    "actions": {
+      "start": "Avvia",
+      "stop": "Ferma",
+      "abort": "Interrompi",
+      "continue": "Continua",
+      "preheat": "Preriscalda",
+      "tare": "Tara",
+      "home": "Posizione iniziale",
+      "purge": "Spurgo",
+      "live": "Live"
+    },
+    "toasts": {
+      "startingShot": "Avvio estrazione…",
+      "stopping": "Arresto estrazione…",
+      "aborting": "Interruzione estrazione…",
+      "continuing": "Ripresa estrazione…",
+      "preheating": "Preriscaldamento…",
+      "tared": "Bilancia tarata",
+      "homed": "Pistone in rientro…",
+      "purging": "Spurgo in corso…",
+      "soundsOn": "Suoni attivati",
+      "soundsOff": "Suoni disattivati",
+      "error": "Comando fallito"
+    },
+    "confirm": {
+      "stopTitle": "Fermare l'estrazione?",
+      "stopDesc": "Questo fermerà l'estrazione in corso in modo controllato.",
+      "abortTitle": "Interrompere l'estrazione?",
+      "abortDesc": "Questo interromperà immediatamente l'estrazione. Usa Ferma per una conclusione controllata.",
+      "purgeTitle": "Avviare lo spurgo?",
+      "purgeDesc": "Questo avvierà un ciclo di spurgo. Assicurati che il vassoio raccogli-gocce sia posizionato."
+    },
+    "sections": {
+      "temperatures": "Temperature",
+      "info": "Info macchina",
+      "settings": "Impostazioni macchina",
+      "actions": "Azioni"
+    },
+    "labels": {
+      "brewHead": "Gruppo erogatore",
+      "boiler": "Caldaia",
+      "target": "Obiettivo",
+      "profile": "Profilo attivo",
+      "shots": "Estrazioni totali",
+      "voltage": "Voltaggio",
+      "sounds": "Suoni"
+    },
+    "lastShot": {
+      "title": "Estrazione {{time}} fa",
+      "minutesAgo": "{{count}} min fa",
+      "minutesAgo_one": "1 min fa",
+      "hoursAgo": "{{count}} ore fa",
+      "hoursAgo_one": "1 ora fa",
+      "analyze": "Analizza estrazione"
+    },
+    "shotDetected": {
+      "title": "Un'estrazione è in corso!",
+      "watch": "Guarda in diretta →"
+    },
+    "liveShot": {
+      "title": "Estrazione live",
+      "stage": "Fase",
+      "goal": "Obiettivo",
+      "limit": "Limite",
+      "exit": "Esci",
+      "shotComplete": "Estrazione completata",
+      "totalTime": "Tempo totale",
+      "finalWeight": "Peso finale",
+      "avgPressure": "Pressione media",
+      "avgFlow": "Flusso medio",
+      "analyzeShot": "Analizza questa estrazione",
+      "backHome": "Torna alla home",
+      "profileOverlay": "Profilo",
+      "shotOverlay": "Confronta"
+    }
   }
 }
