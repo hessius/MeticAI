@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -48,6 +48,7 @@ interface StartViewProps {
   onViewHistory: () => void
   onRunShot: () => void
   onSettings: () => void
+  lastShotBanner?: React.ReactNode
 }
 
 export function StartView({
@@ -55,7 +56,8 @@ export function StartView({
   onGenerateNew,
   onViewHistory,
   onRunShot,
-  onSettings
+  onSettings,
+  lastShotBanner,
 }: StartViewProps) {
   const { t } = useTranslation()
   const [firstName, setFirstName] = useState<string | undefined>(undefined)
@@ -104,6 +106,11 @@ export function StartView({
               : t('profileGeneration.getStarted')}
           </p>
         </div>
+
+        {/* Last-shot analysis prompt */}
+        <AnimatePresence>
+          {lastShotBanner}
+        </AnimatePresence>
 
         <div className="space-y-3">
           {/* Dark Brew — deep brown, gold text */}
