@@ -23,6 +23,70 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.get("/api/last-shot")
+async def get_last_shot(request: Request):
+    """Return metadata for the most recent shot without loading full telemetry.
+
+    This powers the "Analyze your last shot?" banner on the home screen.
+    Returns 404 if no shots exist.
+    """
+    request_id = request.state.request_id
+    try:
+        dates_result = await async_get_history_dates()
+        if hasattr(dates_result, "error") and dates_result.error:
+            raise HTTPException(status_code=502, detail=f"Machine API error: {dates_result.error}")
+
+        dates = sorted([d.name for d in dates_result], reverse=True) if dates_result else []
+        if not dates:
+            raise HTTPException(status_code=404, detail="No shots found")
+
+        # Walk dates newest-first until we find a file
+        for date in dates:
+            files_result = await async_get_shot_files(date)
+            if hasattr(files_result, "error") and files_result.error:
+                continue
+            files = sorted([f.name for f in files_result], reverse=True) if files_result else []
+            if not files:
+                continue
+
+            filename = files[0]
+            shot_data = await fetch_shot_data(date, filename)
+
+            profile_name = shot_data.get("profile_name", "")
+            if not profile_name and isinstance(shot_data.get("profile"), dict):
+                profile_name = shot_data["profile"].get("name", "")
+
+            data_entries = shot_data.get("data", [])
+            final_weight = None
+            total_time_ms = None
+            if data_entries:
+                last_entry = data_entries[-1]
+                if isinstance(last_entry.get("shot"), dict):
+                    final_weight = last_entry["shot"].get("weight")
+                total_time_ms = last_entry.get("time")
+
+            return {
+                "profile_name": profile_name,
+                "date": date,
+                "filename": filename,
+                "timestamp": shot_data.get("time"),
+                "final_weight": final_weight,
+                "total_time": total_time_ms / 1000 if total_time_ms else None,
+            }
+
+        raise HTTPException(status_code=404, detail="No shots found")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get last shot: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def _prepare_profile_for_llm(profile_data: dict, description: str | None) -> dict:
     """Prepare profile data for LLM, removing image and limiting description."""
     # Build clean profile without image
