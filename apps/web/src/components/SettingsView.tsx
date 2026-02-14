@@ -433,7 +433,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 </h4>
                 <div className="space-y-1.5">
                   <a
-                    href="https://github.com/nicpottier/pyMeticulous"
+                    href="https://github.com/MeticulousHome/pyMeticulous"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
@@ -442,7 +442,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                     <span><strong>pyMeticulous</strong> — {t('settings.credits.pyMeticulous')}</span>
                   </a>
                   <a
-                    href="https://github.com/manonstreet/meticulous-mcp"
+                    href="https://github.com/twchad/meticulous-mcp"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
@@ -954,8 +954,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         <p>{t('settings.footer')}</p>
         <p>
           {t('settings.runsOn')}{' '}
-          <a href="https://github.com/nicpottier/pyMeticulous" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">pyMeticulous</a>,{' '}
-          <a href="https://github.com/manonstreet/meticulous-mcp" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">meticulous-mcp</a>,{' '}
+          <a href="https://github.com/MeticulousHome/pyMeticulous" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">pyMeticulous</a>,{' '}
+          <a href="https://github.com/twchad/meticulous-mcp" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">meticulous-mcp</a>,{' '}
           <a href="https://github.com/nickwilsonr/meticulous-addon" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">meticulous-addon</a>,{' '}
           {t('settings.andCaffeine')}
         </p>
