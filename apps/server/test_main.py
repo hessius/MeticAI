@@ -8603,3 +8603,193 @@ class TestMeticulousServiceCoverage:
         # Function should exist
         assert callable(get_meticulous_api)
 
+
+# ---------------------------------------------------------------------------
+# Bridge / MQTT Control Center
+# ---------------------------------------------------------------------------
+
+class TestBridgeStatusEndpoint:
+    """Tests for GET /api/bridge/status."""
+
+    def test_bridge_status_returns_structure(self, client):
+        """Test that bridge status returns the expected JSON structure."""
+        response = client.get("/api/bridge/status")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Top-level keys
+        assert "mqtt_enabled" in data
+        assert "mosquitto" in data
+        assert "bridge" in data
+
+        # Mosquitto sub-keys
+        assert "service" in data["mosquitto"]
+        assert "port_open" in data["mosquitto"]
+        assert "host" in data["mosquitto"]
+        assert "port" in data["mosquitto"]
+
+        # Bridge sub-keys
+        assert "service" in data["bridge"]
+
+    def test_bridge_status_test_mode_values(self, client):
+        """In TEST_MODE the services report safe defaults."""
+        response = client.get("/api/bridge/status")
+        data = response.json()
+
+        # TEST_MODE → s6 checks return 'unknown', port check returns False
+        assert data["mosquitto"]["service"] == "unknown"
+        assert data["mosquitto"]["port_open"] is False
+        assert data["bridge"]["service"] == "unknown"
+
+    def test_bridge_status_default_host_port(self, client):
+        """Default host/port should be 127.0.0.1:1883."""
+        response = client.get("/api/bridge/status")
+        data = response.json()
+        assert data["mosquitto"]["host"] == "127.0.0.1"
+        assert data["mosquitto"]["port"] == 1883
+
+    @patch.dict(os.environ, {"MQTT_ENABLED": "false"})
+    def test_bridge_status_mqtt_disabled(self, client):
+        """When MQTT_ENABLED=false the flag is reflected."""
+        response = client.get("/api/bridge/status")
+        data = response.json()
+        assert data["mqtt_enabled"] is False
+
+    @patch.dict(os.environ, {"MQTT_HOST": "10.0.0.5", "MQTT_PORT": "1884"})
+    def test_bridge_status_custom_host_port(self, client):
+        """Custom MQTT host/port from env vars are returned."""
+        response = client.get("/api/bridge/status")
+        data = response.json()
+        assert data["mosquitto"]["host"] == "10.0.0.5"
+        assert data["mosquitto"]["port"] == 1884
+
+
+class TestBridgeRestartEndpoint:
+    """Tests for POST /api/bridge/restart."""
+
+    def test_bridge_restart_success(self, client):
+        """Restart endpoint returns success in TEST_MODE."""
+        response = client.post("/api/bridge/restart")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "restarting"
+
+    @patch('api.routes.bridge.restart_bridge_service', return_value=False)
+    def test_bridge_restart_failure(self, mock_restart, client):
+        """When the restart command fails a 500 is returned."""
+        response = client.post("/api/bridge/restart")
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+
+
+class TestBridgeServiceFunctions:
+    """Unit tests for bridge_service helper functions."""
+
+    def test_is_process_running_test_mode(self):
+        """_is_process_running returns False in TEST_MODE."""
+        from services.bridge_service import _is_process_running
+        assert _is_process_running("mosquitto") is False
+
+    def test_check_s6_service_test_mode(self):
+        """_check_s6_service returns 'unknown' in TEST_MODE."""
+        from services.bridge_service import _check_s6_service
+        assert _check_s6_service("mosquitto") == "unknown"
+        assert _check_s6_service("meticulous-bridge") == "unknown"
+
+    def test_check_mqtt_port_test_mode(self):
+        """_check_mqtt_port returns False in TEST_MODE."""
+        from services.bridge_service import _check_mqtt_port
+        assert _check_mqtt_port() is False
+
+    def test_get_bridge_status_returns_dict(self):
+        """get_bridge_status returns a dict with expected keys."""
+        from services.bridge_service import get_bridge_status
+        status = get_bridge_status()
+        assert isinstance(status, dict)
+        assert "mqtt_enabled" in status
+        assert "mosquitto" in status
+        assert "bridge" in status
+
+    def test_restart_bridge_service_test_mode(self):
+        """restart_bridge_service returns True in TEST_MODE."""
+        from services.bridge_service import restart_bridge_service
+        assert restart_bridge_service() is True
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run')
+    def test_is_process_running_found(self, mock_run):
+        """_is_process_running returns True when pgrep finds the process."""
+        mock_run.return_value = MagicMock(returncode=0)
+        from services.bridge_service import _is_process_running
+        assert _is_process_running("mosquitto") is True
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run')
+    def test_is_process_running_not_found(self, mock_run):
+        """_is_process_running returns False when pgrep finds nothing."""
+        mock_run.return_value = MagicMock(returncode=1)
+        from services.bridge_service import _is_process_running
+        assert _is_process_running("mosquitto") is False
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run', side_effect=FileNotFoundError)
+    def test_is_process_running_no_pgrep(self, mock_run):
+        """_is_process_running returns False when pgrep binary is missing."""
+        from services.bridge_service import _is_process_running
+        assert _is_process_running("mosquitto") is False
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run')
+    def test_check_s6_service_running(self, mock_run):
+        """_check_s6_service returns 'running' when s6-svstat says up."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="up (pid 123) 45 seconds")
+        from services.bridge_service import _check_s6_service
+        assert _check_s6_service("mosquitto") == "running"
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run')
+    def test_check_s6_service_down(self, mock_run):
+        """_check_s6_service returns 'down' when s6-svstat says down."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="down (signal SIGTERM) 2 seconds")
+        from services.bridge_service import _check_s6_service
+        assert _check_s6_service("mosquitto") == "down"
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run')
+    def test_check_s6_service_unknown_output(self, mock_run):
+        """_check_s6_service returns 'unknown' for unexpected output."""
+        mock_run.return_value = MagicMock(returncode=1, stdout="")
+        from services.bridge_service import _check_s6_service
+        assert _check_s6_service("mosquitto") == "unknown"
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run', side_effect=subprocess.TimeoutExpired("s6-svstat", 5))
+    def test_check_s6_service_timeout(self, mock_run):
+        """_check_s6_service returns 'unknown' on timeout."""
+        from services.bridge_service import _check_s6_service
+        assert _check_s6_service("mosquitto") == "unknown"
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run')
+    def test_restart_bridge_service_success(self, mock_run):
+        """restart_bridge_service returns True on success."""
+        mock_run.return_value = MagicMock(returncode=0)
+        from services.bridge_service import restart_bridge_service
+        assert restart_bridge_service() is True
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run')
+    def test_restart_bridge_service_failure(self, mock_run):
+        """restart_bridge_service returns False on command failure."""
+        mock_run.return_value = MagicMock(returncode=1)
+        from services.bridge_service import restart_bridge_service
+        assert restart_bridge_service() is False
+
+    @patch('services.bridge_service.TEST_MODE', False)
+    @patch('subprocess.run', side_effect=subprocess.TimeoutExpired("s6-svc", 10))
+    def test_restart_bridge_service_timeout(self, mock_run):
+        """restart_bridge_service returns False on timeout."""
+        from services.bridge_service import restart_bridge_service
+        assert restart_bridge_service() is False
+
