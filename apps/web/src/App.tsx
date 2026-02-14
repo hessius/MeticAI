@@ -31,6 +31,14 @@ import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon } from '@phosphor-icons/react'
 
+// Phase 3 — Control Center & live telemetry
+import { useWebSocket } from '@/hooks/useWebSocket'
+import { useLastShot } from '@/hooks/useLastShot'
+import { ControlCenter } from '@/components/ControlCenter'
+import { LastShotBanner } from '@/components/LastShotBanner'
+import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
+import { LiveShotView } from '@/components/LiveShotView'
+
 function App() {
   const [isInitializing, setIsInitializing] = useState(true)
   const [viewState, setViewState] = useState<ViewState>('start')
@@ -62,6 +70,38 @@ function App() {
 
   // Background blobs preference (localStorage)
   const { showBlobs, toggleBlobs } = useBackgroundBlobs()
+
+  // Phase 3 — MQTT / WebSocket telemetry
+  const [mqttEnabled, setMqttEnabled] = useState(false)
+  const machineState = useWebSocket(mqttEnabled)
+  const lastShotHook = useLastShot(mqttEnabled)
+  const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
+  const prevBrewingRef = useRef(false)
+
+  // Fetch mqttEnabled from settings on mount
+  useEffect(() => {
+    const fetchMqttSetting = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const res = await fetch(`${serverUrl}/api/settings`)
+        if (res.ok) {
+          const data = await res.json()
+          setMqttEnabled(data.mqttEnabled !== false)
+        }
+      } catch {
+        // default false if unreachable
+      }
+    }
+    fetchMqttSetting()
+  }, [])
+
+  // Reset shot banner dismissed state when brewing ends
+  useEffect(() => {
+    if (prevBrewingRef.current && !machineState.brewing) {
+      setShotBannerDismissed(false)
+    }
+    prevBrewingRef.current = machineState.brewing
+  }, [machineState.brewing])
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
@@ -355,6 +395,7 @@ function App() {
         break
       case 'history':
       case 'settings':
+      case 'live-shot':
         handleBackToStart()
         break
       // Don't navigate on start, loading, or error views - but still block browser gesture
@@ -530,9 +571,26 @@ Special Notes: For maximum clarity and to really make those delicate floral note
 
   const canSubmit = !!(imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0)
 
+  // Phase 3 layout helpers
+  const showControlCenter = mqttEnabled && machineState._wsConnected
+  const showRightColumn = showControlCenter && ['start', 'run-shot', 'live-shot'].includes(viewState)
+  const showShotBanner =
+    mqttEnabled &&
+    machineState.brewing &&
+    viewState !== 'live-shot' &&
+    !shotBannerDismissed
+
   return (
     <>
       {showBlobs && <AmbientBackground />}
+
+      {/* Shot detection banner — fixed at top, across all views */}
+      <ShotDetectionBanner
+        visible={showShotBanner}
+        onWatch={() => setViewState('live-shot')}
+        onDismiss={() => setShotBannerDismissed(true)}
+      />
+
       <div className={`min-h-screen text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-center py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md lg:max-w-5xl relative">
@@ -581,133 +639,186 @@ Special Notes: For maximum clarity and to really make those delicate floral note
 
         </motion.div>
 
-        <AnimatePresence mode="wait">
-          {isInitializing && (
-            <motion.div
-              key="initializing"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <Card className="p-6">
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
-                </div>
-              </Card>
-            </motion.div>
-          )}
-          
-          {!isInitializing && viewState === 'start' && (
-            <StartView
-              profileCount={profileCount}
-              onGenerateNew={() => setViewState('form')}
-              onViewHistory={() => setViewState('history')}
-              onRunShot={() => {
-                setRunShotProfileId(undefined)
-                setRunShotProfileName(undefined)
-                setViewState('run-shot')
-              }}
-              onSettings={() => setViewState('settings')}
-            />
-          )}
+        {/* Two-column grid wrapper (desktop, specific views only) */}
+        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)] lg:gap-6' : ''}>
+          {/* ── Main content column ─────────────────────── */}
+          <div>
+            {/* Mobile Control Center — above the main card, StartView only */}
+            {showControlCenter && isMobile && viewState === 'start' && (
+              <div className="mb-4">
+                <ControlCenter
+                  machineState={machineState}
+                  onOpenLiveView={() => setViewState('live-shot')}
+                  compact
+                />
+              </div>
+            )}
 
-          {!isInitializing && viewState === 'form' && (
-            <FormView
-              imagePreview={imagePreview}
-              userPrefs={userPrefs}
-              selectedTags={selectedTags}
-              advancedOptions={advancedOptions}
-              errorMessage={errorMessage}
-              canSubmit={canSubmit}
-              profileCount={profileCount}
-              fileInputRef={fileInputRef}
-              onFileSelect={handleFileSelect}
-              onRemoveImage={handleRemoveImage}
-              onUserPrefsChange={setUserPrefs}
-              onToggleTag={toggleTag}
-              onAdvancedOptionsChange={setAdvancedOptions}
-              onSubmit={handleSubmit}
-              onBack={handleBackToStart}
-              onViewHistory={() => setViewState('history')}
-            />
-          )}
+            <AnimatePresence mode="wait">
+              {isInitializing && (
+                <motion.div
+                  key="initializing"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Card className="p-6">
+                    <div className="flex items-center justify-center h-32">
+                      <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
+              
+              {!isInitializing && viewState === 'start' && (
+                <StartView
+                  profileCount={profileCount}
+                  onGenerateNew={() => setViewState('form')}
+                  onViewHistory={() => setViewState('history')}
+                  onRunShot={() => {
+                    setRunShotProfileId(undefined)
+                    setRunShotProfileName(undefined)
+                    setViewState('run-shot')
+                  }}
+                  onSettings={() => setViewState('settings')}
+                  lastShotBanner={
+                    mqttEnabled ? (
+                      <LastShotBanner
+                        lastShot={lastShotHook}
+                        onAnalyze={(date, filename) => {
+                          // Navigate to shot history for analysis
+                          // TODO: wire to specific shot detail once LiveShotView is built
+                          setViewState('history')
+                          void date; void filename
+                        }}
+                      />
+                    ) : undefined
+                  }
+                />
+              )}
 
-          {viewState === 'history' && (
-            <HistoryView
-              onBack={handleBackToStart}
-              onViewProfile={handleViewHistoryEntry}
-              onGenerateNew={() => setViewState('form')}
-            />
-          )}
+              {!isInitializing && viewState === 'form' && (
+                <FormView
+                  imagePreview={imagePreview}
+                  userPrefs={userPrefs}
+                  selectedTags={selectedTags}
+                  advancedOptions={advancedOptions}
+                  errorMessage={errorMessage}
+                  canSubmit={canSubmit}
+                  profileCount={profileCount}
+                  fileInputRef={fileInputRef}
+                  onFileSelect={handleFileSelect}
+                  onRemoveImage={handleRemoveImage}
+                  onUserPrefsChange={setUserPrefs}
+                  onToggleTag={toggleTag}
+                  onAdvancedOptionsChange={setAdvancedOptions}
+                  onSubmit={handleSubmit}
+                  onBack={handleBackToStart}
+                  onViewHistory={() => setViewState('history')}
+                />
+              )}
 
-          {viewState === 'history-detail' && selectedHistoryEntry && (
-            <ProfileDetailView
-              entry={selectedHistoryEntry}
-              onBack={() => setViewState('history')}
-              cachedImageUrl={selectedHistoryImageUrl}
-              onRunProfile={(profileId, profileName) => {
-                setRunShotProfileId(profileId)
-                setRunShotProfileName(profileName)
-                setViewState('run-shot')
-              }}
-            />
-          )}
+              {viewState === 'history' && (
+                <HistoryView
+                  onBack={handleBackToStart}
+                  onViewProfile={handleViewHistoryEntry}
+                  onGenerateNew={() => setViewState('form')}
+                />
+              )}
 
-          {viewState === 'settings' && (
-            <SettingsView
-              onBack={handleBackToStart}
-              showBlobs={showBlobs}
-              onToggleBlobs={toggleBlobs}
-              isDark={isDark}
-              isFollowSystem={isFollowSystem}
-              onToggleTheme={toggleTheme}
-              onSetFollowSystem={setFollowSystem}
-            />
-          )}
+              {viewState === 'history-detail' && selectedHistoryEntry && (
+                <ProfileDetailView
+                  entry={selectedHistoryEntry}
+                  onBack={() => setViewState('history')}
+                  cachedImageUrl={selectedHistoryImageUrl}
+                  onRunProfile={(profileId, profileName) => {
+                    setRunShotProfileId(profileId)
+                    setRunShotProfileName(profileName)
+                    setViewState('run-shot')
+                  }}
+                />
+              )}
 
-          {viewState === 'run-shot' && (
-            <RunShotView
-              onBack={handleBackToStart}
-              initialProfileId={runShotProfileId}
-              initialProfileName={runShotProfileName}
-            />
-          )}
+              {viewState === 'settings' && (
+                <SettingsView
+                  onBack={handleBackToStart}
+                  showBlobs={showBlobs}
+                  onToggleBlobs={toggleBlobs}
+                  isDark={isDark}
+                  isFollowSystem={isFollowSystem}
+                  onToggleTheme={toggleTheme}
+                  onSetFollowSystem={setFollowSystem}
+                />
+              )}
 
-          {viewState === 'loading' && (
-            <LoadingView currentMessage={currentMessage} />
-          )}
+              {viewState === 'run-shot' && (
+                <RunShotView
+                  onBack={handleBackToStart}
+                  initialProfileId={runShotProfileId}
+                  initialProfileName={runShotProfileName}
+                />
+              )}
 
-          {viewState === 'results' && apiResponse && (
-            <ResultsView
-              apiResponse={apiResponse}
-              currentProfileJson={currentProfileJson}
-              createdProfileId={createdProfileId}
-              isCapturing={isCapturing}
-              resultsCardRef={resultsCardRef}
-              onBack={handleReset}
-              onSaveResults={handleSaveResults}
-              onDownloadJson={handleDownloadJson}
-              onViewHistory={() => setViewState('history')}
-              onRunProfile={() => {
-                if (createdProfileId && currentProfileJson?.name) {
-                  setRunShotProfileId(createdProfileId)
-                  setRunShotProfileName(currentProfileJson.name as string)
-                  setViewState('run-shot')
-                }
-              }}
-            />
-          )}
+              {viewState === 'live-shot' && (
+                <LiveShotView
+                  machineState={machineState}
+                  onBack={handleBackToStart}
+                  onAnalyze={() => {
+                    // Navigate to shot history for analysis
+                    setViewState('history')
+                  }}
+                />
+              )}
+
+              {viewState === 'loading' && (
+                <LoadingView currentMessage={currentMessage} />
+              )}
+
+              {viewState === 'results' && apiResponse && (
+                <ResultsView
+                  apiResponse={apiResponse}
+                  currentProfileJson={currentProfileJson}
+                  createdProfileId={createdProfileId}
+                  isCapturing={isCapturing}
+                  resultsCardRef={resultsCardRef}
+                  onBack={handleReset}
+                  onSaveResults={handleSaveResults}
+                  onDownloadJson={handleDownloadJson}
+                  onViewHistory={() => setViewState('history')}
+                  onRunProfile={() => {
+                    if (createdProfileId && currentProfileJson?.name) {
+                      setRunShotProfileId(createdProfileId)
+                      setRunShotProfileName(currentProfileJson.name as string)
+                      setViewState('run-shot')
+                    }
+                  }}
+                />
+              )}
 
 
-          {viewState === 'error' && (
-            <ErrorView
-              errorMessage={errorMessage}
-              onRetry={handleSubmit}
-              onBack={handleReset}
-            />
+              {viewState === 'error' && (
+                <ErrorView
+                  errorMessage={errorMessage}
+                  onRetry={handleSubmit}
+                  onBack={handleReset}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ── Right column — desktop Control Center ─── */}
+          {showRightColumn && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-4">
+                <ControlCenter
+                  machineState={machineState}
+                  onOpenLiveView={() => setViewState('live-shot')}
+                />
+              </div>
+            </aside>
           )}
-        </AnimatePresence>
+        </div>
         
         <QRCodeDialog open={qrDialogOpen} onOpenChange={setQrDialogOpen} />
       </div>

@@ -376,5 +376,103 @@
     "updateAvailable": "Update Available",
     "newVersionReady": "A new version of MeticAI is ready to install",
     "updateNow": "Update Now"
+  },
+  "controlCenter": {
+    "offline": "Machine is offline",
+    "stale": "Stale",
+    "noProfile": "No profile loaded",
+    "totalShots": "{{count}} shots",
+    "showAll": "Show all",
+    "collapse": "Collapse",
+    "states": {
+      "idle": "Idle",
+      "brewing": "Brewing",
+      "heating": "Heating",
+      "preheating": "Pre-heating",
+      "steaming": "Steaming",
+      "descaling": "Descaling",
+      "unknown": "Unknown"
+    },
+    "metrics": {
+      "time": "Time (s)",
+      "weight": "Weight (g)",
+      "pressure": "Pressure (bar)",
+      "flow": "Flow (ml/s)"
+    },
+    "actions": {
+      "start": "Start",
+      "stop": "Stop",
+      "abort": "Abort",
+      "continue": "Continue",
+      "preheat": "Preheat",
+      "tare": "Tare",
+      "home": "Home",
+      "purge": "Purge",
+      "live": "Live"
+    },
+    "toasts": {
+      "startingShot": "Starting shot...",
+      "stopping": "Stopping shot...",
+      "aborting": "Aborting shot...",
+      "continuing": "Continuing shot...",
+      "preheating": "Pre-heating...",
+      "tared": "Scale tared",
+      "homed": "Plunger homing...",
+      "purging": "Purging...",
+      "soundsOn": "Sounds enabled",
+      "soundsOff": "Sounds disabled",
+      "error": "Command failed"
+    },
+    "confirm": {
+      "stopTitle": "Stop Shot?",
+      "stopDesc": "This will gracefully stop the current shot.",
+      "abortTitle": "Abort Shot?",
+      "abortDesc": "This will immediately abort the current shot. Use Stop for a graceful finish.",
+      "purgeTitle": "Run Purge?",
+      "purgeDesc": "This will run a purge cycle. Make sure there's a drip tray in place."
+    },
+    "sections": {
+      "temperatures": "Temperatures",
+      "info": "Machine Info",
+      "settings": "Machine Settings",
+      "actions": "Actions"
+    },
+    "labels": {
+      "brewHead": "Brew Head",
+      "boiler": "Boiler",
+      "target": "Target",
+      "profile": "Active Profile",
+      "shots": "Total Shots",
+      "voltage": "Voltage",
+      "sounds": "Sounds"
+    },
+    "lastShot": {
+      "title": "Shot pulled {{time}}",
+      "minutesAgo": "{{count}} min ago",
+      "minutesAgo_one": "1 min ago",
+      "hoursAgo": "{{count}} hours ago",
+      "hoursAgo_one": "1 hour ago",
+      "analyze": "Analyze Shot"
+    },
+    "shotDetected": {
+      "title": "A shot is running!",
+      "watch": "Watch Live →"
+    },
+    "liveShot": {
+      "title": "Live Shot",
+      "stage": "Stage",
+      "goal": "Goal",
+      "limit": "Limit",
+      "exit": "Exit",
+      "shotComplete": "Shot Complete",
+      "totalTime": "Total Time",
+      "finalWeight": "Final Weight",
+      "avgPressure": "Avg Pressure",
+      "avgFlow": "Avg Flow",
+      "analyzeShot": "Analyze This Shot",
+      "backHome": "Back to Home",
+      "profileOverlay": "Profile",
+      "shotOverlay": "Compare"
+    }
   }
 }
