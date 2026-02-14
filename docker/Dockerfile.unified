@@ -74,6 +74,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     git \
     mosquitto \
+    mosquitto-clients \
     && rm -rf /var/lib/apt/lists/*
 
 # Install s6-overlay for process management

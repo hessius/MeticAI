@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 import logging
 
 from services.bridge_service import get_bridge_status, restart_bridge_service
+from services.mqtt_service import get_mqtt_subscriber
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -15,8 +16,25 @@ async def bridge_status():
     Returns the health of the mosquitto MQTT broker and the
     meticulous-bridge service that relays real-time machine
     telemetry via Socket.IO → MQTT.
+
+    The ``mqtt_snapshot`` section shows the latest sensor values
+    received by the FastAPI MQTT subscriber — useful for verifying
+    that the full pipeline (machine → bridge → mosquitto → server)
+    is working end-to-end.
     """
     status = get_bridge_status()
+
+    # Attach MQTT subscriber diagnostics
+    sub = get_mqtt_subscriber()
+    snapshot = sub.get_snapshot()
+    status["mqtt_subscriber"] = {
+        "connected": bool(snapshot),
+        "ws_clients": sub.ws_client_count,
+        "sensor_count": len(snapshot),
+        "availability": snapshot.get("availability"),
+        "state": snapshot.get("state"),
+    }
+
     return status
 
 

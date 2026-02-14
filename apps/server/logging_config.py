@@ -100,9 +100,10 @@ def setup_logging(
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
     
-    # Get root logger
+    # Get the named logger (used by main.py directly)
     logger = logging.getLogger("meticai-server")
     logger.setLevel(getattr(logging, log_level.upper()))
+    logger.propagate = False  # Don't double-log to root
     
     # Clear any existing handlers
     logger.handlers = []
@@ -112,6 +113,20 @@ def setup_logging(
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(HumanReadableFormatter())
     logger.addHandler(console_handler)
+    
+    # Also configure the root logger so that child loggers (services.*,
+    # api.routes.*) created via logging.getLogger(__name__) inherit the
+    # same handlers.  Without this, logs from mqtt_service, websocket,
+    # bridge_service, etc. are silently dropped.
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, log_level.upper()))
+    # Avoid duplicate handlers if setup_logging is called more than once
+    if not any(isinstance(h, logging.StreamHandler) and h.stream is sys.stdout
+               for h in root.handlers):
+        root_console = logging.StreamHandler(sys.stdout)
+        root_console.setLevel(logging.INFO)
+        root_console.setFormatter(HumanReadableFormatter())
+        root.addHandler(root_console)
     
     # All logs file (JSON format) - rotating
     all_logs_file = log_path / "meticai-server.log"
@@ -124,6 +139,7 @@ def setup_logging(
     all_logs_handler.setLevel(logging.DEBUG)
     all_logs_handler.setFormatter(JSONFormatter())
     logger.addHandler(all_logs_handler)
+    root.addHandler(all_logs_handler)
     
     # Error logs file (JSON format) - rotating, errors only
     error_logs_file = log_path / "meticai-server-errors.log"
@@ -136,6 +152,12 @@ def setup_logging(
     error_logs_handler.setLevel(logging.ERROR)
     error_logs_handler.setFormatter(JSONFormatter())
     logger.addHandler(error_logs_handler)
+    root.addHandler(error_logs_handler)
+    
+    # Suppress noisy third-party loggers
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
     
     logger.info(
         "Logging system initialized",
