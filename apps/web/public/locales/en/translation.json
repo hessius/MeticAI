@@ -215,8 +215,8 @@
     "homeAssistantDescription": "Connect Home Assistant to MeticAI's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
     "poweredBy": "Powered by",
     "credits": {
-      "pyMeticulous": "Python client for the Meticulous API by @nicpottier",
-      "meticulousMcp": "MCP server for profile management by @manonstreet",
+      "pyMeticulous": "Official Python client for the Meticulous API",
+      "meticulousMcp": "MCP server for profile management by @twchad",
       "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
     },
     "runsOn": "Runs on",

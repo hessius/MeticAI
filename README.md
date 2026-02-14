@@ -362,15 +362,15 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - [Meticulous](https://meticulous.coffee/) for creating an amazing machine
 - [Google Gemini](https://ai.google.dev/) for AI capabilities
-- [pyMeticulous](https://github.com/nicpottier/pyMeticulous) by @nicpottier — Python client for the Meticulous API
-- [meticulous-mcp](https://github.com/manonstreet/meticulous-mcp) by @manonstreet — MCP server for machine profile management
+- [pyMeticulous](https://github.com/MeticulousHome/pyMeticulous) by Meticulous — official Python client for the Meticulous API
+- [meticulous-mcp](https://github.com/twchad/meticulous-mcp) by @twchad — MCP server for machine profile management
 - [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) by @nickwilsonr — MQTT bridge for real-time telemetry and Home Assistant integration
 
 ---
 
 <div align="center">
 
-Runs on [pyMeticulous](https://github.com/nicpottier/pyMeticulous), [meticulous-mcp](https://github.com/manonstreet/meticulous-mcp), [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon), and caffeine ☕
+Runs on [pyMeticulous](https://github.com/MeticulousHome/pyMeticulous), [meticulous-mcp](https://github.com/twchad/meticulous-mcp), [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon), and caffeine ☕
 
 Made with ❤️ by <a href="https://github.com/hessius">@hessius</a>
 </div>

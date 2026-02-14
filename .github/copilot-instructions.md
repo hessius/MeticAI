@@ -148,7 +148,7 @@ MeticAI/
 │   │   ├── index.html
 │   │   └── ...
 │   └── mcp-server/             # MCP server for Meticulous communication
-│       ├── meticulous-mcp/     # Fork of manonstreet/meticulous-mcp
+│       ├── meticulous-mcp/     # Fork of twchad/meticulous-mcp
 │       ├── run_http.py         # FastMCP streamable-http entry point
 │       ├── Dockerfile          # Standalone MCP server image (optional)
 │       └── ...
@@ -337,7 +337,7 @@ Must include:
 ## External Dependencies
 
 ### Meticulous MCP
-Based on the excellent work by manonstreet:
+Based on the excellent work by twchad:
 - Repository: https://github.com/hessius/meticulous-mcp (fork)
 - Bundled at `apps/mcp-server/meticulous-mcp/`
 - Provides `create_profile` and `apply_profile` MCP tools
