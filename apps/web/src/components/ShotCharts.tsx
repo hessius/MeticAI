@@ -249,7 +249,7 @@ interface CompareChartProps {
   isShowingReplay: boolean
   comparisonCurrentTime: number
   comparisonIsPlaying: boolean
-  comparisonPlaybackSpeed: string
+  comparisonPlaybackSpeed: number
   variant?: 'mobile' | 'desktop'
 }
 
