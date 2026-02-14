@@ -25,8 +25,12 @@ PREINFUSION_KEYWORDS = ['bloom', 'soak', 'preinfusion', 'pre-infusion', 'pre inf
 # Profile Formatting & Utilities
 # ============================================================================
 
-def _format_dynamics_description(stage: dict) -> str:
-    """Format a human-readable description of the stage dynamics."""
+def _format_dynamics_description(stage: dict, variables: list | None = None) -> str:
+    """Format a human-readable description of the stage dynamics.
+    
+    Resolves $variable references in dynamics_points using the provided variables list.
+    """
+    variables = variables or []
     stage_type = stage.get("type", "unknown")
     dynamics_points = stage.get("dynamics_points", [])
     dynamics_over = stage.get("dynamics_over", "time")
@@ -37,13 +41,23 @@ def _format_dynamics_description(stage: dict) -> str:
     unit = "bar" if stage_type == "pressure" else "ml/s"
     over_unit = "s" if dynamics_over == "time" else "g"
     
+    def _resolve_dp_value(val):
+        """Resolve a dynamics point value, handling $variable references."""
+        if isinstance(val, str) and val.startswith('$'):
+            resolved, _ = _resolve_variable(val, variables)
+            return _safe_float(resolved)
+        return _safe_float(val)
+    
     if len(dynamics_points) == 1:
         # Constant value
-        value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+        raw_value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+        value = _resolve_dp_value(raw_value)
         return f"Constant {stage_type} at {value} {unit}"
     elif len(dynamics_points) == 2:
-        start_x, start_y = dynamics_points[0][0], dynamics_points[0][1]
-        end_x, end_y = dynamics_points[1][0], dynamics_points[1][1]
+        start_x = _safe_float(dynamics_points[0][0])
+        start_y = _resolve_dp_value(dynamics_points[0][1])
+        end_x = _safe_float(dynamics_points[1][0])
+        end_y = _resolve_dp_value(dynamics_points[1][1])
         if start_y == end_y:
             return f"Constant {stage_type} at {start_y} {unit} for {end_x}{over_unit}"
         else:
@@ -51,7 +65,7 @@ def _format_dynamics_description(stage: dict) -> str:
             return f"{stage_type.capitalize()} {direction} from {start_y} to {end_y} {unit} over {end_x}{over_unit}"
     else:
         # Multiple points - describe curve
-        values = [p[1] for p in dynamics_points if len(p) > 1]
+        values = [_resolve_dp_value(p[1]) for p in dynamics_points if len(p) > 1]
         if values:
             return f"{stage_type.capitalize()} curve: {' → '.join(str(v) for v in values)} {unit}"
         return f"Multi-point {stage_type} curve"
@@ -319,7 +333,7 @@ def _analyze_stage_execution(
     stage_key = profile_stage.get("key", "")
     
     # Build profile target description
-    dynamics_desc = _format_dynamics_description(profile_stage)
+    dynamics_desc = _format_dynamics_description(profile_stage, variables)
     exit_triggers = _format_exit_triggers(profile_stage.get("exit_triggers", []), variables)
     limits = _format_limits(profile_stage.get("limits", []), variables)
     
@@ -445,21 +459,28 @@ def _analyze_stage_execution(
         dynamics_points = profile_stage.get("dynamics_points", [])
         if dynamics_points and len(dynamics_points) >= 1:
             # Get the target value (last point in dynamics)
-            target_value = dynamics_points[-1][1] if len(dynamics_points[-1]) > 1 else dynamics_points[-1][0]
+            raw_target = dynamics_points[-1][1] if len(dynamics_points[-1]) > 1 else dynamics_points[-1][0]
+            
+            # Resolve variable reference if present (e.g. "$decline_pressure")
+            if isinstance(raw_target, str) and raw_target.startswith('$'):
+                resolved, _ = _resolve_variable(raw_target, variables)
+                target_value = _safe_float(resolved)
+            else:
+                target_value = _safe_float(raw_target)
             
             if stage_type == "pressure":
                 # Check if we reached target pressure
-                if max_pressure >= target_value * 0.95:  # Within 5%
+                if target_value > 0 and max_pressure >= target_value * 0.95:  # Within 5%
                     goal_reached = True
                     goal_message = f"Target pressure of {target_value} bar was reached ({max_pressure:.1f} bar achieved)"
-                else:
+                elif target_value > 0:
                     goal_message = f"Target pressure of {target_value} bar was NOT reached (only {max_pressure:.1f} bar achieved)"
             elif stage_type == "flow":
                 # For flow stages, use end_flow (not max_flow) since initial peak is just piston movement
-                if end_flow >= target_value * 0.95:
+                if target_value > 0 and end_flow >= target_value * 0.95:
                     goal_reached = True
                     goal_message = f"Target flow of {target_value} ml/s was reached ({end_flow:.1f} ml/s at end)"
-                else:
+                elif target_value > 0:
                     goal_message = f"Target flow of {target_value} ml/s was NOT reached ({end_flow:.1f} ml/s at end)"
         
         if goal_reached:
@@ -711,13 +732,13 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
             else:
                 # Multiple points - interpolate based on relative time within stage
                 # dynamics_points format: [[time1, value1], [time2, value2], ...]
-                max_dynamics_time = max(p[0] for p in dynamics_points)
+                max_dynamics_time = max(_safe_float(p[0]) for p in dynamics_points)
                 
                 # Scale factor to map dynamics time to actual stage duration
                 scale = stage_duration / max_dynamics_time if max_dynamics_time > 0 else 1
                 
                 for dp in dynamics_points:
-                    dp_time = dp[0]
+                    dp_time = _safe_float(dp[0])
                     dp_value = dp[1] if len(dp) > 1 else dp[0]
                     
                     # Resolve variable if needed
@@ -783,7 +804,7 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
                 # Multiple points - interpolate weight values to time
                 # dynamics_points format: [[weight1, value1], [weight2, value2], ...]
                 for dp in dynamics_points:
-                    dp_weight = dp[0]
+                    dp_weight = _safe_float(dp[0])
                     dp_value = dp[1] if len(dp) > 1 else dp[0]
                     
                     # Resolve variable if needed
