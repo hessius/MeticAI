@@ -35,7 +35,6 @@ import {
   Equals,
   X,
   DownloadSimple,
-  Info,
   Brain
 } from '@phosphor-icons/react'
 import { domToPng } from 'modern-screenshot'
@@ -387,6 +386,13 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
 export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
+  // Theme-aware chart styling
+  const chartGridColor = isDark ? '#333' : '#d4d4d8'
+  const chartGridOpacity = isDark ? 0.3 : 0.5
+  const chartAxisStroke = isDark ? '#666' : '#a1a1aa'
+  const chartAxisLineStroke = isDark ? '#444' : '#d4d4d8'
+  const chartTickFill = isDark ? '#888' : '#71717a'
+  const chartReplayLineStroke = isDark ? '#fff' : '#18181b'
   const { shots, isLoading, isBackgroundRefreshing, error, lastFetched, fetchShotsByProfile, backgroundRefresh, fetchShotData } = useShotHistory()
   const [selectedShot, setSelectedShot] = useState<ShotInfo | null>(null)
   const [shotData, setShotData] = useState<ShotData | null>(null)
@@ -1359,40 +1365,57 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
         exit={{ opacity: 0, x: -20 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
       >
-        <Card className="p-6 space-y-5">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBack}
-              className="shrink-0"
-            >
-              <CaretLeft size={22} weight="bold" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold text-foreground truncate">
-                Shot Details
-              </h2>
-              <p className="text-xs text-muted-foreground/70">
-                {formatShotTime(selectedShot)}
-              </p>
+        {loadingData ? (
+          <Card className="p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
+                <CaretLeft size={22} weight="bold" />
+              </Button>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-foreground truncate">Shot Details</h2>
+                <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
+              </div>
             </div>
-          </div>
-
-          {loadingData ? (
             <div className="flex items-center justify-center py-16">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 <p className="text-sm text-muted-foreground">Loading shot data...</p>
               </div>
             </div>
-          ) : dataError ? (
+          </Card>
+        ) : dataError ? (
+          <Card className="p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
+                <CaretLeft size={22} weight="bold" />
+              </Button>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-foreground truncate">Shot Details</h2>
+                <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
+              </div>
+            </div>
             <Alert variant="destructive" className="border-destructive/30 bg-destructive/8 rounded-xl">
               <Warning size={18} weight="fill" />
               <AlertDescription className="text-sm">{dataError}</AlertDescription>
             </Alert>
-          ) : shotData ? (
-            <div className="space-y-4">
+          </Card>
+        ) : shotData ? (
+          <Tabs value={activeAction} onValueChange={(v) => setActiveAction(v as typeof activeAction)} className="w-full">
+              {/* Desktop: two-column — left=card with tab content, right=graph (maximized) */}
+              <div className="lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-6 lg:items-start space-y-4 lg:space-y-0">
+                {/* Left column on desktop / top on mobile: everything inside one Card */}
+                <div className="order-1">
+            <Card className="p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
+                  <CaretLeft size={22} weight="bold" />
+                </Button>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-bold text-foreground truncate">Shot Details</h2>
+                  <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
+                </div>
+              </div>
+
               {/* Shot Summary Stats */}
               <div className="grid grid-cols-3 gap-3">
                 {typeof selectedShot.total_time === 'number' && (
@@ -1430,241 +1453,35 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                 )}
               </div>
 
-              {/* Chart */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold tracking-wide text-primary flex items-center gap-2">
-                    <ChartLine size={16} weight="bold" />
-                    Extraction Graph
-                  </Label>
-                  {isPlaying && (
-                    <Badge variant="secondary" className="animate-pulse">
-                      <Play size={10} weight="fill" className="mr-1" />
-                      Replaying {playbackSpeed}x
-                    </Badge>
-                  )}
-                </div>
-                <div className="p-1 bg-secondary/40 rounded-xl border border-border/20">
-                  <div className="h-80">
-                    {(() => {
-                      const chartData = getChartData(shotData)
-                      const stageRanges = getStageRanges(chartData)
-                      const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
-                      const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
-                      
-                      // Merge with profile target curves if analysis has been done
-                      const mergedData = mergeWithTargetCurves(chartData, analysisResult?.profile_target_curves)
-                      // Note: hasTargetCurves could be used for conditional rendering if needed:
-                      // const hasTargetCurves = analysisResult?.profile_target_curves && analysisResult.profile_target_curves.length > 0
-                      
-                      // Calculate fixed max values from full dataset for stable axes
-                      // Include target curve values to ensure they're not clipped
-                      const maxPressure = Math.max(
-                        ...chartData.map(d => d.pressure || 0),
-                        ...(analysisResult?.profile_target_curves?.map(d => d.target_pressure || 0) || []),
-                        12
-                      )
-                      const maxFlow = Math.max(
-                        ...chartData.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)),
-                        ...(analysisResult?.profile_target_curves?.map(d => d.target_flow || 0) || []),
-                        8
-                      )
-                      const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
-                      const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
-                      const maxRightAxis = Math.ceil(maxWeight * 1.1)
-                      
-                      // Filter data for replay - show data up to currentTime while playing or paused at a position
-                      // Only show full data when at start (0) or at end (>= maxTime)
-                      const isShowingReplay = currentTime > 0 && currentTime < dataMaxTime
-                      const displayData = isShowingReplay
-                        ? mergedData.filter(d => d.time <= currentTime)
-                        : mergedData
-                      
-                      // Filter stage ranges to only show stages that have started (for progressive reveal)
-                      const displayStageRanges = isShowingReplay
-                        ? stageRanges
-                            .filter(stage => stage.startTime <= currentTime)
-                            .map(stage => ({
-                              ...stage,
-                              // Clip the end time to current time if stage is still in progress
-                              endTime: Math.min(stage.endTime, currentTime)
-                            }))
-                        : stageRanges
-                      
-                      return (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={displayData} margin={{ top: 5, right: 0, left: -5, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                            
-                            {/* Stage background areas - progressively revealed during replay */}
-                            {displayStageRanges.map((stage, idx) => (
-                              <ReferenceArea
-                                key={idx}
-                                yAxisId="left"
-                                x1={stage.startTime}
-                                x2={stage.endTime}
-                                fill={STAGE_COLORS[stage.colorIndex]}
-                                fillOpacity={1}
-                                stroke={STAGE_BORDER_COLORS[stage.colorIndex]}
-                                strokeWidth={0}
-                                ifOverflow="extendDomain"
-                              />
-                            ))}
-                            
-                            {/* Playhead reference line during replay */}
-                            {isShowingReplay && (
-                              <ReferenceLine
-                                yAxisId="left"
-                                x={currentTime}
-                                stroke="#fff"
-                                strokeWidth={2}
-                                strokeDasharray="4 2"
-                              />
-                            )}
-                            
-                            <XAxis 
-                              dataKey="time" 
-                              stroke="#666" 
-                              fontSize={10}
-                              tickFormatter={(value) => `${Math.round(value)}s`}
-                              axisLine={{ stroke: '#444' }}
-                              tickLine={{ stroke: '#444' }}
-                              domain={[0, dataMaxTime]}
-                              type="number"
-                              allowDataOverflow={false}
-                            />
-                            <YAxis 
-                              yAxisId="left" 
-                              stroke="#666" 
-                              fontSize={10}
-                              domain={[0, maxLeftAxis]}
-                              axisLine={{ stroke: '#444' }}
-                              tickLine={{ stroke: '#444' }}
-                              width={35}
-                              allowDataOverflow={false}
-                            />
-                            <YAxis 
-                              yAxisId="right" 
-                              orientation="right" 
-                              stroke="#666" 
-                              fontSize={10}
-                              domain={[0, maxRightAxis]}
-                              axisLine={{ stroke: '#444' }}
-                              tickLine={{ stroke: '#444' }}
-                              width={35}
-                              allowDataOverflow={false}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend 
-                              wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }}
-                              iconType="circle"
-                              iconSize={8}
-                            />
-                            <Line
-                              yAxisId="left"
-                              type="monotone"
-                              dataKey="pressure"
-                              stroke={CHART_COLORS.pressure}
-                              strokeWidth={2}
-                              dot={false}
-                              name="Pressure (bar)"
-                              isAnimationActive={false}
-                            />
-                            <Line
-                              yAxisId="left"
-                              type="monotone"
-                              dataKey="flow"
-                              stroke={CHART_COLORS.flow}
-                              strokeWidth={2}
-                              dot={false}
-                              name="Flow (ml/s)"
-                              isAnimationActive={false}
-                            />
-                            <Line
-                              yAxisId="right"
-                              type="monotone"
-                              dataKey="weight"
-                              stroke={CHART_COLORS.weight}
-                              strokeWidth={2}
-                              dot={false}
-                              name="Weight (g)"
-                              isAnimationActive={false}
-                            />
-                            {hasGravFlow && (
-                              <Line
-                                yAxisId="left"
-                                type="monotone"
-                                dataKey="gravimetricFlow"
-                                stroke={CHART_COLORS.gravimetricFlow}
-                                strokeWidth={1.5}
-                                dot={false}
-                                strokeDasharray="4 2"
-                                name="Grav. Flow (g/s)"
-                                isAnimationActive={false}
-                              />
-                            )}
-                          </LineChart>
-                        </ResponsiveContainer>
-                      )
-                    })()}
-                  </div>
-                </div>
-                
-                {/* Stage Legend */}
-                {(() => {
-                  const chartData = getChartData(shotData)
-                  const stageRanges = getStageRanges(chartData)
-                  if (stageRanges.length === 0) return null
-                  
-                  return (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {stageRanges.map((stage, idx) => (
-                        <Badge 
-                          key={idx}
-                          variant="outline"
-                          className="text-[10px] px-2 py-0.5 font-medium"
-                          style={{
-                            backgroundColor: STAGE_COLORS[stage.colorIndex],
-                            borderColor: STAGE_BORDER_COLORS[stage.colorIndex],
-                            color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex]
-                          }}
-                        >
-                          {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
-                        </Badge>
-                      ))}
-                    </div>
-                  )
-                })()}
-              </div>
+              {/* Tab Bar */}
+              <TabsList className="grid w-full grid-cols-3 h-11 bg-secondary/60">
+                <TabsTrigger 
+                  value="replay" 
+                  className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
+                >
+                  <Play size={14} weight={activeAction === 'replay' ? 'fill' : 'bold'} />
+                  Replay
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="compare" 
+                  className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
+                >
+                  <GitDiff size={14} weight={activeAction === 'compare' ? 'fill' : 'bold'} />
+                  Compare
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="analyze" 
+                  className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
+                >
+                  <MagnifyingGlass size={14} weight={activeAction === 'analyze' ? 'fill' : 'bold'} />
+                  Analyze
+                </TabsTrigger>
+              </TabsList>
 
-              {/* Action Tabs */}
-              <Tabs value={activeAction} onValueChange={(v) => setActiveAction(v as typeof activeAction)} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 h-11 bg-secondary/60">
-                  <TabsTrigger 
-                    value="replay" 
-                    className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
-                  >
-                    <Play size={14} weight={activeAction === 'replay' ? 'fill' : 'bold'} />
-                    Replay
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="compare" 
-                    className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
-                  >
-                    <GitDiff size={14} weight={activeAction === 'compare' ? 'fill' : 'bold'} />
-                    Compare
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="analyze" 
-                    className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
-                  >
-                    <MagnifyingGlass size={14} weight={activeAction === 'analyze' ? 'fill' : 'bold'} />
-                    Analyze
-                  </TabsTrigger>
-                </TabsList>
+                {/* Tab content continues inside the Card */}
 
                 {/* Replay Tab Content */}
-                <TabsContent value="replay" className="mt-4 overflow-hidden">
+                <TabsContent value="replay" className="mt-0">
                   <motion.div
                     key="replay-content"
                     initial={{ opacity: 0, height: 0 }}
@@ -1673,6 +1490,75 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                     transition={{ duration: 0.25, ease: "easeInOut" }}
                     className="space-y-4"
                   >
+                  {/* Mobile-only: Replay chart */}
+                  <div className="lg:hidden">
+                    {(() => {
+                      const chartData = getChartData(shotData)
+                      const stageRanges = getStageRanges(chartData)
+                      const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
+                      const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
+                      const mergedData = mergeWithTargetCurves(chartData, analysisResult?.profile_target_curves)
+                      const maxPressure = Math.max(...chartData.map(d => d.pressure || 0), ...(analysisResult?.profile_target_curves?.map(d => d.target_pressure || 0) || []), 12)
+                      const maxFlow = Math.max(...chartData.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)), ...(analysisResult?.profile_target_curves?.map(d => d.target_flow || 0) || []), 8)
+                      const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+                      const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
+                      const maxRightAxis = Math.ceil(maxWeight * 1.1)
+                      const isShowingReplay = currentTime > 0 && currentTime < dataMaxTime
+                      const displayData = isShowingReplay ? mergedData.filter(d => d.time <= currentTime) : mergedData
+                      const displayStageRanges = isShowingReplay
+                        ? stageRanges.filter(s => s.startTime <= currentTime).map(s => ({ ...s, endTime: Math.min(s.endTime, currentTime) }))
+                        : stageRanges
+                      return (
+                        <div className="space-y-2">
+                          {isPlaying && (
+                            <div className="flex justify-end">
+                              <Badge variant="secondary" className="animate-pulse">
+                                <Play size={10} weight="fill" className="mr-1" />
+                                Replaying {playbackSpeed}x
+                              </Badge>
+                            </div>
+                          )}
+                          <div className="p-1 bg-secondary/40 rounded-xl border border-border/20">
+                            <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={displayData} margin={{ top: 5, right: 0, left: -5, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={chartGridOpacity} />
+                                  {displayStageRanges.map((stage, idx) => (
+                                    <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
+                                  ))}
+                                  {isShowingReplay && <ReferenceLine yAxisId="left" x={currentTime} stroke={chartReplayLineStroke} strokeWidth={2} strokeDasharray="4 2" />}
+                                  <XAxis dataKey="time" stroke={chartAxisStroke} fontSize={10} tickFormatter={(value) => `${Math.round(value)}s`} axisLine={{ stroke: chartAxisLineStroke }} tickLine={{ stroke: chartAxisLineStroke }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
+                                  <YAxis yAxisId="left" stroke={chartAxisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: chartAxisLineStroke }} tickLine={{ stroke: chartAxisLineStroke }} width={35} allowDataOverflow={false} />
+                                  <YAxis yAxisId="right" orientation="right" stroke={chartAxisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: chartAxisLineStroke }} tickLine={{ stroke: chartAxisLineStroke }} width={35} allowDataOverflow={false} />
+                                  <Tooltip content={<CustomTooltip />} />
+                                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
+                                  <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
+                                  <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
+                                  <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" isAnimationActive={false} />
+                                  {hasGravFlow && <Line yAxisId="left" type="monotone" dataKey="gravimetricFlow" stroke={CHART_COLORS.gravimetricFlow} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="Grav. Flow (g/s)" isAnimationActive={false} />}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                          {/* Stage Legend */}
+                          {(() => {
+                            const sr = getStageRanges(getChartData(shotData))
+                            if (sr.length === 0) return null
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="text-[10px] font-semibold text-muted-foreground">Stages:</span>
+                                {sr.map((stage, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-[10px] px-2 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
+                                    {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )
+                    })()}
+                  </div>
                   {/* Progress Bar */}
                   {maxTime > 0 && (
                     <div className="space-y-2">
@@ -1756,7 +1642,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                 </TabsContent>
 
                 {/* Compare Tab Content - Embedded */}
-                <TabsContent value="compare" className="mt-4 overflow-hidden">
+                <TabsContent value="compare" className="mt-4">
                   <motion.div
                     key="compare-content"
                     initial={{ opacity: 0, height: 0 }}
@@ -1873,20 +1759,22 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   {/* Comparison Chart with Replay */}
                   {comparisonShotData && (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs font-semibold text-primary flex items-center gap-1.5">
-                          <ChartLine size={14} weight="bold" />
-                          Extraction Comparison
-                        </Label>
-                        {comparisonIsPlaying && (
+                      {/* Chart — mobile only, desktop shows in right column */}
+                      <div className="lg:hidden">
+                      {comparisonIsPlaying && (
+                        <div className="flex justify-end mb-1">
                           <Badge variant="secondary" className="animate-pulse text-[10px]">
                             <Play size={8} weight="fill" className="mr-1" />
                             {comparisonPlaybackSpeed}x
                           </Badge>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className="p-1 bg-secondary/40 rounded-xl border border-border/20">
-                        <div className="h-64">
+                        <div className="h-64 relative">
+                          <div className="absolute top-1 right-1 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-background/70 backdrop-blur-sm rounded-md px-2 py-1 border border-border/30">
+                            <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-foreground rounded" /> Shot A (solid)</span>
+                            <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-foreground/50 rounded" style={{ borderTop: '1px dashed currentColor' }} /> Shot B (dashed)</span>
+                          </div>
                           {(() => {
                             const combinedData = getCombinedChartData()
                             const dataMaxTime = combinedData.length > 0 ? combinedData[combinedData.length - 1].time : 0
@@ -1905,14 +1793,14 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             return (
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={displayData} margin={{ top: 5, right: 0, left: -5, bottom: 5 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+                                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={chartGridOpacity} />
                                   
                                   {/* Playhead during replay */}
                                   {isShowingReplay && (
                                     <ReferenceLine
                                       yAxisId="left"
                                       x={comparisonCurrentTime}
-                                      stroke="#fff"
+                                      stroke={chartReplayLineStroke}
                                       strokeWidth={2}
                                       strokeDasharray="4 2"
                                     />
@@ -1920,17 +1808,18 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                   
                                   <XAxis 
                                     dataKey="time" 
-                                    stroke="#666" 
+                                    stroke={chartAxisStroke} 
                                     fontSize={10}
                                     tickFormatter={(v) => `${Math.round(v)}s`}
+                                    axisLine={{ stroke: chartAxisLineStroke }}
                                     domain={[0, dataMaxTime]}
                                     type="number"
                                     allowDataOverflow={false}
                                   />
-                                  <YAxis yAxisId="left" stroke="#666" fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={false} />
-                                  <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={false} />
+                                  <YAxis yAxisId="left" stroke={chartAxisStroke} fontSize={10} domain={[0, leftDomain]} axisLine={{ stroke: chartAxisLineStroke }} width={30} allowDataOverflow={false} />
+                                  <YAxis yAxisId="right" orientation="right" stroke={chartAxisStroke} fontSize={10} domain={[0, rightDomain]} axisLine={{ stroke: chartAxisLineStroke }} width={30} allowDataOverflow={false} />
                                   <Tooltip 
-                                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid #333', borderRadius: '8px', fontSize: '10px' }}
+                                    contentStyle={{ backgroundColor: isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)', border: `1px solid ${isDark ? '#333' : '#d4d4d8'}`, borderRadius: '8px', fontSize: '10px', color: isDark ? '#fff' : '#18181b' }}
                                   />
                                   <Legend wrapperStyle={{ fontSize: '8px', paddingTop: '4px' }} iconSize={6} />
                                   
@@ -1949,12 +1838,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           })()}
                         </div>
                       </div>
-                      
-                      {/* Legend */}
-                      <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> Shot A (solid)</span>
-                        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> Shot B (dashed)</span>
-                      </div>
+                      </div>{/* end lg:hidden chart wrapper */}
                       
                       {/* Replay Controls */}
                       <div className="space-y-3 pt-2 border-t border-border/20">
@@ -2046,7 +1930,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                 </TabsContent>
 
                 {/* Analyze Tab Content */}
-                <TabsContent value="analyze" className="mt-4 overflow-hidden">
+                <TabsContent value="analyze" className="mt-4">
                   <motion.div
                     key="analyze-content"
                     initial={{ opacity: 0, height: 0 }}
@@ -2112,14 +1996,6 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   {/* Analysis Results - Local Analysis */}
                   {analysisResult && (
                     <div className="space-y-4">
-                      {/* Early stage disclaimer */}
-                      <Alert className="bg-primary/5 border-primary/20">
-                        <Info size={16} weight="bold" className="text-primary" />
-                        <AlertDescription className="text-xs text-muted-foreground">
-                          This analysis feature is in early development. Suggestions for improvement are very welcome!
-                        </AlertDescription>
-                      </Alert>
-                      
                       {/* Content to export */}
                       <div ref={analysisCardRef} className="space-y-4">
                         {/* Shot Summary Card */}
@@ -2163,17 +2039,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           </div>
                         </div>
                         
-                        {/* Profile Target Curves Chart */}
+                        {/* Profile Target Curves Chart — mobile only, desktop shows in right column */}
                         {shotData && (
-                          <div className="mt-4 pt-4 border-t border-primary/10">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-medium text-muted-foreground">Shot vs Profile Target</span>
-                              {analysisResult.profile_target_curves && analysisResult.profile_target_curves.length > 0 && (
-                                <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20">
-                                  Target overlay active
-                                </Badge>
-                              )}
-                            </div>
+                          <div className="mt-4 pt-4 border-t border-primary/10 lg:hidden">
                             <div className="h-48 w-full">
                               <ResponsiveContainer width="100%" height="100%">
                                 {(() => {
@@ -2199,7 +2067,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                   
                                   return (
                                     <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-                                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                      <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={chartGridOpacity} />
                                       
                                       {/* Stage background areas */}
                                       {stageRanges.map((stage, idx) => (
@@ -2218,17 +2086,17 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                       
                                       <XAxis 
                                         dataKey="time" 
-                                        tick={{ fontSize: 10, fill: '#888' }} 
+                                        tick={{ fontSize: 10, fill: chartTickFill }} 
                                         tickFormatter={(v) => `${Math.round(v)}s`}
-                                        axisLine={{ stroke: '#444' }}
+                                        axisLine={{ stroke: chartAxisLineStroke }}
                                         type="number"
                                         domain={[0, dataMaxTime]}
                                       />
                                       <YAxis 
                                         yAxisId="left"
                                         domain={[0, maxLeftAxis]}
-                                        tick={{ fontSize: 10, fill: '#888' }} 
-                                        axisLine={{ stroke: '#444' }}
+                                        tick={{ fontSize: 10, fill: chartTickFill }} 
+                                        axisLine={{ stroke: chartAxisLineStroke }}
                                         tickFormatter={(v) => `${v}`}
                                         width={25}
                                       />
@@ -2236,17 +2104,18 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                         yAxisId="right"
                                         orientation="right"
                                         domain={[0, Math.ceil(maxFlow * 1.1)]}
-                                        tick={{ fontSize: 10, fill: '#888' }} 
-                                        axisLine={{ stroke: '#444' }}
+                                        tick={{ fontSize: 10, fill: chartTickFill }} 
+                                        axisLine={{ stroke: chartAxisLineStroke }}
                                         width={0}
                                         hide
                                       />
                                       <Tooltip 
                                         contentStyle={{ 
-                                          backgroundColor: 'rgba(0,0,0,0.85)', 
-                                          border: '1px solid #333',
+                                          backgroundColor: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)', 
+                                          border: `1px solid ${isDark ? '#333' : '#d4d4d8'}`,
                                           borderRadius: '8px',
-                                          fontSize: '11px'
+                                          fontSize: '11px',
+                                          color: isDark ? '#fff' : '#18181b'
                                         }}
                                         formatter={(value: number, name: string) => [
                                           `${value?.toFixed(1) || '-'}`,
@@ -2369,7 +2238,8 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                               if (stageRanges.length === 0) return null
                               
                               return (
-                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                  <span className="text-[10px] font-semibold text-muted-foreground">Stages:</span>
                                   {stageRanges.map((stage, idx) => (
                                     <Badge 
                                       key={idx}
@@ -2767,7 +2637,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
-                            View Expert Analysis (AI)
+                            View AI Analysis
                           </Button>
                         ) : (
                           <Button
@@ -2778,7 +2648,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
-                            Get Expert Analysis (AI)
+                            Get AI Analysis
                           </Button>
                         )}
                       </div>
@@ -2787,14 +2657,240 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   
                   </motion.div>
                 </TabsContent>
-              </Tabs>
-            </div>
-          ) : (
+                </Card>{/* end Card wrapping entire left column */}
+                </div>{/* end left column */}
+
+                {/* Right column on desktop: Graph area (maximized) — hidden on mobile */}
+                <div className="hidden lg:block order-2 sticky top-0">
+                  <div className="space-y-2">
+                    {/* Replay tab graph */}
+                    {activeAction === 'replay' && (() => {
+                      const chartData = getChartData(shotData)
+                      const stageRanges = getStageRanges(chartData)
+                      const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
+                      const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
+                      const mergedData = mergeWithTargetCurves(chartData, analysisResult?.profile_target_curves)
+                      const maxPressure = Math.max(...chartData.map(d => d.pressure || 0), ...(analysisResult?.profile_target_curves?.map(d => d.target_pressure || 0) || []), 12)
+                      const maxFlow = Math.max(...chartData.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)), ...(analysisResult?.profile_target_curves?.map(d => d.target_flow || 0) || []), 8)
+                      const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+                      const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
+                      const maxRightAxis = Math.ceil(maxWeight * 1.1)
+                      const isShowingReplay = currentTime > 0 && currentTime < dataMaxTime
+                      const displayData = isShowingReplay ? mergedData.filter(d => d.time <= currentTime) : mergedData
+                      const displayStageRanges = isShowingReplay
+                        ? stageRanges.filter(s => s.startTime <= currentTime).map(s => ({ ...s, endTime: Math.min(s.endTime, currentTime) }))
+                        : stageRanges
+                      return (
+                        <>
+                          {isPlaying && (
+                            <div className="flex justify-end">
+                              <Badge variant="secondary" className="animate-pulse">
+                                <Play size={10} weight="fill" className="mr-1" />
+                                Replaying {playbackSpeed}x
+                              </Badge>
+                            </div>
+                          )}
+                          <div className="bg-secondary/40 rounded-xl border border-border/20 p-2">
+                            <div className="h-[60vh] min-h-[400px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={displayData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={chartGridOpacity} />
+                                  {displayStageRanges.map((stage, idx) => (
+                                    <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
+                                  ))}
+                                  {isShowingReplay && <ReferenceLine yAxisId="left" x={currentTime} stroke={chartReplayLineStroke} strokeWidth={2} strokeDasharray="4 2" />}
+                                  <XAxis dataKey="time" stroke={chartAxisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: chartAxisLineStroke }} tickLine={{ stroke: chartAxisLineStroke }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
+                                  <YAxis yAxisId="left" stroke={chartAxisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: chartAxisLineStroke }} tickLine={{ stroke: chartAxisLineStroke }} width={35} allowDataOverflow={false} />
+                                  <YAxis yAxisId="right" orientation="right" stroke={chartAxisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: chartAxisLineStroke }} tickLine={{ stroke: chartAxisLineStroke }} width={35} allowDataOverflow={false} />
+                                  <Tooltip content={<CustomTooltip />} />
+                                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
+                                  <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
+                                  <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
+                                  <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" isAnimationActive={false} />
+                                  {hasGravFlow && <Line yAxisId="left" type="monotone" dataKey="gravimetricFlow" stroke={CHART_COLORS.gravimetricFlow} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="Grav. Flow (g/s)" isAnimationActive={false} />}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                          {/* Stage Legend */}
+                          {(() => {
+                            if (stageRanges.length === 0) return null
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="text-[10px] font-semibold text-muted-foreground">Stages:</span>
+                                {stageRanges.map((stage, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-[10px] px-2 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
+                                    {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )
+                          })()}
+                        </>
+                      )
+                    })()}
+
+                    {/* Compare tab graph */}
+                    {activeAction === 'compare' && comparisonShotData && (() => {
+                      const combinedData = getCombinedChartData()
+                      const dataMaxTime = combinedData.length > 0 ? combinedData[combinedData.length - 1].time : 0
+                      const maxPressure = Math.max(...combinedData.map(d => Math.max(d.pressureA || 0, d.pressureB || 0)), 12)
+                      const maxFlow = Math.max(...combinedData.map(d => Math.max(d.flowA || 0, d.flowB || 0)), 8)
+                      const maxWeight = Math.max(...combinedData.map(d => Math.max(d.weightA || 0, d.weightB || 0)), 50)
+                      const leftDomain = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+                      const rightDomain = Math.ceil(maxWeight * 1.1)
+                      const isShowingReplay = comparisonCurrentTime > 0 && comparisonCurrentTime < dataMaxTime
+                      const displayData = isShowingReplay ? combinedData.filter(d => d.time <= comparisonCurrentTime) : combinedData
+                      return (
+                        <>
+                          {comparisonIsPlaying && (
+                            <div className="flex justify-end">
+                              <Badge variant="secondary" className="animate-pulse text-[10px]">
+                                <Play size={8} weight="fill" className="mr-1" />
+                                {comparisonPlaybackSpeed}x
+                              </Badge>
+                            </div>
+                          )}
+                          <div className="bg-secondary/40 rounded-xl border border-border/20 p-2">
+                            <div className="h-[60vh] min-h-[400px] relative">
+                              <div className="absolute top-2 right-2 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-background/70 backdrop-blur-sm rounded-md px-2 py-1 border border-border/30">
+                                <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-foreground rounded" /> Shot A (solid)</span>
+                                <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-foreground/50 rounded" style={{ borderTop: '1px dashed currentColor' }} /> Shot B (dashed)</span>
+                              </div>
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={displayData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={chartGridOpacity} />
+                                  {isShowingReplay && <ReferenceLine yAxisId="left" x={comparisonCurrentTime} stroke={chartReplayLineStroke} strokeWidth={2} strokeDasharray="4 2" />}
+                                  <XAxis dataKey="time" stroke={chartAxisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: chartAxisLineStroke }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
+                                  <YAxis yAxisId="left" stroke={chartAxisStroke} fontSize={10} domain={[0, leftDomain]} axisLine={{ stroke: chartAxisLineStroke }} width={30} allowDataOverflow={false} />
+                                  <YAxis yAxisId="right" orientation="right" stroke={chartAxisStroke} fontSize={10} domain={[0, rightDomain]} axisLine={{ stroke: chartAxisLineStroke }} width={30} allowDataOverflow={false} />
+                                  <Tooltip contentStyle={{ backgroundColor: isDark ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)', border: `1px solid ${isDark ? '#333' : '#d4d4d8'}`, borderRadius: '8px', fontSize: '10px', color: isDark ? '#fff' : '#18181b' }} />
+                                  <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '4px' }} iconSize={7} />
+                                  <Line yAxisId="left" type="monotone" dataKey="pressureA" stroke={COMPARISON_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure A" isAnimationActive={false} />
+                                  <Line yAxisId="left" type="monotone" dataKey="flowA" stroke={COMPARISON_COLORS.flow} strokeWidth={2} dot={false} name="Flow A" isAnimationActive={false} />
+                                  <Line yAxisId="right" type="monotone" dataKey="weightA" stroke={COMPARISON_COLORS.weight} strokeWidth={2} dot={false} name="Weight A" isAnimationActive={false} />
+                                  <Line yAxisId="left" type="monotone" dataKey="pressureB" stroke={COMPARISON_COLORS.pressure} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Pressure B" opacity={0.6} isAnimationActive={false} />
+                                  <Line yAxisId="left" type="monotone" dataKey="flowB" stroke={COMPARISON_COLORS.flow} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Flow B" opacity={0.6} isAnimationActive={false} />
+                                  <Line yAxisId="right" type="monotone" dataKey="weightB" stroke={COMPARISON_COLORS.weight} strokeWidth={1.5} strokeDasharray="4 3" dot={false} name="Weight B" opacity={0.6} isAnimationActive={false} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        </>
+                      )
+                    })()}
+
+                    {/* Compare tab — no comparison selected yet */}
+                    {activeAction === 'compare' && !comparisonShotData && (
+                      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40">
+                        <GitDiff size={48} weight="duotone" />
+                        <p className="text-sm mt-3">Select a shot to compare</p>
+                      </div>
+                    )}
+
+                    {/* Analyze tab graph — reuse the analysis chart from the analysis result */}
+                    {activeAction === 'analyze' && analysisResult && (() => {
+                      const chartData = getChartData(shotData)
+                      const stageRanges = getStageRanges(chartData)
+                      const hasTargetCurves = analysisResult.profile_target_curves && analysisResult.profile_target_curves.length > 0
+                      const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
+                      const maxPressure = Math.max(...chartData.map(d => d.pressure || 0), ...(analysisResult.profile_target_curves?.map(d => d.target_pressure || 0) || []), 10)
+                      const maxFlow = Math.max(...chartData.map(d => d.flow || 0), ...(analysisResult.profile_target_curves?.map(d => d.target_flow || 0) || []), 5)
+                      const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+                      return (
+                        <>
+                          <div className="bg-secondary/40 rounded-xl border border-border/20 p-2">
+                            <div className="h-[60vh] min-h-[400px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={chartGridOpacity} />
+                                  {stageRanges.map((stage, idx) => (
+                                    <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
+                                  ))}
+                                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: chartTickFill }} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: chartAxisLineStroke }} type="number" domain={[0, dataMaxTime]} />
+                                  <YAxis yAxisId="left" domain={[0, maxLeftAxis]} tick={{ fontSize: 10, fill: chartTickFill }} axisLine={{ stroke: chartAxisLineStroke }} width={25} />
+                                  <YAxis yAxisId="right" orientation="right" domain={[0, Math.ceil(maxFlow * 1.1)]} hide width={0} />
+                                  <Tooltip contentStyle={{ backgroundColor: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)', border: `1px solid ${isDark ? '#333' : '#d4d4d8'}`, borderRadius: '8px', fontSize: '11px', color: isDark ? '#fff' : '#18181b' }} formatter={(value: number, name: string) => [`${value?.toFixed(1) || '-'}`, name]} labelFormatter={(label) => `${Number(label).toFixed(1)}s`} />
+                                  <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
+                                  <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
+                                  {hasTargetCurves && analysisResult.profile_target_curves && (
+                                    <Customized
+                                      component={({ xAxisMap, yAxisMap }: { xAxisMap?: Record<string, { scale: (v: number) => number }>; yAxisMap?: Record<string, { scale: (v: number) => number }> }) => {
+                                        if (!xAxisMap || !yAxisMap) return null
+                                        const xAxis = Object.values(xAxisMap)[0]
+                                        const yAxis = yAxisMap['left']
+                                        if (!xAxis?.scale || !yAxis?.scale) return null
+                                        const curves = analysisResult.profile_target_curves!
+                                        const pressurePoints = curves.filter(p => p.target_pressure !== undefined).sort((a, b) => a.time - b.time)
+                                        const flowPoints = curves.filter(p => p.target_flow !== undefined).sort((a, b) => a.time - b.time)
+                                        let pressurePath = ''
+                                        if (pressurePoints.length >= 2) pressurePath = pressurePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_pressure!)}`).join(' ')
+                                        let flowPath = ''
+                                        if (flowPoints.length >= 2) flowPath = flowPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_flow!)}`).join(' ')
+                                        return (
+                                          <g className="target-curves">
+                                            {pressurePath && <>
+                                              <path d={pressurePath} fill="none" stroke={CHART_COLORS.targetPressure} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+                                              {pressurePoints.map((p, i) => <circle key={`tp-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_pressure!)} r={4} fill={CHART_COLORS.targetPressure} />)}
+                                            </>}
+                                            {flowPath && <>
+                                              <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+                                              {flowPoints.map((p, i) => <circle key={`tf-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_flow!)} r={4} fill={CHART_COLORS.targetFlow} />)}
+                                            </>}
+                                          </g>
+                                        )
+                                      }}
+                                    />
+                                  )}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                          {/* Legend */}
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.pressure }} /><span>Pressure</span></div>
+                            <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.flow }} /><span>Flow</span></div>
+                            {hasTargetCurves && <>
+                              <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPressure, borderStyle: 'dashed' }} /><span>Target Pressure</span></div>
+                              <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetFlow, borderStyle: 'dashed' }} /><span>Target Flow</span></div>
+                            </>}
+                          </div>
+                          {/* Stage Legend */}
+                          {(() => {
+                            if (stageRanges.length === 0) return null
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[10px] font-semibold text-muted-foreground">Stages:</span>
+                                {stageRanges.map((stage, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
+                                    {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )
+                          })()}
+                        </>
+                      )
+                    })()}
+
+                    {/* Analyze tab — no analysis yet */}
+                    {activeAction === 'analyze' && !analysisResult && (
+                      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40">
+                        <MagnifyingGlass size={48} weight="duotone" />
+                        <p className="text-sm mt-3">Run analysis to see graph overlay</p>
+                      </div>
+                    )}
+                  </div>
+                </div>{/* end desktop graph column */}
+              </div>{/* end two-column layout */}
+          </Tabs>
+        ) : (
+            <Card className="p-6">
             <p className="text-center text-muted-foreground py-8">
               No data available for this shot
             </p>
+            </Card>
           )}
-        </Card>
       </motion.div>
     )
   }

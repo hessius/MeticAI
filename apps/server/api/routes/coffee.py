@@ -21,7 +21,8 @@ from services.gemini_service import (
     get_vision_model,
     get_author_instruction,
     build_advanced_customization_section,
-    clean_gemini_output
+    clean_gemini_output,
+    PROFILING_KNOWLEDGE
 )
 from services.history_service import save_to_history
 
@@ -179,7 +180,7 @@ OUTPUT_FORMAT = (
 
 USER_SUMMARY_INSTRUCTIONS = (
     "INSTRUCTIONS:\n"
-    "1. Use the OEPF Reference below to inform your stage design, dynamics, exit triggers, and limits.\n"
+    "1. Use the OEPF Reference and Profiling Guide below to inform your stage design, dynamics, exit triggers, and limits.\n"
     "2. Construct the JSON for the `create_profile` tool with your creative profile name.\n"
     "3. EXECUTE the tool immediately.\n"
     "4. After successful creation, provide a user summary with:\n"
@@ -189,7 +190,14 @@ USER_SUMMARY_INSTRUCTIONS = (
     "   • Special Requirements: Any special gear needed (bottom filter, specific dosage, unique prep steps)\n\n"
 )
 
-# Build the OEPF reference section once
+# Build the reference sections once
+_PROFILING_GUIDE = (
+    f"ESPRESSO PROFILING GUIDE:\n"
+    f"Use this expert knowledge to design profiles with proper phase structure, "
+    f"dynamics, troubleshooting awareness, and best practices.\n\n"
+    f"{PROFILING_KNOWLEDGE}\n\n"
+)
+
 _OEPF_REFERENCE = (
     f"OPEN ESPRESSO PROFILE FORMAT (OEPF) REFERENCE:\n"
     f"Use the following specification to ensure your profile JSON is valid and well-structured.\n\n"
@@ -375,6 +383,7 @@ async def analyze_and_profile(
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
                 OUTPUT_FORMAT +
+                _PROFILING_GUIDE +
                 _OEPF_REFERENCE
             )
         elif coffee_analysis:
@@ -392,6 +401,7 @@ async def analyze_and_profile(
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
                 OUTPUT_FORMAT +
+                _PROFILING_GUIDE +
                 _OEPF_REFERENCE
             )
         else:
@@ -410,6 +420,7 @@ async def analyze_and_profile(
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
                 OUTPUT_FORMAT +
+                _PROFILING_GUIDE +
                 _OEPF_REFERENCE
             )
         
