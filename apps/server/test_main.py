@@ -5055,6 +5055,76 @@ class TestErrorHandling:
         result = _format_dynamics_description(stage)
         assert "g" in result  # Should use weight unit
 
+    def test_format_dynamics_with_variable_references(self):
+        """Test dynamics description with $variable references resolves correctly."""
+        from services.analysis_service import _format_dynamics_description
+        
+        variables = [
+            {"key": "bloom_pressure", "name": "Bloom Pressure", "type": "pressure", "value": 3.5},
+            {"key": "peak_pressure", "name": "Peak Pressure", "type": "pressure", "value": 9.0},
+        ]
+        
+        # Single point with variable
+        stage = {
+            "type": "pressure",
+            "dynamics_points": [[0, "$bloom_pressure"]],
+        }
+        result = _format_dynamics_description(stage, variables)
+        assert "3.5" in result
+        assert "$" not in result
+        
+        # Two points with variables - should produce ramp description
+        stage_ramp = {
+            "type": "pressure",
+            "dynamics_points": [[0, "$bloom_pressure"], [5, "$peak_pressure"]],
+        }
+        result = _format_dynamics_description(stage_ramp, variables)
+        assert "3.5" in result
+        assert "9.0" in result
+        assert "$" not in result
+        assert "ramp up" in result
+
+    def test_analyze_stage_execution_with_variable_dynamics(self):
+        """Test that stage analysis handles $variable references in dynamics_points without crashing."""
+        from services.analysis_service import _analyze_stage_execution
+        
+        variables = [
+            {"key": "decline_pressure", "name": "Decline Pressure", "type": "pressure", "value": 6.0},
+        ]
+        
+        profile_stage = {
+            "name": "Sweet Decline",
+            "key": "sweet_decline",
+            "type": "pressure",
+            "dynamics_points": [[0, 9.0], [10, "$decline_pressure"]],
+            "exit_triggers": [{"type": "weight", "value": 40, "comparison": ">="}],
+            "limits": []
+        }
+        
+        shot_stage_data = {
+            "duration": 8.5,
+            "start_weight": 20.0,
+            "end_weight": 35.0,
+            "start_pressure": 8.8,
+            "end_pressure": 6.2,
+            "avg_pressure": 7.5,
+            "max_pressure": 8.9,
+            "min_pressure": 6.1,
+            "start_flow": 2.0,
+            "end_flow": 1.8,
+            "avg_flow": 1.9,
+            "max_flow": 2.1,
+        }
+        
+        # This should NOT raise TypeError: can't multiply sequence by non-int of type 'float'
+        result = _analyze_stage_execution(profile_stage, shot_stage_data, 30.0, variables)
+        
+        assert result["executed"] is True
+        assert result["stage_name"] == "Sweet Decline"
+        # The target value should have been resolved from "$decline_pressure" to 6.0
+        assert result["profile_target"] is not None
+        assert "$" not in result["profile_target"]
+
 
 class TestDataDirectoryConfiguration:
     """Tests for DATA_DIR configuration and TEST_MODE."""
