@@ -43,7 +43,7 @@ import { useShotHistory, ShotInfo, ShotData } from '@/hooks/useShotHistory'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import {
   LineChart,
   Line,
