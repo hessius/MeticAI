@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+cd /app/bridge
+exec python start_bridge.py
