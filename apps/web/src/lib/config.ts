@@ -22,7 +22,7 @@ export async function loadConfig(): Promise<AppConfig> {
   try {
     const response = await fetch('/config.json');
     if (!response.ok) {
-      console.warn('config.json not found, using default configuration');
+      // Expected when running without a config file — use defaults silently
       cachedConfig = getDefaultConfig();
       return cachedConfig;
     }
@@ -30,7 +30,7 @@ export async function loadConfig(): Promise<AppConfig> {
     // Guard against SPA fallback returning index.html instead of JSON
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      console.warn('config.json returned non-JSON content, using default configuration');
+      // SPA fallback returned HTML — use defaults silently
       cachedConfig = getDefaultConfig();
       return cachedConfig;
     }
