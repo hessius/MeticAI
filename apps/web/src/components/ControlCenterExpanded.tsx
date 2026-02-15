@@ -5,12 +5,19 @@
  * Shows all temperatures, machine info, brightness/sounds controls,
  * and every available command button.
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,9 +41,11 @@ import {
   SpeakerHigh,
   SpeakerSlash,
   Sun as SunIcon,
+  Coffee,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
+import { getServerUrl } from '@/lib/config'
 import {
   startShot,
   stopShot,
@@ -48,6 +57,7 @@ import {
   purge,
   setBrightness,
   enableSounds,
+  loadProfile,
 } from '@/lib/mqttCommands'
 import { relativeTime } from '@/lib/timeUtils'
 
@@ -68,10 +78,48 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
   const [brightnessValue, setBrightnessValue] = useState<number>(
     machineState.brightness ?? 75,
   )
+  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+  const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
+  const [profilesLoaded, setProfilesLoaded] = useState(false)
 
   const isIdle = machineState.state?.toLowerCase() === 'idle' && !machineState.brewing
   const isBrewing = machineState.brewing
   const isConnected = machineState.connected
+
+  // Build the profile image URL when active_profile changes
+  useEffect(() => {
+    let cancelled = false
+    if (!machineState.active_profile) { setProfileImgUrl(null); return }
+    ;(async () => {
+      const base = await getServerUrl()
+      if (!cancelled) {
+        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(machineState.active_profile!)}/image-proxy`)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [machineState.active_profile])
+
+  // Fetch machine profiles once when expanded
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const base = await getServerUrl()
+        const res = await fetch(`${base}/api/machine/profiles`)
+        if (res.ok && !cancelled) {
+          const data = await res.json()
+          setMachineProfiles(
+            (data.profiles ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))
+          )
+        }
+      } catch {
+        // Silently ignore — selector just won't populate
+      } finally {
+        if (!cancelled) setProfilesLoaded(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const cmd = useCallback(
     async (fn: () => Promise<{ success: boolean; message?: string }>, successKey: string) => {
@@ -135,8 +183,59 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           {t('controlCenter.sections.info')}
         </h4>
-        <div className="space-y-1 text-sm">
-          <Row label={t('controlCenter.labels.profile')} value={machineState.active_profile ?? '—'} />
+        <div className="space-y-2 text-sm">
+          {/* Active profile with image */}
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+              {profileImgUrl ? (
+                <img
+                  src={profileImgUrl}
+                  alt={machineState.active_profile ?? ''}
+                  className="h-full w-full object-cover"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden') }}
+                />
+              ) : null}
+              <Coffee size={20} className={`text-muted-foreground ${profileImgUrl ? 'hidden' : ''}`} weight="duotone" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">
+                {t('controlCenter.labels.profile')}
+              </span>
+              <span className="text-foreground font-medium truncate block">
+                {machineState.active_profile ?? '—'}
+              </span>
+            </div>
+          </div>
+
+          {/* Profile selector */}
+          {profilesLoaded && machineProfiles.length > 0 && isIdle && (
+            <div>
+              <Select
+                value={machineState.active_profile ?? ''}
+                onValueChange={async (name) => {
+                  const res = await loadProfile(name)
+                  if (res.success) {
+                    toast.success(t('controlCenter.toasts.profileLoaded', { name }))
+                  } else {
+                    toast.error(res.message ?? t('controlCenter.toasts.error'))
+                  }
+                }}
+                disabled={!isConnected}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder={t('controlCenter.profileSelector.placeholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {machineProfiles.map(p => (
+                    <SelectItem key={p.id} value={p.name} className="text-xs">
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Row label={t('controlCenter.labels.shots')} value={machineState.total_shots?.toLocaleString() ?? '—'} />
           {machineState.last_shot_time && (
             <Row label={t('controlCenter.labels.lastShot')} value={relativeTime(machineState.last_shot_time, t) ?? '—'} />

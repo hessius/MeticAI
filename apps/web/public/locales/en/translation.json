@@ -438,7 +438,11 @@
       "purging": "Purging...",
       "soundsOn": "Sounds enabled",
       "soundsOff": "Sounds disabled",
-      "error": "Command failed"
+      "error": "Command failed",
+      "profileLoaded": "Profile loaded: {{name}}"
+    },
+    "profileSelector": {
+      "placeholder": "Switch profile…"
     },
     "confirm": {
       "stopTitle": "Stop Shot?",
@@ -459,7 +463,7 @@
       "boiler": "Boiler",
       "target": "Target",
       "profile": "Active Profile",
-      "lastProfile": "Last Profile",
+      "activeProfile": "Active Profile",
       "status": "Status",
       "shots": "Total Shots",
       "sounds": "Sounds",

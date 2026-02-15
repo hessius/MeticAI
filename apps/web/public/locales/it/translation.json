@@ -428,7 +428,11 @@
       "purging": "Spurgo in corso…",
       "soundsOn": "Suoni attivati",
       "soundsOff": "Suoni disattivati",
-      "error": "Comando fallito"
+      "error": "Comando fallito",
+      "profileLoaded": "Profilo caricato: {{name}}"
+    },
+    "profileSelector": {
+      "placeholder": "Cambia profilo…"
     },
     "confirm": {
       "stopTitle": "Fermare l'estrazione?",
@@ -449,7 +453,7 @@
       "boiler": "Caldaia",
       "target": "Obiettivo",
       "profile": "Profilo attivo",
-      "lastProfile": "Ultimo profilo",
+      "activeProfile": "Profilo attivo",
       "status": "Stato",
       "shots": "Estrazioni totali",
       "sounds": "Suoni",

@@ -25,7 +25,7 @@ from services.meticulous_service import (
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
-from services.history_service import HISTORY_FILE
+from services.history_service import HISTORY_FILE, load_history, save_history
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description
 from api.routes.shots import _prepare_profile_for_llm
 from utils.file_utils import atomic_write_json, deep_convert_to_dict
@@ -1281,17 +1281,13 @@ async def list_machine_profiles(request: Request):
                 # Check if this profile exists in our history
                 in_history = False
                 try:
-                    if HISTORY_FILE.exists():
-                        with open(HISTORY_FILE, 'r') as f:
-                            history = json.load(f)
-                            # History is a list, not a dict
-                            entries = history if isinstance(history, list) else history.get("entries", [])
-                            in_history = any(
-                                entry.get("profile_name") == full_profile.name 
-                                for entry in entries
-                            )
+                    history = load_history()
+                    entries = history if isinstance(history, list) else history.get("entries", [])
+                    in_history = any(
+                        entry.get("profile_name") == full_profile.name 
+                        for entry in entries
+                    )
                 except Exception:
-                    # Ignore errors loading history file (may not exist or be corrupted)
                     pass
                 
                 # Convert profile to dict
@@ -1309,16 +1305,12 @@ async def list_machine_profiles(request: Request):
                 # Check for existing description in history
                 if in_history:
                     try:
-                        with open(HISTORY_FILE, 'r') as f:
-                            history = json.load(f)
-                            entries = history if isinstance(history, list) else history.get("entries", [])
-                            for entry in entries:
-                                if entry.get("profile_name") == full_profile.name:
-                                    if entry.get("reply"):
-                                        profile_dict["has_description"] = True
-                                    break
+                        for entry in entries:
+                            if entry.get("profile_name") == full_profile.name:
+                                if entry.get("reply"):
+                                    profile_dict["has_description"] = True
+                                break
                     except Exception:
-                        # Ignore errors loading history (may not exist or be corrupted)
                         pass
                 
                 profiles.append(profile_dict)
@@ -1452,15 +1444,12 @@ async def import_profile(request: Request):
         
         # Check if profile already exists in history
         existing_entry = None
-        if HISTORY_FILE.exists():
-            with open(HISTORY_FILE, 'r') as f:
-                history = json.load(f)
-                # History is a list, not a dict
-                entries = history if isinstance(history, list) else history.get("entries", [])
-                for entry in entries:
-                    if entry.get("profile_name") == profile_name:
-                        existing_entry = entry
-                        break
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        for entry in entries:
+            if entry.get("profile_name") == profile_name:
+                existing_entry = entry
+                break
         
         if existing_entry:
             return {
@@ -1498,19 +1487,14 @@ async def import_profile(request: Request):
             "import_source": source
         }
         
-        # Save to history using atomic write to prevent corruption
-        if HISTORY_FILE.exists():
-            with open(HISTORY_FILE, 'r') as f:
-                history = json.load(f)
-                # Ensure it's a list
-                if not isinstance(history, list):
-                    history = history.get("entries", [])
-        else:
-            history = []
+        # Save to history using cache-aware save to keep in-memory cache in sync
+        history = load_history()
+        if not isinstance(history, list):
+            history = history.get("entries", [])
         
         history.insert(0, new_entry)
         
-        atomic_write_json(HISTORY_FILE, history)
+        save_history(history)
         
         logger.info(
             f"Profile imported successfully: {profile_name}",
@@ -1572,15 +1556,9 @@ async def import_all_profiles(request: Request):
             
             # Get existing profile names from history
             existing_names = set()
-            if HISTORY_FILE.exists():
-                try:
-                    with open(HISTORY_FILE, 'r') as f:
-                        history = json.load(f)
-                        entries = history if isinstance(history, list) else history.get("entries", [])
-                        existing_names = {entry.get("profile_name") for entry in entries}
-                except Exception:
-                    # Ignore errors loading history file (may not exist or be corrupted)
-                    pass
+            history = load_history()
+            entries = history if isinstance(history, list) else history.get("entries", [])
+            existing_names = {entry.get("profile_name") for entry in entries}
             
             # Filter profiles to import
             profiles_to_import = []
@@ -1658,18 +1636,14 @@ async def import_all_profiles(request: Request):
                         "import_source": "machine_bulk"
                     }
                     
-                    # Save to history using atomic write to prevent corruption
-                    if HISTORY_FILE.exists():
-                        with open(HISTORY_FILE, 'r') as f:
-                            history = json.load(f)
-                            if not isinstance(history, list):
-                                history = history.get("entries", [])
-                    else:
-                        history = []
+                    # Save to history using cache-aware save
+                    history = load_history()
+                    if not isinstance(history, list):
+                        history = history.get("entries", [])
                     
                     history.insert(0, new_entry)
                     
-                    atomic_write_json(HISTORY_FILE, history)
+                    save_history(history)
                     
                     imported.append(profile_name)
                     
@@ -1748,15 +1722,9 @@ async def get_machine_profile_count(request: Request):
         
         # Get existing profile names from history
         existing_names = set()
-        if HISTORY_FILE.exists():
-            try:
-                with open(HISTORY_FILE, 'r') as f:
-                    history = json.load(f)
-                    entries = history if isinstance(history, list) else history.get("entries", [])
-                    existing_names = {entry.get("profile_name") for entry in entries}
-            except Exception:
-                # Ignore errors loading history file (may not exist or be corrupted)
-                pass
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        existing_names = {entry.get("profile_name") for entry in entries}
         
         not_imported = 0
         for partial_profile in profiles_result:
@@ -1861,20 +1829,14 @@ Remember: NO information should be lost in this conversion!"""
         # Update the history entry if it exists
         entry_id = body.get("entry_id")
         if entry_id:
-            if HISTORY_FILE.exists():
-                with open(HISTORY_FILE, 'r') as f:
-                    history = json.load(f)
-                
-                # History is a list, not a dict
-                entries = history if isinstance(history, list) else history.get("entries", [])
-                for entry in entries:
-                    if entry.get("id") == entry_id:
-                        entry["reply"] = converted_description
-                        entry["description_converted"] = True
-                        break
-                
-                with open(HISTORY_FILE, 'w') as f:
-                    json.dump(history, f, indent=2)
+            history = load_history()
+            entries = history if isinstance(history, list) else history.get("entries", [])
+            for entry in entries:
+                if entry.get("id") == entry_id:
+                    entry["reply"] = converted_description
+                    entry["description_converted"] = True
+                    break
+            save_history(history)
         
         logger.info(
             f"Description converted successfully for: {profile_name}",
