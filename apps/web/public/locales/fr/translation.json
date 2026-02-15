@@ -428,7 +428,11 @@
       "purging": "Purge en cours…",
       "soundsOn": "Sons activés",
       "soundsOff": "Sons désactivés",
-      "error": "Échec de la commande"
+      "error": "Échec de la commande",
+      "profileLoaded": "Profil chargé : {{name}}"
+    },
+    "profileSelector": {
+      "placeholder": "Changer de profil…"
     },
     "confirm": {
       "stopTitle": "Arrêter l'extraction ?",
@@ -449,7 +453,7 @@
       "boiler": "Chaudière",
       "target": "Cible",
       "profile": "Profil actif",
-      "lastProfile": "Dernier profil",
+      "activeProfile": "Profil actif",
       "status": "Statut",
       "shots": "Extractions totales",
       "sounds": "Sons",

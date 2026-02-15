@@ -199,7 +199,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
           {!(compact && isIdle) && (
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <div className="truncate max-w-[60%]">
-                <span className="text-[10px] uppercase tracking-wider block">{t('controlCenter.labels.lastProfile')}</span>
+                <span className="text-[10px] uppercase tracking-wider block">{t('controlCenter.labels.activeProfile')}</span>
                 <span className="text-foreground font-medium">
                   {machineState.active_profile ?? t('controlCenter.noProfile')}
                 </span>

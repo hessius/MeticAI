@@ -428,7 +428,11 @@
       "purging": "Spolar…",
       "soundsOn": "Ljud aktiverat",
       "soundsOff": "Ljud inaktiverat",
-      "error": "Kommandot misslyckades"
+      "error": "Kommandot misslyckades",
+      "profileLoaded": "Profil laddad: {{name}}"
+    },
+    "profileSelector": {
+      "placeholder": "Byt profil…"
     },
     "confirm": {
       "stopTitle": "Stoppa bryggning?",
@@ -449,7 +453,7 @@
       "boiler": "Panna",
       "target": "Mål",
       "profile": "Aktiv profil",
-      "lastProfile": "Senaste profil",
+      "activeProfile": "Aktivt profil",
       "status": "Status",
       "shots": "Totalt antal bryggningar",
       "sounds": "Ljud",

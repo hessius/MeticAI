@@ -428,7 +428,11 @@
       "purging": "Spült…",
       "soundsOn": "Töne aktiviert",
       "soundsOff": "Töne deaktiviert",
-      "error": "Befehl fehlgeschlagen"
+      "error": "Befehl fehlgeschlagen",
+      "profileLoaded": "Profil geladen: {{name}}"
+    },
+    "profileSelector": {
+      "placeholder": "Profil wechseln…"
     },
     "confirm": {
       "stopTitle": "Bezug stoppen?",
@@ -449,7 +453,7 @@
       "boiler": "Boiler",
       "target": "Ziel",
       "profile": "Aktives Profil",
-      "lastProfile": "Letztes Profil",
+      "activeProfile": "Aktives Profil",
       "status": "Status",
       "shots": "Bezüge gesamt",
       "sounds": "Töne",

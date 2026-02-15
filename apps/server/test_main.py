@@ -3298,8 +3298,8 @@ class TestMachineProfilesEndpoint:
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_success(self, mock_history_file, mock_list_profiles, mock_get_profile, client):
+    @patch('api.routes.profiles.load_history')
+    def test_list_profiles_success(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
         """Test successful profile listing from machine."""
         # Mock list_profiles result - return simple objects
         mock_profile1 = type('Profile', (), {})()
@@ -3333,14 +3333,12 @@ class TestMachineProfilesEndpoint:
         
         mock_get_profile.side_effect = [full_profile1, full_profile2]
         
-        # Mock history file
-        mock_history_file.exists.return_value = True
-        history_data = [
+        # Mock history via load_history
+        mock_load_history.return_value = [
             {"profile_name": "Espresso Classic", "reply": "Great profile"}
         ]
         
-        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))):
-            response = client.get("/api/machine/profiles")
+        response = client.get("/api/machine/profiles")
         
         assert response.status_code == 200
         data = response.json()
@@ -3371,12 +3369,10 @@ class TestMachineProfilesEndpoint:
         assert "Machine API error" in response.json()["detail"]
 
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_empty(self, mock_history_file, mock_list_profiles, client):
+    @patch('api.routes.profiles.load_history', return_value=[])
+    def test_list_profiles_empty(self, mock_load_history, mock_list_profiles, client):
         """Test listing when no profiles exist."""
         mock_list_profiles.return_value = []
-        
-        mock_history_file.exists.return_value = False
         
         response = client.get("/api/machine/profiles")
         
@@ -3388,8 +3384,8 @@ class TestMachineProfilesEndpoint:
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_partial_failure(self, mock_history_file, mock_list_profiles, mock_get_profile, client):
+    @patch('api.routes.profiles.load_history', return_value=[])
+    def test_list_profiles_partial_failure(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
         """Test listing continues when individual profile fetch fails."""
         mock_profile1 = type('Profile', (), {})()
         mock_profile1.id = "profile-1"
@@ -3412,8 +3408,6 @@ class TestMachineProfilesEndpoint:
         # Second profile fetch fails
         mock_get_profile.side_effect = [full_profile1, Exception("Network error")]
         
-        mock_history_file.exists.return_value = False
-        
         response = client.get("/api/machine/profiles")
         
         assert response.status_code == 200
@@ -3425,8 +3419,8 @@ class TestMachineProfilesEndpoint:
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_list_profiles_history_dict_format(self, mock_history_file, mock_list_profiles, mock_get_profile, client):
+    @patch('api.routes.profiles.load_history')
+    def test_list_profiles_history_dict_format(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
         """Test handling of legacy history format (dict with entries key)."""
         mock_profile = type('Profile', (), {})()
         mock_profile.id = "profile-1"
@@ -3443,16 +3437,14 @@ class TestMachineProfilesEndpoint:
         
         mock_get_profile.return_value = full_profile
         
-        mock_history_file.exists.return_value = True
         # Legacy format: dict with entries key
-        history_data = {
+        mock_load_history.return_value = {
             "entries": [
                 {"profile_name": "Test Profile", "reply": "Description here"}
             ]
         }
         
-        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))):
-            response = client.get("/api/machine/profiles")
+        response = client.get("/api/machine/profiles")
         
         assert response.status_code == 200
         data = response.json()
@@ -3559,10 +3551,10 @@ class TestMachineProfileJsonEndpoint:
 class TestProfileImportEndpoint:
     """Tests for the /api/profile/import endpoint."""
 
-    @patch('api.routes.profiles.atomic_write_json')
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history', return_value=[])
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_import_profile_success(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
+    def test_import_profile_success(self, mock_generate_desc, mock_load_history, mock_save_history, client):
         """Test successful profile import with description generation."""
         mock_generate_desc.return_value = "Great espresso profile with balanced extraction"
         
@@ -3573,17 +3565,14 @@ class TestProfileImportEndpoint:
             "stages": [{"name": "extraction"}]
         }
         
-        mock_history_file.exists.return_value = True
-        
-        with patch('builtins.open', mock_open(read_data='[]')) as mock_file:
-            response = client.post(
-                "/api/profile/import",
-                json={
-                    "profile": profile_json,
-                    "generate_description": True,
-                    "source": "file"
-                }
-            )
+        response = client.post(
+            "/api/profile/import",
+            json={
+                "profile": profile_json,
+                "generate_description": True,
+                "source": "file"
+            }
+        )
         
         assert response.status_code == 200
         data = response.json()
@@ -3591,12 +3580,12 @@ class TestProfileImportEndpoint:
         assert data["profile_name"] == "Imported Espresso"
         assert data["has_description"] is True
         assert "entry_id" in data
-        mock_atomic_write.assert_called_once()
+        mock_save_history.assert_called_once()
 
-    @patch('api.routes.profiles.atomic_write_json')
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history', return_value=[])
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_import_profile_without_description(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
+    def test_import_profile_without_description(self, mock_generate_desc, mock_load_history, mock_save_history, client):
         """Test profile import without generating description."""
         # Should not be called when generate_description=False
         mock_generate_desc.return_value = "Should not use this"
@@ -3606,37 +3595,30 @@ class TestProfileImportEndpoint:
             "temperature": 92.0
         }
         
-        mock_history_file.exists.return_value = False
-        
-        with patch('builtins.open', mock_open()) as mock_file:
-            response = client.post(
-                "/api/profile/import",
-                json={
-                    "profile": profile_json,
-                    "generate_description": False,
-                    "source": "machine"
-                }
-            )
+        response = client.post(
+            "/api/profile/import",
+            json={
+                "profile": profile_json,
+                "generate_description": False,
+                "source": "machine"
+            }
+        )
         
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        # Description not generated, but basic message exists
-        # has_description checks for "Description generation failed" not in reply
-        # So we just verify import succeeded
         mock_generate_desc.assert_not_called()
-        mock_atomic_write.assert_called_once()
+        mock_save_history.assert_called_once()
 
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_import_profile_already_exists(self, mock_history_file, client):
+    @patch('api.routes.profiles.load_history')
+    def test_import_profile_already_exists(self, mock_load_history, client):
         """Test importing a profile that already exists in history."""
         profile_json = {
             "name": "Existing Profile",
             "temperature": 93.0
         }
         
-        mock_history_file.exists.return_value = True
-        history_data = [
+        mock_load_history.return_value = [
             {
                 "id": "existing-123",
                 "profile_name": "Existing Profile",
@@ -3644,11 +3626,10 @@ class TestProfileImportEndpoint:
             }
         ]
         
-        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))):
-            response = client.post(
-                "/api/profile/import",
-                json={"profile": profile_json}
-            )
+        response = client.post(
+            "/api/profile/import",
+            json={"profile": profile_json}
+        )
         
         assert response.status_code == 200
         data = response.json()
@@ -3666,10 +3647,10 @@ class TestProfileImportEndpoint:
         assert response.status_code == 400
         assert "No profile JSON provided" in response.json()["detail"]
 
-    @patch('api.routes.profiles.atomic_write_json')
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history', return_value=[])
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_import_profile_description_generation_fails(self, mock_history_file, mock_generate_desc, mock_atomic_write, client):
+    def test_import_profile_description_generation_fails(self, mock_generate_desc, mock_load_history, mock_save_history, client):
         """Test import continues when description generation fails."""
         mock_generate_desc.side_effect = Exception("AI service unavailable")
         
@@ -3678,50 +3659,45 @@ class TestProfileImportEndpoint:
             "temperature": 91.0
         }
         
-        mock_history_file.exists.return_value = False
-        
-        with patch('builtins.open', mock_open()) as mock_file:
-            response = client.post(
-                "/api/profile/import",
-                json={
-                    "profile": profile_json,
-                    "generate_description": True,
-                    "source": "file"
-                }
-            )
+        response = client.post(
+            "/api/profile/import",
+            json={
+                "profile": profile_json,
+                "generate_description": True,
+                "source": "file"
+            }
+        )
         
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
         # Should have fallback message
         assert data["has_description"] is False
-        mock_atomic_write.assert_called_once()
+        mock_save_history.assert_called_once()
 
-    @patch('api.routes.profiles.atomic_write_json')
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_import_profile_legacy_history_format(self, mock_history_file, mock_atomic_write, client):
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history')
+    def test_import_profile_legacy_history_format(self, mock_load_history, mock_save_history, client):
         """Test import with legacy history format (dict with entries)."""
         profile_json = {
             "name": "New Profile",
             "temperature": 94.0
         }
         
-        mock_history_file.exists.return_value = True
         # Legacy format
-        history_data = {
+        mock_load_history.return_value = {
             "entries": [
                 {"profile_name": "Old Profile"}
             ]
         }
         
-        with patch('builtins.open', mock_open(read_data=json.dumps(history_data))) as mock_file:
-            response = client.post(
-                "/api/profile/import",
-                json={
-                    "profile": profile_json,
-                    "generate_description": False
-                }
-            )
+        response = client.post(
+            "/api/profile/import",
+            json={
+                "profile": profile_json,
+                "generate_description": False
+            }
+        )
         
         assert response.status_code == 200
         data = response.json()
@@ -4820,8 +4796,7 @@ class TestConvertDescriptionEndpoint:
     """Tests for the POST /api/profile/convert-description endpoint."""
 
     @patch('api.routes.profiles.get_vision_model')
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_convert_description_success(self, mock_history_file, mock_get_model, client):
+    def test_convert_description_success(self, mock_get_model, client):
         """Test successful description conversion."""
         mock_model = MagicMock()
         mock_response = MagicMock()
@@ -4846,8 +4821,6 @@ Adjust grind based on bean age."""
         mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
-        mock_history_file.exists.return_value = False
-        
         response = client.post("/api/profile/convert-description", json={
             "profile": {
                 "name": "Test Profile",
@@ -4864,9 +4837,10 @@ Adjust grind based on bean age."""
         assert "converted_description" in data
         assert "Profile Created" in data["converted_description"]
 
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history')
     @patch('api.routes.profiles.get_vision_model')
-    @patch('api.routes.profiles.HISTORY_FILE')
-    def test_convert_description_with_history_update(self, mock_history_file, mock_get_model, client):
+    def test_convert_description_with_history_update(self, mock_get_model, mock_load_history, mock_save_history, client):
         """Test conversion updates history entry."""
         mock_model = MagicMock()
         mock_response = MagicMock()
@@ -4875,21 +4849,20 @@ Adjust grind based on bean age."""
         mock_model.async_generate_content = AsyncMock(return_value=mock_response)
         mock_get_model.return_value = mock_model
         
-        # Mock history file
-        mock_history_file.exists.return_value = True
-        existing_history = [
+        # Mock history via load_history
+        mock_load_history.return_value = [
             {"id": "entry-123", "profile_name": "Test", "reply": "Old description"},
             {"id": "entry-456", "profile_name": "Other", "reply": "Other description"}
         ]
         
-        with patch('builtins.open', mock_open(read_data=json.dumps(existing_history))) as mock_file:
-            response = client.post("/api/profile/convert-description", json={
-                "profile": {"name": "Test", "temperature": 93.0, "final_weight": 36.0},
-                "description": "Original",
-                "entry_id": "entry-123"
-            })
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {"name": "Test", "temperature": 93.0, "final_weight": 36.0},
+            "description": "Original",
+            "entry_id": "entry-123"
+        })
         
         assert response.status_code == 200
+        mock_save_history.assert_called_once()
 
     def test_convert_description_missing_profile(self, client):
         """Test error when profile JSON missing."""
@@ -4954,7 +4927,7 @@ class TestErrorHandling:
         
         assert response.status_code == 500
 
-    @patch('api.routes.profiles.HISTORY_FILE')
+    @patch('services.history_service.HISTORY_FILE')
     def test_corrupted_history_file(self, mock_history_file, client):
         """Test handling of corrupted history JSON."""
         mock_history_file.exists.return_value = True

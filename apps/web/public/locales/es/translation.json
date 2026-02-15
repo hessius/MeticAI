@@ -428,7 +428,11 @@
       "purging": "Purgando…",
       "soundsOn": "Sonidos activados",
       "soundsOff": "Sonidos desactivados",
-      "error": "El comando falló"
+      "error": "El comando falló",
+      "profileLoaded": "Perfil cargado: {{name}}"
+    },
+    "profileSelector": {
+      "placeholder": "Cambiar perfil…"
     },
     "confirm": {
       "stopTitle": "¿Detener extracción?",
@@ -449,7 +453,7 @@
       "boiler": "Caldera",
       "target": "Objetivo",
       "profile": "Perfil activo",
-      "lastProfile": "Último perfil",
+      "activeProfile": "Perfil activo",
       "status": "Estado",
       "shots": "Total de extracciones",
       "sounds": "Sonidos",
