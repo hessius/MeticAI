@@ -106,6 +106,9 @@ RUN mkdir -p /app/server /app/mcp-server /var/www/html /data
 # Copy built web frontend
 COPY --from=web-builder /build/dist /var/www/html
 
+# Ensure config.json exists (gitignored in source, needed at runtime)
+RUN echo '{"serverUrl":""}' > /var/www/html/config.json
+
 # Copy server
 COPY apps/server/ /app/server/
 
