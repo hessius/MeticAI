@@ -394,6 +394,13 @@
     "totalShots": "{{count}} shots",
     "showAll": "Show all",
     "collapse": "Collapse",
+    "connection": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "offline": "Offline",
+      "stale": "Stale",
+      "connecting": "Connecting"
+    },
     "states": {
       "idle": "Idle",
       "brewing": "Brewing",
@@ -452,8 +459,9 @@
       "boiler": "Boiler",
       "target": "Target",
       "profile": "Active Profile",
+      "lastProfile": "Last Profile",
+      "status": "Status",
       "shots": "Total Shots",
-      "voltage": "Voltage",
       "sounds": "Sounds"
     },
     "lastShot": {

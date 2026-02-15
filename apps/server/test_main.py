@@ -9137,6 +9137,7 @@ class TestMachineCommandEndpoints:
             }
             response = client.post("/api/machine/command/start")
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "start_shot"
 
     def test_command_start_rejected_when_brewing(self, client):
@@ -9165,6 +9166,7 @@ class TestMachineCommandEndpoints:
             }
             response = client.post("/api/machine/command/stop")
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "stop_shot"
 
     def test_command_stop_rejected_not_brewing(self, client):
@@ -9184,12 +9186,14 @@ class TestMachineCommandEndpoints:
             }
             response = client.post("/api/machine/command/abort")
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "abort_shot"
 
     def test_command_continue(self, client):
         """Continue command always succeeds (no precondition)."""
         response = client.post("/api/machine/command/continue")
         assert response.status_code == 200
+        assert response.json()["success"] is True
         assert response.json()["command"] == "continue_shot"
 
     def test_command_preheat_success(self, client):
@@ -9200,6 +9204,7 @@ class TestMachineCommandEndpoints:
             }
             response = client.post("/api/machine/command/preheat")
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "preheat"
 
     def test_command_tare_success(self, client):
@@ -9210,6 +9215,7 @@ class TestMachineCommandEndpoints:
             }
             response = client.post("/api/machine/command/tare")
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "tare_scale"
 
     def test_command_home_plunger(self, client):
@@ -9220,6 +9226,7 @@ class TestMachineCommandEndpoints:
             }
             response = client.post("/api/machine/command/home-plunger")
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "home_plunger"
 
     def test_command_purge(self, client):
@@ -9230,6 +9237,7 @@ class TestMachineCommandEndpoints:
             }
             response = client.post("/api/machine/command/purge")
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "purge"
 
     def test_command_load_profile(self, client):
@@ -9243,6 +9251,7 @@ class TestMachineCommandEndpoints:
                 json={"name": "Berry Blast Bloom"}
             )
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "load_profile"
 
     def test_command_brightness(self, client):
@@ -9256,6 +9265,7 @@ class TestMachineCommandEndpoints:
                 json={"value": 75}
             )
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "set_brightness"
 
     def test_command_brightness_validation(self, client):
@@ -9277,6 +9287,7 @@ class TestMachineCommandEndpoints:
                 json={"enabled": False}
             )
             assert response.status_code == 200
+            assert response.json()["success"] is True
             assert response.json()["command"] == "enable_sounds"
 
     def test_command_publish_failure(self, client):

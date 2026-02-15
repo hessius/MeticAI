@@ -384,6 +384,13 @@
     "totalShots": "{{count}} extractions",
     "showAll": "Tout afficher",
     "collapse": "Réduire",
+    "connection": {
+      "connected": "Connecté",
+      "disconnected": "Déconnecté",
+      "offline": "Hors ligne",
+      "stale": "Périmé",
+      "connecting": "Connexion"
+    },
     "states": {
       "idle": "En attente",
       "brewing": "Extraction en cours",
@@ -442,8 +449,9 @@
       "boiler": "Chaudière",
       "target": "Cible",
       "profile": "Profil actif",
+      "lastProfile": "Dernier profil",
+      "status": "Statut",
       "shots": "Extractions totales",
-      "voltage": "Tension",
       "sounds": "Sons"
     },
     "lastShot": {

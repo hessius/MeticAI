@@ -640,7 +640,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
         </motion.div>
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
-        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)] lg:gap-6' : ''}>
+        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
           <div>
             {/* Mobile Control Center — above the main card, StartView only */}

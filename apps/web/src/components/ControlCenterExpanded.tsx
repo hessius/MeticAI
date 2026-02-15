@@ -68,7 +68,7 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
     machineState.brightness ?? 75,
   )
 
-  const isIdle = machineState.state === 'idle' && !machineState.brewing
+  const isIdle = machineState.state?.toLowerCase() === 'idle' && !machineState.brewing
   const isBrewing = machineState.brewing
   const isConnected = machineState.connected
 
@@ -121,7 +121,9 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
         <div className="space-y-1 text-sm">
           <Row label={t('controlCenter.labels.brewHead')} value={fmt(machineState.brew_head_temperature, '°C')} />
           <Row label={t('controlCenter.labels.boiler')} value={fmt(machineState.boiler_temperature, '°C')} />
-          <Row label={t('controlCenter.labels.target')} value={fmt(machineState.target_temperature, '°C')} />
+          {!isIdle && (
+            <Row label={t('controlCenter.labels.target')} value={fmt(machineState.target_temperature, '°C')} />
+          )}
         </div>
       </section>
 
@@ -135,7 +137,6 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
         <div className="space-y-1 text-sm">
           <Row label={t('controlCenter.labels.profile')} value={machineState.active_profile ?? '—'} />
           <Row label={t('controlCenter.labels.shots')} value={machineState.total_shots?.toLocaleString() ?? '—'} />
-          <Row label={t('controlCenter.labels.voltage')} value={fmt(machineState.voltage, 'V')} />
         </div>
       </section>
 
@@ -221,7 +222,7 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
           <ActionButton
             icon={<ArrowRight size={14} weight="bold" />}
             label={t('controlCenter.actions.continue')}
-            disabled={machineState.state !== 'paused'}
+            disabled={machineState.state?.toLowerCase() !== 'paused'}
             onClick={() => cmd(continueShot, 'continuing')}
           />
           <ActionButton
