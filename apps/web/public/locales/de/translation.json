@@ -452,14 +452,20 @@
       "lastProfile": "Letztes Profil",
       "status": "Status",
       "shots": "Bezüge gesamt",
-      "sounds": "Töne"
+      "sounds": "Töne",
+      "firmware": "Firmware",
+      "lastShot": "Letzter Bezug"
     },
     "lastShot": {
       "title": "Bezug vor {{time}}",
+      "label": "Letzter Bezug: {{time}}",
+      "justNow": "gerade eben",
       "minutesAgo": "vor {{count}} Min.",
       "minutesAgo_one": "vor 1 Min.",
       "hoursAgo": "vor {{count}} Std.",
       "hoursAgo_one": "vor 1 Std.",
+      "daysAgo": "vor {{count}} Tagen",
+      "daysAgo_one": "vor 1 Tag",
       "analyze": "Bezug analysieren"
     },
     "shotDetected": {

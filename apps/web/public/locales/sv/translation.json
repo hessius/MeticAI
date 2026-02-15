@@ -452,14 +452,20 @@
       "lastProfile": "Senaste profil",
       "status": "Status",
       "shots": "Totalt antal bryggningar",
-      "sounds": "Ljud"
+      "sounds": "Ljud",
+      "firmware": "Firmware",
+      "lastShot": "Senaste bryggning"
     },
     "lastShot": {
       "title": "Bryggning gjord {{time}}",
+      "label": "Senaste bryggning: {{time}}",
+      "justNow": "just nu",
       "minutesAgo": "{{count}} min sedan",
       "minutesAgo_one": "1 min sedan",
       "hoursAgo": "{{count}} timmar sedan",
       "hoursAgo_one": "1 timme sedan",
+      "daysAgo": "{{count}} dagar sedan",
+      "daysAgo_one": "1 dag sedan",
       "analyze": "Analysera bryggning"
     },
     "shotDetected": {

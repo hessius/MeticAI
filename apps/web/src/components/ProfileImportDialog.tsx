@@ -445,7 +445,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                   <div className="pt-2 border-t border-border/30">
                     <Alert className="mb-3 bg-blue-500/5 border-blue-500/20">
                       <Info size={16} className="text-blue-500" />
-                      <AlertDescription className="text-xs text-blue-200/80">
+                      <AlertDescription className="text-xs text-muted-foreground">
                         Importing generates AI descriptions for each profile and will consume API tokens.
                       </AlertDescription>
                     </Alert>

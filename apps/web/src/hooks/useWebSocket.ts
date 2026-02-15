@@ -40,6 +40,11 @@ export interface MachineState {
   brightness: number | null
   sounds_enabled: boolean | null
   voltage: number | null
+  firmware_version: string | null
+
+  // Last shot
+  last_shot_time: string | null
+  last_shot_name: string | null
 
   // Meta
   _ts: number | null
@@ -70,6 +75,9 @@ const INITIAL_STATE: MachineState = {
   brightness: null,
   sounds_enabled: null,
   voltage: null,
+  firmware_version: null,
+  last_shot_time: null,
+  last_shot_name: null,
   _ts: null,
   _stale: true,
   _wsConnected: false,
@@ -154,6 +162,9 @@ export function useWebSocket(enabled: boolean): MachineState {
             brightness: msg.brightness ?? prev.brightness,
             sounds_enabled: msg.sounds_enabled ?? prev.sounds_enabled,
             voltage: msg.voltage ?? prev.voltage,
+            firmware_version: msg.firmware_version ?? prev.firmware_version,
+            last_shot_time: msg.last_shot_time ?? prev.last_shot_time,
+            last_shot_name: msg.last_shot_name ?? prev.last_shot_name,
             _ts: msg._ts ?? prev._ts,
             _stale: false,
             _wsConnected: true,

@@ -462,14 +462,20 @@
       "lastProfile": "Last Profile",
       "status": "Status",
       "shots": "Total Shots",
-      "sounds": "Sounds"
+      "sounds": "Sounds",
+      "firmware": "Firmware",
+      "lastShot": "Last Shot"
     },
     "lastShot": {
       "title": "Shot pulled {{time}}",
+      "label": "Last shot: {{time}}",
+      "justNow": "just now",
       "minutesAgo": "{{count}} min ago",
       "minutesAgo_one": "1 min ago",
       "hoursAgo": "{{count}} hours ago",
       "hoursAgo_one": "1 hour ago",
+      "daysAgo": "{{count}} days ago",
+      "daysAgo_one": "1 day ago",
       "analyze": "Analyze Shot"
     },
     "shotDetected": {
