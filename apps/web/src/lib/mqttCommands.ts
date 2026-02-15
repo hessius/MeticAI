@@ -23,7 +23,9 @@ async function postCommand(
     const err = await res.json().catch(() => ({}))
     return { success: false, message: (err as Record<string, string>).detail ?? res.statusText }
   }
-  return res.json()
+  const data = await res.json()
+  // Backend returns { success, status, command }; normalise to { success, message }
+  return { success: data.success ?? data.status === 'ok', message: data.message }
 }
 
 // ---------------------------------------------------------------------------

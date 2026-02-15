@@ -98,7 +98,7 @@ def _do_publish(action: str, payload: str = "") -> dict:
         raise HTTPException(
             status_code=503, detail="Failed to publish MQTT command"
         )
-    return {"status": "ok", "command": action}
+    return {"success": True, "status": "ok", "command": action}
 
 
 # ---------------------------------------------------------------------------

@@ -384,6 +384,13 @@
     "totalShots": "{{count}} bryggningar",
     "showAll": "Visa alla",
     "collapse": "Dölj",
+    "connection": {
+      "connected": "Ansluten",
+      "disconnected": "Frånkopplad",
+      "offline": "Offline",
+      "stale": "Inaktuell",
+      "connecting": "Ansluter"
+    },
     "states": {
       "idle": "Viloläge",
       "brewing": "Brygger",
@@ -442,8 +449,9 @@
       "boiler": "Panna",
       "target": "Mål",
       "profile": "Aktiv profil",
+      "lastProfile": "Senaste profil",
+      "status": "Status",
       "shots": "Totalt antal bryggningar",
-      "voltage": "Spänning",
       "sounds": "Ljud"
     },
     "lastShot": {

@@ -384,6 +384,13 @@
     "totalShots": "{{count}} Bezüge",
     "showAll": "Alle anzeigen",
     "collapse": "Einklappen",
+    "connection": {
+      "connected": "Verbunden",
+      "disconnected": "Getrennt",
+      "offline": "Offline",
+      "stale": "Veraltet",
+      "connecting": "Verbindet"
+    },
     "states": {
       "idle": "Bereit",
       "brewing": "Brüht",
@@ -442,8 +449,9 @@
       "boiler": "Boiler",
       "target": "Ziel",
       "profile": "Aktives Profil",
+      "lastProfile": "Letztes Profil",
+      "status": "Status",
       "shots": "Bezüge gesamt",
-      "voltage": "Spannung",
       "sounds": "Töne"
     },
     "lastShot": {

@@ -384,6 +384,13 @@
     "totalShots": "{{count}} estrazioni",
     "showAll": "Mostra tutto",
     "collapse": "Comprimi",
+    "connection": {
+      "connected": "Connesso",
+      "disconnected": "Disconnesso",
+      "offline": "Offline",
+      "stale": "Obsoleto",
+      "connecting": "Connessione"
+    },
     "states": {
       "idle": "In attesa",
       "brewing": "Estrazione in corso",
@@ -442,8 +449,9 @@
       "boiler": "Caldaia",
       "target": "Obiettivo",
       "profile": "Profilo attivo",
+      "lastProfile": "Ultimo profilo",
+      "status": "Stato",
       "shots": "Estrazioni totali",
-      "voltage": "Voltaggio",
       "sounds": "Suoni"
     },
     "lastShot": {

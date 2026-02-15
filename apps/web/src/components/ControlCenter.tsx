@@ -8,9 +8,10 @@
  *  • Quick-action buttons (idle) or live shot metrics (brewing)
  *  • An expand toggle that reveals ControlCenterExpanded
  */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import confetti from 'canvas-confetti'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -62,7 +63,7 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
     steaming:    { cls: 'bg-purple-500/20 text-purple-400 border-purple-500/40', key: 'steaming' },
     descaling:   { cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', key: 'descaling' },
   }
-  const entry = map[state ?? ''] ?? { cls: 'bg-muted text-muted-foreground border-muted', key: 'unknown' }
+  const entry = map[(state ?? '').toLowerCase()] ?? { cls: 'bg-muted text-muted-foreground border-muted', key: 'unknown' }
   return (
     <Badge className={entry.cls}>
       {t(`controlCenter.states.${entry.key}`)}
@@ -71,11 +72,11 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
 }
 
 function connectionDot(machineState: MachineState) {
-  if (!machineState._wsConnected) return 'bg-gray-400'
-  if (machineState.availability === 'offline') return 'bg-red-500'
-  if (machineState._stale) return 'bg-amber-400'
-  if (machineState.connected) return 'bg-emerald-400'
-  return 'bg-gray-400'
+  if (!machineState._wsConnected) return { dot: 'bg-gray-400', key: 'disconnected' }
+  if (machineState.availability === 'offline') return { dot: 'bg-red-500', key: 'offline' }
+  if (machineState._stale) return { dot: 'bg-amber-400', key: 'stale' }
+  if (machineState.connected) return { dot: 'bg-emerald-400', key: 'connected' }
+  return { dot: 'bg-gray-400', key: 'connecting' }
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,19 @@ function connectionDot(machineState: MachineState) {
 export function ControlCenter({ machineState, onOpenLiveView, compact }: ControlCenterProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
+  const prevShotsRef = useRef<number | null>(null)
+
+  // 🎉 Confetti celebration for every 100th shot
+  useEffect(() => {
+    const shots = machineState.total_shots
+    if (shots == null) return
+    const prev = prevShotsRef.current
+    prevShotsRef.current = shots
+    // Only fire when total_shots *crosses* a 100 boundary (not on initial load)
+    if (prev != null && prev !== shots && shots > 0 && shots % 100 === 0) {
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } })
+    }
+  }, [machineState.total_shots])
 
   // Command helpers with toast feedback
   const cmd = useCallback(
@@ -129,7 +143,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
     )
   }
 
-  const isIdle = machineState.state === 'idle' && !machineState.brewing
+  const isIdle = machineState.state?.toLowerCase() === 'idle' && !machineState.brewing
   const isBrewing = machineState.brewing
 
   return (
@@ -140,11 +154,18 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
           <Coffee size={18} weight="duotone" className="text-primary" />
           <span className="text-sm font-semibold text-foreground">Meticulous</span>
         </div>
-        <div className="flex items-center gap-2">
-          {machineState._stale && (
-            <span className="text-[10px] text-amber-400">{t('controlCenter.stale')}</span>
-          )}
-          <span className={`h-2.5 w-2.5 rounded-full ${connectionDot(machineState)}`} />
+        <div className="flex items-center gap-1.5">
+          {(() => {
+            const { dot, key } = connectionDot(machineState)
+            return (
+              <>
+                <span className="text-[10px] text-muted-foreground">
+                  {t(`controlCenter.connection.${key}`)}
+                </span>
+                <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+              </>
+            )
+          })()}
         </div>
       </div>
 
@@ -161,24 +182,35 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
                   : '—'}
               </span>
               <span className="text-sm text-muted-foreground">°C</span>
-              {machineState.target_temperature != null && (
+              {machineState.target_temperature != null && !isIdle && (
                 <span className="text-xs text-muted-foreground ml-1">
                   / {machineState.target_temperature.toFixed(0)}°C
                 </span>
               )}
             </div>
-            {stateBadge(machineState.state, false, t)}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">{t('controlCenter.labels.status')}</span>
+              {stateBadge(machineState.state, false, t)}
+            </div>
           </div>
 
-          {/* Active profile + total shots */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="truncate max-w-[60%]">
-              {machineState.active_profile ?? t('controlCenter.noProfile')}
-            </span>
-            {machineState.total_shots != null && (
-              <span>{t('controlCenter.totalShots', { count: machineState.total_shots })}</span>
-            )}
-          </div>
+          {/* Active profile + total shots — hidden on mobile idle */}
+          {!(compact && isIdle) && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="truncate max-w-[60%]">
+                <span className="text-[10px] uppercase tracking-wider block">{t('controlCenter.labels.lastProfile')}</span>
+                <span className="text-foreground font-medium">
+                  {machineState.active_profile ?? t('controlCenter.noProfile')}
+                </span>
+              </div>
+              {machineState.total_shots != null && (
+                <div className="text-right">
+                  <span className="text-[10px] uppercase tracking-wider block">{t('controlCenter.labels.shots')}</span>
+                  <span className="text-foreground font-medium">{machineState.total_shots.toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Quick actions */}
           <div className="flex gap-2">
@@ -187,7 +219,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
               size="sm"
               className="flex-1 h-9 text-xs"
               disabled={!isIdle || !machineState.connected}
-              onClick={() => cmd(startShot, 'startingSshot')}
+              onClick={() => cmd(startShot, 'startingShot')}
             >
               <Play size={14} weight="fill" className="mr-1" />
               {t('controlCenter.actions.start')}
@@ -310,9 +342,9 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
         </button>
       )}
 
-      {/* Expanded panel (inline on desktop, same card) */}
+      {/* Expanded panel */}
       <AnimatePresence>
-        {expanded && !isBrewing && !compact && (
+        {expanded && !isBrewing && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
