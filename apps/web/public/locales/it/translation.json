@@ -452,14 +452,20 @@
       "lastProfile": "Ultimo profilo",
       "status": "Stato",
       "shots": "Estrazioni totali",
-      "sounds": "Suoni"
+      "sounds": "Suoni",
+      "firmware": "Firmware",
+      "lastShot": "Ultima estrazione"
     },
     "lastShot": {
       "title": "Estrazione {{time}} fa",
+      "label": "Ultima estrazione: {{time}}",
+      "justNow": "proprio ora",
       "minutesAgo": "{{count}} min fa",
       "minutesAgo_one": "1 min fa",
       "hoursAgo": "{{count}} ore fa",
       "hoursAgo_one": "1 ora fa",
+      "daysAgo": "{{count}} giorni fa",
+      "daysAgo_one": "1 giorno fa",
       "analyze": "Analizza estrazione"
     },
     "shotDetected": {

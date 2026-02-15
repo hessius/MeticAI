@@ -32,6 +32,7 @@ import {
 import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { startShot, stopShot, abortShot, preheat, tareScale } from '@/lib/mqttCommands'
+import { relativeTime } from '@/lib/timeUtils'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 
 // ---------------------------------------------------------------------------
@@ -209,6 +210,13 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
                   <span className="text-foreground font-medium">{machineState.total_shots.toLocaleString()}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Last shot time */}
+          {machineState.last_shot_time && (
+            <div className="text-[10px] text-muted-foreground">
+              {t('controlCenter.lastShot.label', { time: relativeTime(machineState.last_shot_time, t) })}
             </div>
           )}
 

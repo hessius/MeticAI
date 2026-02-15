@@ -49,6 +49,7 @@ import {
   setBrightness,
   enableSounds,
 } from '@/lib/mqttCommands'
+import { relativeTime } from '@/lib/timeUtils'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -137,6 +138,12 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
         <div className="space-y-1 text-sm">
           <Row label={t('controlCenter.labels.profile')} value={machineState.active_profile ?? '—'} />
           <Row label={t('controlCenter.labels.shots')} value={machineState.total_shots?.toLocaleString() ?? '—'} />
+          {machineState.last_shot_time && (
+            <Row label={t('controlCenter.labels.lastShot')} value={relativeTime(machineState.last_shot_time, t) ?? '—'} />
+          )}
+          {machineState.firmware_version && (
+            <Row label={t('controlCenter.labels.firmware')} value={machineState.firmware_version} />
+          )}
         </div>
       </section>
 
