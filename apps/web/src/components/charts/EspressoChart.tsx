@@ -110,7 +110,7 @@ export function EspressoChart({
   const computedRightMax = rightAxisMax ?? Math.ceil(maxWeight * 1.1)
 
   const xDomain: [number | string, number | string] = liveMode
-    ? [0, 'auto']
+    ? [0, xMax ? Math.max(xMax, ...data.map(d => d.time)) : 'auto']
     : [0, xMax ?? Math.ceil(Math.max(...data.map(d => d.time), 1))]
 
   return (

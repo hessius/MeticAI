@@ -149,6 +149,15 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
     [chartData],
   )
 
+  // Compute initial X-axis scale from profile target curves or default to 45s
+  const liveXMax = useMemo(() => {
+    if (targetCurves && targetCurves.length > 0) {
+      const maxTargetTime = Math.max(...targetCurves.map(p => p.time))
+      return Math.ceil(maxTargetTime * 1.1) // 10% padding beyond last target point
+    }
+    return 45 // Default 45 seconds if no profile info available
+  }, [targetCurves])
+
   // Summary stats (computed once when shot completes)
   const summary = useMemo(() => {
     if (!shotComplete || chartDataRef.current.length === 0) return null
@@ -262,6 +271,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 liveMode
                 showWeight
                 targetCurves={targetCurves}
+                xMax={liveXMax}
               />
             </Card>
 
