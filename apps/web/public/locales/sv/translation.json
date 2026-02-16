@@ -470,6 +470,7 @@
     "lastShot": {
       "title": "Bryggning gjord {{time}}",
       "label": "Senaste bryggning: {{time}}",
+      "labelWithProfile": "Senaste bryggning: {{profile}} · {{time}}",
       "justNow": "just nu",
       "minutesAgo": "{{count}} min sedan",
       "minutesAgo_one": "1 min sedan",

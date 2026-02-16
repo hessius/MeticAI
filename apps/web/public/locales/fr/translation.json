@@ -470,6 +470,7 @@
     "lastShot": {
       "title": "Extraction il y a {{time}}",
       "label": "Dernière extraction : {{time}}",
+      "labelWithProfile": "Dernière extraction : {{profile}} · {{time}}",
       "justNow": "à l'instant",
       "minutesAgo": "il y a {{count}} min",
       "minutesAgo_one": "il y a 1 min",
