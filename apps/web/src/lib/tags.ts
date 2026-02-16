@@ -47,14 +47,14 @@ export const CATEGORY_COLORS: Record<TagCategory, string> = {
 }
 
 export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
-  body: 'bg-amber-500/90 border-amber-400 text-white shadow-sm shadow-amber-500/25',
-  flavor: 'bg-rose-500/90 border-rose-400 text-white shadow-sm shadow-rose-500/25',
-  mouthfeel: 'bg-sky-500/90 border-sky-400 text-white shadow-sm shadow-sky-500/25',
-  style: 'bg-violet-500/90 border-violet-400 text-white shadow-sm shadow-violet-500/25',
-  extraction: 'bg-emerald-500/90 border-emerald-400 text-white shadow-sm shadow-emerald-500/25',
-  roast: 'bg-orange-500/90 border-orange-400 text-white shadow-sm shadow-orange-500/25',
-  characteristic: 'bg-teal-500/90 border-teal-400 text-white shadow-sm shadow-teal-500/25',
-  process: 'bg-indigo-500/90 border-indigo-400 text-white shadow-sm shadow-indigo-500/25',
+  body: 'bg-amber-600 border-amber-700 text-white shadow-sm shadow-amber-500/25 dark:bg-amber-500 dark:border-amber-400',
+  flavor: 'bg-rose-600 border-rose-700 text-white shadow-sm shadow-rose-500/25 dark:bg-rose-500 dark:border-rose-400',
+  mouthfeel: 'bg-sky-600 border-sky-700 text-white shadow-sm shadow-sky-500/25 dark:bg-sky-500 dark:border-sky-400',
+  style: 'bg-violet-600 border-violet-700 text-white shadow-sm shadow-violet-500/25 dark:bg-violet-500 dark:border-violet-400',
+  extraction: 'bg-emerald-600 border-emerald-700 text-white shadow-sm shadow-emerald-500/25 dark:bg-emerald-500 dark:border-emerald-400',
+  roast: 'bg-orange-600 border-orange-700 text-white shadow-sm shadow-orange-500/25 dark:bg-orange-500 dark:border-orange-400',
+  characteristic: 'bg-teal-600 border-teal-700 text-white shadow-sm shadow-teal-500/25 dark:bg-teal-500 dark:border-teal-400',
+  process: 'bg-indigo-600 border-indigo-700 text-white shadow-sm shadow-indigo-500/25 dark:bg-indigo-500 dark:border-indigo-400',
 }
 
 // Get category for a tag label
