@@ -185,10 +185,10 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
   const isHeating = stateLC === 'heating'
   const isReady = stateLC === 'click to start'
   const isPourWater = stateLC.startsWith('pour water')
-  // Machine accepts START during preheat or "click to start" state
-  const canStart = (isIdle || isPreheating || isReady) && !isBrewing && machineState.connected
-  // Abort is allowed during preheating or heating (non-idle, non-brewing warmup states)
-  const canAbortWarmup = (isPreheating || isHeating) && !isBrewing && machineState.connected
+  // Machine accepts START during preheat, "click to start", or "pour water" states
+  const canStart = (isIdle || isPreheating || isReady || isPourWater) && !isBrewing && machineState.connected
+  // Abort is allowed during preheating, heating, or pour water (non-idle, non-brewing warmup states)
+  const canAbortWarmup = (isPreheating || isHeating || isPourWater) && !isBrewing && machineState.connected
 
   return (
     <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
@@ -345,8 +345,8 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             </Button>
           </div>
 
-          {/* Live view shortcut during warmup/ready */}
-          {(isPreheating || isHeating || isReady) && onOpenLiveView && (
+          {/* Live view shortcut during warmup/ready/pour-water */}
+          {(isPreheating || isHeating || isReady || isPourWater) && onOpenLiveView && (
             <Button
               variant="dark-brew"
               size="sm"
