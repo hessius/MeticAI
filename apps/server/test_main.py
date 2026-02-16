@@ -2200,6 +2200,43 @@ class TestShotAnalysisHelpers:
         assert stats["avg_pressure"] > 8.0
         assert stats["avg_pressure"] < 9.0
 
+    def test_compute_stage_stats_ignores_early_flow(self):
+        """Flow stats exclude the first 3.5 s to avoid retraction rush false positives."""
+        from services.analysis_service import _compute_stage_stats
+
+        entries = [
+            # Early entries (< 3.5s) — huge flow spike from retraction
+            {"time": 500, "shot": {"pressure": 1.0, "flow": 12.0}},
+            {"time": 1500, "shot": {"pressure": 2.0, "flow": 8.0}},
+            {"time": 3000, "shot": {"pressure": 3.0, "flow": 6.0}},
+            # After 3.5s — normal flow
+            {"time": 4000, "shot": {"pressure": 5.0, "flow": 2.5}},
+            {"time": 6000, "shot": {"pressure": 6.0, "flow": 3.0}},
+        ]
+
+        stats = _compute_stage_stats(entries)
+
+        # max_flow should come from the filtered set (>= 3.5s), i.e. 3.0
+        assert stats["max_flow"] == 3.0
+        # avg_flow should only average the two filtered entries
+        assert abs(stats["avg_flow"] - 2.75) < 0.01
+        # start_flow and end_flow still use all entries
+        assert stats["start_flow"] == 12.0
+        assert stats["end_flow"] == 3.0
+
+    def test_compute_stage_stats_all_early_falls_back(self):
+        """If all entries are within the first 3.5 s, flow stats use all data."""
+        from services.analysis_service import _compute_stage_stats
+
+        entries = [
+            {"time": 500, "shot": {"pressure": 1.0, "flow": 10.0}},
+            {"time": 2000, "shot": {"pressure": 2.0, "flow": 5.0}},
+        ]
+
+        stats = _compute_stage_stats(entries)
+        # No filtered data — falls back to all flows
+        assert stats["max_flow"] == 10.0
+
     def test_format_dynamics_description_flow_type(self):
         """Test with flow type."""
         from services.analysis_service import _format_dynamics_description

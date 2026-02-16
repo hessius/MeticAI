@@ -542,13 +542,21 @@ def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
 
 
 def _compute_stage_stats(entries: list) -> dict:
-    """Compute statistics for a stage from its telemetry entries."""
+    """Compute statistics for a stage from its telemetry entries.
+    
+    Flow statistics (max_flow, avg_flow) ignore the first 3.5 seconds of
+    absolute shot time to avoid false-positive peaks caused by the rush
+    of water at the end of plunger retraction.
+    """
     if not entries:
         return {}
+    
+    FLOW_IGNORE_WINDOW = 3.5  # seconds of absolute shot time to skip for flow
     
     times = []
     pressures = []
     flows = []
+    flows_filtered = []  # Excludes first 3.5 s of absolute shot time
     weights = []
     
     for entry in entries:
@@ -557,11 +565,17 @@ def _compute_stage_stats(entries: list) -> dict:
         
         shot = entry.get("shot", {})
         pressures.append(shot.get("pressure", 0))
-        flows.append(shot.get("flow", 0) or shot.get("gravimetric_flow", 0))
+        flow_val = shot.get("flow", 0) or shot.get("gravimetric_flow", 0)
+        flows.append(flow_val)
+        if t >= FLOW_IGNORE_WINDOW:
+            flows_filtered.append(flow_val)
         weights.append(shot.get("weight", 0))
     
     start_time = min(times) if times else 0
     end_time = max(times) if times else 0
+    
+    # Use filtered flows for max/avg if available, else fall back to all flows
+    flow_stats_src = flows_filtered if flows_filtered else flows
     
     return {
         "start_time": start_time,
@@ -576,9 +590,9 @@ def _compute_stage_stats(entries: list) -> dict:
         "avg_pressure": sum(pressures) / len(pressures) if pressures else 0,
         "start_flow": flows[0] if flows else 0,
         "end_flow": flows[-1] if flows else 0,
-        "min_flow": min(flows) if flows else 0,
-        "max_flow": max(flows) if flows else 0,
-        "avg_flow": sum(flows) / len(flows) if flows else 0,
+        "min_flow": min(flow_stats_src) if flow_stats_src else 0,
+        "max_flow": max(flow_stats_src) if flow_stats_src else 0,
+        "avg_flow": sum(flow_stats_src) / len(flow_stats_src) if flow_stats_src else 0,
         "entry_count": len(entries)
     }
 
@@ -933,6 +947,8 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
     # Extract overall shot metrics
     data_entries = shot_data.get("data", [])
     
+    FLOW_IGNORE_WINDOW = 3.5  # seconds — ignore retraction water rush
+    
     final_weight = 0
     total_time = 0
     max_pressure = 0
@@ -948,7 +964,8 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
         final_weight = max(final_weight, weight)
         total_time = max(total_time, t)
         max_pressure = max(max_pressure, pressure)
-        max_flow = max(max_flow, flow)
+        if t >= FLOW_IGNORE_WINDOW:
+            max_flow = max(max_flow, flow)
     
     target_weight = profile_data.get("final_weight", 0) or 0
     
