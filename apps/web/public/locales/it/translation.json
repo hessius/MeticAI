@@ -453,8 +453,7 @@
       "info": "Info macchina",
       "settings": "Impostazioni macchina",
       "actions": "Azioni",
-      "profile": "Profilo"
-    },
+      "profile": "Profilo"      "activeProfile": "Profilo attivo",    },
     "labels": {
       "brewHead": "Gruppo erogatore",
       "boiler": "Caldaia",

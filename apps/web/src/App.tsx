@@ -798,7 +798,6 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                 <ControlCenter
                   machineState={machineState}
                   onOpenLiveView={() => setViewState('live-shot')}
-                  compact
                 />
               </div>
             )}
