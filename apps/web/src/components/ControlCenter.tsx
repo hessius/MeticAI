@@ -184,8 +184,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const isHeating = stateLC === 'heating'
   const isReady = stateLC === 'click to start'
   const isPourWater = stateLC.startsWith('pour water')
-  // Machine accepts START during preheat, "click to start", or "pour water" states
-  const canStart = (isIdle || isPreheating || isReady || isPourWater) && !isBrewing && machineState.connected
+  // Machine accepts START during idle, preheat, heating, ready, or pour water states
+  const canStart = (isIdle || isPreheating || isHeating || isReady || isPourWater) && !isBrewing && machineState.connected
   // Abort is allowed during preheating, heating, or pour water (non-idle, non-brewing warmup states)
   const canAbortWarmup = (isPreheating || isHeating || isPourWater) && !isBrewing && machineState.connected
 
