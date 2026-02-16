@@ -231,15 +231,19 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
           </div>
 
           {/* Preheat countdown — prominent display when preheating */}
-          {isPreheating && machineState.preheat_countdown != null && machineState.preheat_countdown > 0 && (
-            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2 text-center">
-              <div className="text-2xl font-bold tabular-nums text-orange-400">
-                {Math.ceil(machineState.preheat_countdown)}
-                <span className="text-sm font-normal text-orange-400/70 ml-1">s</span>
+          {isPreheating && machineState.preheat_countdown != null && machineState.preheat_countdown > 0 && (() => {
+            const secs = Math.ceil(machineState.preheat_countdown)
+            const mm = Math.floor(secs / 60)
+            const ss = String(secs % 60).padStart(2, '0')
+            return (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2 text-center">
+                <div className="text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-400">
+                  {mm}:{ss}
+                </div>
+                <div className="text-[10px] text-orange-600/80 dark:text-orange-400/70">{t('controlCenter.preheat.countdown')}</div>
               </div>
-              <div className="text-[10px] text-orange-400/70">{t('controlCenter.preheat.countdown')}</div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Active profile with image + author — hidden on mobile idle */}
           {!(compact && isIdle) && machineState.active_profile && (
