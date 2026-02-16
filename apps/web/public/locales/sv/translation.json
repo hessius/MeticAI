@@ -454,7 +454,9 @@
       "info": "Maskininformation",
       "settings": "Maskininställningar",
       "actions": "Åtgärder",
-      "profile": "Profil"      "activeProfile": "Aktiv profil",    },
+      "profile": "Profil",
+      "activeProfile": "Aktiv profil"
+    },
     "labels": {
       "brewHead": "Brygghuvud",
       "boiler": "Panna",

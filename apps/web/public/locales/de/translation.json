@@ -454,7 +454,9 @@
       "info": "Maschineninfo",
       "settings": "Maschineneinstellungen",
       "actions": "Aktionen",
-      "profile": "Profil"      "activeProfile": "Aktives Profil",    },
+      "profile": "Profil",
+      "activeProfile": "Aktives Profil"
+    },
     "labels": {
       "brewHead": "Brühkopf",
       "boiler": "Boiler",
