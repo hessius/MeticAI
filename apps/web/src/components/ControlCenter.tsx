@@ -299,7 +299,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!machineState.connected}
-                onClick={() => cmd(abortShot, 'aborting')}
+                onClick={() => cmd(preheat, 'preheatCancelled')}
               >
                 <XCircle size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.abortPreheat')}

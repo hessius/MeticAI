@@ -156,9 +156,24 @@ async def command_continue():
 
 @router.post("/api/machine/command/preheat")
 async def command_preheat():
-    """Preheat the water in the chamber."""
+    """Preheat the water in the chamber.
+
+    Also acts as a toggle: sending preheat while already preheating
+    will cancel the preheat cycle.
+    """
     snapshot = _get_snapshot()
-    _require_idle(snapshot)
+    _require_connected(snapshot)
+    # Allow during idle (start preheat) AND preheating (cancel preheat)
+    state = (snapshot.get("state") or "").lower()
+    if snapshot.get("brewing"):
+        raise HTTPException(
+            status_code=409, detail="Cannot preheat while brewing"
+        )
+    if state not in ("idle", "preheating", "click to start"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot preheat in current state: {snapshot.get('state')}",
+        )
     return _do_publish("preheat")
 
 
@@ -188,10 +203,18 @@ async def command_purge():
 
 @router.post("/api/machine/command/load-profile")
 async def command_load_profile(body: LoadProfileRequest):
-    """Switch the machine to a different profile."""
+    """Switch the machine to a different profile.
+
+    Sends select_profile (to set the active profile on the bridge)
+    followed by run_profile (to actually load it on the machine).
+    """
     snapshot = _get_snapshot()
     _require_connected(snapshot)
-    return _do_publish("load_profile", body.name)
+    # Step 1: select the profile by name (sets bridge state + hovers on machine)
+    result = _do_publish("select_profile", body.name)
+    # Step 2: load/run the selected profile on the machine
+    _do_publish("run_profile")
+    return result
 
 
 @router.post("/api/machine/command/brightness")

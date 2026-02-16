@@ -437,6 +437,7 @@
       "aborting": "Aborting shot...",
       "continuing": "Continuing shot...",
       "preheating": "Pre-heating...",
+      "preheatCancelled": "Preheat cancelled",
       "tared": "Scale tared",
       "homed": "Plunger homing...",
       "purging": "Purging...",

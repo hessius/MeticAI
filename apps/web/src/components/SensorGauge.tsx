@@ -24,9 +24,10 @@ interface SensorGaugeProps {
   stale?: boolean
 }
 
-// Arc geometry
-const START_ANGLE = 135 // degrees, measured from 12 o'clock CW
-const END_ANGLE = 405
+// Arc geometry — standard bottom-open gauge:
+// 0 at lower-left (7:30 position), max at lower-right (4:30 position)
+const START_ANGLE = 225 // degrees, measured from 12 o'clock CW
+const END_ANGLE = 495
 const ARC_SPAN = END_ANGLE - START_ANGLE // 270°
 
 function polarToXY(cx: number, cy: number, r: number, angleDeg: number) {
@@ -73,6 +74,10 @@ export function SensorGauge({
   const r = size * 0.38
   const strokeWidth = size * 0.08
 
+  // The arc opens at the bottom, so offset viewBox upward to crop empty space
+  const vbY = size * 0.1
+  const vbH = size * 0.72
+
   const backgroundArc = useMemo(
     () => describeArc(cx, cy, r, START_ANGLE, END_ANGLE),
     [cx, cy, r],
@@ -113,8 +118,8 @@ export function SensorGauge({
     >
       <svg
         width={size}
-        height={size * 0.75}
-        viewBox={`0 0 ${size} ${size * 0.75}`}
+        height={vbH}
+        viewBox={`0 ${vbY} ${size} ${vbH}`}
       >
         {/* Background track */}
         <path
@@ -161,14 +166,14 @@ export function SensorGauge({
         {/* Center dot */}
         <circle cx={cx} cy={cy} r={strokeWidth * 0.35} fill={arcColor} className="transition-colors duration-200" />
 
-        {/* Value text */}
+        {/* Value text — centered in the arc opening */}
         <text
           x={cx}
-          y={cy + size * 0.12}
+          y={cy + size * 0.06}
           textAnchor="middle"
           dominantBaseline="central"
           className="fill-foreground font-bold"
-          style={{ fontSize: size * 0.18 }}
+          style={{ fontSize: size * 0.2 }}
         >
           {value != null ? value.toFixed(1) : '—'}
         </text>
@@ -176,11 +181,11 @@ export function SensorGauge({
         {/* Unit */}
         <text
           x={cx}
-          y={cy + size * 0.24}
+          y={cy + size * 0.2}
           textAnchor="middle"
           dominantBaseline="central"
           className="fill-muted-foreground"
-          style={{ fontSize: size * 0.1 }}
+          style={{ fontSize: size * 0.11 }}
         >
           {unit}
         </text>

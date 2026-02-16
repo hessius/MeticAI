@@ -203,7 +203,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
           </div>
 
           {/* Desktop: two-column — chart + sidebar gauges */}
-          <div className="lg:grid lg:grid-cols-[1fr_180px] lg:gap-4 lg:items-start">
+          <div className="lg:grid lg:grid-cols-[1fr_200px] lg:gap-4 lg:items-start">
             {/* Chart */}
             <Card className="p-4">
               <EspressoChart
@@ -231,7 +231,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 max={15}
                 unit="bar"
                 label={t('controlCenter.metrics.pressureLabel')}
-                size={100}
+                size={130}
                 stale={machineState._stale}
               />
 
@@ -241,7 +241,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 max={8}
                 unit="ml/s"
                 label={t('controlCenter.metrics.flowLabel')}
-                size={100}
+                size={130}
                 stale={machineState._stale}
               />
 

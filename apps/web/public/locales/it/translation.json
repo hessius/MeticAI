@@ -427,6 +427,7 @@
       "aborting": "Interruzione estrazione…",
       "continuing": "Ripresa estrazione…",
       "preheating": "Preriscaldamento…",
+      "preheatCancelled": "Preriscaldamento annullato",
       "tared": "Bilancia tarata",
       "homed": "Pistone in rientro…",
       "purging": "Spurgo in corso…",
