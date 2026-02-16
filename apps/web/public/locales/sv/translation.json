@@ -429,6 +429,7 @@
       "continuing": "Fortsätter bryggning…",
       "preheating": "Förvärmer…",
       "preheatCancelled": "Förvärmning avbruten",
+      "warmupCancelled": "Uppvärmning avbruten",
       "tared": "Våg tarerad",
       "homed": "Kolv återställs…",
       "purging": "Spolar…",
@@ -500,7 +501,7 @@
       "profileOverlay": "Profil",
       "shotOverlay": "Jämför",
       "purgeAfterShot": "Spola",
-      "waitingForShot": "Väntar på att skottet ska starta…",
+      "waitingForShot": "Väntar på att bryggningen ska starta…",
       "waitingDesc": "Diagrammet visas när extraktionen börjar."
     },    "pourWater": {
       "alert": "Fyll på vatten i tanken"
