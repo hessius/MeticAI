@@ -281,7 +281,7 @@ export function EspressoChart({
               />
             )}
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip targetCurves={targetCurves} />} />
             {showLegend && (
               <Legend
                 wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }}
