@@ -67,13 +67,14 @@ import { relativeTime } from '@/lib/timeUtils'
 
 interface ControlCenterExpandedProps {
   machineState: MachineState
+  profileAuthor?: string | null
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function ControlCenterExpanded({ machineState }: ControlCenterExpandedProps) {
+export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCenterExpandedProps) {
   const { t } = useTranslation()
   const [brightnessValue, setBrightnessValue] = useState<number>(
     machineState.brightness ?? 75,
@@ -178,10 +179,10 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
 
       <Separator />
 
-      {/* ── Machine info ──────────────────────────────── */}
+      {/* ── Profile ─────────────────────────────────── */}
       <section>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {t('controlCenter.sections.info')}
+          {t('controlCenter.sections.profile')}
         </h4>
         <div className="space-y-2 text-sm">
           {/* Active profile with image */}
@@ -198,12 +199,14 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
               <Coffee size={20} className={`text-muted-foreground ${profileImgUrl ? 'hidden' : ''}`} weight="duotone" />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">
-                {t('controlCenter.labels.profile')}
-              </span>
               <span className="text-foreground font-medium truncate block">
                 {machineState.active_profile ?? '—'}
               </span>
+              {profileAuthor && (
+                <span className="text-[10px] text-muted-foreground truncate block">
+                  {t('controlCenter.labels.by')} {profileAuthor}
+                </span>
+              )}
             </div>
           </div>
 
@@ -235,7 +238,17 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
               </Select>
             </div>
           )}
+        </div>
+      </section>
 
+      <Separator />
+
+      {/* ── Machine info ──────────────────────────────── */}
+      <section>
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          {t('controlCenter.sections.info')}
+        </h4>
+        <div className="space-y-1 text-sm">
           <Row label={t('controlCenter.labels.shots')} value={machineState.total_shots?.toLocaleString() ?? '—'} />
           {machineState.last_shot_time && (
             <Row label={t('controlCenter.labels.lastShot')} value={relativeTime(machineState.last_shot_time, t) ?? '—'} />

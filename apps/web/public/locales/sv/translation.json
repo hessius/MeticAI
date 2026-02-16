@@ -446,7 +446,8 @@
       "temperatures": "Temperaturer",
       "info": "Maskininformation",
       "settings": "Maskininställningar",
-      "actions": "Åtgärder"
+      "actions": "Åtgärder",
+      "profile": "Profil"
     },
     "labels": {
       "brewHead": "Brygghuvud",
@@ -458,7 +459,8 @@
       "shots": "Totalt antal bryggningar",
       "sounds": "Ljud",
       "firmware": "Firmware",
-      "lastShot": "Senaste bryggning"
+      "lastShot": "Senaste bryggning",
+      "by": "av"
     },
     "lastShot": {
       "title": "Bryggning gjord {{time}}",

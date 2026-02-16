@@ -640,20 +640,9 @@ Special Notes: For maximum clarity and to really make those delicate floral note
         </motion.div>
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
-        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
+        <div className={showRightColumn ? 'md:grid md:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] md:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
           <div>
-            {/* Mobile Control Center — above the main card, StartView only */}
-            {showControlCenter && isMobile && viewState === 'start' && (
-              <div className="mb-4">
-                <ControlCenter
-                  machineState={machineState}
-                  onOpenLiveView={() => setViewState('live-shot')}
-                  compact
-                />
-              </div>
-            )}
-
             <AnimatePresence mode="wait">
               {isInitializing && (
                 <motion.div
@@ -805,11 +794,22 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                 />
               )}
             </AnimatePresence>
+
+            {/* Mobile Control Center — below the main card, StartView only */}
+            {showControlCenter && isMobile && viewState === 'start' && (
+              <div className="mt-4">
+                <ControlCenter
+                  machineState={machineState}
+                  onOpenLiveView={() => setViewState('live-shot')}
+                  compact
+                />
+              </div>
+            )}
           </div>
 
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (
-            <aside className="hidden lg:block">
+            <aside className="hidden md:block">
               <div className="sticky top-4">
                 <ControlCenter
                   machineState={machineState}

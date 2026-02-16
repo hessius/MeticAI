@@ -446,7 +446,8 @@
       "temperatures": "Températures",
       "info": "Info machine",
       "settings": "Réglages machine",
-      "actions": "Actions"
+      "actions": "Actions",
+      "profile": "Profil"
     },
     "labels": {
       "brewHead": "Tête de groupe",
@@ -458,7 +459,8 @@
       "shots": "Extractions totales",
       "sounds": "Sons",
       "firmware": "Firmware",
-      "lastShot": "Dernière extraction"
+      "lastShot": "Dernière extraction",
+      "by": "par"
     },
     "lastShot": {
       "title": "Extraction il y a {{time}}",
