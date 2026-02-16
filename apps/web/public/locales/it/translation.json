@@ -446,7 +446,8 @@
       "temperatures": "Temperature",
       "info": "Info macchina",
       "settings": "Impostazioni macchina",
-      "actions": "Azioni"
+      "actions": "Azioni",
+      "profile": "Profilo"
     },
     "labels": {
       "brewHead": "Gruppo erogatore",
@@ -458,7 +459,8 @@
       "shots": "Estrazioni totali",
       "sounds": "Suoni",
       "firmware": "Firmware",
-      "lastShot": "Ultima estrazione"
+      "lastShot": "Ultima estrazione",
+      "by": "di"
     },
     "lastShot": {
       "title": "Estrazione {{time}} fa",

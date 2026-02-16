@@ -454,6 +454,7 @@
     },
     "sections": {
       "temperatures": "Temperatures",
+      "profile": "Profile",
       "info": "Machine Info",
       "settings": "Machine Settings",
       "actions": "Actions"
@@ -464,6 +465,7 @@
       "target": "Target",
       "profile": "Active Profile",
       "activeProfile": "Active Profile",
+      "by": "by",
       "status": "Status",
       "shots": "Total Shots",
       "sounds": "Sounds",

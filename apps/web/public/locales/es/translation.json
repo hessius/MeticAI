@@ -446,7 +446,8 @@
       "temperatures": "Temperaturas",
       "info": "Info de la máquina",
       "settings": "Ajustes de la máquina",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "profile": "Perfil"
     },
     "labels": {
       "brewHead": "Cabezal",
@@ -458,7 +459,8 @@
       "shots": "Total de extracciones",
       "sounds": "Sonidos",
       "firmware": "Firmware",
-      "lastShot": "Última extracción"
+      "lastShot": "Última extracción",
+      "by": "por"
     },
     "lastShot": {
       "title": "Extracción hecha {{time}}",

@@ -403,6 +403,11 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew }: HistoryVie
                           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
                             {cleanProfileName(entry.profile_name)}
                           </h3>
+                          {entry.profile_json?.author && (
+                            <p className="text-[10px] text-muted-foreground/60 truncate">
+                              by {String(entry.profile_json.author)}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground/70 mt-1">
                             {formatDate(entry.created_at)}
                           </p>

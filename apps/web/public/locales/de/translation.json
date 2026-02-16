@@ -446,7 +446,8 @@
       "temperatures": "Temperaturen",
       "info": "Maschineninfo",
       "settings": "Maschineneinstellungen",
-      "actions": "Aktionen"
+      "actions": "Aktionen",
+      "profile": "Profil"
     },
     "labels": {
       "brewHead": "Brühkopf",
@@ -458,7 +459,8 @@
       "shots": "Bezüge gesamt",
       "sounds": "Töne",
       "firmware": "Firmware",
-      "lastShot": "Letzter Bezug"
+      "lastShot": "Letzter Bezug",
+      "by": "von"
     },
     "lastShot": {
       "title": "Bezug vor {{time}}",

@@ -33,6 +33,7 @@ import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { startShot, stopShot, abortShot, preheat, tareScale } from '@/lib/mqttCommands'
 import { relativeTime } from '@/lib/timeUtils'
+import { getServerUrl } from '@/lib/config'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,34 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
+  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+  const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
+
+  // Build the profile image URL when active_profile changes
+  useEffect(() => {
+    let cancelled = false
+    if (!machineState.active_profile) { setProfileImgUrl(null); setProfileAuthor(null); return }
+    ;(async () => {
+      const base = await getServerUrl()
+      if (!cancelled) {
+        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(machineState.active_profile!)}/image-proxy`)
+      }
+      // Fetch profile author from machine profiles
+      try {
+        const res = await fetch(`${base}/api/machine/profiles`)
+        if (res.ok && !cancelled) {
+          const data = await res.json()
+          const match = (data.profiles ?? []).find(
+            (p: { name: string; author?: string }) => p.name === machineState.active_profile
+          )
+          setProfileAuthor(match?.author ?? null)
+        }
+      } catch {
+        // Silently ignore — author just won't show
+      }
+    })()
+    return () => { cancelled = true }
+  }, [machineState.active_profile])
 
   // 🎉 Confetti celebration for every 100th shot
   useEffect(() => {
@@ -195,21 +224,30 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             </div>
           </div>
 
-          {/* Active profile + total shots — hidden on mobile idle */}
-          {!(compact && isIdle) && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="truncate max-w-[60%]">
-                <span className="text-[10px] uppercase tracking-wider block">{t('controlCenter.labels.activeProfile')}</span>
-                <span className="text-foreground font-medium">
-                  {machineState.active_profile ?? t('controlCenter.noProfile')}
-                </span>
+          {/* Active profile with image + author — hidden on mobile idle */}
+          {!(compact && isIdle) && machineState.active_profile && (
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                {profileImgUrl ? (
+                  <img
+                    src={profileImgUrl}
+                    alt={machineState.active_profile ?? ''}
+                    className="h-full w-full object-cover"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden') }}
+                  />
+                ) : null}
+                <Coffee size={14} className={`text-muted-foreground ${profileImgUrl ? 'hidden' : ''}`} weight="duotone" />
               </div>
-              {machineState.total_shots != null && (
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-wider block">{t('controlCenter.labels.shots')}</span>
-                  <span className="text-foreground font-medium">{machineState.total_shots.toLocaleString()}</span>
-                </div>
-              )}
+              <div className="min-w-0 flex-1">
+                <span className="text-xs text-foreground font-medium truncate block">
+                  {machineState.active_profile}
+                </span>
+                {profileAuthor && (
+                  <span className="text-[10px] text-muted-foreground truncate block">
+                    {t('controlCenter.labels.by')} {profileAuthor}
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
@@ -360,7 +398,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <ControlCenterExpanded machineState={machineState} />
+            <ControlCenterExpanded machineState={machineState} profileAuthor={profileAuthor} />
           </motion.div>
         )}
       </AnimatePresence>
