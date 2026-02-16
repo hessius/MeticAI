@@ -53,19 +53,19 @@ interface ControlCenterProps {
 function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof import('react-i18next').useTranslation>['t']) {
   if (brewing) {
     return (
-      <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/40 animate-pulse">
+      <Badge className="bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/40 animate-pulse">
         {t('controlCenter.states.brewing')}
       </Badge>
     )
   }
   const map: Record<string, { cls: string; key: string }> = {
-    idle:              { cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', key: 'idle' },
-    heating:           { cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40', key: 'heating' },
-    preheating:        { cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40 animate-pulse', key: 'preheating' },
-    steaming:          { cls: 'bg-purple-500/20 text-purple-400 border-purple-500/40', key: 'steaming' },
-    descaling:         { cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', key: 'descaling' },
-    'pour water':      { cls: 'bg-sky-500/20 text-sky-400 border-sky-500/40 animate-pulse', key: 'pourWater' },
-    'click to start':  { cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse', key: 'ready' },
+    idle:              { cls: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/40', key: 'idle' },
+    heating:           { cls: 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/40', key: 'heating' },
+    preheating:        { cls: 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/40 animate-pulse', key: 'preheating' },
+    steaming:          { cls: 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/40', key: 'steaming' },
+    descaling:         { cls: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/40', key: 'descaling' },
+    'pour water':      { cls: 'bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-500/40 animate-pulse', key: 'pourWater' },
+    'click to start':  { cls: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/40 animate-pulse', key: 'ready' },
   }
   // Handle partial/truncated states from the machine (e.g. "Pour water...")
   const normalised = (state ?? '').toLowerCase()
@@ -170,7 +170,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
   if (machineState.availability === 'offline') {
     return (
       <Card className="p-4 border-red-500/30">
-        <div className="flex items-center gap-2 text-red-400">
+        <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
           <Warning size={18} weight="fill" />
           <span className="text-sm font-medium">{t('controlCenter.offline')}</span>
         </div>

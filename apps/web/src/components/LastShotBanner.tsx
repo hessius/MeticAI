@@ -73,7 +73,7 @@ export function LastShotBanner({ lastShot, onAnalyze }: LastShotBannerProps) {
               <Button
                 variant="link"
                 size="sm"
-                className="px-0 h-auto mt-1 text-xs text-amber-400 hover:text-amber-300"
+                className="px-0 h-auto mt-1 text-xs text-amber-700 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300"
                 onClick={() => onAnalyze(shot.date, shot.filename)}
               >
                 {t('controlCenter.lastShot.analyze')}

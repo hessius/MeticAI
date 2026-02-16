@@ -45,7 +45,7 @@ export function ShotDetectionBanner({ visible, onWatch, onDismiss }: ShotDetecti
             <Button
               variant="link"
               size="sm"
-              className="px-2 h-auto text-xs text-blue-400 hover:text-blue-300"
+              className="px-2 h-auto text-xs text-blue-700 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300"
               onClick={onWatch}
             >
               {t('controlCenter.shotDetected.watch')}

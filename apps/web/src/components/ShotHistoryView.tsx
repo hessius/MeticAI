@@ -2018,7 +2018,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                 <Badge 
                                   variant="secondary"
                                   className={`text-xs mt-1 ${
-                                    analysisResult.weight_analysis.status === 'under' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'
+                                    analysisResult.weight_analysis.status === 'under' ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400' : 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
                                   }`}
                                 >
                                   {analysisResult.weight_analysis.deviation_percent > 0 ? '+' : ''}{analysisResult.weight_analysis.deviation_percent}%
@@ -2280,10 +2280,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             : 'bg-secondary/40 border-border/20'
                         }`}>
                           <div className="flex items-center gap-2 mb-2">
-                            <Drop size={16} weight="bold" className="text-cyan-400" />
+                            <Drop size={16} weight="bold" className="text-cyan-700 dark:text-cyan-400" />
                             <span className="text-sm font-semibold">Pre-infusion</span>
                             {analysisResult.preinfusion_summary.weight_percent_of_total > 10 && (
-                              <Badge variant="outline" className="ml-auto text-xs bg-amber-500/20 text-amber-400 border-amber-500/30">
+                              <Badge variant="outline" className="ml-auto text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
                                 {analysisResult.preinfusion_summary.weight_percent_of_total.toFixed(1)}% of shot volume
                               </Badge>
                             )}
@@ -2301,7 +2301,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                               <span className="text-muted-foreground/60">Weight: </span>
                               <span className={`font-medium ${
                                 analysisResult.preinfusion_summary.weight_percent_of_total > 10 
-                                  ? 'text-amber-400' 
+                                  ? 'text-amber-700 dark:text-amber-400' 
                                   : ''
                               }`}>
                                 {analysisResult.preinfusion_summary.weight_accumulated?.toFixed(1) || 0}g
@@ -2318,10 +2318,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                               {analysisResult.preinfusion_summary.issues.map((issue, idx) => (
                                 <div key={idx} className="flex items-start gap-2 text-sm">
                                   <Warning size={14} weight="bold" className={
-                                    issue.severity === 'concern' ? 'text-red-400 mt-0.5' : 'text-amber-400 mt-0.5'
+                                    issue.severity === 'concern' ? 'text-red-700 dark:text-red-400 mt-0.5' : 'text-amber-700 dark:text-amber-400 mt-0.5'
                                   } />
                                   <div>
-                                    <p className={issue.severity === 'concern' ? 'text-red-400' : 'text-amber-400'}>
+                                    <p className={issue.severity === 'concern' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}>
                                       {issue.message}
                                     </p>
                                     <p className="text-xs text-muted-foreground/60">{issue.detail}</p>
@@ -2389,10 +2389,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                               : 'bg-secondary/40 border-border/20'
                           }`}>
                             <div className="flex items-center gap-2 mb-2">
-                              <Gauge size={16} weight="bold" className="text-green-400" />
+                              <Gauge size={16} weight="bold" className="text-green-700 dark:text-green-400" />
                               <span className="text-sm font-semibold">Extraction</span>
                               {reachedGoals.length > 0 && (
-                                <Badge variant="outline" className="ml-auto text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                                <Badge variant="outline" className="ml-auto text-xs bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
                                   {reachedGoals.length} goal{reachedGoals.length !== 1 ? 's' : ''} reached
                                 </Badge>
                               )}
@@ -2421,8 +2421,8 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                 {extractionStages.map((stage, idx) => (
                                   <div key={idx} className="flex items-start gap-2 text-sm">
                                     <span className={`mt-0.5 ${
-                                      stage.assessment?.status === 'reached_goal' ? 'text-green-400' :
-                                      stage.assessment?.status === 'hit_limit' || stage.limit_hit ? 'text-amber-400' :
+                                      stage.assessment?.status === 'reached_goal' ? 'text-green-700 dark:text-green-400' :
+                                      stage.assessment?.status === 'hit_limit' || stage.limit_hit ? 'text-amber-700 dark:text-amber-400' :
                                       'text-muted-foreground'
                                     }`}>
                                       {stage.assessment?.status === 'reached_goal' ? '✓' :
@@ -2529,7 +2529,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                           key={tIdx}
                                           className={`px-2 py-1 rounded text-xs whitespace-nowrap ${
                                             wasTriggered 
-                                              ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                                              ? 'bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30' 
                                               : 'bg-secondary/60 text-muted-foreground border border-border/30'
                                           }`}
                                         >
@@ -2562,7 +2562,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                         key={lIdx}
                                         className={`px-2 py-1 rounded text-xs ${
                                           stage.limit_hit?.type === limit.type
-                                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30'
                                             : 'bg-secondary/60 text-muted-foreground border border-border/30'
                                         }`}
                                       >

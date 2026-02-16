@@ -1044,7 +1044,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
                   transition={{ delay: 0.15 + index * 0.05 }}
                   className="space-y-2"
                 >
-                  <Label className="text-sm font-semibold tracking-wide text-amber-400">
+                  <Label className="text-sm font-semibold tracking-wide text-amber-700 dark:text-amber-400">
                     {section.title}
                   </Label>
                   <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">
@@ -1057,7 +1057,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
             </div>
           ) : (
             <div className="space-y-2">
-              <Label className="text-sm font-semibold tracking-wide text-amber-400">
+              <Label className="text-sm font-semibold tracking-wide text-amber-700 dark:text-amber-400">
                 Profile
               </Label>
               <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">

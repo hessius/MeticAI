@@ -917,7 +917,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             onClick={handleRestart}
             disabled={isRestarting}
             variant="outline"
-            className="w-full bg-destructive/15 border-destructive/25 backdrop-blur-md text-white hover:bg-destructive/25 hover:border-destructive/40"
+            className="w-full bg-destructive/15 border-destructive/25 backdrop-blur-md text-destructive dark:text-white hover:bg-destructive/25 hover:border-destructive/40"
           >
             {isRestarting ? (
               t('settings.restarting')

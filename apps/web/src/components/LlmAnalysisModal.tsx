@@ -1,11 +1,16 @@
 import { useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CaretLeft } from "@phosphor-icons/react";
 import { 
   Loader2, 
   Sparkles, 
@@ -16,14 +21,16 @@ import {
   Lightbulb,
   TrendingUp,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  // ChevronRight removed
 } from "lucide-react";
 
-interface ExpertAnalysisViewProps {
+interface LlmAnalysisModalProps {
+  isOpen: boolean;
   isLoading: boolean;
   analysisResult: string | null;
   error: string | null;
-  onBack: () => void;
+  onClose: () => void;
   onReAnalyze?: () => void;
   profileName?: string;
   shotDate?: string;
@@ -70,6 +77,7 @@ interface ParsedSection {
 function parseStructuredAnalysis(text: string): ParsedSection[] {
   const sections: ParsedSection[] = [];
   
+  // Split by main section headers (## 1. , ## 2., etc.)
   const sectionRegex = /^## (\d+)\.\s+(.+)$/gm;
   const matches = [...text.matchAll(sectionRegex)];
   
@@ -81,6 +89,7 @@ function parseStructuredAnalysis(text: string): ParsedSection[] {
     const endIndex = i < matches.length - 1 ? matches[i + 1].index! : text.length;
     const sectionContent = text.slice(startIndex, endIndex).trim();
     
+    // Parse subsections (bold headers like **What Happened:**)
     const subsections: { title: string; items: string[] }[] = [];
     const subsectionRegex = /\*\*([^*]+):\*\*/g;
     const subsectionMatches = [...sectionContent.matchAll(subsectionRegex)];
@@ -92,6 +101,7 @@ function parseStructuredAnalysis(text: string): ParsedSection[] {
       const subEnd = j < subsectionMatches.length - 1 ? subsectionMatches[j + 1].index! : sectionContent.length;
       const subContent = sectionContent.slice(subStart, subEnd).trim();
       
+      // Extract bullet points
       const items = subContent
         .split('\n')
         .map(line => line.replace(/^[-•]\s*/, '').trim())
@@ -102,6 +112,7 @@ function parseStructuredAnalysis(text: string): ParsedSection[] {
       }
     }
     
+    // Check for Assessment badge
     let assessment: { status: string; color: string } | undefined;
     const assessmentMatch = sectionContent.match(/\*\*Assessment:\*\*\s*\[?([^\]\n]+)\]?/i);
     if (assessmentMatch) {
@@ -126,7 +137,6 @@ function parseStructuredAnalysis(text: string): ParsedSection[] {
   return sections;
 }
 
-// Circled number characters for section numbering
 const CIRCLED_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳'];
 
 function SectionCard({ section }: { section: ParsedSection }) {
@@ -170,6 +180,7 @@ function SectionCard({ section }: { section: ParsedSection }) {
           </div>
         ))}
         
+        {/* If no subsections were parsed, show raw content */}
         {section.subsections.length === 0 && (
           <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
             {section.content}
@@ -180,137 +191,132 @@ function SectionCard({ section }: { section: ParsedSection }) {
   );
 }
 
-export function ExpertAnalysisView({
+export function LlmAnalysisModal({
+  isOpen,
   isLoading,
   analysisResult,
   error,
-  onBack,
+  onClose,
   onReAnalyze,
   profileName,
   shotDate,
   isCached,
-}: ExpertAnalysisViewProps) {
+}: LlmAnalysisModalProps) {
+  // Debug logging
   useEffect(() => {
-    console.log('[ExpertAnalysisView] Props:', { isLoading, hasResult: !!analysisResult, error, isCached });
-  }, [isLoading, analysisResult, error, isCached]);
+    console.log('[LLM Modal] Props changed:', { isOpen, isLoading, hasResult: !!analysisResult, error, isCached });
+  }, [isOpen, isLoading, analysisResult, error, isCached]);
 
   const sections = useMemo(() => {
     if (!analysisResult) return [];
+    console.log('[LLM Modal] Parsing analysis...');
     return parseStructuredAnalysis(analysisResult);
   }, [analysisResult]);
   
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
-    >
-      <Card className="p-6 space-y-5">
-        {/* Header with back button */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            className="shrink-0"
-          >
-            <CaretLeft size={22} weight="bold" />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary shrink-0" />
-              <h2 className="text-lg font-bold text-foreground truncate">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 py-4 border-b shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <Sparkles className="h-5 w-5 text-primary" />
                 AI Shot Analysis
-              </h2>
-              {isCached && (
-                <Badge variant="secondary" className="shrink-0">
-                  Cached
-                </Badge>
-              )}
-            </div>
-            {profileName && shotDate && (
-              <p className="text-xs text-muted-foreground/70 mt-0.5">
-                {profileName} • {shotDate}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* AI Disclaimer */}
-        <Alert className="bg-amber-500/10 border-amber-500/30">
-          <Info className="h-4 w-4 text-amber-500" />
-          <AlertDescription className="text-sm text-amber-700 dark:text-amber-400">
-            This analysis is generated by AI based on shot data. Results should be used as guidance, 
-            not absolute truth. Always trust your own taste preferences.
-          </AlertDescription>
-        </Alert>
-        
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
-            <div className="relative">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <Sparkles className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-            </div>
-            <div className="text-center space-y-1">
-              <p className="text-lg font-medium">Analyzing Shot Data</p>
-              <p className="text-sm text-muted-foreground">Our AI barista is reviewing your extraction...</p>
+                {isCached && (
+                  <Badge variant="secondary" className="ml-2">
+                    Cached
+                  </Badge>
+                )}
+              </DialogTitle>
+              <DialogDescription className="mt-1">
+                {profileName && shotDate && (
+                  <span>{profileName} • {shotDate}</span>
+                )}
+              </DialogDescription>
             </div>
           </div>
-        )}
+        </DialogHeader>
         
-        {/* Error State */}
-        {error && !isLoading && (
-          <Alert variant="destructive">
-            <XCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {/* AI Disclaimer */}
+          <Alert className="mb-6 bg-amber-500/10 border-amber-500/30">
+            <Info className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-sm text-amber-700 dark:text-amber-400">
+              This analysis is generated by AI based on shot data. Results should be used as guidance, 
+              not absolute truth. Always trust your own taste preferences.
+            </AlertDescription>
           </Alert>
-        )}
-        
-        {/* Analysis Content */}
-        {!isLoading && !error && sections.length > 0 && (
-          <div className="space-y-6 lg:columns-2 lg:gap-6 lg:[&>*]:break-inside-avoid lg:[&>*]:mb-6 lg:space-y-0">
-            {sections.map((section, index) => (
-              <SectionCard key={index} section={section} />
-            ))}
-          </div>
-        )}
-        
-        {/* Fallback: Raw content if no sections parsed */}
-        {!isLoading && !error && sections.length === 0 && analysisResult && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                {analysisResult}
+          
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <div className="relative">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <Sparkles className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="text-center space-y-1">
+                <p className="text-lg font-medium">Analyzing Shot Data</p>
+                <p className="text-sm text-muted-foreground">Our AI barista is reviewing your extraction...</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Error State */}
+          {error && !isLoading && (
+            <Alert variant="destructive" className="mb-4">
+              <XCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {/* Analysis Content */}
+          {!isLoading && !error && sections.length > 0 && (
+            <div className="space-y-6">
+              {sections.map((section, index) => (
+                <SectionCard key={index} section={section} />
+              ))}
+            </div>
+          )}
+          
+          {/* Fallback: Raw content if no sections parsed */}
+          {!isLoading && !error && sections.length === 0 && analysisResult && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                  {analysisResult}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* No Content State */}
+          {!isLoading && !error && !analysisResult && (
+            <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
+              <Sparkles className="h-12 w-12 opacity-30" />
+              <p className="text-lg">No analysis available</p>
+            </div>
+          )}
+        </div>
         
-        {/* No Content State */}
-        {!isLoading && !error && !analysisResult && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
-            <Sparkles className="h-12 w-12 opacity-30" />
-            <p className="text-lg">No analysis available</p>
-          </div>
-        )}
-        
-        {/* Re-Analyze button */}
+        {/* Footer with Re-Analyze button */}
         {!isLoading && analysisResult && onReAnalyze && (
-          <div className="flex items-center justify-center pt-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onReAnalyze}
-              className="gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Re-Analyze{isCached ? ' for Fresh Insights' : ''}
-            </Button>
+          <div className="px-6 py-3 border-t bg-muted/30 shrink-0">
+            <div className="flex items-center justify-center">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onReAnalyze}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Re-Analyze{isCached ? ' for Fresh Insights' : ''}
+              </Button>
+            </div>
           </div>
         )}
-      </Card>
-    </motion.div>
+      </DialogContent>
+    </Dialog>
   );
 }
