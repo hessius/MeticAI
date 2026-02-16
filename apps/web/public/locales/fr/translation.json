@@ -429,6 +429,7 @@
       "continuing": "Reprise de l'extraction…",
       "preheating": "Préchauffage…",
       "preheatCancelled": "Préchauffage annulé",
+      "warmupCancelled": "Chauffage annulé",
       "tared": "Balance tarée",
       "homed": "Piston en retour…",
       "purging": "Purge en cours…",
