@@ -709,6 +709,72 @@ async def proxy_profile_image(
         )
 
 
+@router.get("/api/profile/{profile_name:path}/target-curves")
+async def get_profile_target_curves(
+    profile_name: str,
+    request: Request
+):
+    """Return estimated target curves for a profile (no shot data needed).
+    
+    Used by the live-view to show goal overlay lines during a shot.
+    Stage durations are estimated from exit-trigger time values.
+    
+    Returns:
+        {status, target_curves: [{time, target_pressure?, target_flow?, stage_name}]}
+    """
+    request_id = request.state.request_id
+
+    try:
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, 'error') and profiles_result.error:
+            raise HTTPException(status_code=502, detail="Machine API error")
+
+        for partial in profiles_result:
+            if partial.name == profile_name:
+                full_profile = await async_get_profile(partial.id)
+                if hasattr(full_profile, 'error') and full_profile.error:
+                    continue
+
+                # Build dict for the analysis helper
+                profile_dict: dict = {}
+                for attr in ['stages', 'variables']:
+                    val = getattr(full_profile, attr, None)
+                    if val is not None:
+                        if isinstance(val, list):
+                            profile_dict[attr] = [
+                                item.__dict__ if hasattr(item, '__dict__') else item
+                                for item in val
+                            ]
+                            # Flatten nested __dict__ inside list items
+                            for i, item in enumerate(profile_dict[attr]):
+                                if isinstance(item, dict):
+                                    for k, v in list(item.items()):
+                                        if hasattr(v, '__dict__'):
+                                            item[k] = v.__dict__
+                                        elif isinstance(v, list):
+                                            item[k] = [
+                                                el.__dict__ if hasattr(el, '__dict__') else el
+                                                for el in v
+                                            ]
+                        else:
+                            profile_dict[attr] = val
+
+                curves = generate_estimated_target_curves(profile_dict)
+                return {"status": "success", "target_curves": curves}
+
+        raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get target curves: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/profile/{profile_name:path}")
 async def get_profile_info(
     profile_name: str,
@@ -783,73 +849,6 @@ async def get_profile_info(
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "Failed to get profile info"}
         )
-
-
-@router.get("/api/profile/{profile_name:path}/target-curves")
-async def get_profile_target_curves(
-    profile_name: str,
-    request: Request
-):
-    """Return estimated target curves for a profile (no shot data needed).
-    
-    Used by the live-view to show goal overlay lines during a shot.
-    Stage durations are estimated from exit-trigger time values.
-    
-    Returns:
-        {status, target_curves: [{time, target_pressure?, target_flow?, stage_name}]}
-    """
-    request_id = request.state.request_id
-
-    try:
-        profiles_result = await async_list_profiles()
-        if hasattr(profiles_result, 'error') and profiles_result.error:
-            raise HTTPException(status_code=502, detail="Machine API error")
-
-        for partial in profiles_result:
-            if partial.name == profile_name:
-                full_profile = await async_get_profile(partial.id)
-                if hasattr(full_profile, 'error') and full_profile.error:
-                    continue
-
-                # Build dict for the analysis helper
-                profile_dict: dict = {}
-                for attr in ['stages', 'variables']:
-                    val = getattr(full_profile, attr, None)
-                    if val is not None:
-                        if isinstance(val, list):
-                            profile_dict[attr] = [
-                                item.__dict__ if hasattr(item, '__dict__') else item
-                                for item in val
-                            ]
-                            # Flatten nested __dict__ inside list items
-                            for i, item in enumerate(profile_dict[attr]):
-                                if isinstance(item, dict):
-                                    for k, v in list(item.items()):
-                                        if hasattr(v, '__dict__'):
-                                            item[k] = v.__dict__
-                                        elif isinstance(v, list):
-                                            item[k] = [
-                                                el.__dict__ if hasattr(el, '__dict__') else el
-                                                for el in v
-                                            ]
-                        else:
-                            profile_dict[attr] = val
-
-                curves = generate_estimated_target_curves(profile_dict)
-                return {"status": "success", "target_curves": curves}
-
-        raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Failed to get target curves: {e}",
-            exc_info=True,
-            extra={"request_id": request_id, "error_type": type(e).__name__}
-        )
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 
 @router.post("/api/shots/analyze")
