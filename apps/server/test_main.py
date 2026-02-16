@@ -9223,6 +9223,17 @@ class TestMachineCommandEndpoints:
             response = client.post("/api/machine/command/preheat")
             assert response.status_code == 409
 
+    def test_command_preheat_allowed_during_heating(self, client):
+        """Preheat command succeeds during heating state."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False,
+                "state": "Heating",
+            }
+            response = client.post("/api/machine/command/preheat")
+            assert response.status_code == 200
+            assert response.json()["success"] is True
+
     def test_command_tare_success(self, client):
         """Tare command succeeds when connected."""
         with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:

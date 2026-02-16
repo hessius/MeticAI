@@ -169,7 +169,7 @@ async def command_preheat():
         raise HTTPException(
             status_code=409, detail="Cannot preheat while brewing"
         )
-    if state not in ("idle", "preheating", "click to start"):
+    if state not in ("idle", "preheating", "heating", "click to start"):
         raise HTTPException(
             status_code=409,
             detail=f"Cannot preheat in current state: {snapshot.get('state')}",
@@ -205,16 +205,13 @@ async def command_purge():
 async def command_load_profile(body: LoadProfileRequest):
     """Switch the machine to a different profile.
 
-    Sends select_profile (to set the active profile on the bridge)
-    followed by run_profile (to actually load it on the machine).
+    Sends select_profile to set the active profile on the bridge and
+    highlight it on the machine's screen.  This does **not** start a shot;
+    the user still needs to press Start.
     """
     snapshot = _get_snapshot()
     _require_connected(snapshot)
-    # Step 1: select the profile by name (sets bridge state + hovers on machine)
-    result = _do_publish("select_profile", body.name)
-    # Step 2: load/run the selected profile on the machine
-    _do_publish("run_profile")
-    return result
+    return _do_publish("select_profile", body.name)
 
 
 @router.post("/api/machine/command/brightness")

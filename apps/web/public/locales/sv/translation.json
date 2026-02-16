@@ -399,7 +399,8 @@
       "steaming": "Ångar",
       "descaling": "Avkalkar",
       "unknown": "Okänd",
-      "ready": "Redo"
+      "ready": "Redo",
+      "pourWater": "Fyll på vatten"
     },
     "metrics": {
       "time": "Tid (s)",
@@ -434,7 +435,7 @@
       "soundsOn": "Ljud aktiverat",
       "soundsOff": "Ljud inaktiverat",
       "error": "Kommandot misslyckades",
-      "profileLoaded": "Profil laddad: {{name}}"
+      "profileSelected": "Profil vald: {{name}}"
     },
     "profileSelector": {
       "placeholder": "Byt profil…"
@@ -501,8 +502,9 @@
       "purgeAfterShot": "Spola",
       "waitingForShot": "Väntar på att skottet ska starta…",
       "waitingDesc": "Diagrammet visas när extraktionen börjar."
-    },
-    "preheat": {
+    },    "pourWater": {
+      "alert": "Fyll på vatten i tanken"
+    },    "preheat": {
       "countdown": "Förvärmer"
     }
   }

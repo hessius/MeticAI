@@ -88,9 +88,11 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   const isBrewing = machineState.brewing
   const isConnected = machineState.connected
   const isPreheating = stateLC === 'preheating'
+  const isHeating = stateLC === 'heating'
   const isReady = stateLC === 'click to start'
   // Machine accepts START during idle, preheat, or "click to start"
   const canStart = (isIdle || isPreheating || isReady) && !isBrewing && isConnected
+  const canAbortWarmup = (isPreheating || isHeating) && !isBrewing && isConnected
 
   // Build the profile image URL when active_profile changes
   useEffect(() => {
@@ -223,7 +225,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
                 onValueChange={async (name) => {
                   const res = await loadProfile(name)
                   if (res.success) {
-                    toast.success(t('controlCenter.toasts.profileLoaded', { name }))
+                    toast.success(t('controlCenter.toasts.profileSelected', { name }))
                   } else {
                     toast.error(res.message ?? t('controlCenter.toasts.error'))
                   }
@@ -331,13 +333,13 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             t={t}
           />
 
-          {/* Abort — works during brewing; Cancel preheat during preheating */}
-          {isPreheating ? (
+          {/* Abort — works during brewing; Cancel warmup during preheating/heating */}
+          {canAbortWarmup ? (
             <ActionButton
               icon={<XCircle size={14} weight="fill" />}
               label={t('controlCenter.actions.abortPreheat')}
               disabled={!isConnected}
-              onClick={() => cmd(preheat, 'preheatCancelled')}
+              onClick={() => cmd(abortShot, 'preheatCancelled')}
             />
           ) : (
             <ConfirmButton

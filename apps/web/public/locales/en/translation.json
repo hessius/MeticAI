@@ -409,7 +409,8 @@
       "steaming": "Steaming",
       "descaling": "Descaling",
       "unknown": "Unknown",
-      "ready": "Ready"
+      "ready": "Ready",
+      "pourWater": "Pour Water"
     },
     "metrics": {
       "time": "Time (s)",
@@ -444,7 +445,7 @@
       "soundsOn": "Sounds enabled",
       "soundsOff": "Sounds disabled",
       "error": "Command failed",
-      "profileLoaded": "Profile loaded: {{name}}"
+      "profileSelected": "Profile selected: {{name}}"
     },
     "profileSelector": {
       "placeholder": "Switch profile…"
@@ -511,6 +512,9 @@
       "purgeAfterShot": "Purge",
       "waitingForShot": "Waiting for shot to start…",
       "waitingDesc": "The chart will appear once extraction begins."
+    },
+    "pourWater": {
+      "alert": "Please pour water into the tank"
     },
     "preheat": {
       "countdown": "Pre-heating"
