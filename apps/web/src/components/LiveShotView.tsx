@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
+  Play,
   Stop,
   XCircle,
   ArrowLeft,
@@ -24,7 +25,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
-import { stopShot, abortShot, purge } from '@/lib/mqttCommands'
+import { startShot, stopShot, abortShot, purge } from '@/lib/mqttCommands'
 import { SensorGauge } from '@/components/SensorGauge'
 import { EspressoChart } from '@/components/charts'
 import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
@@ -186,14 +187,45 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
       {/* ── ACTIVE SHOT / WAITING ─────────────────────────────── */}
       {!shotComplete && (
         <>
-          {/* Pre-shot waiting indicator */}
+          {/* Pre-shot waiting indicator with Start + Abort controls */}
           {!machineState.brewing && chartData.length === 0 && (
-            <Card className="p-6 text-center">
+            <Card className="p-6 text-center space-y-4">
               <div className="text-muted-foreground space-y-2">
                 <Coffee size={32} weight="duotone" className="mx-auto text-primary animate-pulse" />
                 <p className="text-sm font-medium">{t('controlCenter.liveShot.waitingForShot')}</p>
                 <p className="text-xs text-muted-foreground/70">{t('controlCenter.liveShot.waitingDesc')}</p>
               </div>
+              {/* Action buttons — Start + Abort during warmup/ready */}
+              {machineState.connected && (
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    variant="default"
+                    className="h-11 px-6"
+                    onClick={() => cmd(startShot, 'startingShot')}
+                  >
+                    <Play size={18} weight="fill" className="mr-2" />
+                    {t('controlCenter.actions.start')}
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="h-11 px-6">
+                        <XCircle size={18} weight="fill" className="mr-2" />
+                        {t('controlCenter.actions.abort')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('controlCenter.confirm.abortTitle')}</AlertDialogTitle>
+                        <AlertDialogDescription>{t('controlCenter.confirm.abortDesc')}</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => cmd(abortShot, 'warmupCancelled')}>{t('common.confirm')}</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
             </Card>
           )}
 
