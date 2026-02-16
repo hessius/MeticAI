@@ -398,13 +398,16 @@
       "preheating": "Preriscaldamento",
       "steaming": "Vapore",
       "descaling": "Decalcificazione",
-      "unknown": "Sconosciuto"
+      "unknown": "Sconosciuto",
+      "ready": "Pronto"
     },
     "metrics": {
       "time": "Tempo (s)",
       "weight": "Peso (g)",
       "pressure": "Pressione (bar)",
-      "flow": "Flusso (ml/s)"
+      "flow": "Flusso (ml/s)",
+      "pressureLabel": "Pressione",
+      "flowLabel": "Flusso"
     },
     "actions": {
       "start": "Avvia",
@@ -415,7 +418,8 @@
       "tare": "Tara",
       "home": "Posizione iniziale",
       "purge": "Spurgo",
-      "live": "Live"
+      "live": "Live",
+      "abortPreheat": "Annulla"
     },
     "toasts": {
       "startingShot": "Avvio estrazione…",
@@ -492,7 +496,13 @@
       "analyzeShot": "Analizza questa estrazione",
       "backHome": "Torna alla home",
       "profileOverlay": "Profilo",
-      "shotOverlay": "Confronta"
+      "shotOverlay": "Confronta",
+      "purgeAfterShot": "Spurgo",
+      "waitingForShot": "In attesa dell'estrazione…",
+      "waitingDesc": "Il grafico apparirà all'inizio dell'estrazione."
+    },
+    "preheat": {
+      "countdown": "Preriscaldamento"
     }
   }
 }

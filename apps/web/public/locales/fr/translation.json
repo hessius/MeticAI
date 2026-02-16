@@ -398,13 +398,16 @@
       "preheating": "Préchauffage",
       "steaming": "Vapeur",
       "descaling": "Détartrage",
-      "unknown": "Inconnu"
+      "unknown": "Inconnu",
+      "ready": "Prêt"
     },
     "metrics": {
       "time": "Temps (s)",
       "weight": "Poids (g)",
       "pressure": "Pression (bar)",
-      "flow": "Débit (ml/s)"
+      "flow": "Débit (ml/s)",
+      "pressureLabel": "Pression",
+      "flowLabel": "Débit"
     },
     "actions": {
       "start": "Démarrer",
@@ -415,7 +418,8 @@
       "tare": "Tarer",
       "home": "Position initiale",
       "purge": "Purger",
-      "live": "En direct"
+      "live": "En direct",
+      "abortPreheat": "Annuler"
     },
     "toasts": {
       "startingShot": "Démarrage de l'extraction…",
@@ -492,7 +496,13 @@
       "analyzeShot": "Analyser cette extraction",
       "backHome": "Retour à l'accueil",
       "profileOverlay": "Profil",
-      "shotOverlay": "Comparer"
+      "shotOverlay": "Comparer",
+      "purgeAfterShot": "Purger",
+      "waitingForShot": "En attente de l'extraction…",
+      "waitingDesc": "Le graphique apparaîtra au début de l'extraction."
+    },
+    "preheat": {
+      "countdown": "Préchauffage"
     }
   }
 }

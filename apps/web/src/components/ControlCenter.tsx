@@ -59,11 +59,12 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
     )
   }
   const map: Record<string, { cls: string; key: string }> = {
-    idle:        { cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', key: 'idle' },
-    heating:     { cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40', key: 'heating' },
-    preheating:  { cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40', key: 'preheating' },
-    steaming:    { cls: 'bg-purple-500/20 text-purple-400 border-purple-500/40', key: 'steaming' },
-    descaling:   { cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', key: 'descaling' },
+    idle:              { cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', key: 'idle' },
+    heating:           { cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40', key: 'heating' },
+    preheating:        { cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40 animate-pulse', key: 'preheating' },
+    steaming:          { cls: 'bg-purple-500/20 text-purple-400 border-purple-500/40', key: 'steaming' },
+    descaling:         { cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', key: 'descaling' },
+    'click to start':  { cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse', key: 'ready' },
   }
   const entry = map[(state ?? '').toLowerCase()] ?? { cls: 'bg-muted text-muted-foreground border-muted', key: 'unknown' }
   return (
@@ -173,8 +174,13 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
     )
   }
 
-  const isIdle = machineState.state?.toLowerCase() === 'idle' && !machineState.brewing
+  const stateLC = (machineState.state ?? '').toLowerCase()
+  const isIdle = stateLC === 'idle' && !machineState.brewing
   const isBrewing = machineState.brewing
+  const isPreheating = stateLC === 'preheating'
+  const isReady = stateLC === 'click to start'
+  // Machine accepts START during preheat or "click to start" state
+  const canStart = (isIdle || isPreheating || isReady) && !isBrewing && machineState.connected
 
   return (
     <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
@@ -199,7 +205,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
         </div>
       </div>
 
-      {/* ── IDLE STATE ─────────────────────────────────── */}
+      {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>
           {/* Temperature + state */}
@@ -223,6 +229,17 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
               {stateBadge(machineState.state, false, t)}
             </div>
           </div>
+
+          {/* Preheat countdown — prominent display when preheating */}
+          {isPreheating && machineState.preheat_countdown != null && machineState.preheat_countdown > 0 && (
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2 text-center">
+              <div className="text-2xl font-bold tabular-nums text-orange-400">
+                {Math.ceil(machineState.preheat_countdown)}
+                <span className="text-sm font-normal text-orange-400/70 ml-1">s</span>
+              </div>
+              <div className="text-[10px] text-orange-400/70">{t('controlCenter.preheat.countdown')}</div>
+            </div>
+          )}
 
           {/* Active profile with image + author — hidden on mobile idle */}
           {!(compact && isIdle) && machineState.active_profile && (
@@ -258,39 +275,67 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             </div>
           )}
 
-          {/* Quick actions */}
-          <div className="flex gap-2">
+          {/* Quick actions — adapt to preheat/ready/idle state */}
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
+            {/* Start button — available during idle, preheating, or ready */}
             <Button
               variant="dark-brew"
               size="sm"
-              className="flex-1 h-9 text-xs"
-              disabled={!isIdle || !machineState.connected}
+              className="flex-1 min-w-0 h-9 text-xs"
+              disabled={!canStart}
               onClick={() => cmd(startShot, 'startingShot')}
             >
-              <Play size={14} weight="fill" className="mr-1" />
+              <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
             </Button>
+            {/* Preheat / Abort preheat */}
+            {isPreheating ? (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="flex-1 min-w-0 h-9 text-xs"
+                disabled={!machineState.connected}
+                onClick={() => cmd(abortShot, 'aborting')}
+              >
+                <XCircle size={14} weight="fill" className="mr-1 shrink-0" />
+                {t('controlCenter.actions.abortPreheat')}
+              </Button>
+            ) : (
+              <Button
+                variant="dark-brew"
+                size="sm"
+                className="flex-1 min-w-0 h-9 text-xs"
+                disabled={!isIdle || !machineState.connected}
+                onClick={() => cmd(preheat, 'preheating')}
+              >
+                <Fire size={14} weight="fill" className="mr-1 shrink-0" />
+                {t('controlCenter.actions.preheat')}
+              </Button>
+            )}
             <Button
               variant="dark-brew"
               size="sm"
-              className="flex-1 h-9 text-xs"
-              disabled={!isIdle || !machineState.connected}
-              onClick={() => cmd(preheat, 'preheating')}
-            >
-              <Fire size={14} weight="fill" className="mr-1" />
-              {t('controlCenter.actions.preheat')}
-            </Button>
-            <Button
-              variant="dark-brew"
-              size="sm"
-              className="flex-1 h-9 text-xs"
+              className="flex-1 min-w-0 h-9 text-xs"
               disabled={!machineState.connected}
               onClick={() => cmd(tareScale, 'tared')}
             >
-              <Scales size={14} weight="fill" className="mr-1" />
+              <Scales size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.tare')}
             </Button>
           </div>
+
+          {/* Live view shortcut during preheat/ready */}
+          {(isPreheating || isReady) && onOpenLiveView && (
+            <Button
+              variant="dark-brew"
+              size="sm"
+              className="w-full h-9 text-xs"
+              onClick={onOpenLiveView}
+            >
+              <Eye size={14} weight="fill" className="mr-1" />
+              {t('controlCenter.actions.live')}
+            </Button>
+          )}
         </>
       )}
 
@@ -343,11 +388,11 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
           </div>
 
           {/* Brewing actions */}
-          <div className="flex gap-2">
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
             <Button
               variant="destructive"
               size="sm"
-              className="flex-1 h-9 text-xs"
+              className="h-9 text-xs"
               onClick={() => cmd(stopShot, 'stopping')}
             >
               <Stop size={14} weight="fill" className="mr-1" />
@@ -356,7 +401,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             <Button
               variant="destructive"
               size="sm"
-              className="flex-1 h-9 text-xs"
+              className="h-9 text-xs"
               onClick={() => cmd(abortShot, 'aborting')}
             >
               <XCircle size={14} weight="fill" className="mr-1" />
@@ -366,7 +411,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
               <Button
                 variant="dark-brew"
                 size="sm"
-                className="flex-1 h-9 text-xs"
+                className="h-9 text-xs"
                 onClick={onOpenLiveView}
               >
                 <Eye size={14} weight="fill" className="mr-1" />

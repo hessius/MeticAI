@@ -398,13 +398,16 @@
       "preheating": "Precalentando",
       "steaming": "Vaporizando",
       "descaling": "Descalcificando",
-      "unknown": "Desconocido"
+      "unknown": "Desconocido",
+      "ready": "Listo"
     },
     "metrics": {
       "time": "Tiempo (s)",
       "weight": "Peso (g)",
       "pressure": "Presión (bar)",
-      "flow": "Flujo (ml/s)"
+      "flow": "Flujo (ml/s)",
+      "pressureLabel": "Presión",
+      "flowLabel": "Flujo"
     },
     "actions": {
       "start": "Iniciar",
@@ -415,7 +418,8 @@
       "tare": "Tarar",
       "home": "Inicio",
       "purge": "Purgar",
-      "live": "En vivo"
+      "live": "En vivo",
+      "abortPreheat": "Cancelar"
     },
     "toasts": {
       "startingShot": "Iniciando extracción…",
@@ -492,7 +496,13 @@
       "analyzeShot": "Analizar esta extracción",
       "backHome": "Volver al inicio",
       "profileOverlay": "Perfil",
-      "shotOverlay": "Comparar"
+      "shotOverlay": "Comparar",
+      "purgeAfterShot": "Purgar",
+      "waitingForShot": "Esperando el inicio…",
+      "waitingDesc": "El gráfico aparecerá cuando comience la extracción."
+    },
+    "preheat": {
+      "countdown": "Precalentando"
     }
   }
 }

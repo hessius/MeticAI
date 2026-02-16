@@ -398,13 +398,16 @@
       "preheating": "Vorheizt",
       "steaming": "Dampft",
       "descaling": "Entkalkt",
-      "unknown": "Unbekannt"
+      "unknown": "Unbekannt",
+      "ready": "Bereit"
     },
     "metrics": {
       "time": "Zeit (s)",
       "weight": "Gewicht (g)",
       "pressure": "Druck (bar)",
-      "flow": "Durchfluss (ml/s)"
+      "flow": "Durchfluss (ml/s)",
+      "pressureLabel": "Druck",
+      "flowLabel": "Fluss"
     },
     "actions": {
       "start": "Starten",
@@ -415,7 +418,8 @@
       "tare": "Tarieren",
       "home": "Ausgangsposition",
       "purge": "Spülen",
-      "live": "Live"
+      "live": "Live",
+      "abortPreheat": "Abbrechen"
     },
     "toasts": {
       "startingShot": "Bezug wird gestartet…",
@@ -492,7 +496,13 @@
       "analyzeShot": "Diesen Bezug analysieren",
       "backHome": "Zurück zur Startseite",
       "profileOverlay": "Profil",
-      "shotOverlay": "Vergleichen"
+      "shotOverlay": "Vergleichen",
+      "purgeAfterShot": "Spülen",
+      "waitingForShot": "Warte auf Bezug…",
+      "waitingDesc": "Das Diagramm erscheint sobald die Extraktion beginnt."
+    },
+    "preheat": {
+      "countdown": "Vorheizen"
     }
   }
 }

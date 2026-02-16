@@ -408,13 +408,16 @@
       "preheating": "Pre-heating",
       "steaming": "Steaming",
       "descaling": "Descaling",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "ready": "Ready"
     },
     "metrics": {
       "time": "Time (s)",
       "weight": "Weight (g)",
       "pressure": "Pressure (bar)",
-      "flow": "Flow (ml/s)"
+      "flow": "Flow (ml/s)",
+      "pressureLabel": "Pressure",
+      "flowLabel": "Flow"
     },
     "actions": {
       "start": "Start",
@@ -425,7 +428,8 @@
       "tare": "Tare",
       "home": "Home",
       "purge": "Purge",
-      "live": "Live"
+      "live": "Live",
+      "abortPreheat": "Cancel"
     },
     "toasts": {
       "startingShot": "Starting shot...",
@@ -499,10 +503,16 @@
       "finalWeight": "Final Weight",
       "avgPressure": "Avg Pressure",
       "avgFlow": "Avg Flow",
-      "analyzeShot": "Analyze This Shot",
+      "analyzeShot": "Done",
       "backHome": "Back to Home",
       "profileOverlay": "Profile",
-      "shotOverlay": "Compare"
+      "shotOverlay": "Compare",
+      "purgeAfterShot": "Purge",
+      "waitingForShot": "Waiting for shot to start…",
+      "waitingDesc": "The chart will appear once extraction begins."
+    },
+    "preheat": {
+      "countdown": "Pre-heating"
     }
   }
 }

@@ -19,13 +19,16 @@ import {
   Scales,
   Thermometer,
   ChartLine,
+  Drop,
+  Coffee,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
-import { stopShot, abortShot } from '@/lib/mqttCommands'
+import { stopShot, abortShot, purge } from '@/lib/mqttCommands'
 import { SensorGauge } from '@/components/SensorGauge'
 import { EspressoChart } from '@/components/charts'
 import type { ChartDataPoint } from '@/components/charts/chartConstants'
+import { extractStageRanges } from '@/components/charts/chartConstants'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,6 +99,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
       pressure: machineState.pressure ?? 0,
       flow: machineState.flow_rate ?? 0,
       weight: machineState.shot_weight ?? 0,
+      stage: machineState.state ?? undefined,
     }
 
     chartDataRef.current = [...chartDataRef.current, point]
@@ -119,6 +123,12 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
       }
     },
     [t],
+  )
+
+  // Compute stage ranges from data
+  const stages = useMemo(
+    () => extractStageRanges(chartData),
+    [chartData],
   )
 
   // Summary stats (computed once when shot completes)
@@ -156,9 +166,20 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
         <div className="w-16" /> {/* spacer for centering */}
       </div>
 
-      {/* ── ACTIVE SHOT ─────────────────────────────── */}
+      {/* ── ACTIVE SHOT / WAITING ─────────────────────────────── */}
       {!shotComplete && (
         <>
+          {/* Pre-shot waiting indicator */}
+          {!machineState.brewing && chartData.length === 0 && (
+            <Card className="p-6 text-center">
+              <div className="text-muted-foreground space-y-2">
+                <Coffee size={32} weight="duotone" className="mx-auto text-primary animate-pulse" />
+                <p className="text-sm font-medium">{t('controlCenter.liveShot.waitingForShot')}</p>
+                <p className="text-xs text-muted-foreground/70">{t('controlCenter.liveShot.waitingDesc')}</p>
+              </div>
+            </Card>
+          )}
+
           {/* Sticky mobile metrics bar */}
           <div className="grid grid-cols-4 gap-2 lg:hidden">
             <MetricTile
@@ -182,19 +203,20 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
           </div>
 
           {/* Desktop: two-column — chart + sidebar gauges */}
-          <div className="lg:grid lg:grid-cols-[1fr_180px] lg:gap-4">
+          <div className="lg:grid lg:grid-cols-[1fr_180px] lg:gap-4 lg:items-start">
             {/* Chart */}
             <Card className="p-4">
               <EspressoChart
                 data={chartData}
+                stages={stages}
                 heightClass="h-[45vh] lg:h-[55vh]"
                 liveMode
                 showWeight
               />
             </Card>
 
-            {/* Desktop sidebar gauges */}
-            <div className="hidden lg:flex lg:flex-col lg:gap-3 lg:items-center lg:pt-2">
+            {/* Desktop sidebar gauges — vertically aligned with chart card */}
+            <Card className="hidden lg:flex lg:flex-col lg:gap-3 lg:items-center p-3">
               {/* Timer */}
               <div className="text-center">
                 <div className="text-3xl font-bold tabular-nums text-foreground">
@@ -208,7 +230,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 min={0}
                 max={15}
                 unit="bar"
-                label={t('controlCenter.metrics.pressure')}
+                label={t('controlCenter.metrics.pressureLabel')}
                 size={100}
                 stale={machineState._stale}
               />
@@ -218,7 +240,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 min={0}
                 max={8}
                 unit="ml/s"
-                label={t('controlCenter.metrics.flow')}
+                label={t('controlCenter.metrics.flowLabel')}
                 size={100}
                 stale={machineState._stale}
               />
@@ -251,7 +273,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 <Thermometer size={14} weight="duotone" />
                 {machineState.brew_head_temperature?.toFixed(1) ?? '—'}°C
               </div>
-            </div>
+            </Card>
           </div>
 
           {/* Action buttons */}
@@ -312,6 +334,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
             <Card className="p-4 mb-4">
               <EspressoChart
                 data={chartData}
+                stages={stages}
                 heightClass="h-[35vh] lg:h-[45vh]"
                 showWeight
               />
@@ -328,12 +351,20 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 <SummaryItem label={t('controlCenter.liveShot.avgPressure')} value={`${summary.avgPressure.toFixed(1)} bar`} />
                 <SummaryItem label={t('controlCenter.liveShot.avgFlow')} value={`${summary.avgFlow.toFixed(1)} ml/s`} />
               </div>
-              <div className="flex gap-3 justify-center">
+              <div className="flex gap-3 justify-center flex-wrap">
                 {onAnalyze && (
                   <Button variant="dark-brew" className="h-11 px-6" onClick={onAnalyze}>
                     {t('controlCenter.liveShot.analyzeShot')}
                   </Button>
                 )}
+                <Button
+                  variant="outline"
+                  className="h-11 px-6"
+                  onClick={() => cmd(purge, 'purging')}
+                >
+                  <Drop size={16} weight="fill" className="mr-2" />
+                  {t('controlCenter.liveShot.purgeAfterShot')}
+                </Button>
                 <Button variant="outline" className="h-11 px-6" onClick={onBack}>
                   {t('controlCenter.liveShot.backHome')}
                 </Button>

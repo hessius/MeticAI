@@ -398,13 +398,16 @@
       "preheating": "Förvärmer",
       "steaming": "Ångar",
       "descaling": "Avkalkar",
-      "unknown": "Okänd"
+      "unknown": "Okänd",
+      "ready": "Redo"
     },
     "metrics": {
       "time": "Tid (s)",
       "weight": "Vikt (g)",
       "pressure": "Tryck (bar)",
-      "flow": "Flöde (ml/s)"
+      "flow": "Flöde (ml/s)",
+      "pressureLabel": "Tryck",
+      "flowLabel": "Flöde"
     },
     "actions": {
       "start": "Starta",
@@ -415,7 +418,8 @@
       "tare": "Tarera",
       "home": "Hem",
       "purge": "Spola",
-      "live": "Live"
+      "live": "Live",
+      "abortPreheat": "Avbryt"
     },
     "toasts": {
       "startingShot": "Startar bryggning…",
@@ -492,7 +496,13 @@
       "analyzeShot": "Analysera denna bryggning",
       "backHome": "Tillbaka till start",
       "profileOverlay": "Profil",
-      "shotOverlay": "Jämför"
+      "shotOverlay": "Jämför",
+      "purgeAfterShot": "Spola",
+      "waitingForShot": "Väntar på att skottet ska starta…",
+      "waitingDesc": "Diagrammet visas när extraktionen börjar."
+    },
+    "preheat": {
+      "countdown": "Förvärmer"
     }
   }
 }

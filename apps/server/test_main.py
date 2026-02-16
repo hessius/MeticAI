@@ -9162,6 +9162,26 @@ class TestMachineCommandEndpoints:
             assert response.json()["success"] is True
             assert response.json()["command"] == "abort_shot"
 
+    def test_command_abort_during_preheat(self, client):
+        """Abort command succeeds during preheat (not brewing)."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False
+            }
+            response = client.post("/api/machine/command/abort")
+            assert response.status_code == 200
+            assert response.json()["success"] is True
+            assert response.json()["command"] == "abort_shot"
+
+    def test_command_abort_offline(self, client):
+        """Abort command fails when machine is offline."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "offline", "connected": False, "brewing": False
+            }
+            response = client.post("/api/machine/command/abort")
+            assert response.status_code == 409
+
     def test_command_continue(self, client):
         """Continue command always succeeds (no precondition)."""
         response = client.post("/api/machine/command/continue")
