@@ -113,9 +113,8 @@ export function SensorGauge({
     >
       <svg
         width={size}
-        height={size * 0.72}
-        viewBox={`0 0 ${size} ${size * 0.72}`}
-        className="overflow-visible"
+        height={size * 0.75}
+        viewBox={`0 ${-size * 0.03} ${size} ${size * 0.78}`}
       >
         {/* Background track */}
         <path

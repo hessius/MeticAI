@@ -83,9 +83,14 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
   const [profilesLoaded, setProfilesLoaded] = useState(false)
 
-  const isIdle = machineState.state?.toLowerCase() === 'idle' && !machineState.brewing
+  const stateLC = (machineState.state ?? '').toLowerCase()
+  const isIdle = stateLC === 'idle' && !machineState.brewing
   const isBrewing = machineState.brewing
   const isConnected = machineState.connected
+  const isPreheating = stateLC === 'preheating'
+  const isReady = stateLC === 'click to start'
+  // Machine accepts START during idle, preheat, or "click to start"
+  const canStart = (isIdle || isPreheating || isReady) && !isBrewing && isConnected
 
   // Build the profile image URL when active_profile changes
   useEffect(() => {
@@ -211,7 +216,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           </div>
 
           {/* Profile selector */}
-          {profilesLoaded && machineProfiles.length > 0 && isIdle && (
+          {profilesLoaded && machineProfiles.length > 0 && (isIdle || isPreheating || isReady) && (
             <div>
               <Select
                 value={machineState.active_profile ?? ''}
@@ -311,7 +316,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           <ActionButton
             icon={<Play size={14} weight="fill" />}
             label={t('controlCenter.actions.start')}
-            disabled={!isIdle || !isConnected}
+            disabled={!canStart}
             onClick={() => cmd(startShot, 'startingShot')}
           />
 
@@ -326,11 +331,11 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             t={t}
           />
 
-          {/* Abort — destructive confirmation */}
+          {/* Abort — works during brewing OR preheating */}
           <ConfirmButton
             icon={<XCircle size={14} weight="fill" />}
-            label={t('controlCenter.actions.abort')}
-            disabled={!isBrewing}
+            label={isPreheating ? t('controlCenter.actions.abortPreheat') : t('controlCenter.actions.abort')}
+            disabled={!isBrewing && !isPreheating}
             title={t('controlCenter.confirm.abortTitle')}
             description={t('controlCenter.confirm.abortDesc')}
             onConfirm={() => cmd(abortShot, 'aborting')}
@@ -347,7 +352,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           <ActionButton
             icon={<Fire size={14} weight="fill" />}
             label={t('controlCenter.actions.preheat')}
-            disabled={!isIdle || !isConnected}
+            disabled={(!isIdle && !isReady) || !isConnected}
             onClick={() => cmd(preheat, 'preheating')}
           />
           <ActionButton
@@ -359,7 +364,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           <ActionButton
             icon={<House size={14} weight="fill" />}
             label={t('controlCenter.actions.home')}
-            disabled={!isIdle || !isConnected}
+            disabled={(!isIdle && !isReady) || !isConnected}
             onClick={() => cmd(homePlunger, 'homed')}
           />
 
@@ -367,7 +372,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           <ConfirmButton
             icon={<Drop size={14} weight="fill" />}
             label={t('controlCenter.actions.purge')}
-            disabled={!isIdle || !isConnected}
+            disabled={(!isIdle && !isReady) || !isConnected}
             title={t('controlCenter.confirm.purgeTitle')}
             description={t('controlCenter.confirm.purgeDesc')}
             onConfirm={() => cmd(purge, 'purging')}

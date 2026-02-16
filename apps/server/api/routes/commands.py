@@ -141,9 +141,10 @@ async def command_stop():
 
 @router.post("/api/machine/command/abort")
 async def command_abort():
-    """Abort the current shot and retract the plunger."""
+    """Abort the current shot or preheat and retract the plunger."""
     snapshot = _get_snapshot()
-    _require_brewing(snapshot)
+    _require_connected(snapshot)
+    # Abort is allowed during brewing OR preheating
     return _do_publish("abort_shot")
 
 

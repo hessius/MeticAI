@@ -593,7 +593,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
 
       <div className={`min-h-screen text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-center py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
-      <div className="w-full max-w-md lg:max-w-5xl relative">
+      <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -640,7 +640,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
         </motion.div>
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
-        <div className={showRightColumn ? 'md:grid md:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] md:gap-6' : ''}>
+        <div className={showRightColumn ? 'md:grid md:grid-cols-2 md:gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)]' : ''}>
           {/* ── Main content column ─────────────────────── */}
           <div>
             <AnimatePresence mode="wait">
@@ -753,10 +753,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                 <LiveShotView
                   machineState={machineState}
                   onBack={handleBackToStart}
-                  onAnalyze={() => {
-                    // Navigate to shot history for analysis
-                    setViewState('history')
-                  }}
+                  onAnalyze={handleBackToStart}
                 />
               )}
 
