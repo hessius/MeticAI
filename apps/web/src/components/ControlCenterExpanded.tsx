@@ -331,17 +331,26 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             t={t}
           />
 
-          {/* Abort — works during brewing OR preheating */}
-          <ConfirmButton
-            icon={<XCircle size={14} weight="fill" />}
-            label={isPreheating ? t('controlCenter.actions.abortPreheat') : t('controlCenter.actions.abort')}
-            disabled={!isBrewing && !isPreheating}
-            title={t('controlCenter.confirm.abortTitle')}
-            description={t('controlCenter.confirm.abortDesc')}
-            onConfirm={() => cmd(abortShot, 'aborting')}
-            destructive
-            t={t}
-          />
+          {/* Abort — works during brewing; Cancel preheat during preheating */}
+          {isPreheating ? (
+            <ActionButton
+              icon={<XCircle size={14} weight="fill" />}
+              label={t('controlCenter.actions.abortPreheat')}
+              disabled={!isConnected}
+              onClick={() => cmd(preheat, 'preheatCancelled')}
+            />
+          ) : (
+            <ConfirmButton
+              icon={<XCircle size={14} weight="fill" />}
+              label={t('controlCenter.actions.abort')}
+              disabled={!isBrewing}
+              title={t('controlCenter.confirm.abortTitle')}
+              description={t('controlCenter.confirm.abortDesc')}
+              onConfirm={() => cmd(abortShot, 'aborting')}
+              destructive
+              t={t}
+            />
+          )}
 
           <ActionButton
             icon={<ArrowRight size={14} weight="bold" />}

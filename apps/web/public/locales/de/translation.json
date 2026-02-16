@@ -427,6 +427,7 @@
       "aborting": "Bezug wird abgebrochen…",
       "continuing": "Bezug wird fortgesetzt…",
       "preheating": "Vorheizt…",
+      "preheatCancelled": "Vorheizen abgebrochen",
       "tared": "Waage tariert",
       "homed": "Kolben fährt zurück…",
       "purging": "Spült…",

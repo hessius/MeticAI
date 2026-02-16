@@ -427,6 +427,7 @@
       "aborting": "Avbryter bryggning…",
       "continuing": "Fortsätter bryggning…",
       "preheating": "Förvärmer…",
+      "preheatCancelled": "Förvärmning avbruten",
       "tared": "Våg tarerad",
       "homed": "Kolv återställs…",
       "purging": "Spolar…",

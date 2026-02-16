@@ -9193,12 +9193,35 @@ class TestMachineCommandEndpoints:
         """Preheat command succeeds when idle."""
         with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
             mock_sub.return_value.get_snapshot.return_value = {
-                "availability": "online", "connected": True, "brewing": False
+                "availability": "online", "connected": True, "brewing": False,
+                "state": "Idle",
             }
             response = client.post("/api/machine/command/preheat")
             assert response.status_code == 200
             assert response.json()["success"] is True
             assert response.json()["command"] == "preheat"
+
+    def test_command_preheat_cancel_during_preheating(self, client):
+        """Preheat command succeeds during preheating (toggle off)."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": False,
+                "state": "Preheating",
+            }
+            response = client.post("/api/machine/command/preheat")
+            assert response.status_code == 200
+            assert response.json()["success"] is True
+            assert response.json()["command"] == "preheat"
+
+    def test_command_preheat_rejected_while_brewing(self, client):
+        """Preheat command rejected while a shot is running."""
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+            mock_sub.return_value.get_snapshot.return_value = {
+                "availability": "online", "connected": True, "brewing": True,
+                "state": "Brewing",
+            }
+            response = client.post("/api/machine/command/preheat")
+            assert response.status_code == 409
 
     def test_command_tare_success(self, client):
         """Tare command succeeds when connected."""
@@ -9234,7 +9257,7 @@ class TestMachineCommandEndpoints:
             assert response.json()["command"] == "purge"
 
     def test_command_load_profile(self, client):
-        """Load profile command sends profile name."""
+        """Load profile command sends select_profile then run_profile."""
         with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
             mock_sub.return_value.get_snapshot.return_value = {
                 "availability": "online", "connected": True
@@ -9245,7 +9268,7 @@ class TestMachineCommandEndpoints:
             )
             assert response.status_code == 200
             assert response.json()["success"] is True
-            assert response.json()["command"] == "load_profile"
+            assert response.json()["command"] == "select_profile"
 
     def test_command_brightness(self, client):
         """Brightness command sends value (with connectivity check)."""

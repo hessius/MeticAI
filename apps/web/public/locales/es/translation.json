@@ -427,6 +427,7 @@
       "aborting": "Abortando extracción…",
       "continuing": "Continuando extracción…",
       "preheating": "Precalentando…",
+      "preheatCancelled": "Precalentamiento cancelado",
       "tared": "Báscula tarada",
       "homed": "Émbolo retornando…",
       "purging": "Purgando…",
