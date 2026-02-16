@@ -9398,7 +9398,8 @@ class TestMachineCommandEndpoints:
 
     def test_command_load_profile(self, client):
         """Load profile command sends select_profile then run_profile."""
-        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub:
+        with patch('api.routes.commands.get_mqtt_subscriber') as mock_sub, \
+             patch('api.routes.commands._publish_command', return_value=True) as mock_pub:
             mock_sub.return_value.get_snapshot.return_value = {
                 "availability": "online", "connected": True
             }
@@ -9409,6 +9410,12 @@ class TestMachineCommandEndpoints:
             assert response.status_code == 200
             assert response.json()["success"] is True
             assert response.json()["command"] == "select_profile"
+            # Must send both select_profile AND run_profile
+            calls = mock_pub.call_args_list
+            assert len(calls) == 2
+            assert calls[0][0][0] == "meticulous_espresso/command/select_profile"
+            assert calls[0][0][1] == "Berry Blast Bloom"
+            assert calls[1][0][0] == "meticulous_espresso/command/run_profile"
 
     def test_command_brightness(self, client):
         """Brightness command sends value (with connectivity check)."""
