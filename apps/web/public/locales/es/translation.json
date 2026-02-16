@@ -453,8 +453,7 @@
       "info": "Info de la máquina",
       "settings": "Ajustes de la máquina",
       "actions": "Acciones",
-      "profile": "Perfil"
-    },
+      "profile": "Perfil"      "activeProfile": "Perfil activo",    },
     "labels": {
       "brewHead": "Cabezal",
       "boiler": "Caldera",

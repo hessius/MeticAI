@@ -453,8 +453,7 @@
       "info": "Info machine",
       "settings": "Réglages machine",
       "actions": "Actions",
-      "profile": "Profil"
-    },
+      "profile": "Profil"      "activeProfile": "Profil actif",    },
     "labels": {
       "brewHead": "Tête de groupe",
       "boiler": "Chaudière",

@@ -189,7 +189,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
       {/* ── Profile ─────────────────────────────────── */}
       <section>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {t('controlCenter.sections.profile')}
+          {t('controlCenter.sections.activeProfile')}
         </h4>
         <div className="space-y-2 text-sm">
           {/* Active profile with image */}

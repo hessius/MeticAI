@@ -43,7 +43,6 @@ import { ControlCenterExpanded } from './ControlCenterExpanded'
 interface ControlCenterProps {
   machineState: MachineState
   onOpenLiveView?: () => void
-  compact?: boolean   // mobile layout
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +89,7 @@ function connectionDot(machineState: MachineState) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ControlCenter({ machineState, onOpenLiveView, compact }: ControlCenterProps) {
+export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
@@ -253,9 +252,13 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             )
           })()}
 
-          {/* Active profile with image + author — hidden on mobile idle */}
-          {!(compact && isIdle) && machineState.active_profile && (
-            <div className="flex items-center gap-2.5">
+          {/* Active profile with image + author */}
+          {machineState.active_profile && (
+            <div className="space-y-1">
+              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {t('controlCenter.sections.activeProfile')}
+              </h4>
+              <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                 {profileImgUrl ? (
                   <img
@@ -276,6 +279,7 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
                     {t('controlCenter.labels.by')} {profileAuthor}
                   </span>
                 )}
+              </div>
               </div>
             </div>
           )}
