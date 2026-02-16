@@ -232,7 +232,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
                 }}
                 disabled={!isConnected}
               >
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger className="h-8 text-xs dark:border-white/20">
                   <SelectValue placeholder={t('controlCenter.profileSelector.placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
