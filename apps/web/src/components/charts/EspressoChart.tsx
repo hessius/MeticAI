@@ -175,6 +175,9 @@ export function EspressoChart({
                   const yAxis = props.yAxisMap && (props.yAxisMap as any)['left']
                   if (!xAxis?.scale || !yAxis?.scale) return null
 
+                  // Guard: if chart has no data points yet, scales may return NaN
+                  if (data.length === 0) return null
+
                   const pressurePts = targetCurves
                     .filter(p => p.target_pressure !== undefined)
                     .sort((a, b) => a.time - b.time)
@@ -182,10 +185,18 @@ export function EspressoChart({
                     .filter(p => p.target_flow !== undefined)
                     .sort((a, b) => a.time - b.time)
 
-                  const buildPath = (pts: ProfileTargetPoint[], key: 'target_pressure' | 'target_flow') =>
-                    pts.map((p, i) =>
-                      `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p[key]!)}`
+                  const buildPath = (pts: ProfileTargetPoint[], key: 'target_pressure' | 'target_flow') => {
+                    const segments = pts
+                      .map(p => ({
+                        x: xAxis.scale(p.time),
+                        y: yAxis.scale(p[key]!),
+                      }))
+                      .filter(({ x, y }: { x: number; y: number }) => Number.isFinite(x) && Number.isFinite(y))
+                    if (segments.length < 2) return ''
+                    return segments.map((s: { x: number; y: number }, i: number) =>
+                      `${i === 0 ? 'M' : 'L'} ${s.x} ${s.y}`
                     ).join(' ')
+                  }
 
                   const pPath = pressurePts.length > 1 ? buildPath(pressurePts, 'target_pressure') : ''
                   const fPath = flowPts.length > 1 ? buildPath(flowPts, 'target_flow') : ''
@@ -198,12 +209,16 @@ export function EspressoChart({
                             stroke={CHART_COLORS.targetPressure}
                             strokeWidth={2} strokeDasharray="8 4"
                             strokeLinecap="round" opacity={0.8} />
-                          {pressurePts.map((p, i) => (
-                            <circle key={`tp-${i}`}
-                              cx={xAxis.scale(p.time)}
-                              cy={yAxis.scale(p.target_pressure!)}
-                              r={3} fill={CHART_COLORS.targetPressure} opacity={0.8} />
-                          ))}
+                          {pressurePts.map((p, i) => {
+                            const cx = xAxis.scale(p.time)
+                            const cy = yAxis.scale(p.target_pressure!)
+                            if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
+                            return (
+                              <circle key={`tp-${i}`}
+                                cx={cx} cy={cy}
+                                r={3} fill={CHART_COLORS.targetPressure} opacity={0.8} />
+                            )
+                          })}
                         </>
                       )}
                       {fPath && (
@@ -212,12 +227,16 @@ export function EspressoChart({
                             stroke={CHART_COLORS.targetFlow}
                             strokeWidth={2} strokeDasharray="8 4"
                             strokeLinecap="round" opacity={0.8} />
-                          {flowPts.map((p, i) => (
-                            <circle key={`tf-${i}`}
-                              cx={xAxis.scale(p.time)}
-                              cy={yAxis.scale(p.target_flow!)}
-                              r={3} fill={CHART_COLORS.targetFlow} opacity={0.8} />
-                          ))}
+                          {flowPts.map((p, i) => {
+                            const cx = xAxis.scale(p.time)
+                            const cy = yAxis.scale(p.target_flow!)
+                            if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
+                            return (
+                              <circle key={`tf-${i}`}
+                                cx={cx} cy={cy}
+                                r={3} fill={CHART_COLORS.targetFlow} opacity={0.8} />
+                            )
+                          })}
                         </>
                       )}
                     </g>
