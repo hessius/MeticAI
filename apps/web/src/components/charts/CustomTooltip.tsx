@@ -60,7 +60,7 @@ export function CustomTooltip({ active, payload, label, targetCurves }: CustomTo
               className="w-2 h-2 rounded-full"
               style={{ backgroundColor: item.color || '#888' }}
             />
-            <span className="capitalize">
+            <span>
               {typeof item.name === 'string' ? item.name : 'Value'}:
             </span>
             <span className="font-medium">
