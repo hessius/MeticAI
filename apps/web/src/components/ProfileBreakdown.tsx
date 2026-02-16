@@ -16,14 +16,14 @@ import {
 
 // Distinct colors for variables - designed to be easily distinguishable
 const VARIABLE_COLORS = [
-  { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/40', dot: 'bg-violet-400' },
-  { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/40', dot: 'bg-emerald-400' },
-  { bg: 'bg-rose-500/20', text: 'text-rose-400', border: 'border-rose-500/40', dot: 'bg-rose-400' },
-  { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/40', dot: 'bg-cyan-400' },
-  { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/40', dot: 'bg-orange-400' },
-  { bg: 'bg-pink-500/20', text: 'text-pink-400', border: 'border-pink-500/40', dot: 'bg-pink-400' },
-  { bg: 'bg-teal-500/20', text: 'text-teal-400', border: 'border-teal-500/40', dot: 'bg-teal-400' },
-  { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40', dot: 'bg-yellow-400' },
+  { bg: 'bg-violet-500/20', text: 'text-violet-700 dark:text-violet-400', border: 'border-violet-500/40', dot: 'bg-violet-500 dark:bg-violet-400' },
+  { bg: 'bg-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/40', dot: 'bg-emerald-500 dark:bg-emerald-400' },
+  { bg: 'bg-rose-500/20', text: 'text-rose-700 dark:text-rose-400', border: 'border-rose-500/40', dot: 'bg-rose-500 dark:bg-rose-400' },
+  { bg: 'bg-cyan-500/20', text: 'text-cyan-700 dark:text-cyan-400', border: 'border-cyan-500/40', dot: 'bg-cyan-500 dark:bg-cyan-400' },
+  { bg: 'bg-orange-500/20', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-500/40', dot: 'bg-orange-500 dark:bg-orange-400' },
+  { bg: 'bg-pink-500/20', text: 'text-pink-700 dark:text-pink-400', border: 'border-pink-500/40', dot: 'bg-pink-500 dark:bg-pink-400' },
+  { bg: 'bg-teal-500/20', text: 'text-teal-700 dark:text-teal-400', border: 'border-teal-500/40', dot: 'bg-teal-500 dark:bg-teal-400' },
+  { bg: 'bg-yellow-500/20', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-500/40', dot: 'bg-yellow-500 dark:bg-yellow-400' },
 ]
 
 interface ProfileVariable {
@@ -207,11 +207,11 @@ interface ProfileBreakdownProps {
 function getTypeIcon(type: string) {
   switch (type) {
     case 'pressure':
-      return <Gauge size={14} weight="bold" className="text-amber-400" />
+      return <Gauge size={14} weight="bold" className="text-amber-600 dark:text-amber-400" />
     case 'flow':
-      return <Drop size={14} weight="bold" className="text-blue-400" />
+      return <Drop size={14} weight="bold" className="text-blue-600 dark:text-blue-400" />
     case 'power':
-      return <Thermometer size={14} weight="bold" className="text-red-400" />
+      return <Thermometer size={14} weight="bold" className="text-red-600 dark:text-red-400" />
     default:
       return <Sliders size={14} weight="bold" className="text-muted-foreground" />
   }
@@ -220,11 +220,11 @@ function getTypeIcon(type: string) {
 function getTypeColor(type: string) {
   switch (type) {
     case 'pressure':
-      return 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
     case 'flow':
-      return 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+      return 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30'
     case 'power':
-      return 'bg-red-500/15 text-red-400 border-red-500/30'
+      return 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30'
     default:
       return 'bg-muted text-muted-foreground border-muted'
   }
@@ -524,7 +524,7 @@ export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownPr
             {profile.temperature !== undefined && (
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-red-500/15">
-                  <Thermometer size={16} weight="bold" className="text-red-400" />
+                  <Thermometer size={16} weight="bold" className="text-red-600 dark:text-red-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Temperature</p>
@@ -536,7 +536,7 @@ export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownPr
             {profile.final_weight !== undefined && (
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-green-500/15">
-                  <Scales size={16} weight="bold" className="text-green-400" />
+                  <Scales size={16} weight="bold" className="text-green-600 dark:text-green-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Target Weight</p>
@@ -554,12 +554,12 @@ export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownPr
             {warnings.length > 0 && (
               <div className="space-y-1.5 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
                 <div className="flex items-center gap-1.5">
-                  <Warning size={14} weight="bold" className="text-amber-400 shrink-0" />
-                  <p className="text-xs font-medium text-amber-400 whitespace-nowrap">Variable Issues</p>
+                  <Warning size={14} weight="bold" className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 whitespace-nowrap">Variable Issues</p>
                 </div>
                 <div className="space-y-1">
                   {warnings.map((warning, idx) => (
-                    <p key={idx} className="text-[11px] text-amber-300/80">
+                    <p key={idx} className="text-[11px] text-amber-700/80 dark:text-amber-300/80">
                       • {warning.message}
                     </p>
                   ))}
@@ -571,7 +571,7 @@ export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownPr
             {infoVars.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Info size={14} weight="bold" className="text-blue-400" />
+                  <Info size={14} weight="bold" className="text-blue-600 dark:text-blue-400" />
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preparation</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -604,7 +604,7 @@ export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownPr
                     return (
                       <div 
                         key={idx}
-                        className="px-2.5 py-1.5 rounded-lg border text-xs bg-blue-500/10 text-blue-300 border-blue-500/30 whitespace-nowrap"
+                        className="px-2.5 py-1.5 rounded-lg border text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30 whitespace-nowrap"
                       >
                         <span className="font-medium">{variable.name}</span>
                         {displayValue && (
@@ -746,12 +746,12 @@ export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownPr
                         </span>
                       )}
                       {limitsInfo && (
-                        <span className="text-amber-400/80 whitespace-nowrap">
+                        <span className="text-amber-700/80 dark:text-amber-400/80 whitespace-nowrap">
                           Max: {limitsInfo}
                         </span>
                       )}
                       {exitInfo && (
-                        <span className="text-green-400/80 whitespace-nowrap">
+                        <span className="text-green-700/80 dark:text-green-400/80 whitespace-nowrap">
                           Exit: {exitInfo}
                         </span>
                       )}
