@@ -832,6 +832,99 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
     return data_points
 
 
+def generate_estimated_target_curves(profile_data: dict) -> list[dict]:
+    """Generate *estimated* target curves from a profile without actual shot data.
+    
+    Used by the live-view to show goal overlays before/during a shot.
+    Stage durations are estimated from exit-trigger time values (or a
+    fallback of 10 seconds per stage when no time trigger exists).
+    Weight-based dynamics_over stages use estimated stage duration for
+    linear interpolation of their points.
+    
+    Returns the same [{time, target_pressure?, target_flow?, stage_name}] format
+    as _generate_profile_target_curves.
+    """
+    stages = profile_data.get("stages", [])
+    variables = profile_data.get("variables", [])
+    data_points: list[dict] = []
+    
+    DEFAULT_STAGE_DURATION = 10.0  # seconds when no time-exit exists
+
+    # First pass — estimate duration of each stage from exit triggers
+    stage_durations: list[float] = []
+    for stage in stages:
+        exit_triggers = stage.get("exit_triggers", [])
+        time_trigger_val: float | None = None
+        for trig in exit_triggers:
+            if trig.get("type") == "time":
+                raw = trig.get("value", 0)
+                resolved, _ = _resolve_variable(raw, variables)
+                time_trigger_val = _safe_float(resolved, DEFAULT_STAGE_DURATION)
+                break
+        stage_durations.append(time_trigger_val if time_trigger_val else DEFAULT_STAGE_DURATION)
+
+    # Second pass — build target curve points
+    running_time = 0.0
+    for idx, stage in enumerate(stages):
+        stage_name = stage.get("name", f"Stage {idx+1}")
+        stage_type = stage.get("type", "")  # pressure or flow
+        duration = stage_durations[idx]
+
+        dynamics_points = stage.get("dynamics_points", [])
+        dynamics_over = stage.get("dynamics_over", "time")
+
+        if not dynamics_points:
+            dynamics_obj = stage.get("dynamics", {})
+            if isinstance(dynamics_obj, dict):
+                dynamics_points = dynamics_obj.get("points", [])
+                dynamics_over = dynamics_obj.get("over", "time")
+
+        if not dynamics_points:
+            running_time += duration
+            continue
+
+        stage_start = running_time
+        stage_end = running_time + duration
+
+        if len(dynamics_points) == 1:
+            value = dynamics_points[0][1] if len(dynamics_points[0]) > 1 else dynamics_points[0][0]
+            if isinstance(value, str) and value.startswith('$'):
+                resolved, _ = _resolve_variable(value, variables)
+                value = _safe_float(resolved)
+            else:
+                value = _safe_float(value)
+
+            pt_s = {"time": round(stage_start, 2), "stage_name": stage_name}
+            pt_e = {"time": round(stage_end, 2), "stage_name": stage_name}
+            key = "target_pressure" if stage_type == "pressure" else "target_flow"
+            pt_s[key] = round(value, 1)
+            pt_e[key] = round(value, 1)
+            data_points += [pt_s, pt_e]
+        else:
+            max_x = max(_safe_float(p[0]) for p in dynamics_points)
+            scale = duration / max_x if max_x > 0 else 1
+
+            for dp in dynamics_points:
+                dp_x = _safe_float(dp[0])
+                dp_val = dp[1] if len(dp) > 1 else dp[0]
+                if isinstance(dp_val, str) and dp_val.startswith('$'):
+                    resolved, _ = _resolve_variable(dp_val, variables)
+                    dp_val = _safe_float(resolved)
+                else:
+                    dp_val = _safe_float(dp_val)
+
+                actual_time = stage_start + dp_x * scale
+                pt = {"time": round(actual_time, 2), "stage_name": stage_name}
+                key = "target_pressure" if stage_type == "pressure" else "target_flow"
+                pt[key] = round(dp_val, 1)
+                data_points.append(pt)
+
+        running_time = stage_end
+
+    data_points.sort(key=lambda x: x["time"])
+    return data_points
+
+
 def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
     """Perform complete local analysis of shot vs profile.
     

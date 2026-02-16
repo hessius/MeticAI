@@ -27,7 +27,7 @@ import type { MachineState } from '@/hooks/useWebSocket'
 import { stopShot, abortShot, purge } from '@/lib/mqttCommands'
 import { SensorGauge } from '@/components/SensorGauge'
 import { EspressoChart } from '@/components/charts'
-import type { ChartDataPoint } from '@/components/charts/chartConstants'
+import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
 import { extractStageRanges } from '@/components/charts/chartConstants'
 import {
   AlertDialog,
@@ -81,6 +81,23 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [shotComplete, setShotComplete] = useState(false)
   const wasBrewingRef = useRef(machineState.brewing)
+  const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
+  const fetchedProfileRef = useRef<string | null>(null)
+
+  // Fetch target curves for the active profile when a shot starts
+  useEffect(() => {
+    const profileName = machineState.active_profile
+    if (!profileName || fetchedProfileRef.current === profileName) return
+    fetchedProfileRef.current = profileName
+
+    const base = (window as any).__RUNTIME_CONFIG__?.serverUrl || ''
+    fetch(`${base}/api/profile/${encodeURIComponent(profileName)}/target-curves`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.target_curves) setTargetCurves(data.target_curves)
+      })
+      .catch(() => { /* non-critical — live view works without targets */ })
+  }, [machineState.active_profile])
 
   // Accumulate data from WebSocket frames
   useEffect(() => {
@@ -212,6 +229,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 heightClass="h-[45vh] lg:h-[55vh]"
                 liveMode
                 showWeight
+                targetCurves={targetCurves}
               />
             </Card>
 
@@ -337,6 +355,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 stages={stages}
                 heightClass="h-[35vh] lg:h-[45vh]"
                 showWeight
+                targetCurves={targetCurves}
               />
             </Card>
 

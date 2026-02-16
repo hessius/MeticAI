@@ -3054,6 +3054,98 @@ class TestShotAnalysisHelpers:
         assert "reached" in message.lower()
 
 
+class TestEstimatedTargetCurves:
+    """Tests for generate_estimated_target_curves (live-view goal overlays)."""
+
+    def test_single_point_pressure_stage(self):
+        """Single-point constant pressure stage generates start+end points."""
+        from services.analysis_service import generate_estimated_target_curves
+        profile = {
+            "stages": [{
+                "name": "Pre-Infusion",
+                "type": "pressure",
+                "dynamics_points": [[0, 3]],
+                "exit_triggers": [{"type": "time", "value": 10}],
+            }],
+            "variables": [],
+        }
+        curves = generate_estimated_target_curves(profile)
+        assert len(curves) == 2
+        assert curves[0]["target_pressure"] == 3.0
+        assert curves[0]["time"] == 0.0
+        assert curves[1]["time"] == 10.0
+        assert curves[1]["stage_name"] == "Pre-Infusion"
+
+    def test_multi_stage_accumulates_time(self):
+        """Multiple stages stack up durations correctly."""
+        from services.analysis_service import generate_estimated_target_curves
+        profile = {
+            "stages": [
+                {"name": "S1", "type": "pressure", "dynamics_points": [[0, 2]],
+                 "exit_triggers": [{"type": "time", "value": 5}]},
+                {"name": "S2", "type": "flow", "dynamics_points": [[0, 4]],
+                 "exit_triggers": [{"type": "time", "value": 8}]},
+            ],
+            "variables": [],
+        }
+        curves = generate_estimated_target_curves(profile)
+        # S1: 0-5s, S2: 5-13s
+        flow_pts = [c for c in curves if "target_flow" in c]
+        assert flow_pts[0]["time"] == 5.0
+        assert flow_pts[1]["time"] == 13.0
+
+    def test_variable_resolution(self):
+        """Variables in dynamics_points are resolved."""
+        from services.analysis_service import generate_estimated_target_curves
+        profile = {
+            "stages": [{
+                "name": "Main", "type": "pressure",
+                "dynamics_points": [[0, "$my_pressure"]],
+                "exit_triggers": [{"type": "time", "value": 10}],
+            }],
+            "variables": [{"key": "my_pressure", "value": 9}],
+        }
+        curves = generate_estimated_target_curves(profile)
+        assert curves[0]["target_pressure"] == 9.0
+
+    def test_multi_point_dynamics(self):
+        """Multi-point dynamics produces multiple curve points."""
+        from services.analysis_service import generate_estimated_target_curves
+        profile = {
+            "stages": [{
+                "name": "Ramp", "type": "pressure",
+                "dynamics_points": [[0, 2], [5, 6], [10, 9]],
+                "exit_triggers": [{"type": "time", "value": 20}],
+            }],
+            "variables": [],
+        }
+        curves = generate_estimated_target_curves(profile)
+        assert len(curves) == 3
+        # Scale: 20/10 = 2x — so times are 0, 10, 20
+        assert curves[0]["time"] == 0.0
+        assert curves[1]["time"] == 10.0
+        assert curves[2]["time"] == 20.0
+
+    def test_no_time_trigger_uses_default(self):
+        """Stage without a time exit trigger uses the 10s default."""
+        from services.analysis_service import generate_estimated_target_curves
+        profile = {
+            "stages": [{
+                "name": "WtStage", "type": "flow",
+                "dynamics_points": [[0, 3]],
+                "exit_triggers": [{"type": "weight", "value": 30}],
+            }],
+            "variables": [],
+        }
+        curves = generate_estimated_target_curves(profile)
+        assert curves[1]["time"] == 10.0  # default duration
+
+    def test_empty_profile_returns_empty(self):
+        """Profile with no stages returns empty list."""
+        from services.analysis_service import generate_estimated_target_curves
+        assert generate_estimated_target_curves({"stages": []}) == []
+
+
 class TestBasicEndpoints:
     """Tests for basic utility endpoints."""
     

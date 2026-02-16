@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
   ReferenceArea,
   ReferenceLine,
+  Customized,
 } from 'recharts'
 import { useTheme } from 'next-themes'
 import {
@@ -23,6 +24,7 @@ import {
   getChartTheme,
   type ChartDataPoint,
   type StageRange,
+  type ProfileTargetPoint,
 } from './chartConstants'
 import { CustomTooltip } from './CustomTooltip'
 
@@ -69,6 +71,8 @@ export interface EspressoChartProps {
   leftAxisMax?: number
   /** Override right axis max */
   rightAxisMax?: number
+  /** Profile target curve overlay (dashed pressure / flow goal lines) */
+  targetCurves?: ProfileTargetPoint[]
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +93,7 @@ export function EspressoChart({
   showLegend = true,
   leftAxisMax,
   rightAxisMax,
+  targetCurves,
 }: EspressoChartProps) {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
@@ -160,6 +165,66 @@ export function EspressoChart({
                 label={rl.label ? { value: rl.label, fill: rl.color, fontSize: 10, position: 'insideTopRight' } : undefined}
               />
             ))}
+
+            {/* Profile target curve overlay (dashed goal lines) */}
+            {targetCurves && targetCurves.length > 0 && (
+              <Customized
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                component={(props: any) => {
+                  const xAxis = props.xAxisMap && Object.values(props.xAxisMap)[0] as any
+                  const yAxis = props.yAxisMap && (props.yAxisMap as any)['left']
+                  if (!xAxis?.scale || !yAxis?.scale) return null
+
+                  const pressurePts = targetCurves
+                    .filter(p => p.target_pressure !== undefined)
+                    .sort((a, b) => a.time - b.time)
+                  const flowPts = targetCurves
+                    .filter(p => p.target_flow !== undefined)
+                    .sort((a, b) => a.time - b.time)
+
+                  const buildPath = (pts: ProfileTargetPoint[], key: 'target_pressure' | 'target_flow') =>
+                    pts.map((p, i) =>
+                      `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p[key]!)}`
+                    ).join(' ')
+
+                  const pPath = pressurePts.length > 1 ? buildPath(pressurePts, 'target_pressure') : ''
+                  const fPath = flowPts.length > 1 ? buildPath(flowPts, 'target_flow') : ''
+
+                  return (
+                    <g className="target-curves">
+                      {pPath && (
+                        <>
+                          <path d={pPath} fill="none"
+                            stroke={CHART_COLORS.targetPressure}
+                            strokeWidth={2} strokeDasharray="8 4"
+                            strokeLinecap="round" opacity={0.8} />
+                          {pressurePts.map((p, i) => (
+                            <circle key={`tp-${i}`}
+                              cx={xAxis.scale(p.time)}
+                              cy={yAxis.scale(p.target_pressure!)}
+                              r={3} fill={CHART_COLORS.targetPressure} opacity={0.8} />
+                          ))}
+                        </>
+                      )}
+                      {fPath && (
+                        <>
+                          <path d={fPath} fill="none"
+                            stroke={CHART_COLORS.targetFlow}
+                            strokeWidth={2} strokeDasharray="8 4"
+                            strokeLinecap="round" opacity={0.8} />
+                          {flowPts.map((p, i) => (
+                            <circle key={`tf-${i}`}
+                              cx={xAxis.scale(p.time)}
+                              cy={yAxis.scale(p.target_flow!)}
+                              r={3} fill={CHART_COLORS.targetFlow} opacity={0.8} />
+                          ))}
+                        </>
+                      )}
+                    </g>
+                  )
+                }}
+              />
+            )}
 
             {/* Axes */}
             <XAxis
