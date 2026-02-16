@@ -470,6 +470,7 @@
     "lastShot": {
       "title": "Bezug vor {{time}}",
       "label": "Letzter Bezug: {{time}}",
+      "labelWithProfile": "Letzter Bezug: {{profile}} · {{time}}",
       "justNow": "gerade eben",
       "minutesAgo": "vor {{count}} Min.",
       "minutesAgo_one": "vor 1 Min.",

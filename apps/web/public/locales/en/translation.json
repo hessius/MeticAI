@@ -482,6 +482,7 @@
     "lastShot": {
       "title": "Shot pulled {{time}}",
       "label": "Last shot: {{time}}",
+      "labelWithProfile": "Last shot: {{profile}} · {{time}}",
       "justNow": "just now",
       "minutesAgo": "{{count}} min ago",
       "minutesAgo_one": "1 min ago",

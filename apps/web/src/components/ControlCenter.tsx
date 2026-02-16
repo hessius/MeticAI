@@ -284,10 +284,12 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             </div>
           )}
 
-          {/* Last shot time */}
+          {/* Last shot time + profile name */}
           {machineState.last_shot_time && (
-            <div className="text-[10px] text-muted-foreground">
-              {t('controlCenter.lastShot.label', { time: relativeTime(machineState.last_shot_time, t) })}
+            <div className="text-[10px] text-muted-foreground -mt-1">
+              {machineState.last_shot_name
+                ? t('controlCenter.lastShot.labelWithProfile', { time: relativeTime(machineState.last_shot_time, t), profile: machineState.last_shot_name })
+                : t('controlCenter.lastShot.label', { time: relativeTime(machineState.last_shot_time, t) })}
             </div>
           )}
 
