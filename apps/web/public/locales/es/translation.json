@@ -399,7 +399,8 @@
       "steaming": "Vaporizando",
       "descaling": "Descalcificando",
       "unknown": "Desconocido",
-      "ready": "Listo"
+      "ready": "Listo",
+      "pourWater": "Añadir agua"
     },
     "metrics": {
       "time": "Tiempo (s)",
@@ -434,7 +435,7 @@
       "soundsOn": "Sonidos activados",
       "soundsOff": "Sonidos desactivados",
       "error": "El comando falló",
-      "profileLoaded": "Perfil cargado: {{name}}"
+      "profileSelected": "Perfil seleccionado: {{name}}"
     },
     "profileSelector": {
       "placeholder": "Cambiar perfil…"
@@ -501,8 +502,9 @@
       "purgeAfterShot": "Purgar",
       "waitingForShot": "Esperando el inicio…",
       "waitingDesc": "El gráfico aparecerá cuando comience la extracción."
-    },
-    "preheat": {
+    },    "pourWater": {
+      "alert": "Por favor, añade agua al depósito"
+    },    "preheat": {
       "countdown": "Precalentando"
     }
   }

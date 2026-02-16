@@ -64,9 +64,13 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
     preheating:        { cls: 'bg-orange-500/20 text-orange-400 border-orange-500/40 animate-pulse', key: 'preheating' },
     steaming:          { cls: 'bg-purple-500/20 text-purple-400 border-purple-500/40', key: 'steaming' },
     descaling:         { cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40', key: 'descaling' },
+    'pour water':      { cls: 'bg-sky-500/20 text-sky-400 border-sky-500/40 animate-pulse', key: 'pourWater' },
     'click to start':  { cls: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse', key: 'ready' },
   }
-  const entry = map[(state ?? '').toLowerCase()] ?? { cls: 'bg-muted text-muted-foreground border-muted', key: 'unknown' }
+  // Handle partial/truncated states from the machine (e.g. "Pour water...")
+  const normalised = (state ?? '').toLowerCase()
+  const matchedKey = normalised.startsWith('pour water') ? 'pour water' : normalised
+  const entry = map[matchedKey] ?? { cls: 'bg-muted text-muted-foreground border-muted', key: 'unknown' }
   return (
     <Badge className={entry.cls}>
       {t(`controlCenter.states.${entry.key}`)}
@@ -178,9 +182,13 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
   const isIdle = stateLC === 'idle' && !machineState.brewing
   const isBrewing = machineState.brewing
   const isPreheating = stateLC === 'preheating'
+  const isHeating = stateLC === 'heating'
   const isReady = stateLC === 'click to start'
+  const isPourWater = stateLC.startsWith('pour water')
   // Machine accepts START during preheat or "click to start" state
   const canStart = (isIdle || isPreheating || isReady) && !isBrewing && machineState.connected
+  // Abort is allowed during preheating or heating (non-idle, non-brewing warmup states)
+  const canAbortWarmup = (isPreheating || isHeating) && !isBrewing && machineState.connected
 
   return (
     <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
@@ -279,6 +287,15 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             </div>
           )}
 
+          {/* Pour-water alert */}
+          {isPourWater && (
+            <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg px-3 py-2 text-center">
+              <div className="text-sm font-medium text-sky-700 dark:text-sky-400">
+                {t('controlCenter.pourWater.alert')}
+              </div>
+            </div>
+          )}
+
           {/* Quick actions — adapt to preheat/ready/idle state */}
           <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
             {/* Start button — available during idle, preheating, or ready */}
@@ -292,14 +309,14 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
             </Button>
-            {/* Preheat / Abort preheat */}
-            {isPreheating ? (
+            {/* Preheat / Cancel warmup */}
+            {canAbortWarmup ? (
               <Button
                 variant="destructive"
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!machineState.connected}
-                onClick={() => cmd(preheat, 'preheatCancelled')}
+                onClick={() => cmd(abortShot, 'preheatCancelled')}
               >
                 <XCircle size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.abortPreheat')}
@@ -328,8 +345,8 @@ export function ControlCenter({ machineState, onOpenLiveView, compact }: Control
             </Button>
           </div>
 
-          {/* Live view shortcut during preheat/ready */}
-          {(isPreheating || isReady) && onOpenLiveView && (
+          {/* Live view shortcut during warmup/ready */}
+          {(isPreheating || isHeating || isReady) && onOpenLiveView && (
             <Button
               variant="dark-brew"
               size="sm"

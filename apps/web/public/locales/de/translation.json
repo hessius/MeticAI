@@ -399,7 +399,8 @@
       "steaming": "Dampft",
       "descaling": "Entkalkt",
       "unknown": "Unbekannt",
-      "ready": "Bereit"
+      "ready": "Bereit",
+      "pourWater": "Wasser einfüllen"
     },
     "metrics": {
       "time": "Zeit (s)",
@@ -434,7 +435,7 @@
       "soundsOn": "Töne aktiviert",
       "soundsOff": "Töne deaktiviert",
       "error": "Befehl fehlgeschlagen",
-      "profileLoaded": "Profil geladen: {{name}}"
+      "profileSelected": "Profil ausgewählt: {{name}}"
     },
     "profileSelector": {
       "placeholder": "Profil wechseln…"
@@ -501,6 +502,9 @@
       "purgeAfterShot": "Spülen",
       "waitingForShot": "Warte auf Bezug…",
       "waitingDesc": "Das Diagramm erscheint sobald die Extraktion beginnt."
+    },
+    "pourWater": {
+      "alert": "Bitte Wasser in den Tank füllen"
     },
     "preheat": {
       "countdown": "Vorheizen"
