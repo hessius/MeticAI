@@ -25,7 +25,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
-import { startShot, stopShot, abortShot, purge } from '@/lib/mqttCommands'
+import { continueShot, stopShot, abortShot, purge } from '@/lib/mqttCommands'
 import { SensorGauge } from '@/components/SensorGauge'
 import { EspressoChart } from '@/components/charts'
 import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
@@ -210,7 +210,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                   <Button
                     variant="default"
                     className="h-11 px-6"
-                    onClick={() => cmd(startShot, 'startingShot')}
+                    onClick={() => cmd(continueShot, 'startingShot')}
                   >
                     <Play size={18} weight="fill" className="mr-2" />
                     {t('controlCenter.actions.start')}

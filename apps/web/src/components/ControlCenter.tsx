@@ -31,7 +31,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
-import { startShot, stopShot, abortShot, preheat, tareScale } from '@/lib/mqttCommands'
+import { startShot, continueShot, stopShot, abortShot, preheat, tareScale } from '@/lib/mqttCommands'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
@@ -310,7 +310,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!canStart}
-              onClick={() => cmd(startShot, 'startingShot')}
+              onClick={() => cmd((isHeating || isReady || isPourWater) ? continueShot : startShot, 'startingShot')}
             >
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
