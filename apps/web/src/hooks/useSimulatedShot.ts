@@ -1,111 +1,151 @@
 /**
- * useSimulatedShot — dev-only hook that replays target curves
- * as if a real shot were happening.  Produces a stream of
- * MachineState-like updates that LiveShotView can consume.
+ * useSimulatedShot — replays a **real** shot recorded by the
+ * Meticulous machine, fetched from the backend API.
+ *
+ * On mount it pre-fetches a recent shot. When `start()` is called
+ * it plays back the data points at real-time speed, emitting
+ * MachineState-compatible updates that LiveShotView can consume.
  *
  * Usage:
- *   const sim = useSimulatedShot(targetCurves, profileName)
+ *   const sim = useSimulatedShot(profileName)
  *   sim.start()   // begins playback
  *   sim.stop()    // stops playback
  *   sim.state     // partial MachineState to spread over real state
  *   sim.active    // true while simulating
+ *   sim.ready     // true once shot data has been pre-fetched
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
-import type { ProfileTargetPoint } from '@/components/charts/chartConstants'
 import type { MachineState } from '@/hooks/useWebSocket'
+import { getServerUrl } from '@/lib/config'
 
 // ---------------------------------------------------------------------------
-// Linear-interpolation helpers
+// Types for raw Meticulous shot data
 // ---------------------------------------------------------------------------
 
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t
+interface RawShotPoint {
+  time: number // milliseconds since shot start
+  profile_time: number
+  status: string // stage name
+  shot: {
+    pressure: number
+    flow: number
+    weight: number
+    gravimetric_flow: number
+    setpoints?: { active?: string; [k: string]: unknown }
+  }
+  sensors?: {
+    brew_head_temperature?: number
+    external_1?: number
+    external_2?: number
+    [k: string]: unknown
+  }
 }
 
-function interpolateTargets(curves: ProfileTargetPoint[], time: number) {
-  // Find the two points surrounding `time`
-  let pressure: number | null = null
-  let flow: number | null = null
-  let stage = ''
-
-  // Filter to pressure/flow points
-  const pressurePts = curves.filter(p => p.target_pressure != null)
-  const flowPts = curves.filter(p => p.target_flow != null)
-
-  // Interpolate pressure
-  if (pressurePts.length > 0) {
-    if (time <= pressurePts[0].time) {
-      pressure = pressurePts[0].target_pressure ?? 0
-    } else if (time >= pressurePts[pressurePts.length - 1].time) {
-      pressure = pressurePts[pressurePts.length - 1].target_pressure ?? 0
-    } else {
-      for (let i = 0; i < pressurePts.length - 1; i++) {
-        if (time >= pressurePts[i].time && time <= pressurePts[i + 1].time) {
-          const t = (time - pressurePts[i].time) / (pressurePts[i + 1].time - pressurePts[i].time)
-          pressure = lerp(pressurePts[i].target_pressure!, pressurePts[i + 1].target_pressure!, t)
-          break
-        }
-      }
-    }
-  }
-
-  // Interpolate flow
-  if (flowPts.length > 0) {
-    if (time <= flowPts[0].time) {
-      flow = flowPts[0].target_flow ?? 0
-    } else if (time >= flowPts[flowPts.length - 1].time) {
-      flow = flowPts[flowPts.length - 1].target_flow ?? 0
-    } else {
-      for (let i = 0; i < flowPts.length - 1; i++) {
-        if (time >= flowPts[i].time && time <= flowPts[i + 1].time) {
-          const t = (time - flowPts[i].time) / (flowPts[i + 1].time - flowPts[i].time)
-          flow = lerp(flowPts[i].target_flow!, flowPts[i + 1].target_flow!, t)
-          break
-        }
-      }
-    }
-  }
-
-  // Find current stage name
-  for (let i = curves.length - 1; i >= 0; i--) {
-    if (time >= curves[i].time) {
-      stage = curves[i].stage_name
-      break
-    }
-  }
-
-  return { pressure, flow, stage }
+interface NormalisedPoint {
+  /** seconds since shot start */
+  time: number
+  pressure: number
+  flow: number
+  weight: number
+  stage: string
+  temperature: number
 }
 
 // ---------------------------------------------------------------------------
-// Simulate realistic noise
+// Fetch helpers
 // ---------------------------------------------------------------------------
 
-function addNoise(value: number | null, amplitude: number): number | null {
-  if (value == null) return null
-  return Math.max(0, value + (Math.random() - 0.5) * amplitude)
+async function fetchRecentShot(base: string): Promise<{
+  points: NormalisedPoint[]
+  profileName: string
+  targetWeight: number
+} | null> {
+  try {
+    // Get available dates
+    const datesRes = await fetch(`${base}/api/shots/dates`)
+    if (!datesRes.ok) return null
+    const { dates } = await datesRes.json() as { dates: string[] }
+    if (!dates || dates.length === 0) return null
+
+    // Try dates until we find one with shot files
+    for (const date of dates.slice(0, 5)) {
+      const filesRes = await fetch(`${base}/api/shots/files/${date}`)
+      if (!filesRes.ok) continue
+      const { files } = await filesRes.json() as { files: string[] }
+      if (!files || files.length === 0) continue
+
+      // Shuffle files and try each until one works
+      const shuffled = [...files].sort(() => Math.random() - 0.5)
+      for (const file of shuffled) {
+        try {
+          const dataRes = await fetch(`${base}/api/shots/data/${date}/${file}`)
+          if (!dataRes.ok) continue
+          const raw = await dataRes.json()
+
+          const rawPoints: RawShotPoint[] = raw?.data?.data
+          const pName: string = raw?.data?.profile_name ?? 'Unknown Profile'
+          if (!rawPoints || rawPoints.length < 10) continue
+
+          // Normalise: convert ms times to seconds relative to first point
+          const t0 = rawPoints[0].time
+          const points: NormalisedPoint[] = rawPoints.map(p => ({
+            time: (p.time - t0) / 1000,
+            pressure: p.shot.pressure,
+            flow: p.shot.flow,
+            weight: p.shot.weight,
+            stage: p.status,
+            temperature: (p.sensors?.external_1 ?? p.sensors?.brew_head_temperature ?? 93),
+          }))
+
+          // Derive target weight from final weight
+          const finalWeight = points[points.length - 1].weight
+          const targetWeight = Math.ceil(finalWeight / 2) * 2 // round up to nearest even number
+
+          return { points, profileName: pName, targetWeight }
+        } catch {
+          // This specific file failed — try the next one
+          continue
+        }
+      }
+    }
+  } catch {
+    // non-critical — simulation just won't be available
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
-const TICK_INTERVAL = 100 // ms between updates (10 Hz)
-const SPEED_MULTIPLIER = 1 // 1x real-time
+const TICK_INTERVAL = 100 // ms between state updates (10 Hz)
 
-export function useSimulatedShot(
-  targetCurves: ProfileTargetPoint[] | undefined,
-  profileName?: string,
-) {
+export function useSimulatedShot(profileName?: string) {
   const [active, setActive] = useState(false)
+  const [ready, setReady] = useState(false)
   const [simState, setSimState] = useState<Partial<MachineState>>({})
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef(0)
-  const weightAccRef = useRef(0)
+  const shotDataRef = useRef<{
+    points: NormalisedPoint[]
+    profileName: string
+    targetWeight: number
+  } | null>(null)
+  const cursorRef = useRef(0) // index into points array
 
-  const maxTime = targetCurves && targetCurves.length > 0
-    ? Math.max(...targetCurves.map(p => p.time))
-    : 30
+  // Pre-fetch shot data on mount
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const base = await getServerUrl()
+      const data = await fetchRecentShot(base)
+      if (!cancelled && data) {
+        shotDataRef.current = data
+        setReady(true)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const stop = useCallback(() => {
     if (timerRef.current) {
@@ -113,7 +153,7 @@ export function useSimulatedShot(
       timerRef.current = null
     }
     setActive(false)
-    // Send one final "shot complete" frame
+    // Emit one final "shot complete" frame
     setSimState(prev => ({
       ...prev,
       brewing: false,
@@ -122,62 +162,72 @@ export function useSimulatedShot(
   }, [])
 
   const start = useCallback(() => {
-    if (!targetCurves || targetCurves.length === 0) return
+    const data = shotDataRef.current
+    if (!data || data.points.length === 0) return
     setActive(true)
     startTimeRef.current = Date.now()
-    weightAccRef.current = 0
+    cursorRef.current = 0
 
-    // Initial state: brewing
+    const effectiveName = profileName ?? data.profileName
+
+    // Initial frame
+    const p0 = data.points[0]
     setSimState({
       connected: true,
       availability: 'online',
       brewing: true,
-      state: targetCurves[0]?.stage_name ?? 'Simulating',
-      pressure: 0,
-      flow_rate: 0,
-      shot_weight: 0,
+      state: p0.stage,
+      pressure: p0.pressure,
+      flow_rate: p0.flow,
+      shot_weight: p0.weight,
       shot_timer: 0,
-      target_weight: 44,
-      brew_head_temperature: 93,
-      target_temperature: 93,
-      active_profile: profileName ?? 'Simulated Profile',
+      target_weight: data.targetWeight,
+      brew_head_temperature: p0.temperature,
+      target_temperature: Math.round(p0.temperature),
+      active_profile: effectiveName,
       _wsConnected: true,
       _stale: false,
       _ts: Date.now(),
     })
 
     timerRef.current = setInterval(() => {
-      const elapsed = ((Date.now() - startTimeRef.current) / 1000) * SPEED_MULTIPLIER
-      if (elapsed >= maxTime) {
+      const elapsed = (Date.now() - startTimeRef.current) / 1000 // seconds
+
+      // Advance cursor to the latest point whose time <= elapsed
+      while (
+        cursorRef.current < data.points.length - 1 &&
+        data.points[cursorRef.current + 1].time <= elapsed
+      ) {
+        cursorRef.current++
+      }
+
+      const pt = data.points[cursorRef.current]
+
+      // If we're past the last point, end simulation
+      if (elapsed >= data.points[data.points.length - 1].time + 0.5) {
         stop()
         return
       }
-
-      const { pressure, flow, stage } = interpolateTargets(targetCurves, elapsed)
-
-      // Simulate weight as integral of flow
-      const flowVal = flow ?? 0
-      weightAccRef.current += flowVal * (TICK_INTERVAL / 1000) * SPEED_MULTIPLIER
 
       setSimState({
         connected: true,
         availability: 'online',
         brewing: true,
-        state: stage || 'Simulating',
-        pressure: addNoise(pressure, 0.3),
-        flow_rate: addNoise(flow, 0.15),
-        shot_weight: Math.round(weightAccRef.current * 10) / 10,
+        state: pt.stage,
+        pressure: pt.pressure,
+        flow_rate: pt.flow,
+        shot_weight: pt.weight,
         shot_timer: Math.round(elapsed * 10) / 10,
-        target_weight: 44,
-        brew_head_temperature: addNoise(93, 0.2),
-        target_temperature: 93,
-        active_profile: profileName ?? 'Simulated Profile',
+        target_weight: data.targetWeight,
+        brew_head_temperature: pt.temperature,
+        target_temperature: Math.round(pt.temperature),
+        active_profile: effectiveName,
         _wsConnected: true,
         _stale: false,
         _ts: Date.now(),
       })
     }, TICK_INTERVAL)
-  }, [targetCurves, profileName, maxTime, stop])
+  }, [profileName, stop])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -186,5 +236,5 @@ export function useSimulatedShot(
     }
   }, [])
 
-  return { active, state: simState, start, stop }
+  return { active, ready, state: simState, start, stop }
 }

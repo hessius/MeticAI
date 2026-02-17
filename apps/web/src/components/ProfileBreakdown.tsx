@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -79,7 +79,20 @@ function findVariableUsage(stages: ProfileStage[], variables: ProfileVariable[])
     const refs = new Set<string>()
     
     if (typeof obj === 'string') {
-      // Match $variable_key pattern - must be exact match with word boundary
+      // Match $variable_key patterns — keys can contain spaces (e.g. "$flow_preinfuse fill")
+      // Strategy: find every $-prefix and try to match against known variable keys
+      // first, then fall back to simple word-boundary matching
+      const knownKeys = variables.map(v => v.key).filter(k => !k.startsWith('info_'))
+      
+      // Try longest keys first to avoid partial matches
+      const sortedKeys = [...knownKeys].sort((a, b) => b.length - a.length)
+      for (const key of sortedKeys) {
+        if (obj.includes(`$${key}`)) {
+          refs.add(key)
+        }
+      }
+      
+      // Also match simple $word patterns as fallback
       const matches = obj.match(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g)
       if (matches) {
         matches.forEach(match => {
@@ -202,6 +215,8 @@ export interface ProfileData {
 interface ProfileBreakdownProps {
   profile: ProfileData | null
   className?: string
+  /** When set, highlights the named stage and auto-scrolls to it */
+  currentStage?: string | null
 }
 
 function getTypeIcon(type: string) {
@@ -458,7 +473,18 @@ function formatLimits(limits?: StageLimit[], variables?: ProfileVariable[]): str
   }).join(', ')
 }
 
-export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownProps) {
+export function ProfileBreakdown({ profile, className = '', currentStage }: ProfileBreakdownProps) {
+  const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  // Auto-scroll to the active stage when it changes
+  useEffect(() => {
+    if (!currentStage) return
+    const el = stageRefs.current.get(currentStage)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [currentStage])
+
   // Memoize expensive variable calculations
   const { adjustableVars, infoVars, variableColorMap, variableUsage, warnings } = useMemo(() => {
     if (!profile) {
@@ -684,10 +710,27 @@ export function ProfileBreakdown({ profile, className = '' }: ProfileBreakdownPr
                   return stagesUsingVar.includes(stage.name)
                 })
                 
+                const isActive = currentStage === stage.name
+                const stageIdx = profile.stages!.indexOf(stage)
+                const currentIdx = currentStage
+                  ? profile.stages!.findIndex(s => s.name === currentStage)
+                  : -1
+                const isDone = currentIdx >= 0 && stageIdx < currentIdx
+
                 return (
-                  <div 
+                  <div
                     key={idx}
-                    className="p-2.5 rounded-lg bg-background/50 border border-border/30 space-y-1.5"
+                    ref={el => { if (el) stageRefs.current.set(stage.name, el) }}
+                    className={[
+                      'p-2.5 rounded-lg space-y-1.5 transition-all duration-300',
+                      isActive
+                        ? 'bg-primary/10 border-2 border-primary/50 shadow-[0_0_12px_rgba(var(--primary-rgb,59,130,246),0.25)]'
+                        : isDone
+                          ? 'bg-background/50 border border-emerald-500/30 opacity-70'
+                          : currentStage
+                            ? 'bg-background/50 border border-border/30 opacity-40'
+                            : 'bg-background/50 border border-border/30',
+                    ].join(' ')}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">

@@ -58,7 +58,6 @@ import { getServerUrl } from '@/lib/config'
 interface LiveShotViewProps {
   machineState: MachineState
   onBack: () => void
-  onAnalyze?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +94,7 @@ interface ProfileStageInfo {
 // Component
 // ---------------------------------------------------------------------------
 
-export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewProps) {
+export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
   const { t } = useTranslation()
   const chartDataRef = useRef<ChartDataPoint[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
@@ -106,7 +105,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
 
   // Simulation mode
-  const sim = useSimulatedShot(targetCurves, machineState.active_profile ?? undefined)
+  const sim = useSimulatedShot(machineState.active_profile ?? undefined)
 
   // The effective machine state — uses simulation overlay when active
   const ms: MachineState = sim.active
@@ -305,8 +304,8 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                     </AlertDialog>
                   </>
                 )}
-                {/* Simulate button — for dev/testing without a real machine */}
-                {targetCurves && targetCurves.length > 0 && (
+                {/* Simulate button — replays a real recorded shot */}
+                {sim.ready && (
                   <Button
                     variant="outline"
                     className="h-11 px-6 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
@@ -386,13 +385,15 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
             </Card>
           )}
 
-          {/* ── Profile stage breakdown — live progress ───── */}
+          {/* ── Profile stage breakdown — mobile only (full breakdown in right column on desktop) ───── */}
           {(ms.brewing || chartData.length > 0) && profileStages.length > 0 && (
-            <LiveStageBreakdown
-              stages={profileStages}
-              currentStage={currentStageName}
-              completedStages={stages.map(s => s.name)}
-            />
+            <div className="md:hidden">
+              <LiveStageBreakdown
+                stages={profileStages}
+                currentStage={currentStageName}
+                completedStages={stages.map(s => s.name)}
+              />
+            </div>
           )}
 
           {/* ── Action buttons (only during real brewing, not simulation) ── */}
@@ -487,11 +488,6 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                 <SummaryItem label={t('controlCenter.liveShot.avgFlow')} value={`${summary.avgFlow.toFixed(1)} ml/s`} />
               </div>
               <div className="flex gap-3 justify-center flex-wrap">
-                {onAnalyze && (
-                  <Button variant="dark-brew" className="h-11 px-6" onClick={onAnalyze}>
-                    {t('controlCenter.liveShot.analyzeShot')}
-                  </Button>
-                )}
                 {!sim.active && (
                   <Button
                     variant="outline"
@@ -502,7 +498,7 @@ export function LiveShotView({ machineState, onBack, onAnalyze }: LiveShotViewPr
                     {t('controlCenter.liveShot.purgeAfterShot')}
                   </Button>
                 )}
-                <Button variant="outline" className="h-11 px-6" onClick={onBack}>
+                <Button variant="default" className="h-11 px-6" onClick={onBack}>
                   {t('controlCenter.liveShot.backHome')}
                 </Button>
               </div>

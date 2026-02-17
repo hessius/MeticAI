@@ -778,12 +778,14 @@ async def get_profile_target_curves(
 @router.get("/api/profile/{profile_name:path}")
 async def get_profile_info(
     profile_name: str,
-    request: Request
+    request: Request,
+    include_stages: bool = False
 ):
     """Get profile information from the Meticulous machine.
     
     Args:
         profile_name: Name of the profile to fetch
+        include_stages: If True, include full stage/variable data for breakdown display
         
     Returns:
         Profile information including image if set
@@ -819,7 +821,7 @@ async def get_profile_info(
                     image = full_profile.display.image
                     accent_color = full_profile.display.accentColor
                 
-                return {
+                result = {
                     "status": "success",
                     "profile": {
                         "id": full_profile.id,
@@ -831,6 +833,29 @@ async def get_profile_info(
                         "accent_color": accent_color
                     }
                 }
+                
+                # Optionally include full stage/variable data
+                if include_stages:
+                    def _serialise(obj):
+                        """Recursively convert API objects to dicts."""
+                        if obj is None:
+                            return None
+                        if isinstance(obj, (str, int, float, bool)):
+                            return obj
+                        if isinstance(obj, list):
+                            return [_serialise(i) for i in obj]
+                        if isinstance(obj, dict):
+                            return {k: _serialise(v) for k, v in obj.items()}
+                        if hasattr(obj, '__dict__'):
+                            return {k: _serialise(v) for k, v in obj.__dict__.items() if v is not None}
+                        return obj
+
+                    if hasattr(full_profile, 'stages') and full_profile.stages:
+                        result["profile"]["stages"] = _serialise(full_profile.stages)
+                    if hasattr(full_profile, 'variables') and full_profile.variables:
+                        result["profile"]["variables"] = _serialise(full_profile.variables)
+                
+                return result
         
         raise HTTPException(
             status_code=404,
