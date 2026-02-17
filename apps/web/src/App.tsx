@@ -38,6 +38,8 @@ import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { LiveShotView } from '@/components/LiveShotView'
+import { ProfileBreakdown } from '@/components/ProfileBreakdown'
+import type { ProfileData } from '@/components/ProfileBreakdown'
 
 function App() {
   const [isInitializing, setIsInitializing] = useState(true)
@@ -77,6 +79,34 @@ function App() {
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
+
+  // Live profile breakdown data (fetched when in live-shot view)
+  const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
+  const liveProfileFetchedRef = useRef<string | null>(null)
+
+  // Fetch full profile data (with stages) when in live-shot view
+  useEffect(() => {
+    if (viewState !== 'live-shot') {
+      liveProfileFetchedRef.current = null
+      setLiveProfileData(null)
+      return
+    }
+    const profileName = machineState.active_profile
+    if (!profileName || liveProfileFetchedRef.current === profileName) return
+    liveProfileFetchedRef.current = profileName
+
+    ;(async () => {
+      try {
+        const base = await getServerUrl()
+        const r = await fetch(`${base}/api/profile/${encodeURIComponent(profileName)}?include_stages=true`)
+        if (!r.ok) return
+        const data = await r.json()
+        if (data?.profile) {
+          setLiveProfileData(data.profile as ProfileData)
+        }
+      } catch { /* non-critical */ }
+    })()
+  }, [viewState, machineState.active_profile])
 
   // Fetch mqttEnabled from settings on mount
   useEffect(() => {
@@ -753,7 +783,6 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                 <LiveShotView
                   machineState={machineState}
                   onBack={handleBackToStart}
-                  onAnalyze={handleBackToStart}
                 />
               )}
 
@@ -811,6 +840,15 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                   machineState={machineState}
                   onOpenLiveView={() => setViewState('live-shot')}
                 />
+                {/* Live profile breakdown — shown during active shot view */}
+                {viewState === 'live-shot' && liveProfileData && (
+                  <div className="mt-4 max-h-[50vh] overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                    <ProfileBreakdown
+                      profile={liveProfileData}
+                      currentStage={machineState.state ?? null}
+                    />
+                  </div>
+                )}
               </div>
             </aside>
           )}
