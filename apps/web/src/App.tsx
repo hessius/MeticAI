@@ -806,7 +806,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (
             <aside className="hidden md:block">
-              <div className={`sticky top-4 ${viewState === 'live-shot' ? 'mt-10' : ''}`}>
+              <div className={`sticky top-4 ${viewState === 'live-shot' ? 'mt-10' : 'mt-2'}`}>
                 <ControlCenter
                   machineState={machineState}
                   onOpenLiveView={() => setViewState('live-shot')}
