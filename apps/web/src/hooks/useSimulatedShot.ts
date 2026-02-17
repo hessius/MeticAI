@@ -35,6 +35,7 @@ interface RawShotPoint {
   }
   sensors?: {
     brew_head_temperature?: number
+    tube?: number
     external_1?: number
     external_2?: number
     [k: string]: unknown
@@ -94,7 +95,9 @@ async function fetchRecentShot(base: string): Promise<{
             flow: p.shot.flow,
             weight: p.shot.weight,
             stage: p.status,
-            temperature: (p.sensors?.external_1 ?? p.sensors?.brew_head_temperature ?? 93),
+            // Use tube sensor (actual water/brew temp, ~75-85°C) rather than
+            // external_1 which is a group-head thermocouple that reads >100°C.
+            temperature: (p.sensors?.tube ?? p.sensors?.brew_head_temperature ?? 93),
           }))
 
           // Derive target weight from final weight

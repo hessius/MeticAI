@@ -305,16 +305,15 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
                   </>
                 )}
                 {/* Simulate button — replays a real recorded shot */}
-                {sim.ready && (
-                  <Button
-                    variant="outline"
-                    className="h-11 px-6 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
-                    onClick={handleSimulate}
-                  >
-                    <Lightning size={18} weight="fill" className="mr-2" />
-                    Simulate
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  className="h-11 px-6 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
+                  onClick={handleSimulate}
+                  disabled={!sim.ready}
+                >
+                  <Lightning size={18} weight="fill" className="mr-2" />
+                  {sim.ready ? 'Simulate' : 'Loading…'}
+                </Button>
               </div>
             </Card>
           )}
