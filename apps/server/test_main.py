@@ -193,7 +193,7 @@ class TestAnalyzeAndProfileEndpoint:
         # Mock successful subprocess execution
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Profile uploaded"
+        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
         mock_result.stderr = ""
         mock_subprocess.return_value = mock_result
 
@@ -231,7 +231,7 @@ class TestAnalyzeAndProfileEndpoint:
         # Mock successful subprocess execution
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Profile uploaded"
+        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
         mock_result.stderr = ""
         mock_subprocess.return_value = mock_result
 
@@ -268,7 +268,7 @@ class TestAnalyzeAndProfileEndpoint:
         # Mock successful subprocess execution
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Profile uploaded"
+        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
         mock_result.stderr = ""
         mock_subprocess.return_value = mock_result
 
@@ -373,6 +373,77 @@ class TestAnalyzeAndProfileEndpoint:
         assert "error" in response.json()["detail"]["status"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.subprocess.run')
+    def test_analyze_and_profile_llm_silent_failure(self, mock_subprocess, client):
+        """Test that LLM failure is detected even when Gemini CLI exits with code 0.
+        
+        When the LLM encounters MCP validation errors it can't resolve, it returns
+        exit code 0 but with a failure message (no profile JSON, no 'Profile Created:').
+        This should be detected and returned as an error, not success.
+        """
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = (
+            "I've hit a roadblock trying to create this profile. "
+            "The validation system returned conflicting errors that I couldn't resolve. "
+            "Could you try again with slightly different parameters?"
+        )
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Berry, Florals, Medium Body"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "error"
+        assert "validation errors" in data["message"]
+        assert "reply" in data  # The LLM's failure explanation is still included
+        assert "hit a roadblock" in data["reply"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.subprocess.run')
+    def test_analyze_and_profile_llm_silent_failure_empty_output(self, mock_subprocess, client):
+        """Test detection of empty LLM output as a failure."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = ""
+        mock_result.stderr = ""
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Default"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "error"
+        assert "validation errors" in data["message"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.subprocess.run')
+    def test_analyze_and_profile_llm_silent_failure_with_stderr(self, mock_subprocess, client):
+        """Test that stderr is logged when Gemini CLI exits 0 but fails."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "I couldn't create the profile due to errors."
+        mock_result.stderr = "MCP tool error: ProfileValidationError: pressure limit exceeded"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Default"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "error"
+        assert "history_id" in data  # Failed attempts are still saved to history
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
     @patch('api.routes.coffee.subprocess.run')
     @patch('api.routes.coffee.get_vision_model')
@@ -388,7 +459,7 @@ class TestAnalyzeAndProfileEndpoint:
         
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Profile uploaded"
+        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
         mock_subprocess.return_value = mock_result
 
         preferences = [
@@ -425,7 +496,7 @@ class TestAnalyzeAndProfileEndpoint:
         
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
@@ -452,7 +523,7 @@ class TestAnalyzeAndProfileEndpoint:
         
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
@@ -546,7 +617,7 @@ class TestEnhancedBaristaPersona:
         
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
@@ -569,7 +640,7 @@ class TestEnhancedBaristaPersona:
         """Test that the prompt includes instructions for complex profile creation."""
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
@@ -592,7 +663,7 @@ class TestEnhancedBaristaPersona:
         """Test that the prompt includes witty naming convention instructions."""
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
@@ -614,7 +685,7 @@ class TestEnhancedBaristaPersona:
         """Test that the prompt includes instructions for post-creation user summary."""
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
@@ -638,7 +709,7 @@ class TestEnhancedBaristaPersona:
         """Test that the prompt includes the output format template."""
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(
@@ -655,6 +726,50 @@ class TestEnhancedBaristaPersona:
         assert "Description:" in prompt
         assert "Preparation:" in prompt
         assert "Why This Works:" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.subprocess.run')
+    def test_prompt_includes_validation_rules(self, mock_subprocess, client):
+        """Test that the prompt includes validation rules to prevent MCP rejections."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "**Profile Created:** Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test"}
+        )
+
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+
+        # Verify validation rules are present
+        assert "VALIDATION RULES" in prompt
+        assert "PARADOX" in prompt
+        assert "BACKUP EXIT TRIGGERS" in prompt
+        assert "REQUIRED SAFETY LIMITS" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.subprocess.run')
+    def test_prompt_includes_error_recovery(self, mock_subprocess, client):
+        """Test that the prompt includes error recovery instructions."""
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "**Profile Created:** Test Profile"
+        mock_subprocess.return_value = mock_result
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test"}
+        )
+
+        call_args = mock_subprocess.call_args[0][0]
+        prompt = call_args[-1]
+
+        assert "ERROR RECOVERY" in prompt
+        assert "Fix ALL errors in a SINGLE retry" in prompt
+        assert "NEVER give up" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.subprocess.run')
@@ -975,7 +1090,7 @@ class TestCORS:
         """Test that CORS headers are present on /analyze_and_profile responses."""
         mock_result = Mock()
         mock_result.returncode = 0
-        mock_result.stdout = "Success"
+        mock_result.stdout = "**Profile Created:** Test Profile"
         mock_subprocess.return_value = mock_result
 
         response = client.post(

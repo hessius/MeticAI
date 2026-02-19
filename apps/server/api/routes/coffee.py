@@ -5,6 +5,7 @@ from PIL import Image
 import asyncio
 import io
 import os
+import re
 import subprocess
 import time
 import logging
@@ -113,6 +114,11 @@ PROFILE_GUIDELINES = (
     '  {"name": "Peak Pressure", "key": "peak_pressure", "type": "pressure", "value": 9.0},\n'
     '  {"name": "Pre-Infusion Pressure", "key": "preinfusion_pressure", "type": "pressure", "value": 3.0}\n'
     ']\n\n'
+    "TIME VALUES (CRITICAL — ALWAYS USE RELATIVE):\n"
+    "• ALL time-based exit triggers MUST use \"relative\": true\n"
+    "• ALL dynamics_points x-axis values are ALWAYS relative to stage start (0 = stage start)\n"
+    "• NEVER use \"relative\": false on time exit triggers — absolute time interpretation has known firmware issues\n"
+    "• Example: {\"type\": \"time\", \"value\": 30, \"comparison\": \">=\", \"relative\": true} means 30s after stage starts\n\n"
     "STAGE LIMITS (CRITICAL SAFETY):\n"
     "• EVERY flow stage MUST have a pressure limit to prevent pressure runaway\n"
     "• EVERY pressure stage MUST have a flow limit to prevent channeling and ensure even extraction\n"
@@ -135,6 +141,62 @@ PROFILE_GUIDELINES = (
     '    "limits": [{"type": "flow", "value": 5}],\n'
     '    "exit_triggers": [{"type": "weight", "value": 36, "comparison": ">=", "relative": false}]\n'
     '  }\n\n'
+)
+
+VALIDATION_RULES = (
+    "VALIDATION RULES (your profile WILL be rejected if these are violated):\n\n"
+    "1. EXIT TRIGGER / STAGE TYPE PARADOX:\n"
+    "   • A flow stage must NOT have a flow exit trigger\n"
+    "   • A pressure stage must NOT have a pressure exit trigger\n"
+    "   • Why: you're controlling that variable, so you can't reliably exit based on it\n"
+    "   • Fix: use 'time', 'weight', or the opposite type (pressure trigger on flow stage, etc.)\n\n"
+    "2. BACKUP EXIT TRIGGERS (failsafe):\n"
+    "   • Every stage MUST have EITHER multiple exit triggers OR at least one time trigger\n"
+    "   • A single non-time trigger (e.g. only weight) will be rejected — add a time failsafe\n"
+    '   • Pattern: [{"type": "weight", ...}, {"type": "time", "value": 60, "comparison": ">=", "relative": true}]\n\n'
+    "3. REQUIRED SAFETY LIMITS (cross-type):\n"
+    "   • Flow stages MUST have a pressure limit (prevents pressure spike/stall)\n"
+    "   • Pressure stages MUST have a flow limit (prevents channeling/gusher)\n"
+    "   • A limit CANNOT have the same type as the stage (redundant — will be rejected)\n"
+    "   • Correct: flow stage → pressure limit | pressure stage → flow limit\n\n"
+    "4. INTERPOLATION:\n"
+    "   • Only 'linear' and 'curve' are valid. 'none' is NOT supported and will stall the machine\n"
+    "   • 'curve' requires at least 2 dynamics points\n\n"
+    "5. DYNAMICS.OVER:\n"
+    "   • Must be 'time', 'weight', or 'piston_position'. No other values\n\n"
+    "6. STAGE TYPES:\n"
+    "   • Must be 'power', 'flow', or 'pressure'. No other values\n\n"
+    "7. EXIT TRIGGER TYPES:\n"
+    "   • Must be: 'weight', 'pressure', 'flow', 'time', 'piston_position', 'power', or 'user_interaction'\n"
+    "   • Comparison must be '>=' or '<='\n\n"
+    "8. PRESSURE LIMITS:\n"
+    "   • Max 15 bar in dynamics points and exit triggers. No negative values\n\n"
+    "9. ABSOLUTE WEIGHT TRIGGERS:\n"
+    "   • If using absolute weight triggers (relative: false), values MUST be strictly increasing across stages\n"
+    "   • Otherwise the next stage's trigger fires immediately. Prefer 'relative: true' for weight triggers\n\n"
+    "10. VARIABLES:\n"
+    "   • Info variables (adjustable: false / key starts with 'info_'): name MUST start with emoji\n"
+    "   • Adjustable variables: name must NOT start with emoji\n"
+    "   • Every adjustable variable MUST be referenced in at least one stage's dynamics ($key)\n\n"
+    "QUICK REFERENCE — VALID STAGE PATTERNS:\n"
+    "• Flow stage: limits=[{pressure}], exit_triggers=[{weight, ...}, {time, ...}] ✅\n"
+    "• Pressure stage: limits=[{flow}], exit_triggers=[{weight, ...}, {time, ...}] ✅\n"
+    "• Flow stage with flow exit trigger: ❌ PARADOX\n"
+    "• Pressure stage with pressure exit trigger: ❌ PARADOX\n"
+    "• Any stage with single non-time trigger and no backup: ❌ NO FAILSAFE\n"
+    "• Flow stage without pressure limit: ❌ UNSAFE\n"
+    "• Pressure stage without flow limit: ❌ UNSAFE\n\n"
+)
+
+ERROR_RECOVERY = (
+    "ERROR RECOVERY (if create_profile fails):\n"
+    "• Read ALL validation errors carefully before making changes\n"
+    "• Fix ALL errors in a SINGLE retry — do not fix one at a time\n"
+    "• Common trap: fixing one error can introduce another (e.g., changing a trigger type may create a paradox)\n"
+    "• Before resubmitting, mentally verify each stage against the validation rules above\n"
+    "• If you get conflicting errors, simplify the profile: fewer stages, standard patterns\n"
+    "• NEVER give up — always attempt at least 3 retries with different approaches\n"
+    "• If a complex design keeps failing, fall back to a simpler but still excellent profile\n\n"
 )
 
 NAMING_CONVENTION = (
@@ -379,6 +441,8 @@ async def analyze_and_profile(
                 f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
                 f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
+                VALIDATION_RULES +
+                ERROR_RECOVERY +
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
@@ -397,6 +461,8 @@ async def analyze_and_profile(
                 f"TASK: Create a sophisticated espresso profile for this coffee" +
                 (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
                 PROFILE_GUIDELINES +
+                VALIDATION_RULES +
+                ERROR_RECOVERY +
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
@@ -416,6 +482,8 @@ async def analyze_and_profile(
                 f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
                 "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
+                VALIDATION_RULES +
+                ERROR_RECOVERY +
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
@@ -475,6 +543,58 @@ async def analyze_and_profile(
                 "message": user_message
             }
         
+        # Clean up Gemini CLI noise from the output
+        reply = clean_gemini_output(result.stdout)
+        
+        # Log stderr even on success — captures MCP validation errors
+        # that the LLM saw but we otherwise can't observe
+        stderr_text = result.stderr if isinstance(result.stderr, str) else ""
+        if stderr_text.strip():
+            logger.warning(
+                "Gemini CLI stderr (exit 0)",
+                extra={
+                    "request_id": request_id,
+                    "stderr": stderr_text[:2000],
+                }
+            )
+        
+        # Detect silent failure: Gemini returns exit code 0 but the LLM
+        # couldn't actually create a profile (e.g. MCP validation errors
+        # that the LLM gave up trying to fix).
+        from services.history_service import _extract_profile_json
+        profile_json_check = _extract_profile_json(reply)
+        has_profile_created_header = bool(
+            re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
+        )
+        
+        if not profile_json_check and not has_profile_created_header:
+            logger.error(
+                "Gemini CLI exited 0 but no profile was created (LLM failure)",
+                extra={
+                    "request_id": request_id,
+                    "reply_preview": reply[:500],
+                    "stderr": stderr_text[:1000],
+                }
+            )
+            # Still save to history so user can see what happened
+            history_entry = save_to_history(
+                coffee_analysis=coffee_analysis,
+                user_prefs=user_prefs,
+                reply=reply
+            )
+            return {
+                "status": "error",
+                "analysis": coffee_analysis,
+                "reply": reply,
+                "message": (
+                    "The AI attempted to create a profile but encountered "
+                    "validation errors it couldn't resolve. Please try again — "
+                    "the AI will often succeed on a second attempt with a "
+                    "different approach."
+                ),
+                "history_id": history_entry.get("id")
+            }
+        
         logger.info(
             "Profile creation completed successfully",
             extra={
@@ -483,9 +603,6 @@ async def analyze_and_profile(
                 "output_preview": result.stdout[:200] if len(result.stdout) > 200 else result.stdout
             }
         )
-        
-        # Clean up Gemini CLI noise from the output
-        reply = clean_gemini_output(result.stdout)
         
         # Save to history
         history_entry = save_to_history(
