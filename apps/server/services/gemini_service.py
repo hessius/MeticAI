@@ -234,9 +234,11 @@ Note: No pressure target, entirely flow-controlled
 - Logical OR ensures the stage exits on the FIRST condition met
 
 **Relative vs Absolute Values**:
+- Time exit triggers: ALWAYS use "relative": true (time relative to stage start). Never use absolute time.
 - Relative weight: Value relative to stage start (useful for multi-stage recipes)
 - Absolute weight: Total weight from shot start (easier to understand)
-- Use absolute for clarity, relative only when needed for complex recipes
+- Use absolute weight for clarity, relative weight only when needed for complex recipes
+- dynamics_points x-axis values are always relative to stage start (0 = beginning of stage)
 
 ### Temperature Considerations
 
