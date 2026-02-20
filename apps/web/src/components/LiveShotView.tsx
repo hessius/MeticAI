@@ -30,6 +30,7 @@ import {
   Coffee,
   Gauge,
   Lightning,
+  Fire,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
@@ -49,6 +50,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { SensorGauge } from '@/components/SensorGauge'
 import { getServerUrl } from '@/lib/config'
 
 // ---------------------------------------------------------------------------
@@ -265,58 +267,185 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
       {/* ── ACTIVE SHOT / WAITING ─────────────────────────────── */}
       {!shotComplete && (
         <>
-          {/* Pre-shot waiting indicator with Start + Abort + Simulate controls */}
-          {!ms.brewing && chartData.length === 0 && (
-            <Card className="p-6 text-center space-y-4">
-              <div className="text-muted-foreground space-y-2">
-                <Coffee size={32} weight="duotone" className="mx-auto text-primary animate-pulse" />
-                <p className="text-sm font-medium">{t('controlCenter.liveShot.waitingForShot')}</p>
-                <p className="text-xs text-muted-foreground/70">{t('controlCenter.liveShot.waitingDesc')}</p>
-              </div>
-              <div className="flex gap-3 justify-center flex-wrap">
-                {ms.connected && (
-                  <>
-                    <Button
-                      variant="default"
-                      className="h-11 px-6"
-                      onClick={() => cmd(continueShot, 'startingShot')}
-                    >
-                      <Play size={18} weight="fill" className="mr-2" />
-                      {t('controlCenter.actions.start')}
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="h-11 px-6">
-                          <XCircle size={18} weight="fill" className="mr-2" />
-                          {t('controlCenter.actions.abort')}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>{t('controlCenter.confirm.abortTitle')}</AlertDialogTitle>
-                          <AlertDialogDescription>{t('controlCenter.confirm.abortDesc')}</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => cmd(abortShot, 'warmupCancelled')}>{t('common.confirm')}</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
+          {/* Pre-shot empty state — gauges, deactivated chart, heating/ready prominence */}
+          {!ms.brewing && chartData.length === 0 && (() => {
+            const stateLC = (ms.state ?? '').toLowerCase()
+            const isHeating = stateLC === 'heating' || stateLC === 'preheating'
+            const isReady = stateLC === 'click to start'
+            const temp = ms.brew_head_temperature
+            const targetTemp = ms.target_temperature
+
+            return (
+              <>
+                {/* Prominent READY banner */}
+                {isReady && (
+                  <Card className="p-4 border-emerald-500/50 bg-emerald-500/10">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                        </span>
+                        <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400">
+                          {t('controlCenter.states.ready')}
+                        </span>
+                      </div>
+                      {temp != null && (
+                        <span className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                          {temp.toFixed(1)}°C
+                        </span>
+                      )}
+                    </div>
+                  </Card>
                 )}
-                {/* Simulate button — replays a real recorded shot */}
-                <Button
-                  variant="outline"
-                  className="h-11 px-6 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
-                  onClick={handleSimulate}
-                  disabled={!sim.ready}
-                >
-                  <Lightning size={18} weight="fill" className="mr-2" />
-                  {sim.ready ? 'Simulate' : 'Loading…'}
-                </Button>
-              </div>
-            </Card>
-          )}
+
+                {/* Prominent HEATING display */}
+                {isHeating && (
+                  <Card className="p-4 border-orange-500/40 bg-orange-500/10">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <Fire size={20} weight="fill" className="text-orange-500 animate-pulse" />
+                        <span className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                          {t('controlCenter.states.heating')}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-bold tabular-nums text-foreground">
+                          {temp != null ? temp.toFixed(1) : '—'}
+                        </span>
+                        <span className="text-lg text-muted-foreground">°C</span>
+                        {targetTemp != null && (
+                          <span className="text-sm text-muted-foreground ml-1">
+                            / {targetTemp.toFixed(0)}°C
+                          </span>
+                        )}
+                      </div>
+                      {/* Progress bar toward target temp */}
+                      {temp != null && targetTemp != null && targetTemp > 0 && (
+                        <div className="w-full max-w-xs">
+                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, (temp / targetTemp) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {/* Preheat countdown */}
+                      {ms.preheat_countdown != null && ms.preheat_countdown > 0 && (() => {
+                        const secs = Math.ceil(ms.preheat_countdown)
+                        const mm = Math.floor(secs / 60)
+                        const ss = String(secs % 60).padStart(2, '0')
+                        return (
+                          <span className="text-xl font-bold tabular-nums text-orange-700 dark:text-orange-400">
+                            {mm}:{ss}
+                          </span>
+                        )
+                      })()}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Sensor gauges row */}
+                <div className="flex justify-center gap-2 flex-wrap">
+                  <SensorGauge
+                    value={ms.brew_head_temperature}
+                    min={20}
+                    max={100}
+                    goal={ms.target_temperature}
+                    unit="°C"
+                    label={t('controlCenter.metrics.temp', 'Temp')}
+                    size={100}
+                    stale={ms._stale}
+                  />
+                  <SensorGauge
+                    value={ms.pressure}
+                    min={0}
+                    max={12}
+                    unit="bar"
+                    label={t('controlCenter.metrics.pressure')}
+                    size={100}
+                    stale={ms._stale}
+                  />
+                  <SensorGauge
+                    value={ms.flow_rate}
+                    min={0}
+                    max={8}
+                    unit="ml/s"
+                    label={t('controlCenter.metrics.flow')}
+                    size={100}
+                    stale={ms._stale}
+                  />
+                  <SensorGauge
+                    value={ms.shot_weight}
+                    min={0}
+                    max={ms.target_weight ?? 50}
+                    goal={ms.target_weight}
+                    unit="g"
+                    label={t('controlCenter.metrics.weight')}
+                    size={100}
+                    stale={ms._stale}
+                  />
+                </div>
+
+                {/* Deactivated chart placeholder */}
+                <Card className="p-4 opacity-40">
+                  <EspressoChart
+                    data={[]}
+                    stages={[]}
+                    heightClass="h-[25vh] lg:h-[30vh]"
+                    showWeight
+                    targetCurves={targetCurves}
+                    xMax={liveXMax}
+                  />
+                </Card>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 justify-center flex-wrap">
+                  {ms.connected && (
+                    <>
+                      <Button
+                        variant="default"
+                        className="h-11 px-6"
+                        onClick={() => cmd(continueShot, 'startingShot')}
+                      >
+                        <Play size={18} weight="fill" className="mr-2" />
+                        {t('controlCenter.actions.start')}
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" className="h-11 px-6">
+                            <XCircle size={18} weight="fill" className="mr-2" />
+                            {t('controlCenter.actions.abort')}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{t('controlCenter.confirm.abortTitle')}</AlertDialogTitle>
+                            <AlertDialogDescription>{t('controlCenter.confirm.abortDesc')}</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => cmd(abortShot, 'warmupCancelled')}>{t('common.confirm')}</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+                  {/* Simulate button — replays a real recorded shot */}
+                  <Button
+                    variant="outline"
+                    className="h-11 px-6 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
+                    onClick={handleSimulate}
+                    disabled={!sim.ready}
+                  >
+                    <Lightning size={18} weight="fill" className="mr-2" />
+                    {sim.ready ? 'Simulate' : 'Loading…'}
+                  </Button>
+                </div>
+              </>
+            )
+          })()}
 
           {/* ── Horizontal metrics — two rows ─────────────── */}
           {(ms.brewing || chartData.length > 0) && (
