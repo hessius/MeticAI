@@ -179,7 +179,7 @@ After creating a profile, you'll receive a detailed summary:
 - Temperature recommendations
 - Any pre-shot preparation steps
 
-**Why This Works:** Scientific reasoning behind the profile design, explaining how it extracts the best from your specific beans
+**Why This Works:** Expert reasoning behind the profile design, explaining how it extracts the best from your specific beans
 
 **Special Notes:** Any special equipment requirements (bottom filter, specific basket, etc.) or technique notes
 
@@ -261,7 +261,7 @@ When requesting profiles, you can specify:
 - **Special techniques:** blooming, pressure profiling, temperature steps
 - **Equipment constraints:** basket size, machine capabilities
 
-The barista persona understands modern espresso techniques and will create profiles that push the boundaries while remaining grounded in extraction science.
+The barista persona understands modern espresso techniques and will create profiles that push the boundaries while remaining grounded in espresso profiling expertise.
 
 ## Attribution & Credits
 

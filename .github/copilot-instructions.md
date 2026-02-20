@@ -155,7 +155,7 @@ Must include:
 - **Profile Created**: [Name]
 - **Description**: What makes it special
 - **Preparation**: Dose, grind, temperature recommendations
-- **Why This Works**: Scientific reasoning
+- **Why This Works**: Expert reasoning
 - **Special Notes**: Equipment requirements or technique notes
 
 ## Docker Best Practices
