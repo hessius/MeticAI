@@ -105,7 +105,14 @@ export function EspressoChart({
     ...data.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)),
     8,
   )
-  const computedLeftMax = leftAxisMax ?? Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+  const maxPower = Math.max(...data.map(d => d.power || 0), 0)
+  const targetPowerMax = targetCurves
+    ? Math.max(...targetCurves.map(p => p.target_power ?? 0), 0)
+    : 0
+  const effectivePowerMax = Math.max(maxPower, targetPowerMax)
+  const computedLeftMax = leftAxisMax ?? Math.ceil(
+    Math.max(maxPressure, maxFlow, effectivePowerMax) * 1.1,
+  )
   const maxWeight = Math.max(...data.map(d => d.weight || 0), 50)
   const computedRightMax = rightAxisMax ?? Math.ceil(maxWeight * 1.1)
 
@@ -184,8 +191,11 @@ export function EspressoChart({
                   const flowPts = targetCurves
                     .filter(p => p.target_flow !== undefined)
                     .sort((a, b) => a.time - b.time)
+                  const powerPts = targetCurves
+                    .filter(p => p.target_power !== undefined)
+                    .sort((a, b) => a.time - b.time)
 
-                  const buildPath = (pts: ProfileTargetPoint[], key: 'target_pressure' | 'target_flow') => {
+                  const buildPath = (pts: ProfileTargetPoint[], key: 'target_pressure' | 'target_flow' | 'target_power') => {
                     const segments = pts
                       .map(p => ({
                         x: xAxis.scale(p.time),
@@ -200,6 +210,7 @@ export function EspressoChart({
 
                   const pPath = pressurePts.length > 1 ? buildPath(pressurePts, 'target_pressure') : ''
                   const fPath = flowPts.length > 1 ? buildPath(flowPts, 'target_flow') : ''
+                  const pwPath = powerPts.length > 1 ? buildPath(powerPts, 'target_power') : ''
 
                   return (
                     <g className="target-curves">
@@ -235,6 +246,24 @@ export function EspressoChart({
                               <circle key={`tf-${i}`}
                                 cx={cx} cy={cy}
                                 r={3} fill={CHART_COLORS.targetFlow} opacity={0.8} />
+                            )
+                          })}
+                        </>
+                      )}
+                      {pwPath && (
+                        <>
+                          <path d={pwPath} fill="none"
+                            stroke={CHART_COLORS.targetPower}
+                            strokeWidth={2} strokeDasharray="8 4"
+                            strokeLinecap="round" opacity={0.8} />
+                          {powerPts.map((p, i) => {
+                            const cx = xAxis.scale(p.time)
+                            const cy = yAxis.scale(p.target_power!)
+                            if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
+                            return (
+                              <circle key={`tpw-${i}`}
+                                cx={cx} cy={cy}
+                                r={3} fill={CHART_COLORS.targetPower} opacity={0.8} />
                             )
                           })}
                         </>

@@ -646,7 +646,7 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
         shot_data: The complete shot data including telemetry entries
         
     Returns:
-        List of data points: [{time, target_pressure, target_flow, stage_name}, ...]
+        List of data points: [{time, target_pressure, target_flow, target_power, stage_name}, ...]
     """
     stages = profile_data.get("stages", [])
     variables = profile_data.get("variables", [])
@@ -740,6 +740,9 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
                 elif stage_type == "flow":
                     point_start["target_flow"] = round(value, 1)
                     point_end["target_flow"] = round(value, 1)
+                elif stage_type == "power":
+                    point_start["target_power"] = round(value, 1)
+                    point_end["target_power"] = round(value, 1)
                     
                 data_points.append(point_start)
                 data_points.append(point_end)
@@ -769,6 +772,8 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
                         point["target_pressure"] = round(dp_value, 1)
                     elif stage_type == "flow":
                         point["target_flow"] = round(dp_value, 1)
+                    elif stage_type == "power":
+                        point["target_power"] = round(dp_value, 1)
                         
                     data_points.append(point)
         
@@ -811,6 +816,9 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
                 elif stage_type == "flow":
                     point_start["target_flow"] = round(value, 1)
                     point_end["target_flow"] = round(value, 1)
+                elif stage_type == "power":
+                    point_start["target_power"] = round(value, 1)
+                    point_end["target_power"] = round(value, 1)
                 
                 data_points.append(point_start)
                 data_points.append(point_end)
@@ -837,6 +845,8 @@ def _generate_profile_target_curves(profile_data: dict, shot_stage_times: dict, 
                             point["target_pressure"] = round(dp_value, 1)
                         elif stage_type == "flow":
                             point["target_flow"] = round(dp_value, 1)
+                        elif stage_type == "power":
+                            point["target_power"] = round(dp_value, 1)
                         
                         data_points.append(point)
     
@@ -910,7 +920,7 @@ def generate_estimated_target_curves(profile_data: dict) -> list[dict]:
 
             pt_s = {"time": round(stage_start, 2), "stage_name": stage_name}
             pt_e = {"time": round(stage_end, 2), "stage_name": stage_name}
-            key = "target_pressure" if stage_type == "pressure" else "target_flow"
+            key = "target_pressure" if stage_type == "pressure" else ("target_power" if stage_type == "power" else "target_flow")
             pt_s[key] = round(value, 1)
             pt_e[key] = round(value, 1)
             data_points += [pt_s, pt_e]
@@ -929,7 +939,7 @@ def generate_estimated_target_curves(profile_data: dict) -> list[dict]:
 
                 actual_time = stage_start + dp_x * scale
                 pt = {"time": round(actual_time, 2), "stage_name": stage_name}
-                key = "target_pressure" if stage_type == "pressure" else "target_flow"
+                key = "target_pressure" if stage_type == "pressure" else ("target_power" if stage_type == "power" else "target_flow")
                 pt[key] = round(dp_val, 1)
                 data_points.append(pt)
 
