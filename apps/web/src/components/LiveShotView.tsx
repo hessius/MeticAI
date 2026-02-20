@@ -393,7 +393,7 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
                   <EspressoChart
                     data={[]}
                     stages={[]}
-                    heightClass="h-[25vh] lg:h-[30vh]"
+                    heightClass="h-[25vh] lg:h-[30vh] max-h-[250px]"
                     showWeight
                     targetCurves={targetCurves}
                     xMax={liveXMax}
@@ -504,7 +504,7 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
               <EspressoChart
                 data={chartData}
                 stages={stages}
-                heightClass="h-[40vh] lg:h-[50vh]"
+                heightClass="h-[40vh] lg:h-[50vh] max-h-[400px]"
                 liveMode
                 showWeight
                 targetCurves={targetCurves}
@@ -598,7 +598,7 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
               <EspressoChart
                 data={chartData}
                 stages={stages}
-                heightClass="h-[35vh] lg:h-[45vh]"
+                heightClass="h-[35vh] lg:h-[45vh] max-h-[360px]"
                 showWeight
                 targetCurves={targetCurves}
               />
