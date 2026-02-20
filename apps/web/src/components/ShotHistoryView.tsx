@@ -64,7 +64,8 @@ const CHART_COLORS = {
   gravimetricFlow: '#c2855a', // Brown-orange (muted to fit dark theme)
   // Profile target curves (lighter/dashed versions of main colors)
   targetPressure: '#86efac',  // Lighter green for target pressure
-  targetFlow: '#a5f3fc'       // Lighter cyan for target flow
+  targetFlow: '#a5f3fc',      // Lighter cyan for target flow
+  targetPower: '#fca5a5'      // Lighter red for target power
 }
 
 // Stage colors for background areas (matching tag colors)
@@ -235,6 +236,7 @@ interface ProfileTargetPoint {
   time: number
   target_pressure?: number
   target_flow?: number
+  target_power?: number
   stage_name: string
 }
 
@@ -1047,7 +1049,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
   const mergeWithTargetCurves = (
     chartData: ChartDataPoint[], 
     targetCurves: ProfileTargetPoint[] | undefined
-  ): (ChartDataPoint & { targetPressure?: number; targetFlow?: number })[] => {
+  ): (ChartDataPoint & { targetPressure?: number; targetFlow?: number; targetPower?: number })[] => {
     if (!targetCurves || targetCurves.length === 0) {
       return chartData
     }
@@ -1059,6 +1061,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
     
     const flowPoints = targetCurves
       .filter(c => c.target_flow !== undefined)
+      .sort((a, b) => a.time - b.time)
+    
+    const powerPoints = targetCurves
+      .filter(c => c.target_power !== undefined)
       .sort((a, b) => a.time - b.time)
     
     // Helper function for binary search to find upper bound (first element > time)
@@ -1084,6 +1090,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
       // Find surrounding target points for interpolation
       let targetPressure: number | undefined
       let targetFlow: number | undefined
+      let targetPower: number | undefined
       
       // Find pressure target using binary search for efficiency
       if (pressurePoints.length > 0) {
@@ -1135,10 +1142,33 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
         }
       }
       
+      // Find power target using binary search for efficiency
+      if (powerPoints.length > 0) {
+        const afterIndex = findUpperBound(powerPoints, point.time)
+        
+        if (afterIndex === 0) {
+          targetPower = powerPoints[0].target_power
+        } else if (afterIndex === powerPoints.length) {
+          targetPower = powerPoints[powerPoints.length - 1].target_power
+        } else {
+          const before = powerPoints[afterIndex - 1]
+          const after = powerPoints[afterIndex]
+          
+          const timeDiff = after.time - before.time
+          if (timeDiff === 0) {
+            targetPower = before.target_power!
+          } else {
+            const t = (point.time - before.time) / timeDiff
+            targetPower = before.target_power! + t * (after.target_power! - before.target_power!)
+          }
+        }
+      }
+      
       return {
         ...point,
         targetPressure,
-        targetFlow
+        targetFlow,
+        targetPower
       }
     })
   }
@@ -2161,6 +2191,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                             const flowPoints = curves
                                               .filter(p => p.target_flow !== undefined)
                                               .sort((a, b) => a.time - b.time)
+                                            const powerPoints = curves
+                                              .filter(p => p.target_power !== undefined)
+                                              .sort((a, b) => a.time - b.time)
                                             
                                             let pressurePath = ''
                                             if (pressurePoints.length >= 2) {
@@ -2180,6 +2213,15 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                               }).join(' ')
                                             }
                                             
+                                            let powerPath = ''
+                                            if (powerPoints.length >= 2) {
+                                              powerPath = powerPoints.map((p, i) => {
+                                                const x = xAxis.scale(p.time)
+                                                const y = yAxis.scale(p.target_power!)
+                                                return i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`
+                                              }).join(' ')
+                                            }
+                                            
                                             return (
                                               <g className="target-curves">
                                                 {pressurePath && (
@@ -2195,6 +2237,14 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                                     <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
                                                     {flowPoints.map((p, i) => (
                                                       <circle key={`tf-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_flow!)} r={4} fill={CHART_COLORS.targetFlow} />
+                                                    ))}
+                                                  </>
+                                                )}
+                                                {powerPath && (
+                                                  <>
+                                                    <path d={powerPath} fill="none" stroke={CHART_COLORS.targetPower} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+                                                    {powerPoints.map((p, i) => (
+                                                      <circle key={`tpw-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_power!)} r={4} fill={CHART_COLORS.targetPower} />
                                                     ))}
                                                   </>
                                                 )}
@@ -2228,6 +2278,12 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                     <div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetFlow, borderStyle: 'dashed' }} />
                                     <span>Target Flow</span>
                                   </div>
+                                  {analysisResult.profile_target_curves.some(p => p.target_power !== undefined) && (
+                                    <div className="flex items-center gap-1">
+                                      <div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPower, borderStyle: 'dashed' }} />
+                                      <span>Target Power</span>
+                                    </div>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -2823,10 +2879,13 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                         const curves = analysisResult.profile_target_curves!
                                         const pressurePoints = curves.filter(p => p.target_pressure !== undefined).sort((a, b) => a.time - b.time)
                                         const flowPoints = curves.filter(p => p.target_flow !== undefined).sort((a, b) => a.time - b.time)
+                                        const powerPoints = curves.filter(p => p.target_power !== undefined).sort((a, b) => a.time - b.time)
                                         let pressurePath = ''
                                         if (pressurePoints.length >= 2) pressurePath = pressurePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_pressure!)}`).join(' ')
                                         let flowPath = ''
                                         if (flowPoints.length >= 2) flowPath = flowPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_flow!)}`).join(' ')
+                                        let powerPath = ''
+                                        if (powerPoints.length >= 2) powerPath = powerPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_power!)}`).join(' ')
                                         return (
                                           <g className="target-curves">
                                             {pressurePath && <>
@@ -2836,6 +2895,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                             {flowPath && <>
                                               <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
                                               {flowPoints.map((p, i) => <circle key={`tf-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_flow!)} r={4} fill={CHART_COLORS.targetFlow} />)}
+                                            </>}
+                                            {powerPath && <>
+                                              <path d={powerPath} fill="none" stroke={CHART_COLORS.targetPower} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+                                              {powerPoints.map((p, i) => <circle key={`tpw-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_power!)} r={4} fill={CHART_COLORS.targetPower} />)}
                                             </>}
                                           </g>
                                         )
@@ -2853,6 +2916,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             {hasTargetCurves && <>
                               <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPressure, borderStyle: 'dashed' }} /><span>Target Pressure</span></div>
                               <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetFlow, borderStyle: 'dashed' }} /><span>Target Flow</span></div>
+                              {analysisResult.profile_target_curves?.some(p => p.target_power !== undefined) && (
+                                <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPower, borderStyle: 'dashed' }} /><span>Target Power</span></div>
+                              )}
                             </>}
                           </div>
                           {/* Stage Legend */}

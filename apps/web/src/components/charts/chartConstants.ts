@@ -12,8 +12,10 @@ export const CHART_COLORS = {
   flow: '#67e8f9',            // Light cyan/blue
   weight: '#fbbf24',          // Amber/Yellow
   gravimetricFlow: '#c2855a', // Brown-orange
+  power: '#f87171',           // Red (power / motor)
   targetPressure: '#86efac',  // Lighter green (dashed)
   targetFlow: '#a5f3fc',      // Lighter cyan (dashed)
+  targetPower: '#fca5a5',     // Lighter red (dashed)
 } as const
 
 export const COMPARISON_COLORS = {
@@ -86,6 +88,7 @@ export interface ChartDataPoint {
   flow?: number
   weight?: number
   gravimetricFlow?: number
+  power?: number
   stage?: string
 }
 
@@ -100,6 +103,7 @@ export interface ProfileTargetPoint {
   time: number
   target_pressure?: number
   target_flow?: number
+  target_power?: number
   stage_name: string
 }
 
