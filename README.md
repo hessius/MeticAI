@@ -39,7 +39,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 ### For Coffee Enthusiasts
 - 🎯 **Advanced Profiling** - Multi-stage extraction, blooming, pressure ramping
 - 📊 **Detailed Guidance** - Dose, grind, temperature recommendations
-- 🔬 **Science-Based** - Explanations of why each profile works
+- 🔬 **Expert Knowledge** - Explanations of why each profile works
 - ⚡️ **Modern Techniques** - Turbo shots, flow profiling, and more
 
 ### For Power Users
@@ -227,7 +227,7 @@ MeticAI doesn't just create recipes—it creates *experiences* with:
 Every profile includes:
 - ☕️ Recommended dose and grind settings
 - 🌡️ Temperature recommendations
-- 🔬 Scientific explanation of why it works
+- 🔬 Expert explanation of why it works
 - ⚙️ Any special equipment notes
 
 **🚀 Modern Techniques**
