@@ -836,13 +836,16 @@ Special Notes: For maximum clarity and to really make those delicate floral note
           {showRightColumn && (
             <aside className="hidden md:block">
               <div className={`sticky top-4 ${viewState === 'live-shot' ? 'mt-10' : 'mt-2'}`}>
-                <ControlCenter
-                  machineState={machineState}
-                  onOpenLiveView={() => setViewState('live-shot')}
-                />
-                {/* Live profile breakdown — shown during active shot view */}
+                {/* Hide control center during live shot — profile breakdown takes over */}
+                {viewState !== 'live-shot' && (
+                  <ControlCenter
+                    machineState={machineState}
+                    onOpenLiveView={() => setViewState('live-shot')}
+                  />
+                )}
+                {/* Live profile breakdown — shown during active shot view, fills the column */}
                 {viewState === 'live-shot' && liveProfileData && (
-                  <div className="mt-4 max-h-[50vh] overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                  <div className="max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                     <ProfileBreakdown
                       profile={liveProfileData}
                       currentStage={machineState.state ?? null}
