@@ -184,8 +184,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const isHeating = stateLC === 'heating'
   const isReady = stateLC === 'click to start'
   const isPourWater = stateLC.startsWith('pour water')
-  // Machine accepts START during idle, preheat, heating, ready, or pour water states
-  const canStart = (isIdle || isPreheating || isHeating || isReady || isPourWater) && !isBrewing && machineState.connected
+  // Machine accepts START during idle, preheat, or "click to start" — not during
+  // heating or pour-water (shot already started, waiting to reach target temp)
+  const canStart = (isIdle || isPreheating || isReady) && !isBrewing && machineState.connected
   // Abort is allowed during preheating, heating, or pour water (non-idle, non-brewing warmup states)
   const canAbortWarmup = (isPreheating || isHeating || isPourWater) && !isBrewing && machineState.connected
 
@@ -310,7 +311,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!canStart}
-              onClick={() => cmd((isHeating || isReady || isPourWater) ? continueShot : startShot, 'startingShot')}
+              onClick={() => cmd(isReady ? continueShot : startShot, 'startingShot')}
             >
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
