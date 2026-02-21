@@ -28,6 +28,8 @@ NC='\033[0m' # No Color
 INSTALL_DIR="${HOME}/.meticai"
 BACKUP_DIR="${INSTALL_DIR}/backup-$(date +%Y%m%d-%H%M%S)"
 OLD_METICAI_DIR="${HOME}/MeticAI"
+REPO_BRANCH="${REPO_BRANCH:-main}"
+REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
 
 log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
 log_success() { echo -e "${GREEN}✓${NC} $1"; }
@@ -118,8 +120,8 @@ else
     log_warning "No existing .env found, you'll need to configure manually"
     
     # Prompt for required values
-    read -p "Enter your Gemini API Key: " GEMINI_API_KEY
-    read -p "Enter Meticulous IP [meticulous.local]: " METICULOUS_IP
+    read -p "Enter your Gemini API Key: " GEMINI_API_KEY < /dev/tty
+    read -p "Enter Meticulous IP [meticulous.local]: " METICULOUS_IP < /dev/tty
     METICULOUS_IP=${METICULOUS_IP:-meticulous.local}
     
     cat > .env << EOF
@@ -128,10 +130,15 @@ METICULOUS_IP=${METICULOUS_IP}
 EOF
 fi
 
-# Download new compose file
+# Download new v2 compose files
 log_info "Downloading docker-compose.yml..."
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.yml -o docker-compose.yml
+curl -fsSL "${REPO_URL}/docker-compose.yml" -o docker-compose.yml
 log_success "Downloaded docker-compose.yml"
+
+# Download optional compose files (best-effort)
+curl -fsSL "${REPO_URL}/docker-compose.tailscale.yml" -o docker-compose.tailscale.yml 2>/dev/null || true
+curl -fsSL "${REPO_URL}/docker-compose.watchtower.yml" -o docker-compose.watchtower.yml 2>/dev/null || true
+curl -fsSL "${REPO_URL}/tailscale-serve.json" -o tailscale-serve.json 2>/dev/null || true
 
 # Migrate data to Docker volume
 log_info "Migrating data to Docker volume..."
@@ -182,7 +189,7 @@ echo ""
 
 # Offer to clean up old installation
 echo "Would you like to remove the old installation at $OLD_METICAI_DIR?"
-read -p "(This saves disk space but is irreversible) [y/N]: " CLEANUP
+read -p "(This saves disk space but is irreversible) [y/N]: " CLEANUP < /dev/tty
 
 if [[ "$CLEANUP" =~ ^[Yy]$ ]]; then
     log_info "Removing old installation..."
