@@ -146,9 +146,53 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 # Configuration
 # ==============================================================================
 
-@test "Script installs to ~/.meticai" {
-    run grep -q 'INSTALL_DIR="${HOME}/.meticai"' "$SCRIPT_PATH"
+@test "Script installs to ~/.meticai by default" {
+    run grep -q 'INSTALL_DIR=.*HOME.*\.meticai' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
+}
+
+@test "Script allows INSTALL_DIR override via env var" {
+    run grep -q 'INSTALL_DIR:-' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script prompts for installation directory" {
+    run grep -q 'Installation directory' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Install directory prompt is skipped in non-interactive mode" {
+    local prompt_line
+    prompt_line=$(grep -n 'read -p "Installation directory' "$SCRIPT_PATH" | head -1 | cut -d: -f1)
+    [ -n "$prompt_line" ]
+    local guard_line
+    guard_line=$(awk -v line="$prompt_line" 'NR>=line-3 && NR<line && /NON_INTERACTIVE/' "$SCRIPT_PATH")
+    [ -n "$guard_line" ]
+}
+
+@test "Script computes METICAI_TAG from REPO_BRANCH" {
+    run grep -q 'METICAI_TAG=' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "METICAI_TAG defaults to latest for main branch" {
+    run grep -q 'REPO_BRANCH.*==.*main.*METICAI_TAG.*latest\|main.*latest' "$SCRIPT_PATH"
+    # Check the logic: if main then latest
+    run grep -A1 'REPO_BRANCH.*==.*main' "$SCRIPT_PATH"
+    [[ "$output" == *"latest"* ]]
+}
+
+@test "METICAI_TAG converts branch slashes to dashes" {
+    run grep -q "tr '/' '-'" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script writes METICAI_TAG to .env file" {
+    run grep -q 'METICAI_TAG=' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+    # Check it's written to .env (inside the cat heredoc)
+    run grep -A20 'cat > .env' "$SCRIPT_PATH"
+    [[ "$output" == *"METICAI_TAG"* ]]
 }
 
 @test "Script provides Gemini API key link" {
@@ -293,6 +337,11 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 
 @test "docker-compose.yml defines meticai service" {
     run grep -q "meticai:" "${BATS_TEST_DIRNAME}/../docker-compose.yml"
+    [ "$status" -eq 0 ]
+}
+
+@test "docker-compose.yml uses METICAI_TAG variable for image tag" {
+    run grep -q 'METICAI_TAG:-latest' "${BATS_TEST_DIRNAME}/../docker-compose.yml"
     [ "$status" -eq 0 ]
 }
 
@@ -493,6 +542,11 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 
 @test "Uninstall script offers to remove Docker image" {
     run grep -q "remove the MeticAI Docker image" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Uninstall script uses METICAI_TAG for image removal" {
+    run grep -q 'METICAI_TAG:-latest' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
