@@ -34,11 +34,9 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
-
-  # Tailscale shares the meticai network namespace
-  meticai:
-    depends_on:
-      - tailscale
+    # tailscale joins meticai's network namespace via network_mode,
+    # so Docker Compose automatically starts meticai first — no
+    # additional depends_on is needed (and adding one would cause a cycle).
 
 volumes:
   tailscale-state:
