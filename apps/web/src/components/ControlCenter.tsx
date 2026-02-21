@@ -416,7 +416,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
           </div>
 
           {/* Brewing actions */}
-          <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
             <Button
               variant="destructive"
               size="sm"
@@ -425,15 +425,6 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             >
               <Stop size={14} weight="fill" className="mr-1" />
               {t('controlCenter.actions.stop')}
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-9 text-xs"
-              onClick={() => cmd(abortShot, 'aborting')}
-            >
-              <XCircle size={14} weight="fill" className="mr-1" />
-              {t('controlCenter.actions.abort')}
             </Button>
             {onOpenLiveView && (
               <Button

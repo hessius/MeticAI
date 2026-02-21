@@ -60,6 +60,8 @@ import { getServerUrl } from '@/lib/config'
 interface LiveShotViewProps {
   machineState: MachineState
   onBack: () => void
+  /** Navigate to shot history for the given profile */
+  onAnalyzeShot?: (profileName: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +98,7 @@ interface ProfileStageInfo {
 // Component
 // ---------------------------------------------------------------------------
 
-export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
+export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotViewProps) {
   const { t } = useTranslation()
   const chartDataRef = useRef<ChartDataPoint[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
@@ -524,7 +526,7 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
             </div>
           )}
 
-          {/* ── Action buttons (only during real brewing, not simulation) ── */}
+          {/* ── Action button (only during real brewing, not simulation) ── */}
           {ms.brewing && !sim.active && (
             <div className="flex gap-3 justify-center">
               <AlertDialog>
@@ -542,25 +544,6 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
                   <AlertDialogFooter>
                     <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                     <AlertDialogAction onClick={() => cmd(stopShot, 'stopping')}>{t('common.confirm')}</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" className="h-9 px-4 text-xs">
-                    <XCircle size={14} weight="fill" className="mr-1" />
-                    {t('controlCenter.actions.abort')}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t('controlCenter.confirm.abortTitle')}</AlertDialogTitle>
-                    <AlertDialogDescription>{t('controlCenter.confirm.abortDesc')}</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => cmd(abortShot, 'aborting')}>{t('common.confirm')}</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -624,6 +607,16 @@ export function LiveShotView({ machineState, onBack }: LiveShotViewProps) {
                   >
                     <Drop size={16} weight="fill" className="mr-2" />
                     {t('controlCenter.liveShot.purgeAfterShot')}
+                  </Button>
+                )}
+                {!sim.active && ms.active_profile && onAnalyzeShot && (
+                  <Button
+                    variant="outline"
+                    className="h-11 px-6"
+                    onClick={() => onAnalyzeShot(ms.active_profile!)}
+                  >
+                    <ChartLine size={16} weight="duotone" className="mr-2" />
+                    {t('controlCenter.liveShot.analyzeShot', 'Analyze Shot')}
                   </Button>
                 )}
                 <Button variant="default" className="h-11 px-6" onClick={onBack}>
