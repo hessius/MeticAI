@@ -270,7 +270,7 @@ export function ExpertAnalysisView({
         
         {/* Analysis Content */}
         {!isLoading && !error && sections.length > 0 && (
-          <div className="space-y-6 lg:columns-2 lg:gap-6 lg:[&>*]:break-inside-avoid lg:[&>*]:mb-6 lg:space-y-0">
+          <div className="grid gap-6 lg:grid-cols-2">
             {sections.map((section, index) => (
               <SectionCard key={index} section={section} />
             ))}
