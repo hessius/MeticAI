@@ -18,6 +18,11 @@
 #   ENABLE_TAILSCALE        - Set to "y" to enable Tailscale
 #   TAILSCALE_AUTHKEY       - Tailscale auth key
 #   ENABLE_WATCHTOWER       - Set to "y" to enable Watchtower
+#   REPO_BRANCH             - GitHub branch to download from (default: main)
+#
+# Branch testing:
+#   REPO_BRANCH=version/2.0.0 bash <(curl -fsSL \
+#     https://raw.githubusercontent.com/hessius/MeticAI/version/2.0.0/scripts/install.sh)
 # ==============================================================================
 
 set -e
@@ -32,7 +37,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 INSTALL_DIR="${HOME}/.meticai"
-REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/main"
+REPO_BRANCH="${REPO_BRANCH:-main}"
+REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
 
 # ==============================================================================
 # Logging helpers
@@ -393,6 +399,25 @@ mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
 # ==============================================================================
+# Download compose files (early, so we know what's available)
+# ==============================================================================
+
+log_info "Downloading Docker Compose files..."
+
+curl -fsSL "${REPO_URL}/docker-compose.yml" -o docker-compose.yml
+HAS_TAILSCALE_COMPOSE=false
+if curl -fsSL "${REPO_URL}/docker-compose.tailscale.yml" -o docker-compose.tailscale.yml 2>/dev/null; then
+    HAS_TAILSCALE_COMPOSE=true
+fi
+HAS_WATCHTOWER_COMPOSE=false
+if curl -fsSL "${REPO_URL}/docker-compose.watchtower.yml" -o docker-compose.watchtower.yml 2>/dev/null; then
+    HAS_WATCHTOWER_COMPOSE=true
+fi
+curl -fsSL "${REPO_URL}/tailscale-serve.json" -o tailscale-serve.json 2>/dev/null || true
+
+log_success "Compose files downloaded"
+
+# ==============================================================================
 # [2/4] Configuration
 # ==============================================================================
 
@@ -485,35 +510,41 @@ echo ""
 echo -e "${YELLOW}[3/4] Optional services${NC}"
 echo ""
 
-if [[ "$METICAI_NON_INTERACTIVE" != "true" ]]; then
-    # Tailscale
-    read -p "Enable Tailscale for remote access? (y/N): " ENABLE_TAILSCALE < /dev/tty
-fi
-if [[ "$ENABLE_TAILSCALE" =~ ^[Yy]$ ]]; then
-    if [[ -z "$TAILSCALE_AUTHKEY" ]]; then
-        echo "Get an auth key from: https://login.tailscale.com/admin/settings/keys"
-        read -p "Tailscale Auth Key: " TAILSCALE_AUTHKEY < /dev/tty
+if [[ "$HAS_TAILSCALE_COMPOSE" == "true" ]]; then
+    if [[ "$METICAI_NON_INTERACTIVE" != "true" ]]; then
+        read -p "Enable Tailscale for remote access? (y/N): " ENABLE_TAILSCALE < /dev/tty
     fi
-    if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
-        COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.tailscale.yml"
-        log_success "Tailscale enabled"
+    if [[ "$ENABLE_TAILSCALE" =~ ^[Yy]$ ]]; then
+        if [[ -z "$TAILSCALE_AUTHKEY" ]]; then
+            echo "Get an auth key from: https://login.tailscale.com/admin/settings/keys"
+            read -p "Tailscale Auth Key: " TAILSCALE_AUTHKEY < /dev/tty
+        fi
+        if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
+            COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.tailscale.yml"
+            log_success "Tailscale enabled"
+        else
+            log_warning "No auth key provided, skipping Tailscale"
+        fi
     else
-        log_warning "No auth key provided, skipping Tailscale"
+        log_info "Tailscale: skipped"
     fi
 else
-    log_info "Tailscale: skipped"
+    log_info "Tailscale: not available (compose file not found)"
 fi
 
-if [[ "$METICAI_NON_INTERACTIVE" != "true" ]]; then
-    # Watchtower
-    read -p "Enable Watchtower for automatic updates? (y/N): " ENABLE_WATCHTOWER < /dev/tty
-fi
-if [[ "$ENABLE_WATCHTOWER" =~ ^[Yy]$ ]]; then
-    WATCHTOWER_TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.watchtower.yml"
-    log_success "Watchtower enabled (auto-update)"
+if [[ "$HAS_WATCHTOWER_COMPOSE" == "true" ]]; then
+    if [[ "$METICAI_NON_INTERACTIVE" != "true" ]]; then
+        read -p "Enable Watchtower for automatic updates? (y/N): " ENABLE_WATCHTOWER < /dev/tty
+    fi
+    if [[ "$ENABLE_WATCHTOWER" =~ ^[Yy]$ ]]; then
+        WATCHTOWER_TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
+        COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.watchtower.yml"
+        log_success "Watchtower enabled (auto-update)"
+    else
+        log_info "Watchtower: skipped"
+    fi
 else
-    log_info "Watchtower: skipped"
+    log_info "Watchtower: not available (compose file not found)"
 fi
 
 # ==============================================================================
@@ -545,18 +576,15 @@ fi
 
 log_success "Configuration saved to ${INSTALL_DIR}/.env"
 
-# ==============================================================================
-# Download compose files
-# ==============================================================================
-
-log_info "Downloading Docker Compose files..."
-
-curl -fsSL "${REPO_URL}/docker-compose.yml" -o docker-compose.yml
-curl -fsSL "${REPO_URL}/docker-compose.tailscale.yml" -o docker-compose.tailscale.yml 2>/dev/null || true
-curl -fsSL "${REPO_URL}/docker-compose.watchtower.yml" -o docker-compose.watchtower.yml 2>/dev/null || true
-curl -fsSL "${REPO_URL}/tailscale-serve.json" -o tailscale-serve.json 2>/dev/null || true
-
-log_success "Compose files downloaded"
+# Verify all referenced compose files exist before proceeding
+for cf in $COMPOSE_FILES; do
+    if [[ "$cf" == "-f" ]]; then continue; fi
+    if [[ ! -f "$cf" ]]; then
+        log_error "Required compose file missing: $cf"
+        log_error "Downloads may have failed. Check your network and try again."
+        exit 1
+    fi
+done
 
 # ==============================================================================
 # Generate convenience scripts
