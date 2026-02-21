@@ -56,6 +56,13 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "All read commands use /dev/tty for curl|bash compatibility" {
+    # Every 'read -p' must redirect from /dev/tty
+    local reads_without_tty
+    reads_without_tty=$(grep 'read -p' "$SCRIPT_PATH" | grep -v '/dev/tty' | wc -l)
+    [ "$reads_without_tty" -eq 0 ]
+}
+
 # ==============================================================================
 # Platform detection
 # ==============================================================================
@@ -132,13 +139,13 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "Script makes Gemini API key optional" {
-    run grep -q "AI features will be disabled" "$SCRIPT_PATH"
+@test "Script requires Gemini API key" {
+    run grep -q "API key is required" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
-@test "Script mentions adding key later in Settings" {
-    run grep -q "add a key later in Settings" "$SCRIPT_PATH"
+@test "Script loops until API key is provided" {
+    run grep -q "while.*GEMINI_API_KEY" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 

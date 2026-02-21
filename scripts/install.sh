@@ -139,7 +139,7 @@ if [[ -d "${HOME}/MeticAI" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
     echo "  2) Fresh install (will override existing config)"
     echo "  3) Cancel"
     echo ""
-    read -p "Choice [1]: " CHOICE
+    read -p "Choice [1]: " CHOICE < /dev/tty
     CHOICE=${CHOICE:-1}
     
     case "$CHOICE" in
@@ -178,13 +178,13 @@ echo ""
 # Gemini API Key
 if [[ -z "$GEMINI_API_KEY" ]]; then
     echo "Get your API key from: https://aistudio.google.com/app/apikey"
-    echo "(Press Enter to skip — AI features will be disabled, but MeticAI will still work)"
-    read -p "Gemini API Key: " GEMINI_API_KEY
-    
-    if [[ -z "$GEMINI_API_KEY" ]]; then
-        log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
-        log_info "You can add a key later in Settings within the MeticAI web UI"
-    fi
+    while [[ -z "$GEMINI_API_KEY" ]]; do
+        read -p "Gemini API Key: " GEMINI_API_KEY < /dev/tty
+        if [[ -z "$GEMINI_API_KEY" ]]; then
+            log_error "API key is required. Get one from https://aistudio.google.com/app/apikey"
+        fi
+    done
+    log_success "API key configured"
 fi
 
 # Meticulous IP
@@ -192,7 +192,7 @@ if [[ -z "$METICULOUS_IP" ]]; then
     echo ""
     echo "Enter the IP address or hostname of your Meticulous machine."
     echo "If unsure, try 'meticulous.local' for mDNS discovery."
-    read -p "Meticulous IP [meticulous.local]: " METICULOUS_IP
+    read -p "Meticulous IP [meticulous.local]: " METICULOUS_IP < /dev/tty
     METICULOUS_IP=${METICULOUS_IP:-meticulous.local}
 fi
 
@@ -208,10 +208,10 @@ echo "-----------------"
 echo ""
 
 # Tailscale
-read -p "Enable Tailscale for remote access? (y/N): " ENABLE_TAILSCALE
+read -p "Enable Tailscale for remote access? (y/N): " ENABLE_TAILSCALE < /dev/tty
 if [[ "$ENABLE_TAILSCALE" =~ ^[Yy]$ ]]; then
     echo "Get an auth key from: https://login.tailscale.com/admin/settings/keys"
-    read -p "Tailscale Auth Key: " TAILSCALE_AUTHKEY
+    read -p "Tailscale Auth Key: " TAILSCALE_AUTHKEY < /dev/tty
     if [[ -n "$TAILSCALE_AUTHKEY" ]]; then
         COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.tailscale.yml"
     else
@@ -220,7 +220,7 @@ if [[ "$ENABLE_TAILSCALE" =~ ^[Yy]$ ]]; then
 fi
 
 # Watchtower
-read -p "Enable Watchtower for automatic updates? (y/N): " ENABLE_WATCHTOWER
+read -p "Enable Watchtower for automatic updates? (y/N): " ENABLE_WATCHTOWER < /dev/tty
 if [[ "$ENABLE_WATCHTOWER" =~ ^[Yy]$ ]]; then
     WATCHTOWER_TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.watchtower.yml"
