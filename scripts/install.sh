@@ -36,8 +36,13 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="${HOME}/.meticai"
+INSTALL_DIR="${INSTALL_DIR:-${HOME}/.meticai}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
+if [[ "$REPO_BRANCH" == "main" ]]; then
+    METICAI_TAG="${METICAI_TAG:-latest}"
+else
+    METICAI_TAG="${METICAI_TAG:-$(echo "$REPO_BRANCH" | tr '/' '-')}"
+fi
 REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
 
 # ==============================================================================
@@ -355,6 +360,18 @@ fi
 log_success "Docker Compose is available"
 
 # ==============================================================================
+# Installation directory prompt
+# ==============================================================================
+
+if [[ "$METICAI_NON_INTERACTIVE" != "true" ]]; then
+    read -p "Installation directory [${INSTALL_DIR}]: " CUSTOM_INSTALL_DIR < /dev/tty
+    if [[ -n "$CUSTOM_INSTALL_DIR" ]]; then
+        INSTALL_DIR="$CUSTOM_INSTALL_DIR"
+    fi
+fi
+log_info "Installing to: ${INSTALL_DIR}"
+
+# ==============================================================================
 # Check for existing installation
 # ==============================================================================
 
@@ -598,6 +615,9 @@ cat > .env << EOF
 GEMINI_API_KEY=${GEMINI_API_KEY}
 METICULOUS_IP=${METICULOUS_IP}
 
+# Image tag (auto-detected from install branch: ${REPO_BRANCH})
+METICAI_TAG=${METICAI_TAG}
+
 # Compose files to load
 COMPOSE_FILES="${COMPOSE_FILES}"
 EOF
@@ -695,7 +715,7 @@ fi
 
 read -p "Also remove the MeticAI Docker image? (y/N): " REMOVE_IMAGE < /dev/tty
 if [[ "$REMOVE_IMAGE" =~ ^[Yy]$ ]]; then
-    docker rmi ghcr.io/hessius/meticai:latest 2>/dev/null || true
+    docker rmi "ghcr.io/hessius/meticai:${METICAI_TAG:-latest}" 2>/dev/null || true
     echo "Image removed"
 fi
 
@@ -748,7 +768,7 @@ if docker compose ps 2>/dev/null | grep -q "running\|healthy"; then
     log_success "MeticAI is running!"
 else
     log_warning "Container may still be starting..."
-    echo "  Check status with: cd ~/.meticai && docker compose ps"
+    echo "  Check status with: cd ${INSTALL_DIR} && docker compose ps"
 fi
 
 # ==============================================================================
@@ -818,7 +838,7 @@ echo "  Test it:"
 echo "    curl -sf http://${SERVER_IP}:3550/api/version"
 echo ""
 echo "  Useful commands:"
-echo "    cd ~/.meticai"
+echo "    cd ${INSTALL_DIR}"
 echo "    ./start.sh        Start MeticAI"
 echo "    ./stop.sh         Stop MeticAI"
 echo "    ./update.sh       Pull latest image & restart"

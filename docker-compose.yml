@@ -13,7 +13,7 @@
 
 services:
   meticai:
-    image: ghcr.io/hessius/meticai:latest
+    image: ghcr.io/hessius/meticai:${METICAI_TAG:-latest}
     container_name: meticai
     build:
       context: .
