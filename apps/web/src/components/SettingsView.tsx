@@ -72,7 +72,9 @@ interface TailscaleStatus {
   installed: boolean
   connected: boolean
   hostname: string | null
+  dns_name: string | null
   ip: string | null
+  external_url: string | null
   auth_key_expired: boolean
   login_url: string | null
 }
@@ -166,8 +168,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           const data = await response.json()
           setTailscaleStatus(data)
         }
-      } catch (err) {
-        console.error('Failed to load tailscale status:', err)
+      } catch {
+        // Tailscale may not be installed — this is expected
       }
     }
     
@@ -775,7 +777,21 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               <div className={`w-2 h-2 rounded-full ${tailscaleStatus.connected ? 'bg-green-500' : 'bg-red-500'}`} />
             </div>
             
-            {tailscaleStatus.hostname && (
+            {tailscaleStatus.external_url && (
+              <div className="flex justify-between items-center py-2 border-b border-border/50">
+                <span className="text-sm text-muted-foreground">{t('settings.tailscale.remoteUrl')}</span>
+                <a 
+                  href={tailscaleStatus.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-mono text-primary hover:underline truncate max-w-[200px]"
+                >
+                  {tailscaleStatus.dns_name}
+                </a>
+              </div>
+            )}
+            
+            {tailscaleStatus.hostname && !tailscaleStatus.external_url && (
               <div className="flex justify-between items-center py-2 border-b border-border/50">
                 <span className="text-sm text-muted-foreground">{t('settings.tailscale.hostname')}</span>
                 <span className="text-sm font-mono">{tailscaleStatus.hostname}</span>
@@ -808,6 +824,30 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   </Button>
                 )}
               </>
+            )}
+            
+            {/* Remote Access Guide */}
+            {tailscaleStatus.connected && (
+              <div className="rounded-md bg-muted/50 p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.guideTitle')}</p>
+                <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
+                  <li>{t('settings.tailscale.guideStep1')}</li>
+                  <li>{t('settings.tailscale.guideStep2')}</li>
+                  <li>
+                    {t('settings.tailscale.guideStep3')}{' '}
+                    {tailscaleStatus.external_url && (
+                      <a 
+                        href={tailscaleStatus.external_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-primary hover:underline"
+                      >
+                        {tailscaleStatus.external_url}
+                      </a>
+                    )}
+                  </li>
+                </ol>
+              </div>
             )}
           </div>
         </Card>

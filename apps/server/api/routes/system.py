@@ -392,7 +392,9 @@ async def get_tailscale_status(request: Request):
             "installed": False,
             "connected": False,
             "hostname": None,
+            "dns_name": None,
             "ip": None,
+            "external_url": None,
             "auth_key_expired": False,
             "login_url": None
         }
@@ -412,6 +414,13 @@ async def get_tailscale_status(request: Request):
                 
                 self_info = ts_data.get("Self", {})
                 status["hostname"] = self_info.get("HostName")
+                
+                # Get DNS name (FQDN) for remote access URL
+                dns_name = self_info.get("DNSName", "")
+                if dns_name:
+                    # DNSName ends with a trailing dot — remove it
+                    status["dns_name"] = dns_name.rstrip(".")
+                    status["external_url"] = f"https://{status['dns_name']}"
                 
                 # Get Tailscale IPs
                 ts_ips = self_info.get("TailscaleIPs", [])
@@ -458,6 +467,10 @@ async def get_tailscale_status(request: Request):
                     status["connected"] = backend_state == "Running"
                     self_info = ts_data.get("Self", {})
                     status["hostname"] = self_info.get("HostName")
+                    dns_name = self_info.get("DNSName", "")
+                    if dns_name:
+                        status["dns_name"] = dns_name.rstrip(".")
+                        status["external_url"] = f"https://{status['dns_name']}"
                     ts_ips = self_info.get("TailscaleIPs", [])
                     if ts_ips:
                         status["ip"] = ts_ips[0]
@@ -480,7 +493,9 @@ async def get_tailscale_status(request: Request):
             "installed": False,
             "connected": False,
             "hostname": None,
+            "dns_name": None,
             "ip": None,
+            "external_url": None,
             "auth_key_expired": False,
             "login_url": None,
             "error": str(e)
