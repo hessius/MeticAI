@@ -261,14 +261,19 @@
       "label": "Language"
     },
     "tailscale": {
-      "title": "Tailscale",
+      "title": "Remote Access",
       "connected": "Connected",
       "disconnected": "Disconnected",
-      "authKeyExpired": "Auth key expired",
+      "authKeyExpired": "Auth key expired — re-authenticate to restore remote access.",
       "hostname": "Hostname",
-      "ip": "IP Address",
-      "renewKey": "Renew Auth Key",
-      "notInstalled": "Tailscale is not installed"
+      "remoteUrl": "Remote URL",
+      "ip": "Tailscale IP",
+      "renewKey": "Re-authenticate",
+      "notInstalled": "Tailscale is not installed",
+      "guideTitle": "How to access MeticAI remotely:",
+      "guideStep1": "Install Tailscale on your phone or laptop from tailscale.com/download",
+      "guideStep2": "Sign in with the same account used during MeticAI setup",
+      "guideStep3": "Open this URL from any device on your Tailscale network:"
     },
     "updateMethod": {
       "watchtower": "Automatic updates via Watchtower",
