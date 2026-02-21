@@ -320,3 +320,236 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 @test "tailscale-serve.json exists" {
     [ -f "${BATS_TEST_DIRNAME}/../tailscale-serve.json" ]
 }
+
+# ==============================================================================
+# Network discovery (ported from v1)
+# ==============================================================================
+
+@test "Script defines scan_for_meticulous function" {
+    run grep -q "^scan_for_meticulous()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script defines resolve_local_hostname function" {
+    run grep -q "^resolve_local_hostname()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script defines run_with_timeout function" {
+    run grep -q "^run_with_timeout()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script defines detect_server_ip function" {
+    run grep -q "^detect_server_ip()" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Network scan uses dns-sd (macOS Bonjour)" {
+    run grep -q "dns-sd -B _http._tcp" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Network scan uses avahi-browse (Linux)" {
+    run grep -q "avahi-browse" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Network scan uses ARP cache fallback" {
+    run grep -q "arp -a" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Network scan uses direct mDNS name fallback" {
+    run grep -q 'for name in meticulous' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Hostname resolution uses dscacheutil (macOS)" {
+    run grep -q "dscacheutil -q host" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Hostname resolution uses getent (Linux)" {
+    run grep -q "getent hosts" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Hostname resolution uses ping fallback" {
+    run grep -q "ping -c 1" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Timeout helper supports GNU timeout" {
+    run grep -q 'command -v timeout' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Timeout helper supports gtimeout (Homebrew)" {
+    run grep -q 'command -v gtimeout' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Timeout helper supports perl alarm fallback" {
+    run grep -q "perl -e 'alarm shift" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Machine selection shows numbered list for multiple devices" {
+    run grep -q 'Select device' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Machine selection offers Y/n for single device" {
+    run grep -q 'Use this device' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Scanning message is shown before network scan" {
+    run grep -q "Scanning network for Meticulous machines" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+# ==============================================================================
+# Non-interactive mode
+# ==============================================================================
+
+@test "Script supports METICAI_NON_INTERACTIVE env var" {
+    run grep -q 'METICAI_NON_INTERACTIVE' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Non-interactive mode requires GEMINI_API_KEY" {
+    run grep -q 'GEMINI_API_KEY is required in non-interactive mode' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Non-interactive mode defaults METICULOUS_IP to meticulous.local" {
+    run grep -q 'METICULOUS_IP:-meticulous.local' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Non-interactive mode skips Tailscale prompt" {
+    run grep -q 'METICAI_NON_INTERACTIVE.*!=.*true.*Tailscale\|Tailscale.*METICAI_NON_INTERACTIVE' "$SCRIPT_PATH"
+    # Check that Tailscale read is inside a non-interactive guard
+    local tailscale_line
+    tailscale_line=$(grep -n "Enable Tailscale" "$SCRIPT_PATH" | head -1 | cut -d: -f1)
+    [ -n "$tailscale_line" ]
+    # Verify there's a NON_INTERACTIVE check nearby (within 3 lines before)
+    local guard_line
+    guard_line=$(awk -v line="$tailscale_line" 'NR>=line-3 && NR<line && /NON_INTERACTIVE/' "$SCRIPT_PATH")
+    [ -n "$guard_line" ]
+}
+
+@test "Non-interactive mode skips Docker install prompt" {
+    run grep -A1 'METICAI_NON_INTERACTIVE.*true' "$SCRIPT_PATH"
+    [[ "$output" == *"Docker is not installed"* ]]
+}
+
+# ==============================================================================
+# Docker Compose availability check
+# ==============================================================================
+
+@test "Script checks Docker Compose availability" {
+    run grep -q "docker compose version" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script shows fix suggestion when Compose is missing" {
+    run grep -q "Docker Compose V2 is required" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+# ==============================================================================
+# Uninstall script generation
+# ==============================================================================
+
+@test "Script generates uninstall.sh" {
+    run grep -q "cat > uninstall.sh" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Uninstall script offers to remove data volumes" {
+    run grep -q "remove data volume" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Uninstall script offers to remove Docker image" {
+    run grep -q "remove the MeticAI Docker image" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Uninstall script cleans up macOS app shortcut" {
+    run grep -q '/Applications/MeticAI.app' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Uninstall script uses /dev/tty for reads" {
+    # Extract the uninstall script block and check reads
+    local uninstall_reads
+    uninstall_reads=$(sed -n '/cat > uninstall.sh/,/SCRIPT_END/p' "$SCRIPT_PATH" | grep 'read -p' | grep -v '/dev/tty' | wc -l)
+    [ "$uninstall_reads" -eq 0 ]
+}
+
+# ==============================================================================
+# macOS Dock shortcut
+# ==============================================================================
+
+@test "Script offers macOS Dock shortcut" {
+    run grep -q "Add MeticAI to your macOS Dock" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Dock shortcut creates Info.plist" {
+    run grep -q "Info.plist" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Dock shortcut only offered on macOS" {
+    run grep -q 'PLATFORM.*macos.*ADD_DOCK\|macos.*Dock' "$SCRIPT_PATH"
+    # The macOS Dock section is gated by platform check
+    local dock_line
+    dock_line=$(grep -n "Add MeticAI to your macOS Dock" "$SCRIPT_PATH" | head -1 | cut -d: -f1)
+    [ -n "$dock_line" ]
+    local platform_guard
+    platform_guard=$(awk -v line="$dock_line" 'NR>=line-3 && NR<line && /macos/' "$SCRIPT_PATH")
+    [ -n "$platform_guard" ]
+}
+
+# ==============================================================================
+# Server IP detection
+# ==============================================================================
+
+@test "IP detection uses route/ipconfig on macOS" {
+    run grep -q "route -n get default" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "IP detection uses hostname -I on Linux" {
+    run grep -q "hostname -I" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "IP detection falls back to localhost" {
+    run grep -q 'SERVER_IP:-localhost' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "IP detection tries multiple macOS interfaces" {
+    run grep -q "en0 en1 en2" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+# ==============================================================================
+# Post-install test command
+# ==============================================================================
+
+@test "Script shows curl test command" {
+    run grep -q "curl.*api/version" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script shows docker compose logs command" {
+    run grep -q "docker compose logs" "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
