@@ -333,24 +333,13 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             t={t}
           />
 
-          {/* Abort — works during brewing; Cancel warmup during preheating/heating */}
-          {canAbortWarmup ? (
+          {/* Cancel warmup — visible during preheating/heating (not during brewing) */}
+          {canAbortWarmup && (
             <ActionButton
               icon={<XCircle size={14} weight="fill" />}
               label={t('controlCenter.actions.abortPreheat')}
               disabled={!isConnected}
               onClick={() => cmd(abortShot, 'preheatCancelled')}
-            />
-          ) : (
-            <ConfirmButton
-              icon={<XCircle size={14} weight="fill" />}
-              label={t('controlCenter.actions.abort')}
-              disabled={!isBrewing}
-              title={t('controlCenter.confirm.abortTitle')}
-              description={t('controlCenter.confirm.abortDesc')}
-              onConfirm={() => cmd(abortShot, 'aborting')}
-              destructive
-              t={t}
             />
           )}
 

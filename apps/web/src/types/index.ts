@@ -119,7 +119,8 @@ export type ViewState =
   | 'history-detail' 
   | 'settings' 
   | 'run-shot'
-  | 'live-shot';
+  | 'live-shot'
+  | 'shot-history';
 
 // ============================================================================
 // Tag Types

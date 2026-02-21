@@ -38,6 +38,7 @@ import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { LiveShotView } from '@/components/LiveShotView'
+import { ShotHistoryView } from '@/components/ShotHistoryView'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
@@ -62,6 +63,7 @@ function App() {
   const [createdProfileId, setCreatedProfileId] = useState<string | null>(null)
   const [runShotProfileId, setRunShotProfileId] = useState<string | undefined>(undefined)
   const [runShotProfileName, setRunShotProfileName] = useState<string | undefined>(undefined)
+  const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -82,6 +84,7 @@ function App() {
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
+  const [liveProfileImageUrl, setLiveProfileImageUrl] = useState<string | null>(null)
   const liveProfileFetchedRef = useRef<string | null>(null)
 
   // Fetch full profile data (with stages) when in live-shot view
@@ -89,6 +92,7 @@ function App() {
     if (viewState !== 'live-shot') {
       liveProfileFetchedRef.current = null
       setLiveProfileData(null)
+      setLiveProfileImageUrl(null)
       return
     }
     const profileName = machineState.active_profile
@@ -98,12 +102,15 @@ function App() {
     ;(async () => {
       try {
         const base = await getServerUrl()
+        // Fetch profile stages
         const r = await fetch(`${base}/api/profile/${encodeURIComponent(profileName)}?include_stages=true`)
         if (!r.ok) return
         const data = await r.json()
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
         }
+        // Build image URL
+        setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
       } catch { /* non-critical */ }
     })()
   }, [viewState, machineState.active_profile])
@@ -783,6 +790,17 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                 <LiveShotView
                   machineState={machineState}
                   onBack={handleBackToStart}
+                  onAnalyzeShot={(profileName) => {
+                    setShotHistoryProfileName(profileName)
+                    setViewState('shot-history')
+                  }}
+                />
+              )}
+
+              {viewState === 'shot-history' && shotHistoryProfileName && (
+                <ShotHistoryView
+                  profileName={shotHistoryProfileName}
+                  onBack={handleBackToStart}
                 />
               )}
 
@@ -845,11 +863,37 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                 )}
                 {/* Live profile breakdown — shown during active shot view, fills the column */}
                 {viewState === 'live-shot' && liveProfileData && (
-                  <div className="max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                    <ProfileBreakdown
-                      profile={liveProfileData}
-                      currentStage={machineState.state ?? null}
-                    />
+                  <div className="flex flex-col max-h-[calc(100vh-6rem)]">
+                    {/* Sticky profile header — always visible */}
+                    {machineState.active_profile && (
+                      <div className="flex items-center gap-3 px-3 py-2.5 bg-card/80 backdrop-blur-sm border border-border/60 rounded-xl mb-2 shrink-0">
+                        {liveProfileImageUrl && (
+                          <img
+                            src={liveProfileImageUrl}
+                            alt=""
+                            className="w-10 h-10 rounded-lg object-cover shrink-0"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">
+                            {machineState.active_profile}
+                          </p>
+                          {machineState.state && (
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {machineState.state}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {/* Scrollable stage breakdown */}
+                    <div className="overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                      <ProfileBreakdown
+                        profile={liveProfileData}
+                        currentStage={machineState.state ?? null}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
