@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react"
 
-const DESKTOP_BREAKPOINT = 768
+const DESKTOP_BREAKPOINT = 1024
 
 /**
- * Hook to detect if the current device is a desktop (non-mobile)
- * Returns true if the viewport width is >= 768px
- * @returns boolean True if on desktop, false if on mobile, undefined during initial render
+ * Hook to detect if the current device is a desktop
+ * Returns true if the viewport width is >= 1024px (Tailwind `lg:` breakpoint)
+ * @returns boolean True if on desktop, false if on mobile/tablet, undefined during initial render
  */
 export function useIsDesktop(): boolean | undefined {
   const [isDesktop, setIsDesktop] = useState<boolean | undefined>(undefined)

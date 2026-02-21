@@ -131,11 +131,15 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
 
   const cmd = useCallback(
     async (fn: () => Promise<{ success: boolean; message?: string }>, successKey: string) => {
-      const res = await fn()
-      if (res.success) {
-        toast.success(t(`controlCenter.toasts.${successKey}`))
-      } else {
-        toast.error(res.message ?? t('controlCenter.toasts.error'))
+      try {
+        const res = await fn()
+        if (res.success) {
+          toast.success(t(`controlCenter.toasts.${successKey}`))
+        } else {
+          toast.error(res.message ?? t('controlCenter.toasts.error'))
+        }
+      } catch {
+        toast.error(t('controlCenter.toasts.error'))
       }
     },
     [t],

@@ -21,6 +21,7 @@ import {
   STAGE_TEXT_COLORS_LIGHT,
   STAGE_TEXT_COLORS_DARK,
   COMPARISON_COLORS,
+  getChartTheme,
   type ChartDataPoint,
   type StageRange,
   type ProfileTargetPoint,
@@ -91,6 +92,7 @@ export function ReplayChart({
   const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
   const padding = isMobile ? 'p-1' : 'p-2'
   const rightMargin = isMobile ? 0 : 5
+  const theme = getChartTheme(isDark)
   
   const content = (
     <>
@@ -110,14 +112,14 @@ export function ReplayChart({
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 5, right: rightMargin, left: -5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} opacity={theme.gridOpacity} />
               {displayStageRanges.map((stage, idx) => (
                 <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
               ))}
-              {isShowingReplay && <ReferenceLine yAxisId="left" x={currentTime} stroke="#fff" strokeWidth={2} strokeDasharray="4 2" />}
-              <XAxis dataKey="time" stroke="#666" fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
-              <YAxis yAxisId="left" stroke="#666" fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} width={35} allowDataOverflow={false} />
-              <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: '#444' }} tickLine={{ stroke: '#444' }} width={35} allowDataOverflow={false} />
+              {isShowingReplay && <ReferenceLine yAxisId="left" x={currentTime} stroke={theme.replayLineStroke} strokeWidth={2} strokeDasharray="4 2" />}
+              <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
+              <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={false} />
+              <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={false} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
               <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
@@ -167,6 +169,7 @@ interface CompareChartProps {
   comparisonCurrentTime: number
   comparisonIsPlaying: boolean
   comparisonPlaybackSpeed: number
+  isDark: boolean
   variant?: 'mobile' | 'desktop'
 }
 
@@ -179,11 +182,13 @@ export function CompareChart({
   comparisonCurrentTime,
   comparisonIsPlaying,
   comparisonPlaybackSpeed,
+  isDark,
   variant = 'mobile'
 }: CompareChartProps) {
   const isMobile = variant === 'mobile'
   const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
   const padding = isMobile ? 'p-1' : 'p-2'
+  const theme = getChartTheme(isDark)
   const displayData = isShowingReplay ? combinedData.filter(d => d.time <= comparisonCurrentTime) : combinedData
   
   return (
@@ -204,12 +209,12 @@ export function CompareChart({
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-              {isShowingReplay && <ReferenceLine yAxisId="left" x={comparisonCurrentTime} stroke="#fff" strokeWidth={2} strokeDasharray="4 2" />}
-              <XAxis dataKey="time" stroke="#666" fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
-              <YAxis yAxisId="left" stroke="#666" fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={false} />
-              <YAxis yAxisId="right" orientation="right" stroke="#666" fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={false} />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid #333', borderRadius: '8px', fontSize: '10px' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} opacity={theme.gridOpacity} />
+              {isShowingReplay && <ReferenceLine yAxisId="left" x={comparisonCurrentTime} stroke={theme.replayLineStroke} strokeWidth={2} strokeDasharray="4 2" />}
+              <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
+              <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={false} />
+              <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={false} />
+              <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '4px' }} iconSize={7} />
               <Line yAxisId="left" type="monotone" dataKey="pressureA" stroke={COMPARISON_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure A" isAnimationActive={false} />
               <Line yAxisId="left" type="monotone" dataKey="flowA" stroke={COMPARISON_COLORS.flow} strokeWidth={2} dot={false} name="Flow A" isAnimationActive={false} />
@@ -255,6 +260,7 @@ export function AnalyzeChart({
   const isMobile = variant === 'mobile'
   const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
   const padding = isMobile ? 'p-1' : 'p-2'
+  const theme = getChartTheme(isDark)
   
   return (
     <>
@@ -271,14 +277,14 @@ export function AnalyzeChart({
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} opacity={theme.gridOpacity} />
               {stageRanges.map((stage, idx) => (
                 <ReferenceArea key={idx} yAxisId="left" x1={stage.startTime} x2={stage.endTime} fill={STAGE_COLORS[stage.colorIndex]} fillOpacity={1} stroke={STAGE_BORDER_COLORS[stage.colorIndex]} strokeWidth={0} ifOverflow="extendDomain" />
               ))}
-              <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: '#444' }} type="number" domain={[0, dataMaxTime]} />
-              <YAxis yAxisId="left" domain={[0, maxLeftAxis]} tick={{ fontSize: 10, fill: '#888' }} axisLine={{ stroke: '#444' }} width={25} />
+              <XAxis dataKey="time" tick={{ fontSize: 10, fill: theme.tickFill }} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: theme.axisLineStroke }} type="number" domain={[0, dataMaxTime]} />
+              <YAxis yAxisId="left" domain={[0, maxLeftAxis]} tick={{ fontSize: 10, fill: theme.tickFill }} axisLine={{ stroke: theme.axisLineStroke }} width={25} />
               <YAxis yAxisId="right" orientation="right" domain={[0, Math.ceil(maxFlow * 1.1)]} hide width={0} />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: '1px solid #333', borderRadius: '8px', fontSize: '11px' }} formatter={(value: number, name: string) => [`${value?.toFixed(1) || '-'}`, name]} labelFormatter={(label) => `${Number(label).toFixed(1)}s`} />
+              <Tooltip content={<CustomTooltip />} />
               <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
               <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
               {hasTargetCurves && profileTargetCurves && (
