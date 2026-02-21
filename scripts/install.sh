@@ -358,8 +358,12 @@ log_success "Docker Compose is available"
 # Check for existing installation
 # ==============================================================================
 
-if [[ -d "${HOME}/MeticAI" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
-    log_warning "Existing MeticAI installation detected"
+HAS_V1="${HOME}/MeticAI"
+HAS_V2="${INSTALL_DIR}/docker-compose.yml"
+
+if [[ -d "$HAS_V1" ]]; then
+    # Old v1 multi-container installation detected
+    log_warning "Old MeticAI v1 installation detected at ~/MeticAI"
 
     if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
         log_info "Non-interactive mode: proceeding with fresh install"
@@ -376,11 +380,44 @@ if [[ -d "${HOME}/MeticAI" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
         case "$CHOICE" in
             1)
                 log_info "Running migration script..."
+                export REPO_BRANCH REPO_URL
                 curl -fsSL "${REPO_URL}/scripts/migrate-to-unified.sh" | bash
                 exit $?
                 ;;
             2)
                 log_info "Proceeding with fresh install..."
+                ;;
+            *)
+                log_info "Cancelled"
+                exit 0
+                ;;
+        esac
+    fi
+elif [[ -f "$HAS_V2" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
+    # Previous v2 installation detected
+    log_warning "Existing MeticAI v2 installation detected at ${INSTALL_DIR}"
+
+    if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
+        log_info "Non-interactive mode: proceeding with reinstall"
+    else
+        echo ""
+        echo "Would you like to:"
+        echo "  1) Reinstall / update (will override existing config)"
+        echo "  2) Cancel"
+        echo ""
+        read -p "Choice [1]: " CHOICE < /dev/tty
+        CHOICE=${CHOICE:-1}
+
+        case "$CHOICE" in
+            1)
+                log_info "Proceeding with reinstall..."
+                # Stop existing containers before reinstalling
+                if [[ -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
+                    log_info "Stopping existing containers..."
+                    cd "$INSTALL_DIR"
+                    docker compose down 2>/dev/null || true
+                    cd "$HOME"
+                fi
                 ;;
             *)
                 log_info "Cancelled"

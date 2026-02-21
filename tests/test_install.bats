@@ -111,17 +111,34 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 # ==============================================================================
 
 @test "Script detects existing installation" {
-    run grep -q "Existing MeticAI installation detected" "$SCRIPT_PATH"
+    run grep -q 'Old MeticAI v1 installation detected' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+    run grep -q 'Existing MeticAI v2 installation detected' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
 @test "Script offers migration option" {
-    run grep -q "Migrate existing installation" "$SCRIPT_PATH"
+    run grep -q 'Migrate existing installation' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
 @test "Script downloads migration script when needed" {
-    run grep -q "migrate-to-unified.sh" "$SCRIPT_PATH"
+    run grep -q 'migrate-to-unified.sh' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script exports REPO_BRANCH for migration script" {
+    run grep -q 'export REPO_BRANCH REPO_URL' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script offers reinstall for existing v2 installations" {
+    run grep -q 'Reinstall / update' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script stops existing containers on v2 reinstall" {
+    run grep -q 'Stopping existing containers' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
@@ -603,5 +620,54 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 
 @test "Script verifies compose files exist before docker compose pull" {
     run grep -q 'Required compose file missing' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+# ==============================================================================
+# Migration script (migrate-to-unified.sh)
+# ==============================================================================
+
+MIGRATION_SCRIPT="${BATS_TEST_DIRNAME}/../scripts/migrate-to-unified.sh"
+
+@test "Migration script exists and has valid syntax" {
+    [ -f "$MIGRATION_SCRIPT" ]
+    run bash -n "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script supports REPO_BRANCH" {
+    run grep -q 'REPO_BRANCH=.*:-main' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script uses REPO_URL not hardcoded URLs" {
+    # Functional curl commands should use REPO_URL, not hardcoded URLs
+    # (comments and echo strings are fine to have hardcoded examples)
+    run grep -E '^\s*curl.*raw.githubusercontent.com/hessius/MeticAI/main/' "$MIGRATION_SCRIPT"
+    [ "$status" -ne 0 ]
+    # Should use REPO_URL variable for downloads
+    run grep -q 'curl.*\${REPO_URL}' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script reads use /dev/tty" {
+    # All read -p commands must use < /dev/tty for curl|bash
+    while IFS= read -r line; do
+        if [[ "$line" =~ 'read -p' ]] && [[ ! "$line" =~ '/dev/tty' ]]; then
+            echo "FAIL: read without /dev/tty: $line"
+            return 1
+        fi
+    done < "$MIGRATION_SCRIPT"
+}
+
+@test "Migration script stops old v1 containers" {
+    run grep -q 'meticai-web\|gemini-client\|coffee-relay' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script downloads optional compose files" {
+    run grep -q 'docker-compose.tailscale.yml' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'docker-compose.watchtower.yml' "$MIGRATION_SCRIPT"
     [ "$status" -eq 0 ]
 }
