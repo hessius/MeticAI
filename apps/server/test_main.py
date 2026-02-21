@@ -9756,3 +9756,167 @@ class TestBridgeServiceLogging:
         assert restart_bridge_service() is True
 
 
+class TestTailscaleStatusEndpoint:
+    """Tests for the Tailscale status and configuration endpoints."""
+
+    def test_tailscale_status_returns_config_fields(self, client):
+        """GET /api/tailscale-status includes enabled and auth_key_configured."""
+        response = client.get("/api/tailscale-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "enabled" in data
+        assert "auth_key_configured" in data
+        assert "installed" in data
+        assert "connected" in data
+        assert "external_url" in data
+
+    def test_tailscale_status_defaults_disabled(self, client):
+        """Tailscale defaults to disabled when no settings configured."""
+        # Ensure clean defaults
+        from services.settings_service import save_settings, _DEFAULT_SETTINGS
+        save_settings(dict(_DEFAULT_SETTINGS))
+
+        response = client.get("/api/tailscale-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["enabled"] is False
+
+    def test_tailscale_status_reads_enabled_from_settings(self, client):
+        """Status reflects tailscaleEnabled from settings.json."""
+        from services.settings_service import load_settings, save_settings
+        settings = load_settings()
+        settings["tailscaleEnabled"] = True
+        save_settings(settings)
+
+        response = client.get("/api/tailscale-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["enabled"] is True
+
+    def test_tailscale_status_auth_key_from_settings(self, client):
+        """auth_key_configured reflects tailscaleAuthKey in settings."""
+        from services.settings_service import load_settings, save_settings
+        settings = load_settings()
+        settings["tailscaleAuthKey"] = "tskey-auth-abc123"
+        save_settings(settings)
+
+        response = client.get("/api/tailscale-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["auth_key_configured"] is True
+
+    def test_tailscale_status_auth_key_from_env(self, client, monkeypatch):
+        """auth_key_configured checks TAILSCALE_AUTHKEY env var fallback."""
+        monkeypatch.setenv("TAILSCALE_AUTHKEY", "tskey-auth-env")
+
+        response = client.get("/api/tailscale-status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["auth_key_configured"] is True
+
+
+class TestTailscaleConfigureEndpoint:
+    """Tests for POST /api/tailscale/configure."""
+
+    def test_enable_tailscale(self, client):
+        """Enabling Tailscale saves to settings."""
+        response = client.post("/api/tailscale/configure", json={"enabled": True})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["enabled"] is True
+
+        from services.settings_service import load_settings
+        settings = load_settings()
+        assert settings["tailscaleEnabled"] is True
+
+    def test_disable_tailscale(self, client):
+        """Disabling Tailscale saves to settings."""
+        # First enable
+        client.post("/api/tailscale/configure", json={"enabled": True})
+        # Then disable
+        response = client.post("/api/tailscale/configure", json={"enabled": False})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["enabled"] is False
+
+        from services.settings_service import load_settings
+        settings = load_settings()
+        assert settings["tailscaleEnabled"] is False
+
+    def test_save_auth_key(self, client):
+        """Saving an auth key updates settings."""
+        response = client.post("/api/tailscale/configure", json={
+            "authKey": "tskey-auth-test123"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["auth_key_configured"] is True
+
+        from services.settings_service import load_settings
+        settings = load_settings()
+        assert settings["tailscaleAuthKey"] == "tskey-auth-test123"
+
+    def test_save_masked_key_ignored(self, client):
+        """Masked auth key values are not saved."""
+        # Save a real key first
+        client.post("/api/tailscale/configure", json={"authKey": "tskey-auth-real"})
+
+        # Try to save a masked value
+        response = client.post("/api/tailscale/configure", json={
+            "authKey": "tskey-***masked***"
+        })
+        assert response.status_code == 200
+
+        from services.settings_service import load_settings
+        settings = load_settings()
+        assert settings["tailscaleAuthKey"] == "tskey-auth-real"
+
+    def test_clear_auth_key(self, client):
+        """Empty auth key clears the saved key."""
+        # Save a key first
+        client.post("/api/tailscale/configure", json={"authKey": "tskey-auth-real"})
+        # Clear it
+        response = client.post("/api/tailscale/configure", json={"authKey": ""})
+        assert response.status_code == 200
+
+        from services.settings_service import load_settings
+        settings = load_settings()
+        assert settings["tailscaleAuthKey"] == ""
+
+    def test_no_changes(self, client):
+        """Empty body returns success with no-changes message."""
+        response = client.post("/api/tailscale/configure", json={})
+        assert response.status_code == 200
+        data = response.json()
+        assert "No changes" in data["message"]
+
+    def test_enable_signals_restart(self, client):
+        """Toggling enabled state signals a restart is required."""
+        response = client.post("/api/tailscale/configure", json={"enabled": True})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["restart_required"] is True
+
+    def test_auth_key_no_restart(self, client):
+        """Just changing auth key does not signal restart."""
+        response = client.post("/api/tailscale/configure", json={
+            "authKey": "tskey-auth-new"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("restart_required") is not True
+
+
+class TestTailscaleSettingsDefaults:
+    """Test that settings_service includes Tailscale defaults."""
+
+    def test_default_settings_include_tailscale(self):
+        """Default settings include tailscaleEnabled and tailscaleAuthKey."""
+        from services.settings_service import _DEFAULT_SETTINGS
+        assert "tailscaleEnabled" in _DEFAULT_SETTINGS
+        assert "tailscaleAuthKey" in _DEFAULT_SETTINGS
+        assert _DEFAULT_SETTINGS["tailscaleEnabled"] is False
+        assert _DEFAULT_SETTINGS["tailscaleAuthKey"] == ""
+
+

@@ -49,5 +49,12 @@ def _reset_in_memory_caches():
     _hs._history_cache = None
     _ms._profile_list_cache = None
     _ms._profile_list_cache_time = 0.0
+
+    # Also reset settings file on disk to defaults to prevent cross-test leaks
+    from config import DATA_DIR
+    settings_file = DATA_DIR / "settings.json"
+    if settings_file.exists():
+        settings_file.unlink()
+
     yield
 

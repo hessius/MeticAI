@@ -22,7 +22,10 @@ import {
   Globe,
   WifiHigh,
   WifiSlash,
-  House
+  House,
+  Key,
+  Link as LinkIcon,
+  Copy
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -69,6 +72,8 @@ interface UpdateMethod {
 }
 
 interface TailscaleStatus {
+  enabled: boolean
+  auth_key_configured: boolean
   installed: boolean
   connected: boolean
   hostname: string | null
@@ -122,6 +127,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   
   // Tailscale status
   const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null)
+  const [tailscaleAuthKey, setTailscaleAuthKey] = useState('')
+  const [tailscaleSaving, setTailscaleSaving] = useState(false)
+  const [tailscaleSaveStatus, setTailscaleSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [tailscaleMessage, setTailscaleMessage] = useState('')
 
   // Load current settings on mount
   useEffect(() => {
@@ -365,6 +374,70 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   }
 
   const canTriggerUpdate = updateMethod?.can_trigger_update ?? false
+
+  const handleTailscaleToggle = async (enabled: boolean) => {
+    setTailscaleSaving(true)
+    setTailscaleSaveStatus('idle')
+    setTailscaleMessage('')
+    
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/tailscale/configure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTailscaleStatus(prev => prev ? { ...prev, enabled } : null)
+        setTailscaleSaveStatus('success')
+        setTailscaleMessage(data.restart_required 
+          ? t('settings.tailscale.restartRequired')
+          : t('settings.tailscale.saved'))
+        setTimeout(() => setTailscaleSaveStatus('idle'), 5000)
+      } else {
+        throw new Error(t('settings.tailscale.saveFailed'))
+      }
+    } catch (err) {
+      setTailscaleSaveStatus('error')
+      setTailscaleMessage(err instanceof Error ? err.message : t('settings.tailscale.saveFailed'))
+    } finally {
+      setTailscaleSaving(false)
+    }
+  }
+
+  const handleTailscaleAuthKeySave = async () => {
+    if (!tailscaleAuthKey.trim()) return
+    
+    setTailscaleSaving(true)
+    setTailscaleSaveStatus('idle')
+    setTailscaleMessage('')
+    
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/tailscale/configure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authKey: tailscaleAuthKey })
+      })
+      
+      if (response.ok) {
+        setTailscaleStatus(prev => prev ? { ...prev, auth_key_configured: true } : null)
+        setTailscaleAuthKey('')
+        setTailscaleSaveStatus('success')
+        setTailscaleMessage(t('settings.tailscale.authKeySaved'))
+        setTimeout(() => setTailscaleSaveStatus('idle'), 5000)
+      } else {
+        throw new Error(t('settings.tailscale.saveFailed'))
+      }
+    } catch (err) {
+      setTailscaleSaveStatus('error')
+      setTailscaleMessage(err instanceof Error ? err.message : t('settings.tailscale.saveFailed'))
+    } finally {
+      setTailscaleSaving(false)
+    }
+  }
 
   return (
     <motion.div
@@ -754,104 +827,237 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         </AnimatePresence>
       </Card>
 
-      {/* Tailscale Section — only show if installed */}
-      {tailscaleStatus?.installed && (
-        <Card className="p-6 space-y-4">
+      {/* Remote Access (Tailscale) Section — always visible */}
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-primary">{t('settings.tailscale.title')}</h3>
-          
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                {tailscaleStatus.connected ? (
-                  <WifiHigh size={18} className="text-green-500" weight="bold" />
-                ) : (
-                  <WifiSlash size={18} className="text-red-500" weight="bold" />
-                )}
-                <span className="text-sm text-muted-foreground">
-                  {tailscaleStatus.connected 
-                    ? t('settings.tailscale.connected')
-                    : t('settings.tailscale.disconnected')
-                  }
-                </span>
-              </div>
-              <div className={`w-2 h-2 rounded-full ${tailscaleStatus.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+          {tailscaleStatus?.connected && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-xs text-green-600 dark:text-green-400 font-medium">{t('settings.tailscale.connected')}</span>
             </div>
-            
-            {tailscaleStatus.external_url && (
-              <div className="flex justify-between items-center py-2 border-b border-border/50">
-                <span className="text-sm text-muted-foreground">{t('settings.tailscale.remoteUrl')}</span>
+          )}
+        </div>
+        
+        <div className="space-y-4">
+          {/* External URL — prominent when connected */}
+          {tailscaleStatus?.connected && tailscaleStatus.external_url && (
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <LinkIcon size={16} className="text-primary" weight="bold" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('settings.tailscale.remoteUrl')}</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <a 
                   href={tailscaleStatus.external_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-mono text-primary hover:underline truncate max-w-[200px]"
+                  className="text-sm font-mono text-primary hover:underline break-all flex-1"
                 >
-                  {tailscaleStatus.dns_name}
+                  {tailscaleStatus.external_url}
                 </a>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 h-8 w-8"
+                  onClick={() => {
+                    navigator.clipboard.writeText(tailscaleStatus.external_url!)
+                  }}
+                  title={t('settings.tailscale.copyUrl')}
+                >
+                  <Copy size={14} />
+                </Button>
               </div>
-            )}
-            
-            {tailscaleStatus.hostname && !tailscaleStatus.external_url && (
-              <div className="flex justify-between items-center py-2 border-b border-border/50">
-                <span className="text-sm text-muted-foreground">{t('settings.tailscale.hostname')}</span>
-                <span className="text-sm font-mono">{tailscaleStatus.hostname}</span>
-              </div>
-            )}
-            
-            {tailscaleStatus.ip && (
-              <div className="flex justify-between items-center py-2 border-b border-border/50">
-                <span className="text-sm text-muted-foreground">{t('settings.tailscale.ip')}</span>
-                <span className="text-sm font-mono">{tailscaleStatus.ip}</span>
-              </div>
-            )}
-            
-            {tailscaleStatus.auth_key_expired && (
-              <>
-                <Alert className="bg-yellow-500/10 border-yellow-500/20">
-                  <Warning size={16} className="text-yellow-600" weight="fill" />
-                  <AlertDescription className="text-sm text-yellow-700">
-                    {t('settings.tailscale.authKeyExpired')}
-                  </AlertDescription>
-                </Alert>
-                {tailscaleStatus.login_url && (
+            </div>
+          )}
+
+          {/* Enable/disable toggle */}
+          <div className="flex items-center justify-between py-2">
+            <div className="space-y-0.5">
+              <Label htmlFor="tailscale-toggle" className="text-sm font-medium">
+                {t('settings.tailscale.enableLabel')}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t('settings.tailscale.enableDescription')}
+              </p>
+            </div>
+            <Switch
+              id="tailscale-toggle"
+              checked={tailscaleStatus?.enabled ?? false}
+              onCheckedChange={(checked) => handleTailscaleToggle(checked as boolean)}
+              disabled={tailscaleSaving}
+            />
+          </div>
+          
+          {/* Auth key input — show when enabled */}
+          {tailscaleStatus?.enabled && (
+            <div className="space-y-3 pt-2 border-t border-border/50">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="tailscale-auth-key" className="text-sm font-medium">
+                    {t('settings.tailscale.authKeyLabel')}
+                  </Label>
+                  {tailscaleStatus.auth_key_configured && (
+                    <span className="text-xs text-success flex items-center gap-1">
+                      <CheckCircle size={12} weight="fill" />
+                      {t('settings.configured')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    id="tailscale-auth-key"
+                    type="password"
+                    value={tailscaleAuthKey}
+                    onChange={(e) => setTailscaleAuthKey(e.target.value)}
+                    placeholder={tailscaleStatus.auth_key_configured 
+                      ? t('settings.tailscale.authKeyPlaceholderExisting')
+                      : t('settings.tailscale.authKeyPlaceholder')
+                    }
+                    className="flex-1"
+                  />
                   <Button
                     variant="outline"
-                    className="w-full"
-                    onClick={() => window.open(tailscaleStatus.login_url!, '_blank')}
+                    onClick={handleTailscaleAuthKeySave}
+                    disabled={tailscaleSaving || !tailscaleAuthKey.trim()}
                   >
-                    <Globe size={18} className="mr-2" />
-                    {t('settings.tailscale.renewKey')}
+                    <Key size={16} className="mr-1.5" weight="bold" />
+                    {t('settings.tailscale.saveKey')}
                   </Button>
-                )}
-              </>
-            )}
-            
-            {/* Remote Access Guide */}
-            {tailscaleStatus.connected && (
-              <div className="rounded-md bg-muted/50 p-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.guideTitle')}</p>
-                <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
-                  <li>{t('settings.tailscale.guideStep1')}</li>
-                  <li>{t('settings.tailscale.guideStep2')}</li>
-                  <li>
-                    {t('settings.tailscale.guideStep3')}{' '}
-                    {tailscaleStatus.external_url && (
-                      <a 
-                        href={tailscaleStatus.external_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-primary hover:underline"
-                      >
-                        {tailscaleStatus.external_url}
-                      </a>
-                    )}
-                  </li>
-                </ol>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.tailscale.authKeyDescription')}{' '}
+                  <a 
+                    href="https://login.tailscale.com/admin/settings/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {t('settings.tailscale.getAuthKey')}
+                  </a>
+                </p>
               </div>
-            )}
-          </div>
-        </Card>
-      )}
+            </div>
+          )}
+
+          {/* Connection status details — show when enabled */}
+          {tailscaleStatus?.enabled && (
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-sm text-muted-foreground">{t('settings.tailscale.status')}</span>
+                <div className="flex items-center gap-2">
+                  {tailscaleStatus.connected ? (
+                    <WifiHigh size={16} className="text-green-500" weight="bold" />
+                  ) : tailscaleStatus.installed ? (
+                    <WifiSlash size={16} className="text-yellow-500" weight="bold" />
+                  ) : (
+                    <WifiSlash size={16} className="text-muted-foreground" weight="bold" />
+                  )}
+                  <span className="text-sm">
+                    {tailscaleStatus.connected 
+                      ? t('settings.tailscale.connected')
+                      : tailscaleStatus.installed
+                        ? t('settings.tailscale.disconnected')
+                        : t('settings.tailscale.notRunning')
+                    }
+                  </span>
+                </div>
+              </div>
+              
+              {tailscaleStatus.hostname && (
+                <div className="flex justify-between items-center py-1.5">
+                  <span className="text-sm text-muted-foreground">{t('settings.tailscale.hostname')}</span>
+                  <span className="text-sm font-mono">{tailscaleStatus.hostname}</span>
+                </div>
+              )}
+              
+              {tailscaleStatus.ip && (
+                <div className="flex justify-between items-center py-1.5">
+                  <span className="text-sm text-muted-foreground">{t('settings.tailscale.ip')}</span>
+                  <span className="text-sm font-mono">{tailscaleStatus.ip}</span>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Auth key expired warning */}
+          {tailscaleStatus?.auth_key_expired && (
+            <>
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <Warning size={16} className="text-yellow-600" weight="fill" />
+                <AlertDescription className="text-sm text-yellow-700 dark:text-yellow-400">
+                  {t('settings.tailscale.authKeyExpired')}
+                </AlertDescription>
+              </Alert>
+              {tailscaleStatus.login_url && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => window.open(tailscaleStatus.login_url!, '_blank')}
+                >
+                  <Globe size={18} className="mr-2" />
+                  {t('settings.tailscale.renewKey')}
+                </Button>
+              )}
+            </>
+          )}
+          
+          {/* Setup guide — show when enabled but not connected */}
+          {tailscaleStatus?.enabled && !tailscaleStatus?.connected && !tailscaleStatus?.auth_key_expired && (
+            <div className="rounded-md bg-muted/50 p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.setupTitle')}</p>
+              <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
+                <li>{t('settings.tailscale.setupStep1')}</li>
+                <li>{t('settings.tailscale.setupStep2')}</li>
+                <li>{t('settings.tailscale.setupStep3')}</li>
+              </ol>
+            </div>
+          )}
+
+          {/* Remote access guide — show when connected */}
+          {tailscaleStatus?.connected && (
+            <div className="rounded-md bg-muted/50 p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.guideTitle')}</p>
+              <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
+                <li>{t('settings.tailscale.guideStep1')}</li>
+                <li>{t('settings.tailscale.guideStep2')}</li>
+                <li>
+                  {t('settings.tailscale.guideStep3')}{' '}
+                  {tailscaleStatus.external_url && (
+                    <a 
+                      href={tailscaleStatus.external_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-primary hover:underline"
+                    >
+                      {tailscaleStatus.external_url}
+                    </a>
+                  )}
+                </li>
+              </ol>
+            </div>
+          )}
+          
+          {/* Save status messages */}
+          {tailscaleSaveStatus === 'success' && (
+            <Alert className="bg-success/10 border-success/20">
+              <CheckCircle size={16} className="text-success" weight="fill" />
+              <AlertDescription className="text-sm text-success">
+                {tailscaleMessage}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {tailscaleSaveStatus === 'error' && (
+            <Alert variant="destructive">
+              <Warning size={16} weight="fill" />
+              <AlertDescription className="text-sm">
+                {tailscaleMessage}
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </Card>
 
       {/* Version Info Section - Unified */}
       <Card className="p-6 space-y-4">
