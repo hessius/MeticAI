@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -190,10 +190,6 @@ export function ExpertAnalysisView({
   shotDate,
   isCached,
 }: ExpertAnalysisViewProps) {
-  useEffect(() => {
-    console.log('[ExpertAnalysisView] Props:', { isLoading, hasResult: !!analysisResult, error, isCached });
-  }, [isLoading, analysisResult, error, isCached]);
-
   const sections = useMemo(() => {
     if (!analysisResult) return [];
     return parseStructuredAnalysis(analysisResult);

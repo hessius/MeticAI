@@ -658,28 +658,6 @@
   box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
 }
 
-/* ── Desktop two-column layout ────────────────────────────── */
-@media (min-width: 1024px) {
-  .desktop-two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    align-items: start;
-  }
-
-  .desktop-full-width {
-    grid-column: 1 / -1;
-  }
-
-  .desktop-panel-left {
-    position: relative;
-  }
-
-  .desktop-panel-right {
-    position: relative;
-  }
-}
-
 /* ── Custom list bullet styling ───────────────────────────── */
 ul:not([class]) li,
 .custom-bullet li {

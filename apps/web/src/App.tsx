@@ -276,26 +276,20 @@ function App() {
       }
 
       const serverUrl = await getServerUrl()
-      console.log('Sending request to:', `${serverUrl}/analyze_and_profile`)
       
-      const response = await fetch(`${serverUrl}/analyze_and_profile`, {
+      const response = await fetch(`${serverUrl}/api/analyze_and_profile`, {
         method: 'POST',
         body: formData,
       })
 
       clearInterval(messageInterval)
 
-      console.log('Response status:', response.status)
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
-
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('Error response:', errorText)
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
       }
 
       const responseText = await response.text()
-      console.log('Response text:', responseText)
       
       const data: APIResponse = JSON.parse(responseText)
       
@@ -677,7 +671,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
         </motion.div>
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
-        <div className={showRightColumn ? 'md:grid md:grid-cols-2 md:gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)]' : ''}>
+        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
           <div>
             <AnimatePresence mode="wait">
@@ -852,7 +846,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
 
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (
-            <aside className="hidden md:block">
+            <aside className="hidden lg:block">
               <div className={`sticky top-4 ${viewState === 'live-shot' ? 'mt-10' : 'mt-2'}`}>
                 {/* Hide control center during live shot — profile breakdown takes over */}
                 {viewState !== 'live-shot' && (
