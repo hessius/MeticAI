@@ -178,11 +178,12 @@ echo ""
 # Gemini API Key
 if [[ -z "$GEMINI_API_KEY" ]]; then
     echo "Get your API key from: https://aistudio.google.com/app/apikey"
+    echo "(Press Enter to skip — AI features will be disabled, but MeticAI will still work)"
     read -p "Gemini API Key: " GEMINI_API_KEY
     
     if [[ -z "$GEMINI_API_KEY" ]]; then
-        log_error "Gemini API Key is required"
-        exit 1
+        log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
+        log_info "You can add a key later in Settings within the MeticAI web UI"
     fi
 fi
 
@@ -264,18 +265,45 @@ log_info "Downloading Docker Compose files..."
 curl -fsSL "${REPO_URL}/docker-compose.yml" -o docker-compose.yml
 curl -fsSL "${REPO_URL}/docker-compose.tailscale.yml" -o docker-compose.tailscale.yml 2>/dev/null || true
 curl -fsSL "${REPO_URL}/docker-compose.watchtower.yml" -o docker-compose.watchtower.yml 2>/dev/null || true
+curl -fsSL "${REPO_URL}/tailscale-serve.json" -o tailscale-serve.json 2>/dev/null || true
 
 log_success "Compose files downloaded"
+
+# ==============================================================================
+# Generate start/stop convenience scripts
+# ==============================================================================
+
+cat > start.sh << STARTEOF
+#!/bin/bash
+cd "\$(dirname "\$0")"
+docker compose ${COMPOSE_FILES} up -d
+STARTEOF
+chmod +x start.sh
+
+cat > stop.sh << STOPEOF
+#!/bin/bash
+cd "\$(dirname "\$0")"
+docker compose ${COMPOSE_FILES} down
+STOPEOF
+chmod +x stop.sh
+
+cat > update.sh << UPDATEEOF
+#!/bin/bash
+cd "\$(dirname "\$0")"
+docker compose ${COMPOSE_FILES} pull
+docker compose ${COMPOSE_FILES} up -d
+UPDATEEOF
+chmod +x update.sh
 
 # ==============================================================================
 # Pull and start
 # ==============================================================================
 
 log_info "Pulling MeticAI image (this may take a few minutes)..."
-eval "docker compose ${COMPOSE_FILES} pull"
+docker compose ${COMPOSE_FILES} pull
 
 log_info "Starting MeticAI..."
-eval "docker compose ${COMPOSE_FILES} up -d"
+docker compose ${COMPOSE_FILES} up -d
 
 # Wait for services
 log_info "Waiting for services to start..."
@@ -307,9 +335,9 @@ echo "  📚 API:     http://${IP}:3550/api/docs"
 echo ""
 echo "  Useful commands:"
 echo "    View logs:   cd ~/.meticai && docker compose logs -f"
-echo "    Restart:     cd ~/.meticai && docker compose restart"
-echo "    Stop:        cd ~/.meticai && docker compose down"
-echo "    Update:      cd ~/.meticai && docker compose pull && docker compose up -d"
+echo "    Restart:     cd ~/.meticai && ./start.sh"
+echo "    Stop:        cd ~/.meticai && ./stop.sh"
+echo "    Update:      cd ~/.meticai && ./update.sh"
 echo ""
 echo "  ☕ Enjoy your coffee!"
 echo ""

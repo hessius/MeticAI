@@ -29,8 +29,13 @@ services:
       - tailscale-state:/var/lib/tailscale
       - ./tailscale-serve.json:/config/serve.json:ro
     network_mode: service:meticai
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
 
-  # Create serve config for Tailscale Serve
+  # Tailscale shares the meticai network namespace
   meticai:
     depends_on:
       - tailscale

@@ -270,7 +270,12 @@ function Install-MeticAI {
     $apiKey = $GeminiApiKey
     if ([string]::IsNullOrEmpty($apiKey)) {
         Write-Host "  Get your API key from: https://aistudio.google.com/app/apikey"
-        $apiKey = Get-UserInput -Prompt "Gemini API Key" -Required
+        Write-Host "  (Press Enter to skip — AI features will be disabled, but MeticAI will still work)" -ForegroundColor DarkGray
+        $apiKey = Get-UserInput -Prompt "Gemini API Key"
+        if ([string]::IsNullOrEmpty($apiKey)) {
+            Write-LogWarning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
+            Write-LogInfo "You can add a key later in Settings within the MeticAI web UI"
+        }
     }
 
     # Meticulous IP
@@ -364,6 +369,7 @@ COMPOSE_FILES="$composeFilesString"
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.yml" -OutFile (Join-Path $InstallDir "docker-compose.yml")
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.tailscale.yml" -OutFile (Join-Path $InstallDir "docker-compose.tailscale.yml") -Optional
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.watchtower.yml" -OutFile (Join-Path $InstallDir "docker-compose.watchtower.yml") -Optional
+    Invoke-DownloadFile -Url "$RepoUrl/tailscale-serve.json" -OutFile (Join-Path $InstallDir "tailscale-serve.json") -Optional
 
     Write-LogSuccess "Compose files downloaded"
 
@@ -423,9 +429,9 @@ COMPOSE_FILES="$composeFilesString"
     Write-Host ""
     Write-Host "  Useful commands:" -ForegroundColor White
     Write-Host "    View logs:   cd ~\.meticai; docker compose logs -f"
-    Write-Host "    Restart:     cd ~\.meticai; docker compose restart"
-    Write-Host "    Stop:        cd ~\.meticai; docker compose down"
-    Write-Host "    Update:      cd ~\.meticai; docker compose pull; docker compose up -d"
+    Write-Host "    Restart:     cd ~\.meticai; docker compose $composeFilesString up -d"
+    Write-Host "    Stop:        cd ~\.meticai; docker compose $composeFilesString down"
+    Write-Host "    Update:      cd ~\.meticai; docker compose $composeFilesString pull; docker compose $composeFilesString up -d"
     Write-Host "    Uninstall:   irm $RepoUrl/scripts/uninstall.ps1 -OutFile uninstall.ps1; .\uninstall.ps1"
     Write-Host ""
     Write-Host "  ☕ Enjoy your coffee!" -ForegroundColor Cyan
