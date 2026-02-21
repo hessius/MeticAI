@@ -371,14 +371,17 @@ async def get_update_method(request: Request):
 
 @router.get("/api/tailscale-status")
 async def get_tailscale_status(request: Request):
-    """Get Tailscale connection status.
+    """Get Tailscale connection status and configuration.
     
     Checks if Tailscale is running and provides status information.
+    Also returns the user's Tailscale configuration preferences from settings.
     Works both when Tailscale runs as a sidecar container and when
     it runs natively on the host.
     
     Returns:
-        - installed: Whether Tailscale is available
+        - enabled: Whether user has enabled Tailscale in settings
+        - auth_key_configured: Whether an auth key is saved
+        - installed: Whether Tailscale is available/running
         - connected: Whether Tailscale is connected
         - hostname: Tailscale hostname if connected
         - ip: Tailscale IP if connected
@@ -388,7 +391,18 @@ async def get_tailscale_status(request: Request):
     request_id = request.state.request_id
     
     try:
+        # Load user config from settings
+        from services.settings_service import load_settings
+        settings = load_settings()
+        ts_enabled = settings.get("tailscaleEnabled", False)
+        ts_auth_key = settings.get("tailscaleAuthKey", "")
+        # Also check env var fallback
+        if not ts_auth_key:
+            ts_auth_key = os.environ.get("TAILSCALE_AUTHKEY", "")
+        
         status = {
+            "enabled": ts_enabled,
+            "auth_key_configured": bool(ts_auth_key),
             "installed": False,
             "connected": False,
             "hostname": None,
@@ -490,6 +504,8 @@ async def get_tailscale_status(request: Request):
             extra={"request_id": request_id}
         )
         return {
+            "enabled": False,
+            "auth_key_configured": False,
             "installed": False,
             "connected": False,
             "hostname": None,
@@ -500,6 +516,167 @@ async def get_tailscale_status(request: Request):
             "login_url": None,
             "error": str(e)
         }
+
+
+@router.post("/api/tailscale/configure")
+async def configure_tailscale(request: Request):
+    """Configure Tailscale remote access settings.
+    
+    Saves Tailscale preferences (enabled state and auth key) to settings.
+    When enabled/disabled or auth key is changed, updates the .env file
+    and COMPOSE_FILES variable, then signals a restart so the host
+    picks up the new compose configuration.
+    
+    Body:
+        - enabled: bool — Whether Tailscale should be active
+        - authKey: str (optional) — Tailscale auth key
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        
+        from services.settings_service import load_settings, save_settings
+        current_settings = load_settings()
+        
+        changed = False
+        compose_changed = False
+        
+        # Handle enabled toggle
+        if "enabled" in body:
+            new_enabled = bool(body["enabled"])
+            old_enabled = current_settings.get("tailscaleEnabled", False)
+            current_settings["tailscaleEnabled"] = new_enabled
+            changed = True
+            if new_enabled != old_enabled:
+                compose_changed = True
+        
+        # Handle auth key update
+        if "authKey" in body:
+            new_key = body["authKey"].strip() if body["authKey"] else ""
+            # Don't save masked values
+            if new_key and "*" not in new_key and "..." not in new_key:
+                current_settings["tailscaleAuthKey"] = new_key
+                changed = True
+            elif not new_key:
+                current_settings["tailscaleAuthKey"] = ""
+                changed = True
+        
+        if not changed:
+            return {"status": "success", "message": "No changes to apply"}
+        
+        # Save to settings.json (persisted on /data volume)
+        save_settings(current_settings)
+        
+        # Update .env file for compose-level changes
+        env_path = Path("/app/.env")
+        env_content = ""
+        if env_path.exists():
+            env_content = env_path.read_text()
+        
+        env_updated = False
+        ts_enabled = current_settings.get("tailscaleEnabled", False)
+        ts_auth_key = current_settings.get("tailscaleAuthKey", "")
+        
+        # Update TAILSCALE_AUTHKEY in .env
+        if ts_auth_key:
+            if "TAILSCALE_AUTHKEY=" in env_content:
+                env_content = re.sub(
+                    r'TAILSCALE_AUTHKEY=.*',
+                    f'TAILSCALE_AUTHKEY={ts_auth_key}',
+                    env_content
+                )
+            else:
+                env_content += f"\nTAILSCALE_AUTHKEY={ts_auth_key}"
+            env_updated = True
+        
+        # Update COMPOSE_FILES to add/remove tailscale overlay
+        if compose_changed:
+            compose_match = re.search(r'COMPOSE_FILES="([^"]*)"', env_content)
+            if compose_match:
+                current_compose = compose_match.group(1)
+            else:
+                current_compose = "-f docker-compose.yml"
+            
+            ts_flag = "-f docker-compose.tailscale.yml"
+            
+            if ts_enabled and ts_flag not in current_compose:
+                current_compose = f"{current_compose} {ts_flag}"
+            elif not ts_enabled and ts_flag in current_compose:
+                current_compose = current_compose.replace(f" {ts_flag}", "").replace(ts_flag, "")
+                current_compose = current_compose.strip()
+            
+            if 'COMPOSE_FILES=' in env_content:
+                env_content = re.sub(
+                    r'COMPOSE_FILES="[^"]*"',
+                    f'COMPOSE_FILES="{current_compose}"',
+                    env_content
+                )
+            else:
+                env_content += f'\nCOMPOSE_FILES="{current_compose}"'
+            env_updated = True
+        
+        if env_updated:
+            try:
+                env_path.write_text(env_content)
+                logger.info("Updated .env with Tailscale config",
+                           extra={"request_id": request_id})
+            except (PermissionError, FileNotFoundError, OSError) as e:
+                logger.warning(
+                    f".env file not writable ({type(e).__name__}), "
+                    "Tailscale config saved to settings.json only",
+                    extra={"request_id": request_id}
+                )
+        
+        # Signal restart if compose config changed (needs container recreation)
+        restart_signaled = False
+        if compose_changed:
+            try:
+                import time
+                restart_signal = Path("/app/.restart-requested")
+                restart_signal.write_text(f"tailscale-config:{time.time()}\n")
+                restart_signaled = True
+                logger.info("Signaled host restart for Tailscale config change",
+                           extra={"request_id": request_id})
+            except Exception as e:
+                logger.warning(f"Could not signal restart: {e}",
+                             extra={"request_id": request_id})
+        
+        action = "enabled" if ts_enabled else "disabled"
+        logger.info(
+            f"Tailscale configuration updated: {action}",
+            extra={
+                "request_id": request_id,
+                "tailscale_enabled": ts_enabled,
+                "auth_key_configured": bool(ts_auth_key),
+                "compose_changed": compose_changed,
+                "restart_signaled": restart_signaled
+            }
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Tailscale {action}",
+            "enabled": ts_enabled,
+            "auth_key_configured": bool(ts_auth_key),
+            "restart_required": compose_changed,
+            "restart_signaled": restart_signaled
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to configure Tailscale: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to configure Tailscale"
+            }
+        )
 
 
 @router.post("/api/trigger-update")

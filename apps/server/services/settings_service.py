@@ -17,7 +17,9 @@ _DEFAULT_SETTINGS = {
     "meticulousIp": "",
     "serverIp": "",
     "authorName": "",
-    "mqttEnabled": True
+    "mqttEnabled": True,
+    "tailscaleEnabled": False,
+    "tailscaleAuthKey": ""
 }
 
 
