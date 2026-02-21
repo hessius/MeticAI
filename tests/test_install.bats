@@ -553,3 +553,55 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
     run grep -q "docker compose logs" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
+
+# ==============================================================================
+# REPO_BRANCH support and early compose downloads
+# ==============================================================================
+
+@test "Script supports REPO_BRANCH env var for branch testing" {
+    run grep -q 'REPO_BRANCH=.*:-main' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "REPO_URL is constructed from REPO_BRANCH" {
+    run grep -q 'REPO_URL=.*\${REPO_BRANCH}' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Compose files downloaded before configuration section" {
+    # Downloads must come before [2/4] Configuration
+    local dl_line=$(grep -n 'Downloading Docker Compose files' "$SCRIPT_PATH" | head -1 | cut -d: -f1)
+    local cfg_line=$(grep -n '\[2/4\] Configuration' "$SCRIPT_PATH" | head -1 | cut -d: -f1)
+    [ -n "$dl_line" ]
+    [ -n "$cfg_line" ]
+    [ "$dl_line" -lt "$cfg_line" ]
+}
+
+@test "Script tracks tailscale compose download success" {
+    run grep -q 'HAS_TAILSCALE_COMPOSE=true' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+    run grep -q 'HAS_TAILSCALE_COMPOSE=false' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script tracks watchtower compose download success" {
+    run grep -q 'HAS_WATCHTOWER_COMPOSE=true' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+    run grep -q 'HAS_WATCHTOWER_COMPOSE=false' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Tailscale only offered when compose file downloaded" {
+    run grep -q 'HAS_TAILSCALE_COMPOSE.*==.*true' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Watchtower only offered when compose file downloaded" {
+    run grep -q 'HAS_WATCHTOWER_COMPOSE.*==.*true' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
+
+@test "Script verifies compose files exist before docker compose pull" {
+    run grep -q 'Required compose file missing' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
+}
