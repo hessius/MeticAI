@@ -30,5 +30,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # - //./pipe/docker_engine:/var/run/docker.sock:ro  # Windows
     ports:
-      - "8080:8080"  # HTTP API for manual trigger
+      - "127.0.0.1:8080:8080"  # HTTP API — localhost only for security
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
     command: --http-api-metrics

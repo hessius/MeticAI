@@ -1,0 +1,72 @@
+# ==============================================================================
+# MeticAI Docker Build Ignore
+# ==============================================================================
+# Prevents unnecessary files from being sent to the Docker build context.
+
+# Version control
+.git
+.gitignore
+
+# IDE / Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+!apps/mcp-server/README.md
+LICENSE
+docs/
+
+# Test files
+tests/
+apps/server/test_*.py
+apps/server/conftest.py
+apps/server/pytest.ini
+apps/server/requirements-test.txt
+apps/web/e2e/
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/playwright.config.ts
+apps/web/vitest.config.ts
+apps/web/TESTING.md
+apps/web/ACCESSIBILITY_TESTING.md
+apps/web/STORYBOOK.md
+
+# Local data and logs
+data/
+logs/
+*.log
+
+# Node modules (web builder stage installs fresh)
+apps/web/node_modules/
+apps/web/dist/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment files
+.env
+.env.*
+
+# Temp files
+tmp_*.py
+*.tmp
+
+# macOS / system
+.DS_Store
+macos-installer/
+
+# Scripts (not needed in image)
+scripts/
+
+# GitHub
+.github/
+
+# Screenshots and reports
+apps/web/screenshots/
+apps/web/playwright-report/
