@@ -8,7 +8,7 @@
  *  • Quick-action buttons (idle) or live shot metrics (brewing)
  *  • An expand toggle that reveals ControlCenterExpanded
  */
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import confetti from 'canvas-confetti'
@@ -29,8 +29,8 @@ import {
   Coffee,
   Warning,
 } from '@phosphor-icons/react'
-import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
+import { useMachineActions } from '@/hooks/useMachineActions'
 import { startShot, continueShot, stopShot, abortShot, preheat, tareScale } from '@/lib/mqttCommands'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
@@ -96,6 +96,12 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
 
+  // Shared state derivation + command executor
+  const {
+    isIdle, isBrewing, isPreheating, isHeating, isReady, isPourWater,
+    canStart, canAbortWarmup, cmd,
+  } = useMachineActions(machineState)
+
   // Build the profile image URL when active_profile changes
   useEffect(() => {
     let cancelled = false
@@ -134,23 +140,6 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     }
   }, [machineState.total_shots])
 
-  // Command helpers with toast feedback
-  const cmd = useCallback(
-    async (fn: () => Promise<{ success: boolean; message?: string }>, successKey: string) => {
-      try {
-        const res = await fn()
-        if (res.success) {
-          toast.success(t(`controlCenter.toasts.${successKey}`))
-        } else {
-          toast.error(res.message ?? t('controlCenter.toasts.error'))
-        }
-      } catch {
-        toast.error(t('controlCenter.toasts.error'))
-      }
-    },
-    [t],
-  )
-
   // ── Not connected yet (skeleton) ──────────────────────────
   if (!machineState._wsConnected) {
     return (
@@ -180,19 +169,6 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       </Card>
     )
   }
-
-  const stateLC = (machineState.state ?? '').toLowerCase()
-  const isIdle = stateLC === 'idle' && !machineState.brewing
-  const isBrewing = machineState.brewing
-  const isPreheating = stateLC === 'preheating'
-  const isHeating = stateLC === 'heating'
-  const isReady = stateLC === 'click to start'
-  const isPourWater = stateLC.startsWith('pour water')
-  // Machine accepts START during idle, preheat, or "click to start" — not during
-  // heating or pour-water (shot already started, waiting to reach target temp)
-  const canStart = (isIdle || isPreheating || isReady) && !isBrewing && machineState.connected
-  // Abort is allowed during preheating, heating, or pour water (non-idle, non-brewing warmup states)
-  const canAbortWarmup = (isPreheating || isHeating || isPourWater) && !isBrewing && machineState.connected
 
   return (
     <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>

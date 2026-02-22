@@ -43,8 +43,9 @@ import {
   Sun as SunIcon,
   Coffee,
 } from '@phosphor-icons/react'
-import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
+import { useMachineActions } from '@/hooks/useMachineActions'
+import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
 import {
   startShot,
@@ -83,16 +84,11 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
   const [profilesLoaded, setProfilesLoaded] = useState(false)
 
-  const stateLC = (machineState.state ?? '').toLowerCase()
-  const isIdle = stateLC === 'idle' && !machineState.brewing
-  const isBrewing = machineState.brewing
-  const isConnected = machineState.connected
-  const isPreheating = stateLC === 'preheating'
-  const isHeating = stateLC === 'heating'
-  const isReady = stateLC === 'click to start'
-  // Machine accepts START during idle, preheat, or "click to start"
-  const canStart = (isIdle || isPreheating || isReady) && !isBrewing && isConnected
-  const canAbortWarmup = (isPreheating || isHeating) && !isBrewing && isConnected
+  // Shared state derivation + command executor
+  const {
+    isIdle, isBrewing, isPreheating, isReady,
+    canStart, canAbortWarmup, isConnected, cmd,
+  } = useMachineActions(machineState)
 
   // Build the profile image URL when active_profile changes
   useEffect(() => {
@@ -128,22 +124,6 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     })()
     return () => { cancelled = true }
   }, [])
-
-  const cmd = useCallback(
-    async (fn: () => Promise<{ success: boolean; message?: string }>, successKey: string) => {
-      try {
-        const res = await fn()
-        if (res.success) {
-          toast.success(t(`controlCenter.toasts.${successKey}`))
-        } else {
-          toast.error(res.message ?? t('controlCenter.toasts.error'))
-        }
-      } catch {
-        toast.error(t('controlCenter.toasts.error'))
-      }
-    },
-    [t],
-  )
 
   const handleBrightnessChange = useCallback(
     async (val: number[]) => {
