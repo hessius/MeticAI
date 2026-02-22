@@ -32,8 +32,9 @@ import {
   Lightning,
   Fire,
 } from '@phosphor-icons/react'
-import { toast } from 'sonner'
 import type { MachineState } from '@/hooks/useWebSocket'
+import { useMachineActions } from '@/hooks/useMachineActions'
+import { toast } from 'sonner'
 import { continueShot, stopShot, abortShot, purge } from '@/lib/mqttCommands'
 import { useSimulatedShot } from '@/hooks/useSimulatedShot'
 import { EspressoChart } from '@/components/charts'
@@ -187,18 +188,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     ms.state,
   ])
 
-  // Command helpers
-  const cmd = useCallback(
-    async (fn: () => Promise<{ success: boolean; message?: string }>, successKey: string) => {
-      const res = await fn()
-      if (res.success) {
-        toast.success(t(`controlCenter.toasts.${successKey}`))
-      } else {
-        toast.error(res.message ?? t('controlCenter.toasts.error'))
-      }
-    },
-    [t],
-  )
+  // Command helper from shared hook
+  const { cmd } = useMachineActions(machineState)
 
   // Compute stage ranges from data
   const stages = useMemo(
