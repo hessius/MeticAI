@@ -1278,12 +1278,17 @@ class TestTriggerUpdateEndpoint:
     """Tests for the /api/trigger-update endpoint."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.os.replace')
+    @patch('api.routes.system.os.fdopen')
+    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
     @patch('api.routes.system.Path')
-    def test_trigger_update_success(self, mock_path_class, client):
+    def test_trigger_update_success(self, mock_path_class, mock_mkstemp, mock_fdopen, mock_replace, client):
         """Test successful update trigger."""
-        # Mock the rebuild signal file
         mock_rebuild_file = Mock()
+        mock_rebuild_file.parent = '/app'
         mock_path_class.return_value = mock_rebuild_file
+        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
+        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
 
         response = client.post("/api/trigger-update")
         
@@ -1293,16 +1298,17 @@ class TestTriggerUpdateEndpoint:
         assert "message" in data
         assert "host will pull updates and restart containers" in data["message"].lower()
         
-        # Verify write_text was called to signal the update
-        mock_rebuild_file.write_text.assert_called_once()
+        # Verify atomic write was called
+        mock_mkstemp.assert_called_once()
+        mock_replace.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.tempfile.mkstemp', side_effect=OSError("Permission denied"))
     @patch('api.routes.system.Path')
-    def test_trigger_update_write_failure(self, mock_path, client):
+    def test_trigger_update_write_failure(self, mock_path, mock_mkstemp, client):
         """Test handling of file write failure."""
-        # Mock the rebuild signal file to raise an exception on write
         mock_rebuild_file = Mock()
-        mock_rebuild_file.write_text.side_effect = OSError("Permission denied")
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
@@ -1314,12 +1320,12 @@ class TestTriggerUpdateEndpoint:
         assert "Permission denied" in data["detail"]["error"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.tempfile.mkstemp', side_effect=IOError("Disk full"))
     @patch('api.routes.system.Path')
-    def test_trigger_update_io_error(self, mock_path, client):
+    def test_trigger_update_io_error(self, mock_path, mock_mkstemp, client):
         """Test handling of IO errors."""
-        # Mock the rebuild signal file to raise an IO exception
         mock_rebuild_file = Mock()
-        mock_rebuild_file.write_text.side_effect = IOError("Disk full")
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
@@ -1331,12 +1337,12 @@ class TestTriggerUpdateEndpoint:
         assert "Disk full" in data["detail"]["error"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.tempfile.mkstemp', side_effect=Exception("Unexpected error"))
     @patch('api.routes.system.Path')
-    def test_trigger_update_unexpected_error(self, mock_path, client):
+    def test_trigger_update_unexpected_error(self, mock_path, mock_mkstemp, client):
         """Test handling of unexpected errors."""
-        # Mock the rebuild signal file to raise an unexpected exception
         mock_rebuild_file = Mock()
-        mock_rebuild_file.write_text.side_effect = Exception("Unexpected error")
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
@@ -1348,12 +1354,17 @@ class TestTriggerUpdateEndpoint:
         assert "unexpected error" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.os.replace')
+    @patch('api.routes.system.os.fdopen')
+    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
     @patch('api.routes.system.Path')
-    def test_trigger_update_cors_enabled(self, mock_path, client):
+    def test_trigger_update_cors_enabled(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
         """Test that /api/trigger-update has CORS enabled."""
-        # Mock the rebuild signal file
         mock_rebuild_file = Mock()
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
+        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
+        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
 
         response = client.post(
             "/api/trigger-update",
@@ -1374,26 +1385,36 @@ class TestTriggerUpdateEndpoint:
         assert "post" in openapi_data["paths"]["/api/trigger-update"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.os.replace')
+    @patch('api.routes.system.os.fdopen')
+    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
     @patch('api.routes.system.Path')
-    def test_trigger_update_no_body_required(self, mock_path, client):
+    def test_trigger_update_no_body_required(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
         """Test that endpoint works without request body."""
-        # Mock the rebuild signal file
         mock_rebuild_file = Mock()
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
+        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
+        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
 
-        # Test without any body
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 200
         assert response.json()["status"] == "success"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.os.replace')
+    @patch('api.routes.system.os.fdopen')
+    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
     @patch('api.routes.system.Path')
-    def test_trigger_update_signal_written(self, mock_path, client):
-        """Test that timestamp is written to signal file."""
-        # Mock the rebuild signal file
+    def test_trigger_update_signal_written(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
+        """Test that timestamp is written to signal file via atomic write."""
         mock_rebuild_file = Mock()
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
+        mock_file = Mock()
+        mock_fdopen.return_value.__enter__ = Mock(return_value=mock_file)
+        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
 
         response = client.post("/api/trigger-update")
         
@@ -1401,37 +1422,37 @@ class TestTriggerUpdateEndpoint:
         data = response.json()
         assert data["status"] == "success"
         
-        # Verify write_text was called with a timestamp string
-        mock_rebuild_file.write_text.assert_called_once()
-        call_args = mock_rebuild_file.write_text.call_args[0][0]
-        # Verify the update signal format (flexible to allow timestamp changes)
+        # Verify atomic write: mkstemp was called, file was written, then replaced
+        mock_mkstemp.assert_called_once()
+        mock_file.write.assert_called_once()
+        call_args = mock_file.write.call_args[0][0]
         assert call_args.startswith("update-requested:")
+        mock_replace.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.tempfile.mkstemp', side_effect=PermissionError("Cannot write to file"))
     @patch('api.routes.system.Path')
-    def test_trigger_update_partial_failure(self, mock_path, client):
+    def test_trigger_update_partial_failure(self, mock_path, mock_mkstemp, client):
         """Test handling when file write operation encounters an error."""
-        # Mock the rebuild signal file to raise an error
         mock_rebuild_file = Mock()
-        mock_rebuild_file.write_text.side_effect = PermissionError("Cannot write to file")
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 500
         data = response.json()
-        # The detail is nested in the response
         assert "detail" in data
         assert "status" in str(data["detail"])
         assert "error" in str(data["detail"])
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.tempfile.mkstemp', side_effect=TimeoutError("File operation timed out"))
     @patch('api.routes.system.Path')
-    def test_trigger_update_timeout(self, mock_path, client):
+    def test_trigger_update_timeout(self, mock_path, mock_mkstemp, client):
         """Test handling when file write operation times out or hangs."""
-        # Mock the rebuild signal file to raise a timeout-related error
         mock_rebuild_file = Mock()
-        mock_rebuild_file.write_text.side_effect = TimeoutError("File operation timed out")
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
 
         response = client.post("/api/trigger-update")
@@ -1439,24 +1460,26 @@ class TestTriggerUpdateEndpoint:
         assert response.status_code == 500
         data = response.json()
         assert "detail" in data
-        # Check the error field contains the timeout-related message
         assert "timed" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system.os.replace')
+    @patch('api.routes.system.os.fdopen')
+    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
     @patch('api.routes.system.Path')
-    def test_trigger_update_path_resolution(self, mock_path, client):
+    def test_trigger_update_path_resolution(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
         """Test that file path is properly resolved."""
-        # Mock the rebuild signal file
         mock_rebuild_file = Mock()
+        mock_rebuild_file.parent = '/app'
         mock_path.return_value = mock_rebuild_file
+        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
+        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
 
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 200
-        # Verify Path was called with the correct path
         mock_path.assert_called_once_with("/app/.update-requested")
-        # Verify write_text was called
-        mock_rebuild_file.write_text.assert_called_once()
+        mock_replace.assert_called_once()
 
 
 class TestHistoryAPI:
