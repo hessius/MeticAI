@@ -105,6 +105,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [shotComplete, setShotComplete] = useState(false)
   const wasBrewingRef = useRef(machineState.brewing)
+  const renderFrameRef = useRef<number | null>(null)
   const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
@@ -154,7 +155,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     fetchData()
   }, [ms.active_profile])
 
-  // Accumulate data from WebSocket frames
+  // Accumulate data from WebSocket frames — push + rAF for O(1) per frame
   useEffect(() => {
     if (!ms.brewing) {
       // Shot just ended
@@ -176,8 +177,21 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
       stage: ms.state ?? undefined,
     }
 
-    chartDataRef.current = [...chartDataRef.current, point]
-    setChartData(downsample(chartDataRef.current, MAX_VISIBLE_POINTS))
+    // O(1) push instead of O(n) spread copy
+    chartDataRef.current.push(point)
+
+    // Coalesce rapid WebSocket bursts — render on next animation frame
+    if (renderFrameRef.current === null) {
+      renderFrameRef.current = requestAnimationFrame(() => {
+        const data = chartDataRef.current
+        setChartData(
+          data.length > MAX_VISIBLE_POINTS
+            ? downsample(data, MAX_VISIBLE_POINTS)
+            : data.slice(),  // cheap copy when small
+        )
+        renderFrameRef.current = null
+      })
+    }
   }, [
     ms.brewing,
     ms.shot_timer,
@@ -187,6 +201,15 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     ms.shot_weight,
     ms.state,
   ])
+
+  // Clean up any pending rAF on unmount
+  useEffect(() => {
+    return () => {
+      if (renderFrameRef.current !== null) {
+        cancelAnimationFrame(renderFrameRef.current)
+      }
+    }
+  }, [])
 
   // Command helper from shared hook
   const { cmd } = useMachineActions(machineState)
