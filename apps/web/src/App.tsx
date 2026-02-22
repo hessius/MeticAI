@@ -881,12 +881,14 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                         </div>
                       </div>
                     )}
-                    {/* Scrollable stage breakdown */}
-                    <div className="overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                    {/* Scrollable stage breakdown — auto-scroll only, no manual scroll */}
+                    <div className="auto-scroll-only rounded-xl">
                       <ProfileBreakdown
                         profile={liveProfileData}
                         currentStage={machineState.state ?? null}
                       />
+                      {/* Overscroll padding: allows last stage to scroll to top of container */}
+                      <div className="h-[80vh]" />
                     </div>
                   </div>
                 )}
