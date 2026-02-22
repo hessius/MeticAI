@@ -18,6 +18,7 @@
 #   ENABLE_TAILSCALE        - Set to "y" to enable Tailscale
 #   TAILSCALE_AUTHKEY       - Tailscale auth key
 #   ENABLE_WATCHTOWER       - Set to "y" to enable Watchtower
+#   ENABLE_HA               - Set to "y" to enable Home Assistant MQTT
 #   REPO_BRANCH             - GitHub branch to download from (default: main)
 #
 # Branch testing:
@@ -467,7 +468,13 @@ HAS_WATCHTOWER_COMPOSE=false
 if curl -fsSL "${REPO_URL}/docker-compose.watchtower.yml" -o docker-compose.watchtower.yml 2>/dev/null; then
     HAS_WATCHTOWER_COMPOSE=true
 fi
+HAS_HA_COMPOSE=false
+if curl -fsSL "${REPO_URL}/docker-compose.homeassistant.yml" -o docker-compose.homeassistant.yml 2>/dev/null; then
+    HAS_HA_COMPOSE=true
+fi
 curl -fsSL "${REPO_URL}/tailscale-serve.json" -o tailscale-serve.json 2>/dev/null || true
+mkdir -p docker
+curl -fsSL "${REPO_URL}/docker/mosquitto-external.conf" -o docker/mosquitto-external.conf 2>/dev/null || true
 
 log_success "Compose files downloaded"
 
@@ -599,6 +606,20 @@ if [[ "$HAS_WATCHTOWER_COMPOSE" == "true" ]]; then
     fi
 else
     log_info "Watchtower: not available (compose file not found)"
+fi
+
+if [[ "$HAS_HA_COMPOSE" == "true" ]]; then
+    if [[ "$METICAI_NON_INTERACTIVE" != "true" ]]; then
+        read -p "Enable Home Assistant MQTT integration? (y/N): " ENABLE_HA < /dev/tty
+    fi
+    if [[ "$ENABLE_HA" =~ ^[Yy]$ ]]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.homeassistant.yml"
+        log_success "Home Assistant MQTT enabled (port 1883 exposed)"
+    else
+        log_info "Home Assistant MQTT: skipped"
+    fi
+else
+    log_info "Home Assistant MQTT: not available (compose file not found)"
 fi
 
 # ==============================================================================

@@ -9,6 +9,7 @@
 # Optional add-ons:
 #   docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 #   docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
 # ==============================================================================
 
 services:
