@@ -676,3 +676,14 @@ ul:not([class]) li::before,
   color: var(--color-primary);
   font-weight: bold;
 }
+
+/* ── Auto-scroll container (no manual scroll) ────────────── */
+.auto-scroll-only {
+  overflow-y: scroll;
+  pointer-events: none;
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge */
+}
+.auto-scroll-only::-webkit-scrollbar {
+  display: none;                  /* Chrome/Safari */
+}

@@ -105,6 +105,7 @@ export function EspressoChart({
     ...data.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)),
     8,
   )
+  const minFlow = Math.min(...data.map(d => d.flow ?? 0), 0)
   const maxPower = Math.max(...data.map(d => d.power || 0), 0)
   const targetPowerMax = targetCurves
     ? Math.max(...targetCurves.map(p => p.target_power ?? 0), 0)
@@ -113,6 +114,7 @@ export function EspressoChart({
   const computedLeftMax = leftAxisMax ?? Math.ceil(
     Math.max(maxPressure, maxFlow, effectivePowerMax) * 1.1,
   )
+  const computedLeftMin = Math.floor(Math.min(minFlow, 0))
   const maxWeight = Math.max(...data.map(d => d.weight || 0), 50)
   const computedRightMax = rightAxisMax ?? Math.ceil(maxWeight * 1.1)
 
@@ -290,7 +292,7 @@ export function EspressoChart({
               yAxisId="left"
               stroke={theme.axisStroke}
               fontSize={10}
-              domain={[0, computedLeftMax]}
+              domain={[computedLeftMin, computedLeftMax]}
               axisLine={{ stroke: theme.axisLineStroke }}
               tickLine={{ stroke: theme.axisLineStroke }}
               width={35}

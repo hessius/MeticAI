@@ -687,13 +687,13 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="theme-toggle" className="text-sm font-medium">
-                        {isDark ? 'Dark mode' : 'Light mode'}
+                        Use light mode
                       </Label>
-                      <p className="text-xs text-muted-foreground">Toggle between light and dark theme</p>
+                      <p className="text-xs text-muted-foreground">Switch between light and dark theme</p>
                     </div>
                     <Switch
                       id="theme-toggle"
-                      checked={isDark}
+                      checked={!isDark}
                       onCheckedChange={onToggleTheme}
                     />
                   </div>

@@ -481,7 +481,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
     if (!currentStage) return
     const el = stageRefs.current.get(currentStage)
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [currentStage])
 
