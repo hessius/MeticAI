@@ -20,6 +20,6 @@ export default defineConfig({
     }
   },
   build: {
-    sourcemap: true,  // Enable source maps for better error debugging
+    sourcemap: false,  // Disabled for production — don't expose source code
   },
 });

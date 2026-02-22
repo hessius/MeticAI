@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -202,14 +202,8 @@ export function LlmAnalysisModal({
   shotDate,
   isCached,
 }: LlmAnalysisModalProps) {
-  // Debug logging
-  useEffect(() => {
-    console.log('[LLM Modal] Props changed:', { isOpen, isLoading, hasResult: !!analysisResult, error, isCached });
-  }, [isOpen, isLoading, analysisResult, error, isCached]);
-
   const sections = useMemo(() => {
     if (!analysisResult) return [];
-    console.log('[LLM Modal] Parsing analysis...');
     return parseStructuredAnalysis(analysisResult);
   }, [analysisResult]);
   

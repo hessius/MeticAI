@@ -93,7 +93,9 @@ RUN case "${TARGETARCH}" in \
     && rm /tmp/s6-overlay-*.tar.xz
 
 # Install Gemini CLI globally
-RUN npm install -g @google/gemini-cli || true
+RUN npm install -g @google/gemini-cli \
+    && echo "Gemini CLI installed successfully" \
+    || { echo "WARNING: Gemini CLI install failed — profile creation will not work" >&2; true; }
 
 # Copy Python virtual environment from builder
 COPY --from=python-builder /opt/venv /opt/venv
