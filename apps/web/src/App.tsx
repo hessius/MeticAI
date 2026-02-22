@@ -224,7 +224,7 @@ function App() {
 
     const messageInterval = setInterval(() => {
       setCurrentMessage(prev => (prev + 1) % LOADING_MESSAGE_COUNT)
-    }, 3500)
+    }, 5000)
 
     try {
       const formData = new FormData()
