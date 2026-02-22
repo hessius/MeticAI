@@ -1125,7 +1125,11 @@ class TestCORS:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_cors_allows_credentials(self, client):
-        """Test that CORS allows credentials."""
+        """Test that CORS does not send credentials header with wildcard origin.
+
+        Browsers reject allow_origins='*' combined with allow_credentials=True
+        per the CORS spec, so credentials must be disabled when using wildcard.
+        """
         response = client.options(
             "/analyze_and_profile",
             headers={
@@ -1135,8 +1139,8 @@ class TestCORS:
         )
 
         assert response.status_code == 200
-        assert "access-control-allow-credentials" in response.headers
-        assert response.headers["access-control-allow-credentials"] == "true"
+        # With allow_origins=["*"], credentials must not be sent
+        assert response.headers.get("access-control-allow-credentials") != "true"
 
 
 class TestStatusEndpoint:

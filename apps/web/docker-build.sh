@@ -79,7 +79,7 @@ if [ ! -f "config.json" ]; then
     if [ -f "config.example.json" ]; then
         cp config.example.json config.json
     else
-        echo '{"serverUrl": "http://localhost:8000"}' > config.json
+        echo '{"serverUrl": "http://localhost:3550"}' > config.json
     fi
 fi
 
@@ -90,12 +90,12 @@ echo "✓ Done! Application is running at http://localhost:3550"
 echo ""
 echo "IMPORTANT: API Configuration"
 echo "----------------------------"
-echo "To connect to your backend API, you need to create a config.json file."
-echo "Replace 5000 with your actual API port if different."
+echo "The application is accessible at http://localhost:3550"
+echo "The API is served through nginx at /api on port 3550."
 echo ""
-echo "If your API is running on the host machine:"
-echo "  Linux:   echo '{\"serverUrl\":\"http://172.17.0.1:5000\"}' > config.json"
-echo "  Mac/Win: echo '{\"serverUrl\":\"http://host.docker.internal:5000\"}' > config.json"
+echo "If you need to point the web app to a different backend:"
+echo "  Linux:   echo '{\"serverUrl\":\"http://172.17.0.1:3550\"}' > config.json"
+echo "  Mac/Win: echo '{\"serverUrl\":\"http://host.docker.internal:3550\"}' > config.json"
 echo ""
 echo "If your API is at a different location:"
 echo "  echo '{\"serverUrl\":\"http://your-api-server:PORT\"}' > config.json"
