@@ -18,7 +18,7 @@ set -e
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
 # Configuration
-INSTALL_DIR="${HOME}/.meticai"
+INSTALL_DIR="${HOME}/meticai"
 REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/main"
 
 # Colors for terminal output (when run manually)
@@ -166,7 +166,7 @@ You can find it in your Applications folder." '"OK"' "OK" "caution"
     if [ -f "${INSTALL_DIR}/.env" ]; then
         result=$(show_dialog "Existing Installation Found
 
-MeticAI is already installed at ~/.meticai
+MeticAI is already installed at ~/meticai
 
 What would you like to do?" '"Cancel", "Reinstall", "Update"' "Update")
         

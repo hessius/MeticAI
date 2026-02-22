@@ -25,7 +25,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="${HOME}/.meticai"
+INSTALL_DIR="${HOME}/meticai"
 BACKUP_DIR="${INSTALL_DIR}/backup-$(date +%Y%m%d-%H%M%S)"
 OLD_METICAI_DIR="${HOME}/MeticAI"
 REPO_BRANCH="${REPO_BRANCH:-main}"
@@ -182,9 +182,9 @@ echo ""
 echo "Backup saved to: $BACKUP_DIR"
 echo ""
 echo "Useful commands:"
-echo "  View logs:     cd ~/.meticai && docker compose logs -f"
-echo "  Restart:       cd ~/.meticai && docker compose restart"
-echo "  Stop:          cd ~/.meticai && docker compose down"
+echo "  View logs:     cd ~/meticai && docker compose logs -f"
+echo "  Restart:       cd ~/meticai && docker compose restart"
+echo "  Stop:          cd ~/meticai && docker compose down"
 echo ""
 
 # Offer to clean up old installation

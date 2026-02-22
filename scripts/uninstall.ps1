@@ -36,7 +36,7 @@ $ErrorActionPreference = "Stop"
 # Configuration
 # ==============================================================================
 
-$InstallDir = Join-Path $env:USERPROFILE ".meticai"
+$InstallDir = Join-Path $env:USERPROFILE "meticai"
 
 # ==============================================================================
 # Helper functions
@@ -240,7 +240,7 @@ function Uninstall-MeticAI {
             }
             else {
                 Write-LogInfo "Installation directory kept (contains .env)"
-                $script:KeptItems += "Installation directory (~\.meticai)"
+                $script:KeptItems += "Installation directory (~\meticai)"
             }
         }
         else {

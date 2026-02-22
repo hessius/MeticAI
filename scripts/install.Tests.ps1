@@ -215,7 +215,7 @@ Describe "Install-MeticAI - Docker Checks" {
 Describe "Install-MeticAI - Full Flow (Non-Interactive)" {
     BeforeAll {
         # Set up a temp install directory
-        $script:InstallDir = Join-Path $TestDrive ".meticai"
+        $script:InstallDir = Join-Path $TestDrive "meticai"
 
         # Mock all external dependencies
         Mock Test-DockerInstalled { return $true }
@@ -295,7 +295,7 @@ Describe "Install-MeticAI - Full Flow (Non-Interactive)" {
 
 Describe "Install-MeticAI - Optional Services" {
     BeforeAll {
-        $script:InstallDir = Join-Path $TestDrive ".meticai"
+        $script:InstallDir = Join-Path $TestDrive "meticai"
 
         Mock Test-DockerInstalled { return $true }
         Mock Test-DockerRunning { return $true }
@@ -381,7 +381,7 @@ Describe "Install-MeticAI - Optional Services" {
 
 Describe "Install-MeticAI - Default Values" {
     BeforeAll {
-        $script:InstallDir = Join-Path $TestDrive ".meticai"
+        $script:InstallDir = Join-Path $TestDrive "meticai"
 
         Mock Test-DockerInstalled { return $true }
         Mock Test-DockerRunning { return $true }
@@ -428,7 +428,7 @@ Describe "Install-MeticAI - Default Values" {
 
 Describe "Install-MeticAI - Error Handling" {
     BeforeAll {
-        $script:InstallDir = Join-Path $TestDrive ".meticai"
+        $script:InstallDir = Join-Path $TestDrive "meticai"
         Mock Test-DockerInstalled { return $true }
         Mock Test-DockerRunning { return $true }
         Mock Test-Path { return $false } -ParameterFilter {
