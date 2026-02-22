@@ -11,6 +11,28 @@ vi.mock('framer-motion', () => ({
   },
 }))
 
+// Mock react-i18next to return English translations
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        'profileBreakdown.title': 'Profile Details',
+        'profileBreakdown.temperature': 'Temperature',
+        'profileBreakdown.targetWeight': 'Target Weight',
+        'profileBreakdown.preparation': 'Preparation',
+        'profileBreakdown.adjustableVariables': 'Adjustable Variables',
+        'profileBreakdown.stages': 'Stages',
+        'profileBreakdown.variableIssues': 'Variable Issues',
+        'profileBreakdown.max': 'Max',
+        'profileBreakdown.exit': 'Exit',
+        'profileBreakdown.alsoVisible': 'Also visible in the Meticulous app under Profile Settings → Variables',
+      }
+      return translations[key] || key
+    },
+    i18n: { language: 'en' },
+  }),
+}))
+
 describe('ProfileBreakdown', () => {
   describe('rendering', () => {
     it('should return null when profile is null', () => {
