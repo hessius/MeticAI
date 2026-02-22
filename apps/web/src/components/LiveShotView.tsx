@@ -7,11 +7,10 @@
  * with CTAs to analyse or go home.
  *
  * Features:
- *  • Simulation mode — replay target curves for UI testing
  *  • Horizontal gauge layout — compact two-row indicators
  *  • Live profile breakdown — stages with current-stage highlight
  */
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -34,9 +33,7 @@ import {
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { toast } from 'sonner'
 import { continueShot, stopShot, abortShot, purge } from '@/lib/mqttCommands'
-import { useSimulatedShot } from '@/hooks/useSimulatedShot'
 import { EspressoChart } from '@/components/charts'
 import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
 import { extractStageRanges, STAGE_COLORS, STAGE_BORDER_COLORS } from '@/components/charts/chartConstants'
@@ -110,13 +107,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
 
-  // Simulation mode
-  const sim = useSimulatedShot(machineState.active_profile ?? undefined)
-
-  // The effective machine state — uses simulation overlay when active
-  const ms: MachineState = sim.active
-    ? { ...machineState, ...sim.state } as MachineState
-    : machineState
+  // Use machine state from props directly
+  const ms = machineState
 
   // Fetch target curves and profile info for the active profile
   useEffect(() => {
@@ -161,7 +153,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
       // Shot just ended
       if (wasBrewingRef.current) {
         setShotComplete(true)
-        if (sim.active) sim.stop()
       }
       wasBrewingRef.current = false
       return
@@ -245,16 +236,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     return { totalTime, finalWeight, avgPressure, avgFlow }
   }, [shotComplete])
 
-  // Handle simulation start
-  const handleSimulate = useCallback(() => {
-    chartDataRef.current = []
-    setChartData([])
-    setShotComplete(false)
-    wasBrewingRef.current = false
-    sim.start()
-    toast.success(t('controlCenter.liveShot.simulationStarted'))
-  }, [sim, t])
-
   return (
     <motion.div
       key="live-shot"
@@ -266,18 +247,13 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => { if (sim.active) sim.stop(); onBack() }} className="text-muted-foreground">
+        <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft size={16} className="mr-1" />
           {t('common.back')}
         </Button>
         <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
           <ChartLine size={20} weight="duotone" />
           {t('controlCenter.liveShot.title')}
-          {sim.active && (
-            <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600 dark:text-amber-400 ml-1">
-              SIM
-            </Badge>
-          )}
         </h2>
         <div className="w-16" /> {/* spacer for centering */}
       </div>
@@ -451,16 +427,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       </AlertDialog>
                     </>
                   )}
-                  {/* Simulate button — replays a real recorded shot */}
-                  <Button
-                    variant="outline"
-                    className="h-11 px-6 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
-                    onClick={handleSimulate}
-                    disabled={!sim.ready}
-                  >
-                    <Lightning size={18} weight="fill" className="mr-2" />
-                    {sim.ready ? t('controlCenter.liveShot.simulate') : t('controlCenter.liveShot.simulateLoading')}
-                  </Button>
                 </div>
               </>
             )
@@ -544,8 +510,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
             </div>
           )}
 
-          {/* ── Action button (only during real brewing, not simulation) ── */}
-          {ms.brewing && !sim.active && (
+          {/* ── Action button during brewing ── */}
+          {ms.brewing && (
             <div className="flex gap-3 justify-center">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -568,20 +534,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
             </div>
           )}
 
-          {/* Simulation stop button */}
-          {sim.active && (
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-4 text-xs border-amber-500/50 text-amber-600 dark:text-amber-400"
-                onClick={() => sim.stop()}
-              >
-                <Stop size={14} weight="fill" className="mr-1" />
-                {t('controlCenter.liveShot.stopSimulation')}
-              </Button>
-            </div>
-          )}
         </>
       )}
 
@@ -618,17 +570,15 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 <SummaryItem label={t('controlCenter.liveShot.avgFlow')} value={`${summary.avgFlow.toFixed(1)} ml/s`} />
               </div>
               <div className="flex gap-3 justify-center flex-wrap">
-                {!sim.active && (
-                  <Button
-                    variant="outline"
-                    className="h-11 px-6"
-                    onClick={() => cmd(purge, 'purging')}
-                  >
-                    <Drop size={16} weight="fill" className="mr-2" />
-                    {t('controlCenter.liveShot.purgeAfterShot')}
-                  </Button>
-                )}
-                {!sim.active && ms.active_profile && onAnalyzeShot && (
+                <Button
+                  variant="outline"
+                  className="h-11 px-6"
+                  onClick={() => cmd(purge, 'purging')}
+                >
+                  <Drop size={16} weight="fill" className="mr-2" />
+                  {t('controlCenter.liveShot.purgeAfterShot')}
+                </Button>
+                {ms.active_profile && onAnalyzeShot && (
                   <Button
                     variant="outline"
                     className="h-11 px-6"

@@ -633,10 +633,6 @@
       "purgeAfterShot": "Spurgo",
       "waitingForShot": "In attesa dell'estrazione…",
       "waitingDesc": "Il grafico apparirà all'inizio dell'estrazione.",
-      "simulate": "Simulate",
-      "simulateLoading": "Loading…",
-      "stopSimulation": "Stop Simulation",
-      "simulationStarted": "Simulation started",
       "stages": "Stages"
     },
     "pourWater": {

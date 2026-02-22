@@ -633,10 +633,6 @@
       "purgeAfterShot": "Purge",
       "waitingForShot": "Waiting for shot to start…",
       "waitingDesc": "The chart will appear once extraction begins.",
-      "simulate": "Simulate",
-      "simulateLoading": "Loading…",
-      "stopSimulation": "Stop Simulation",
-      "simulationStarted": "Simulation started",
       "stages": "Stages"
     },
     "pourWater": {
