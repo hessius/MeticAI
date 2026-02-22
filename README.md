@@ -173,8 +173,9 @@ docker compose up -d
 Open `http://YOUR_SERVER_IP:3550` in any browser to access the web interface!
 
 ### Need Help?
-- � [API Reference](API.md)
-- 🔧 [Troubleshooting](#troubleshooting)
+- � [API Reference](API.md)- 🌐 [Remote Access (Tailscale)](TAILSCALE.md)
+- 🏠 [Home Assistant Integration](HOME_ASSISTANT.md)
+- 📱 [iOS Shortcuts](IOS_SHORTCUTS.md)- 🔧 [Troubleshooting](#troubleshooting)
 
 ## 📱 Using MeticAI
 
@@ -235,7 +236,16 @@ The Control Center appears as a side panel on desktop and a full page on mobile.
 
 ### Home Assistant Integration
 
-When the MQTT bridge is enabled, your Meticulous machine is automatically discoverable in Home Assistant. Add the MQTT integration in HA and point it to your MeticAI server's IP on port 1883. This enables automations like "notify me when my shot is done" or "preheat at 7am on weekdays".
+When the MQTT bridge is enabled, your Meticulous machine is automatically discoverable in Home Assistant.
+
+1. Start MeticAI with the Home Assistant overlay:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
+   ```
+2. In HA, add the **MQTT** integration and point it to your MeticAI server's IP on port 1883
+3. This enables automations like "notify me when my shot is done" or "preheat at 7am on weekdays"
+
+[→ Full Home Assistant integration guide](HOME_ASSISTANT.md)
 
 ## 🔄 Updating MeticAI
 
@@ -284,6 +294,8 @@ cd ~/.meticai
 echo "TAILSCALE_AUTHKEY=your_key_here" >> .env
 docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 ```
+
+> **Important:** Both your MeticAI server and the device you're accessing it from must have Tailscale installed and connected to the same account. See the [full Tailscale setup guide](TAILSCALE.md) for HTTPS setup, troubleshooting, and more.
 
 ## 🏗️ Architecture
 
