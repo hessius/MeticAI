@@ -89,6 +89,8 @@ export interface ChartDataPoint {
   weight?: number
   gravimetricFlow?: number
   power?: number
+  /** Power normalized to the left Y-axis scale (for chart rendering) */
+  powerNorm?: number
   stage?: string
 }
 

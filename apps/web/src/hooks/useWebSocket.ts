@@ -27,6 +27,7 @@ export interface MachineState {
   state: string | null
   pressure: number | null
   flow_rate: number | null
+  power: number | null
   shot_weight: number | null
   shot_timer: number | null
   target_weight: number | null
@@ -66,6 +67,7 @@ const INITIAL_STATE: MachineState = {
   state: null,
   pressure: null,
   flow_rate: null,
+  power: null,
   shot_weight: null,
   shot_timer: null,
   target_weight: null,
@@ -153,6 +155,7 @@ export function useWebSocket(enabled: boolean): MachineState {
             state: msg.state ?? prev.state,
             pressure: msg.pressure ?? prev.pressure,
             flow_rate: msg.flow_rate ?? prev.flow_rate,
+            power: msg.power ?? prev.power,
             shot_weight: msg.shot_weight ?? prev.shot_weight,
             shot_timer: msg.shot_timer ?? prev.shot_timer,
             target_weight: msg.target_weight ?? prev.target_weight,

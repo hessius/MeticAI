@@ -47,6 +47,7 @@ def build_config() -> dict:
         "weight_delta": float(os.environ.get("BRIDGE_WEIGHT_DELTA", "0.1")),
         "time_delta": float(os.environ.get("BRIDGE_TIME_DELTA", "0.1")),
         "voltage_delta": float(os.environ.get("BRIDGE_VOLTAGE_DELTA", "1.0")),
+        "power_delta": float(os.environ.get("BRIDGE_POWER_DELTA", "1.0")),
 
         # Stale data refresh (hours)
         "stale_data_refresh_interval": int(

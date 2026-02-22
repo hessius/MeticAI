@@ -16,6 +16,7 @@ import {
   ReferenceLine,
   Customized,
 } from 'recharts'
+import { useMemo } from 'react'
 import { useTheme } from 'next-themes'
 import {
   CHART_COLORS,
@@ -57,6 +58,8 @@ export interface EspressoChartProps {
   showWeight?: boolean
   /** Show gravimetric flow line. Default false. */
   showGravimetricFlow?: boolean
+  /** Show power (motor %) line. Default false. */
+  showPower?: boolean
   /** Replay playhead position (seconds) — omit to hide */
   replayTime?: number
   /** Fixed X-axis max (omit for auto) */
@@ -86,6 +89,7 @@ export function EspressoChart({
   heightClass = 'h-64',
   showWeight = true,
   showGravimetricFlow = false,
+  showPower = false,
   replayTime,
   xMax,
   referenceLines = [],
@@ -106,15 +110,24 @@ export function EspressoChart({
     8,
   )
   const minFlow = Math.min(...data.map(d => d.flow ?? 0), 0)
-  const maxPower = Math.max(...data.map(d => d.power || 0), 0)
-  const targetPowerMax = targetCurves
-    ? Math.max(...targetCurves.map(p => p.target_power ?? 0), 0)
-    : 0
-  const effectivePowerMax = Math.max(maxPower, targetPowerMax)
+  // Power (0–100%) is normalized to the left axis range so it doesn't
+  // compress pressure/flow readings (Option B from #183).
   const computedLeftMax = leftAxisMax ?? Math.ceil(
-    Math.max(maxPressure, maxFlow, effectivePowerMax) * 1.1,
+    Math.max(maxPressure, maxFlow) * 1.1,
   )
   const computedLeftMin = Math.floor(Math.min(minFlow, 0))
+
+  // Scale factor: maps power 0-100% → 0-computedLeftMax
+  const powerScale = computedLeftMax / 100
+
+  // Pre-process data: add normalized power for chart rendering
+  const normalizedData = useMemo(() => {
+    if (!showPower) return data
+    return data.map(d => ({
+      ...d,
+      powerNorm: d.power != null ? d.power * powerScale : undefined,
+    }))
+  }, [data, showPower, powerScale])
   const maxWeight = Math.max(...data.map(d => d.weight || 0), 50)
   const computedRightMax = rightAxisMax ?? Math.ceil(maxWeight * 1.1)
 
@@ -127,7 +140,7 @@ export function EspressoChart({
       <div className={heightClass}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
-            data={data}
+            data={normalizedData}
             margin={{ top: 5, right: 0, left: -5, bottom: 5 }}
           >
             <CartesianGrid
@@ -201,7 +214,7 @@ export function EspressoChart({
                     const segments = pts
                       .map(p => ({
                         x: xAxis.scale(p.time),
-                        y: yAxis.scale(p[key]!),
+                        y: yAxis.scale(key === 'target_power' ? (p[key]! * powerScale) : p[key]!),
                       }))
                       .filter(({ x, y }: { x: number; y: number }) => Number.isFinite(x) && Number.isFinite(y))
                     if (segments.length < 2) return ''
@@ -260,7 +273,7 @@ export function EspressoChart({
                             strokeLinecap="round" opacity={0.8} />
                           {powerPts.map((p, i) => {
                             const cx = xAxis.scale(p.time)
-                            const cy = yAxis.scale(p.target_power!)
+                            const cy = yAxis.scale(p.target_power! * powerScale)
                             if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
                             return (
                               <circle key={`tpw-${i}`}
@@ -364,6 +377,18 @@ export function EspressoChart({
                 dot={false}
                 strokeDasharray="4 2"
                 name="Grav. Flow (g/s)"
+                isAnimationActive={false}
+              />
+            )}
+            {showPower && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="powerNorm"
+                stroke={CHART_COLORS.power}
+                strokeWidth={1.5}
+                dot={false}
+                name="Power (%)"
                 isAnimationActive={false}
               />
             )}
