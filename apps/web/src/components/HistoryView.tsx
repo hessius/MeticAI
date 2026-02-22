@@ -697,9 +697,6 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
       }
       
       const data = await response.json()
-      console.log('Generate image response:', data)
-      console.log('Image data length:', data.image_data?.length)
-      console.log('Image data starts with:', data.image_data?.substring(0, 50))
       
       // Show the preview dialog with the generated image
       if (data.image_data) {

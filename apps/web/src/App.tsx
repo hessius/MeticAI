@@ -57,7 +57,6 @@ function App() {
   const [apiResponse, setApiResponse] = useState<APIResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [isCapturing, setIsCapturing] = useState(false)
-  const [clickCount, setClickCount] = useState(0)
   const [qrDialogOpen, setQrDialogOpen] = useState(false)
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<HistoryEntry | null>(null)
   const [selectedHistoryImageUrl, setSelectedHistoryImageUrl] = useState<string | undefined>(undefined)
@@ -543,62 +542,10 @@ function App() {
     }
   }
 
-  const loadMockResults = () => {
-    const mockProfileJson = {
-      name: "Riesling to the Occasion",
-      author: "MeticAI",
-      temperature: 94,
-      final_weight: 45,
-      stages: [
-        { name: "Pre-infusion", pressure: 3, flow: 2, duration: 10 },
-        { name: "Bloom", pressure: 2, flow: 1.5, duration: 15 },
-        { name: "Extraction", pressure: 9, flow: null, duration: 20 },
-        { name: "Decline", pressure: 6, flow: null, duration: 10 }
-      ]
-    }
-    
-    setApiResponse({
-      status: 'success',
-      analysis: "Standout Coffee's Washed Pink Bourbon, grown in the Huila region of Colombia at 1800 masl on the Zarza farm, offers floral notes of rose and lily with flavors of cantaloupe, sweet mango, pink lemonade, and sparkling Austrian riesling.",
-      reply: `Profile Created: Riesling to the Occasion
-
-Description: A modern, multi-stage profile designed to highlight the delicate florals and funky fruit-forward nature of the Washed Pink Bourbon. It uses an extended blooming phase to deepen complexity and a declining pressure ramp to deliver a clean, sparkling finish reminiscent of a fine white wine.
-
-Preparation: • Dose: 18g
-• Grind: Fine; slightly finer than a standard espresso grind to accommodate the long, gentle pre-infusion.
-• Water Temp: 94°C
-• Yield: 45g (approx. 1:2.5 ratio)
-• Total Time: ~45-55 seconds
-
-Why This Works: We're giving this exceptional coffee the spa treatment. The initial low-flow soak gently saturates the puck, preventing any harshness. The long, low-energy "Funk Tank Bloom" is where the magic happens, allowing unique, soluble compounds to develop, pushing those mango and cantaloupe notes forward. The pressure ramp extracts the core sweetness and body, while the final, declining pressure phase mimics a lever machine, which prevents over-extraction of bitter compounds and lets that bright, acidic "Riesling" and pink lemonade sparkle.
-
-Special Notes: For maximum clarity and to really make those delicate floral notes pop, consider using a paper filter at the bottom of your basket.`
-    })
-    setCurrentProfileJson(mockProfileJson)
-    setViewState('results')
-  }
-
   const handleTitleClick = () => {
-    if (clickTimerRef.current) {
-      clearTimeout(clickTimerRef.current)
-    }
-    
-    const newCount = clickCount + 1
-    setClickCount(newCount)
-    
-    if (newCount === 5) {
-      // Secret dev feature: 5 rapid clicks loads test results
-      loadMockResults()
-      setClickCount(0)
-    } else {
-      // Set a timer - if no more clicks, go home after 300ms
-      clickTimerRef.current = setTimeout(() => {
-        // Single tap: go to start screen (only if not on start already)
-        if (viewState !== 'start') {
-          handleBackToStart()
-        }
-        setClickCount(0)
-      }, 300)
+    // Single tap: go to start screen (only if not on start already)
+    if (viewState !== 'start') {
+      handleBackToStart()
     }
   }
 
