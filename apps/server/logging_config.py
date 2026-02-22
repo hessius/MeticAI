@@ -130,29 +130,41 @@ def setup_logging(
     
     # All logs file (JSON format) - rotating
     all_logs_file = log_path / "meticai-server.log"
-    all_logs_handler = logging.handlers.RotatingFileHandler(
-        all_logs_file,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding='utf-8'
-    )
-    all_logs_handler.setLevel(logging.DEBUG)
-    all_logs_handler.setFormatter(JSONFormatter())
-    logger.addHandler(all_logs_handler)
-    root.addHandler(all_logs_handler)
+    all_logs_str = str(all_logs_file)
+    _all_handlers = logger.handlers + root.handlers
+    if not any(
+        isinstance(h, logging.handlers.RotatingFileHandler) and h.baseFilename == all_logs_str
+        for h in _all_handlers
+    ):
+        all_logs_handler = logging.handlers.RotatingFileHandler(
+            all_logs_file,
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding='utf-8'
+        )
+        all_logs_handler.setLevel(logging.DEBUG)
+        all_logs_handler.setFormatter(JSONFormatter())
+        logger.addHandler(all_logs_handler)
+        root.addHandler(all_logs_handler)
     
     # Error logs file (JSON format) - rotating, errors only
     error_logs_file = log_path / "meticai-server-errors.log"
-    error_logs_handler = logging.handlers.RotatingFileHandler(
-        error_logs_file,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding='utf-8'
-    )
-    error_logs_handler.setLevel(logging.ERROR)
-    error_logs_handler.setFormatter(JSONFormatter())
-    logger.addHandler(error_logs_handler)
-    root.addHandler(error_logs_handler)
+    error_logs_str = str(error_logs_file)
+    _err_handlers = logger.handlers + root.handlers
+    if not any(
+        isinstance(h, logging.handlers.RotatingFileHandler) and h.baseFilename == error_logs_str
+        for h in _err_handlers
+    ):
+        error_logs_handler = logging.handlers.RotatingFileHandler(
+            error_logs_file,
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding='utf-8'
+        )
+        error_logs_handler.setLevel(logging.ERROR)
+        error_logs_handler.setFormatter(JSONFormatter())
+        logger.addHandler(error_logs_handler)
+        root.addHandler(error_logs_handler)
     
     # Suppress noisy third-party loggers
     logging.getLogger("uvicorn").setLevel(logging.WARNING)

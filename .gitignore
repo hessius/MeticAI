@@ -42,6 +42,8 @@ data/
 
 # Runtime markers
 .rebuild-needed
+.restart-requested
+.update-requested
 
 # Web app (cloned dependency)
 meticai-web/
