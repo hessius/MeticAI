@@ -20,6 +20,21 @@ const FALLBACK_LOADING_MESSAGES = [
   "Consulting the Sprometheus archives...",
   "Generating espresso profile...",
   "Channeling my inner Morgan Drinks Coffee...",
+  "Aligning the puck particles...",
+  "Debating WDT technique...",
+  "Calibrating the refractometer...",
+  "Asking the beans how they feel...",
+  "Adjusting for altitude and humidity...",
+  "Running through the Barista Hustle curriculum...",
+  "Polishing the portafilter...",
+  "Measuring TDS for the nth time...",
+  "Contemplating the meaning of crema...",
+  "Dialing in the perfect ratio...",
+  "Channeling is bad, unless it's channeling vibes...",
+  "Watching one more Weiss Distribution video...",
+  "Preheating the group head of knowledge...",
+  "Applying 6 bar of computational pressure...",
+  "Tasting notes: patience, with hints of anticipation...",
   "Almost there..."
 ]
 
@@ -82,7 +97,7 @@ export function LoadingView({ currentMessage }: LoadingViewProps) {
               style={{ background: 'linear-gradient(135deg, #FFC107 0%, #FF8F00 50%, #FF6F00 100%)' }}
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
-              transition={{ duration: 75, ease: "linear" }}
+              transition={{ duration: 180, ease: "linear" }}
             />
           </div>
         </div>
