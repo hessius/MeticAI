@@ -1,5 +1,6 @@
 import { useMemo, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -474,6 +475,7 @@ function formatLimits(limits?: StageLimit[], variables?: ProfileVariable[]): str
 }
 
 export function ProfileBreakdown({ profile, className = '', currentStage }: ProfileBreakdownProps) {
+  const { t } = useTranslation()
   const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   // Auto-scroll to the active stage when it changes
@@ -540,7 +542,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
       className={`space-y-3 ${className}`}
     >
       <Label className="text-sm font-semibold tracking-wide text-primary">
-        Profile Details
+        {t('profileBreakdown.title')}
       </Label>
       
       <div className="p-4 bg-secondary/60 rounded-xl border border-primary/20 space-y-4">
@@ -553,7 +555,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                   <Thermometer size={16} weight="bold" className="text-red-600 dark:text-red-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Temperature</p>
+                  <p className="text-xs text-muted-foreground">{t('profileBreakdown.temperature')}</p>
                   <p className="text-sm font-semibold">{profile.temperature}°C</p>
                 </div>
               </div>
@@ -565,7 +567,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                   <Scales size={16} weight="bold" className="text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Target Weight</p>
+                  <p className="text-xs text-muted-foreground">{t('profileBreakdown.targetWeight')}</p>
                   <p className="text-sm font-semibold">{profile.final_weight}g</p>
                 </div>
               </div>
@@ -581,7 +583,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
               <div className="space-y-1.5 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
                 <div className="flex items-center gap-1.5">
                   <Warning size={14} weight="bold" className="text-amber-600 dark:text-amber-400 shrink-0" />
-                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 whitespace-nowrap">Variable Issues</p>
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 whitespace-nowrap">{t('profileBreakdown.variableIssues')}</p>
                 </div>
                 <div className="space-y-1">
                   {warnings.map((warning, idx) => (
@@ -598,7 +600,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Info size={14} weight="bold" className="text-blue-600 dark:text-blue-400" />
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preparation</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('profileBreakdown.preparation')}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {infoVars.map((variable, idx) => {
@@ -641,7 +643,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                   })}
                 </div>
                 <p className="text-[10px] text-muted-foreground/60 italic">
-                  💡 Also visible in the Meticulous app under Profile Settings → Variables
+                  💡 {t('profileBreakdown.alsoVisible')}
                 </p>
               </div>
             )}
@@ -651,7 +653,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Sliders size={14} weight="bold" className="text-muted-foreground shrink-0" />
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Adjustable Variables</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{t('profileBreakdown.adjustableVariables')}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {adjustableVars.map((variable, idx) => {
@@ -693,7 +695,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
             <div className="flex items-center gap-2">
               <ListNumbers size={14} weight="bold" className="text-muted-foreground shrink-0" />
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                Stages ({profile.stages!.length})
+                {t('profileBreakdown.stages')} ({profile.stages!.length})
               </p>
             </div>
             <div className="space-y-2">
@@ -790,12 +792,12 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                       )}
                       {limitsInfo && (
                         <span className="text-amber-700/80 dark:text-amber-400/80 whitespace-nowrap">
-                          Max: {limitsInfo}
+                          {t('profileBreakdown.max')}: {limitsInfo}
                         </span>
                       )}
                       {exitInfo && (
                         <span className="text-green-700/80 dark:text-green-400/80 whitespace-nowrap">
-                          Exit: {exitInfo}
+                          {t('profileBreakdown.exit')}: {exitInfo}
                         </span>
                       )}
                     </div>

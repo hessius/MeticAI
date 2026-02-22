@@ -15,7 +15,8 @@
     "retry": "Réessayer",
     "or": "OU",
     "and": "ET",
-    "selected": "Sélectionné"
+    "selected": "Sélectionné",
+    "tryAgain": "Try Again"
   },
   "greetings": {
     "morning": [
@@ -78,7 +79,17 @@
     "title": "Profileur AI Meticulous Espresso",
     "meticulousEspresso": "Meticulous Espresso",
     "tapToGoHome": "Appuyez pour retourner à l'accueil",
-    "openOnMobile": "Ouvrir sur mobile"
+    "openOnMobile": "Ouvrir sur mobile",
+    "loading": "Loading...",
+    "errors": {
+      "uploadImage": "Please upload an image file (JPG, PNG, etc.)",
+      "provideInput": "Please provide at least a coffee bag photo or taste preferences",
+      "generateFailed": "Failed to generate profile: {{message}}",
+      "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
+      "noProfileJson": "No profile JSON available",
+      "profileJsonDownloaded": "Profile JSON downloaded!",
+      "saveFailed": "Failed to save results. Please try again."
+    }
   },
   "navigation": {
     "generateNewProfile": "Générer nouveau profil",
@@ -193,7 +204,51 @@
     "llmAnalysisFailed": "Échec de l'analyse LLM",
     "restart": "Redémarrer",
     "play": "Lecture",
-    "pause": "Pause"
+    "pause": "Pause",
+    "title": "Shot History",
+    "shotDetails": "Shot Details",
+    "searching": "Searching machine history...",
+    "scanningLogs": "Scanning shot logs from your Meticulous machine",
+    "checkingNewShots": "Checking for new shots...",
+    "refreshing": "Refreshing...",
+    "checkForNewShots": "Check for New Shots",
+    "noShots": "No shots found",
+    "noShotsDescription": "No shots have been pulled with this profile yet",
+    "noData": "No data available",
+    "shotsCount": "{{count}} shots",
+    "temp": "Temp",
+    "replay": "Replay",
+    "compare": "Compare",
+    "analyze": "Analyze",
+    "shotAnalysis": "Shot Analysis",
+    "analysisDescription": "AI-powered breakdown of your extraction against the profile targets",
+    "analyzeShot": "Analyze Shot",
+    "analyzingShot": "Analyzing Shot...",
+    "comparingStages": "Comparing stages against profile targets",
+    "shotSummary": "Shot Summary",
+    "weight": "Weight",
+    "preinfusion": "Pre-infusion",
+    "durationLabel": "Duration: ",
+    "timePercent": "Time %: ",
+    "weightLabel": "Weight: ",
+    "stagesLabel": "Stages: ",
+    "recommendations": "Recommendations:",
+    "extraction": "Extraction",
+    "goalsReached": "{{reached}} of {{total}} goals reached",
+    "stageAnalysis": "Stage Analysis",
+    "profileTarget": "Profile target",
+    "exitTriggers": "Exit Triggers:",
+    "limits": "Limits:",
+    "goalReached": "✓ Reached Goal",
+    "hitLimit": "⚠ Hit Limit",
+    "notReached": "✗ Not Reached",
+    "stageFailed": "✗ Failed",
+    "incomplete": "◐ Incomplete",
+    "exporting": "Exporting...",
+    "exportAsImage": "Export as Image",
+    "viewAiAnalysis": "View AI Analysis",
+    "getAiAnalysis": "Get AI Analysis",
+    "runAnalysisForOverlay": "Run analysis to see graph overlay"
   },
   "shotComparison": {
     "title": "Comparaison d'extractions",
@@ -202,7 +257,10 @@
     "primary": "Primaire",
     "compare": "Comparer",
     "selectShot": "Sélectionnez une extraction...",
-    "timeTooltip": "Temps : {{value}}s"
+    "timeTooltip": "Temps : {{value}}s",
+    "selectShotDesktop": "Select a shot to compare",
+    "compareWith": "Compare with:",
+    "noOtherShots": "No other shots available to compare"
   },
   "settings": {
     "title": "Paramètres",
@@ -309,7 +367,17 @@
       "manualDescription": "Aucun mécanisme de mise à jour automatique détecté. Mettez à jour manuellement via docker pull."
     },
     "version": "Version",
-    "footer": "MeticAI • Conçu avec ❤️ pour les amateurs de café"
+    "footer": "MeticAI • Conçu avec ❤️ pour les amateurs de café",
+    "addToHomeAssistant": "Add to Home Assistant",
+    "homeAssistantDescription": "Connect Home Assistant to MeticAI's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
+    "poweredBy": "Powered by",
+    "credits": {
+      "pyMeticulous": "Official Python client for the Meticulous API",
+      "meticulousMcp": "MCP server for profile management by @twchad",
+      "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
+    },
+    "runsOn": "Runs on",
+    "andCaffeine": "and caffeine ☕"
   },
   "profileBreakdown": {
     "title": "Détails du profil",
@@ -324,7 +392,27 @@
     "usedIn": "Utilisé dans",
     "stage": "étape",
     "stages_other": "étapes",
-    "alsoVisible": "Également visible dans l'application Meticulous sous Paramètres du profil → Variables"
+    "alsoVisible": "Également visible dans l'application Meticulous sous Paramètres du profil → Variables",
+    "patterns": {
+      "constant": "constant",
+      "rampingUp": "ramping up",
+      "declining": "declining",
+      "rampThenHold": "ramp then hold",
+      "declineThenHold": "decline then hold",
+      "upThenDown": "up then down",
+      "downThenUp": "down then up",
+      "oscillating": "oscillating",
+      "complex": "complex"
+    },
+    "dynamics": {
+      "static": "Static (no dynamics defined)",
+      "smooth": "(smooth)"
+    },
+    "validation": {
+      "highPressure": "⚠ Stage {{stage}} sets pressure to {{value}} bar — typical max is 12 bar",
+      "noEmojiPrefix": "Adjustable variable \"{{name}}\" should not start with an emoji — it may not render in the Meticulous app",
+      "lowWeight": "⚠ Target weight {{value}}g is unusually low — check your dose/yield"
+    }
   },
   "advancedCustomization": {
     "title": "Personnalisation avancée",
@@ -544,7 +632,12 @@
       "shotOverlay": "Comparer",
       "purgeAfterShot": "Purger",
       "waitingForShot": "En attente de l'extraction…",
-      "waitingDesc": "Le graphique apparaîtra au début de l'extraction."
+      "waitingDesc": "Le graphique apparaîtra au début de l'extraction.",
+      "simulate": "Simulate",
+      "simulateLoading": "Loading…",
+      "stopSimulation": "Stop Simulation",
+      "simulationStarted": "Simulation started",
+      "stages": "Stages"
     },
     "pourWater": {
       "alert": "Veuillez remplir le réservoir d'eau"
@@ -552,5 +645,47 @@
     "preheat": {
       "countdown": "Préchauffage"
     }
+  },
+  "shotCharts": {
+    "extractionGraph": "Extraction Graph",
+    "extractionComparison": "Extraction Comparison",
+    "shotVsProfile": "Shot vs Profile Target",
+    "targetOverlay": "Target overlay",
+    "pressure": "Pressure",
+    "flow": "Flow",
+    "power": "Power",
+    "targetPressure": "Target Pressure",
+    "targetFlow": "Target Flow",
+    "targetPower": "Target Power",
+    "weight": "Weight",
+    "shotASolid": "Shot A (solid)",
+    "shotBDashed": "Shot B (dashed)",
+    "replaying": "Replaying {{speed}}x",
+    "tooltipTime": "Time",
+    "tooltipStage": "Stage"
+  },
+  "expertAnalysis": {
+    "title": "AI Shot Analysis",
+    "cached": "Cached",
+    "disclaimer": "This analysis is generated by AI and may not always be accurate. Use it as a starting point for your own experimentation.",
+    "analyzing": "Analyzing Shot Data",
+    "analyzingDescription": "Our AI barista is reviewing your extraction data and comparing it against the profile targets...",
+    "noAnalysis": "No analysis available",
+    "reAnalyze": "Re-Analyze",
+    "forFreshInsights": "for Fresh Insights",
+    "shotPerformance": "Shot Performance",
+    "extractionQuality": "Extraction Quality",
+    "profileAdherence": "Profile Adherence",
+    "recommendations": "Recommendations",
+    "overallScore": "Overall Score"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "useLightMode": "Use light mode",
+    "lightModeDescription": "Switch between dark and light mode",
+    "followSystemTheme": "Follow system theme",
+    "followSystemDescription": "Automatically match your system's dark/light mode preference",
+    "backgroundAnimations": "Background animations",
+    "animationsDescription": "Show animated background effects"
   }
 }

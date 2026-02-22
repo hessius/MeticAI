@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -55,6 +56,7 @@ interface ProfileImportDialogProps {
 type ImportStep = 'choose' | 'file' | 'machine' | 'importing' | 'bulk-importing' | 'success' | 'bulk-success' | 'error'
 
 export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew }: ProfileImportDialogProps) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<ImportStep>('choose')
   const [machineProfiles, setMachineProfiles] = useState<MachineProfile[]>([])
   const [loadingMachine, setLoadingMachine] = useState(false)
@@ -186,14 +188,14 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
     if (!file) return
     
     setStep('importing')
-    setImportProgress('Reading file...')
+    setImportProgress(t('profileImport.readingFile'))
     setError(null)
     
     try {
       const text = await file.text()
       const profileJson = JSON.parse(text)
       
-      setImportProgress('Importing profile...')
+      setImportProgress(t('profileImport.importingProfile'))
       
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/profile/import`, {
@@ -237,7 +239,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
   const handleMachineImport = async (profile: MachineProfile) => {
     setSelectedProfile(profile)
     setStep('importing')
-    setImportProgress('Fetching profile from machine...')
+    setImportProgress(t('profileImport.fetchingProfile'))
     setError(null)
     
     try {
@@ -252,7 +254,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
       
       const profileData = await profileResponse.json()
       
-      setImportProgress('Importing and generating description...')
+      setImportProgress(t('profileImport.importingAndGenerating'))
       
       // Now import it
       const importResponse = await fetch(`${serverUrl}/api/profile/import`, {
@@ -314,7 +316,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
               <div className="p-1.5 rounded-lg bg-amber-500/10">
                 <Plus size={20} className="text-amber-500" weight="bold" />
               </div>
-              <h2 className="text-lg font-bold tracking-tight">Add Profile</h2>
+              <h2 className="text-lg font-bold tracking-tight">{t('profileImport.title')}</h2>
             </div>
             <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
               <X size={18} weight="bold" />
@@ -336,7 +338,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                   className="w-full h-14 text-base font-semibold bg-amber-500 hover:bg-amber-600 text-zinc-900"
                 >
                   <MagicWand size={20} className="mr-2" weight="fill" />
-                  Generate New Profile
+                  {t('profileImport.generateNewProfile')}
                 </Button>
                 
                 <div className="relative">
@@ -344,7 +346,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                     <div className="w-full border-t border-border/30" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-card px-3 text-xs text-muted-foreground font-medium">or import</span>
+                    <span className="bg-card px-3 text-xs text-muted-foreground font-medium">{t('profileImport.orImport')}</span>
                   </div>
                 </div>
                 
@@ -355,8 +357,8 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                     className="h-24 flex-col gap-2 border-border/50 hover:border-primary/50 hover:bg-primary/5"
                   >
                     <Upload size={28} weight="duotone" className="text-primary" />
-                    <span className="text-sm font-medium">From File</span>
-                    <span className="text-[10px] text-muted-foreground">JSON profile</span>
+                    <span className="text-sm font-medium">{t('profileImport.fromFile')}</span>
+                    <span className="text-[10px] text-muted-foreground">{t('profileImport.jsonProfile')}</span>
                   </Button>
                   
                   <Button
@@ -370,8 +372,8 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                     ) : (
                       <CloudArrowDown size={28} weight="duotone" className="text-primary" />
                     )}
-                    <span className="text-sm font-medium">From Machine</span>
-                    <span className="text-[10px] text-muted-foreground">Meticulous</span>
+                    <span className="text-sm font-medium">{t('profileImport.fromMachine')}</span>
+                    <span className="text-[10px] text-muted-foreground">{t('profileImport.meticulous')}</span>
                   </Button>
                 </div>
                 
@@ -396,17 +398,17 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
               >
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium">
-                    Profiles on Machine
+                    {t('profileImport.profilesOnMachine')}
                   </Label>
                   <Badge variant="secondary" className="text-xs">
-                    {machineProfiles.length} available
+                    {machineProfiles.length} {t('profileImport.available')}
                   </Badge>
                 </div>
                 
                 {machineProfiles.length === 0 ? (
                   <div className="p-6 text-center text-muted-foreground">
                     <Coffee size={32} className="mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">All machine profiles are already in your catalogue</p>
+                    <p className="text-sm">{t('profileImport.allProfilesImported')}</p>
                   </div>
                 ) : (
                   <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
@@ -446,7 +448,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                     <Alert className="mb-3 bg-blue-500/5 border-blue-500/20">
                       <Info size={16} className="text-blue-500" />
                       <AlertDescription className="text-xs text-muted-foreground">
-                        Importing generates AI descriptions for each profile and will consume API tokens.
+                        {t('profileImport.importingNote')}
                       </AlertDescription>
                     </Alert>
                     <Button
@@ -454,7 +456,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                       className="w-full bg-primary/90 hover:bg-primary text-primary-foreground"
                     >
                       <DownloadSimple size={18} className="mr-2" weight="bold" />
-                      Import All {machineProfiles.length} Profiles
+                      {t('profileImport.importAll', { count: machineProfiles.length })}
                     </Button>
                   </div>
                 )}
@@ -474,10 +476,10 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                   <SpinnerGap size={40} className="mx-auto animate-spin text-primary mb-3" />
                   <p className="font-semibold">
                     {bulkProgress?.type === 'start' 
-                      ? 'Starting import...'
+                      ? t('profileImport.startingImport')
                       : bulkProgress?.current && bulkProgress?.total
-                        ? `Importing ${bulkProgress.current}/${bulkProgress.total}`
-                        : 'Preparing...'
+                        ? t('profileImport.importing', { current: bulkProgress.current, total: bulkProgress.total })
+                        : t('profileImport.preparing')
                     }
                   </p>
                   {bulkProgress?.profile_name && (
@@ -499,7 +501,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                       />
                     </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      {Math.round((bulkProgress.current / bulkProgress.total) * 100)}% complete
+                      {t('profileImport.percentComplete', { percent: Math.round((bulkProgress.current / bulkProgress.total) * 100) })}
                     </p>
                   </div>
                 )}
@@ -518,7 +520,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                 )}
                 
                 <p className="text-xs text-center text-muted-foreground/70">
-                  Generating AI descriptions for each profile...
+                  {t('profileImport.generatingDescriptions')}
                 </p>
               </motion.div>
             )}
@@ -555,13 +557,13 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                   <CheckCircle size={40} weight="fill" className="text-green-500" />
                 </div>
                 <div>
-                  <p className="font-semibold text-lg">Profile Imported!</p>
+                  <p className="font-semibold text-lg">{t('profileImport.profileImported')}</p>
                   {importedProfileName && (
                     <p className="text-sm text-muted-foreground mt-1">{importedProfileName}</p>
                   )}
                 </div>
                 <Button onClick={handleClose} className="w-full">
-                  View in Catalogue
+                  {t('profileImport.viewInCatalogue')}
                 </Button>
               </motion.div>
             )}
@@ -579,27 +581,27 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                   <CheckCircle size={40} weight="fill" className="text-green-500" />
                 </div>
                 <div>
-                  <p className="font-semibold text-lg">Import Complete!</p>
+                  <p className="font-semibold text-lg">{t('profileImport.importComplete')}</p>
                   <div className="flex items-center justify-center gap-4 mt-2 text-sm">
                     {bulkProgress?.imported !== undefined && bulkProgress.imported > 0 && (
                       <span className="text-green-500">
-                        {bulkProgress.imported} imported
+                        {bulkProgress.imported} {t('profileImport.imported')}
                       </span>
                     )}
                     {bulkProgress?.skipped !== undefined && bulkProgress.skipped > 0 && (
                       <span className="text-muted-foreground">
-                        {bulkProgress.skipped} skipped
+                        {bulkProgress.skipped} {t('profileImport.skipped')}
                       </span>
                     )}
                     {bulkProgress?.failed !== undefined && bulkProgress.failed > 0 && (
                       <span className="text-destructive">
-                        {bulkProgress.failed} failed
+                        {bulkProgress.failed} {t('profileImport.failed')}
                       </span>
                     )}
                   </div>
                 </div>
                 <Button onClick={handleClose} className="w-full">
-                  View in Catalogue
+                  {t('profileImport.viewInCatalogue')}
                 </Button>
               </motion.div>
             )}
@@ -618,7 +620,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
                 <Button variant="outline" onClick={() => setStep('choose')} className="w-full">
-                  Try Again
+                  {t('profileImport.tryAgain')}
                 </Button>
               </motion.div>
             )}

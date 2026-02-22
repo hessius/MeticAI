@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from 'next-themes'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -206,6 +207,7 @@ const SHOT_QUOTES = [
 
 // Progress loader component with fake progress
 function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number }) {
+  const { t } = useTranslation()
   const [progress, setProgress] = useState(0)
   const [showQuote, setShowQuote] = useState(false)
   const [currentQuote] = useState(() => SHOT_QUOTES[Math.floor(Math.random() * SHOT_QUOTES.length)])
@@ -234,7 +236,7 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
       <div className="w-full max-w-xs space-y-2">
         <Progress value={progress} className="h-2" />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>Searching machine history...</span>
+          <span>{t('shotHistory.searching')}</span>
           <span>{Math.round(progress)}%</span>
         </div>
       </div>
@@ -247,7 +249,7 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
             exit={{ opacity: 0, y: -5 }}
             className="text-xs text-muted-foreground/60 text-center max-w-[200px]"
           >
-            Scanning shot logs from your Meticulous machine
+            {t('shotHistory.scanningLogs')}
           </motion.p>
         ) : (
           <motion.div
@@ -270,6 +272,7 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
 }
 
 export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
+  const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   const { shots, isLoading, isBackgroundRefreshing, error, lastFetched, fetchShotsByProfile, backgroundRefresh, fetchShotData } = useShotHistory()
@@ -1252,14 +1255,14 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                 <CaretLeft size={22} weight="bold" />
               </Button>
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-foreground truncate">Shot Details</h2>
+                <h2 className="text-lg font-bold text-foreground truncate">{t('shotHistory.shotDetails')}</h2>
                 <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
               </div>
             </div>
             <div className="flex items-center justify-center py-16">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <p className="text-sm text-muted-foreground">Loading shot data...</p>
+                <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
               </div>
             </div>
           </Card>
@@ -1270,7 +1273,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                 <CaretLeft size={22} weight="bold" />
               </Button>
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-foreground truncate">Shot Details</h2>
+                <h2 className="text-lg font-bold text-foreground truncate">{t('shotHistory.shotDetails')}</h2>
                 <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
               </div>
             </div>
@@ -1291,7 +1294,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   <CaretLeft size={22} weight="bold" />
                 </Button>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg font-bold text-foreground truncate">Shot Details</h2>
+                  <h2 className="text-lg font-bold text-foreground truncate">{t('shotHistory.shotDetails')}</h2>
                   <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
                 </div>
               </div>
@@ -1302,7 +1305,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   <div className="p-3 bg-secondary/40 rounded-xl border border-border/20">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Clock size={14} weight="bold" />
-                      <span className="text-xs font-medium">Duration</span>
+                      <span className="text-xs font-medium">{t('shotHistory.duration')}</span>
                     </div>
                     <p className="text-lg font-bold">
                       {selectedShot.total_time.toFixed(1)}s
@@ -1313,7 +1316,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   <div className="p-3 bg-secondary/40 rounded-xl border border-border/20">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Drop size={14} weight="fill" />
-                      <span className="text-xs font-medium">Yield</span>
+                      <span className="text-xs font-medium">{t('shotHistory.yield')}</span>
                     </div>
                     <p className="text-lg font-bold">
                       {selectedShot.final_weight.toFixed(1)}g
@@ -1324,7 +1327,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   <div className="p-3 bg-secondary/40 rounded-xl border border-border/20">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Thermometer size={14} weight="fill" />
-                      <span className="text-xs font-medium">Temp</span>
+                      <span className="text-xs font-medium">{t('shotHistory.temp')}</span>
                     </div>
                     <p className="text-lg font-bold">
                       {shotData.profile.temperature}°C
@@ -1340,21 +1343,21 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
                 >
                   <Play size={14} weight={activeAction === 'replay' ? 'fill' : 'bold'} />
-                  Replay
+                  {t('shotHistory.replay')}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="compare" 
                   className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
                 >
                   <GitDiff size={14} weight={activeAction === 'compare' ? 'fill' : 'bold'} />
-                  Compare
+                  {t('shotHistory.compare')}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="analyze" 
                   className="gap-1.5 text-xs data-[state=active]:bg-amber-500 dark:data-[state=active]:bg-amber-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-zinc-900 data-[state=active]:font-semibold"
                 >
                   <MagnifyingGlass size={14} weight={activeAction === 'analyze' ? 'fill' : 'bold'} />
-                  Analyze
+                  {t('shotHistory.analyze')}
                 </TabsTrigger>
               </TabsList>
 
@@ -1445,7 +1448,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       size="icon"
                       onClick={handleRestart}
                       className="h-10 w-10 rounded-full"
-                      title="Restart"
+                      title={t('shotHistory.restart')}
                     >
                       <ArrowCounterClockwise size={18} weight="bold" />
                     </Button>
@@ -1456,7 +1459,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       size="icon"
                       onClick={handlePlayPause}
                       className="h-10 w-10 rounded-full shadow-lg"
-                      title={isPlaying ? "Pause" : "Play"}
+                      title={isPlaying ? t('shotHistory.pause') : t('shotHistory.play')}
                     >
                       {isPlaying ? (
                         <Pause size={20} weight="fill" />
@@ -1502,7 +1505,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   {/* Shot Selector */}
                   <div className="p-3 bg-secondary/40 rounded-xl border border-border/20">
                     <div className="flex items-center justify-between mb-2">
-                      <Label className="text-xs font-medium text-muted-foreground">Compare with:</Label>
+                      <Label className="text-xs font-medium text-muted-foreground">{t('shotComparison.compareWith')}</Label>
                       {comparisonShot && (
                         <button 
                           onClick={handleClearComparison}
@@ -1516,11 +1519,11 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                     {loadingComparison ? (
                       <div className="flex items-center gap-2 py-2">
                         <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                        <span className="text-xs text-muted-foreground">Loading shot data...</span>
+                        <span className="text-xs text-muted-foreground">{t('common.loading')}</span>
                       </div>
                     ) : comparisonShot ? (
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-[10px]">Shot B</Badge>
+                        <Badge variant="secondary" className="text-[10px]">{t('shotComparison.shotB')}</Badge>
                         <span className="text-sm font-medium">{formatShotTime(comparisonShot)}</span>
                         <span className="text-xs text-muted-foreground">
                           {comparisonShot.final_weight?.toFixed(1)}g
@@ -1528,7 +1531,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       </div>
                     ) : selectableShots.length === 0 ? (
                       <p className="text-xs text-muted-foreground/60 py-2">
-                        No other shots available to compare
+                        {t('shotComparison.noOtherShots')}
                       </p>
                     ) : (
                       <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
@@ -1596,10 +1599,10 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                     
                     return (
                       <div className="grid grid-cols-2 gap-2">
-                        <StatCard label="Duration" icon={Clock} a={stats.duration.a} b={stats.duration.b} unit="s" diffPercent={stats.duration.diffPercent} higherIsBetter={false} />
-                        <StatCard label="Yield" icon={Drop} a={stats.yield.a} b={stats.yield.b} unit="g" diffPercent={stats.yield.diffPercent} higherIsBetter={true} />
-                        <StatCard label="Max Pressure" icon={Gauge} a={stats.maxPressure.a} b={stats.maxPressure.b} unit="bar" diffPercent={stats.maxPressure.diffPercent} higherIsBetter={false} />
-                        <StatCard label="Max Flow" icon={Waves} a={stats.maxFlow.a} b={stats.maxFlow.b} unit="ml/s" diffPercent={stats.maxFlow.diffPercent} higherIsBetter={false} />
+                        <StatCard label={t('shotHistory.duration')} icon={Clock} a={stats.duration.a} b={stats.duration.b} unit="s" diffPercent={stats.duration.diffPercent} higherIsBetter={false} />
+                        <StatCard label={t('shotHistory.yield')} icon={Drop} a={stats.yield.a} b={stats.yield.b} unit="g" diffPercent={stats.yield.diffPercent} higherIsBetter={true} />
+                        <StatCard label={t('shotHistory.maxPressure')} icon={Gauge} a={stats.maxPressure.a} b={stats.maxPressure.b} unit="bar" diffPercent={stats.maxPressure.diffPercent} higherIsBetter={false} />
+                        <StatCard label={t('shotHistory.maxFlow')} icon={Waves} a={stats.maxFlow.a} b={stats.maxFlow.b} unit="ml/s" diffPercent={stats.maxFlow.diffPercent} higherIsBetter={false} />
                       </div>
                     )
                   })()}
@@ -1672,7 +1675,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             size="icon"
                             onClick={handleComparisonRestart}
                             className="h-8 w-8 rounded-full"
-                            title="Restart"
+                            title={t('shotHistory.restart')}
                           >
                             <ArrowCounterClockwise size={14} weight="bold" />
                           </Button>
@@ -1682,7 +1685,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             size="icon"
                             onClick={handleComparisonPlayPause}
                             className="h-10 w-10 rounded-full shadow-lg"
-                            title={comparisonIsPlaying ? "Pause" : "Play"}
+                            title={comparisonIsPlaying ? t('shotHistory.pause') : t('shotHistory.play')}
                           >
                             {comparisonIsPlaying ? (
                               <Pause size={20} weight="fill" />
@@ -1719,7 +1722,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                   {!comparisonShot && !loadingComparison && selectableShots.length > 0 && (
                     <div className="text-center py-4">
                       <GitDiff size={28} className="mx-auto mb-2 text-muted-foreground/30" weight="duotone" />
-                      <p className="text-xs text-muted-foreground/50">Select a shot above to see comparison</p>
+                      <p className="text-xs text-muted-foreground/50">{t('shotComparison.selectShot')}</p>
                     </div>
                   )}
                   </motion.div>
@@ -1743,14 +1746,14 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         <ChartLine size={32} className="text-muted-foreground/60" weight="duotone" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground/80">Shot Analysis</p>
+                        <p className="text-sm font-medium text-foreground/80">{t('shotHistory.shotAnalysis')}</p>
                         <p className="text-xs text-muted-foreground/60 mt-1 max-w-[250px] mx-auto">
-                          Compare shot execution against profile targets, exit triggers, and limits.
+                          {t('shotHistory.analysisDescription')}
                         </p>
                       </div>
                       <Button variant="default" size="sm" className="mt-2" onClick={handleAnalyze}>
                         <ChartLine size={14} weight="bold" className="mr-1.5" />
-                        Analyze Shot
+                        {t('shotHistory.analyzeShot')}
                       </Button>
                     </div>
                   )}
@@ -1765,9 +1768,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         <div className="absolute inset-0 rounded-2xl border-2 border-primary/30 animate-ping" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-foreground/80">Analyzing Shot...</p>
+                        <p className="text-sm font-medium text-foreground/80">{t('shotHistory.analyzingShot')}</p>
                         <p className="text-xs text-muted-foreground/60">
-                          Comparing stages against profile targets
+                          {t('shotHistory.comparingStages')}
                         </p>
                       </div>
                     </div>
@@ -1783,7 +1786,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       <div className="flex justify-center">
                         <Button variant="outline" size="sm" onClick={handleAnalyze}>
                           <ArrowsCounterClockwise size={14} weight="bold" className="mr-1.5" />
-                          Try Again
+                          {t('common.tryAgain')}
                         </Button>
                       </div>
                     </div>
@@ -1798,12 +1801,12 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         <div className="p-4 bg-gradient-to-br from-primary/10 via-secondary/30 to-secondary/20 rounded-xl border border-primary/20">
                           <div className="flex items-center gap-2 mb-3">
                             <ChartLine size={20} weight="fill" className="text-primary" />
-                            <span className="text-base font-semibold">Shot Summary</span>
+                            <span className="text-base font-semibold">{t('shotHistory.shotSummary')}</span>
                             <span className="ml-auto text-xs text-muted-foreground">{profileName}</span>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className="text-xs text-muted-foreground">Weight</span>
+                              <span className="text-xs text-muted-foreground">{t('shotHistory.weight')}</span>
                               <div className="flex items-baseline gap-1">
                                 <span className="text-xl font-bold">{analysisResult.shot_summary.final_weight}g</span>
                                 {analysisResult.shot_summary.target_weight && (
@@ -1822,15 +1825,15 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             )}
                           </div>
                           <div>
-                            <span className="text-xs text-muted-foreground">Duration</span>
+                            <span className="text-xs text-muted-foreground">{t('shotHistory.duration')}</span>
                             <div className="text-xl font-bold">{analysisResult.shot_summary.total_time}s</div>
                           </div>
                           <div>
-                            <span className="text-xs text-muted-foreground">Max Pressure</span>
+                            <span className="text-xs text-muted-foreground">{t('shotHistory.maxPressure')}</span>
                             <div className="text-lg font-semibold">{analysisResult.shot_summary.max_pressure} bar</div>
                           </div>
                           <div>
-                            <span className="text-xs text-muted-foreground">Max Flow</span>
+                            <span className="text-xs text-muted-foreground">{t('shotHistory.maxFlow')}</span>
                             <div className="text-lg font-semibold">{analysisResult.shot_summary.max_flow} ml/s</div>
                           </div>
                         </div>
@@ -1892,7 +1895,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         }`}>
                           <div className="flex items-center gap-2 mb-2">
                             <Drop size={16} weight="bold" className="text-cyan-700 dark:text-cyan-400" />
-                            <span className="text-sm font-semibold">Pre-infusion</span>
+                            <span className="text-sm font-semibold">{t('shotHistory.preinfusion')}</span>
                             {analysisResult.preinfusion_summary.weight_percent_of_total > 10 && (
                               <Badge variant="outline" className="ml-auto text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
                                 {analysisResult.preinfusion_summary.weight_percent_of_total.toFixed(1)}% of shot volume
@@ -1901,15 +1904,15 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           </div>
                           <div className="flex flex-wrap items-center gap-4 text-sm">
                             <div>
-                              <span className="text-muted-foreground/60">Duration: </span>
+                              <span className="text-muted-foreground/60">{t('shotHistory.durationLabel')}</span>
                               <span className="font-medium">{analysisResult.preinfusion_summary.total_time}s</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground/60">Time %: </span>
+                              <span className="text-muted-foreground/60">{t('shotHistory.timePercent')}</span>
                               <span className="font-medium">{analysisResult.preinfusion_summary.proportion_of_shot}%</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground/60">Weight: </span>
+                              <span className="text-muted-foreground/60">{t('shotHistory.weightLabel')}</span>
                               <span className={`font-medium ${
                                 analysisResult.preinfusion_summary.weight_percent_of_total > 10 
                                   ? 'text-amber-700 dark:text-amber-400' 
@@ -1920,7 +1923,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             </div>
                           </div>
                           <p className="text-xs text-muted-foreground/60 mt-2">
-                            Stages: {analysisResult.preinfusion_summary.stages.join(', ')}
+                            {t('shotHistory.stagesLabel')}{analysisResult.preinfusion_summary.stages.join(', ')}
                           </p>
                           
                           {/* Pre-infusion Issues */}
@@ -1945,7 +1948,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           {/* Pre-infusion Recommendations */}
                           {analysisResult.preinfusion_summary.recommendations?.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-border/20">
-                              <p className="text-xs text-muted-foreground/60 mb-1">Recommendations:</p>
+                              <p className="text-xs text-muted-foreground/60 mb-1">{t('shotHistory.recommendations')}</p>
                               <ul className="space-y-1">
                                 {analysisResult.preinfusion_summary.recommendations.map((rec, idx) => (
                                   <li key={idx} className="text-xs text-primary/80 flex items-start gap-1.5">
@@ -2001,29 +2004,29 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           }`}>
                             <div className="flex items-center gap-2 mb-2">
                               <Gauge size={16} weight="bold" className="text-green-700 dark:text-green-400" />
-                              <span className="text-sm font-semibold">Extraction</span>
+                              <span className="text-sm font-semibold">{t('shotHistory.extraction')}</span>
                               {reachedGoals.length > 0 && (
                                 <Badge variant="outline" className="ml-auto text-xs bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
-                                  {reachedGoals.length} goal{reachedGoals.length !== 1 ? 's' : ''} reached
+                                  {t('shotHistory.goalsReached', { reached: reachedGoals.length, total: extractionStages.length })}
                                 </Badge>
                               )}
                             </div>
                             <div className="flex flex-wrap items-center gap-4 text-sm">
                               <div>
-                                <span className="text-muted-foreground/60">Duration: </span>
+                                <span className="text-muted-foreground/60">{t('shotHistory.durationLabel')}</span>
                                 <span className="font-medium">{extractionTime.toFixed(1)}s</span>
                               </div>
                               <div>
-                                <span className="text-muted-foreground/60">Time %: </span>
+                                <span className="text-muted-foreground/60">{t('shotHistory.timePercent')}</span>
                                 <span className="font-medium">{extractionPercent}%</span>
                               </div>
                               <div>
-                                <span className="text-muted-foreground/60">Weight: </span>
+                                <span className="text-muted-foreground/60">{t('shotHistory.weightLabel')}</span>
                                 <span className="font-medium">{extractionWeight.toFixed(1)}g</span>
                               </div>
                             </div>
                             <p className="text-xs text-muted-foreground/60 mt-2">
-                              Stages: {extractionStages.map(s => s.stage_name).join(', ')}
+                              {t('shotHistory.stagesLabel')}{extractionStages.map(s => s.stage_name).join(', ')}
                             </p>
                             
                             {/* Extraction stage summaries */}
@@ -2060,7 +2063,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       <div className="p-4 bg-secondary/40 rounded-xl border border-border/20">
                         <div className="flex items-center gap-2 mb-4">
                           <ChartLine size={16} weight="bold" className="text-primary" />
-                          <span className="text-sm font-semibold">Stage Analysis</span>
+                          <span className="text-sm font-semibold">{t('shotHistory.stageAnalysis')}</span>
                           <Badge variant="secondary" className="text-xs ml-auto">
                             {analysisResult.stage_analyses.filter(s => s.executed).length}/{analysisResult.stage_analyses.length} executed
                           </Badge>
@@ -2110,11 +2113,11 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                       'bg-blue-500/20 text-blue-700 dark:text-blue-300'
                                     }`}
                                   >
-                                    {stage.assessment.status === 'reached_goal' ? '✓ Reached Goal' :
-                                     stage.assessment.status === 'hit_limit' ? '⚠ Hit Limit' :
-                                     stage.assessment.status === 'not_reached' ? '✗ Not Reached' :
-                                     stage.assessment.status === 'failed' ? '✗ Failed' :
-                                     stage.assessment.status === 'incomplete' ? '◐ Incomplete' :
+                                    {stage.assessment.status === 'reached_goal' ? t('shotHistory.goalReached') :
+                                     stage.assessment.status === 'hit_limit' ? t('shotHistory.hitLimit') :
+                                     stage.assessment.status === 'not_reached' ? t('shotHistory.notReached') :
+                                     stage.assessment.status === 'failed' ? t('shotHistory.stageFailed') :
+                                     stage.assessment.status === 'incomplete' ? t('shotHistory.incomplete') :
                                      stage.assessment.status}
                                   </Badge>
                                 )}
@@ -2122,14 +2125,14 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                               
                               {/* Profile Target */}
                               <div className="mb-3 p-2 bg-background/40 rounded-md">
-                                <span className="text-xs text-muted-foreground block mb-1">Profile Target:</span>
+                                <span className="text-xs text-muted-foreground block mb-1">{t('shotHistory.profileTarget')}:</span>
                                 <span className="text-sm font-medium">{stage.profile_target}</span>
                               </div>
                               
                               {/* Exit Triggers */}
                               {stage.exit_triggers.length > 0 && (
                                 <div className="mb-3">
-                                  <span className="text-xs text-muted-foreground block mb-1.5">Exit Triggers:</span>
+                                  <span className="text-xs text-muted-foreground block mb-1.5">{t('shotHistory.exitTriggers')}</span>
                                   <div className="flex flex-wrap gap-2">
                                     {stage.exit_triggers.map((trigger, tIdx) => {
                                       const wasTriggered = stage.exit_trigger_result?.triggered?.type === trigger.type
@@ -2166,7 +2169,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                               {/* Limits */}
                               {stage.limits.length > 0 && (
                                 <div className="mb-3">
-                                  <span className="text-xs text-muted-foreground block mb-1.5">Limits:</span>
+                                  <span className="text-xs text-muted-foreground block mb-1.5">{t('shotHistory.limits')}</span>
                                   <div className="flex flex-wrap gap-2">
                                     {stage.limits.map((limit, lIdx) => (
                                       <div 
@@ -2196,19 +2199,19 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                               {stage.execution_data && (
                                 <div className="grid grid-cols-4 gap-2 p-2 bg-background/40 rounded-md text-center">
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">Duration</span>
+                                    <span className="text-xs text-muted-foreground block">{t('shotHistory.duration')}</span>
                                     <span className="text-sm font-medium">{stage.execution_data.duration}s</span>
                                   </div>
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">Weight</span>
+                                    <span className="text-xs text-muted-foreground block">{t('shotHistory.weight')}</span>
                                     <span className="text-sm font-medium">+{stage.execution_data.weight_gain}g</span>
                                   </div>
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">Pressure</span>
+                                    <span className="text-xs text-muted-foreground block">{t('shotHistory.maxPressure')}</span>
                                     <span className="text-sm font-medium">{stage.execution_data.avg_pressure} bar</span>
                                   </div>
                                   <div>
-                                    <span className="text-xs text-muted-foreground block">Flow</span>
+                                    <span className="text-xs text-muted-foreground block">{t('shotHistory.maxFlow')}</span>
                                     <span className="text-sm font-medium">{stage.execution_data.avg_flow} ml/s</span>
                                   </div>
                                 </div>
@@ -2236,7 +2239,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           className="gap-1.5 w-full"
                         >
                           <DownloadSimple size={14} weight="bold" />
-                          {isExportingAnalysis ? 'Exporting...' : 'Export as Image'}
+                          {isExportingAnalysis ? t('shotHistory.exporting') : t('shotHistory.exportAsImage')}
                         </Button>
                         
                         {/* Show "View" if cached, otherwise "Get" */}
@@ -2248,7 +2251,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
-                            View AI Analysis
+                            {t('shotHistory.viewAiAnalysis')}
                           </Button>
                         ) : (
                           <Button
@@ -2259,7 +2262,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
-                            Get AI Analysis
+                            {t('shotHistory.getAiAnalysis')}
                           </Button>
                         )}
                       </div>
@@ -2340,7 +2343,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                     {activeAction === 'compare' && !comparisonShotData && (
                       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40">
                         <GitDiff size={48} weight="duotone" />
-                        <p className="text-sm mt-3">Select a shot to compare</p>
+                        <p className="text-sm mt-3">{t('shotComparison.selectShotDesktop')}</p>
                       </div>
                     )}
 
@@ -2372,7 +2375,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                     {activeAction === 'analyze' && !analysisResult && (
                       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40">
                         <MagnifyingGlass size={48} weight="duotone" />
-                        <p className="text-sm mt-3">Run analysis to see graph overlay</p>
+                        <p className="text-sm mt-3">{t('shotHistory.runAnalysisForOverlay')}</p>
                       </div>
                     )}
                   </div>
@@ -2382,7 +2385,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
         ) : (
             <Card className="p-6">
             <p className="text-center text-muted-foreground py-8">
-              No data available for this shot
+              {t('shotHistory.noData')}
             </p>
             </Card>
           )}
@@ -2413,9 +2416,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold tracking-tight">Shot History</h2>
+                <h2 className="text-lg font-bold tracking-tight">{t('shotHistory.title')}</h2>
                 <Badge variant="secondary" className="shrink-0">
-                  {shots.length} shots
+                  {t('shotHistory.shotsCount', { count: shots.length })}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground/70 break-words line-clamp-2">
@@ -2443,7 +2446,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <ArrowsCounterClockwise size={12} className="animate-spin" weight="bold" />
-                Checking for new shots...
+                {t('shotHistory.checkingNewShots')}
               </span>
             </div>
             <Progress value={undefined} className="h-1" />
@@ -2457,9 +2460,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
             <div className="p-4 rounded-2xl bg-secondary/40 inline-block mb-4">
               <ChartLine size={40} className="text-muted-foreground/40" weight="duotone" />
             </div>
-            <p className="text-foreground/80 font-medium">No shots found</p>
+            <p className="text-foreground/80 font-medium">{t('shotHistory.noShots')}</p>
             <p className="text-sm text-muted-foreground/60 mt-1.5">
-              No shots have been pulled with this profile yet
+              {t('shotHistory.noShotsDescription')}
             </p>
           </div>
         ) : (
@@ -2524,7 +2527,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
               className="w-full h-9 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               <ArrowsCounterClockwise size={16} weight="bold" className={`mr-2 ${isBackgroundRefreshing ? 'animate-spin' : ''}`} />
-              {isBackgroundRefreshing ? 'Refreshing...' : 'Check for New Shots'}
+              {isBackgroundRefreshing ? t('shotHistory.refreshing') : t('shotHistory.checkForNewShots')}
             </Button>
           </div>
         )}
