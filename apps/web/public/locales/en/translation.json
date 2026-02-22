@@ -287,6 +287,7 @@
     "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
     "addToHomeAssistant": "Add to Home Assistant",
     "homeAssistantDescription": "Connect Home Assistant to MeticAI's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
+    "homeAssistantGuide": "Home Assistant Guide",
     "poweredBy": "Powered by",
     "credits": {
       "pyMeticulous": "Official Python client for the Meticulous API",
@@ -366,7 +367,8 @@
       "guideTitle": "How to access MeticAI remotely:",
       "guideStep1": "Install Tailscale on your phone or laptop from tailscale.com/download",
       "guideStep2": "Sign in with the same account used during MeticAI setup",
-      "guideStep3": "Open this URL from any device on your Tailscale network:"
+      "guideStep3": "Open this URL from any device on your Tailscale network:",
+      "setupGuide": "Setup Guide"
     },
     "updateMethod": {
       "watchtower": "Automatic updates via Watchtower",

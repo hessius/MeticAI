@@ -37,7 +37,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="${INSTALL_DIR:-${HOME}/.meticai}"
+INSTALL_DIR="${INSTALL_DIR:-${HOME}/meticai}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 if [[ "$REPO_BRANCH" == "main" ]]; then
     METICAI_TAG="${METICAI_TAG:-latest}"

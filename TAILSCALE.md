@@ -41,7 +41,7 @@ Tailscale Auth Key: tskey-auth-xxxxx
 ### Option B: Add to an Existing Installation
 
 ```bash
-cd ~/.meticai   # or wherever MeticAI is installed
+cd ~/meticai   # or wherever MeticAI is installed
 
 # 1. Add your auth key to .env
 echo "TAILSCALE_AUTHKEY=tskey-auth-xxxxx" >> .env
@@ -67,7 +67,7 @@ Tailscale can automatically provision TLS certificates for your MeticAI instance
 3. Restart the Tailscale sidecar to pick up the change:
 
 ```bash
-cd ~/.meticai
+cd ~/meticai
 docker compose -f docker-compose.yml -f docker-compose.tailscale.yml restart tailscale
 ```
 

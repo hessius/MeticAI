@@ -141,7 +141,7 @@ If you prefer not to clone the entire repository, you can download just the comp
 
 ```bash
 # Create configuration directory
-mkdir -p ~/.meticai && cd ~/.meticai
+mkdir -p ~/meticai && cd ~/meticai
 
 # Download and inspect the compose file BEFORE running it
 # Use a specific commit hash for reproducibility and security
@@ -253,7 +253,7 @@ MeticAI v2.0 uses Docker for simple updates:
 
 **Quick update:**
 ```bash
-cd ~/.meticai
+cd ~/meticai
 docker compose pull
 docker compose up -d
 ```
@@ -275,9 +275,9 @@ curl -X POST http://localhost:8080/v1/update \
 ## 🗑️ Uninstalling MeticAI
 
 ```bash
-cd ~/.meticai
+cd ~/meticai
 docker compose down -v  # -v removes all volumes and data
-rm -rf ~/.meticai
+rm -rf ~/meticai
 ```
 
 **Note:** To verify volume names before removal, use `docker volume ls`
@@ -290,7 +290,7 @@ Access MeticAI from anywhere using Tailscale:
 2. Enable during installation, or add manually:
 
 ```bash
-cd ~/.meticai
+cd ~/meticai
 echo "TAILSCALE_AUTHKEY=your_key_here" >> .env
 docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 ```
@@ -352,7 +352,7 @@ docker exec meticai s6-svc -r /run/service/server
 
 ```bash
 # Check logs
-cd ~/.meticai && docker compose logs -f
+cd ~/meticai && docker compose logs -f
 
 # Check container status
 docker compose ps
@@ -374,7 +374,7 @@ docker compose logs meticai | grep -i error
 ### Reset everything
 
 ```bash
-cd ~/.meticai
+cd ~/meticai
 docker compose down -v  # -v removes volumes
 docker compose pull
 docker compose up -d

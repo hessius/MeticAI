@@ -25,7 +25,8 @@ import {
   House,
   Key,
   Link as LinkIcon,
-  Copy
+  Copy,
+  Question
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -641,7 +642,18 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
             {/* MQTT Bridge */}
             <div className="space-y-3 pt-2 border-t border-border">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Control Center</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Control Center</h3>
+                <a
+                  href="https://github.com/hessius/MeticAI/blob/main/HOME_ASSISTANT.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  title={t('settings.homeAssistantGuide')}
+                >
+                  <Question size={14} weight="bold" />
+                </a>
+              </div>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="mqtt-toggle" className="text-sm font-medium">
@@ -830,7 +842,18 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       {/* Remote Access (Tailscale) Section — always visible */}
       <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-primary">{t('settings.tailscale.title')}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-primary">{t('settings.tailscale.title')}</h3>
+            <a
+              href="https://github.com/hessius/MeticAI/blob/main/TAILSCALE.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors"
+              title={t('settings.tailscale.setupGuide')}
+            >
+              <Question size={18} weight="bold" />
+            </a>
+          </div>
           {tailscaleStatus?.connected && (
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-green-500" />

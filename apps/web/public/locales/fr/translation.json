@@ -356,7 +356,8 @@
       "guideTitle": "Comment accéder à MeticAI à distance :",
       "guideStep1": "Installez Tailscale sur votre téléphone ou ordinateur depuis tailscale.com/download",
       "guideStep2": "Connectez-vous avec le même compte utilisé lors de la configuration de MeticAI",
-      "guideStep3": "Ouvrez cette URL depuis n'importe quel appareil sur votre réseau Tailscale :"
+      "guideStep3": "Ouvrez cette URL depuis n'importe quel appareil sur votre réseau Tailscale :",
+      "setupGuide": "Guide d'installation"
     },
     "updateMethod": {
       "watchtower": "Mises à jour automatiques via Watchtower",
@@ -370,6 +371,7 @@
     "footer": "MeticAI • Conçu avec ❤️ pour les amateurs de café",
     "addToHomeAssistant": "Add to Home Assistant",
     "homeAssistantDescription": "Connect Home Assistant to MeticAI's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
+    "homeAssistantGuide": "Guide Home Assistant",
     "poweredBy": "Powered by",
     "credits": {
       "pyMeticulous": "Official Python client for the Meticulous API",

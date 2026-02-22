@@ -146,8 +146,8 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 # Configuration
 # ==============================================================================
 
-@test "Script installs to ~/.meticai by default" {
-    run grep -q 'INSTALL_DIR=.*HOME.*\.meticai' "$SCRIPT_PATH"
+@test "Script installs to ~/meticai by default" {
+    run grep -q 'INSTALL_DIR=.*HOME.*/meticai' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
