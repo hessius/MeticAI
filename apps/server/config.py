@@ -45,7 +45,11 @@ class Config:
     
     # Data Directories
     if TEST_MODE:
-        DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
+        data_dir_env = os.environ.get("DATA_DIR")
+        if data_dir_env:
+            DATA_DIR = Path(data_dir_env)
+        else:
+            DATA_DIR = Path(tempfile.gettempdir()) / "meticai_test_data"
         DATA_DIR.mkdir(parents=True, exist_ok=True)
     else:
         DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
