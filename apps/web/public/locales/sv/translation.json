@@ -633,10 +633,6 @@
       "purgeAfterShot": "Spola",
       "waitingForShot": "Väntar på att bryggningen ska starta…",
       "waitingDesc": "Diagrammet visas när extraktionen börjar.",
-      "simulate": "Simulate",
-      "simulateLoading": "Loading…",
-      "stopSimulation": "Stop Simulation",
-      "simulationStarted": "Simulation started",
       "stages": "Stages"
     },
     "pourWater": {

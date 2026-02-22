@@ -633,10 +633,6 @@
       "purgeAfterShot": "Spülen",
       "waitingForShot": "Warte auf Bezug…",
       "waitingDesc": "Das Diagramm erscheint sobald die Extraktion beginnt.",
-      "simulate": "Simulate",
-      "simulateLoading": "Loading…",
-      "stopSimulation": "Stop Simulation",
-      "simulationStarted": "Simulation started",
       "stages": "Stages"
     },
     "pourWater": {
