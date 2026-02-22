@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "kill": "fuser -k 5000/tcp",
+        "kill": "fuser -k ${PORT:-5173}/tcp",
         "build": "tsc -b --noCheck && vite build",
         "lint": "eslint .",
         "optimize": "vite optimize",
