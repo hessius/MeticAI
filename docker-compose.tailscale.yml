@@ -15,7 +15,6 @@ services:
   tailscale:
     image: tailscale/tailscale:latest
     container_name: meticai-tailscale
-    hostname: meticai
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -24,9 +23,12 @@ services:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=true
+      - TS_HOSTNAME=meticai
       - TS_SERVE_CONFIG=/config/serve.json
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
     volumes:
       - tailscale-state:/var/lib/tailscale
+      - tailscale-sock:/var/run/tailscale
       - ./tailscale-serve.json:/config/serve.json:ro
     network_mode: service:meticai
     logging:
@@ -38,6 +40,13 @@ services:
     # so Docker Compose automatically starts meticai first — no
     # additional depends_on is needed (and adding one would cause a cycle).
 
+  # Overlay: mount Tailscale socket into the main container
+  meticai:
+    volumes:
+      - tailscale-sock:/var/run/tailscale:ro
+
 volumes:
   tailscale-state:
     name: meticai-tailscale-state
+  tailscale-sock:
+    name: meticai-tailscale-sock
