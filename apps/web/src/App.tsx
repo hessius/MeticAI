@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
@@ -43,6 +44,7 @@ import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
 function App() {
+  const { t } = useTranslation()
   const [isInitializing, setIsInitializing] = useState(true)
   const [viewState, setViewState] = useState<ViewState>('start')
   const [profileCount, setProfileCount] = useState<number | null>(null)
@@ -184,7 +186,7 @@ function App() {
     const file = e.target.files?.[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
-        setErrorMessage('Please upload an image file (JPG, PNG, etc.)')
+        setErrorMessage(t('app.errors.uploadImage'))
         return
       }
       setImageFile(file)
@@ -214,7 +216,7 @@ function App() {
 
   const handleSubmit = async () => {
     if (!imageFile && !userPrefs.trim() && selectedTags.length === 0) {
-      setErrorMessage('Please provide at least a coffee bag photo or taste preferences')
+      setErrorMessage(t('app.errors.provideInput'))
       return
     }
 
@@ -295,7 +297,7 @@ function App() {
       
       // Check if the API returned an error status
       if (data.status === 'error') {
-        throw new Error((data as unknown as { message?: string }).message || 'Profile generation failed on the server')
+        throw new Error((data as unknown as { message?: string }).message || t('app.errors.generateFailedGeneric'))
       }
       
       setApiResponse(data)
@@ -366,8 +368,8 @@ function App() {
       console.error('Error:', error)
       setErrorMessage(
         error instanceof Error 
-          ? `Failed to generate profile: ${error.message}` 
-          : 'Failed to generate profile. Please check your connection and try again.'
+          ? t('app.errors.generateFailed', { message: error.message }) 
+          : t('app.errors.generateFailedGeneric')
       )
       setViewState('error')
     }
@@ -685,7 +687,7 @@ Special Notes: For maximum clarity and to really make those delicate floral note
                 >
                   <Card className="p-6">
                     <div className="flex items-center justify-center h-32">
-                      <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+                      <div className="animate-pulse text-muted-foreground text-sm">{t('app.loading')}</div>
                     </div>
                   </Card>
                 </motion.div>

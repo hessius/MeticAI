@@ -680,16 +680,16 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             {/* Appearance */}
             {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (
               <div className="space-y-3 pt-2 border-t border-border">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Appearance</h3>
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{t('appearance.title')}</h3>
                 
                 {/* Theme toggle */}
                 {onToggleTheme !== undefined && (
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="theme-toggle" className="text-sm font-medium">
-                        Use light mode
+                        {t('appearance.useLightMode')}
                       </Label>
-                      <p className="text-xs text-muted-foreground">Switch between light and dark theme</p>
+                      <p className="text-xs text-muted-foreground">{t('appearance.lightModeDescription')}</p>
                     </div>
                     <Switch
                       id="theme-toggle"
@@ -703,8 +703,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 {onSetFollowSystem !== undefined && (
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="system-theme-toggle" className="text-sm font-medium">Follow system theme</Label>
-                      <p className="text-xs text-muted-foreground">Automatically match your device settings</p>
+                      <Label htmlFor="system-theme-toggle" className="text-sm font-medium">{t('appearance.followSystemTheme')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('appearance.followSystemDescription')}</p>
                     </div>
                     <Switch
                       id="system-theme-toggle"
@@ -718,8 +718,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 {onToggleBlobs !== undefined && (
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="blob-toggle" className="text-sm font-medium">Background animations</Label>
-                      <p className="text-xs text-muted-foreground">Animated ambient blobs behind content</p>
+                      <Label htmlFor="blob-toggle" className="text-sm font-medium">{t('appearance.backgroundAnimations')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('appearance.animationsDescription')}</p>
                     </div>
                     <Switch
                       id="blob-toggle"

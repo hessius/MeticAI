@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ChartLine, Play } from '@phosphor-icons/react'
@@ -30,20 +31,20 @@ import {
 
 // Custom tooltip for the chart
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadItem[]; label?: number }) {
+  const { t } = useTranslation()
   if (!active || !payload || !payload.length) return null
   
-  // Find stage from the first payload item if available
   const stageData = payload[0]?.payload
   const stageName = stageData?.stage
   
   return (
     <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg">
       <p className="text-xs font-medium text-muted-foreground mb-1.5">
-        Time: {typeof label === 'number' ? label.toFixed(1) : '0'}s
+        {t('shotCharts.tooltipTime')}: {typeof label === 'number' ? label.toFixed(1) : '0'}s
       </p>
       {stageName && typeof stageName === 'string' && (
         <p className="text-xs font-medium text-primary mb-1.5">
-          Stage: {stageName}
+          {t('shotCharts.tooltipStage')}: {stageName}
         </p>
       )}
       <div className="space-y-1">
@@ -88,6 +89,7 @@ export function ReplayChart({
   isDark,
   variant = 'mobile'
 }: ReplayChartProps) {
+  const { t } = useTranslation()
   const isMobile = variant === 'mobile'
   const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
   const padding = isMobile ? 'p-1' : 'p-2'
@@ -99,12 +101,12 @@ export function ReplayChart({
       <div className="flex items-center justify-between">
         <Label className="text-sm font-semibold tracking-wide text-primary flex items-center gap-2">
           <ChartLine size={16} weight="bold" />
-          Extraction Graph
+          {t('shotCharts.extractionGraph')}
         </Label>
         {isPlaying && (
           <Badge variant="secondary" className="animate-pulse">
             <Play size={10} weight="fill" className="mr-1" />
-            Replaying {playbackSpeed}x
+            {t('shotCharts.replaying', { speed: playbackSpeed })}
           </Badge>
         )}
       </div>
@@ -185,6 +187,7 @@ export function CompareChart({
   isDark,
   variant = 'mobile'
 }: CompareChartProps) {
+  const { t } = useTranslation()
   const isMobile = variant === 'mobile'
   const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
   const padding = isMobile ? 'p-1' : 'p-2'
@@ -196,7 +199,7 @@ export function CompareChart({
       <div className="flex items-center justify-between">
         <Label className="text-sm font-semibold text-primary flex items-center gap-1.5">
           <ChartLine size={16} weight="bold" />
-          Extraction Comparison
+          {t('shotCharts.extractionComparison')}
         </Label>
         {comparisonIsPlaying && (
           <Badge variant="secondary" className="animate-pulse text-[10px]">
@@ -227,8 +230,8 @@ export function CompareChart({
         </div>
       </div>
       <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> Shot A (solid)</span>
-        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> Shot B (dashed)</span>
+        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> {t('shotCharts.shotASolid')}</span>
+        <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> {t('shotCharts.shotBDashed')}</span>
       </div>
     </>
   )
@@ -257,6 +260,7 @@ export function AnalyzeChart({
   isDark,
   variant = 'mobile'
 }: AnalyzeChartProps) {
+  const { t } = useTranslation()
   const isMobile = variant === 'mobile'
   const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
   const padding = isMobile ? 'p-1' : 'p-2'
@@ -267,10 +271,10 @@ export function AnalyzeChart({
       <div className="flex items-center justify-between">
         <Label className="text-sm font-semibold text-primary flex items-center gap-1.5">
           <ChartLine size={16} weight="bold" />
-          Shot vs Profile Target
+          {t('shotCharts.shotVsProfile')}
         </Label>
         {hasTargetCurves && (
-          <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20">Target overlay</Badge>
+          <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20">{t('shotCharts.targetOverlay')}</Badge>
         )}
       </div>
       <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding}`}>
@@ -331,13 +335,13 @@ export function AnalyzeChart({
       </div>
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.pressure }} /><span>Pressure</span></div>
-        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.flow }} /><span>Flow</span></div>
+        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.pressure }} /><span>{t('shotCharts.pressure')}</span></div>
+        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.flow }} /><span>{t('shotCharts.flow')}</span></div>
         {hasTargetCurves && <>
-          <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPressure, borderStyle: 'dashed' }} /><span>Target Pressure</span></div>
-          <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetFlow, borderStyle: 'dashed' }} /><span>Target Flow</span></div>
+          <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPressure, borderStyle: 'dashed' }} /><span>{t('shotCharts.targetPressure')}</span></div>
+          <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetFlow, borderStyle: 'dashed' }} /><span>{t('shotCharts.targetFlow')}</span></div>
           {profileTargetCurves?.some(p => p.target_power !== undefined) && (
-            <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPower, borderStyle: 'dashed' }} /><span>Target Power</span></div>
+            <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPower, borderStyle: 'dashed' }} /><span>{t('shotCharts.targetPower')}</span></div>
           )}
         </>}
       </div>

@@ -252,8 +252,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     setShotComplete(false)
     wasBrewingRef.current = false
     sim.start()
-    toast.success('Simulation started')
-  }, [sim])
+    toast.success(t('controlCenter.liveShot.simulationStarted'))
+  }, [sim, t])
 
   return (
     <motion.div
@@ -459,7 +459,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     disabled={!sim.ready}
                   >
                     <Lightning size={18} weight="fill" className="mr-2" />
-                    {sim.ready ? 'Simulate' : 'Loading…'}
+                    {sim.ready ? t('controlCenter.liveShot.simulate') : t('controlCenter.liveShot.simulateLoading')}
                   </Button>
                 </div>
               </>
@@ -578,7 +578,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 onClick={() => sim.stop()}
               >
                 <Stop size={14} weight="fill" className="mr-1" />
-                Stop Simulation
+                {t('controlCenter.liveShot.stopSimulation')}
               </Button>
             </div>
           )}
@@ -705,6 +705,7 @@ function LiveStageBreakdown({ stages, currentStage, completedStages }: {
   currentStage: string | null
   completedStages: string[]
 }) {
+  const { t } = useTranslation()
   const currentIdx = stages.findIndex(s => s.name === currentStage)
 
   return (
@@ -712,7 +713,7 @@ function LiveStageBreakdown({ stages, currentStage, completedStages }: {
       <div className="flex items-center gap-1.5 mb-2">
         <Coffee size={14} weight="duotone" className="text-primary" />
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Stages
+          {t('controlCenter.liveShot.stages')}
         </span>
       </div>
       <div className="space-y-1">
