@@ -173,7 +173,7 @@ docker compose up -d
 Open `http://YOUR_SERVER_IP:3550` in any browser to access the web interface!
 
 ### Need Help?
-- 📖 [Technical documentation](TECHNICAL.md)
+- � [API Reference](API.md)
 - 🔧 [Troubleshooting](#troubleshooting)
 
 ## 📱 Using MeticAI
@@ -321,6 +321,20 @@ MeticAI v2.0 runs as a single unified container with five internal services mana
 - **Watchtower** - Automatic container updates
 
 ## 🛠️ Troubleshooting
+
+### Viewing Logs
+
+```bash
+# Container logs (stdout)
+docker logs meticai -f
+
+# Structured logs via API (last 100 entries, filterable by level)
+curl http://<SERVER_IP>:3550/api/logs
+curl "http://<SERVER_IP>:3550/api/logs?level=ERROR&lines=200"
+
+# Restart a single service
+docker exec meticai s6-svc -r /run/service/server
+```
 
 ### Container won't start
 
