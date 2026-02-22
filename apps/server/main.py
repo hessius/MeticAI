@@ -203,11 +203,13 @@ async def log_requests(request: Request, call_next):
         # Re-raise to let FastAPI handle it
         raise
 
-# Configure CORS middleware to allow web app interactions
+# Configure CORS middleware to allow web app interactions.
+# allow_credentials=True is incompatible with allow_origins=["*"] per the CORS
+# spec (browsers reject it), so credentials are disabled for the wildcard case.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
