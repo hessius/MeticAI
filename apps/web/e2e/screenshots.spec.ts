@@ -12,17 +12,18 @@ const languages = [
 test.describe('Screenshot Generation', () => {
   for (const lang of languages) {
     test(`Home view - ${lang.name}`, async ({ page }, testInfo) => {
+      // Set the language via localStorage before navigating so i18next picks it up
+      await page.addInitScript((langCode) => {
+        localStorage.setItem('meticai-language', langCode);
+      }, lang.code);
+
       await page.goto('/');
       await page.waitForLoadState('domcontentloaded');
       await page.waitForSelector('text=MeticAI');
-      
-      // Select language
-      if (lang.code !== 'en') {
-        await page.click('[aria-label*="language"], [aria-label*="Language"]');
-        await page.getByText(lang.name).click();
-        await page.waitForTimeout(500);
-      }
-      
+
+      // Allow i18n to settle after page load
+      await page.waitForTimeout(500);
+
       await page.screenshot({
         path: testInfo.outputPath(`home_${lang.code}.png`),
         fullPage: true,
