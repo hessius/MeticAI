@@ -46,7 +46,7 @@ export default defineConfig({
   projects,
 
   webServer: {
-    command: 'bunx vite --host',
+    command: 'bunx vite --host --port 5173 --strictPort',
     url: 'http://localhost:5173',
     reuseExistingServer: !isCI,
     timeout: 120_000,
