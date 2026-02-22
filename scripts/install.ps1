@@ -33,6 +33,7 @@ param(
     [switch]$EnableTailscale,
     [string]$TailscaleAuthKey,
     [switch]$EnableWatchtower,
+    [switch]$EnableHomeAssistant,
     [switch]$NonInteractive
 )
 
@@ -194,6 +195,7 @@ function Install-MeticAI {
         [switch]$EnableTailscale,
         [string]$TailscaleAuthKey,
         [switch]$EnableWatchtower,
+        [switch]$EnableHomeAssistant,
         [switch]$NonInteractive
     )
 
@@ -332,6 +334,16 @@ function Install-MeticAI {
         Write-Host "     See: https://github.com/hessius/MeticAI/issues" -ForegroundColor DarkGray
     }
 
+    # Home Assistant MQTT
+    $haEnabled = $EnableHomeAssistant.IsPresent
+    if (-not $NonInteractive -and -not $haEnabled) {
+        $haEnabled = Get-YesNo -Prompt "Enable Home Assistant MQTT integration? (exposes port 1883)"
+    }
+    if ($haEnabled) {
+        $composeFiles += @("-f", "docker-compose.homeassistant.yml")
+        Write-LogSuccess "Home Assistant MQTT enabled (port 1883 exposed)"
+    }
+
     # ------------------------------------------------------------------
     # 6. Write configuration
     # ------------------------------------------------------------------
@@ -369,7 +381,11 @@ COMPOSE_FILES="$composeFilesString"
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.yml" -OutFile (Join-Path $InstallDir "docker-compose.yml")
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.tailscale.yml" -OutFile (Join-Path $InstallDir "docker-compose.tailscale.yml") -Optional
     Invoke-DownloadFile -Url "$RepoUrl/docker-compose.watchtower.yml" -OutFile (Join-Path $InstallDir "docker-compose.watchtower.yml") -Optional
+    Invoke-DownloadFile -Url "$RepoUrl/docker-compose.homeassistant.yml" -OutFile (Join-Path $InstallDir "docker-compose.homeassistant.yml") -Optional
     Invoke-DownloadFile -Url "$RepoUrl/tailscale-serve.json" -OutFile (Join-Path $InstallDir "tailscale-serve.json") -Optional
+    $dockerDir = Join-Path $InstallDir "docker"
+    if (-not (Test-Path $dockerDir)) { New-Item -ItemType Directory -Path $dockerDir -Force | Out-Null }
+    Invoke-DownloadFile -Url "$RepoUrl/docker/mosquitto-external.conf" -OutFile (Join-Path $dockerDir "mosquitto-external.conf") -Optional
 
     Write-LogSuccess "Compose files downloaded"
 
@@ -448,6 +464,7 @@ try {
                     -EnableTailscale:$EnableTailscale `
                     -TailscaleAuthKey $TailscaleAuthKey `
                     -EnableWatchtower:$EnableWatchtower `
+                    -EnableHomeAssistant:$EnableHomeAssistant `
                     -NonInteractive:$NonInteractive
 }
 catch {

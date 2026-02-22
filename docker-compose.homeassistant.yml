@@ -1,0 +1,29 @@
+# ==============================================================================
+# MeticAI Home Assistant Integration
+# ==============================================================================
+# Exposes the MQTT broker so Home Assistant (or other MQTT clients) can
+# subscribe to real-time machine telemetry.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
+#
+# Then in Home Assistant → Settings → Devices & Services → Add Integration:
+#   - Integration: MQTT
+#   - Broker: <MeticAI host IP>  (e.g. 192.168.50.22)
+#   - Port: 1883
+#   - No username/password required
+#
+# Available MQTT Topics:
+#   meticulous/status          – Machine connection state
+#   meticulous/sensors         – Real-time sensor data (temperature, pressure, flow, weight)
+#   meticulous/shot/active     – Active shot state
+#   meticulous/shot/history    – Shot completion events
+# ==============================================================================
+
+services:
+  meticai:
+    ports:
+      - "1883:1883"   # MQTT broker (for Home Assistant / external clients)
+    volumes:
+      - ./docker/mosquitto-external.conf:/etc/mosquitto/mosquitto.conf:ro
+
