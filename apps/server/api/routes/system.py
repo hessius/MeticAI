@@ -632,9 +632,16 @@ async def configure_tailscale(request: Request):
         restart_signaled = False
         if compose_changed:
             try:
-                import time
+                import time, tempfile
                 restart_signal = Path("/app/.restart-requested")
-                restart_signal.write_text(f"tailscale-config:{time.time()}\n")
+                tmp_fd, tmp_path = tempfile.mkstemp(dir=restart_signal.parent, prefix=".restart-tmp-")
+                try:
+                    with os.fdopen(tmp_fd, "w") as f:
+                        f.write(f"tailscale-config:{time.time()}\n")
+                    os.replace(tmp_path, str(restart_signal))
+                except Exception:
+                    Path(tmp_path).unlink(missing_ok=True)
+                    raise
                 restart_signaled = True
                 logger.info("Signaled host restart for Tailscale config change",
                            extra={"request_id": request_id})
@@ -707,9 +714,17 @@ async def trigger_update(request: Request):
         # This file is watched by systemd/launchd on the host (rebuild-watcher.sh)
         update_signal = Path("/app/.update-requested")
         
-        # Write a timestamp to trigger the file change
-        import time
-        update_signal.write_text(f"update-requested:{time.time()}\n")
+        # Atomic write: write to temp file then rename to avoid partial reads
+        import time, tempfile
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=update_signal.parent, prefix=".update-tmp-")
+        try:
+            with os.fdopen(tmp_fd, "w") as f:
+                f.write(f"update-requested:{time.time()}\n")
+            os.replace(tmp_path, str(update_signal))
+        except Exception:
+            # Clean up temp file on failure, then re-raise
+            Path(tmp_path).unlink(missing_ok=True)
+            raise
         
         logger.info(
             "Update triggered - signaled host via .update-requested",
@@ -763,9 +778,16 @@ async def restart_system(request: Request):
         # This file is watched by systemd/launchd on the host (rebuild-watcher.sh)
         restart_signal = Path("/app/.restart-requested")
         
-        # Write a timestamp to trigger the file change
-        import time
-        restart_signal.write_text(f"restart-requested:{time.time()}\n")
+        # Atomic write: write to temp file then rename to avoid partial reads
+        import time, tempfile
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=restart_signal.parent, prefix=".restart-tmp-")
+        try:
+            with os.fdopen(tmp_fd, "w") as f:
+                f.write(f"restart-requested:{time.time()}\n")
+            os.replace(tmp_path, str(restart_signal))
+        except Exception:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise
         
         logger.info(
             "Restart triggered - signaled host via .restart-requested",
