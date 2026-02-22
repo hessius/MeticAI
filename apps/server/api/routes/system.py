@@ -413,61 +413,57 @@ async def get_tailscale_status(request: Request):
             "login_url": None
         }
         
-        # Try tailscale status command
+        def _parse_ts_status(ts_data: dict) -> None:
+            """Fill status dict from tailscale status JSON."""
+            status["installed"] = True
+            backend_state = ts_data.get("BackendState", "")
+            status["connected"] = backend_state == "Running"
+            self_info = ts_data.get("Self", {})
+            status["hostname"] = self_info.get("HostName")
+            dns_name = self_info.get("DNSName", "")
+            if dns_name:
+                status["dns_name"] = dns_name.rstrip(".")
+                status["external_url"] = f"https://{status['dns_name']}"
+            ts_ips = self_info.get("TailscaleIPs", [])
+            if ts_ips:
+                status["ip"] = ts_ips[0]
+            if backend_state == "NeedsLogin":
+                status["auth_key_expired"] = True
+                status["connected"] = False
+                status["login_url"] = "https://login.tailscale.com/admin/settings/keys"
+        
+        # Strategy 1: native tailscale binary (host install)
         try:
             result = subprocess.run(
                 ["tailscale", "status", "--json"],
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
-                ts_data = json.loads(result.stdout)
-                status["installed"] = True
-                
-                backend_state = ts_data.get("BackendState", "")
-                status["connected"] = backend_state == "Running"
-                
-                self_info = ts_data.get("Self", {})
-                status["hostname"] = self_info.get("HostName")
-                
-                # Get DNS name (FQDN) for remote access URL
-                dns_name = self_info.get("DNSName", "")
-                if dns_name:
-                    # DNSName ends with a trailing dot — remove it
-                    status["dns_name"] = dns_name.rstrip(".")
-                    status["external_url"] = f"https://{status['dns_name']}"
-                
-                # Get Tailscale IPs
-                ts_ips = self_info.get("TailscaleIPs", [])
-                if ts_ips:
-                    status["ip"] = ts_ips[0]  # Primary IP
-                
-                # Check if auth key is expired (NeedsLogin state)
-                if backend_state == "NeedsLogin":
-                    status["auth_key_expired"] = True
-                    status["connected"] = False
-                    
-                    # Get login URL
-                    try:
-                        login_result = subprocess.run(
-                            ["tailscale", "up", "--json"],
-                            capture_output=True, text=True, timeout=5
-                        )
-                        if login_result.returncode == 0:
-                            login_data = json.loads(login_result.stdout)
-                            status["login_url"] = login_data.get("AuthURL")
-                    except Exception:
-                        status["login_url"] = "https://login.tailscale.com/admin/settings/keys"
-                        
+                _parse_ts_status(json.loads(result.stdout))
             elif result.returncode == 1 and "not running" in result.stderr.lower():
                 status["installed"] = True
                 status["connected"] = False
         except FileNotFoundError:
-            # tailscale binary not available
             pass
         except Exception as e:
             logger.debug(f"Tailscale status check failed: {e}", extra={"request_id": request_id})
         
-        # If not found natively, try via docker exec on sidecar
+        # Strategy 2: shared Tailscale socket (sidecar with volume mount)
+        if not status["installed"]:
+            ts_socket = "/var/run/tailscale/tailscaled.sock"
+            if os.path.exists(ts_socket):
+                try:
+                    result = subprocess.run(
+                        ["curl", "-sf", "--unix-socket", ts_socket,
+                         "http://local-tailscaled.sock/localapi/v0/status"],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if result.returncode == 0:
+                        _parse_ts_status(json.loads(result.stdout))
+                except Exception as e:
+                    logger.debug(f"Tailscale socket check failed: {e}", extra={"request_id": request_id})
+        
+        # Strategy 3: docker exec on sidecar container
         if not status["installed"]:
             try:
                 result = subprocess.run(
@@ -475,23 +471,7 @@ async def get_tailscale_status(request: Request):
                     capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0:
-                    ts_data = json.loads(result.stdout)
-                    status["installed"] = True
-                    backend_state = ts_data.get("BackendState", "")
-                    status["connected"] = backend_state == "Running"
-                    self_info = ts_data.get("Self", {})
-                    status["hostname"] = self_info.get("HostName")
-                    dns_name = self_info.get("DNSName", "")
-                    if dns_name:
-                        status["dns_name"] = dns_name.rstrip(".")
-                        status["external_url"] = f"https://{status['dns_name']}"
-                    ts_ips = self_info.get("TailscaleIPs", [])
-                    if ts_ips:
-                        status["ip"] = ts_ips[0]
-                    if backend_state == "NeedsLogin":
-                        status["auth_key_expired"] = True
-                        status["connected"] = False
-                        status["login_url"] = "https://login.tailscale.com/admin/settings/keys"
+                    _parse_ts_status(json.loads(result.stdout))
             except Exception:
                 pass
         

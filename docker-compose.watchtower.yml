@@ -19,10 +19,10 @@ services:
     restart: unless-stopped
     environment:
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=21600  # 6 hours
       - WATCHTOWER_LABEL_ENABLE=true     # Only update labeled containers
       - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}
       - WATCHTOWER_HTTP_API_UPDATE=true
+      - DOCKER_API_VERSION=1.44
     volumes:
       # Linux/macOS: /var/run/docker.sock
       # Windows (Docker Desktop): //./pipe/docker_engine:/var/run/docker.sock
@@ -36,4 +36,4 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
-    command: --http-api-metrics
+    command: --http-api-metrics --http-api-periodic-polls --interval 21600
