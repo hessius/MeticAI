@@ -11,20 +11,20 @@ const languages = [
 
 test.describe('Screenshot Generation', () => {
   for (const lang of languages) {
-    test(`Home view - ${lang.name}`, async ({ page }) => {
+    test(`Home view - ${lang.name}`, async ({ page }, testInfo) => {
       await page.goto('/');
       await page.waitForLoadState('domcontentloaded');
       await page.waitForSelector('text=MeticAI');
       
       // Select language
       if (lang.code !== 'en') {
-        await page.click('[aria-label*="language"], [aria-label*="Language"]').catch(() => {});
-        await page.getByText(lang.name).click().catch(() => {});
+        await page.click('[aria-label*="language"], [aria-label*="Language"]');
+        await page.getByText(lang.name).click();
         await page.waitForTimeout(500);
       }
       
       await page.screenshot({
-        path: `screenshots/home_${lang.code}.png`,
+        path: testInfo.outputPath(`home_${lang.code}.png`),
         fullPage: true,
       });
     });
