@@ -298,12 +298,14 @@ export function AnalyzeChart({
                     const pressurePoints = curves.filter(p => p.target_pressure !== undefined).sort((a, b) => a.time - b.time)
                     const flowPoints = curves.filter(p => p.target_flow !== undefined).sort((a, b) => a.time - b.time)
                     const powerPoints = curves.filter(p => p.target_power !== undefined).sort((a, b) => a.time - b.time)
+                    // Normalize power (0–100%) to the left axis range so it doesn't compress pressure/flow
+                    const pwScale = maxLeftAxis / 100
                     let pressurePath = ''
                     if (pressurePoints.length >= 2) pressurePath = pressurePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_pressure!)}`).join(' ')
                     let flowPath = ''
                     if (flowPoints.length >= 2) flowPath = flowPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_flow!)}`).join(' ')
                     let powerPath = ''
-                    if (powerPoints.length >= 2) powerPath = powerPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_power!)}`).join(' ')
+                    if (powerPoints.length >= 2) powerPath = powerPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_power! * pwScale)}`).join(' ')
                     return (
                       <g className="target-curves">
                         {pressurePath && <>
@@ -316,7 +318,7 @@ export function AnalyzeChart({
                         </>}
                         {powerPath && <>
                           <path d={powerPath} fill="none" stroke={CHART_COLORS.targetPower} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
-                          {powerPoints.map((p, i) => <circle key={`tpw-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_power!)} r={4} fill={CHART_COLORS.targetPower} />)}
+                          {powerPoints.map((p, i) => <circle key={`tpw-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_power! * pwScale)} r={4} fill={CHART_COLORS.targetPower} />)}
                         </>}
                       </g>
                     )

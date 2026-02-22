@@ -38,6 +38,7 @@ _FLOAT_SENSORS = frozenset({
     "external_temp_1", "external_temp_2",
     "pressure", "flow_rate", "shot_weight", "shot_timer",
     "preheat_countdown", "target_temperature", "target_weight",
+    "power",
 })
 
 _BOOL_SENSORS = frozenset({

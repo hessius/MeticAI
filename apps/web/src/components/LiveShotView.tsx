@@ -171,6 +171,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
       pressure: ms.pressure ?? 0,
       flow: ms.flow_rate ?? 0,
       weight: ms.shot_weight ?? 0,
+      power: ms.power ?? 0,
       stage: ms.state ?? undefined,
     }
 
@@ -181,6 +182,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     ms.shot_timer,
     ms.pressure,
     ms.flow_rate,
+    ms.power,
     ms.shot_weight,
     ms.state,
   ])
@@ -397,6 +399,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     stages={[]}
                     heightClass="h-[25vh] lg:h-[30vh] max-h-[250px]"
                     showWeight
+                    showPower
                     targetCurves={targetCurves}
                     xMax={liveXMax}
                   />
@@ -509,6 +512,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 heightClass="h-[40vh] lg:h-[50vh] max-h-[400px]"
                 liveMode
                 showWeight
+                showPower
                 targetCurves={targetCurves}
                 xMax={liveXMax}
               />
@@ -583,6 +587,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 stages={stages}
                 heightClass="h-[35vh] lg:h-[45vh] max-h-[360px]"
                 showWeight
+                showPower
                 targetCurves={targetCurves}
               />
             </Card>

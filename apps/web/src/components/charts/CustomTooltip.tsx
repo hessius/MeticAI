@@ -55,20 +55,29 @@ export function CustomTooltip({ active, payload, label, targetCurves }: CustomTo
         </p>
       )}
       <div className="space-y-1">
-        {payload.map((item, index) => (
-          <div key={index} className="flex items-center gap-2 text-xs">
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: item.color || '#888' }}
-            />
-            <span>
-              {typeof item.name === 'string' ? item.name : 'Value'}:
-            </span>
-            <span className="font-medium">
-              {typeof item.value === 'number' ? item.value.toFixed(2) : '-'}
-            </span>
-          </div>
-        ))}
+        {payload.map((item, index) => {
+          // For normalized power, show actual percentage instead of scaled value
+          const isPowerNorm = item.dataKey === 'powerNorm'
+          const displayValue = isPowerNorm
+            ? item.payload?.power
+            : item.value
+
+          return (
+            <div key={index} className="flex items-center gap-2 text-xs">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: item.color || '#888' }}
+              />
+              <span>
+                {typeof item.name === 'string' ? item.name : 'Value'}:
+              </span>
+              <span className="font-medium">
+                {typeof displayValue === 'number' ? displayValue.toFixed(isPowerNorm ? 1 : 2) : '-'}
+                {isPowerNorm && typeof displayValue === 'number' ? '%' : ''}
+              </span>
+            </div>
+          )
+        })}
       </div>
       {/* Goal values from profile target curves */}
       {(goalPressure !== null || goalFlow !== null || goalPower !== null) && (
