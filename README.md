@@ -39,7 +39,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 ### For Coffee Enthusiasts
 - 🎯 **Advanced Profiling** - Multi-stage extraction, blooming, pressure ramping
 - 📊 **Detailed Guidance** - Dose, grind, temperature recommendations
-- 🔬 **Science-Based** - Explanations of why each profile works
+- 🔬 **Expert Knowledge** - Explanations of why each profile works
 - ⚡️ **Modern Techniques** - Turbo shots, flow profiling, and more
 
 ### For Power Users
