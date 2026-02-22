@@ -41,7 +41,7 @@ For details: [TESTING.md](./TESTING.md) · [ACCESSIBILITY_TESTING.md](./ACCESSIB
 
 ## Tech Stack
 
-- **React 18** + TypeScript
+- **React 19** + TypeScript
 - **Vite** (build tool)
 - **Tailwind CSS v4** with CSS variables
 - **shadcn/ui** (New York style) + Radix UI primitives
