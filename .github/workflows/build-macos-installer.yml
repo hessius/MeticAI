@@ -113,7 +113,7 @@ jobs:
           echo "✅ Notarization complete"
 
       - name: Upload DMG Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: MeticAI-macOS-Installer
           path: macos-installer/build/MeticAI.dmg
@@ -126,12 +126,12 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
         
       - name: Download DMG Artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: MeticAI-macOS-Installer
           path: ./
@@ -193,7 +193,7 @@ jobs:
             
             ### Linux/Raspberry Pi Installation
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/v${{ steps.version.outputs.version }}/web_install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/v${{ steps.version.outputs.version }}/scripts/install.sh | bash
             ```
             
             ---
