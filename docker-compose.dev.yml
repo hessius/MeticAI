@@ -1,0 +1,15 @@
+# ==============================================================================
+# MeticAI Local Development Build Overlay
+# ==============================================================================
+# Adds build context so you can build the image locally instead of pulling
+# from GHCR.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# ==============================================================================
+
+services:
+  meticai:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.unified

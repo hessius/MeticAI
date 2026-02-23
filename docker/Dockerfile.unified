@@ -157,6 +157,10 @@ COPY docker/gemini-settings.json /root/.gemini/settings.json
 # Copy s6 service definitions
 COPY docker/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 
+# Copy data migration script (v1.x → v2.0 one-shot)
+COPY docker/scripts/data-migrate.sh /etc/s6-overlay/scripts/data-migrate
+RUN chmod +x /etc/s6-overlay/scripts/data-migrate
+
 # Create data directory for persistent storage
 VOLUME ["/data"]
 
