@@ -883,6 +883,11 @@ DATA_MIGRATE_TYPE="${BATS_TEST_DIRNAME}/../docker/s6-rc.d/data-migrate/type"
     [ "$status" -eq 0 ]
 }
 
+@test "Root update.sh respects METICAI_TAG from environment" {
+    run grep -q 'METICAI_TAG:-latest' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
 # --- docker-compose.yml changes ---
 
 @test "docker-compose.yml does NOT contain build: section" {
@@ -925,6 +930,11 @@ DATA_MIGRATE_TYPE="${BATS_TEST_DIRNAME}/../docker/s6-rc.d/data-migrate/type"
     [ "$status" -eq 0 ]
     run grep -q 'meticai-migration-token' "$COMPOSE_OVERRIDE"
     [ "$status" -eq 0 ]
+}
+
+@test "docker-compose.override.yml does NOT expose ports (avoids conflicts during migration)" {
+    run grep -q 'ports:' "$COMPOSE_OVERRIDE"
+    [ "$status" -ne 0 ]
 }
 
 # --- s6 data-migrate service ---

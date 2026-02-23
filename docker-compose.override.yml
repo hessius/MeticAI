@@ -26,8 +26,8 @@ services:
       - DOCKER_API_VERSION=1.44
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    ports:
-      - "127.0.0.1:8088:8080"
+    # No port binding — avoids conflicts with existing services during migration.
+    # The HTTP API is available via docker-compose.watchtower.yml for explicit installs.
     logging:
       driver: json-file
       options:
