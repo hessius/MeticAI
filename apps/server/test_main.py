@@ -1275,96 +1275,73 @@ class TestStatusEndpoint:
 
 
 class TestTriggerUpdateEndpoint:
-    """Tests for the /api/trigger-update endpoint."""
+    """Tests for the /api/trigger-update endpoint (Watchtower-based)."""
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.os.replace')
-    @patch('api.routes.system.os.fdopen')
-    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_success(self, mock_path_class, mock_mkstemp, mock_fdopen, mock_replace, client):
-        """Test successful update trigger."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path_class.return_value = mock_rebuild_file
-        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
-        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
+    @patch('httpx.AsyncClient')
+    def test_trigger_update_watchtower_success(self, mock_client_cls, client):
+        """Test successful update trigger via Watchtower HTTP API."""
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
         response = client.post("/api/trigger-update")
         
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert "message" in data
-        assert "host will pull updates and restart containers" in data["message"].lower()
-        
-        # Verify atomic write was called
-        mock_mkstemp.assert_called_once()
-        mock_replace.assert_called_once()
+        assert "watchtower" in data["message"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.tempfile.mkstemp', side_effect=OSError("Permission denied"))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_write_failure(self, mock_path, mock_mkstemp, client):
-        """Test handling of file write failure."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
+    @patch('httpx.AsyncClient')
+    def test_trigger_update_watchtower_401(self, mock_client_cls, client):
+        """Test update trigger when Watchtower returns 401 (no token)."""
+        mock_response = AsyncMock()
+        mock_response.status_code = 401
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
         response = client.post("/api/trigger-update")
         
-        assert response.status_code == 500
+        assert response.status_code == 200
         data = response.json()
-        assert "detail" in data
-        assert data["detail"]["status"] == "error"
-        assert "Permission denied" in data["detail"]["error"]
+        assert data["status"] == "success"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.tempfile.mkstemp', side_effect=IOError("Disk full"))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_io_error(self, mock_path, mock_mkstemp, client):
-        """Test handling of IO errors."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
+    @patch('httpx.AsyncClient')
+    def test_trigger_update_no_watchtower(self, mock_client_cls, client):
+        """Test update trigger when Watchtower is not available."""
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(side_effect=Exception("Connection refused"))
+        mock_client_cls.return_value = mock_client
 
         response = client.post("/api/trigger-update")
         
-        assert response.status_code == 500
+        assert response.status_code == 503
         data = response.json()
         assert "detail" in data
-        assert data["detail"]["status"] == "error"
-        assert "Disk full" in data["detail"]["error"]
+        assert "watchtower" in data["detail"]["error"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.tempfile.mkstemp', side_effect=Exception("Unexpected error"))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_unexpected_error(self, mock_path, mock_mkstemp, client):
-        """Test handling of unexpected errors."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
-
-        response = client.post("/api/trigger-update")
-        
-        assert response.status_code == 500
-        data = response.json()
-        assert "detail" in data
-        assert data["detail"]["status"] == "error"
-        assert "unexpected error" in data["detail"]["error"].lower()
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.os.replace')
-    @patch('api.routes.system.os.fdopen')
-    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_cors_enabled(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
+    @patch('httpx.AsyncClient')
+    def test_trigger_update_cors_enabled(self, mock_client_cls, client):
         """Test that /api/trigger-update has CORS enabled."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
-        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
-        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
         response = client.post(
             "/api/trigger-update",
@@ -1383,103 +1360,6 @@ class TestTriggerUpdateEndpoint:
         openapi_data = response.json()
         assert "/api/trigger-update" in openapi_data["paths"]
         assert "post" in openapi_data["paths"]["/api/trigger-update"]
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.os.replace')
-    @patch('api.routes.system.os.fdopen')
-    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_no_body_required(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
-        """Test that endpoint works without request body."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
-        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
-        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
-
-        response = client.post("/api/trigger-update")
-        
-        assert response.status_code == 200
-        assert response.json()["status"] == "success"
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.os.replace')
-    @patch('api.routes.system.os.fdopen')
-    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_signal_written(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
-        """Test that timestamp is written to signal file via atomic write."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
-        mock_file = Mock()
-        mock_fdopen.return_value.__enter__ = Mock(return_value=mock_file)
-        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
-
-        response = client.post("/api/trigger-update")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "success"
-        
-        # Verify atomic write: mkstemp was called, file was written, then replaced
-        mock_mkstemp.assert_called_once()
-        mock_file.write.assert_called_once()
-        call_args = mock_file.write.call_args[0][0]
-        assert call_args.startswith("update-requested:")
-        mock_replace.assert_called_once()
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.tempfile.mkstemp', side_effect=PermissionError("Cannot write to file"))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_partial_failure(self, mock_path, mock_mkstemp, client):
-        """Test handling when file write operation encounters an error."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
-
-        response = client.post("/api/trigger-update")
-        
-        assert response.status_code == 500
-        data = response.json()
-        assert "detail" in data
-        assert "status" in str(data["detail"])
-        assert "error" in str(data["detail"])
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.tempfile.mkstemp', side_effect=TimeoutError("File operation timed out"))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_timeout(self, mock_path, mock_mkstemp, client):
-        """Test handling when file write operation times out or hangs."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
-
-        response = client.post("/api/trigger-update")
-        
-        assert response.status_code == 500
-        data = response.json()
-        assert "detail" in data
-        assert "timed" in data["detail"]["error"].lower()
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.os.replace')
-    @patch('api.routes.system.os.fdopen')
-    @patch('api.routes.system.tempfile.mkstemp', return_value=(5, '/app/.update-tmp-abc123'))
-    @patch('api.routes.system.Path')
-    def test_trigger_update_path_resolution(self, mock_path, mock_mkstemp, mock_fdopen, mock_replace, client):
-        """Test that file path is properly resolved."""
-        mock_rebuild_file = Mock()
-        mock_rebuild_file.parent = '/app'
-        mock_path.return_value = mock_rebuild_file
-        mock_fdopen.return_value.__enter__ = Mock(return_value=Mock())
-        mock_fdopen.return_value.__exit__ = Mock(return_value=False)
-
-        response = client.post("/api/trigger-update")
-        
-        assert response.status_code == 200
-        mock_path.assert_called_once_with("/app/.update-requested")
-        mock_replace.assert_called_once()
 
 
 class TestHistoryAPI:
@@ -6839,22 +6719,26 @@ class TestSettingsEndpoints:
 
 
 class TestRestartEndpoint:
-    """Test system restart endpoint."""
+    """Test system restart endpoint (SIGTERM to PID 1)."""
     
-    def test_restart_success(self, client, tmp_path, monkeypatch):
-        """Test successful restart."""
-        # Create a proper /app directory structure
-        app_dir = tmp_path / "app"
-        app_dir.mkdir()
-        
-        monkeypatch.setenv("DATA_DIR", str(app_dir))
-        
-        # Need to reload main to pick up new DATA_DIR
-        # Instead, just test that the endpoint exists and handles errors gracefully
+    @patch('api.routes.system.os.kill')
+    def test_restart_success(self, mock_kill, client, tmp_path, monkeypatch):
+        """Test successful restart triggers SIGTERM to PID 1."""
         response = client.post("/api/restart")
         
-        # May succeed or fail depending on environment
-        assert response.status_code in [200, 500]
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "restart" in data["message"].lower()
+
+    def test_restart_returns_success_response(self, client):
+        """Test that restart endpoint returns success even without PID 1 access."""
+        response = client.post("/api/restart")
+        
+        # Should succeed — the actual kill is deferred in a background task
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
 
 
 class TestLogsEndpoint:
@@ -7473,56 +7357,6 @@ class TestRecurringScheduleEndpoints:
         response = client.delete("/api/machine/recurring-schedules/nonexistent-id")
         
         assert response.status_code == 404
-
-
-class TestWatcherStatusEndpoint:
-    """Tests for watcher status endpoint."""
-    
-    def test_watcher_status_no_log_file(self, client, tmp_path, monkeypatch):
-        """Test watcher status when log file doesn't exist."""
-        # The endpoint checks for specific paths
-        response = client.get("/api/watcher-status")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "running" in data
-        assert "message" in data
-    
-    def test_watcher_status_with_recent_log(self, client, tmp_path, monkeypatch):
-        """Test watcher status with recent log activity."""
-        import os
-        from datetime import datetime, timezone
-        
-        # Create mock log file
-        log_file = tmp_path / ".rebuild-watcher.log"
-        log_file.write_text("2024-01-01 Watcher started\n")
-        
-        # We can't easily mock the paths in the endpoint,
-        # but we can test the endpoint returns a valid response
-        response = client.get("/api/watcher-status")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data["running"], bool)
-        assert "message" in data
-    
-    def test_watcher_status_response_structure(self, client):
-        """Test that watcher status returns expected structure."""
-        response = client.get("/api/watcher-status")
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        # Verify response has expected keys
-        assert "running" in data
-        assert "last_activity" in data
-        assert "message" in data
-        
-        # running should be boolean
-        assert isinstance(data["running"], bool)
-        
-        # message should be string
-        assert isinstance(data["message"], str)
 
 
 class TestScheduledShotRestoration:
@@ -8306,19 +8140,6 @@ class TestPrepareProfileForLLM:
         result = _prepare_profile_for_llm(profile_data, None)
         
         assert "target" not in result["stages"][0]
-
-
-class TestWatcherStatusPaths:
-    """Tests for watcher status endpoint paths."""
-
-    def test_watcher_status_endpoint(self, client):
-        """Test watcher status endpoint returns proper structure."""
-        response = client.get("/api/watcher-status")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "running" in data
-        assert "message" in data
 
 
 class TestProfileImageUpload:

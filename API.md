@@ -213,12 +213,11 @@ curl -X DELETE http://<SERVER_IP>:3550/api/machine/schedule-shot/<schedule_id>
 | GET | `/api/version` | Server version |
 | GET | `/api/settings` | Current settings |
 | POST | `/api/settings` | Save settings (triggers hot-reload) |
-| POST | `/api/restart` | Restart container services |
+| POST | `/api/restart` | Restart container (via SIGTERM to PID 1) |
 | GET | `/api/logs` | Retrieve log entries |
 | GET | `/api/changelog` | Changelog |
 | GET | `/api/network-ip` | Server network IP |
-| GET | `/api/watcher-status` | Watchtower status |
-| GET | `/api/update-method` | Current update method |
+| GET | `/api/update-method` | Current update method (watchtower or manual) |
 | GET | `/api/tailscale-status` | Tailscale connection info |
 | POST | `/api/check-updates` | Trigger update check |
 | GET | `/health` | Health check (no `/api` prefix) |

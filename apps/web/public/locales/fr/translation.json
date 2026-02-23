@@ -308,12 +308,6 @@
     "noUpdatesAvailable": "Aucune mise à jour disponible",
     "checkForUpdates": "Vérifier les mises à jour",
     "system": "Système",
-    "backgroundWatcher": "Observateur en arrière-plan",
-    "running": "En cours d'exécution",
-    "notRunning": "Non en cours d'exécution",
-    "watcherNotRunning": "L'observateur en arrière-plan n'est pas en cours d'exécution. Les boutons de redémarrage et de mise à jour peuvent ne pas fonctionner. Exécutez",
-    "watcherCommand": "./rebuild-watcher.sh --install",
-    "watcherCommandSuffix": "sur l'hôte.",
     "restartDescription": "Redémarrer tous les services MeticAI. Utilisez ceci si vous rencontrez des problèmes.",
     "restartMeticAI": "Redémarrer MeticAI",
     "restarting": "Redémarrage...",
@@ -361,10 +355,8 @@
     },
     "updateMethod": {
       "watchtower": "Mises à jour automatiques via Watchtower",
-      "watcher": "Mises à jour gérées par l'hôte via watcher",
       "manual": "Mises à jour manuelles uniquement",
       "watchtowerDescription": "Les mises à jour sont appliquées automatiquement lorsque de nouvelles versions sont disponibles.",
-      "watcherDescription": "Les mises à jour sont déclenchées depuis l'interface et appliquées par le watcher de l'hôte.",
       "manualDescription": "Aucun mécanisme de mise à jour automatique détecté. Mettez à jour manuellement via docker pull."
     },
     "version": "Version",

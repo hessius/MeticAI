@@ -308,12 +308,6 @@
     "noUpdatesAvailable": "Inga uppdateringar tillgängliga",
     "checkForUpdates": "Sök efter uppdateringar",
     "system": "System",
-    "backgroundWatcher": "Bakgrundsbevakare",
-    "running": "Körs",
-    "notRunning": "Körs inte",
-    "watcherNotRunning": "Bakgrundsbevakaren körs inte. Omstart- och uppdateringsknappar kanske inte fungerar. Kör",
-    "watcherCommand": "./rebuild-watcher.sh --install",
-    "watcherCommandSuffix": "på värden.",
     "restartDescription": "Starta om alla MeticAI-tjänster. Använd detta om du upplever problem.",
     "restartMeticAI": "Starta om MeticAI",
     "restarting": "Startar om...",
@@ -361,10 +355,8 @@
     },
     "updateMethod": {
       "watchtower": "Automatiska uppdateringar via Watchtower",
-      "watcher": "Värdbaserade uppdateringar via watcher",
       "manual": "Endast manuella uppdateringar",
       "watchtowerDescription": "Uppdateringar tillämpas automatiskt när nya versioner är tillgängliga.",
-      "watcherDescription": "Uppdateringar utlöses från gränssnittet och tillämpas av värd-watchern.",
       "manualDescription": "Ingen automatisk uppdateringsmekanism hittades. Uppdatera manuellt via docker pull."
     },
     "version": "Version",

@@ -211,107 +211,22 @@ async def get_status(request: Request):
         }
 
 
-@router.get("/api/watcher-status")
-async def get_watcher_status(request: Request):
-    """Get the status of the host rebuild-watcher service.
-    
-    The watcher is considered active if:
-    1. The log file exists and was modified recently, OR
-    2. The signal file was processed (log is newer than signal)
-    
-    Returns:
-        - running: Whether the watcher appears to be running
-        - last_activity: Timestamp of last watcher activity
-        - message: Human-readable status message
-    """
-    request_id = request.state.request_id
-    
-    try:
-        from datetime import datetime, timezone
-        
-        log_file = Path("/app/.rebuild-watcher.log")
-        restart_signal = Path("/app/.restart-requested")
-        
-        status = {
-            "running": False,
-            "last_activity": None,
-            "message": "Watcher status unknown"
-        }
-        
-        # Check 1: Log file exists and has recent activity
-        if log_file.exists():
-            log_mtime = os.path.getmtime(log_file)
-            log_time = datetime.fromtimestamp(log_mtime, tz=timezone.utc)
-            now = datetime.now(timezone.utc)
-            age_seconds = (now - log_time).total_seconds()
-            
-            status["last_activity"] = log_time.isoformat()
-            
-            # If log was modified in the last 10 minutes, watcher is likely active
-            if age_seconds < 600:  # 10 minutes
-                status["running"] = True
-                status["message"] = f"Watcher active (last activity {int(age_seconds)}s ago)"
-            else:
-                # Check the restart signal file's mtime vs log mtime
-                # If signal is newer than log, watcher might not be running
-                if restart_signal.exists():
-                    signal_mtime = os.path.getmtime(restart_signal)
-                    if signal_mtime > log_mtime + 10:  # Signal newer by >10s
-                        status["running"] = False
-                        status["message"] = "Watcher may not be running (signal not processed)"
-                    else:
-                        status["running"] = True
-                        status["message"] = f"Watcher idle (last activity {int(age_seconds/60)}m ago)"
-                else:
-                    status["running"] = True
-                    status["message"] = f"Watcher idle (last activity {int(age_seconds/60)}m ago)"
-        else:
-            # No log file - check if this is a fresh install
-            if restart_signal.exists():
-                status["running"] = False
-                status["message"] = "Watcher not installed or not running"
-            else:
-                status["message"] = "Unable to determine watcher status"
-        
-        logger.debug(
-            f"Watcher status: {status}",
-            extra={"request_id": request_id}
-        )
-        
-        return status
-        
-    except Exception as e:
-        logger.error(
-            f"Failed to check watcher status: {str(e)}",
-            exc_info=True,
-            extra={"request_id": request_id}
-        )
-        return {
-            "running": False,
-            "last_activity": None,
-            "error": str(e),
-            "message": "Failed to check watcher status"
-        }
-
-
 @router.get("/api/update-method")
 async def get_update_method(request: Request):
     """Detect how MeticAI updates are managed.
     
     Checks whether Watchtower is running (automatic Docker image updates)
-    or whether the host-side watcher/manual approach is used.
+    or whether updates must be applied manually.
     
     Returns:
-        - method: "watchtower" | "watcher" | "manual"
+        - method: "watchtower" | "manual"
         - watchtower_running: bool
-        - watcher_running: bool
         - can_trigger_update: bool
     """
     request_id = request.state.request_id
     
     try:
         watchtower_running = False
-        watcher_running = False
         
         # Check for Watchtower: try to reach its HTTP API on port 8088
         # or detect the container via docker socket
@@ -334,26 +249,12 @@ async def get_update_method(request: Request):
             except Exception:
                 pass
         
-        # Check for host-side watcher
-        log_file = Path("/app/.rebuild-watcher.log")
-        if log_file.exists():
-            log_mtime = os.path.getmtime(log_file)
-            age_seconds = (datetime.now(timezone.utc) - datetime.fromtimestamp(log_mtime, tz=timezone.utc)).total_seconds()
-            if age_seconds < 600:  # Active in last 10 minutes
-                watcher_running = True
-        
-        if watchtower_running:
-            method = "watchtower"
-        elif watcher_running:
-            method = "watcher"
-        else:
-            method = "manual"
+        method = "watchtower" if watchtower_running else "manual"
         
         return {
             "method": method,
             "watchtower_running": watchtower_running,
-            "watcher_running": watcher_running,
-            "can_trigger_update": watchtower_running or watcher_running
+            "can_trigger_update": watchtower_running
         }
     except Exception as e:
         logger.error(
@@ -364,7 +265,6 @@ async def get_update_method(request: Request):
         return {
             "method": "manual",
             "watchtower_running": False,
-            "watcher_running": False,
             "can_trigger_update": False
         }
 
@@ -612,21 +512,22 @@ async def configure_tailscale(request: Request):
         restart_signaled = False
         if compose_changed:
             try:
-                import time, tempfile
-                restart_signal = Path("/app/.restart-requested")
-                tmp_fd, tmp_path = tempfile.mkstemp(dir=restart_signal.parent, prefix=".restart-tmp-")
-                try:
-                    with os.fdopen(tmp_fd, "w") as f:
-                        f.write(f"tailscale-config:{time.time()}\n")
-                    os.replace(tmp_path, str(restart_signal))
-                except Exception:
-                    Path(tmp_path).unlink(missing_ok=True)
-                    raise
+                import signal as sig
+                
+                async def _deferred_restart():
+                    """Wait briefly then kill PID 1 for restart."""
+                    await asyncio.sleep(2.0)
+                    try:
+                        os.kill(1, sig.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                
+                asyncio.get_event_loop().create_task(_deferred_restart())
                 restart_signaled = True
-                logger.info("Signaled host restart for Tailscale config change",
+                logger.info("Scheduled container restart for Tailscale config change",
                            extra={"request_id": request_id})
             except Exception as e:
-                logger.warning(f"Could not signal restart: {e}",
+                logger.warning(f"Could not schedule restart: {e}",
                              extra={"request_id": request_id})
         
         action = "enabled" if ts_enabled else "disabled"
@@ -668,15 +569,11 @@ async def configure_tailscale(request: Request):
 
 @router.post("/api/trigger-update")
 async def trigger_update(request: Request):
-    """Trigger the backend update process by signaling the host.
+    """Trigger an immediate update check via Watchtower.
     
-    This endpoint writes a timestamp to /app/.update-requested which is mounted
-    from the host. The host's systemd/launchd service (rebuild-watcher) monitors this
-    file and runs update.sh --auto when it changes, which pulls updates AND rebuilds.
-    
-    The update cannot run inside the container because:
-    1. Docker mounts create git conflicts (files appear modified)
-    2. The container cannot rebuild itself
+    Calls Watchtower's HTTP API to request an immediate image-update check.
+    If Watchtower is not running, returns an error indicating manual update
+    is required.
     
     Returns:
         - status: "success" or "error"
@@ -685,36 +582,59 @@ async def trigger_update(request: Request):
     request_id = request.state.request_id
     
     try:
+        import httpx
+        
         logger.info(
-            "Triggering system update via host signal",
+            "Triggering update via Watchtower HTTP API",
             extra={"request_id": request_id, "endpoint": "/api/trigger-update"}
         )
         
-        # Signal the host to perform the full update (git pull + rebuild)
-        # This file is watched by systemd/launchd on the host (rebuild-watcher.sh)
-        update_signal = Path("/app/.update-requested")
+        watchtower_triggered = False
         
-        # Atomic write: write to temp file then rename to avoid partial reads
-        import time, tempfile
-        tmp_fd, tmp_path = tempfile.mkstemp(dir=update_signal.parent, prefix=".update-tmp-")
+        # Try Watchtower HTTP API — POST triggers an immediate check
         try:
-            with os.fdopen(tmp_fd, "w") as f:
-                f.write(f"update-requested:{time.time()}\n")
-            os.replace(tmp_path, str(update_signal))
-        except Exception:
-            # Clean up temp file on failure, then re-raise
-            Path(tmp_path).unlink(missing_ok=True)
-            raise
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://localhost:8088/v1/update",
+                    timeout=10.0,
+                )
+                # 200 = update started, 401 = no token (but watchtower is there)
+                if resp.status_code in (200, 204):
+                    watchtower_triggered = True
+                elif resp.status_code == 401:
+                    # Watchtower is running but requires a token
+                    watchtower_triggered = True
+                    logger.warning(
+                        "Watchtower returned 401 — update may still proceed",
+                        extra={"request_id": request_id}
+                    )
+        except Exception as wt_err:
+            logger.debug(
+                f"Watchtower HTTP API not reachable: {wt_err}",
+                extra={"request_id": request_id}
+            )
         
-        logger.info(
-            "Update triggered - signaled host via .update-requested",
-            extra={"request_id": request_id}
+        if watchtower_triggered:
+            logger.info(
+                "Update triggered via Watchtower",
+                extra={"request_id": request_id}
+            )
+            return {
+                "status": "success",
+                "message": "Update triggered. Watchtower will pull the latest image and restart the container."
+            }
+        
+        # No Watchtower — manual update required
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "error",
+                "error": "Watchtower not available",
+                "message": "Automatic updates require Watchtower. Update manually with: docker compose pull && docker compose up -d"
+            }
         )
-        
-        return {
-            "status": "success",
-            "message": "Update triggered. The host will pull updates and restart containers."
-        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             f"Failed to trigger update: {str(e)}",
@@ -729,18 +649,18 @@ async def trigger_update(request: Request):
             detail={
                 "status": "error",
                 "error": str(e),
-                "message": "Failed to signal update"
+                "message": "Failed to trigger update"
             }
         )
 
 
 @router.post("/api/restart")
 async def restart_system(request: Request):
-    """Restart all MeticAI containers.
+    """Restart the MeticAI container.
     
-    This endpoint writes a timestamp to /app/.restart-requested which is mounted
-    from the host. The host's systemd/launchd service (rebuild-watcher) monitors this
-    file and restarts all containers without pulling updates.
+    Sends SIGTERM to PID 1 (s6-overlay init) after a short delay to allow
+    the HTTP response to be sent. Docker's ``restart: unless-stopped`` policy
+    will automatically bring the container back up.
     
     Returns:
         - status: "success" or "error"
@@ -749,30 +669,25 @@ async def restart_system(request: Request):
     request_id = request.state.request_id
     
     try:
+        import signal
+        
         logger.info(
-            "Triggering system restart via host signal",
+            "Triggering container restart via SIGTERM to PID 1",
             extra={"request_id": request_id, "endpoint": "/api/restart"}
         )
         
-        # Signal the host to restart containers
-        # This file is watched by systemd/launchd on the host (rebuild-watcher.sh)
-        restart_signal = Path("/app/.restart-requested")
+        async def _kill_pid1():
+            """Wait briefly for the HTTP response to flush, then kill PID 1."""
+            await asyncio.sleep(1.5)
+            logger.info("Sending SIGTERM to PID 1 (s6-overlay) for restart")
+            try:
+                os.kill(1, signal.SIGTERM)
+            except ProcessLookupError:
+                # In test/dev environments PID 1 may not be s6
+                logger.warning("PID 1 not found — not running inside container?")
         
-        # Atomic write: write to temp file then rename to avoid partial reads
-        import time, tempfile
-        tmp_fd, tmp_path = tempfile.mkstemp(dir=restart_signal.parent, prefix=".restart-tmp-")
-        try:
-            with os.fdopen(tmp_fd, "w") as f:
-                f.write(f"restart-requested:{time.time()}\n")
-            os.replace(tmp_path, str(restart_signal))
-        except Exception:
-            Path(tmp_path).unlink(missing_ok=True)
-            raise
-        
-        logger.info(
-            "Restart triggered - signaled host via .restart-requested",
-            extra={"request_id": request_id}
-        )
+        # Schedule the kill in the background so the response can be sent first
+        asyncio.get_event_loop().create_task(_kill_pid1())
         
         return {
             "status": "success",
@@ -792,7 +707,7 @@ async def restart_system(request: Request):
             detail={
                 "status": "error",
                 "error": str(e),
-                "message": "Failed to signal restart"
+                "message": "Failed to trigger restart"
             }
         )
 
