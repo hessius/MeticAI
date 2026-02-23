@@ -7,7 +7,7 @@ http://<SERVER_IP>:3550/api
 ```
 
 All endpoints are served via nginx on port **3550**. The `/api` prefix is required.
-Container name: `meticai`. Interactive docs: `http://<SERVER_IP>:3550/api/docs`
+Container name: `meticai`. Interactive docs: `http://<SERVER_IP>:3550/docs`
 
 ---
 

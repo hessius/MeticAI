@@ -441,7 +441,7 @@ COMPOSE_FILES="$composeFilesString"
     Write-Host "  ╚══════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
     Write-Host "  Web UI:  http://${ip}:3550"
-    Write-Host "  API:     http://${ip}:3550/api/docs"
+    Write-Host "  API:     http://${ip}:3550/docs"
     Write-Host ""
     Write-Host "  Useful commands:" -ForegroundColor White
     Write-Host "    View logs:   cd ~\meticai; docker compose logs -f"
