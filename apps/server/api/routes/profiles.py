@@ -136,7 +136,7 @@ async def upload_profile_image(
             )
         
         # Process image: crop, resize, encode (CPU-bound, offload to thread)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         image_data_uri, png_bytes = await loop.run_in_executor(
             None, process_image_for_profile, image_data, file.content_type
         )
@@ -349,7 +349,7 @@ async def generate_profile_image(
         image_data = generated.image.image_bytes
         
         # Process the image (crop/resize) — CPU-bound, offload to thread
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         image_data_uri, png_bytes = await loop.run_in_executor(
             None, process_image_for_profile, image_data, "image/png"
         )

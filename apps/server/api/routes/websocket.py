@@ -65,6 +65,10 @@ async def live_telemetry(ws: WebSocket):
                     break
                 continue
 
+            # Clear the event *before* waiting so that any signal arriving
+            # between wait() returning and the next iteration is not lost.
+            subscriber.data_event.clear()
+
             # Wait for new data from the MQTT thread (or timeout)
             try:
                 await asyncio.wait_for(subscriber.data_event.wait(), timeout=5.0)
@@ -76,10 +80,6 @@ async def live_telemetry(ws: WebSocket):
                 except Exception:
                     break
                 continue
-
-            # Clear *before* reading snapshot so we don't miss signals that
-            # arrive between get_snapshot() and the next wait().
-            subscriber.data_event.clear()
 
             # Rate-limit: sleep until at least FRAME_INTERVAL since last send
             snapshot = subscriber.get_snapshot()

@@ -28,19 +28,28 @@ _recurring_schedules: dict = {}
 # Module-level lock protecting mutations to the above dicts.
 # Callers that read-modify-write any of these dicts across an ``await``
 # boundary MUST hold this lock to prevent interleaved mutations.
-# Created lazily so it binds to the correct running event loop.
+# Created lazily and recreated when the running event loop changes so that
+# tests using a new loop per function don't hit "attached to a different loop".
 _state_lock: Optional[asyncio.Lock] = None
+_state_lock_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
 def _get_state_lock() -> asyncio.Lock:
-    """Return the module-level state lock, creating it on first call.
+    """Return the module-level state lock, (re)creating it when needed.
     
-    This avoids binding the lock to a loop at import time, which causes
-    issues when tests create a new event loop per test function.
+    The lock is recreated when the running event loop differs from the one
+    it was originally bound to.  This avoids ``RuntimeError: ... attached to
+    a different loop`` in test suites that create a fresh loop per test.
     """
-    global _state_lock
-    if _state_lock is None:
+    global _state_lock, _state_lock_loop
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+
+    if _state_lock is None or (running_loop is not None and running_loop is not _state_lock_loop):
         _state_lock = asyncio.Lock()
+        _state_lock_loop = running_loop
     return _state_lock
 
 # Constant for preheat duration

@@ -292,7 +292,7 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
                 img = img.convert('RGB')
             return img
         
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         image = await loop.run_in_executor(None, _open_image, contents)
         
         logger.debug(
@@ -399,7 +399,7 @@ async def analyze_and_profile(
                     img = img.convert('RGB')
                 return img
             
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             image = await loop.run_in_executor(None, _open_image, contents)
             
             # Analyze the coffee bag

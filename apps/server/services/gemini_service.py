@@ -453,7 +453,7 @@ class _GeminiModelWrapper:
         Runs the synchronous Gemini SDK call in a thread pool executor
         so it doesn't block the asyncio event loop.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None, self.generate_content, contents
         )

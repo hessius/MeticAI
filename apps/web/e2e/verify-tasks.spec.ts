@@ -94,34 +94,15 @@ test.describe('v2.0.0 Task Verification', () => {
   })
 
   // -----------------------------------------------------------------
-  // Verify the built JS bundle contains "Targets" (not "Goals") in tooltip
+  // Verify the UI shows "Targets" (not "Goals") in the rendered DOM
   // -----------------------------------------------------------------
-  test('Built JS bundle contains "Targets" string for tooltip', async ({ page }) => {
+  test('UI shows "Targets" string for tooltip', async ({ page }) => {
     await page.goto('/')
     // Wait for the app to fully load
     await page.waitForTimeout(2000)
-    
-    // Fetch the main JS bundle and verify "Targets" is present
-    const scripts = page.locator('script[src]')
-    const count = await scripts.count()
-    let foundTargets = false
-    
-    for (let i = 0; i < count; i++) {
-      const src = await scripts.nth(i).getAttribute('src')
-      if (src && src.includes('.js')) {
-        const fullUrl = src.startsWith('http') ? src : `${BASE}${src}`
-        const res = await page.request.get(fullUrl)
-        if (res.ok()) {
-          const text = await res.text()
-          if (text.includes('Targets')) {
-            foundTargets = true
-            // Also verify "Goals" is NOT in the tooltip context
-            // (it could appear in third-party code, so we check specifically near "Targets")
-            break
-          }
-        }
-      }
-    }
-    expect(foundTargets).toBeTruthy()
+
+    // Assert that the user-visible text uses "Targets" and not "Goals"
+    await expect(page.getByText('Targets')).toBeVisible()
+    await expect(page.getByText('Goals')).toHaveCount(0)
   })
 })
