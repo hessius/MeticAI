@@ -314,6 +314,7 @@
     "restartConfirm": "Êtes-vous sûr de vouloir redémarrer MeticAI ? Le système sera indisponible pendant quelques secondes.",
     "restartTriggered": "Redémarrage déclenché ! Le système redémarrera dans un instant.",
     "restartFailed": "Échec du déclenchement du redémarrage",
+    "apiDocs": "Documentation API",
     "language": {
       "select": "Sélectionner la langue",
       "label": "Langue"

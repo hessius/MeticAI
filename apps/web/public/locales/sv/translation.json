@@ -314,6 +314,7 @@
     "restartConfirm": "Är du säker på att du vill starta om MeticAI? Systemet kommer att vara otillgängligt i några sekunder.",
     "restartTriggered": "Omstart utlöst! Systemet kommer att starta om omedelbart.",
     "restartFailed": "Misslyckades utlösa omstart",
+    "apiDocs": "API-dokumentation",
     "language": {
       "select": "Välj språk",
       "label": "Språk"

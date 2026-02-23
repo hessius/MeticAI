@@ -26,7 +26,8 @@ import {
   Key,
   Link as LinkIcon,
   Copy,
-  Question
+  Question,
+  Code
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -1227,6 +1228,15 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           <p className="text-sm text-muted-foreground">
             {t('settings.restartDescription')}
           </p>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => window.open(`${window.location.origin}/docs`, '_blank')}
+          >
+            <Code size={18} className="mr-2" weight="bold" />
+            {t('settings.apiDocs')}
+          </Button>
           
           <Button
             onClick={handleRestart}

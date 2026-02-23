@@ -314,6 +314,7 @@
     "restartConfirm": "Bist du sicher, dass du MeticAI neu starten möchtest? Das System wird für einige Sekunden nicht verfügbar sein.",
     "restartTriggered": "Neustart ausgelöst! Das System wird in Kürze neu gestartet.",
     "restartFailed": "Neustart konnte nicht ausgelöst werden",
+    "apiDocs": "API-Dokumentation",
     "language": {
       "select": "Sprache auswählen",
       "label": "Sprache"
