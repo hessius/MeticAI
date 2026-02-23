@@ -26,9 +26,6 @@ services:
     volumes:
       - meticai-data:/data
       - mosquitto-data:/var/lib/mosquitto
-      # Legacy v1.x data mount — enables automatic migration on first boot.
-      # Harmless if ./data does not exist (Docker creates an empty bind).
-      - ./data:/legacy-data:ro
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:3550/health"]
       interval: 30s

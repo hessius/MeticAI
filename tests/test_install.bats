@@ -895,10 +895,15 @@ DATA_MIGRATE_TYPE="${BATS_TEST_DIRNAME}/../docker/s6-rc.d/data-migrate/type"
     [ "$status" -ne 0 ]
 }
 
-@test "docker-compose.yml has legacy data mount for migration" {
-    run grep 'legacy-data' "$COMPOSE_FILE"
+@test "docker-compose.override.yml has legacy data mount for migration" {
+    run grep 'legacy-data' "$COMPOSE_OVERRIDE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"/legacy-data:ro"* ]]
+}
+
+@test "docker-compose.yml does NOT contain legacy data mount (moved to override)" {
+    run grep -q 'legacy-data' "$COMPOSE_FILE"
+    [ "$status" -ne 0 ]
 }
 
 @test "docker-compose.yml still references GHCR image" {

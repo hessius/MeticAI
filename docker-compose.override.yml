@@ -14,6 +14,12 @@
 # ==============================================================================
 
 services:
+  meticai:
+    volumes:
+      # Legacy v1.x data mount — enables automatic migration on first boot.
+      # Only loaded during migration (no -f flags); not present in fresh v2 installs.
+      - ./data:/legacy-data:ro
+
   watchtower:
     image: containrrr/watchtower:latest
     container_name: meticai-watchtower
