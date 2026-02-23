@@ -172,6 +172,9 @@ do_v1_migration() {
     local WATCHTOWER_TOKEN
     WATCHTOWER_TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p | head -c 32)
 
+    # Respect METICAI_TAG from environment (useful for testing), default to latest
+    local TAG="${METICAI_TAG:-latest}"
+
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.watchtower.yml"
 
     if [[ -n "$OLD_TAILSCALE_KEY" ]]; then
@@ -187,7 +190,7 @@ GEMINI_API_KEY=${OLD_GEMINI_KEY}
 METICULOUS_IP=${OLD_METICULOUS_IP}
 
 # Image tag
-METICAI_TAG=latest
+METICAI_TAG=${TAG}
 
 # Compose files to load
 COMPOSE_FILES="${COMPOSE_FILES}"
