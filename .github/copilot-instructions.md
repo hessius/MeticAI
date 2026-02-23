@@ -319,7 +319,7 @@ Must include:
 - View logs: `docker logs meticai -f`
 - Check s6 service status: `docker exec meticai s6-rc -a list`
 - Restart a single service: `docker exec meticai s6-svc -r /run/service/server`
-- Access FastAPI docs: `http://localhost:3550/api/docs`
+- Access FastAPI docs: `http://localhost:3550/docs`
 - MCP server logs: `docker exec meticai cat /var/log/mcp-server.log`
 
 ## Important Files

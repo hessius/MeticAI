@@ -855,7 +855,7 @@ echo "  +======================================+"
 echo -e "${NC}"
 echo ""
 echo "  Web UI:  ${METICAI_URL}"
-echo "  API:     ${METICAI_URL}/api/docs"
+echo "  API:     ${METICAI_URL}/docs"
 echo ""
 
 # QR code for easy mobile access
