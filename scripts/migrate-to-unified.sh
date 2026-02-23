@@ -153,6 +153,23 @@ done
 log_success "Cleaned up old watcher artifacts and v1 scripts"
 
 # ==============================================================================
+# Step 4b: Clean up old source directories
+# ==============================================================================
+for d in meticulous-source meticai-web coffee-relay gemini-client; do
+    if [[ -d "$INSTALL_DIR/$d" ]]; then
+        rm -rf "$INSTALL_DIR/$d"
+        log_info "Removed old $d/"
+    fi
+done
+
+# Also remove the override file if present (only needed for first-pass migration)
+rm -f "$INSTALL_DIR/docker-compose.override.yml" 2>/dev/null || true
+# Remove .update-config.json if present (v1 central config)
+rm -f "$INSTALL_DIR/.update-config.json" 2>/dev/null || true
+# Remove check-updates-on-start.sh if present (v1 startup script)
+rm -f "$INSTALL_DIR/check-updates-on-start.sh" 2>/dev/null || true
+
+# ==============================================================================
 # Step 5: Download new v2 compose files
 # ==============================================================================
 cd "$INSTALL_DIR"
