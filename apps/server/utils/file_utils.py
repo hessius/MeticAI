@@ -61,10 +61,10 @@ def atomic_write_json(filepath: Path, data: Any, indent: int = 2) -> None:
         suffix='.tmp'
     )
     try:
-        with os.fdopen(temp_fd, 'w') as f:
+        with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
             f.write(json_str)
-        # Atomic rename
-        os.rename(temp_path, filepath)
+        # Atomic replace
+        os.replace(temp_path, filepath)
     except Exception:
         # Clean up temp file on failure
         try:
