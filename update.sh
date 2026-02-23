@@ -270,7 +270,18 @@ SCRIPT_END
     docker compose ${COMPOSE_FILES} pull
 
     echo -e "${YELLOW}Starting MeticAI v2.0...${NC}"
-    docker compose ${COMPOSE_FILES} up -d
+    docker compose ${COMPOSE_FILES} up -d || {
+        # Watchtower may fail to start (port conflict with existing services).
+        # If meticai itself is running, that's OK — watchtower is optional.
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^meticai$'; then
+            echo -e "${YELLOW}  Note: Watchtower failed to start (port conflict?), but MeticAI is running.${NC}"
+            echo "  You can change the Watchtower port in docker-compose.watchtower.yml."
+        else
+            echo -e "${RED}ERROR: Failed to start MeticAI.${NC}"
+            echo "  Check logs: docker compose ${COMPOSE_FILES} logs"
+            exit 1
+        fi
+    }
 
     # --- 10. Wait for healthy --------------------------------------------------
     echo ""
