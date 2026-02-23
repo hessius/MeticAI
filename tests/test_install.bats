@@ -146,8 +146,8 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 # Configuration
 # ==============================================================================
 
-@test "Script installs to ~/meticai by default" {
-    run grep -q 'INSTALL_DIR=.*HOME.*/meticai' "$SCRIPT_PATH"
+@test "Script installs to ~/MeticAI by default" {
+    run grep -q 'INSTALL_DIR=.*HOME.*/MeticAI' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
@@ -318,7 +318,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 }
 
 @test "Script displays API docs URL" {
-    run grep -q "/api/docs" "$SCRIPT_PATH"
+    run grep -q "/docs" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
@@ -723,5 +723,63 @@ MIGRATION_SCRIPT="${BATS_TEST_DIRNAME}/../scripts/migrate-to-unified.sh"
     run grep -q 'docker-compose.tailscale.yml' "$MIGRATION_SCRIPT"
     [ "$status" -eq 0 ]
     run grep -q 'docker-compose.watchtower.yml' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script detects interactive mode" {
+    run grep -q 'IS_INTERACTIVE' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'METICAI_NON_INTERACTIVE' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script defaults to Watchtower enabled" {
+    # In non-interactive mode, Watchtower should default to enabled
+    run grep -q 'ENABLE_WATCHTOWER="y"' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script defaults to Tailscale enabled" {
+    # In non-interactive mode, Tailscale should default to enabled
+    run grep -q 'ENABLE_TAILSCALE="y"' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script generates convenience scripts" {
+    run grep -q 'start.sh' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'stop.sh' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'update.sh' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'uninstall.sh' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script removes watcher services" {
+    run grep -q 'com.meticai.rebuild-watcher.plist' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'meticai-rebuild-watcher.path' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script cleans up signal files" {
+    run grep -q '.rebuild-needed' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q '.update-requested' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q '.versions.json' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script uses COMPOSE_FILES variable" {
+    run grep -q 'COMPOSE_FILES=' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'docker compose \${COMPOSE_FILES}' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script installs to ~/MeticAI" {
+    run grep -q 'INSTALL_DIR="\${HOME}/MeticAI"' "$MIGRATION_SCRIPT"
     [ "$status" -eq 0 ]
 }

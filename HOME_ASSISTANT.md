@@ -35,7 +35,7 @@ Enable Home Assistant MQTT integration? (y/N): y
 **On an existing installation:**
 
 ```bash
-cd ~/meticai   # or wherever MeticAI is installed
+cd ~/MeticAI   # or wherever MeticAI is installed
 
 # Start with the Home Assistant overlay
 docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d

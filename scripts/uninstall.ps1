@@ -36,7 +36,7 @@ $ErrorActionPreference = "Stop"
 # Configuration
 # ==============================================================================
 
-$InstallDir = Join-Path $env:USERPROFILE "meticai"
+$InstallDir = Join-Path $env:USERPROFILE "MeticAI"
 
 # ==============================================================================
 # Helper functions
