@@ -37,6 +37,7 @@ echo "data-migrate: found legacy v1.x data — migrating to Docker volume..."
 
 migrated=0
 skipped=0
+failed=0
 
 for src in "$LEGACY"/*; do
     [ -e "$src" ] || continue
@@ -57,11 +58,17 @@ for src in "$LEGACY"/*; do
             echo "data-migrate:   copied $name"
         else
             echo "data-migrate:   WARN: failed to copy $name"
+            failed=$((failed + 1))
         fi
     fi
 done
 
-echo "data-migrate: complete — migrated=$migrated skipped=$skipped"
+echo "data-migrate: complete — migrated=$migrated skipped=$skipped failed=$failed"
+
+if [ "$failed" -gt 0 ]; then
+    echo "data-migrate: ERROR: $failed item(s) failed to copy — skipping marker to allow retry on next boot"
+    exit 1
+fi
 
 # Leave a breadcrumb so we don't re-run
 date -u '+%Y-%m-%dT%H:%M:%SZ' > "$MARKER"
