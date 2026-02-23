@@ -33,8 +33,8 @@ export default defineConfig({
   testDir: './e2e',
   /* verify-tasks.spec.ts needs a running Docker container (port 3550),
      so it's excluded from normal CI e2e runs and executed separately
-     in the docker-build job instead. */
-  testIgnore: isCI ? ['**/verify-tasks.spec.ts'] : [],
+     in the docker-build job (which sets BASE_URL). */
+  testIgnore: isCI && !process.env.BASE_URL ? ['**/verify-tasks.spec.ts'] : [],
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
