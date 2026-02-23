@@ -4,9 +4,10 @@
 # Builds the unified Docker image and pushes to GitHub Container Registry.
 #
 # Triggers:
-#   - Push to main branch
-#   - Version tags (v*)
-#   - Manual workflow dispatch
+#   - Version tags (v*) — created by auto-release.yml when VERSION changes on main
+#   - Manual workflow dispatch (for emergency rebuilds)
+#
+# PR builds (no push) are triggered for validation only.
 #
 # Images:
 #   ghcr.io/hessius/meticai:latest
@@ -17,15 +18,8 @@ name: Build and Publish
 
 on:
   push:
-    branches:
-      - main
-      - version/2.0.0
     tags:
       - 'v*'
-    paths:
-      - 'apps/**'
-      - 'docker/**'
-      - '.github/workflows/build-publish.yml'
   pull_request:
     branches:
       - main
@@ -72,11 +66,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
