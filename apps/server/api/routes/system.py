@@ -510,7 +510,7 @@ async def configure_tailscale(request: Request):
                     except ProcessLookupError:
                         pass
                 
-                asyncio.get_event_loop().create_task(_deferred_restart())
+                asyncio.get_running_loop().create_task(_deferred_restart())
                 restart_signaled = True
                 logger.info("Scheduled container restart for Tailscale config change",
                            extra={"request_id": request_id})
@@ -675,7 +675,7 @@ async def restart_system(request: Request):
                 logger.warning("PID 1 not found — not running inside container?")
         
         # Schedule the kill in the background so the response can be sent first
-        asyncio.get_event_loop().create_task(_kill_pid1())
+        asyncio.get_running_loop().create_task(_kill_pid1())
         
         return {
             "status": "success",

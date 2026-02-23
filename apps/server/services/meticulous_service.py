@@ -85,7 +85,7 @@ async def execute_scheduled_shot(
     """
     from meticulous.api_types import ActionType
     
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     
     try:
         api = get_meticulous_api()
@@ -179,7 +179,7 @@ async def async_list_profiles():
     if _profile_list_cache is not None and (now - _profile_list_cache_time) < _PROFILE_CACHE_TTL:
         return _profile_list_cache
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, api.list_profiles)
     _profile_list_cache = result
     _profile_list_cache_time = now
@@ -196,14 +196,14 @@ def invalidate_profile_list_cache():
 async def async_load_profile_by_id(profile_id: str):
     """load_profile_by_id() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.load_profile_by_id, profile_id)
 
 
 async def async_create_profile(profile_json):
     """create_profile() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, api.create_profile, profile_json)
     invalidate_profile_list_cache()
     return result
@@ -212,7 +212,7 @@ async def async_create_profile(profile_json):
 async def async_delete_profile(profile_id: str):
     """delete_profile() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, api.delete_profile, profile_id)
     invalidate_profile_list_cache()
     return result
@@ -221,28 +221,28 @@ async def async_delete_profile(profile_id: str):
 async def async_get_last_profile():
     """get_last_profile() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.get_last_profile)
 
 
 async def async_get_settings():
     """get_settings() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.get_settings)
 
 
 async def async_execute_action(action_type):
     """execute_action() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.execute_action, action_type)
 
 
 async def async_session_get(path: str):
     """api.session.get() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     url = f"{api.base_url}{path}"
     return await loop.run_in_executor(None, api.session.get, url)
 
@@ -250,7 +250,7 @@ async def async_session_get(path: str):
 async def async_session_post(path: str, json_body: dict = None):
     """api.session.post() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     url = f"{api.base_url}{path}"
     import functools
     fn = functools.partial(api.session.post, url, json=json_body)
@@ -260,28 +260,28 @@ async def async_session_post(path: str, json_body: dict = None):
 async def async_get_history_dates():
     """get_history_dates() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.get_history_dates)
 
 
 async def async_get_shot_files(date: str):
     """get_shot_files() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.get_shot_files, date)
 
 
 async def async_get_profile(profile_id: str):
     """get_profile() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.get_profile, profile_id)
 
 
 async def async_save_profile(profile):
     """save_profile() offloaded to a thread."""
     api = get_meticulous_api()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, api.save_profile, profile)
     invalidate_profile_list_cache()
     return result

@@ -42,7 +42,7 @@ export default defineConfig({
   reporter: isCI ? 'github' : 'html',
   timeout: isCI ? 30_000 : 60_000,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
     trace: 'on-first-retry',
     actionTimeout: 10_000,
   },
