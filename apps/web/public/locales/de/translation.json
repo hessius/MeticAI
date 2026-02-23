@@ -523,7 +523,8 @@
       "descaling": "Entkalkt",
       "unknown": "Unbekannt",
       "ready": "Bereit",
-      "pourWater": "Wasser einfüllen"
+      "pourWater": "Wasser einfüllen",
+      "purging": "Spülen"
     },
     "metrics": {
       "time": "Zeit (s)",

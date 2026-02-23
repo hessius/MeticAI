@@ -422,8 +422,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 
                 {/* Metric tiles (same layout as active shot) */}
                 <div className="space-y-2">
-                  {/* Full-width profile & stage card */}
-                  <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3">
+                  {/* Full-width profile & stage card — hidden on desktop where the right column shows this */}
+                  <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3 lg:hidden">
                     {profileImgUrl && (
                       <img
                         src={profileImgUrl}
@@ -539,8 +539,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
           {/* ── Horizontal metrics — two rows ─────────────── */}
           {(ms.brewing || chartData.length > 0) && (
             <div className="space-y-2">
-              {/* Full-width profile & stage card */}
-              <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3">
+              {/* Full-width profile & stage card — hidden on desktop where the right column shows this */}
+              <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3 lg:hidden">
                 {profileImgUrl && (
                   <img
                     src={profileImgUrl}

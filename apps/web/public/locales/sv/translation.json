@@ -523,7 +523,8 @@
       "descaling": "Avkalkar",
       "unknown": "Okänd",
       "ready": "Redo",
-      "pourWater": "Fyll på vatten"
+      "pourWater": "Fyll på vatten",
+      "purging": "Spolar"
     },
     "metrics": {
       "time": "Tid (s)",

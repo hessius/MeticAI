@@ -523,7 +523,8 @@
       "descaling": "Decalcificazione",
       "unknown": "Sconosciuto",
       "ready": "Pronto",
-      "pourWater": "Aggiungere acqua"
+      "pourWater": "Aggiungere acqua",
+      "purging": "Spurgo"
     },
     "metrics": {
       "time": "Tempo (s)",
