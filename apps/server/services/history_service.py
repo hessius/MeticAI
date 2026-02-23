@@ -28,16 +28,51 @@ def ensure_history_file():
 
 
 def load_history() -> list:
-    """Load history, using in-memory copy when available."""
+    """Load history, using in-memory copy when available.
+    
+    Filters out malformed entries that lack required fields (e.g. test data
+    or pre-v2 entries that were never migrated properly).
+    """
     global _history_cache
     if _history_cache is not None:
         return _history_cache
     ensure_history_file()
     try:
         with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            _history_cache = json.load(f)
+            raw = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
-        _history_cache = []
+        raw = []
+    
+    # Filter out entries missing critical fields.  A valid v2 entry always
+    # has at least 'id' and 'profile_name' (or 'reply' from which the name
+    # can be derived).  Entries like {"id": "test123", "name": "TestProfile"}
+    # are test artefacts and must be dropped.
+    valid = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        if not entry.get("id"):
+            continue
+        # Must have at least profile_name or reply
+        if not entry.get("profile_name") and not entry.get("reply"):
+            logger.warning(
+                "Dropping malformed history entry (no profile_name or reply): id=%s",
+                entry.get("id"),
+            )
+            continue
+        valid.append(entry)
+    
+    if len(valid) != len(raw):
+        logger.info(
+            "Filtered %d malformed entries from history (kept %d)",
+            len(raw) - len(valid), len(valid),
+        )
+        # Persist the cleaned list so bad entries don't come back
+        _history_cache = valid
+        save_history(valid)
+    else:
+        _history_cache = valid
+    
     return _history_cache
 
 
