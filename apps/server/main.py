@@ -75,7 +75,10 @@ async def periodic_update_checker():
 async def lifespan(app: FastAPI):
     """Manage application lifespan - start background tasks on startup."""
     # Start the periodic update checker
-    logger.info("Starting periodic update checker (runs on startup and every 24 hours)")
+    logger.info(
+        f"Starting periodic update checker "
+        f"(runs on startup and every {UPDATE_CHECK_INTERVAL} seconds)"
+    )
     update_task = asyncio.create_task(periodic_update_checker())
     
     # Restore scheduled shots from persistence
