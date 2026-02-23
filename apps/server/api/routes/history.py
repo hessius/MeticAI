@@ -40,12 +40,15 @@ async def get_history(
         # Apply pagination
         entries = history[offset:offset + limit]
         
-        # Remove large fields from list view (keep image_preview small or remove)
+        # Remove large fields from list view and ensure required fields exist
         sanitized_entries = []
         for entry in entries:
             entry_copy = dict(entry)  # avoid mutating cached history entries
             if "image_preview" in entry_copy:
                 entry_copy["image_preview"] = None  # Remove for list view to save bandwidth
+            # Ensure profile_name is always a string (defense against corrupt data)
+            if not entry_copy.get("profile_name"):
+                entry_copy["profile_name"] = entry_copy.get("profile_json", {}).get("name", "Untitled Profile") if isinstance(entry_copy.get("profile_json"), dict) else "Untitled Profile"
             sanitized_entries.append(entry_copy)
         
         return {
@@ -89,6 +92,10 @@ async def get_history_entry(request: Request, entry_id: str):
         
         for entry in history:
             if entry.get("id") == entry_id:
+                # Ensure profile_name is always a string
+                if not entry.get("profile_name"):
+                    pj = entry.get("profile_json")
+                    entry["profile_name"] = pj.get("name", "Untitled Profile") if isinstance(pj, dict) else "Untitled Profile"
                 return entry
         
         raise HTTPException(status_code=404, detail="History entry not found")

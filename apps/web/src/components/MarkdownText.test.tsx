@@ -35,6 +35,14 @@ describe('MarkdownText utilities', () => {
     it('should handle empty string', () => {
       expect(cleanProfileName('')).toBe('')
     })
+
+    it('should handle undefined input', () => {
+      expect(cleanProfileName(undefined as unknown as string)).toBe('')
+    })
+
+    it('should handle null input', () => {
+      expect(cleanProfileName(null as unknown as string)).toBe('')
+    })
   })
 
   describe('cleanMalformedMarkdown', () => {

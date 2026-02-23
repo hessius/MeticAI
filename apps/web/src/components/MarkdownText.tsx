@@ -28,9 +28,11 @@ export function cleanMalformedMarkdown(text: string): string {
 }
 
 /**
- * Clean a profile name by removing any stray markdown formatting
+ * Clean a profile name by removing any stray markdown formatting.
+ * Handles undefined/null input gracefully to prevent runtime crashes.
  */
-export function cleanProfileName(name: string): string {
+export function cleanProfileName(name: string | undefined | null): string {
+  if (!name) return ''
   return name
     // Remove leading/trailing ** or *
     .replace(/^\*+\s*/, '')
