@@ -127,6 +127,20 @@ RUN git clone --depth 1 https://github.com/MeticulousHome/espresso-profile-schem
 # Credit: @nickwilsonr — https://github.com/nickwilsonr/meticulous-addon
 RUN git clone --depth 1 https://github.com/nickwilsonr/meticulous-addon.git /app/meticulous-addon
 
+# Patch: add 'power' sensor to the bridge's MQTT mapping
+# The upstream addon doesn't map machine power % to MQTT — inject it after 'brightness'
+RUN python3 -c "\
+import re, pathlib; \
+p = pathlib.Path('/app/meticulous-addon/rootfs/usr/bin/run.py'); \
+s = p.read_text(); \
+s = s.replace(\
+  '\"brightness\": {\\n                \"component\": \"sensor\",\\n                \"state_topic\": f\"{base}/brightness/state\",\\n            },', \
+  '\"brightness\": {\\n                \"component\": \"sensor\",\\n                \"state_topic\": f\"{base}/brightness/state\",\\n            },\\n            \"power\": {\\n                \"component\": \"sensor\",\\n                \"state_topic\": f\"{base}/power/state\",\\n            },'); \
+s = s.replace('\"brightness\": \"Brightness\",', '\"brightness\": \"Brightness\",\\n                \"power\": \"Power\",'); \
+s = s.replace('\"brightness\": \"Display brightness level\",', '\"brightness\": \"Display brightness level\",\\n                \"power\": \"Motor power percentage during extraction\",'); \
+p.write_text(s); \
+print('Patched meticulous-addon with power sensor mapping')"
+
 # Copy bridge wrapper (zero-fork adapter for the addon)
 COPY apps/bridge/ /app/bridge/
 

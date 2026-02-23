@@ -109,13 +109,13 @@ export function EspressoChart({
     ...data.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)),
     8,
   )
-  const minFlow = Math.min(...data.map(d => d.flow ?? 0), 0)
   // Power (0–100%) is normalized to the left axis range so it doesn't
   // compress pressure/flow readings (Option B from #183).
   const computedLeftMax = leftAxisMax ?? Math.ceil(
     Math.max(maxPressure, maxFlow) * 1.1,
   )
-  const computedLeftMin = Math.floor(Math.min(minFlow, 0))
+  // Always start at zero — never display negative values
+  const computedLeftMin = 0
 
   // Scale factor: maps power 0-100% → 0-computedLeftMax
   const powerScale = computedLeftMax / 100

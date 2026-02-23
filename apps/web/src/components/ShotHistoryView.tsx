@@ -1991,8 +1991,8 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           s => s.limit_hit || s.assessment?.status === 'hit_limit' || s.assessment?.status === 'failed'
                         )
                         
-                        // Get reached goals
-                        const reachedGoals = extractionStages.filter(
+                        // Get reached targets
+                        const reachedTargets = extractionStages.filter(
                           s => s.assessment?.status === 'reached_goal'
                         )
                         
@@ -2005,9 +2005,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             <div className="flex items-center gap-2 mb-2">
                               <Gauge size={16} weight="bold" className="text-green-700 dark:text-green-400" />
                               <span className="text-sm font-semibold">{t('shotHistory.extraction')}</span>
-                              {reachedGoals.length > 0 && (
+                              {reachedTargets.length > 0 && (
                                 <Badge variant="outline" className="ml-auto text-xs bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
-                                  {t('shotHistory.goalsReached', { reached: reachedGoals.length, total: extractionStages.length })}
+                                  {t('shotHistory.targetsReached', { reached: reachedTargets.length, total: extractionStages.length })}
                                 </Badge>
                               )}
                             </div>
@@ -2113,7 +2113,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                                       'bg-blue-500/20 text-blue-700 dark:text-blue-300'
                                     }`}
                                   >
-                                    {stage.assessment.status === 'reached_goal' ? t('shotHistory.goalReached') :
+                                    {stage.assessment.status === 'reached_goal' ? t('shotHistory.targetReached') :
                                      stage.assessment.status === 'hit_limit' ? t('shotHistory.hitLimit') :
                                      stage.assessment.status === 'not_reached' ? t('shotHistory.notReached') :
                                      stage.assessment.status === 'failed' ? t('shotHistory.stageFailed') :
