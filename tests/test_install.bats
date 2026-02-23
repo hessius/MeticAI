@@ -783,3 +783,198 @@ MIGRATION_SCRIPT="${BATS_TEST_DIRNAME}/../scripts/migrate-to-unified.sh"
     run grep -q 'INSTALL_DIR="\${HOME}/MeticAI"' "$MIGRATION_SCRIPT"
     [ "$status" -eq 0 ]
 }
+
+# ==============================================================================
+# Seamless v1.x → v2.0 migration tests (update.sh + compose changes)
+# ==============================================================================
+
+UPDATE_SCRIPT="${BATS_TEST_DIRNAME}/../update.sh"
+COMPOSE_FILE="${BATS_TEST_DIRNAME}/../docker-compose.yml"
+COMPOSE_DEV="${BATS_TEST_DIRNAME}/../docker-compose.dev.yml"
+COMPOSE_OVERRIDE="${BATS_TEST_DIRNAME}/../docker-compose.override.yml"
+DOCKERFILE="${BATS_TEST_DIRNAME}/../docker/Dockerfile.unified"
+DATA_MIGRATE_SCRIPT="${BATS_TEST_DIRNAME}/../docker/scripts/data-migrate.sh"
+DATA_MIGRATE_TYPE="${BATS_TEST_DIRNAME}/../docker/s6-rc.d/data-migrate/type"
+
+@test "Root update.sh exists and is executable" {
+    [ -f "$UPDATE_SCRIPT" ]
+    [ -x "$UPDATE_SCRIPT" ]
+}
+
+@test "Root update.sh has valid bash syntax" {
+    run bash -n "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh accepts --auto flag (v1.x compat)" {
+    run grep -q '\-\-auto' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh accepts --check-only flag (v1.x compat)" {
+    run grep -q '\-\-check-only' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh detects v1 by rebuild-watcher.sh presence" {
+    run grep -q 'rebuild-watcher.sh' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh detects v1 by local-install.sh presence" {
+    run grep -q 'local-install.sh' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh detects v1 by old compose service names" {
+    run grep -q 'coffee-relay' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh removes watcher launchd plist during migration" {
+    run grep -q 'com.meticai.rebuild-watcher.plist' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh removes watcher systemd units during migration" {
+    run grep -q 'meticai-rebuild-watcher.path' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh enables Watchtower during migration" {
+    run grep -q 'watchtower' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'WATCHTOWER_TOKEN' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh cleans up old sub-repos during migration" {
+    run grep -q 'meticulous-source' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'meticai-web' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'coffee-relay' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'gemini-client' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh generates convenience scripts during migration" {
+    run grep -q 'start.sh' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'stop.sh' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'uninstall.sh' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh removes docker-compose.override.yml during cleanup" {
+    run grep -q 'docker-compose.override.yml' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh writes .versions.json for v1 UI compat" {
+    run grep -q '.versions.json' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Root update.sh does v2 update when no v1 artifacts present" {
+    run grep -q 'do_v2_update' "$UPDATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+# --- docker-compose.yml changes ---
+
+@test "docker-compose.yml does NOT contain build: section" {
+    run grep -q 'build:' "$COMPOSE_FILE"
+    [ "$status" -ne 0 ]
+}
+
+@test "docker-compose.yml has legacy data mount for migration" {
+    run grep 'legacy-data' "$COMPOSE_FILE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"/legacy-data:ro"* ]]
+}
+
+@test "docker-compose.yml still references GHCR image" {
+    run grep -q 'ghcr.io/hessius/meticai' "$COMPOSE_FILE"
+    [ "$status" -eq 0 ]
+}
+
+# --- docker-compose.dev.yml ---
+
+@test "docker-compose.dev.yml exists for local builds" {
+    [ -f "$COMPOSE_DEV" ]
+}
+
+@test "docker-compose.dev.yml contains build: section" {
+    run grep -q 'build:' "$COMPOSE_DEV"
+    [ "$status" -eq 0 ]
+    run grep -q 'Dockerfile.unified' "$COMPOSE_DEV"
+    [ "$status" -eq 0 ]
+}
+
+# --- docker-compose.override.yml (migration bridge) ---
+
+@test "docker-compose.override.yml exists for migration bridge" {
+    [ -f "$COMPOSE_OVERRIDE" ]
+}
+
+@test "docker-compose.override.yml includes Watchtower with fallback token" {
+    run grep -q 'watchtower' "$COMPOSE_OVERRIDE"
+    [ "$status" -eq 0 ]
+    run grep -q 'meticai-migration-token' "$COMPOSE_OVERRIDE"
+    [ "$status" -eq 0 ]
+}
+
+# --- s6 data-migrate service ---
+
+@test "s6 data-migrate service type is oneshot" {
+    [ -f "$DATA_MIGRATE_TYPE" ]
+    run cat "$DATA_MIGRATE_TYPE"
+    [[ "$output" == *"oneshot"* ]]
+}
+
+@test "s6 data-migrate service has up script" {
+    [ -f "${BATS_TEST_DIRNAME}/../docker/s6-rc.d/data-migrate/up" ]
+}
+
+@test "s6 data-migrate is included in user bundle" {
+    [ -f "${BATS_TEST_DIRNAME}/../docker/s6-rc.d/user/contents.d/data-migrate" ]
+}
+
+@test "s6 server service depends on data-migrate" {
+    [ -f "${BATS_TEST_DIRNAME}/../docker/s6-rc.d/server/dependencies" ]
+    run grep -q 'data-migrate' "${BATS_TEST_DIRNAME}/../docker/s6-rc.d/server/dependencies"
+    [ "$status" -eq 0 ]
+}
+
+@test "data-migrate script exists and checks /legacy-data" {
+    [ -f "$DATA_MIGRATE_SCRIPT" ]
+    run grep -q '/legacy-data' "$DATA_MIGRATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "data-migrate script is idempotent (checks marker file)" {
+    run grep -q '.migrated-from-v1' "$DATA_MIGRATE_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Dockerfile copies data-migrate script" {
+    run grep -q 'data-migrate' "$DOCKERFILE"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script cleans up old source directories" {
+    run grep -q 'meticulous-source' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'meticai-web' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+    run grep -q 'coffee-relay' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Migration script removes docker-compose.override.yml" {
+    run grep -q 'docker-compose.override.yml' "$MIGRATION_SCRIPT"
+    [ "$status" -eq 0 ]
+}
