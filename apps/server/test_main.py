@@ -6322,12 +6322,11 @@ class TestUtilityFunctions:
         filepath = tmp_path / "test.json"
         data = {"key": "value"}
         
-        # Mock os.rename to raise an exception
-        original_rename = os.rename
-        def failing_rename(src, dst):
-            raise OSError("Simulated rename failure")
+        # Mock os.replace to raise an exception (atomic_write_json uses os.replace)
+        def failing_replace(src, dst):
+            raise OSError("Simulated replace failure")
         
-        monkeypatch.setattr(os, "rename", failing_rename)
+        monkeypatch.setattr(os, "replace", failing_replace)
         
         with pytest.raises(OSError):
             utils.file_utils.atomic_write_json(filepath, data)
