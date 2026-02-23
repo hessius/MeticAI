@@ -325,6 +325,7 @@
     "restartConfirm": "Are you sure you want to restart MeticAI? The system will be unavailable for a few seconds.",
     "restartTriggered": "Restart triggered! The system will restart momentarily.",
     "restartFailed": "Failed to trigger restart",
+    "apiDocs": "API Documentation",
     "language": {
       "select": "Select language",
       "label": "Language"

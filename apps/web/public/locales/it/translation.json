@@ -314,6 +314,7 @@
     "restartConfirm": "Sei sicuro di voler riavviare MeticAI? Il sistema non sarà disponibile per alcuni secondi.",
     "restartTriggered": "Riavvio attivato! Il sistema si riavvierà a breve.",
     "restartFailed": "Impossibile attivare il riavvio",
+    "apiDocs": "Documentazione API",
     "language": {
       "select": "Seleziona lingua",
       "label": "Lingua"
