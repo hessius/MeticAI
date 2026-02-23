@@ -144,13 +144,33 @@ do_v1_migration() {
                 systemctl --user disable meticai-rebuild-watcher.path 2>/dev/null || true
                 rm -f "$HOME/.config/systemd/user/meticai-rebuild-watcher.path" \
                       "$HOME/.config/systemd/user/meticai-rebuild-watcher.service" 2>/dev/null
-                # Also try system-level
-                sudo systemctl stop meticai-rebuild-watcher.path 2>/dev/null || true
-                sudo systemctl disable meticai-rebuild-watcher.path 2>/dev/null || true
-                sudo rm -f /etc/systemd/system/meticai-rebuild-watcher.path \
-                           /etc/systemd/system/meticai-rebuild-watcher.service 2>/dev/null
-                systemctl daemon-reload 2>/dev/null || true
-                systemctl --user daemon-reload 2>/dev/null || true
+                # Also try system-level, but only when root or passwordless sudo is available
+                CAN_SYSTEM_SUDO=false
+                if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+                    CAN_SYSTEM_SUDO=true
+                elif command -v sudo &>/dev/null && sudo -n -v &>/dev/null; then
+                    CAN_SYSTEM_SUDO=true
+                fi
+
+                if [[ "$CAN_SYSTEM_SUDO" == true ]]; then
+                    if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+                        systemctl stop meticai-rebuild-watcher.path || true
+                        systemctl disable meticai-rebuild-watcher.path || true
+                        rm -f /etc/systemd/system/meticai-rebuild-watcher.path \
+                              /etc/systemd/system/meticai-rebuild-watcher.service || true
+                        systemctl daemon-reload || true
+                    else
+                        sudo -n systemctl stop meticai-rebuild-watcher.path || true
+                        sudo -n systemctl disable meticai-rebuild-watcher.path || true
+                        sudo -n rm -f /etc/systemd/system/meticai-rebuild-watcher.path \
+                               /etc/systemd/system/meticai-rebuild-watcher.service || true
+                        sudo -n systemctl daemon-reload || true
+                    fi
+                else
+                    echo "  Skipping system-level systemd cleanup (no passwordless sudo or root)."
+                fi
+
+                systemctl --user daemon-reload || true
                 echo "  Removed systemd units"
             fi
             ;;
