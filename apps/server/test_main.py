@@ -1144,116 +1144,122 @@ class TestCORS:
 
 
 class TestStatusEndpoint:
-    """Tests for the /api/status endpoint."""
+    """Tests for the /api/status endpoint (GitHub Releases API)."""
+
+    @pytest.fixture(autouse=True)
+    def clear_update_cache(self):
+        """Clear the update cache between tests."""
+        import api.routes.system as sys_module
+        sys_module._update_cache = None
+        sys_module._update_cache_time = None
+        yield
+        sys_module._update_cache = None
+        sys_module._update_cache_time = None
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_status_endpoint_exists(self, mock_subprocess, client):
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_status_endpoint_exists(self, mock_client_cls, mock_version, client):
         """Test that /api/status endpoint exists and is accessible."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "✓ Everything is up to date!"
-        mock_subprocess.return_value = mock_result
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
         response = client.get("/api/status")
         assert response.status_code == 200
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    @patch('api.routes.system.Path')
-    def test_status_returns_json_structure(self, mock_path, mock_subprocess, client):
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_status_returns_json_structure(self, mock_client_cls, mock_version, client):
         """Test that /api/status returns expected JSON structure."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "✓ Up to date"
-        mock_subprocess.return_value = mock_result
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
-        # Mock version file
-        mock_version_file = Mock()
-        mock_version_file.exists.return_value = True
-        mock_path.return_value = mock_version_file
-        
-        with patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = '{"last_check": "2026-01-13T00:00:00Z", "repositories": {}}'
-            
-            response = client.get("/api/status")
-            
+        response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
         assert "update_available" in data
-        assert "last_check" in data or "error" in data
-        assert isinstance(data.get("update_available"), bool) or "error" in data
+        assert isinstance(data["update_available"], bool)
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('builtins.open', new_callable=mock_open, read_data='{"update_available": true, "last_check": "2024-01-01T00:00:00", "repositories": {"mcp": {"update_available": true}}}')
-    @patch('api.routes.system.Path')
-    def test_status_detects_updates_available(self, mock_path, mock_file, client):
+    @patch('api.routes.system._get_running_version', return_value='1.0.0')
+    @patch('httpx.AsyncClient')
+    def test_status_detects_updates_available(self, mock_client_cls, mock_version, client):
         """Test that /api/status correctly identifies when updates are available."""
-        # Mock version file as existing
-        mock_version_file = Mock()
-        mock_version_file.exists.return_value = True
-        mock_path.return_value = mock_version_file
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
         response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
-        assert data.get("update_available") == True
+        assert data["update_available"] is True
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('builtins.open', new_callable=mock_open, read_data='{"update_available": true, "last_check": "2024-01-01T00:00:00", "repositories": {"mcp": {"update_available": true}}}')
-    @patch('api.routes.system.Path')
-    def test_status_detects_missing_dependencies(self, mock_path, mock_file, client):
-        """Test that /api/status identifies missing dependencies as requiring updates."""
-        # Mock version file as existing
-        mock_version_file = Mock()
-        mock_version_file.exists.return_value = True
-        mock_path.return_value = mock_version_file
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_status_no_updates(self, mock_client_cls, mock_version, client):
+        """Test /api/status when already on latest version."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
         response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
-        assert data.get("update_available") == True
+        assert data["update_available"] is False
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.Path')
-    def test_status_handles_missing_version_file(self, mock_path, client):
-        """Test that /api/status handles missing version file gracefully."""
-        # Mock version file as not existing
-        mock_version_file = Mock()
-        mock_version_file.exists.return_value = False
-        mock_path.return_value = mock_version_file
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_status_handles_github_error(self, mock_client_cls, mock_version, client):
+        """Test that /api/status handles GitHub API errors gracefully."""
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(side_effect=Exception("Connection refused"))
+        mock_client_cls.return_value = mock_client
 
         response = client.get("/api/status")
         assert response.status_code == 200
         data = response.json()
-        # Should still return a valid response
-        assert "update_available" in data
+        assert data["update_available"] is False
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('builtins.open')
-    @patch('api.routes.system.Path')
-    def test_status_handles_script_error(self, mock_path, mock_open_func, client):
-        """Test that /api/status handles update script errors gracefully."""
-        # Mock version file as existing but simulate error reading it
-        mock_version_file = Mock()
-        mock_version_file.exists.return_value = True
-        mock_path.return_value = mock_version_file
-        mock_open_func.side_effect = Exception("File read error")
-
-        response = client.get("/api/status")
-        assert response.status_code == 200
-        data = response.json()
-        # Should return error information
-        assert "error" in data or "message" in data
-
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.system.Path')
-    def test_status_endpoint_cors_enabled(self, mock_path, client):
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_status_endpoint_cors_enabled(self, mock_client_cls, mock_version, client):
         """Test that /api/status endpoint has CORS enabled for web app."""
-        # Mock version file as not existing for simplicity
-        mock_version_file = Mock()
-        mock_version_file.exists.return_value = False
-        mock_path.return_value = mock_version_file
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
         response = client.get(
             "/api/status",
@@ -3304,144 +3310,104 @@ class TestProcessImageForProfile:
 
 
 class TestCheckUpdatesEndpoint:
-    """Tests for the /api/check-updates endpoint."""
+    """Tests for the /api/check-updates endpoint (GitHub Releases API)."""
 
-    @patch('api.routes.system.Path')
-    @patch('api.routes.system.asyncio.sleep', new_callable=AsyncMock)
-    def test_check_updates_success_with_updates(self, mock_sleep, mock_path, client):
+    @pytest.fixture(autouse=True)
+    def clear_update_cache(self):
+        """Clear the update cache between tests."""
+        import api.routes.system as sys_module
+        sys_module._update_cache = None
+        sys_module._update_cache_time = None
+        yield
+        sys_module._update_cache = None
+        sys_module._update_cache_time = None
+
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_check_updates_success_with_updates(self, mock_client_cls, mock_version, client):
         """Test successful update check with updates available."""
-        # Mock version file exists and has update data
-        mock_version_file = MagicMock()
-        mock_version_file.exists.return_value = True
-        mock_path.return_value = mock_version_file
-        
-        version_data = {
-            "update_available": True,
-            "last_check": "2024-01-15T10:30:00",
-            "repositories": {
-                "MeticAI": {"current": "v1.0.0", "latest": "v1.1.0"}
-            }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "tag_name": "v2.1.0",
+            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.1.0"
         }
-        
-        with patch('builtins.open', mock_open(read_data=json.dumps(version_data))):
-            response = client.post("/api/check-updates")
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
+
+        response = client.post("/api/check-updates")
         
         assert response.status_code == 200
         data = response.json()
         assert data["update_available"] is True
-        assert data["last_check"] == "2024-01-15T10:30:00"
-        assert "repositories" in data
+        assert data["current_version"] == "2.0.0"
+        assert data["latest_version"] == "2.1.0"
+        assert data["fresh_check"] is True
 
-    @patch('api.routes.system.Path')
-    @patch('api.routes.system.asyncio.sleep', new_callable=AsyncMock)
-    def test_check_updates_no_updates(self, mock_sleep, mock_path, client):
-        """Test update check with no updates available."""
-        mock_version_file = MagicMock()
-        mock_version_file.exists.return_value = True
-        mock_path.return_value = mock_version_file
-        
-        version_data = {
-            "update_available": False,
-            "last_check": "2024-01-15T10:30:00",
-            "repositories": {
-                "MeticAI": {"current": "v1.0.0", "latest": "v1.0.0"}
-            }
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_check_updates_no_updates(self, mock_client_cls, mock_version, client):
+        """Test update check when already on latest version."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "tag_name": "v2.0.0",
+            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0"
         }
-        
-        with patch('builtins.open', mock_open(read_data=json.dumps(version_data))):
-            response = client.post("/api/check-updates")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["update_available"] is False
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
-    @patch('api.routes.system.Path')
-    def test_check_updates_file_not_found(self, mock_path, client):
-        """Test update check when version file doesn't exist."""
-        mock_version_file = MagicMock()
-        mock_version_file.exists.return_value = False
-        mock_path.return_value = mock_version_file
-        
         response = client.post("/api/check-updates")
         
         assert response.status_code == 200
         data = response.json()
         assert data["update_available"] is False
-        assert "error" in data
-        assert "Version file not found" in data["error"]
 
-    @patch('api.routes.system.Path')
-    @patch('api.routes.system.asyncio.sleep', new_callable=AsyncMock)
-    def test_check_updates_fresh_check(self, mock_sleep, mock_path, client):
-        """Test that update check triggers fresh check and waits for update."""
-        mock_version_file = MagicMock()
-        mock_signal_file = MagicMock()
-        
-        # Setup: version file exists, signal file gets created then removed
-        call_count = {"path_calls": 0}
-        
-        def path_side_effect(arg):
-            if ".versions.json" in str(arg):
-                return mock_version_file
-            elif ".update-check-requested" in str(arg):
-                return mock_signal_file
-            return MagicMock()
-        
-        mock_path.side_effect = path_side_effect
-        mock_version_file.exists.return_value = True
-        
-        # Signal file exists initially, then gets removed
-        signal_exists_calls = [True, False]
-        mock_signal_file.exists.side_effect = signal_exists_calls
-        
-        old_version_data = {
-            "update_available": False,
-            "last_check": "2024-01-15T10:00:00",
-            "repositories": {}
-        }
-        
-        new_version_data = {
-            "update_available": True,
-            "last_check": "2024-01-15T10:30:00",
-            "repositories": {
-                "MeticAI": {"current": "v1.0.0", "latest": "v1.1.0"}
-            }
-        }
-        
-        read_calls = [json.dumps(old_version_data), json.dumps(new_version_data)]
-        
-        with patch('builtins.open', mock_open()) as mock_file:
-            mock_file.return_value.read.side_effect = read_calls
-            response = client.post("/api/check-updates")
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_check_updates_github_unreachable(self, mock_client_cls, mock_version, client):
+        """Test update check when GitHub API is unreachable."""
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(side_effect=Exception("Connection refused"))
+        mock_client_cls.return_value = mock_client
+
+        response = client.post("/api/check-updates")
         
         assert response.status_code == 200
         data = response.json()
-        assert "update_available" in data
+        assert data["update_available"] is False
+        assert data["current_version"] == "2.0.0"
 
-    @patch('api.routes.system.Path')
-    def test_check_updates_json_error(self, mock_path, client):
-        """Test handling of corrupted version file."""
-        mock_version_file = MagicMock()
-        mock_version_file.exists.return_value = True
+    @patch('api.routes.system._get_running_version', return_value='2.0.0')
+    @patch('httpx.AsyncClient')
+    def test_check_updates_fresh_check(self, mock_client_cls, mock_version, client):
+        """Test that check-updates returns fresh_check=True."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "tag_name": "v2.0.0",
+            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0"
+        }
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
 
-        # Each call to Path(...) returns a fresh mock, but we need the
-        # signal path's exists() to return False so the polling loop
-        # exits immediately.  Use side_effect to distinguish paths.
-        mock_signal = MagicMock()
-        mock_signal.exists.return_value = False  # signal "already processed"
-
-        def path_factory(p, *a, **kw):
-            if ".update-check-requested" in str(p):
-                return mock_signal
-            return mock_version_file
-
-        mock_path.side_effect = path_factory
-
-        with patch('builtins.open', mock_open(read_data="invalid json {")):
-            response = client.post("/api/check-updates")
-
-        # Should handle gracefully
-        assert response.status_code in [200, 500]
+        response = client.post("/api/check-updates")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("fresh_check") is True
+        assert "last_check" in data
 
 
 class TestMachineProfilesEndpoint:
