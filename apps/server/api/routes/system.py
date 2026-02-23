@@ -41,102 +41,115 @@ _changelog_cache_time: Optional[datetime] = None
 CHANGELOG_CACHE_DURATION = timedelta(hours=1)  # Cache for 1 hour
 
 
+# Cached update status (avoid hammering the GitHub API)
+_update_cache: Optional[dict] = None
+_update_cache_time: Optional[datetime] = None
+UPDATE_CACHE_DURATION = timedelta(minutes=15)
+
+GITHUB_RELEASES_URL = "https://api.github.com/repos/hessius/MeticAI/releases/latest"
+
+
+def _get_running_version() -> str:
+    """Read the version baked into the container image."""
+    version_file = Path(__file__).parent.parent.parent / "VERSION"
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return "unknown"
+
+
+def _version_tuple(v: str):
+    """Parse a semver string like '2.0.0' into a tuple for comparison."""
+    v = v.lstrip("v")
+    parts = v.split("-")[0].split(".")  # strip pre-release suffixes
+    try:
+        return tuple(int(p) for p in parts)
+    except (ValueError, TypeError):
+        return (0, 0, 0)
+
+
+async def _fetch_latest_release() -> dict:
+    """Query GitHub Releases API for the latest published version."""
+    global _update_cache, _update_cache_time
+    
+    now = datetime.now(timezone.utc)
+    if (_update_cache is not None
+            and _update_cache_time is not None
+            and (now - _update_cache_time) < UPDATE_CACHE_DURATION):
+        return _update_cache
+    
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                GITHUB_RELEASES_URL,
+                headers={"Accept": "application/vnd.github+json"},
+                timeout=10.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                latest_version = data.get("tag_name", "").lstrip("v")
+                running_version = _get_running_version()
+                update_available = (
+                    latest_version != "unknown"
+                    and running_version != "unknown"
+                    and _version_tuple(latest_version) > _version_tuple(running_version)
+                )
+                result = {
+                    "update_available": update_available,
+                    "latest_version": latest_version,
+                    "current_version": running_version,
+                    "last_check": now.isoformat(),
+                    "release_url": data.get("html_url"),
+                }
+                _update_cache = result
+                _update_cache_time = now
+                return result
+    except Exception as e:
+        logger.debug(f"Failed to query GitHub releases: {e}")
+    
+    # Return stale cache if available, otherwise a safe fallback
+    if _update_cache is not None:
+        return _update_cache
+    return {
+        "update_available": False,
+        "current_version": _get_running_version(),
+        "latest_version": None,
+        "last_check": None,
+        "error": "Could not reach GitHub API",
+    }
+
+
 @router.post("/api/check-updates")
 async def check_updates(request: Request):
-    """Trigger a fresh update check by signaling the host-side watcher.
+    """Trigger a fresh update check against the GitHub Releases API.
     
-    This endpoint creates a flag file that the host-side watcher script detects
-    and runs the actual git fetch. Since git operations can't run properly inside
-    the container (no access to sub-repo .git directories), we delegate to the host.
+    Queries the latest published release on GitHub and compares it to
+    the version baked into the running container image.
     
     Returns:
-        - update_available: Whether updates are available for any component
+        - update_available: Whether a newer version exists
+        - current_version: Version running in this container
+        - latest_version: Latest version on GitHub
         - last_check: Timestamp of this check
-        - repositories: Status of each repository (main, mcp, web)
-        - fresh_check: True if this was a fresh check
+        - fresh_check: Always True for this endpoint
     """
     request_id = request.state.request_id
     
     try:
+        global _update_cache, _update_cache_time
+        # Bust the cache so we get a fresh result
+        _update_cache = None
+        _update_cache_time = None
+        
         logger.info(
-            "Triggering fresh update check via host signal",
+            "Checking for updates via GitHub Releases API",
             extra={"request_id": request_id, "endpoint": "/api/check-updates"}
         )
         
-        # Get the current timestamp from .versions.json before signaling
-        version_file_path = Path("/app/.versions.json")
-        old_check_time = None
-        if version_file_path.exists():
-            try:
-                with open(version_file_path, 'r') as f:
-                    old_data = json.load(f)
-                    old_check_time = old_data.get("last_check")
-            except Exception:
-                # Ignore errors reading old version file (may not exist or be corrupted)
-                pass
+        result = await _fetch_latest_release()
+        result["fresh_check"] = True
+        return result
         
-        # Create signal file for host-side watcher
-        signal_path = Path("/app/.update-check-requested")
-        signal_path.write_text(f"requested_at: {datetime.now(timezone.utc).isoformat()}\n")
-        
-        logger.info(
-            "Update check signal created, waiting for host to process",
-            extra={"request_id": request_id}
-        )
-        
-        # Wait for host to process the signal (poll for up to 30 seconds)
-        max_wait = 30
-        poll_interval = 0.5
-        waited = 0
-        
-        while waited < max_wait:
-            await asyncio.sleep(poll_interval)
-            waited += poll_interval
-            
-            # Check if signal file was removed (host processed it)
-            if not signal_path.exists():
-                break
-            
-            # Check if .versions.json was updated
-            if version_file_path.exists():
-                try:
-                    with open(version_file_path, 'r') as f:
-                        current_data = json.load(f)
-                        new_check_time = current_data.get("last_check")
-                        if new_check_time and new_check_time != old_check_time:
-                            # Versions file was updated
-                            break
-                except Exception:
-                    # Ignore errors polling version file (may be being written or temporarily unavailable)
-                    pass
-        
-        # Clean up signal file if it still exists
-        try:
-            signal_path.unlink(missing_ok=True)
-        except Exception:
-            # Ignore errors during cleanup (file may already be deleted or have permission issues)
-            pass
-        
-        # Read the versions file
-        if version_file_path.exists():
-            with open(version_file_path, 'r') as f:
-                version_data = json.load(f)
-                new_check_time = version_data.get("last_check")
-                was_updated = new_check_time != old_check_time
-                
-                return {
-                    "update_available": version_data.get("update_available", False),
-                    "last_check": new_check_time,
-                    "repositories": version_data.get("repositories", {}),
-                    "fresh_check": was_updated
-                }
-        else:
-            return {
-                "update_available": False,
-                "error": "Version file not found",
-                "message": "No version information available"
-            }
-            
     except Exception as e:
         logger.error(
             f"Failed to check for updates: {str(e)}",
@@ -154,45 +167,20 @@ async def check_updates(request: Request):
 async def get_status(request: Request):
     """Get system status including update availability.
     
-    Returns:
-        - update_available: Whether updates are available for any component
-        - last_check: Timestamp of last update check
-        - repositories: Status of each repository (main, mcp, web)
+    Returns cached update information (refreshed every 15 minutes) comparing
+    the running container version to the latest GitHub release.
     
-    Note: This reads from .versions.json which is populated by the update.sh
-    script running on the host. The file is mounted into the container.
-    Run './update.sh --check-only' on the host to refresh update status.
+    Returns:
+        - update_available: Whether a newer version exists
+        - current_version: Version running in this container
+        - latest_version: Latest version on GitHub (if known)
+        - last_check: Timestamp of last update check
     """
     request_id = request.state.request_id
     
     try:
         logger.debug("Checking system status", extra={"request_id": request_id})
-        
-        # Read version file directly (mounted from host)
-        # The file is updated by update.sh --check-only running on the host
-        version_file_path = Path("/app/.versions.json")
-        update_status = {
-            "update_available": False,
-            "last_check": None,
-            "repositories": {}
-        }
-        
-        if version_file_path.exists():
-            with open(version_file_path, 'r') as f:
-                version_data = json.load(f)
-                # Read update_available directly from file (new format)
-                update_status["update_available"] = version_data.get("update_available", False)
-                update_status["last_check"] = version_data.get("last_check")
-                update_status["repositories"] = version_data.get("repositories", {})
-        else:
-            # File doesn't exist yet - suggest running update check
-            update_status["message"] = "Version file not found. Run './update.sh --check-only' on the host to check for updates."
-            logger.warning(
-                "Version file not found",
-                extra={"request_id": request_id, "version_file": str(version_file_path)}
-            )
-        
-        return update_status
+        return await _fetch_latest_release()
         
     except Exception as e:
         logger.error(

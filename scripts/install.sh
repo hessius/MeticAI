@@ -772,20 +772,20 @@ echo -e "${YELLOW}[4/4] Starting MeticAI...${NC}"
 echo ""
 
 log_info "Pulling MeticAI image (this may take a few minutes)..."
-docker compose ${COMPOSE_FILES} pull
+docker compose ${COMPOSE_FILES} pull 2>&1 || true
 
 log_info "Starting MeticAI..."
-docker compose ${COMPOSE_FILES} up -d
+docker compose ${COMPOSE_FILES} up -d 2>&1 || true
 
 # Wait for services
 log_info "Waiting for services to start..."
-sleep 8
+sleep 10
 
 # ==============================================================================
 # Verify installation
 # ==============================================================================
 
-if docker compose ps 2>/dev/null | grep -q "running\|healthy"; then
+if docker compose ${COMPOSE_FILES} ps 2>/dev/null | grep -qi "running\|healthy\|up"; then
     log_success "MeticAI is running!"
 else
     log_warning "Container may still be starting..."
@@ -845,6 +845,8 @@ fi
 # Success banner
 # ==============================================================================
 
+METICAI_URL="http://${SERVER_IP}:3550"
+
 echo ""
 echo -e "${GREEN}"
 echo "  +======================================+"
@@ -852,11 +854,46 @@ echo "  |      Installation Complete!          |"
 echo "  +======================================+"
 echo -e "${NC}"
 echo ""
-echo "  Web UI:  http://${SERVER_IP}:3550"
-echo "  API:     http://${SERVER_IP}:3550/api/docs"
+echo "  Web UI:  ${METICAI_URL}"
+echo "  API:     ${METICAI_URL}/api/docs"
 echo ""
+
+# QR code for easy mobile access
+if command -v qrencode &>/dev/null; then
+    echo "  Scan to open on your phone:"
+    echo ""
+    qrencode -t ANSIUTF8 -m 2 "${METICAI_URL}" 2>/dev/null | sed 's/^/    /'
+    echo ""
+elif command -v python3 &>/dev/null && python3 -c "import qrcode" 2>/dev/null; then
+    echo "  Scan to open on your phone:"
+    echo ""
+    python3 -c "
+import qrcode, sys
+qr = qrcode.QRCode(border=1)
+qr.add_data('${METICAI_URL}')
+qr.make()
+qr.print_ascii(out=sys.stdout, invert=True)
+" 2>/dev/null | sed 's/^/    /'
+    echo ""
+else
+    # Pure-bash mini QR hint — just show a framed URL instead
+    echo "  Open this URL on your phone to get started:"
+    echo ""
+    echo "    ┌──────────────────────────────────────┐"
+    echo "    │  ${METICAI_URL}  │"
+    echo "    └──────────────────────────────────────┘"
+    echo ""
+    echo "  Tip: install 'qrencode' for a scannable QR code:"
+    if [[ "$PLATFORM" == "macos" ]]; then
+        echo "    brew install qrencode"
+    else
+        echo "    sudo apt-get install -y qrencode"
+    fi
+    echo ""
+fi
+
 echo "  Test it:"
-echo "    curl -sf http://${SERVER_IP}:3550/api/version"
+echo "    curl -sf ${METICAI_URL}/api/version"
 echo ""
 echo "  Useful commands:"
 echo "    cd ${INSTALL_DIR}"
@@ -866,5 +903,5 @@ echo "    ./update.sh       Pull latest image & restart"
 echo "    ./uninstall.sh    Remove MeticAI"
 echo "    docker compose logs -f   View live logs"
 echo ""
-echo "  Enjoy your coffee!"
+echo "  Enjoy your coffee! ☕"
 echo ""

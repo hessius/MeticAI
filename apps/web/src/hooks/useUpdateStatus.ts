@@ -4,7 +4,9 @@ import { getServerUrl } from '@/lib/config'
 interface UpdateStatus {
   update_available: boolean
   last_check?: string
-  repositories?: Record<string, unknown>
+  current_version?: string
+  latest_version?: string
+  release_url?: string
   fresh_check?: boolean
 }
 
@@ -16,7 +18,7 @@ interface UseUpdateStatusReturn {
   lastChecked: string | null
 }
 
-// Check cached status every 5 minutes (reads from .versions.json)
+// Check cached status every 5 minutes (queries GitHub Releases API with server-side cache)
 const CHECK_INTERVAL_MINUTES = 5
 const CHECK_INTERVAL = CHECK_INTERVAL_MINUTES * 60 * 1000
 
@@ -26,7 +28,7 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
   const [error, setError] = useState<string | null>(null)
   const [lastChecked, setLastChecked] = useState<string | null>(null)
 
-  // Read cached status (fast, no git fetch)
+  // Read cached status from the server
   const readCachedStatus = useCallback(async (): Promise<{ updateAvailable: boolean; error: string | null }> => {
     try {
       const serverUrl = await getServerUrl()
@@ -48,14 +50,14 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
     }
   }, [])
 
-  // Trigger a fresh update check (runs git fetch, slower)
+  // Trigger a fresh update check (queries GitHub Releases API, bypasses cache)
   const checkForUpdates = useCallback(async (): Promise<{ updateAvailable: boolean; error: string | null }> => {
     setIsChecking(true)
     setError(null)
 
     try {
       const serverUrl = await getServerUrl()
-      // Use the new endpoint that triggers an actual git fetch
+      // Use the check-updates endpoint that bypasses the server-side cache
       const response = await fetch(`${serverUrl}/api/check-updates`, {
         method: 'POST',
       })
