@@ -783,7 +783,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
     if (!resultsCardRef.current) return
     
     try {
-      const safeFilename = entry.profile_name
+      const safeFilename = (entry.profile_name || 'profile')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
@@ -840,8 +840,9 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
     }
   }
 
-  const parseProfileSections = (text: string) => {
+  const parseProfileSections = (text: string | undefined | null) => {
     const sections: { title: string; content: string }[] = []
+    if (!text) return sections
     // Note: 'Profile Created' is excluded as it's already shown in the header
     const sectionHeaders = [
       'Description',

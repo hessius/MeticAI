@@ -5420,14 +5420,34 @@ class TestDataFileManagement:
         """Test loading history with existing valid file."""
         from services.history_service import load_history as _load_history, HISTORY_FILE
         
-        # Create a valid history file
-        test_data = [{"id": "test123", "name": "TestProfile"}]
+        # Create a valid history file with proper v2 schema fields
+        test_data = [{"id": "test123", "profile_name": "TestProfile", "reply": "**Profile Created:** TestProfile\n"}]
         with open(HISTORY_FILE, 'w') as f:
             json.dump(test_data, f)
         
         history = _load_history()
         assert len(history) == 1
         assert history[0]["id"] == "test123"
+        assert history[0]["profile_name"] == "TestProfile"
+    
+    def test_load_history_filters_malformed_entries(self):
+        """Test that load_history drops entries without profile_name or reply."""
+        from services.history_service import load_history as _load_history, HISTORY_FILE
+        
+        # Mix of valid and invalid entries
+        test_data = [
+            {"id": "valid1", "profile_name": "Good Entry", "reply": "some reply"},
+            {"id": "bad1", "name": "TestProfile"},  # missing profile_name AND reply
+            {"id": "valid2", "reply": "**Profile Created:** Another\n"},  # has reply, no profile_name
+            {"id": "bad2"},  # missing everything
+        ]
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(test_data, f)
+        
+        history = _load_history()
+        assert len(history) == 2
+        assert history[0]["id"] == "valid1"
+        assert history[1]["id"] == "valid2"
 
 
 class TestCacheManagementFunctions:
