@@ -173,6 +173,7 @@ jobs:
       - name: Test container starts
         run: |
           docker run -d --name test-container \
+            -p 3550:3550 \
             -e GEMINI_API_KEY=test \
             -e METICULOUS_IP=127.0.0.1 \
             meticai:test
@@ -185,6 +186,33 @@ jobs:
 
           # Check health endpoint
           docker exec test-container curl -f http://localhost:3550/health || exit 1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run integration E2E tests (verify-tasks)
+        working-directory: apps/web
+        run: bunx playwright test e2e/verify-tasks.spec.ts
+        env:
+          BASE_URL: http://localhost:3550
+
+      - name: Upload Integration Test Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-report
+          path: apps/web/playwright-report/
+          retention-days: 30
 
       - name: Cleanup
         if: always()

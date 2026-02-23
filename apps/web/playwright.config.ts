@@ -31,6 +31,10 @@ const projects = isCI
 
 export default defineConfig({
   testDir: './e2e',
+  /* verify-tasks.spec.ts needs a running Docker container (port 3550),
+     so it's excluded from normal CI e2e runs and executed separately
+     in the docker-build job instead. */
+  testIgnore: isCI ? ['**/verify-tasks.spec.ts'] : [],
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
@@ -45,10 +49,14 @@ export default defineConfig({
 
   projects,
 
-  webServer: {
-    command: 'bunx vite --host --port 5173 --strictPort',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !isCI,
-    timeout: 120_000,
-  },
+  /* Start the Vite dev server for tests that run against the SPA.
+     Skip when BASE_URL is set (integration tests run against Docker). */
+  ...(!process.env.BASE_URL && {
+    webServer: {
+      command: 'bunx vite --host --port 5173 --strictPort',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !isCI,
+      timeout: 120_000,
+    },
+  }),
 })
