@@ -62,6 +62,7 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
     heating:           { cls: 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/40', key: 'heating' },
     preheating:        { cls: 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/40 animate-pulse', key: 'preheating' },
     steaming:          { cls: 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/40', key: 'steaming' },
+    purging:           { cls: 'bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-500/40 animate-pulse', key: 'purging' },
     descaling:         { cls: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/40', key: 'descaling' },
     'pour water':      { cls: 'bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-500/40 animate-pulse', key: 'pourWater' },
     'click to start':  { cls: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/40 animate-pulse', key: 'ready' },
