@@ -66,9 +66,8 @@ interface ReleaseNote {
 }
 
 interface UpdateMethod {
-  method: 'watchtower' | 'watcher' | 'manual'
+  method: 'watchtower' | 'manual'
   watchtower_running: boolean
-  watcher_running: boolean
   can_trigger_update: boolean
 }
 
@@ -121,7 +120,6 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const { triggerUpdate, isUpdating, updateError } = useUpdateTrigger()
   const [updateProgress, setUpdateProgress] = useState(0)
   
-  // Watcher status (legacy - now handled by updateMethod)
   
   // Update method detection
   const [updateMethod, setUpdateMethod] = useState<UpdateMethod | null>(null)
@@ -362,15 +360,63 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
       if (response.ok) {
         setRestartStatus('success')
+        
+        // The container will actually restart — wait for it to come back
+        // Poll the health endpoint until the server is reachable again
+        const pollHealth = async () => {
+          const maxAttempts = 30 // ~30 seconds
+          for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(r => setTimeout(r, 1000))
+            try {
+              const healthResp = await fetch(`${serverUrl}/api/health`, {
+                signal: AbortSignal.timeout(2000)
+              })
+              if (healthResp.ok) {
+                window.location.reload()
+                return
+              }
+            } catch {
+              // Server still down, keep polling
+            }
+          }
+          // If we get here, server didn't come back — reload anyway
+          window.location.reload()
+        }
+        pollHealth()
       } else {
         const error = await response.json()
         throw new Error(error.detail?.message || t('settings.restartFailed'))
       }
     } catch (err) {
-      setRestartStatus('error')
-      setErrorMessage(err instanceof Error ? err.message : t('settings.restartFailed'))
-    } finally {
-      setIsRestarting(false)
+      // Network errors are expected — the server may have already started shutting down
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setRestartStatus('success')
+        // Server went down before we got a response — poll for it to come back
+        const serverUrl = await getServerUrl()
+        const pollHealth = async () => {
+          const maxAttempts = 30
+          for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(r => setTimeout(r, 1000))
+            try {
+              const healthResp = await fetch(`${serverUrl}/api/health`, {
+                signal: AbortSignal.timeout(2000)
+              })
+              if (healthResp.ok) {
+                window.location.reload()
+                return
+              }
+            } catch {
+              // Still down
+            }
+          }
+          window.location.reload()
+        }
+        pollHealth()
+      } else {
+        setRestartStatus('error')
+        setErrorMessage(err instanceof Error ? err.message : t('settings.restartFailed'))
+        setIsRestarting(false)
+      }
     }
   }
 

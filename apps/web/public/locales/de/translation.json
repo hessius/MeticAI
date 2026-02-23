@@ -308,12 +308,6 @@
     "noUpdatesAvailable": "Keine Updates verfügbar",
     "checkForUpdates": "Nach Updates suchen",
     "system": "System",
-    "backgroundWatcher": "Hintergrund-Watcher",
-    "running": "Läuft",
-    "notRunning": "Läuft nicht",
-    "watcherNotRunning": "Der Hintergrund-Watcher läuft nicht. Neustart- und Update-Schaltflächen funktionieren möglicherweise nicht. Führe",
-    "watcherCommand": "./rebuild-watcher.sh --install",
-    "watcherCommandSuffix": "auf dem Host aus.",
     "restartDescription": "Alle MeticAI-Dienste neu starten. Verwende dies, wenn du Probleme hast.",
     "restartMeticAI": "MeticAI neu starten",
     "restarting": "Wird neu gestartet...",
@@ -361,10 +355,8 @@
     },
     "updateMethod": {
       "watchtower": "Automatische Updates über Watchtower",
-      "watcher": "Host-verwaltete Updates über Watcher",
       "manual": "Nur manuelle Updates",
       "watchtowerDescription": "Updates werden automatisch angewendet, wenn neue Versionen verfügbar sind.",
-      "watcherDescription": "Updates werden über die Benutzeroberfläche ausgelöst und vom Host-Watcher angewendet.",
       "manualDescription": "Kein automatischer Update-Mechanismus erkannt. Aktualisiere manuell über docker pull."
     },
     "version": "Version",
