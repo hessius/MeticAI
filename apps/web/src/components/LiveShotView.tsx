@@ -48,7 +48,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { SensorGauge } from '@/components/SensorGauge'
 import { getServerUrl } from '@/lib/config'
 
 // ---------------------------------------------------------------------------
@@ -106,6 +105,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
+  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
 
   // Use machine state from props directly
   const ms = machineState
@@ -118,6 +118,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 
     const fetchData = async () => {
       const base = await getServerUrl()
+
+      // Build profile image URL
+      setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(profileName!)}/image-proxy`)
 
       // Fetch target curves
       try {
@@ -210,6 +213,83 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     () => extractStageRanges(chartData),
     [chartData],
   )
+
+  // Realign target curves to match actual stage timings.
+  // The original target curves use *estimated* stage durations from
+  // exit-trigger values.  When a stage exits prematurely (or late),
+  // the targets for that stage and all subsequent stages would be
+  // misaligned with the actual chart data.
+  //
+  // Strategy: group original target points by stage_name, then for each
+  // stage that has an actual StageRange, scale the points to the actual
+  // duration and shift all subsequent stages accordingly.
+  const adjustedTargetCurves = useMemo(() => {
+    if (!targetCurves || targetCurves.length === 0 || stages.length === 0) return targetCurves
+
+    // Group original target points by stage_name (preserving order)
+    const stageGroups: { name: string; points: ProfileTargetPoint[] }[] = []
+    let currentGroup: { name: string; points: ProfileTargetPoint[] } | null = null
+    for (const pt of targetCurves) {
+      if (!currentGroup || currentGroup.name !== pt.stage_name) {
+        currentGroup = { name: pt.stage_name, points: [] }
+        stageGroups.push(currentGroup)
+      }
+      currentGroup.points.push(pt)
+    }
+
+    // Build a map of actual stage ranges by name
+    const actualByName = new Map<string, { startTime: number; endTime: number }>()
+    for (const s of stages) {
+      // First occurrence wins (in case of duplicates)
+      if (!actualByName.has(s.name)) {
+        actualByName.set(s.name, { startTime: s.startTime, endTime: s.endTime })
+      }
+    }
+
+    const adjusted: ProfileTargetPoint[] = []
+    let timeOffset = 0 // cumulative shift applied to all subsequent stages
+
+    for (const group of stageGroups) {
+      const pts = group.points
+      if (pts.length === 0) continue
+
+      const origStart = pts[0].time
+      const origEnd = pts[pts.length - 1].time
+      const origDuration = origEnd - origStart
+
+      const actual = actualByName.get(group.name)
+      if (actual) {
+        // This stage has started (and possibly completed) — align to actual
+        const actualStart = actual.startTime
+        const actualEnd = actual.endTime
+        const actualDuration = actualEnd - actualStart
+
+        // Scale factor: maps estimated duration → actual duration
+        const scale = origDuration > 0 ? actualDuration / origDuration : 1
+
+        for (const pt of pts) {
+          const relTime = pt.time - origStart
+          adjusted.push({
+            ...pt,
+            time: Math.round((actualStart + relTime * scale) * 100) / 100,
+          })
+        }
+
+        // Update offset for subsequent stages
+        timeOffset = (actualEnd) - (origEnd)
+      } else {
+        // Stage hasn't started yet — shift by accumulated offset
+        for (const pt of pts) {
+          adjusted.push({
+            ...pt,
+            time: Math.round((pt.time + timeOffset) * 100) / 100,
+          })
+        }
+      }
+    }
+
+    return adjusted
+  }, [targetCurves, stages])
 
   // Compute initial X-axis scale from profile target curves or default to 45s
   const liveXMax = useMemo(() => {
@@ -340,46 +420,70 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   </Card>
                 )}
 
-                {/* Sensor gauges row */}
-                <div className="flex justify-center gap-2 flex-wrap">
-                  <SensorGauge
-                    value={ms.brew_head_temperature}
-                    min={20}
-                    max={100}
-                    goal={ms.target_temperature}
-                    unit="°C"
-                    label={t('controlCenter.metrics.temp', 'Temp')}
-                    size={100}
-                    stale={ms._stale}
-                  />
-                  <SensorGauge
-                    value={ms.pressure}
-                    min={0}
-                    max={12}
-                    unit="bar"
-                    label={t('controlCenter.metrics.pressure')}
-                    size={100}
-                    stale={ms._stale}
-                  />
-                  <SensorGauge
-                    value={ms.flow_rate}
-                    min={0}
-                    max={8}
-                    unit="ml/s"
-                    label={t('controlCenter.metrics.flow')}
-                    size={100}
-                    stale={ms._stale}
-                  />
-                  <SensorGauge
-                    value={ms.shot_weight}
-                    min={0}
-                    max={ms.target_weight ?? 50}
-                    goal={ms.target_weight}
-                    unit="g"
-                    label={t('controlCenter.metrics.weight')}
-                    size={100}
-                    stale={ms._stale}
-                  />
+                {/* Metric tiles (same layout as active shot) */}
+                <div className="space-y-2">
+                  {/* Full-width profile & stage card */}
+                  <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3">
+                    {profileImgUrl && (
+                      <img
+                        src={profileImgUrl}
+                        alt={ms.active_profile ?? ''}
+                        className="w-8 h-8 rounded-md object-cover shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      {ms.active_profile && (
+                        <div className="text-xs font-semibold text-foreground truncate">{ms.active_profile}</div>
+                      )}
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {ms.state || '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 1: Time, Pressure, Flow */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <MetricTile
+                      icon={<Timer size={14} />}
+                      value={ms.shot_timer?.toFixed(1) ?? '0.0'}
+                      unit="s"
+                      label={t('controlCenter.metrics.time')}
+                    />
+                    <MetricTile
+                      icon={<Gauge size={14} />}
+                      value={ms.pressure?.toFixed(1) ?? '0.0'}
+                      unit="bar"
+                      label={t('controlCenter.metrics.pressure')}
+                    />
+                    <MetricTile
+                      icon={<Drop size={14} />}
+                      value={ms.flow_rate?.toFixed(1) ?? '0.0'}
+                      unit="ml/s"
+                      label={t('controlCenter.metrics.flow')}
+                    />
+                  </div>
+                  {/* Row 2: Weight, Temperature, Power */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <MetricTile
+                      icon={<Scales size={14} />}
+                      value={ms.shot_weight?.toFixed(1) ?? '0.0'}
+                      unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
+                      label={t('controlCenter.metrics.weight')}
+                    />
+                    <MetricTile
+                      icon={<Thermometer size={14} />}
+                      value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
+                      unit="°C"
+                      label={t('controlCenter.metrics.temp', 'Temp')}
+                    />
+                    <MetricTile
+                      icon={<Lightning size={14} />}
+                      value={ms.power?.toFixed(0) ?? '0'}
+                      unit="%"
+                      label={t('controlCenter.metrics.power', 'Power')}
+                    />
+                  </div>
                 </div>
 
                 {/* Deactivated chart placeholder */}
@@ -435,6 +539,26 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
           {/* ── Horizontal metrics — two rows ─────────────── */}
           {(ms.brewing || chartData.length > 0) && (
             <div className="space-y-2">
+              {/* Full-width profile & stage card */}
+              <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3">
+                {profileImgUrl && (
+                  <img
+                    src={profileImgUrl}
+                    alt={ms.active_profile ?? ''}
+                    className="w-8 h-8 rounded-md object-cover shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  {ms.active_profile && (
+                    <div className="text-xs font-semibold text-foreground truncate">{ms.active_profile}</div>
+                  )}
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {currentStageName || '—'}
+                  </div>
+                </div>
+              </div>
+
               {/* Row 1: Time, Pressure, Flow */}
               <div className="grid grid-cols-3 gap-2">
                 <MetricTile
@@ -456,7 +580,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   label={t('controlCenter.metrics.flow')}
                 />
               </div>
-              {/* Row 2: Weight, Temperature, Stage */}
+              {/* Row 2: Weight, Temperature, Power */}
               <div className="grid grid-cols-3 gap-2">
                 <MetricTile
                   icon={<Scales size={14} />}
@@ -473,12 +597,12 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   unit="°C"
                   label={t('controlCenter.metrics.temp', 'Temp')}
                 />
-                <div className="bg-muted/50 rounded-lg px-3 py-2 text-center flex flex-col justify-center">
-                  <div className="text-[10px] text-muted-foreground mb-0.5">{t('controlCenter.labels.status', 'Stage')}</div>
-                  <div className="text-xs font-medium text-foreground truncate">
-                    {currentStageName || '—'}
-                  </div>
-                </div>
+                <MetricTile
+                  icon={<Lightning size={14} />}
+                  value={ms.power?.toFixed(0) ?? '0'}
+                  unit="%"
+                  label={t('controlCenter.metrics.power', 'Power')}
+                />
               </div>
             </div>
           )}
@@ -493,7 +617,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 liveMode
                 showWeight
                 showPower
-                targetCurves={targetCurves}
+                targetCurves={adjustedTargetCurves}
                 xMax={liveXMax}
               />
             </Card>
@@ -554,7 +678,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 heightClass="h-[35vh] lg:h-[45vh] max-h-[360px]"
                 showWeight
                 showPower
-                targetCurves={targetCurves}
+                targetCurves={adjustedTargetCurves}
               />
             </Card>
 

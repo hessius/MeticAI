@@ -234,12 +234,12 @@
     "stagesLabel": "Stages: ",
     "recommendations": "Recommendations:",
     "extraction": "Extraction",
-    "goalsReached": "{{reached}} of {{total}} goals reached",
+    "targetsReached": "{{reached}} of {{total}} targets reached",
     "stageAnalysis": "Stage Analysis",
     "profileTarget": "Profile target",
     "exitTriggers": "Exit Triggers:",
     "limits": "Limits:",
-    "goalReached": "✓ Reached Goal",
+    "targetReached": "✓ Reached Target",
     "hitLimit": "⚠ Hit Limit",
     "notReached": "✗ Not Reached",
     "stageFailed": "✗ Failed",
@@ -538,7 +538,9 @@
       "pressure": "Pressure (bar)",
       "flow": "Flow (ml/s)",
       "pressureLabel": "Pressure",
-      "flowLabel": "Flow"
+      "flowLabel": "Flow",
+      "power": "Power",
+      "temp": "Temp"
     },
     "actions": {
       "start": "Start",
@@ -620,7 +622,7 @@
     "liveShot": {
       "title": "Live Shot",
       "stage": "Stage",
-      "goal": "Goal",
+      "target": "Target",
       "limit": "Limit",
       "exit": "Exit",
       "shotComplete": "Shot Complete",
@@ -628,7 +630,7 @@
       "finalWeight": "Final Weight",
       "avgPressure": "Avg Pressure",
       "avgFlow": "Avg Flow",
-      "analyzeShot": "Done",
+      "analyzeShot": "Analyze Shot",
       "backHome": "Back to Home",
       "profileOverlay": "Profile",
       "shotOverlay": "Compare",

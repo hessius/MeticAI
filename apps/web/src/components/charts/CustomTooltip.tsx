@@ -82,7 +82,7 @@ export function CustomTooltip({ active, payload, label, targetCurves }: CustomTo
       {/* Goal values from profile target curves */}
       {(goalPressure !== null || goalFlow !== null || goalPower !== null) && (
         <div className="mt-1.5 pt-1.5 border-t border-border/50 space-y-1">
-          <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Goals</p>
+          <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Targets</p>
           {goalPressure !== null && (
             <div className="flex items-center gap-2 text-xs">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.targetPressure }} />
