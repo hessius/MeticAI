@@ -313,13 +313,13 @@ async def get_update_method(request: Request):
         watchtower_running = False
         watcher_running = False
         
-        # Check for Watchtower: try to reach its HTTP API on port 8080
+        # Check for Watchtower: try to reach its HTTP API on port 8088
         # or detect the container via docker socket
         try:
             import httpx
             async with httpx.AsyncClient() as client:
-                # Watchtower in the compose stack listens on 8080
-                resp = await client.get("http://localhost:8080/v1/update", timeout=2.0)
+                # Watchtower in the compose stack maps host 8088 → container 8080
+                resp = await client.get("http://localhost:8088/v1/update", timeout=2.0)
                 # Any response (even 401) means watchtower is there
                 watchtower_running = True
         except Exception:

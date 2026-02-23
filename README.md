@@ -266,9 +266,9 @@ If you enabled Watchtower during installation, MeticAI will automatically check 
 
 To use this endpoint, your Watchtower container must:
 - be started with the HTTP API enabled (for example using `--http-api-update` and a token via `--http-api-token` or `WATCHTOWER_HTTP_API_TOKEN`), and
-- publish its API port to the host (for example `-p 8080:8080` or `ports: ["8080:8080"]` in Docker Compose so that `http://localhost:8080` is reachable).
+- publish its API port to the host (for example `-p 8088:8080` or `ports: ["8088:8080"]` in Docker Compose so that `http://localhost:8088` is reachable). MeticAI uses port 8088 by default to avoid conflicts with other Watchtower instances.
 ```bash
-curl -X POST http://localhost:8080/v1/update \
+curl -X POST http://localhost:8088/v1/update \
   -H "Authorization: Bearer YOUR_WATCHTOWER_TOKEN"
 ```
 

@@ -371,7 +371,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 }
 
 @test "docker-compose.watchtower.yml binds API to localhost only" {
-    run grep -q "127.0.0.1:8080" "${BATS_TEST_DIRNAME}/../docker-compose.watchtower.yml"
+    run grep -q "127.0.0.1:8088" "${BATS_TEST_DIRNAME}/../docker-compose.watchtower.yml"
     [ "$status" -eq 0 ]
 }
 
