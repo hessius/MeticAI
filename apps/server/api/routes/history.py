@@ -41,12 +41,15 @@ async def get_history(
         entries = history[offset:offset + limit]
         
         # Remove large fields from list view (keep image_preview small or remove)
+        sanitized_entries = []
         for entry in entries:
-            if 'image_preview' in entry:
-                entry['image_preview'] = None  # Remove for list view to save bandwidth
+            entry_copy = dict(entry)  # avoid mutating cached history entries
+            if "image_preview" in entry_copy:
+                entry_copy["image_preview"] = None  # Remove for list view to save bandwidth
+            sanitized_entries.append(entry_copy)
         
         return {
-            "entries": entries,
+            "entries": sanitized_entries,
             "total": total,
             "limit": limit,
             "offset": offset
