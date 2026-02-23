@@ -16,9 +16,6 @@ services:
   meticai:
     image: ghcr.io/hessius/meticai:${METICAI_TAG:-latest}
     container_name: meticai
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.unified
     restart: unless-stopped
     ports:
       - "3550:3550"   # Web UI (nginx proxy)

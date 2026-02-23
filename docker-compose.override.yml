@@ -1,0 +1,42 @@
+# ==============================================================================
+# MeticAI Compose Override — v1.x Migration Bridge
+# ==============================================================================
+# Docker Compose automatically reads this file when no -f flags are specified.
+# This is what makes Watchtower start automatically during v1.x → v2.0 migration,
+# since the old v1.2.0 update.sh calls `docker compose up -d --build` without -f.
+#
+# For v2.0 fresh installs, the install.sh uses explicit -f flags, so this file
+# is NOT loaded — Watchtower is handled via docker-compose.watchtower.yml overlay.
+#
+# NOTE: Once the second-pass migration runs (update.sh detects v1 artifacts),
+# this file can be removed. It only matters for the first-pass migration where
+# the old update.sh is still executing from memory.
+# ==============================================================================
+
+services:
+  meticai:
+    volumes:
+      # Legacy v1.x data mount — enables automatic migration on first boot.
+      # Only loaded during migration (no -f flags); not present in fresh v2 installs.
+      - ./data:/legacy-data:ro
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: meticai-watchtower
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN:-meticai-migration-token}
+      - WATCHTOWER_HTTP_API_UPDATE=true
+      - DOCKER_API_VERSION=1.44
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # No port binding — avoids conflicts with existing services during migration.
+    # The HTTP API is available via docker-compose.watchtower.yml for explicit installs.
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    command: --http-api-metrics --http-api-periodic-polls --interval 21600
