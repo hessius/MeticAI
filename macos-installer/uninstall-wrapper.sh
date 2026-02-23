@@ -15,7 +15,7 @@ set -e
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
 # Configuration
-INSTALL_DIR="${HOME}/meticai"
+INSTALL_DIR="${HOME}/MeticAI"
 
 # Get icon path for dialogs
 get_icon_path() {
@@ -71,7 +71,7 @@ main() {
     if [ ! -d "$INSTALL_DIR" ]; then
         show_dialog "MeticAI Not Found
 
-No MeticAI installation was found at ~/meticai
+No MeticAI installation was found at ~/MeticAI
 
 Nothing to uninstall." '"OK"' "OK" "note"
         exit 0

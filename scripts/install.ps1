@@ -45,7 +45,7 @@ $ErrorActionPreference = "Stop"
 # Configuration
 # ==============================================================================
 
-$InstallDir = Join-Path $env:USERPROFILE "meticai"
+$InstallDir = Join-Path $env:USERPROFILE "MeticAI"
 $RepoUrl = "https://raw.githubusercontent.com/hessius/MeticAI/main"
 
 # ==============================================================================
@@ -419,7 +419,7 @@ COMPOSE_FILES="$composeFilesString"
     }
     else {
         Write-LogWarning "Container may still be starting..."
-        Write-Host "  Check status with: cd ~\meticai; docker compose ps"
+        Write-Host "  Check status with: cd ~\MeticAI; docker compose ps"
     }
 
     # Get access URL
@@ -444,10 +444,10 @@ COMPOSE_FILES="$composeFilesString"
     Write-Host "  API:     http://${ip}:3550/docs"
     Write-Host ""
     Write-Host "  Useful commands:" -ForegroundColor White
-    Write-Host "    View logs:   cd ~\meticai; docker compose logs -f"
-    Write-Host "    Restart:     cd ~\meticai; docker compose $composeFilesString up -d"
-    Write-Host "    Stop:        cd ~\meticai; docker compose $composeFilesString down"
-    Write-Host "    Update:      cd ~\meticai; docker compose $composeFilesString pull; docker compose $composeFilesString up -d"
+    Write-Host "    View logs:   cd ~\MeticAI; docker compose logs -f"
+    Write-Host "    Restart:     cd ~\MeticAI; docker compose $composeFilesString up -d"
+    Write-Host "    Stop:        cd ~\MeticAI; docker compose $composeFilesString down"
+    Write-Host "    Update:      cd ~\MeticAI; docker compose $composeFilesString pull; docker compose $composeFilesString up -d"
     Write-Host "    Uninstall:   irm $RepoUrl/scripts/uninstall.ps1 -OutFile uninstall.ps1; .\uninstall.ps1"
     Write-Host ""
     Write-Host "  ☕ Enjoy your coffee!" -ForegroundColor Cyan

@@ -37,7 +37,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="${INSTALL_DIR:-${HOME}/meticai}"
+INSTALL_DIR="${INSTALL_DIR:-${HOME}/MeticAI}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 if [[ "$REPO_BRANCH" == "main" ]]; then
     METICAI_TAG="${METICAI_TAG:-latest}"
@@ -376,10 +376,19 @@ log_info "Installing to: ${INSTALL_DIR}"
 # Check for existing installation
 # ==============================================================================
 
-HAS_V1="${HOME}/MeticAI"
 HAS_V2="${INSTALL_DIR}/docker-compose.yml"
 
-if [[ -d "$HAS_V1" ]]; then
+# Detect v1 vs v2: v1 had rebuild-watcher.sh or multi-container compose
+IS_V1=false
+if [[ -d "$INSTALL_DIR" ]]; then
+    if [[ -f "$INSTALL_DIR/rebuild-watcher.sh" ]] || [[ -f "$INSTALL_DIR/local-install.sh" ]]; then
+        IS_V1=true
+    elif [[ -f "$HAS_V2" ]] && grep -q "meticai-server\|meticai-web" "$HAS_V2" 2>/dev/null; then
+        IS_V1=true
+    fi
+fi
+
+if [[ "$IS_V1" == "true" ]]; then
     # Old v1 multi-container installation detected
     log_warning "Old MeticAI v1 installation detected at ~/MeticAI"
 
