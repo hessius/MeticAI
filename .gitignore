@@ -44,6 +44,9 @@ data/
 .restart-requested
 .update-requested
 
+# Development safety marker (prevents uninstaller from deleting dev folder)
+.meticai-dev
+
 # Web app (cloned dependency)
 meticai-web/
 
