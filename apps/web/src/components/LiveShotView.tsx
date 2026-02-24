@@ -165,7 +165,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     const point: ChartDataPoint = {
       time: ms.shot_timer ?? 0,
       pressure: ms.pressure ?? 0,
-      flow: ms.flow_rate ?? 0,
+      flow: Math.max(0, ms.flow_rate ?? 0),
       weight: ms.shot_weight ?? 0,
       power: ms.power ?? 0,
       stage: ms.state ?? undefined,
