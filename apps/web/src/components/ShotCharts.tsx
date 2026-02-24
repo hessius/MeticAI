@@ -120,8 +120,8 @@ export function ReplayChart({
               ))}
               {isShowingReplay && <ReferenceLine yAxisId="left" x={currentTime} stroke={theme.replayLineStroke} strokeWidth={2} strokeDasharray="4 2" />}
               <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
-              <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={false} />
-              <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={false} />
+              <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
+              <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
               <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
@@ -215,8 +215,8 @@ export function CompareChart({
               <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} opacity={theme.gridOpacity} />
               {isShowingReplay && <ReferenceLine yAxisId="left" x={comparisonCurrentTime} stroke={theme.replayLineStroke} strokeWidth={2} strokeDasharray="4 2" />}
               <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
-              <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={false} />
-              <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={false} />
+              <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={true} />
+              <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={true} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '4px' }} iconSize={7} />
               <Line yAxisId="left" type="monotone" dataKey="pressureA" stroke={COMPARISON_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure A" isAnimationActive={false} />
