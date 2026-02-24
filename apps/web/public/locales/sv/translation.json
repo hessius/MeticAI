@@ -524,7 +524,8 @@
       "unknown": "Okänd",
       "ready": "Redo",
       "pourWater": "Fyll på vatten",
-      "purging": "Spolar"
+      "purging": "Spolar",
+      "clickToPurge": "Klicka för att spola"
     },
     "metrics": {
       "time": "Tid (s)",

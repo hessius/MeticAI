@@ -524,7 +524,8 @@
       "unknown": "Sconosciuto",
       "ready": "Pronto",
       "pourWater": "Aggiungere acqua",
-      "purging": "Spurgo"
+      "purging": "Spurgo",
+      "clickToPurge": "Clicca per purgare"
     },
     "metrics": {
       "time": "Tempo (s)",
