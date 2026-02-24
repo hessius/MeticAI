@@ -20,10 +20,8 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/App
 # Configuration
 DEFAULT_INSTALL_DIR="${HOME}/MeticAI"
 INSTALL_DIR=""  # Set by user during install flow
-# NOTE: Using version/2.0.0 branch for pre-release testing.
-# Revert to main before final release.
-REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/version/2.0.0"
-METICAI_TAG="2.0.0"
+REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/main"
+METICAI_TAG="latest"
 
 # Colors for terminal output (when run manually)
 RED='\033[0;31m'
