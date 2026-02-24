@@ -642,7 +642,7 @@ SCRIPT_END
     # Offer macOS Dock shortcut
     result=$(show_dialog "Add Dock Shortcut?
 
-Would you like to add a MeticAI shortcut to your Applications folder?
+Would you like to add a MeticAI shortcut to your Dock?
 
 This creates a simple app that opens the MeticAI web interface." '"No", "Yes"' "Yes")
 
@@ -659,6 +659,10 @@ open "${APP_URL}"
 APPEOF
         chmod +x "${APP_PATH}/Contents/MacOS/MeticAI"
 
+        # Download the proper .icns icon
+        curl -fsSL "${REPO_URL}/resources/MeticAI.icns" \
+            -o "${APP_PATH}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+
         cat > "${APP_PATH}/Contents/Info.plist" << PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -674,12 +678,34 @@ APPEOF
     <string>2.0.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
 </dict>
 </plist>
 PLISTEOF
 
-        curl -fsSL "${REPO_URL}/resources/Favicons/android-chrome-512x512.png" \
-            -o "${APP_PATH}/Contents/Resources/icon.png" 2>/dev/null || true
+        # Add the app to the Dock
+        # Uses defaults to append a persistent-apps entry
+        defaults write com.apple.dock persistent-apps -array-add \
+            "<dict>
+                <key>tile-data</key>
+                <dict>
+                    <key>file-data</key>
+                    <dict>
+                        <key>_CFURLString</key>
+                        <string>file://${APP_PATH}/</string>
+                        <key>_CFURLStringType</key>
+                        <integer>15</integer>
+                    </dict>
+                    <key>file-label</key>
+                    <string>MeticAI</string>
+                    <key>file-type</key>
+                    <integer>41</integer>
+                </dict>
+                <key>tile-type</key>
+                <string>file-tile</string>
+            </dict>"
+        killall Dock 2>/dev/null || true
     fi
 
     # Build feature summary for success dialog
