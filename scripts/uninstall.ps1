@@ -36,7 +36,8 @@ $ErrorActionPreference = "Stop"
 # Configuration
 # ==============================================================================
 
-$InstallDir = Join-Path $env:USERPROFILE "MeticAI"
+$DefaultInstallDir = Join-Path $env:USERPROFILE "MeticAI"
+$InstallDir = $null  # Resolved during detection phase
 
 # ==============================================================================
 # Helper functions
@@ -51,6 +52,70 @@ function Write-LogError   { param([string]$Message) Write-Host "  X " -Foregroun
 $script:UninstalledItems = @()
 $script:KeptItems = @()
 $script:FailedItems = @()
+
+# ==============================================================================
+# Detection & safety
+# ==============================================================================
+
+function Find-MeticAIInstallation {
+    # Method 1: Detect from running Docker containers
+    try {
+        $containers = docker ps --filter "name=meticai" --format "{{.ID}}" 2>&1
+        if ($containers -and $LASTEXITCODE -eq 0) {
+            foreach ($cid in ($containers -split "`n" | Where-Object { $_ })) {
+                $workDir = docker inspect $cid --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>&1
+                if ($workDir -and (Test-Path $workDir)) {
+                    return $workDir.Trim()
+                }
+            }
+        }
+    } catch { }
+
+    # Method 2: docker compose ls
+    try {
+        $projects = docker compose ls --format json 2>&1 | ConvertFrom-Json -ErrorAction SilentlyContinue
+        foreach ($p in $projects) {
+            if ($p.Name -match "meticai") {
+                $configFile = ($p.ConfigFiles -split ",")[0]
+                if ($configFile -and (Test-Path $configFile)) {
+                    return (Split-Path $configFile -Parent)
+                }
+            }
+        }
+    } catch { }
+
+    # Method 3: Check default location
+    if (Test-Path (Join-Path $DefaultInstallDir "docker-compose.yml")) {
+        return $DefaultInstallDir
+    }
+    if (Test-Path (Join-Path $DefaultInstallDir ".env")) {
+        return $DefaultInstallDir
+    }
+
+    return $null
+}
+
+function Test-SafeToUninstall {
+    param([string]$Dir)
+
+    # REFUSE to delete git repositories
+    if (Test-Path (Join-Path $Dir ".git")) {
+        Write-LogError "The selected folder is a Git repository (development checkout):"
+        Write-Host "    $Dir" -ForegroundColor Red
+        Write-Host "    The uninstaller will NOT delete development folders." -ForegroundColor Red
+        return $false
+    }
+
+    # REFUSE to delete dev-marked directories
+    if (Test-Path (Join-Path $Dir ".meticai-dev")) {
+        Write-LogError "The selected folder contains a .meticai-dev marker:"
+        Write-Host "    $Dir" -ForegroundColor Red
+        Write-Host "    This folder is marked as a development environment." -ForegroundColor Red
+        return $false
+    }
+
+    return $true
+}
 
 # ==============================================================================
 # Banner
@@ -80,10 +145,60 @@ function Uninstall-MeticAI {
     Show-Banner
 
     # ------------------------------------------------------------------
+    # Detect installation location
+    # ------------------------------------------------------------------
+    Write-LogInfo "Searching for MeticAI installation..."
+    $detected = Find-MeticAIInstallation
+
+    if ($detected) {
+        Write-LogSuccess "Found MeticAI at: $detected"
+        if (-not $NonInteractive) {
+            Write-Host ""
+            $useDetected = Read-Host "  Uninstall from this location? (Y/n)"
+            if ($useDetected -match "^[Nn]") {
+                $customDir = Read-Host "  Enter the MeticAI installation path"
+                if (-not [string]::IsNullOrEmpty($customDir) -and (Test-Path $customDir)) {
+                    $script:InstallDir = $customDir.TrimEnd('\', '/')
+                } else {
+                    Write-LogError "Invalid path. Cancelled."
+                    return
+                }
+            } else {
+                $script:InstallDir = $detected
+            }
+        } else {
+            $script:InstallDir = $detected
+        }
+    } else {
+        Write-LogWarning "Could not auto-detect MeticAI installation."
+        if (-not $NonInteractive) {
+            $customDir = Read-Host "  Enter the MeticAI installation path [$DefaultInstallDir]"
+            if ([string]::IsNullOrEmpty($customDir)) { $customDir = $DefaultInstallDir }
+            if (Test-Path $customDir) {
+                $script:InstallDir = $customDir.TrimEnd('\', '/')
+            } else {
+                Write-LogError "Path not found: $customDir"
+                return
+            }
+        } else {
+            $script:InstallDir = $DefaultInstallDir
+        }
+    }
+
+    # Safety check
+    if (-not (Test-SafeToUninstall $InstallDir)) {
+        Write-LogError "Uninstallation aborted for safety."
+        return
+    }
+
+    Write-LogInfo "Will uninstall from: $InstallDir"
+
+    # ------------------------------------------------------------------
     # Confirmation
     # ------------------------------------------------------------------
     if (-not $NonInteractive) {
-        Write-Host "  This will remove MeticAI containers, volumes, and configuration." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  This will remove MeticAI containers, configuration, and optionally data." -ForegroundColor Yellow
         Write-Host ""
         $confirm = Read-Host "  Are you sure you want to uninstall MeticAI? (y/N)"
         if ($confirm -notmatch "^[Yy]") {
@@ -165,28 +280,45 @@ function Uninstall-MeticAI {
     }
 
     # ------------------------------------------------------------------
-    # [3/5] Remove Docker volumes
+    # [3/5] Remove Docker volumes (data)
     # ------------------------------------------------------------------
-    Write-LogInfo "[3/5] Removing Docker volumes..."
+    Write-LogInfo "[3/5] Checking Docker volumes..."
 
     if (Get-Command docker -ErrorAction SilentlyContinue) {
-        try {
-            $meticVolumes = docker volume ls --format "{{.Name}}" 2>&1 |
-                Where-Object { $_ -match "meticai" }
-            foreach ($vol in $meticVolumes) {
-                $null = docker volume rm $vol 2>&1
+        $meticVolumes = docker volume ls --format "{{.Name}}" 2>&1 |
+            Where-Object { $_ -match "meticai|mosquitto" }
+
+        if ($meticVolumes) {
+            $doRemoveVolumes = $false
+            if (-not $NonInteractive) {
+                Write-Host ""
+                Write-Host "  Found data volumes (profiles, shot history, settings):" -ForegroundColor Yellow
+                $meticVolumes | ForEach-Object { Write-Host "    - $_" }
+                Write-Host ""
+                $volChoice = Read-Host "  Remove these data volumes? This cannot be undone. (y/N)"
+                $doRemoveVolumes = $volChoice -match "^[Yy]"
             }
-            if ($meticVolumes) {
-                Write-LogSuccess "Docker volumes removed"
-                $script:UninstalledItems += "Docker volumes"
+
+            if ($doRemoveVolumes) {
+                try {
+                    foreach ($vol in $meticVolumes) {
+                        $null = docker volume rm $vol 2>&1
+                    }
+                    Write-LogSuccess "Docker volumes removed"
+                    $script:UninstalledItems += "Docker volumes"
+                }
+                catch {
+                    Write-LogWarning "Could not remove some volumes"
+                    $script:FailedItems += "Docker volumes"
+                }
             }
             else {
-                Write-LogInfo "No MeticAI volumes found"
+                Write-LogInfo "Keeping data volumes"
+                $script:KeptItems += "Docker volumes (data preserved)"
             }
         }
-        catch {
-            Write-LogWarning "Could not remove some volumes"
-            $script:FailedItems += "Docker volumes"
+        else {
+            Write-LogInfo "No MeticAI volumes found"
         }
     }
 
@@ -215,11 +347,14 @@ function Uninstall-MeticAI {
     Write-LogInfo "[5/5] Cleaning installation directory..."
 
     if (Test-Path $InstallDir) {
-        # Remove compose files and other generated files
+        # Remove compose files, convenience scripts, and config
         $filesToRemove = @(
             "docker-compose.yml",
             "docker-compose.tailscale.yml",
-            "docker-compose.watchtower.yml"
+            "docker-compose.watchtower.yml",
+            "docker-compose.homeassistant.yml",
+            "tailscale-serve.json",
+            "start.sh", "stop.sh", "update.sh", "uninstall.sh"
         )
         foreach ($file in $filesToRemove) {
             $filePath = Join-Path $InstallDir $file
@@ -227,8 +362,13 @@ function Uninstall-MeticAI {
                 Remove-Item $filePath -Force
             }
         }
-        Write-LogSuccess "Compose files removed"
-        $script:UninstalledItems += "Compose files"
+        # Remove docker/ config subdirectory
+        $dockerDir = Join-Path $InstallDir "docker"
+        if (Test-Path $dockerDir) {
+            Remove-Item $dockerDir -Recurse -Force
+        }
+        Write-LogSuccess "Configuration files removed"
+        $script:UninstalledItems += "Configuration files"
 
         # Remove install dir if empty (or only has .env)
         $remaining = Get-ChildItem $InstallDir -Force -ErrorAction SilentlyContinue

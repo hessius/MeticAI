@@ -721,6 +721,20 @@ echo "  MeticAI Uninstaller"
 echo "  ==================="
 echo ""
 INSTALL_PATH="$(pwd)"
+
+# Safety: refuse to operate on git repos or dev checkouts
+if [[ -d "${INSTALL_PATH}/.git" ]]; then
+    echo "  ⛔ ERROR: This directory is a Git repository."
+    echo "  The uninstaller will NOT modify development checkouts."
+    echo "  Use git or your file manager to manage this directory."
+    exit 1
+fi
+if [[ -f "${INSTALL_PATH}/.meticai-dev" ]]; then
+    echo "  ⛔ ERROR: This directory has a .meticai-dev marker."
+    echo "  It is marked as a development environment and will not be modified."
+    exit 1
+fi
+
 echo "This will stop MeticAI and remove all files from ${INSTALL_PATH}."
 echo "Your data (profiles, history) is stored in a Docker volume and will be preserved."
 echo ""
