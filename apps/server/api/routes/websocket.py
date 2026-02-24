@@ -49,6 +49,17 @@ async def live_telemetry(ws: WebSocket):
     try:
         last_sent: dict = {}
 
+        # Send the current MQTT snapshot immediately so the browser
+        # does not have to wait for the next MQTT delta.
+        initial = subscriber.get_snapshot()
+        if initial:
+            initial["_ts"] = time.time()
+            try:
+                await ws.send_json(initial)
+                last_sent = {k: v for k, v in initial.items() if k != "_ts"}
+            except Exception:
+                return  # Client already gone
+
         while True:
             # Re-fetch subscriber to survive hot-reloads (reset_mqtt_subscriber)
             subscriber = get_mqtt_subscriber()

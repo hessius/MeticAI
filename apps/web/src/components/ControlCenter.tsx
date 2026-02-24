@@ -66,10 +66,13 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
     descaling:         { cls: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/40', key: 'descaling' },
     'pour water':      { cls: 'bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-500/40 animate-pulse', key: 'pourWater' },
     'click to start':  { cls: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/40 animate-pulse', key: 'ready' },
+    'click to purge':  { cls: 'bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-500/40 animate-pulse', key: 'clickToPurge' },
   }
-  // Handle partial/truncated states from the machine (e.g. "Pour water...")
+  // Handle partial/truncated states from the machine (e.g. "Pour water...", "Click to purge")
   const normalised = (state ?? '').toLowerCase()
-  const matchedKey = normalised.startsWith('pour water') ? 'pour water' : normalised
+  const matchedKey = normalised.startsWith('pour water') ? 'pour water'
+    : normalised.startsWith('click to purge') ? 'click to purge'
+    : normalised
   const entry = map[matchedKey] ?? { cls: 'bg-muted text-muted-foreground border-muted', key: 'unknown' }
   return (
     <Badge className={entry.cls}>

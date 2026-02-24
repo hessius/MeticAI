@@ -524,7 +524,8 @@
       "unknown": "Unbekannt",
       "ready": "Bereit",
       "pourWater": "Wasser einfüllen",
-      "purging": "Spülen"
+      "purging": "Spülen",
+      "clickToPurge": "Klicken zum Spülen"
     },
     "metrics": {
       "time": "Zeit (s)",

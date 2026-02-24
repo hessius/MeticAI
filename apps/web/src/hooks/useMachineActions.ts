@@ -31,6 +31,8 @@ export interface MachineActions {
   isReady: boolean
   /** Machine is in pour-water phase (warmup state) */
   isPourWater: boolean
+  /** Machine is in post-shot purge prompt state */
+  isClickToPurge: boolean
   /** Machine is connected to the network */
   isConnected: boolean
   /** A shot can be started (idle / preheating / ready, not brewing, connected) */
@@ -56,6 +58,7 @@ export function useMachineActions(machineState: MachineState): MachineActions {
   const isHeating = stateLC === 'heating'
   const isReady = stateLC === 'click to start'
   const isPourWater = stateLC.startsWith('pour water')
+  const isClickToPurge = stateLC.startsWith('click to purge')
   const isConnected = machineState.connected
 
   // Machine accepts START during idle, preheat, or "click to start" —
@@ -92,6 +95,7 @@ export function useMachineActions(machineState: MachineState): MachineActions {
     isHeating,
     isReady,
     isPourWater,
+    isClickToPurge,
     isConnected,
     canStart,
     canAbortWarmup,
