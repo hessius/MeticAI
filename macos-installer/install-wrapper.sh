@@ -18,7 +18,8 @@ set -e
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
 # Configuration
-INSTALL_DIR="${HOME}/MeticAI"
+DEFAULT_INSTALL_DIR="${HOME}/MeticAI"
+INSTALL_DIR=""  # Set by user during install flow
 # NOTE: Using version/2.0.0 branch for pre-release testing.
 # Revert to main before final release.
 REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/version/2.0.0"
@@ -83,6 +84,19 @@ tell application "System Events"
     activate
     set dialogResult to display dialog "$prompt" default answer "$default_value" buttons {"Cancel", "OK"} default button "OK" with title "MeticAI Installer"
     return text returned of dialogResult
+end tell
+EOF
+}
+
+# Show a folder-chooser dialog, returns selected path
+choose_folder() {
+    local prompt_text="$1"
+    local default_dir="$2"
+    osascript <<EOF 2>/dev/null
+tell application "System Events"
+    activate
+    set chosenFolder to choose folder with prompt "$prompt_text" default location POSIX file "$default_dir"
+    return POSIX path of chosenFolder
 end tell
 EOF
 }
@@ -212,11 +226,49 @@ You can find it in your Applications folder." '"OK"' "OK" "caution"
     
     show_progress "Docker is ready!"
     
-    # Check for existing installation
+    # --- Choose installation location ---
+    # Check if there's already an install at the default path
+    if [ -f "${DEFAULT_INSTALL_DIR}/.env" ]; then
+        INSTALL_DIR="$DEFAULT_INSTALL_DIR"
+    else
+        # Ask user for install location (dialog with default path + Browse option)
+        result=$(show_dialog "Choose Installation Location
+
+MeticAI files will be stored in this folder.
+Default: ${DEFAULT_INSTALL_DIR}
+
+Click Browse to choose a different folder, or Continue to use the default." '"Cancel", "Browse…", "Continue"' "Continue")
+
+        case "$result" in
+            "Browse…")
+                # Ensure the default parent directory exists for the folder picker
+                mkdir -p "${DEFAULT_INSTALL_DIR%/*}"
+                chosen=$(choose_folder "Choose a folder for MeticAI" "${DEFAULT_INSTALL_DIR%/*}")
+                if [ -z "$chosen" ]; then
+                    show_error "No folder selected. Installation cancelled."
+                fi
+                # Append MeticAI subfolder if user picked a parent
+                chosen="${chosen%/}"
+                if [[ "$(basename "$chosen")" != "MeticAI" && "$(basename "$chosen")" != "meticai" ]]; then
+                    INSTALL_DIR="${chosen}/MeticAI"
+                else
+                    INSTALL_DIR="$chosen"
+                fi
+                ;;
+            "Continue")
+                INSTALL_DIR="$DEFAULT_INSTALL_DIR"
+                ;;
+            *)
+                exit 0
+                ;;
+        esac
+    fi
+
+    # Check for existing installation at chosen path
     if [ -f "${INSTALL_DIR}/.env" ]; then
         result=$(show_dialog "Existing Installation Found
 
-MeticAI is already installed at ~/MeticAI
+MeticAI is already installed at ${INSTALL_DIR}
 
 What would you like to do?" '"Cancel", "Reinstall", "Update"' "Update")
         
