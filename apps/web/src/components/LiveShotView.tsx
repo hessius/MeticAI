@@ -463,8 +463,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       label={t('controlCenter.metrics.flow')}
                     />
                   </div>
-                  {/* Row 2: Weight, Temperature, Power */}
-                  <div className="grid grid-cols-3 gap-2">
+                  {/* Row 2: Weight, Temperature */}
+                  <div className="grid grid-cols-2 gap-2">
                     <MetricTile
                       icon={<Scales size={14} />}
                       value={ms.shot_weight?.toFixed(1) ?? '0.0'}
@@ -477,12 +477,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       unit="°C"
                       label={t('controlCenter.metrics.temp', 'Temp')}
                     />
-                    <MetricTile
-                      icon={<Lightning size={14} />}
-                      value={ms.power?.toFixed(0) ?? '0'}
-                      unit="%"
-                      label={t('controlCenter.metrics.power', 'Power')}
-                    />
                   </div>
                 </div>
 
@@ -493,7 +487,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     stages={[]}
                     heightClass="h-[25vh] lg:h-[30vh] max-h-[250px]"
                     showWeight
-                    showPower
                     targetCurves={targetCurves}
                     xMax={liveXMax}
                   />
@@ -580,8 +573,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   label={t('controlCenter.metrics.flow')}
                 />
               </div>
-              {/* Row 2: Weight, Temperature, Power */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Row 2: Weight, Temperature */}
+              <div className="grid grid-cols-2 gap-2">
                 <MetricTile
                   icon={<Scales size={14} />}
                   value={ms.shot_weight?.toFixed(1) ?? '0.0'}
@@ -597,12 +590,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   unit="°C"
                   label={t('controlCenter.metrics.temp', 'Temp')}
                 />
-                <MetricTile
-                  icon={<Lightning size={14} />}
-                  value={ms.power?.toFixed(0) ?? '0'}
-                  unit="%"
-                  label={t('controlCenter.metrics.power', 'Power')}
-                />
               </div>
             </div>
           )}
@@ -616,7 +603,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 heightClass="h-[40vh] lg:h-[50vh] max-h-[400px]"
                 liveMode
                 showWeight
-                showPower
                 targetCurves={adjustedTargetCurves}
                 xMax={liveXMax}
               />
@@ -677,7 +663,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 stages={stages}
                 heightClass="h-[35vh] lg:h-[45vh] max-h-[360px]"
                 showWeight
-                showPower
                 targetCurves={adjustedTargetCurves}
               />
             </Card>
