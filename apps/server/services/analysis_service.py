@@ -873,19 +873,37 @@ def generate_estimated_target_curves(profile_data: dict) -> list[dict]:
     data_points: list[dict] = []
     
     DEFAULT_STAGE_DURATION = 10.0  # seconds when no time-exit exists
+    # When a stage has BOTH weight and time exit triggers, the time trigger
+    # is a safety maximum (not the expected duration).  In practice the
+    # weight trigger fires first, so we cap the estimated stage duration to
+    # this value for stages that have a weight trigger alongside a time one.
+    WEIGHT_STAGE_MAX_ESTIMATE = 15.0  # realistic stage length when weight exits first
 
     # First pass — estimate duration of each stage from exit triggers
     stage_durations: list[float] = []
     for stage in stages:
         exit_triggers = stage.get("exit_triggers", [])
         time_trigger_val: float | None = None
+        has_weight_trigger = False
         for trig in exit_triggers:
             if trig.get("type") == "time":
                 raw = trig.get("value", 0)
                 resolved, _ = _resolve_variable(raw, variables)
                 time_trigger_val = _safe_float(resolved, DEFAULT_STAGE_DURATION)
-                break
-        stage_durations.append(time_trigger_val if time_trigger_val else DEFAULT_STAGE_DURATION)
+            if trig.get("type") == "weight":
+                has_weight_trigger = True
+
+        if time_trigger_val is not None:
+            # If a weight trigger also exists, the time trigger is only
+            # a safety ceiling — the actual stage is much shorter.
+            if has_weight_trigger:
+                duration = min(time_trigger_val, WEIGHT_STAGE_MAX_ESTIMATE)
+            else:
+                duration = time_trigger_val
+        else:
+            duration = DEFAULT_STAGE_DURATION
+
+        stage_durations.append(duration)
 
     # Second pass — build target curve points
     running_time = 0.0

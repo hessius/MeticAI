@@ -291,11 +291,13 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     return adjusted
   }, [targetCurves, stages])
 
-  // Compute initial X-axis scale from profile target curves or default to 45s
+  // Compute initial X-axis scale from profile target curves or default to 45s.
+  // Cap at 60s — the chart auto-extends as actual data exceeds xMax.
+  const LIVE_XMAX_CAP = 60
   const liveXMax = useMemo(() => {
     if (targetCurves && targetCurves.length > 0) {
       const maxTargetTime = Math.max(...targetCurves.map(p => p.time))
-      return Math.ceil(maxTargetTime * 1.1) // 10% padding beyond last target point
+      return Math.min(Math.ceil(maxTargetTime * 1.1), LIVE_XMAX_CAP)
     }
     return 45 // Default 45 seconds if no profile info available
   }, [targetCurves])
