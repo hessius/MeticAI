@@ -107,39 +107,74 @@ show_progress() {
     osascript -e "display notification \"$message\" with title \"MeticAI Installer\""
 }
 
-# Auto-detect Meticulous machine on the network
+# Auto-detect Meticulous machine on the network via Bonjour.
+# The machine advertises as "meticulous<Name>._http._tcp.local."
+# We browse for HTTP services, find the one whose name starts with
+# "meticulous", then look it up to extract its IP.
+# Writes result to /tmp/meticai-result.txt and returns 0 on success.
 detect_meticulous() {
-    local detected=""
+    local result_file="/tmp/meticai-result.txt"
+    rm -f "$result_file"
 
-    # Method 1: dns-sd (Bonjour) — most reliable on macOS
-    if command -v dns-sd &>/dev/null; then
-        local dns_output
-        dns_output=$(timeout 4 dns-sd -B _http._tcp local 2>/dev/null || true)
-        if echo "$dns_output" | grep -qi "meticulous"; then
-            # Found via Bonjour — resolve the hostname
-            detected=$(resolve_meticulous_ip "meticulous")
-            if [[ -n "$detected" ]]; then
-                echo "$detected"
-                return 0
-            fi
-        fi
+    local tmpfile
+    tmpfile=$(mktemp /tmp/meticai-detect.XXXXXX)
+
+    # --- Step 1: Browse Bonjour for HTTP services ---
+    # dns-sd never exits on its own — run it, wait, force-kill.
+    dns-sd -B _http._tcp local > "$tmpfile" 2>/dev/null &
+    local pid=$!
+    sleep 3
+    kill -9 "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null
+
+    # Find the service instance whose name starts with "meticulous" (case-insensitive)
+    local service_name
+    service_name=$(grep -i 'meticulous' "$tmpfile" | awk '{for(i=7;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ *$//' | head -1)
+    rm -f "$tmpfile"
+
+    if [[ -z "$service_name" ]]; then
+        return 1
     fi
 
-    # Method 2: Try resolving meticulous.local directly
-    detected=$(resolve_meticulous_ip "meticulous")
-    if [[ -n "$detected" ]]; then
-        echo "$detected"
+    # --- Step 2: Lookup the service to resolve hostname & IP ---
+    local lookup_file
+    lookup_file=$(mktemp /tmp/meticai-lookup.XXXXXX)
+    dns-sd -L "$service_name" _http._tcp local > "$lookup_file" 2>/dev/null &
+    pid=$!
+    sleep 3
+    kill -9 "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null
+
+    # Extract IPv4 from the ips=[...] field (e.g. ips=\['192.168.50.168',...\])
+    local ip
+    ip=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$lookup_file" | head -1)
+
+    if [[ -z "$ip" ]]; then
+        # Fallback: extract the hostname from "can be reached at <host>.local.:port"
+        local hostname
+        hostname=$(grep 'can be reached at' "$lookup_file" | sed 's/.*can be reached at //' | sed 's/\.:.*/:/' | cut -d: -f1)
+        rm -f "$lookup_file"
+        if [[ -n "$hostname" ]]; then
+            ip=$(resolve_hostname_to_ip "$hostname")
+        fi
+    else
+        rm -f "$lookup_file"
+    fi
+
+    if [[ -n "$ip" ]]; then
+        echo "$ip" > "$result_file"
         return 0
     fi
-
     return 1
 }
 
-# Resolve meticulous.local to an IP
-resolve_meticulous_ip() {
-    local name="${1:-meticulous}"
-    local hostname="${name}.local"
+# Resolve a .local hostname to an IP address
+resolve_hostname_to_ip() {
+    local hostname="$1"
     local ip=""
+
+    # Append .local if not already present
+    [[ "$hostname" != *.local ]] && hostname="${hostname}.local"
 
     # dscacheutil (macOS native)
     if command -v dscacheutil &>/dev/null; then
@@ -227,42 +262,41 @@ You can find it in your Applications folder." '"OK"' "OK" "caution"
     show_progress "Docker is ready!"
     
     # --- Choose installation location ---
-    # Check if there's already an install at the default path
+    local existing_note=""
     if [ -f "${DEFAULT_INSTALL_DIR}/.env" ]; then
-        INSTALL_DIR="$DEFAULT_INSTALL_DIR"
-    else
-        # Ask user for install location (dialog with default path + Browse option)
-        result=$(show_dialog "Choose Installation Location
+        existing_note="\n\n⚠️ An existing installation was found at the default location."
+    fi
+
+    result=$(show_dialog "Choose Installation Location
 
 MeticAI files will be stored in this folder.
-Default: ${DEFAULT_INSTALL_DIR}
+Default: ${DEFAULT_INSTALL_DIR}${existing_note}
 
 Click Browse to choose a different folder, or Continue to use the default." '"Cancel", "Browse…", "Continue"' "Continue")
 
-        case "$result" in
-            "Browse…")
-                # Ensure the default parent directory exists for the folder picker
-                mkdir -p "${DEFAULT_INSTALL_DIR%/*}"
-                chosen=$(choose_folder "Choose a folder for MeticAI" "${DEFAULT_INSTALL_DIR%/*}")
-                if [ -z "$chosen" ]; then
-                    show_error "No folder selected. Installation cancelled."
-                fi
-                # Append MeticAI subfolder if user picked a parent
-                chosen="${chosen%/}"
-                if [[ "$(basename "$chosen")" != "MeticAI" && "$(basename "$chosen")" != "meticai" ]]; then
-                    INSTALL_DIR="${chosen}/MeticAI"
-                else
-                    INSTALL_DIR="$chosen"
-                fi
-                ;;
-            "Continue")
-                INSTALL_DIR="$DEFAULT_INSTALL_DIR"
-                ;;
-            *)
-                exit 0
-                ;;
-        esac
-    fi
+    case "$result" in
+        "Browse…")
+            # Ensure the default parent directory exists for the folder picker
+            mkdir -p "${DEFAULT_INSTALL_DIR%/*}"
+            chosen=$(choose_folder "Choose a folder for MeticAI" "${DEFAULT_INSTALL_DIR%/*}")
+            if [ -z "$chosen" ]; then
+                show_error "No folder selected. Installation cancelled."
+            fi
+            # Append MeticAI subfolder if user picked a parent
+            chosen="${chosen%/}"
+            if [[ "$(basename "$chosen")" != "MeticAI" && "$(basename "$chosen")" != "meticai" ]]; then
+                INSTALL_DIR="${chosen}/MeticAI"
+            else
+                INSTALL_DIR="$chosen"
+            fi
+            ;;
+        "Continue")
+            INSTALL_DIR="$DEFAULT_INSTALL_DIR"
+            ;;
+        *)
+            exit 0
+            ;;
+    esac
 
     # Check for existing installation at chosen path
     if [ -f "${INSTALL_DIR}/.env" ]; then
@@ -315,7 +349,13 @@ Paste your API key below:" "")
     
     # Auto-detect Meticulous machine
     show_progress "Scanning network for Meticulous machine..."
-    DETECTED_IP=$(detect_meticulous 2>/dev/null || true)
+    # Run detection directly (not in a subshell) so dns-sd can be killed.
+    # Result is written to /tmp/meticai-result.txt.
+    DETECTED_IP=""
+    if detect_meticulous 2>/dev/null; then
+        DETECTED_IP=$(cat /tmp/meticai-result.txt 2>/dev/null)
+        rm -f /tmp/meticai-result.txt
+    fi
 
     if [ -n "$DETECTED_IP" ]; then
         # Machine found — let user confirm or override
