@@ -19,7 +19,10 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/App
 
 # Configuration
 INSTALL_DIR="${HOME}/MeticAI"
-REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/main"
+# NOTE: Using version/2.0.0 branch for pre-release testing.
+# Revert to main before final release.
+REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/version/2.0.0"
+METICAI_TAG="2.0.0"
 
 # Colors for terminal output (when run manually)
 RED='\033[0;31m'
@@ -243,6 +246,7 @@ Would you like to enable automatic updates?
 
 GEMINI_API_KEY=${GEMINI_API_KEY}
 METICULOUS_IP=${METICULOUS_IP}
+METICAI_TAG=${METICAI_TAG}
 EOF
     
     # Build compose files list
