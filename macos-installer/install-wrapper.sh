@@ -93,6 +93,53 @@ show_progress() {
     osascript -e "display notification \"$message\" with title \"MeticAI Installer\""
 }
 
+# Auto-detect Meticulous machine on the network
+detect_meticulous() {
+    local detected=""
+
+    # Method 1: dns-sd (Bonjour) — most reliable on macOS
+    if command -v dns-sd &>/dev/null; then
+        local dns_output
+        dns_output=$(timeout 4 dns-sd -B _http._tcp local 2>/dev/null || true)
+        if echo "$dns_output" | grep -qi "meticulous"; then
+            # Found via Bonjour — resolve the hostname
+            detected=$(resolve_meticulous_ip "meticulous")
+            if [[ -n "$detected" ]]; then
+                echo "$detected"
+                return 0
+            fi
+        fi
+    fi
+
+    # Method 2: Try resolving meticulous.local directly
+    detected=$(resolve_meticulous_ip "meticulous")
+    if [[ -n "$detected" ]]; then
+        echo "$detected"
+        return 0
+    fi
+
+    return 1
+}
+
+# Resolve meticulous.local to an IP
+resolve_meticulous_ip() {
+    local name="${1:-meticulous}"
+    local hostname="${name}.local"
+    local ip=""
+
+    # dscacheutil (macOS native)
+    if command -v dscacheutil &>/dev/null; then
+        ip=$(dscacheutil -q host -a name "$hostname" 2>/dev/null | grep "^ip_address:" | head -1 | awk '{print $2}')
+        [[ -n "$ip" ]] && { echo "$ip"; return 0; }
+    fi
+
+    # ping fallback
+    ip=$(ping -c 1 -t 2 "$hostname" 2>/dev/null | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | head -1 | tr -d '()')
+    [[ -n "$ip" ]] && { echo "$ip"; return 0; }
+
+    return 1
+}
+
 # Show error and exit
 show_error() {
     local message="$1"
@@ -214,11 +261,18 @@ Paste your API key below:" "")
         show_error "Gemini API Key is required. Installation cancelled."
     fi
     
-    # Get Meticulous IP
-    METICULOUS_IP=$(show_input_dialog "Enter your Meticulous machine IP address
+    # Auto-detect Meticulous machine
+    show_progress "Scanning network for Meticulous machine..."
+    DETECTED_IP=$(detect_meticulous 2>/dev/null || true)
 
-If you're not sure, try 'meticulous.local' for automatic discovery." "meticulous.local")
-    
+    if [ -n "$DETECTED_IP" ]; then
+        # Machine found — let user confirm or override
+        METICULOUS_IP=$(show_input_dialog "Meticulous Machine Found! ✅\n\nDetected your machine at: ${DETECTED_IP}\n\nPress OK to use this address, or change it below:" "$DETECTED_IP")
+    else
+        # Not found — ask user to enter manually
+        METICULOUS_IP=$(show_input_dialog "Meticulous Machine Not Found\n\nCould not auto-detect your machine on the network.\nPlease enter its IP address manually.\n\nTip: Check the Meticulous app or your router's device list." "meticulous.local")
+    fi
+
     if [ -z "$METICULOUS_IP" ]; then
         METICULOUS_IP="meticulous.local"
     fi
