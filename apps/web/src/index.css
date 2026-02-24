@@ -687,3 +687,16 @@ ul:not([class]) li::before,
 .auto-scroll-only::-webkit-scrollbar {
   display: none;                  /* Chrome/Safari */
 }
+
+/* ── Desktop two-column layout ────────────────────────────── */
+@media (min-width: 1024px) {
+  .desktop-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .desktop-full-width {
+    grid-column: 1 / -1;
+  }
+}
