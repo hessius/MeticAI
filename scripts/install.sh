@@ -108,6 +108,31 @@ if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
 fi
 
 # ==============================================================================
+# Dependency check (warn about missing optional tools)
+# ==============================================================================
+
+check_optional_deps() {
+    local missing=0
+    for cmd in curl; do
+        if ! command -v "$cmd" &>/dev/null; then
+            log_error "Required command '$cmd' is not installed."
+            missing=1
+        fi
+    done
+    if [[ $missing -eq 1 ]]; then
+        exit 1
+    fi
+
+    # Optional tools — warn but continue
+    for cmd in openssl xxd qrencode; do
+        if ! command -v "$cmd" &>/dev/null; then
+            log_warning "Optional command '$cmd' is not installed (some features may be limited)"
+        fi
+    done
+}
+check_optional_deps
+
+# ==============================================================================
 # Portable timeout helper (for network scanning)
 # ==============================================================================
 
@@ -607,7 +632,7 @@ if [[ "$HAS_WATCHTOWER_COMPOSE" == "true" ]]; then
         read -p "Enable Watchtower for automatic updates? (y/N): " ENABLE_WATCHTOWER < /dev/tty
     fi
     if [[ "$ENABLE_WATCHTOWER" =~ ^[Yy]$ ]]; then
-        WATCHTOWER_TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
+        WATCHTOWER_TOKEN=$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
         COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.watchtower.yml"
         log_success "Watchtower enabled (auto-update)"
     else
@@ -648,7 +673,7 @@ METICULOUS_IP=${METICULOUS_IP}
 # Image tag (auto-detected from install branch: ${REPO_BRANCH})
 METICAI_TAG=${METICAI_TAG}
 
-# Compose files to load
+# Compose files to load (custom var used by start.sh/stop.sh/update.sh, not a Docker env var)
 COMPOSE_FILES="${COMPOSE_FILES}"
 EOF
 
@@ -795,10 +820,20 @@ echo -e "${YELLOW}[4/4] Starting MeticAI...${NC}"
 echo ""
 
 log_info "Pulling MeticAI image (this may take a few minutes)..."
-docker compose ${COMPOSE_FILES} pull 2>&1 || true
+if ! docker compose ${COMPOSE_FILES} pull 2>&1; then
+    log_warning "Image pull encountered errors. Continuing anyway (cached image may work)..."
+fi
 
 log_info "Starting MeticAI..."
-docker compose ${COMPOSE_FILES} up -d 2>&1 || true
+if ! docker compose ${COMPOSE_FILES} up -d 2>&1; then
+    log_error "Failed to start MeticAI containers."
+    echo ""
+    echo "  Troubleshooting:"
+    echo "    1. Is Docker running?  docker info"
+    echo "    2. Check logs:         docker compose ${COMPOSE_FILES} logs"
+    echo "    3. Retry:              cd ${INSTALL_DIR} && docker compose ${COMPOSE_FILES} up -d"
+    echo ""
+fi
 
 # Wait for services
 log_info "Waiting for services to start..."
@@ -808,11 +843,32 @@ sleep 10
 # Verify installation
 # ==============================================================================
 
+CONTAINER_RUNNING=false
 if docker compose ${COMPOSE_FILES} ps 2>/dev/null | grep -qi "running\|healthy\|up"; then
-    log_success "MeticAI is running!"
+    CONTAINER_RUNNING=true
+    log_success "MeticAI container is running"
 else
     log_warning "Container may still be starting..."
     echo "  Check status with: cd ${INSTALL_DIR} && docker compose ps"
+fi
+
+# Health check against the API
+if [[ "$CONTAINER_RUNNING" == "true" ]]; then
+    log_info "Checking service health..."
+    HEALTH_OK=false
+    for i in 1 2 3 4 5 6; do
+        if curl -sf http://localhost:3550/api/health &>/dev/null; then
+            HEALTH_OK=true
+            break
+        fi
+        sleep 5
+    done
+    if [[ "$HEALTH_OK" == "true" ]]; then
+        log_success "MeticAI is responding at http://localhost:3550"
+    else
+        log_warning "Service not responding yet. It may need another minute to start."
+        echo "  Try opening http://localhost:3550 in your browser shortly."
+    fi
 fi
 
 # ==============================================================================

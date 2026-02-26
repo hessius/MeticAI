@@ -22,18 +22,23 @@ The installer guides you through configuration including optional Tailscale and 
 
 ### Option B: Manual Setup
 
-```powershell
-# 1. Clone the repository
-git clone https://github.com/hessius/MeticAI.git
-cd MeticAI
+> **Note:** Do **not** use `git clone` on Windows. The repository contains macOS metadata files with special characters that are incompatible with NTFS. The install script and the steps below download only the files needed.
 
-# 2. Create .env file
+```powershell
+# 1. Create the MeticAI directory
+mkdir ~\MeticAI
+cd ~\MeticAI
+
+# 2. Download docker-compose.yml
+irm https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.yml -OutFile docker-compose.yml
+
+# 3. Create .env file
 @"
 GEMINI_API_KEY=your_api_key_here
 METICULOUS_IP=meticulous.local
 "@ | Set-Content .env
 
-# 3. Start MeticAI
+# 4. Start MeticAI
 docker compose up -d
 ```
 
