@@ -64,118 +64,35 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 ### Installation (5 minutes)
 
-**Prerequisites:**
-- Docker and Docker Compose installed ([Get Docker](https://docs.docker.com/get-docker/))
-- Git
+**Prerequisites:** Docker and Docker Compose ([Get Docker](https://docs.docker.com/get-docker/))
 
-<details>
-<summary><strong>🐧🍎 Linux / macOS (Recommended: Git Clone)</strong></summary>
-
-This is the safest and most transparent installation method:
+**Linux / macOS:**
 
 ```bash
-# 1. Clone the repository (recommended: use a specific release tag when available)
-git clone https://github.com/hessius/MeticAI.git
-cd MeticAI
-
-# Optional: Checkout a specific release for stability
-# git checkout v2.0.0  # (use when tagged releases are available)
-
-# 2. Create .env file with your configuration
+git clone https://github.com/hessius/MeticAI.git && cd MeticAI
 cat > .env << EOF
-GEMINI_API_KEY=your_api_key_here
-METICULOUS_IP=meticulous.local  # or IP address like 192.168.1.100
-EOF
-
-# 3. Start MeticAI
-docker compose up -d
-```
-
-</details>
-
-<details>
-<summary><strong>🪟 Windows (PowerShell)</strong></summary>
-
-> ⚠️ **Windows support is community-tested only.** The PowerShell installer has been validated with automated tests but has not been verified on a real Windows environment. If you encounter issues, please [report them](https://github.com/hessius/MeticAI/issues).
-
-**Prerequisites:** [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) installed and running.
-
-**Option A: Interactive installer (recommended)**
-
-```powershell
-# Download and run the installer
-irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 -OutFile install.ps1
-.\install.ps1
-```
-
-The installer will guide you through configuration, including optional Tailscale and Watchtower setup.
-
-**Option B: Manual setup**
-
-```powershell
-# 1. Clone the repository
-git clone https://github.com/hessius/MeticAI.git
-cd MeticAI
-
-# 2. Create .env file
-@"
 GEMINI_API_KEY=your_api_key_here
 METICULOUS_IP=meticulous.local
-"@ | Set-Content .env
-
-# 3. Start MeticAI
-docker compose up -d
-```
-
-**Windows notes:**
-- mDNS (`meticulous.local`) may require [Bonjour Print Services](https://support.apple.com/kb/DL999) — using the machine's IP address directly is recommended on Windows.
-- If you get an execution policy error, run: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`
-
-</details>
-
-**Alternative: Direct Download (Advanced Users)**
-
-> ⚠️ **Security Warning**: Downloading and executing scripts or configuration files directly from the internet carries security risks. Only use this method if you trust the source and have verified the file contents.
-
-If you prefer not to clone the entire repository, you can download just the compose file:
-
-```bash
-# Create configuration directory
-mkdir -p ~/MeticAI && cd ~/MeticAI
-
-# Download and inspect the compose file BEFORE running it
-# Use a specific commit hash for reproducibility and security
-# Find the latest commit at: https://github.com/hessius/MeticAI/commits/main
-COMMIT_HASH="104d7c5"  # Example: update this to your chosen commit
-curl -fsSL "https://raw.githubusercontent.com/hessius/MeticAI/${COMMIT_HASH}/docker-compose.yml" -o docker-compose.yml
-
-# IMPORTANT: Review the downloaded file before proceeding
-cat docker-compose.yml
-
-# Verify file integrity (optional but recommended)
-# Compare the file hash with the one published in the release notes
-sha256sum docker-compose.yml
-
-# Create .env file
-cat > .env << EOF
-GEMINI_API_KEY=your_api_key_here
-METICULOUS_IP=meticulous.local  # or IP address like 192.168.1.100
 EOF
-
-# Start MeticAI only after verifying the compose file
 docker compose up -d
 ```
 
-> **Best Practice**: Always review configuration files before running them, especially when downloaded from the internet. The git clone method above is recommended as it provides full transparency and version control.
+**Windows:** See the [Windows Installation Guide](WINDOWS.md) for PowerShell installer and Windows-specific notes.
+
+**macOS App Installer:** Download from [Releases](https://github.com/hessius/MeticAI/releases/latest) — no terminal required.
 
 ### After Installation
 
 Open `http://YOUR_SERVER_IP:3550` in any browser to access the web interface!
 
 ### Need Help?
-- � [API Reference](API.md)- 🌐 [Remote Access (Tailscale)](TAILSCALE.md)
+- 📖 [API Reference](API.md)
+- 🪟 [Windows Installation](WINDOWS.md)
+- 🔄 [Updating & Migration](UPDATING.md)
+- 🌐 [Remote Access (Tailscale)](TAILSCALE.md)
 - 🏠 [Home Assistant Integration](HOME_ASSISTANT.md)
-- 📱 [iOS Shortcuts](IOS_SHORTCUTS.md)- 🔧 [Troubleshooting](#troubleshooting)
+- 📱 [iOS Shortcuts](IOS_SHORTCUTS.md)
+- 🔧 [Troubleshooting](#-troubleshooting)
 
 ## 📱 Using MeticAI
 
@@ -249,28 +166,15 @@ When the MQTT bridge is enabled, your Meticulous machine is automatically discov
 
 ## 🔄 Updating MeticAI
 
-MeticAI v2.0 uses Docker for simple updates:
-
-**Quick update:**
 ```bash
 cd ~/MeticAI
 docker compose pull
 docker compose up -d
 ```
 
-**With Watchtower (automatic updates):**
+With Watchtower enabled, updates happen automatically every 6 hours.
 
-If you enabled Watchtower during installation, MeticAI will automatically check for updates every 6 hours and update seamlessly.
-
-**Manual trigger via API:**
-
-To use this endpoint, your Watchtower container must:
-- be started with the HTTP API enabled (for example using `--http-api-update` and a token via `--http-api-token` or `WATCHTOWER_HTTP_API_TOKEN`), and
-- publish its API port to the host (for example `-p 8088:8080` or `ports: ["8088:8080"]` in Docker Compose so that `http://localhost:8088` is reachable). MeticAI uses port 8088 by default to avoid conflicts with other Watchtower instances.
-```bash
-curl -X POST http://localhost:8088/v1/update \
-  -H "Authorization: Bearer YOUR_WATCHTOWER_TOKEN"
-```
+[→ Full update guide, migration from v1.x, and troubleshooting](UPDATING.md)
 
 ## 🗑️ Uninstalling MeticAI
 
