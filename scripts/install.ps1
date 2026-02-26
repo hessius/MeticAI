@@ -359,7 +359,7 @@ function Install-MeticAI {
 GEMINI_API_KEY=$apiKey
 METICULOUS_IP=$machineIp
 
-# Compose files to load
+# Compose files to load (custom var used by the installer and convenience commands, not a Docker env var)
 COMPOSE_FILES="$composeFilesString"
 "@
 
@@ -389,6 +389,12 @@ COMPOSE_FILES="$composeFilesString"
 
     Write-LogSuccess "Compose files downloaded"
 
+    # Verify critical compose file exists and is not empty
+    $mainCompose = Join-Path $InstallDir "docker-compose.yml"
+    if (-not (Test-Path $mainCompose) -or (Get-Item $mainCompose).Length -eq 0) {
+        throw "docker-compose.yml is missing or empty. The download may have failed. Check your internet connection and try again."
+    }
+
     # ------------------------------------------------------------------
     # 8. Pull and start
     # ------------------------------------------------------------------
@@ -414,12 +420,37 @@ COMPOSE_FILES="$composeFilesString"
     # 9. Verify installation
     # ------------------------------------------------------------------
     $psOutput = docker compose ps 2>&1
-    if ($psOutput -match "running|healthy") {
-        Write-LogSuccess "MeticAI is running!"
+    $containerRunning = $psOutput -match "running|healthy"
+    if ($containerRunning) {
+        Write-LogSuccess "MeticAI container is running"
     }
     else {
         Write-LogWarning "Container may still be starting..."
         Write-Host "  Check status with: cd ~\MeticAI; docker compose ps"
+    }
+
+    # Health check against the API
+    $healthOk = $false
+    if ($containerRunning) {
+        Write-LogInfo "Checking service health..."
+        for ($i = 0; $i -lt 6; $i++) {
+            try {
+                $resp = Invoke-WebRequest -Uri "http://localhost:3550/api/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+                if ($resp.StatusCode -eq 200) {
+                    $healthOk = $true
+                    break
+                }
+            }
+            catch { }
+            Start-Sleep -Seconds 5
+        }
+        if ($healthOk) {
+            Write-LogSuccess "MeticAI is responding at http://localhost:3550"
+        }
+        else {
+            Write-LogWarning "Service not responding yet. It may need another minute to start."
+            Write-Host "  Try opening http://localhost:3550 in your browser shortly." -ForegroundColor DarkGray
+        }
     }
 
     # Get access URL
@@ -442,6 +473,11 @@ COMPOSE_FILES="$composeFilesString"
     Write-Host ""
     Write-Host "  Web UI:  http://${ip}:3550"
     Write-Host "  API:     http://${ip}:3550/docs"
+    Write-Host ""
+    Write-Host "  ┌──────────────────────────────────────────────────────┐" -ForegroundColor Yellow
+    Write-Host "  │  IMPORTANT: Your files are in $InstallDir" -ForegroundColor Yellow
+    Write-Host "  │  Run this first:  cd ~\MeticAI" -ForegroundColor Yellow
+    Write-Host "  └──────────────────────────────────────────────────────┘" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  Useful commands:" -ForegroundColor White
     Write-Host "    View logs:   cd ~\MeticAI; docker compose logs -f"
@@ -468,10 +504,23 @@ try {
                     -NonInteractive:$NonInteractive
 }
 catch {
+    Write-Host ""
+    Write-Host "  ╔══════════════════════════════════════╗" -ForegroundColor Red
+    Write-Host "  ║        ❌ Installation Failed        ║" -ForegroundColor Red
+    Write-Host "  ╚══════════════════════════════════════╝" -ForegroundColor Red
+    Write-Host ""
     Write-LogError $_.Exception.Message
     Write-Host ""
-    Write-Host "  Installation failed. Please check the error above." -ForegroundColor Red
-    Write-Host "  For help, visit: https://github.com/hessius/MeticAI/issues" -ForegroundColor DarkGray
+    Write-Host "  Troubleshooting checklist:" -ForegroundColor Yellow
+    Write-Host "    1. Is Docker Desktop running? (look for the whale icon in system tray)"
+    Write-Host "    2. Do you have an internet connection?"
+    Write-Host "    3. Is PowerShell running as a normal user (not required to be admin)?"
+    Write-Host ""
+    Write-Host "  To retry, run:" -ForegroundColor White
+    Write-Host "    irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 | iex" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  Still stuck? Open an issue:" -ForegroundColor White
+    Write-Host "    https://github.com/hessius/MeticAI/issues" -ForegroundColor Cyan
     Write-Host ""
     exit 1
 }
