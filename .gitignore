@@ -17,6 +17,8 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+Icon?
+Icon\r
 
 # Logs
 *.log
