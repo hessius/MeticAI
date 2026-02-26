@@ -631,6 +631,18 @@ h1 span {
     margin-bottom: 2rem;
 }
 
+.install-note a,
+.install-panel a {
+    color: var(--accent-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color 0.2s;
+}
+.install-note a:hover,
+.install-panel a:hover {
+    color: var(--text-color);
+}
+
 .install-alternative {
     margin: 2.5rem 0;
     padding: 2rem;
