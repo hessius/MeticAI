@@ -205,13 +205,23 @@
 
             <div class="install-panel" id="panel-linux">
                 <p class="install-label">One-line install for Raspberry Pi, Linux, and macOS:</p>
-                <code class="install-command">curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash</code>
+                <div class="install-command-wrapper">
+                    <code class="install-command">curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash</code>
+                    <button class="copy-btn" title="Copy to clipboard" aria-label="Copy command">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    </button>
+                </div>
                 <p class="install-note">The installer checks prerequisites, pulls the Docker image, and starts all services automatically.</p>
             </div>
 
             <div class="install-panel" id="panel-windows" style="display:none">
                 <p class="install-label">PowerShell installer for Windows 10/11 (requires Docker Desktop):</p>
-                <code class="install-command">irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 | iex</code>
+                <div class="install-command-wrapper">
+                    <code class="install-command">irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 | iex</code>
+                    <button class="copy-btn" title="Copy to clipboard" aria-label="Copy command">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    </button>
+                </div>
                 <p class="install-note">Runs in PowerShell 5.1+. See the <a href="https://github.com/hessius/MeticAI/blob/main/WINDOWS.md" target="_blank">Windows guide</a> for details.</p>
             </div>
 
@@ -303,6 +313,23 @@
                 btn.classList.add('active');
                 document.querySelectorAll('.install-panel').forEach(function(p) { p.style.display = 'none'; });
                 document.getElementById('panel-' + btn.getAttribute('data-panel')).style.display = '';
+            });
+        });
+
+        /* Copy-to-clipboard buttons */
+        document.querySelectorAll('.copy-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var code = btn.parentElement.querySelector('.install-command');
+                if (!code) return;
+                var text = code.textContent.trim();
+                navigator.clipboard.writeText(text).then(function() {
+                    btn.classList.add('copied');
+                    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+                    setTimeout(function() {
+                        btn.classList.remove('copied');
+                        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+                    }, 2000);
+                });
             });
         });
     </script>

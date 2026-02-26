@@ -926,6 +926,42 @@ footer p {
     margin: 0 auto 2rem;
 }
 
+/* Install command copy wrapper */
+.install-command-wrapper {
+    position: relative;
+}
+
+.install-command-wrapper .install-command {
+    padding-right: 3.5rem;
+}
+
+.copy-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    padding: 0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.copy-btn:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.copy-btn.copied {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
 /* Mobile adjustments */
 @media (max-width: 768px) {
     .nav-links { display: none; }
