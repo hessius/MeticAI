@@ -14,7 +14,7 @@
         </div>
         <div class="nav-links">
             <a href="#features">Features</a>
-            <a href="#how-it-works">How It Works</a>
+            <a href="#screenshots">Screenshots</a>
             <a href="#getting-started">Get Started</a>
             <a href="https://github.com/hessius/MeticAI" target="_blank">GitHub</a>
         </div>
@@ -24,35 +24,51 @@
         <div class="hero-content">
             <h1 class="brand-title">Metic<span class="text-primary">AI</span></h1>
             <p class="subtitle">Meticulous Espresso AI Profiler</p>
+            <span class="version-badge">v2.0 &mdash; Major Release</span>
         </div>
-
         <p class="hero-tagline">Meticulous Unleashed</p>
-        <a href="#getting-started" class="cta-button hero-cta">Get Started on Raspberry Pi or Mac</a>
+        <a href="#getting-started" class="cta-button hero-cta">Get Started on Raspberry Pi, Mac, or Windows</a>
     </section>
 
     <section id="features" class="features">
         <div class="features-header">What It Does</div>
-        
+
         <div class="features-layout">
             <div class="features-grid">
                 <div class="feature-card" data-feature="create-profiles">
-                    <div class="icon-box">🧠</div> <h3>Create Profiles</h3>
+                    <div class="icon-box">&#x1F9E0;</div>
+                    <h3>Create Profiles</h3>
                     <p>Automatically create espresso profiles tailored to your preferences and coffee at hand. Just snap a photo or describe what you want.</p>
                 </div>
 
                 <div class="feature-card" data-feature="understand-shots">
-                    <div class="icon-box">📊</div> <h3>Understand Your Shots</h3>
+                    <div class="icon-box">&#x1F4CA;</div>
+                    <h3>Understand Your Shots</h3>
                     <p>Understand your espresso profiles and shot data like never before with detailed analysis and visualizations.</p>
                 </div>
 
                 <div class="feature-card" data-feature="ai-coaching">
-                    <div class="icon-box">🔬</div> <h3>AI Coaching</h3>
+                    <div class="icon-box">&#x1F52C;</div>
+                    <h3>AI Coaching</h3>
                     <p>Get AI-powered coaching to improve your technique and dial in faster.</p>
                 </div>
 
                 <div class="feature-card" data-feature="great-espresso">
-                    <div class="icon-box">☕️</div> <h3>Just Great Espresso</h3>
+                    <div class="icon-box">&#x2615;</div>
+                    <h3>Just Great Espresso</h3>
                     <p>No more guesswork. From input to machine, fully automatic profile creation.</p>
+                </div>
+
+                <div class="feature-card" data-feature="control-center">
+                    <div class="icon-box">&#x1F39B;</div>
+                    <h3>Control Center</h3>
+                    <p>Real-time machine telemetry via MQTT. Start shots, preheat, tare, and control your Meticulous from any device.</p>
+                </div>
+
+                <div class="feature-card" data-feature="home-assistant">
+                    <div class="icon-box">&#x1F3E0;</div>
+                    <h3>Home Assistant</h3>
+                    <p>Auto-discover your Meticulous in Home Assistant with 24 sensors and 11 commands. One click to connect.</p>
                 </div>
             </div>
 
@@ -66,34 +82,92 @@
         </div>
     </section>
 
+    <section id="screenshots" class="screenshots-section">
+        <h2>See It in Action</h2>
+        <div class="screenshot-tabs">
+            <button class="screenshot-tab active" data-tab="desktop">Desktop</button>
+            <button class="screenshot-tab" data-tab="mobile">Mobile</button>
+        </div>
+        <div class="screenshot-gallery" id="gallery-desktop">
+            <figure><img src="screenshots/desktop-home.png" alt="MeticAI Home — Desktop" loading="lazy"><figcaption>Home &amp; Control Center</figcaption></figure>
+            <figure><img src="screenshots/desktop-analysis.png" alt="MeticAI Profile Generation — Desktop" loading="lazy"><figcaption>New Profile</figcaption></figure>
+            <figure><img src="screenshots/desktop-profiles.png" alt="MeticAI Profile Catalogue — Desktop" loading="lazy"><figcaption>Profile Catalogue</figcaption></figure>
+            <figure><img src="screenshots/desktop-shots.png" alt="MeticAI Run / Schedule — Desktop" loading="lazy"><figcaption>Run &amp; Schedule</figcaption></figure>
+            <figure><img src="screenshots/desktop-settings.png" alt="MeticAI Settings — Desktop" loading="lazy"><figcaption>Settings</figcaption></figure>
+        </div>
+        <div class="screenshot-gallery screenshot-mobile" id="gallery-mobile" style="display:none">
+            <figure><img src="screenshots/mobile-home.png" alt="MeticAI Home — Mobile" loading="lazy"><figcaption>Home</figcaption></figure>
+            <figure><img src="screenshots/mobile-analysis.png" alt="MeticAI Profile Generation — Mobile" loading="lazy"><figcaption>New Profile</figcaption></figure>
+            <figure><img src="screenshots/mobile-profiles.png" alt="MeticAI Profile Catalogue — Mobile" loading="lazy"><figcaption>Catalogue</figcaption></figure>
+            <figure><img src="screenshots/mobile-shots.png" alt="MeticAI Run / Schedule — Mobile" loading="lazy"><figcaption>Run &amp; Schedule</figcaption></figure>
+            <figure><img src="screenshots/mobile-settings.png" alt="MeticAI Settings — Mobile" loading="lazy"><figcaption>Settings</figcaption></figure>
+        </div>
+    </section>
+
+    <section class="whats-new-section">
+        <h2>What's New in v2.0</h2>
+        <div class="whats-new-grid">
+            <div class="whats-new-card">
+                <div class="icon-box">&#x1F4E6;</div>
+                <h3>Unified Container</h3>
+                <p>One container, one port. Everything &mdash; backend, frontend, MQTT, reverse proxy &mdash; runs inside a single Docker container managed by s6-overlay.</p>
+            </div>
+            <div class="whats-new-card">
+                <div class="icon-box">&#x1F39B;</div>
+                <h3>Control Center</h3>
+                <p>Live temperature, pressure, and flow telemetry. Start, stop, preheat, tare, and purge &mdash; all from your browser.</p>
+            </div>
+            <div class="whats-new-card">
+                <div class="icon-box">&#x1F3E0;</div>
+                <h3>Home Assistant</h3>
+                <p>Built-in MQTT broker with auto-discovery. 24 sensors and 11 commands appear in Home Assistant automatically.</p>
+            </div>
+            <div class="whats-new-card">
+                <div class="icon-box">&#x23F0;</div>
+                <h3>Scheduling</h3>
+                <p>Schedule preheats and shots for specific times or recurring days. Wake up to a warm machine.</p>
+            </div>
+            <div class="whats-new-card">
+                <div class="icon-box">&#x1F5A5;</div>
+                <h3>Windows Support</h3>
+                <p>Full PowerShell installer for Windows 10/11 with Docker Desktop. First-class Windows citizen.</p>
+            </div>
+            <div class="whats-new-card">
+                <div class="icon-box">&#x1F310;</div>
+                <h3>6 Languages</h3>
+                <p>Full UI localization in English, Swedish, Spanish, Italian, French, and German.</p>
+            </div>
+        </div>
+    </section>
+
     <section id="how-it-works" class="how-it-works">
         <h2>How It Works</h2>
         <div class="how-it-works-content">
-            <p class="how-intro">MeticAI runs on a small computer in your home — like a Raspberry Pi or a Mac — and creates a private web app just for you.</p>
-            
+            <p class="how-intro">MeticAI runs on a small computer in your home &mdash; like a Raspberry Pi, Mac, or Windows PC &mdash; and creates a private web app just for you.</p>
+
             <div class="how-steps">
                 <div class="how-step">
-                    <div class="step-icon">🖥️</div>
-                    <h3>Install Once</h3>
-                    <p>Run a simple installer on a Raspberry Pi, Mac, or Linux computer. It sets everything up automatically and starts running in the background.</p>
+                    <div class="step-number">1</div>
+                    <h3>Install</h3>
+                    <p>Run a one-line installer on Linux/macOS, PowerShell on Windows, or use the macOS app. It sets everything up and starts running in the background.</p>
                 </div>
-                
+
                 <div class="how-step">
-                    <div class="step-icon">🌐</div>
-                    <h3>Access From Any Device</h3>
-                    <p>Open the web app from any phone, tablet, or computer on your home network. No app store needed — just use your browser.</p>
+                    <div class="step-number">2</div>
+                    <h3>Open the Web App</h3>
+                    <p>Access MeticAI from any phone, tablet, or computer on your home network. No app store needed &mdash; just use your browser.</p>
                 </div>
-                
+
                 <div class="how-step">
-                    <div class="step-icon">📱</div>
-                    <h3>Add to Home Screen</h3>
-                    <p>On your phone, you can add it to your home screen for quick access — it works and feels just like a native app.</p>
+                    <div class="step-number">3</div>
+                    <h3>Snap &amp; Brew</h3>
+                    <p>Take a photo of your coffee bag, pick taste tags, and let the AI create and upload a tailored espresso profile to your machine.</p>
                 </div>
-                
+
                 <div class="how-step">
-                    <div class="step-icon">⚡</div>
-                    <h3>iOS Shortcuts</h3>
-                    <p>Integrate with Apple Shortcuts to create profiles with a tap or even your voice — "Hey Siri, make me an espresso profile."</p>
+                    <div class="step-number">4</div>
+                    <h3>Control &amp; Automate</h3>
+                    <p>Use the Control Center to manage your machine, schedule preheats, or integrate with Home Assistant and iOS Shortcuts.</p>
                 </div>
             </div>
         </div>
@@ -103,10 +177,10 @@
         <div class="story-content">
             <h2>Why I Built This</h2>
             <blockquote>
-                <p>The potential was (and is) basically limitless — my knowledge and time not so.</p>
+                <p>The potential was (and is) basically limitless &mdash; my knowledge and time not so.</p>
             </blockquote>
-                <p>When I got my Meticulous, after a loooong wait, I was overwhelmed with the options — dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless — my knowledge and time not so.</p>
-            <p>MeticAI is a growing set of AI tools to enable me, and you, to get the most out of a Meticulous Espresso machine. Among other things it lets you automatically create espresso profiles tailored to your preferences and coffee at hand, understand your espresso profiles and shot data like never before, and ultimately — lets you unleash your Meticulous.</p>
+            <p>When I got my Meticulous, after a loooong wait, I was overwhelmed with the options &mdash; dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless &mdash; my knowledge and time not so.</p>
+            <p>MeticAI is a growing set of AI tools to enable me, and you, to get the most out of a Meticulous Espresso machine. Among other things it lets you automatically create espresso profiles tailored to your preferences and coffee at hand, understand your espresso profiles and shot data like never before, and ultimately &mdash; lets you unleash your Meticulous.</p>
             <p class="story-signature">Jesper, coffee nerd and MeticAI creator</p>
         </div>
     </section>
@@ -116,127 +190,120 @@
         <div class="requirements">
             <h3>What You Need</h3>
             <ul>
-                <li>☑️ A <strong>Meticulous Espresso Machine</strong> (connected to your network)</li>
-                <li>☑️ A server to run MeticAI (Raspberry Pi, Mac, or Linux computer)</li>
-                <li>☑️ A <strong>free Google Gemini API key</strong> → <a href="https://aistudio.google.com/app/apikey" target="_blank">Get yours here</a> (takes 30 seconds)</li>
+                <li>&#x2611;&#xFE0F; A <strong>Meticulous Espresso Machine</strong> (connected to your network)</li>
+                <li>&#x2611;&#xFE0F; A server to run MeticAI (Raspberry Pi, Mac, Linux, or Windows PC)</li>
+                <li>&#x2611;&#xFE0F; A <strong>free Google Gemini API key</strong> &rarr; <a href="https://aistudio.google.com/app/apikey" target="_blank">Get yours here</a> (takes 30 seconds)</li>
             </ul>
         </div>
         <div class="install-options">
             <h3>Installation (5 minutes)</h3>
-            <p class="install-label">Recommended: One-line install for Raspberry Pi, Linux, and Mac:</p>
-            <code class="install-command">curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/web_install.sh | bash</code>
-            <p class="install-note">The installer will guide you through setup, check prerequisites, and start all services automatically.</p>
-            
-            <div class="install-alternative">
-                <p class="install-label">macOS App Installer:</p>
-                <p class="install-note">Prefer a GUI? Download the macOS installer app — no terminal required.</p>
+            <div class="install-tabs">
+                <button class="install-tab active" data-panel="linux">Linux / macOS</button>
+                <button class="install-tab" data-panel="windows">Windows</button>
+                <button class="install-tab" data-panel="macos-app">macOS App</button>
+            </div>
+
+            <div class="install-panel" id="panel-linux">
+                <p class="install-label">One-line install for Raspberry Pi, Linux, and macOS:</p>
+                <code class="install-command">curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash</code>
+                <p class="install-note">The installer checks prerequisites, pulls the Docker image, and starts all services automatically.</p>
+            </div>
+
+            <div class="install-panel" id="panel-windows" style="display:none">
+                <p class="install-label">PowerShell installer for Windows 10/11 (requires Docker Desktop):</p>
+                <code class="install-command">irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 | iex</code>
+                <p class="install-note">Runs in PowerShell 5.1+. See the <a href="https://github.com/hessius/MeticAI/blob/main/WINDOWS.md" target="_blank">Windows guide</a> for details.</p>
+            </div>
+
+            <div class="install-panel" id="panel-macos-app" style="display:none">
+                <p class="install-label">Prefer a GUI? Download the macOS installer app &mdash; no terminal required.</p>
                 <a href="https://github.com/hessius/MeticAI/releases/latest" class="cta-button cta-secondary">Download macOS Installer</a>
             </div>
-            
+
             <a href="https://github.com/hessius/MeticAI" target="_blank" class="cta-button cta-outline">View Full Documentation on GitHub</a>
         </div>
     </section>
 
     <section class="acknowledgements">
-        <h2>Credits & Acknowledgements</h2>
+        <h2>Credits &amp; Acknowledgements</h2>
         <div class="acknowledgements-content">
-            <p>MeticAI is built on the excellent <a href="https://github.com/twchad/meticulous-mcp" target="_blank">Meticulous MCP</a> project by <strong>twchad</strong> and its <a href="https://github.com/manonstreet/meticulous-mcp" target="_blank">containerized fork</a> by <strong>@manonstreet</strong>, which provides the essential interface for controlling the Meticulous Espresso Machine.</p>
-            
+            <p>MeticAI is built on the excellent <a href="https://github.com/twchad/meticulous-mcp" target="_blank">Meticulous MCP</a> by <strong>twchad</strong>, <a href="https://github.com/nickwilsonr/meticulous-addon" target="_blank">meticulous-addon</a> by <strong>nickwilsonr</strong>, and <a href="https://github.com/MeticulousHome/pyMeticulous" target="_blank">pyMeticulous</a> by the Meticulous team.</p>
             <div class="tech-stack">
                 <h3>Built With</h3>
                 <ul class="tech-list">
-                    <li>🧠 <strong>Google Gemini 2.0 Flash</strong> — Vision AI and reasoning</li>
-                    <li>⚡ <strong>FastAPI</strong> — Backend API framework</li>
-                    <li>🐳 <strong>Docker</strong> — Containerization and deployment</li>
-                    <li>⚛️ <strong>React</strong> — Web interface</li>
-                    <li>🐍 <strong>Python</strong> — Core application logic</li>
+                    <li>&#x1F9E0; <strong>Google Gemini 2.0 Flash</strong> &mdash; Vision AI and reasoning</li>
+                    <li>&#x26A1; <strong>FastAPI + Uvicorn</strong> &mdash; Backend API</li>
+                    <li>&#x269B;&#xFE0F; <strong>React + TypeScript</strong> &mdash; Web interface (Vite/Bun)</li>
+                    <li>&#x1F433; <strong>Docker + s6-overlay</strong> &mdash; Unified container</li>
+                    <li>&#x1F4E1; <strong>MQTT + Socket.IO</strong> &mdash; Real-time telemetry</li>
+                    <li>&#x1F50C; <strong>FastMCP</strong> &mdash; Machine communication</li>
                 </ul>
             </div>
-            
             <div class="open-source">
                 <p>MeticAI is open source and welcomes contributions!</p>
                 <div class="open-source-links">
-                    <a href="https://github.com/hessius/MeticAI" target="_blank">📖 View the code</a>
-                    <a href="https://github.com/hessius/MeticAI/issues" target="_blank">🐛 Report issues</a>
-                    <a href="https://github.com/hessius/MeticAI/pulls" target="_blank">💡 Contribute</a>
+                    <a href="https://github.com/hessius/MeticAI" target="_blank">&#x1F4D6; View the code</a>
+                    <a href="https://github.com/hessius/MeticAI/issues" target="_blank">&#x1F41B; Report issues</a>
+                    <a href="https://github.com/hessius/MeticAI/pulls" target="_blank">&#x1F4A1; Contribute</a>
                 </div>
             </div>
         </div>
     </section>
 
     <footer>
-        <p>Built with ❤️ for coffee lovers</p>
+        <p>Built with &#x2764;&#xFE0F; for coffee lovers</p>
         <p>Not affiliated with Meticulous Espresso.</p>
     </footer>
 
     <script>
-        // Demo video configuration
-        const demoConfig = {
+        /* Demo video configuration */
+        var demoConfig = {
             videos: [
-                {
-                    src: 'demo_profile_generation.mp4',
-                    duration: 39,
-                    highlights: [
-                        { feature: 'create-profiles', start: 0, end: 39 }
-                    ]
-                },
-                {
-                    src: 'demo_analysis.mp4',
-                    duration: 94,
-                    highlights: [
-                        { feature: 'understand-shots', start: 0, end: 69 },
-                        { feature: 'ai-coaching', start: 69, end: 94 }
-                    ]
-                }
+                { src: 'demo_profile_generation.mp4', duration: 39, highlights: [{ feature: 'create-profiles', start: 0, end: 39 }] },
+                { src: 'demo_analysis.mp4', duration: 94, highlights: [{ feature: 'understand-shots', start: 0, end: 69 }, { feature: 'ai-coaching', start: 69, end: 94 }] }
             ],
             currentVideoIndex: 0
         };
 
-        const videoElement = document.getElementById('demo-video');
-        const videoSource = document.getElementById('video-source');
-        const featureCards = document.querySelectorAll('.feature-card');
+        var videoElement = document.getElementById('demo-video');
+        var videoSource = document.getElementById('video-source');
+        var featureCards = document.querySelectorAll('.feature-card');
 
-        function clearHighlights() {
-            featureCards.forEach(card => card.classList.remove('highlighted'));
-        }
-
-        function highlightFeature(featureName) {
-            clearHighlights();
-            const card = document.querySelector(`[data-feature="${featureName}"]`);
-            if (card) {
-                card.classList.add('highlighted');
-            }
-        }
-
+        function clearHighlights() { featureCards.forEach(function(c) { c.classList.remove('highlighted'); }); }
+        function highlightFeature(name) { clearHighlights(); var c = document.querySelector('[data-feature="' + name + '"]'); if (c) c.classList.add('highlighted'); }
         function updateHighlight() {
-            const currentVideo = demoConfig.videos[demoConfig.currentVideoIndex];
-            const currentTime = videoElement.currentTime;
-            
-            for (const highlight of currentVideo.highlights) {
-                if (currentTime >= highlight.start && currentTime < highlight.end) {
-                    highlightFeature(highlight.feature);
-                    return;
-                }
-            }
+            var v = demoConfig.videos[demoConfig.currentVideoIndex];
+            for (var i = 0; i < v.highlights.length; i++) { var h = v.highlights[i]; if (videoElement.currentTime >= h.start && videoElement.currentTime < h.end) { highlightFeature(h.feature); return; } }
             clearHighlights();
         }
-
         function playNextVideo() {
             demoConfig.currentVideoIndex = (demoConfig.currentVideoIndex + 1) % demoConfig.videos.length;
-            const nextVideo = demoConfig.videos[demoConfig.currentVideoIndex];
-            
-            videoSource.src = nextVideo.src;
-            videoElement.load();
-            videoElement.play();
+            videoSource.src = demoConfig.videos[demoConfig.currentVideoIndex].src;
+            videoElement.load(); videoElement.play();
         }
-
-        // Event listeners
         videoElement.addEventListener('timeupdate', updateHighlight);
         videoElement.addEventListener('ended', playNextVideo);
+        videoElement.addEventListener('loadeddata', updateHighlight);
 
-        // Start with first video highlight
-        videoElement.addEventListener('loadeddata', () => {
-            updateHighlight();
+        /* Screenshot tabs */
+        document.querySelectorAll('.screenshot-tab').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.screenshot-tab').forEach(function(b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                var tab = btn.getAttribute('data-tab');
+                document.getElementById('gallery-desktop').style.display = tab === 'desktop' ? '' : 'none';
+                document.getElementById('gallery-mobile').style.display = tab === 'mobile' ? '' : 'none';
+            });
+        });
+
+        /* Install tabs */
+        document.querySelectorAll('.install-tab').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.install-tab').forEach(function(b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                document.querySelectorAll('.install-panel').forEach(function(p) { p.style.display = 'none'; });
+                document.getElementById('panel-' + btn.getAttribute('data-panel')).style.display = '';
+            });
         });
     </script>
 

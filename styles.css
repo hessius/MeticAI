@@ -759,3 +759,164 @@ footer p {
     .story-content blockquote { padding: 1rem 1.5rem; }
     .install-command { font-size: 0.75rem; padding: 0.75rem 1rem; }
 }
+
+/* === v2.0 Website Additions === */
+
+/* Version badge */
+.version-badge {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.4rem 1.2rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--primary), oklch(0.65 0.16 50));
+    color: var(--primary-foreground);
+    animation: badge-pulse 3s ease-in-out infinite;
+}
+@keyframes badge-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(210, 160, 60, 0.4); }
+    50%       { box-shadow: 0 0 18px 4px rgba(210, 160, 60, 0.15); }
+}
+
+/* Screenshots section */
+.screenshots-section {
+    padding: 5rem 5%;
+    text-align: center;
+}
+.screenshots-section h2 {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+}
+.screenshot-tabs, .install-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+}
+.screenshot-tab, .install-tab {
+    padding: 0.5rem 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    font-family: var(--font-main);
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+.screenshot-tab:hover, .install-tab:hover {
+    color: var(--text-color);
+    border-color: var(--accent-color);
+}
+.screenshot-tab.active, .install-tab.active {
+    background: var(--accent-color);
+    color: var(--primary-foreground);
+    border-color: var(--accent-color);
+}
+
+.screenshot-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.screenshot-gallery figure {
+    margin: 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card);
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+.screenshot-gallery figure:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+}
+.screenshot-gallery img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+.screenshot-gallery figcaption {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+}
+
+.screenshot-mobile {
+    max-width: 900px;
+}
+.screenshot-mobile figure img {
+    max-height: 500px;
+    width: auto;
+    margin: 0 auto;
+}
+
+/* What's New section */
+.whats-new-section {
+    padding: 5rem 5%;
+    text-align: center;
+}
+.whats-new-section h2 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+}
+.whats-new-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.whats-new-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem 1.5rem;
+    text-align: left;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.whats-new-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 20px rgba(210, 160, 60, 0.1);
+}
+.whats-new-card h3 {
+    margin: 0.75rem 0 0.5rem;
+}
+.whats-new-card p {
+    color: var(--muted-foreground);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Step numbers for how-it-works */
+.step-number {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), oklch(0.65 0.16 50));
+    color: var(--primary-foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 auto 1rem;
+}
+
+/* Install panels */
+.install-panel {
+    text-align: left;
+    max-width: 700px;
+    margin: 0 auto 2rem;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .nav-links { display: none; }
+    .screenshot-gallery { grid-template-columns: 1fr; }
+    .whats-new-grid { grid-template-columns: 1fr; }
+}
