@@ -113,19 +113,19 @@ For automation and integration:
 
 **With a photo:**
 ```bash
-curl -X POST http://YOUR_IP:3550/api/v1/analyze_and_profile \
+curl -X POST http://YOUR_IP:3550/api/analyze_and_profile \
   -F "file=@coffee_bag.jpg"
 ```
 
 **With text preferences:**
 ```bash
-curl -X POST http://YOUR_IP:3550/api/v1/analyze_and_profile \
+curl -X POST http://YOUR_IP:3550/api/analyze_and_profile \
   -F "user_prefs=Bold and chocolatey"
 ```
 
 **With both:**
 ```bash
-curl -X POST http://YOUR_IP:3550/api/v1/analyze_and_profile \
+curl -X POST http://YOUR_IP:3550/api/analyze_and_profile \
   -F "file=@coffee_bag.jpg" \
   -F "user_prefs=Traditional extraction"
 ```
