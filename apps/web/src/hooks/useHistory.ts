@@ -99,7 +99,7 @@ export function useHistory() {
     }
 
     // Create filename from profile name
-    const safeName = entry.profile_name
+    const safeName = (entry.profile_name || 'profile')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')

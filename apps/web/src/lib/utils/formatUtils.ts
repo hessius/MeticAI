@@ -74,7 +74,8 @@ export function formatNumber(
 /**
  * Format duration in seconds to human-readable string
  */
-export function formatDuration(seconds: number): string {
+export function formatDuration(seconds: number | null | undefined): string {
+  if (seconds == null || isNaN(seconds)) return '0s';
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
@@ -90,7 +91,8 @@ export function formatDuration(seconds: number): string {
 /**
  * Truncate text with ellipsis
  */
-export function truncateText(text: string, maxLength: number): string {
+export function truncateText(text: string | null | undefined, maxLength: number): string {
+  if (!text) return '';
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength - 3) + '...';
 }

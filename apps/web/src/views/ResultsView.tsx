@@ -10,7 +10,8 @@ import { MeticAILogo } from '@/components/MeticAILogo'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import type { APIResponse } from '@/types'
 
-function parseProfileSections(text: string) {
+function parseProfileSections(text: string | undefined | null) {
+  if (!text) return []
   const sections: { title: string; content: string }[] = []
   const sectionHeaders = [
     'Description',
@@ -88,11 +89,11 @@ export function ResultsView({
   onViewHistory,
   onRunProfile
 }: ResultsViewProps) {
-  const sections = useMemo(() => parseProfileSections(apiResponse.reply), [apiResponse.reply])
+  const sections = useMemo(() => parseProfileSections(apiResponse?.reply), [apiResponse?.reply])
   const profileName = useMemo(() => {
-    const profileNameMatch = apiResponse.reply.match(/Profile Created:\s*(.+?)(?:\n|$)/i)
+    const profileNameMatch = apiResponse?.reply?.match(/Profile Created:\s*(.+?)(?:\n|$)/i)
     return cleanProfileName(profileNameMatch?.[1]?.trim() || '')
-  }, [apiResponse.reply])
+  }, [apiResponse?.reply])
 
   return (
     <motion.div
