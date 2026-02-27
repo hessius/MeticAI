@@ -80,6 +80,8 @@ jobs:
         continue-on-error: true
         uses: oven-sh/setup-bun@v2
         with:
+          # Pin Bun for CI reproducibility and transient download stability.
+          # Keep this in sync with docker/Dockerfile.unified bun base image.
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 2)
@@ -91,7 +93,7 @@ jobs:
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 3)
-        if: steps.setup_bun_1.outcome == 'failure' && steps.setup_bun_2.outcome == 'failure'
+        if: steps.setup_bun_2.outcome == 'failure'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.10
@@ -139,6 +141,8 @@ jobs:
         continue-on-error: true
         uses: oven-sh/setup-bun@v2
         with:
+          # Pin Bun for CI reproducibility and transient download stability.
+          # Keep this in sync with docker/Dockerfile.unified bun base image.
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 2)
@@ -150,7 +154,7 @@ jobs:
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 3)
-        if: steps.setup_bun_1.outcome == 'failure' && steps.setup_bun_2.outcome == 'failure'
+        if: steps.setup_bun_2.outcome == 'failure'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.10
@@ -224,6 +228,8 @@ jobs:
         continue-on-error: true
         uses: oven-sh/setup-bun@v2
         with:
+          # Pin Bun for CI reproducibility and transient download stability.
+          # Keep this in sync with docker/Dockerfile.unified bun base image.
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 2)
@@ -235,7 +241,7 @@ jobs:
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 3)
-        if: steps.setup_bun_1.outcome == 'failure' && steps.setup_bun_2.outcome == 'failure'
+        if: steps.setup_bun_2.outcome == 'failure'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.10
@@ -304,6 +310,8 @@ jobs:
         continue-on-error: true
         uses: oven-sh/setup-bun@v2
         with:
+          # Pin Bun for CI reproducibility and transient download stability.
+          # Keep this in sync with docker/Dockerfile.unified bun base image.
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 2)
@@ -315,7 +323,7 @@ jobs:
           bun-version: 1.3.10
 
       - name: Setup Bun (attempt 3)
-        if: steps.setup_bun_1.outcome == 'failure' && steps.setup_bun_2.outcome == 'failure'
+        if: steps.setup_bun_2.outcome == 'failure'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.10
