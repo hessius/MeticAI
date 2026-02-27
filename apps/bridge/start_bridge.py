@@ -22,8 +22,131 @@ import json
 import logging
 import os
 import sys
+import asyncio
+from typing import Any, Optional
 
 logger = logging.getLogger("meticai.bridge")
+
+
+def _as_float(value: Any) -> Optional[float]:
+    """Best-effort float conversion."""
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_value(container: Any, key: str) -> Any:
+    """Get a value from dict/object containers."""
+    if container is None:
+        return None
+    if isinstance(container, dict):
+        return container.get(key)
+    return getattr(container, key, None)
+
+
+def _extract_power_value(payload: Any) -> Optional[float]:
+    """Extract power percentage from status/actuator payloads.
+
+    The upstream add-on defines a `power` sensor but does not consistently
+    populate it in status callbacks. This helper probes common field names
+    used by Socket.IO payload variants and returns the first numeric value.
+    """
+    power_keys = (
+        "power",
+        "motor_power",
+        "motorPower",
+        "heater_power",
+        "heaterPower",
+        "pwr",
+        "pw",
+        "mp",
+    )
+
+    nested_keys = (
+        "sensors",
+        "actuators",
+        "motor",
+        "heater",
+    )
+
+    containers = [payload]
+    for nested in nested_keys:
+        nested_obj = _extract_value(payload, nested)
+        if nested_obj is not None:
+            containers.append(nested_obj)
+
+    for container in containers:
+        for key in power_keys:
+            value = _as_float(_extract_value(container, key))
+            if value is not None:
+                return max(0.0, min(100.0, value))
+    return None
+
+
+def _publish_power_if_available(addon: Any, payload: Any) -> None:
+    """Publish power telemetry to MQTT if present in raw event payload."""
+    power_value = _extract_power_value(payload)
+    if power_value is None:
+        return
+
+    # Reuse add-on throttling so we don't spam MQTT updates.
+    fields = addon._filter_throttled_fields({"power": round(power_value, 2)})
+    if fields and getattr(addon, "loop", None):
+        asyncio.run_coroutine_threadsafe(
+            addon.publish_to_homeassistant(fields), addon.loop
+        )
+
+
+def _patch_addon_power_telemetry() -> None:
+    """Monkey-patch upstream add-on to emit real-time power values.
+
+    We patch runtime methods instead of forking upstream code. This keeps
+    MeticAI's zero-fork bridge model intact while restoring power telemetry.
+    """
+    try:
+        import run  # type: ignore
+    except Exception as exc:
+        logger.warning("Could not import add-on runtime for patching: %s", exc)
+        return
+
+    addon_cls = getattr(run, "MeticulousAddon", None)
+    if addon_cls is None:
+        logger.warning("MeticulousAddon class not found in add-on runtime")
+        return
+
+    original_init = addon_cls.__init__
+    original_status_handler = addon_cls._handle_status_event
+    original_actuators_handler = addon_cls._handle_actuators_event
+
+    def patched_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        try:
+            # Ensure power participates in delta filtering.
+            self.sensor_deltas["power"] = float(self.config.get("power_delta", 1.0))
+        except Exception:
+            self.sensor_deltas["power"] = 1.0
+
+    def patched_status_handler(self, status):
+        original_status_handler(self, status)
+        try:
+            _publish_power_if_available(self, status)
+        except Exception as exc:
+            logger.debug("Power patch status handler error: %s", exc)
+
+    def patched_actuators_handler(self, actuators):
+        original_actuators_handler(self, actuators)
+        try:
+            _publish_power_if_available(self, actuators)
+        except Exception as exc:
+            logger.debug("Power patch actuators handler error: %s", exc)
+
+    addon_cls.__init__ = patched_init
+    addon_cls._handle_status_event = patched_status_handler
+    addon_cls._handle_actuators_event = patched_actuators_handler
+    logger.info("Applied runtime power telemetry patch to meticulous-addon")
 
 
 def _resolve_machine_ip() -> str:
@@ -127,6 +250,9 @@ def main():
     addon_src = "/app/meticulous-addon/rootfs/usr/bin"
     if addon_src not in sys.path:
         sys.path.insert(0, addon_src)
+
+    # Patch upstream add-on runtime to publish real power telemetry.
+    _patch_addon_power_telemetry()
 
     # Import and run the addon's main entry point
     try:

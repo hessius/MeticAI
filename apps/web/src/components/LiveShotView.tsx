@@ -489,6 +489,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     stages={[]}
                     heightClass="h-[25vh] lg:h-[30vh] max-h-[250px]"
                     showWeight
+                    showPower
                     targetCurves={targetCurves}
                     xMax={liveXMax}
                   />
@@ -605,6 +606,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 heightClass="h-[40vh] lg:h-[50vh] max-h-[400px]"
                 liveMode
                 showWeight
+                showPower
                 targetCurves={adjustedTargetCurves}
                 xMax={liveXMax}
               />
@@ -665,6 +667,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 stages={stages}
                 heightClass="h-[35vh] lg:h-[45vh] max-h-[360px]"
                 showWeight
+                showPower
                 targetCurves={adjustedTargetCurves}
               />
             </Card>
