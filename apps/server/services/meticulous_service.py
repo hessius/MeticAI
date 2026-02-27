@@ -6,10 +6,52 @@ import zstandard
 import httpx
 import asyncio
 import os
+import functools
+import requests.exceptions
 from typing import Optional
+from fastapi import HTTPException
 from logging_config import get_logger
 
 logger = get_logger()
+
+
+class MachineUnreachableError(HTTPException):
+    """Raised when the Meticulous espresso machine cannot be reached.
+
+    Extends HTTPException so that routes with ``except HTTPException: raise``
+    guards automatically propagate it as a 503 instead of wrapping it in a
+    generic 500.
+    """
+
+    def __init__(self, original: Exception | None = None):
+        detail = (
+            "Espresso machine is unreachable. "
+            "Check that the machine is powered on and METICULOUS_IP is correct in Settings."
+        )
+        super().__init__(status_code=503, detail=detail)
+        self.__cause__ = original
+
+
+# Connection-error types that indicate the machine is down
+_MACHINE_CONNECTION_ERRORS = (
+    requests.exceptions.ConnectionError,
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+)
+
+
+def _wrap_machine_call(fn):
+    """Decorator that converts connection errors into MachineUnreachableError."""
+
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except _MACHINE_CONNECTION_ERRORS as exc:
+            logger.warning("Machine unreachable in %s: %s", fn.__name__, exc)
+            raise MachineUnreachableError(exc) from exc
+
+    return wrapper
 
 # Lazy-loaded Meticulous API client
 _meticulous_api = None
@@ -150,6 +192,7 @@ def decompress_shot_data(compressed_data: bytes) -> dict:
     return json.loads(decompressed.decode('utf-8'))
 
 
+@_wrap_machine_call
 async def fetch_shot_data(date_str: str, filename: str) -> dict:
     """Fetch and decompress shot data from the Meticulous machine."""
     api = get_meticulous_api()
@@ -172,6 +215,7 @@ async def fetch_shot_data(date_str: str, filename: str) -> dict:
 # The pyMeticulous library is fully synchronous. These helpers offload each
 # blocking call to a thread-pool executor so the FastAPI event loop stays free.
 
+@_wrap_machine_call
 async def async_list_profiles():
     """list_profiles() offloaded to a thread, with short-lived TTL cache."""
     global _profile_list_cache, _profile_list_cache_time
@@ -193,6 +237,7 @@ def invalidate_profile_list_cache():
     _profile_list_cache_time = 0.0
 
 
+@_wrap_machine_call
 async def async_load_profile_by_id(profile_id: str):
     """load_profile_by_id() offloaded to a thread."""
     api = get_meticulous_api()
@@ -200,6 +245,7 @@ async def async_load_profile_by_id(profile_id: str):
     return await loop.run_in_executor(None, api.load_profile_by_id, profile_id)
 
 
+@_wrap_machine_call
 async def async_create_profile(profile_json):
     """create_profile() offloaded to a thread."""
     api = get_meticulous_api()
@@ -209,6 +255,7 @@ async def async_create_profile(profile_json):
     return result
 
 
+@_wrap_machine_call
 async def async_delete_profile(profile_id: str):
     """delete_profile() offloaded to a thread."""
     api = get_meticulous_api()
@@ -218,6 +265,7 @@ async def async_delete_profile(profile_id: str):
     return result
 
 
+@_wrap_machine_call
 async def async_get_last_profile():
     """get_last_profile() offloaded to a thread."""
     api = get_meticulous_api()
@@ -225,6 +273,7 @@ async def async_get_last_profile():
     return await loop.run_in_executor(None, api.get_last_profile)
 
 
+@_wrap_machine_call
 async def async_get_settings():
     """get_settings() offloaded to a thread."""
     api = get_meticulous_api()
@@ -232,6 +281,7 @@ async def async_get_settings():
     return await loop.run_in_executor(None, api.get_settings)
 
 
+@_wrap_machine_call
 async def async_execute_action(action_type):
     """execute_action() offloaded to a thread."""
     api = get_meticulous_api()
@@ -239,6 +289,7 @@ async def async_execute_action(action_type):
     return await loop.run_in_executor(None, api.execute_action, action_type)
 
 
+@_wrap_machine_call
 async def async_session_get(path: str):
     """api.session.get() offloaded to a thread."""
     api = get_meticulous_api()
@@ -247,16 +298,17 @@ async def async_session_get(path: str):
     return await loop.run_in_executor(None, api.session.get, url)
 
 
+@_wrap_machine_call
 async def async_session_post(path: str, json_body: dict = None):
     """api.session.post() offloaded to a thread."""
     api = get_meticulous_api()
     loop = asyncio.get_running_loop()
     url = f"{api.base_url}{path}"
-    import functools
     fn = functools.partial(api.session.post, url, json=json_body)
     return await loop.run_in_executor(None, fn)
 
 
+@_wrap_machine_call
 async def async_get_history_dates():
     """get_history_dates() offloaded to a thread."""
     api = get_meticulous_api()
@@ -264,6 +316,7 @@ async def async_get_history_dates():
     return await loop.run_in_executor(None, api.get_history_dates)
 
 
+@_wrap_machine_call
 async def async_get_shot_files(date: str):
     """get_shot_files() offloaded to a thread."""
     api = get_meticulous_api()
@@ -271,6 +324,7 @@ async def async_get_shot_files(date: str):
     return await loop.run_in_executor(None, api.get_shot_files, date)
 
 
+@_wrap_machine_call
 async def async_get_profile(profile_id: str):
     """get_profile() offloaded to a thread."""
     api = get_meticulous_api()
@@ -278,6 +332,7 @@ async def async_get_profile(profile_id: str):
     return await loop.run_in_executor(None, api.get_profile, profile_id)
 
 
+@_wrap_machine_call
 async def async_save_profile(profile):
     """save_profile() offloaded to a thread."""
     api = get_meticulous_api()
