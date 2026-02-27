@@ -34,7 +34,7 @@ RUN bun run build
 # ------------------------------------------------------------------------------
 # Stage 2: Build Python Dependencies
 # ------------------------------------------------------------------------------
-FROM python:3.12-slim AS python-builder
+FROM python:3.13-slim AS python-builder
 
 WORKDIR /build
 
@@ -63,7 +63,7 @@ RUN pip install --no-cache-dir -r bridge-requirements.txt
 # ------------------------------------------------------------------------------
 # Stage 3: Final Runtime Image
 # ------------------------------------------------------------------------------
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Install runtime dependencies (xz-utils needed for s6-overlay extraction)
 RUN apt-get update && apt-get install -y --no-install-recommends \
