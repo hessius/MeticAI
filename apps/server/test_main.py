@@ -1368,6 +1368,58 @@ class TestTriggerUpdateEndpoint:
         assert "post" in openapi_data["paths"]["/api/trigger-update"]
 
 
+class TestUpdateMethodEndpoint:
+    """Tests for the /api/update-method endpoint."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system._probe_watchtower_api', new_callable=AsyncMock)
+    def test_update_method_watchtower_reachable(self, mock_probe, client):
+        """Returns watchtower mode when API is reachable via any probe endpoint."""
+        mock_probe.return_value = {
+            "reachable": True,
+            "can_trigger": False,
+            "endpoint": "http://watchtower:8080/v1/update",
+            "status_code": 401,
+            "error": None,
+        }
+
+        response = client.get("/api/update-method")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["method"] == "watchtower"
+        assert data["watchtower_running"] is True
+        assert data["can_trigger_update"] is False
+        assert data["watchtower_endpoint"] == "http://watchtower:8080/v1/update"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('subprocess.run')
+    @patch('api.routes.system._probe_watchtower_api', new_callable=AsyncMock)
+    def test_update_method_reports_container_error(self, mock_probe, mock_subprocess_run, client):
+        """Surfaces watchtower container startup failures in response diagnostics."""
+        mock_probe.return_value = {
+            "reachable": False,
+            "can_trigger": False,
+            "endpoint": None,
+            "status_code": None,
+            "error": "http://localhost:8088/v1/update: connection refused",
+        }
+
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "created|failed to bind host port 127.0.0.1:8088/tcp: address already in use"
+        mock_subprocess_run.return_value = mock_result
+
+        response = client.get("/api/update-method")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["method"] == "manual"
+        assert data["watchtower_running"] is False
+        assert data["can_trigger_update"] is False
+        assert "address already in use" in data["watchtower_error"]
+
+
 class TestHistoryAPI:
     """Tests for the profile history API endpoints."""
 
