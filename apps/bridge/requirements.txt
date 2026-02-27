@@ -10,4 +10,4 @@ paho-mqtt==1.6.1
 
 # Async HTTP (required by addon top-level import, used for HA Supervisor API
 # which is unused in our context but must be importable)
-aiohttp==3.9.1
+aiohttp==3.13.3
