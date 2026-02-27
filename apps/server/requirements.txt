@@ -1,5 +1,5 @@
 fastapi==0.109.1
-uvicorn==0.40.0
+uvicorn==0.41.0
 google-genai>=1.0.0
 pillow>=10.3.0
 pillow-heif>=0.18.0
