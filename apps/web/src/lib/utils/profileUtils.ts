@@ -123,7 +123,8 @@ export function formatProfileForExport(profile: ProfileData): string {
 /**
  * Sanitize profile name for file system
  */
-export function sanitizeFileName(name: string): string {
+export function sanitizeFileName(name: string | null | undefined): string {
+  if (!name) return 'unnamed';
   return name
     .replace(/[^a-z0-9]/gi, '_')
     .replace(/_+/g, '_')

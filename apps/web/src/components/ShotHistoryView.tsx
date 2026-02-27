@@ -1887,7 +1887,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       )}
                       
                       {/* Pre-infusion Summary */}
-                      {analysisResult.preinfusion_summary.stages.length > 0 && (
+                      {(analysisResult.preinfusion_summary?.stages ?? []).length > 0 && (
                         <div className={`p-4 rounded-xl border ${
                           analysisResult.preinfusion_summary.issues?.length > 0
                             ? 'bg-amber-500/10 border-amber-500/30'
@@ -1896,9 +1896,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           <div className="flex items-center gap-2 mb-2">
                             <Drop size={16} weight="bold" className="text-cyan-700 dark:text-cyan-400" />
                             <span className="text-sm font-semibold">{t('shotHistory.preinfusion')}</span>
-                            {analysisResult.preinfusion_summary.weight_percent_of_total > 10 && (
+                            {(analysisResult.preinfusion_summary.weight_percent_of_total ?? 0) > 10 && (
                               <Badge variant="outline" className="ml-auto text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
-                                {analysisResult.preinfusion_summary.weight_percent_of_total.toFixed(1)}% of shot volume
+                                {(analysisResult.preinfusion_summary.weight_percent_of_total ?? 0).toFixed(1)}% of shot volume
                               </Badge>
                             )}
                           </div>
@@ -1923,7 +1923,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             </div>
                           </div>
                           <p className="text-xs text-muted-foreground/60 mt-2">
-                            {t('shotHistory.stagesLabel')}{analysisResult.preinfusion_summary.stages.join(', ')}
+                            {t('shotHistory.stagesLabel')}{(analysisResult.preinfusion_summary.stages ?? []).join(', ')}
                           </p>
                           
                           {/* Pre-infusion Issues */}
@@ -1966,9 +1966,9 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                       {(() => {
                         // Get extraction stages (stages not in pre-infusion)
                         const preinfusionStageNames = new Set(
-                          analysisResult.preinfusion_summary.stages.map(s => s.toLowerCase())
+                          (analysisResult.preinfusion_summary.stages ?? []).map(s => s.toLowerCase())
                         )
-                        const extractionStages = analysisResult.stage_analyses.filter(
+                        const extractionStages = (analysisResult.stage_analyses ?? []).filter(
                           s => s.executed && !preinfusionStageNames.has(s.stage_name.toLowerCase())
                         )
                         
@@ -1982,8 +1982,8 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         const extractionPercent = totalTime > 0 ? Math.round((extractionTime / totalTime) * 100) : 0
                         
                         // Calculate extraction weight (total - preinfusion weight)
-                        const totalWeight = analysisResult.shot_summary.final_weight
-                        const preinfusionWeight = analysisResult.preinfusion_summary.weight_accumulated || 0
+                        const totalWeight = analysisResult.shot_summary?.final_weight ?? 0
+                        const preinfusionWeight = analysisResult.preinfusion_summary?.weight_accumulated ?? 0
                         const extractionWeight = totalWeight - preinfusionWeight
                         
                         // Check for any limit hits or failed assessments in extraction
@@ -2065,11 +2065,11 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                           <ChartLine size={16} weight="bold" className="text-primary" />
                           <span className="text-sm font-semibold">{t('shotHistory.stageAnalysis')}</span>
                           <Badge variant="secondary" className="text-xs ml-auto">
-                            {analysisResult.stage_analyses.filter(s => s.executed).length}/{analysisResult.stage_analyses.length} executed
+                            {(analysisResult.stage_analyses ?? []).filter(s => s.executed).length}/{(analysisResult.stage_analyses ?? []).length} executed
                           </Badge>
                         </div>
                         <div className="space-y-4">
-                          {analysisResult.stage_analyses.map((stage, idx) => (
+                          {(analysisResult.stage_analyses ?? []).map((stage, idx) => (
                             <div 
                               key={idx} 
                               className={`p-4 rounded-lg border ${
