@@ -70,6 +70,8 @@ interface UpdateMethod {
   method: 'watchtower' | 'manual'
   watchtower_running: boolean
   can_trigger_update: boolean
+  watchtower_endpoint?: string | null
+  watchtower_error?: string | null
 }
 
 interface TailscaleStatus {
@@ -1161,6 +1163,11 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               <p className="text-xs text-muted-foreground">
                 {t(`settings.updateMethod.${updateMethod.method}Description`)}
               </p>
+              {updateMethod.watchtower_error && (
+                <p className="text-xs text-muted-foreground break-words mt-1">
+                  Watchtower status: {updateMethod.watchtower_error}
+                </p>
+              )}
             </div>
           </div>
         )}
