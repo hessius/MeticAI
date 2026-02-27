@@ -81,6 +81,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     machineState.brightness ?? 75,
   )
   const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+  const [profileImgError, setProfileImgError] = useState(false)
   const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
   const [profilesLoaded, setProfilesLoaded] = useState(false)
 
@@ -93,11 +94,16 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   // Build the profile image URL when active_profile changes
   useEffect(() => {
     let cancelled = false
-    if (!machineState.active_profile) { setProfileImgUrl(null); return }
+    if (!machineState.active_profile) {
+      setProfileImgUrl(null)
+      setProfileImgError(false)
+      return
+    }
     ;(async () => {
       const base = await getServerUrl()
       if (!cancelled) {
         setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(machineState.active_profile!)}/image-proxy`)
+        setProfileImgError(false)
       }
     })()
     return () => { cancelled = true }
@@ -179,15 +185,16 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           {/* Active profile with image */}
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-              {profileImgUrl ? (
+              {profileImgUrl && !profileImgError ? (
                 <img
                   src={profileImgUrl}
                   alt={machineState.active_profile ?? ''}
                   className="h-full w-full object-cover"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden') }}
+                  onError={() => setProfileImgError(true)}
                 />
-              ) : null}
-              <Coffee size={20} className={`text-muted-foreground ${profileImgUrl ? 'hidden' : ''}`} weight="duotone" />
+              ) : (
+                <Coffee size={20} className="text-muted-foreground" weight="duotone" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-foreground font-medium truncate block">
