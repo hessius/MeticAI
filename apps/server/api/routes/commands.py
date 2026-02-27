@@ -205,17 +205,12 @@ async def command_purge():
 async def command_load_profile(body: LoadProfileRequest):
     """Switch the machine to a different profile.
 
-    Sends select_profile to highlight the profile on the machine's screen,
-    then run_profile to load it into the brew engine.  This does **not**
-    start a shot; run_profile only prepares the profile for brewing.
+    Sends select_profile to highlight/load the profile on the machine's screen.
+    Starting extraction is a separate explicit action via /start.
     """
     snapshot = _get_snapshot()
     _require_connected(snapshot)
-    # Step 1: highlight the profile on the machine screen
-    result = _do_publish("select_profile", body.name)
-    # Step 2: load the profile into the brew engine (does NOT start brewing)
-    _do_publish("run_profile")
-    return result
+    return _do_publish("select_profile", body.name)
 
 
 @router.post("/api/machine/command/brightness")
