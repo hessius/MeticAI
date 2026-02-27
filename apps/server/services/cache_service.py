@@ -41,9 +41,12 @@ def _load_llm_cache() -> dict:
         return _llm_cache
     _ensure_llm_cache_file()
     try:
-        _llm_cache = json.loads(LLM_CACHE_FILE.read_text())
+        data = json.loads(LLM_CACHE_FILE.read_text())
     except (json.JSONDecodeError, IOError):
-        _llm_cache = {}
+        data = None
+    if not isinstance(data, dict):
+        data = {}
+    _llm_cache = data
     return _llm_cache
 
 
@@ -121,9 +124,12 @@ def _load_shot_cache() -> dict:
     _ensure_shot_cache_file()
     try:
         with open(SHOT_CACHE_FILE, 'r', encoding='utf-8') as f:
-            _shot_cache = json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
-        _shot_cache = {}
+        data = None
+    if not isinstance(data, dict):
+        data = {}
+    _shot_cache = data
     return _shot_cache
 
 
