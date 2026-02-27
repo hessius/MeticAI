@@ -163,9 +163,8 @@ def _resolve_machine_ip() -> str:
         return env_ip
 
     # 2) Persisted settings file (written by the web UI)
-    settings_path = os.path.join(
-        os.environ.get("DATA_DIR", "/data"), "settings.json"
-    )
+    data_dir = os.environ.get("DATA_DIR") or "/data"
+    settings_path = os.path.join(data_dir, "settings.json")
     try:
         with open(settings_path) as f:
             settings = json.load(f)

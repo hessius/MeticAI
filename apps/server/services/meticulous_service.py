@@ -11,6 +11,7 @@ import requests.exceptions
 from typing import Optional
 from fastapi import HTTPException
 from logging_config import get_logger
+from services.settings_service import load_settings
 
 logger = get_logger()
 
@@ -86,7 +87,18 @@ def get_meticulous_api():
     global _meticulous_api
     if _meticulous_api is None:
         from meticulous.api import Api
-        meticulous_ip = os.environ.get("METICULOUS_IP", "meticulousmodelalmondmilklatte.local")
+
+        meticulous_ip = os.environ.get("METICULOUS_IP", "").strip()
+        if not meticulous_ip:
+            try:
+                settings = load_settings()
+                meticulous_ip = (settings.get("meticulousIp") or "").strip()
+            except Exception:
+                meticulous_ip = ""
+
+        if not meticulous_ip:
+            meticulous_ip = "meticulous.local"
+
         # Ensure we use http:// prefix
         if not meticulous_ip.startswith("http"):
             meticulous_ip = f"http://{meticulous_ip}"
