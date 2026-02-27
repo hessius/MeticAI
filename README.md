@@ -174,6 +174,30 @@ docker compose up -d
 
 With Watchtower enabled, updates happen automatically every 6 hours.
 
+### Manage Addons After Install
+
+You can enable or disable optional addons at any time (Watchtower, Tailscale, Home Assistant MQTT) without re-running the full installer.
+
+Linux/macOS:
+
+```bash
+cd ~/MeticAI
+bash scripts/addons.sh
+```
+
+Windows PowerShell:
+
+```powershell
+cd $HOME/MeticAI
+powershell -ExecutionPolicy Bypass -File .\scripts\addons.ps1
+```
+
+Remote one-liner (Linux/macOS):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/addons.sh | bash
+```
+
 [→ Full update guide, migration from v1.x, and troubleshooting](UPDATING.md)
 
 ## 🗑️ Uninstalling MeticAI
