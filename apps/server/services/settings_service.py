@@ -31,16 +31,26 @@ def ensure_settings_file():
 
 
 def load_settings() -> dict:
-    """Load settings, using in-memory copy when available."""
+    """Load settings, using in-memory copy when available.
+    
+    Validates that the on-disk data is a dict and merges with defaults
+    so missing keys always have a safe fallback value.
+    """
     global _settings_cache
     if _settings_cache is not None:
         return _settings_cache
     ensure_settings_file()
     try:
         with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            _settings_cache = json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
-        _settings_cache = dict(_DEFAULT_SETTINGS)
+        data = None
+
+    if not isinstance(data, dict):
+        data = {}
+
+    # Merge with defaults so missing keys always have a safe value
+    _settings_cache = {**_DEFAULT_SETTINGS, **data}
     return _settings_cache
 
 

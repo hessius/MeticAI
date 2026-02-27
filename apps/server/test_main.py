@@ -9826,3 +9826,170 @@ class TestBridgeResolveMachineIp:
             assert mod._resolve_machine_ip() == "meticulous.local"
 
 
+# ==============================================================================
+# Data Loading Hardening Tests (#198)
+# ==============================================================================
+
+class TestDataLoadingHardening:
+    """Tests that all data-loading functions handle corrupt/unexpected types gracefully."""
+
+    # -- settings_service ---------------------------------------------------
+
+    def test_settings_load_non_dict_returns_defaults(self, tmp_path):
+        """When settings.json contains a list, load_settings returns defaults."""
+        from services.settings_service import (
+            load_settings, _DEFAULT_SETTINGS, SETTINGS_FILE,
+        )
+        import services.settings_service as ss
+
+        old_file = ss.SETTINGS_FILE
+        old_cache = ss._settings_cache
+        try:
+            ss.SETTINGS_FILE = tmp_path / "settings.json"
+            ss._settings_cache = None
+            ss.SETTINGS_FILE.write_text("[1, 2, 3]")
+
+            result = load_settings()
+            assert isinstance(result, dict)
+            # All default keys must be present
+            for key in _DEFAULT_SETTINGS:
+                assert key in result
+        finally:
+            ss.SETTINGS_FILE = old_file
+            ss._settings_cache = old_cache
+
+    def test_settings_load_null_returns_defaults(self, tmp_path):
+        """When settings.json contains null, load_settings returns defaults."""
+        import services.settings_service as ss
+
+        old_file = ss.SETTINGS_FILE
+        old_cache = ss._settings_cache
+        try:
+            ss.SETTINGS_FILE = tmp_path / "settings.json"
+            ss._settings_cache = None
+            ss.SETTINGS_FILE.write_text("null")
+
+            result = ss.load_settings()
+            assert isinstance(result, dict)
+            assert result.get("mqttEnabled") is True  # default value
+        finally:
+            ss.SETTINGS_FILE = old_file
+            ss._settings_cache = old_cache
+
+    def test_settings_load_merges_with_defaults(self, tmp_path):
+        """Partial settings on disk get missing keys filled from defaults."""
+        import services.settings_service as ss
+
+        old_file = ss.SETTINGS_FILE
+        old_cache = ss._settings_cache
+        try:
+            ss.SETTINGS_FILE = tmp_path / "settings.json"
+            ss._settings_cache = None
+            ss.SETTINGS_FILE.write_text('{"geminiApiKey": "test-key"}')
+
+            result = ss.load_settings()
+            assert result["geminiApiKey"] == "test-key"
+            # Missing keys filled from defaults
+            assert "meticulousIp" in result
+            assert result["mqttEnabled"] is True
+        finally:
+            ss.SETTINGS_FILE = old_file
+            ss._settings_cache = old_cache
+
+    # -- cache_service (LLM cache) ------------------------------------------
+
+    def test_llm_cache_load_non_dict_returns_empty(self, tmp_path):
+        """When llm cache file contains a list, _load_llm_cache returns {}."""
+        import services.cache_service as cs
+
+        old_file = cs.LLM_CACHE_FILE
+        old_cache = cs._llm_cache
+        try:
+            cs.LLM_CACHE_FILE = tmp_path / "llm_analysis_cache.json"
+            cs._llm_cache = None
+            cs.LLM_CACHE_FILE.write_text("[1, 2, 3]")
+
+            result = cs._load_llm_cache()
+            assert isinstance(result, dict)
+            assert result == {}
+        finally:
+            cs.LLM_CACHE_FILE = old_file
+            cs._llm_cache = old_cache
+
+    def test_llm_cache_load_null_returns_empty(self, tmp_path):
+        """When llm cache file contains null, _load_llm_cache returns {}."""
+        import services.cache_service as cs
+
+        old_file = cs.LLM_CACHE_FILE
+        old_cache = cs._llm_cache
+        try:
+            cs.LLM_CACHE_FILE = tmp_path / "llm_analysis_cache.json"
+            cs._llm_cache = None
+            cs.LLM_CACHE_FILE.write_text("null")
+
+            result = cs._load_llm_cache()
+            assert isinstance(result, dict)
+            assert result == {}
+        finally:
+            cs.LLM_CACHE_FILE = old_file
+            cs._llm_cache = old_cache
+
+    # -- cache_service (shot cache) ------------------------------------------
+
+    def test_shot_cache_load_non_dict_returns_empty(self, tmp_path):
+        """When shot cache file contains a string, _load_shot_cache returns {}."""
+        import services.cache_service as cs
+
+        old_file = cs.SHOT_CACHE_FILE
+        old_cache = cs._shot_cache
+        try:
+            cs.SHOT_CACHE_FILE = tmp_path / "shot_cache.json"
+            cs._shot_cache = None
+            cs.SHOT_CACHE_FILE.write_text('"just a string"')
+
+            result = cs._load_shot_cache()
+            assert isinstance(result, dict)
+            assert result == {}
+        finally:
+            cs.SHOT_CACHE_FILE = old_file
+            cs._shot_cache = old_cache
+
+    # -- history_service ----------------------------------------------------
+
+    def test_history_load_non_list_returns_empty(self, tmp_path):
+        """When history file contains a dict, load_history returns []."""
+        import services.history_service as hs
+
+        old_file = hs.HISTORY_FILE
+        old_cache = hs._history_cache
+        try:
+            hs.HISTORY_FILE = tmp_path / "profile_history.json"
+            hs._history_cache = None
+            hs.HISTORY_FILE.write_text('{"not": "a list"}')
+
+            result = hs.load_history()
+            assert isinstance(result, list)
+            assert result == []
+        finally:
+            hs.HISTORY_FILE = old_file
+            hs._history_cache = old_cache
+
+    def test_history_load_null_returns_empty(self, tmp_path):
+        """When history file contains null, load_history returns []."""
+        import services.history_service as hs
+
+        old_file = hs.HISTORY_FILE
+        old_cache = hs._history_cache
+        try:
+            hs.HISTORY_FILE = tmp_path / "profile_history.json"
+            hs._history_cache = None
+            hs.HISTORY_FILE.write_text("null")
+
+            result = hs.load_history()
+            assert isinstance(result, list)
+            assert result == []
+        finally:
+            hs.HISTORY_FILE = old_file
+            hs._history_cache = old_cache
+
+

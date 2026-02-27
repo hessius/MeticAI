@@ -42,6 +42,14 @@ def load_history() -> list:
             raw = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         raw = []
+
+    # Guard against the top-level value being a non-list (e.g. {} or null)
+    if not isinstance(raw, list):
+        logger.warning(
+            "History file contained %s instead of list — resetting",
+            type(raw).__name__,
+        )
+        raw = []
     
     # Filter out entries missing critical fields.  A valid v2 entry always
     # has at least 'id' and 'profile_name' (or 'reply' from which the name
