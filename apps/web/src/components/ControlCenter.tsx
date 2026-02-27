@@ -98,6 +98,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
   const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+  const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
 
   // Shared state derivation + command executor
@@ -109,11 +110,17 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   // Build the profile image URL when active_profile changes
   useEffect(() => {
     let cancelled = false
-    if (!machineState.active_profile) { setProfileImgUrl(null); setProfileAuthor(null); return }
+    if (!machineState.active_profile) {
+      setProfileImgUrl(null)
+      setProfileImgError(false)
+      setProfileAuthor(null)
+      return
+    }
     ;(async () => {
       const base = await getServerUrl()
       if (!cancelled) {
         setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(machineState.active_profile!)}/image-proxy`)
+        setProfileImgError(false)
       }
       // Fetch profile author from machine profiles
       try {
@@ -245,15 +252,16 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               </h4>
               <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-                {profileImgUrl ? (
+                {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}
                     alt={machineState.active_profile ?? ''}
                     className="h-full w-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden') }}
+                    onError={() => setProfileImgError(true)}
                   />
-                ) : null}
-                <Coffee size={14} className={`text-muted-foreground ${profileImgUrl ? 'hidden' : ''}`} weight="duotone" />
+                ) : (
+                  <Coffee size={14} className="text-muted-foreground" weight="duotone" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <span className="text-xs text-foreground font-medium truncate block">
