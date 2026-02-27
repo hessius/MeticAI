@@ -26,11 +26,42 @@ import sys
 logger = logging.getLogger("meticai.bridge")
 
 
+def _resolve_machine_ip() -> str:
+    """Determine the Meticulous machine IP.
+
+    Priority:
+    1. ``METICULOUS_IP`` environment variable (set by s6 container env)
+    2. ``meticulousIp`` field in ``/data/settings.json`` (persisted by the UI)
+    3. ``meticulous.local`` (mDNS default)
+    """
+    # 1) Env var — preferred, set by s6-overlay container environment
+    env_ip = os.environ.get("METICULOUS_IP", "").strip()
+    if env_ip:
+        return env_ip
+
+    # 2) Persisted settings file (written by the web UI)
+    settings_path = os.path.join(
+        os.environ.get("DATA_DIR", "/data"), "settings.json"
+    )
+    try:
+        with open(settings_path) as f:
+            settings = json.load(f)
+        saved_ip = (settings.get("meticulousIp") or "").strip()
+        if saved_ip:
+            logger.info("Using machine IP from settings.json: %s", saved_ip)
+            return saved_ip
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+
+    # 3) Default
+    return "meticulous.local"
+
+
 def build_config() -> dict:
     """Build addon config dict from MeticAI environment variables."""
     return {
         # Machine connection
-        "machine_ip": os.environ.get("METICULOUS_IP", "meticulous.local"),
+        "machine_ip": _resolve_machine_ip(),
 
         # MQTT broker (local mosquitto inside the same container)
         "mqtt_enabled": os.environ.get("MQTT_ENABLED", "true").lower() == "true",
