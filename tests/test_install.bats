@@ -200,13 +200,13 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "Script requires Gemini API key" {
-    run grep -q "API key is required" "$SCRIPT_PATH"
+@test "Script allows skipping Gemini API key" {
+    run grep -q "Press Enter to skip" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
-@test "Script loops until API key is provided" {
-    run grep -q "while.*GEMINI_API_KEY" "$SCRIPT_PATH"
+@test "Script warns when API key is skipped" {
+    run grep -q "No API key provided — AI features" "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
@@ -496,8 +496,8 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "Non-interactive mode requires GEMINI_API_KEY" {
-    run grep -q 'GEMINI_API_KEY is required in non-interactive mode' "$SCRIPT_PATH"
+@test "Non-interactive mode allows missing GEMINI_API_KEY" {
+    run grep -q 'No GEMINI_API_KEY provided in non-interactive mode' "$SCRIPT_PATH"
     [ "$status" -eq 0 ]
 }
 
