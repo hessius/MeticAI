@@ -12,7 +12,7 @@
 #     curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
 #
 # Environment variables (pre-set to skip prompts):
-#   GEMINI_API_KEY          - Google Gemini API key (required)
+#   GEMINI_API_KEY          - Google Gemini API key (optional)
 #   METICULOUS_IP           - Meticulous machine IP or hostname
 #   METICAI_NON_INTERACTIVE - Set to "true" to skip all prompts
 #   ENABLE_TAILSCALE        - Set to "y" to enable Tailscale
@@ -101,8 +101,7 @@ fi
 if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
     log_info "Running in non-interactive mode"
     if [[ -z "$GEMINI_API_KEY" ]]; then
-        log_error "GEMINI_API_KEY is required in non-interactive mode"
-        exit 1
+        log_warning "No GEMINI_API_KEY provided in non-interactive mode — AI features will be disabled"
     fi
     METICULOUS_IP="${METICULOUS_IP:-meticulous.local}"
 fi
@@ -523,13 +522,14 @@ echo ""
 # --- Gemini API Key ---
 if [[ -z "$GEMINI_API_KEY" ]]; then
     echo "Get your API key from: https://aistudio.google.com/app/apikey"
-    while [[ -z "$GEMINI_API_KEY" ]]; do
-        read -p "Gemini API Key: " GEMINI_API_KEY < /dev/tty
-        if [[ -z "$GEMINI_API_KEY" ]]; then
-            log_error "API key is required. Get one from https://aistudio.google.com/app/apikey"
-        fi
-    done
-    log_success "API key configured"
+    echo "(Press Enter to skip — AI features will be disabled, but MeticAI will still work)"
+    read -p "Gemini API Key: " GEMINI_API_KEY < /dev/tty
+    if [[ -z "$GEMINI_API_KEY" ]]; then
+        log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
+        log_info "You can add a key later in Settings within the MeticAI web UI"
+    else
+        log_success "API key configured"
+    fi
 fi
 
 # --- Meticulous Machine Discovery ---
