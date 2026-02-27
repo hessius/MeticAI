@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import os
 import subprocess
@@ -8,6 +9,8 @@ from pathlib import Path
 import uuid
 import time
 import tempfile
+import requests.exceptions
+import httpx
 from logging_config import setup_logging
 from config import UPDATE_CHECK_INTERVAL
 
@@ -132,7 +135,40 @@ async def lifespan(app: FastAPI):
     mqtt_sub.stop()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    # FastAPI 0.132+ rejects JSON bodies without a valid Content-Type header.
+    # Disable to keep backward-compat with iOS Shortcuts, curl, and other callers.
+    strict_content_type=False,
+)
+
+
+# ---------------------------------------------------------------------------
+# Global exception handlers — convert machine-connection errors to 503
+# ---------------------------------------------------------------------------
+_MACHINE_UNREACHABLE_MSG = (
+    "Espresso machine is unreachable. "
+    "Check that the machine is powered on and METICULOUS_IP is correct in Settings."
+)
+
+
+@app.exception_handler(requests.exceptions.ConnectionError)
+async def _requests_connection_error(_request: Request, exc: requests.exceptions.ConnectionError):
+    logger.warning(f"Machine connection failed (requests): {exc}")
+    return JSONResponse(status_code=503, content={"detail": _MACHINE_UNREACHABLE_MSG})
+
+
+@app.exception_handler(httpx.ConnectError)
+async def _httpx_connect_error(_request: Request, exc: httpx.ConnectError):
+    logger.warning(f"Machine connection failed (httpx): {exc}")
+    return JSONResponse(status_code=503, content={"detail": _MACHINE_UNREACHABLE_MSG})
+
+
+@app.exception_handler(httpx.ConnectTimeout)
+async def _httpx_connect_timeout(_request: Request, exc: httpx.ConnectTimeout):
+    logger.warning(f"Machine connection timed out (httpx): {exc}")
+    return JSONResponse(status_code=503, content={"detail": _MACHINE_UNREACHABLE_MSG})
+
 
 # Import route modules
 from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands
