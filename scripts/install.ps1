@@ -355,6 +355,10 @@ function Install-MeticAI {
 # Generated on $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 # Platform: Windows (PowerShell installer)
 
+# Docker Compose project name (keeps volume ownership consistent regardless of
+# the install directory name, and avoids warnings on systems like Puppy Linux)
+COMPOSE_PROJECT_NAME=meticai
+
 # Required
 GEMINI_API_KEY=$apiKey
 METICULOUS_IP=$machineIp
@@ -399,14 +403,14 @@ COMPOSE_FILES="$composeFilesString"
     # 8. Pull and start
     # ------------------------------------------------------------------
     Write-LogInfo "Pulling MeticAI image (this may take a few minutes)..."
-    $pullArgs = @("compose") + $composeFiles + @("pull")
+    $pullArgs = @("compose") + $composeFiles + @("pull", "--progress", "plain")
     & docker @pullArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to pull Docker images. Check your internet connection."
     }
 
     Write-LogInfo "Starting MeticAI..."
-    $upArgs = @("compose") + $composeFiles + @("up", "-d")
+    $upArgs = @("compose") + $composeFiles + @("up", "-d", "--progress", "plain")
     & docker @upArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to start MeticAI containers."
