@@ -9753,3 +9753,76 @@ class TestTailscaleSettingsDefaults:
         assert _DEFAULT_SETTINGS["tailscaleAuthKey"] == ""
 
 
+class TestUpdateS6Env:
+    """Tests for _update_s6_env helper that writes to s6 container environment."""
+
+    def test_update_s6_env_writes_file(self, tmp_path):
+        """_update_s6_env writes the value to the s6 env directory."""
+        from api.routes.system import _update_s6_env
+        s6_dir = tmp_path / "container_environment"
+        s6_dir.mkdir()
+        with patch("api.routes.system.os.path.isdir", return_value=True):
+            with patch("builtins.open", mock_open()) as m:
+                with patch("api.routes.system.os.path.join",
+                           return_value=str(s6_dir / "METICULOUS_IP")):
+                    _update_s6_env("METICULOUS_IP", "192.168.1.100", "req-1")
+                    m.assert_called_once()
+
+    def test_update_s6_env_no_dir(self):
+        """_update_s6_env is a no-op when s6 env dir doesn't exist."""
+        from api.routes.system import _update_s6_env
+        with patch("api.routes.system.os.path.isdir", return_value=False):
+            # Should not raise
+            _update_s6_env("METICULOUS_IP", "192.168.1.100", "req-2")
+
+    def test_update_s6_env_permission_error(self, tmp_path):
+        """_update_s6_env handles write errors gracefully."""
+        from api.routes.system import _update_s6_env
+        with patch("api.routes.system.os.path.isdir", return_value=True):
+            with patch("builtins.open", side_effect=PermissionError("read-only")):
+                with patch("api.routes.system.os.path.join",
+                           return_value="/var/run/s6/container_environment/X"):
+                    # Should not raise, just log a warning
+                    _update_s6_env("X", "val", "req-3")
+
+
+class TestBridgeResolveMachineIp:
+    """Tests for the bridge's _resolve_machine_ip function."""
+
+    @staticmethod
+    def _get_bridge_module():
+        """Import start_bridge from the bridge app directory."""
+        import importlib
+        bridge_dir = os.path.abspath(os.path.join(
+            os.path.dirname(__file__) or '.', '..', 'bridge'))
+        sys_path_backup = sys.path.copy()
+        sys.path.insert(0, bridge_dir)
+        try:
+            import start_bridge
+            importlib.reload(start_bridge)
+            return start_bridge
+        finally:
+            sys.path = sys_path_backup
+
+    def test_resolve_from_env(self):
+        """Env var takes priority over settings.json."""
+        mod = self._get_bridge_module()
+        with patch.dict(os.environ, {"METICULOUS_IP": "10.0.0.5"}):
+            assert mod._resolve_machine_ip() == "10.0.0.5"
+
+    def test_resolve_from_settings_json(self, tmp_path):
+        """Falls back to settings.json when env var is empty."""
+        mod = self._get_bridge_module()
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text('{"meticulousIp": "192.168.50.168"}')
+        with patch.dict(os.environ, {"METICULOUS_IP": "", "DATA_DIR": str(tmp_path)}):
+            assert mod._resolve_machine_ip() == "192.168.50.168"
+
+    def test_resolve_default(self, tmp_path):
+        """Falls back to meticulous.local when nothing is configured."""
+        mod = self._get_bridge_module()
+        with patch.dict(os.environ, {"METICULOUS_IP": "", "DATA_DIR": str(tmp_path)},
+                       clear=False):
+            assert mod._resolve_machine_ip() == "meticulous.local"
+
+
