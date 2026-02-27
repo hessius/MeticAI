@@ -223,6 +223,12 @@ Describe "Install-MeticAI - Full Flow (Non-Interactive)" {
         Mock Test-Path { return $false } -ParameterFilter {
             $Path -like "*MeticAI" -or $Path -like "*.env"
         }
+        Mock Test-Path { return $true } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
+        Mock Get-Item { return [PSCustomObject]@{ Length = 1024 } } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
         Mock New-Item { } -ParameterFilter { $ItemType -eq "Directory" }
         Mock Set-Location { }
         Mock Invoke-DownloadFile { return $true }
@@ -301,6 +307,12 @@ Describe "Install-MeticAI - Optional Services" {
         Mock Test-DockerRunning { return $true }
         Mock Test-Path { return $false } -ParameterFilter {
             $Path -like "*MeticAI" -or $Path -like "*.env"
+        }
+        Mock Test-Path { return $true } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
+        Mock Get-Item { return [PSCustomObject]@{ Length = 1024 } } -ParameterFilter {
+            $Path -like "*docker-compose*"
         }
         Mock New-Item { }
         Mock Set-Location { }
@@ -388,6 +400,12 @@ Describe "Install-MeticAI - Default Values" {
         Mock Test-Path { return $false } -ParameterFilter {
             $Path -like "*MeticAI" -or $Path -like "*.env"
         }
+        Mock Test-Path { return $true } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
+        Mock Get-Item { return [PSCustomObject]@{ Length = 1024 } } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
         Mock New-Item { }
         Mock Set-Location { }
         Mock Invoke-DownloadFile { return $true }
@@ -434,6 +452,12 @@ Describe "Install-MeticAI - Error Handling" {
         Mock Test-Path { return $false } -ParameterFilter {
             $Path -like "*MeticAI" -or $Path -like "*.env"
         }
+        Mock Test-Path { return $true } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
+        Mock Get-Item { return [PSCustomObject]@{ Length = 1024 } } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
         Mock New-Item { }
         Mock Set-Location { }
         Mock Set-Content { }
@@ -470,6 +494,12 @@ Describe ".env File Format" {
         Mock Test-DockerRunning { return $true }
         Mock Test-Path { return $false } -ParameterFilter {
             $Path -like "*MeticAI" -or $Path -like "*.env"
+        }
+        Mock Test-Path { return $true } -ParameterFilter {
+            $Path -like "*docker-compose*"
+        }
+        Mock Get-Item { return [PSCustomObject]@{ Length = 1024 } } -ParameterFilter {
+            $Path -like "*docker-compose*"
         }
         Mock New-Item { }
         Mock Set-Location { }
