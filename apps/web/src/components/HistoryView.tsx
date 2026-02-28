@@ -95,9 +95,11 @@ interface HistoryViewProps {
   onBack: () => void
   onViewProfile: (entry: HistoryEntry, cachedImageUrl?: string) => void
   onGenerateNew: () => void
+  aiConfigured?: boolean
+  hideAiWhenUnavailable?: boolean
 }
 
-export function HistoryView({ onBack, onViewProfile, onGenerateNew }: HistoryViewProps) {
+export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
   const { 
     entries, 
     total, 
@@ -496,6 +498,8 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew }: HistoryVie
       {/* Profile Import Dialog */}
       <ProfileImportDialog
         isOpen={showImportDialog}
+        aiConfigured={aiConfigured}
+        hideAiWhenUnavailable={hideAiWhenUnavailable}
         onClose={() => setShowImportDialog(false)}
         onImported={() => {
           setShowImportDialog(false)
@@ -525,9 +529,11 @@ interface ProfileDetailViewProps {
   onBack: () => void
   onRunProfile?: (profileId: string, profileName: string) => void
   cachedImageUrl?: string
+  aiConfigured?: boolean
+  hideAiWhenUnavailable?: boolean
 }
 
-export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl }: ProfileDetailViewProps) {
+export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
   const { downloadJson } = useHistory()
   const { invalidate: invalidateImageCache } = useProfileImageCache()
   const [isDownloading, setIsDownloading] = useState(false)
@@ -904,6 +910,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
         key={`shot-history-${entry.profile_name}`}
         profileName={entry.profile_name} 
         onBack={() => setShowShotHistory(false)} 
+        aiConfigured={aiConfigured}
+        hideAiWhenUnavailable={hideAiWhenUnavailable}
       />
     )
   }
@@ -1122,34 +1130,39 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl 
                 </label>
                 
                 {/* AI Image Generation */}
-                <Button
-                  variant="outline"
-                  className="w-full h-11 text-sm font-semibold border-dashed"
-                  disabled={isGeneratingImage}
-                  onClick={() => setShowStylePicker(!showStylePicker)}
-                >
-                  {isGeneratingImage ? (
-                    <>
-                      <SpinnerGap size={18} className="mr-1.5 animate-spin" weight="bold" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <MagicWand size={18} className="mr-1.5" weight="bold" />
-                      Generate
-                    </>
-                  )}
-                </Button>
+                {(!hideAiWhenUnavailable || aiConfigured) && (
+                  <Button
+                    variant="outline"
+                    className="w-full h-11 text-sm font-semibold border-dashed"
+                    disabled={isGeneratingImage || !aiConfigured}
+                    onClick={() => setShowStylePicker(!showStylePicker)}
+                  >
+                    {isGeneratingImage ? (
+                      <>
+                        <SpinnerGap size={18} className="mr-1.5 animate-spin" weight="bold" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <MagicWand size={18} className="mr-1.5" weight="bold" />
+                        Generate
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
               {imageUploadError && (
                 <p className="text-xs text-destructive text-center">{imageUploadError}</p>
+              )}
+              {!aiConfigured && (
+                <p className="text-xs text-muted-foreground text-center">AI image generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.</p>
               )}
               <p className="text-[10px] text-muted-foreground/60 text-center">
                 Image will be cropped to square and synced to your machine
               </p>
               
               <AnimatePresence>
-                  {showStylePicker && !isGeneratingImage && (
+                  {showStylePicker && !isGeneratingImage && aiConfigured && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}

@@ -1303,7 +1303,84 @@ Special Notes:
 
 Be concise but informative. Focus on actionable barista guidance."""
 
-    model = get_vision_model()
-    response = await model.async_generate_content(prompt)
-    
-    return response.text.strip()
+    try:
+        model = get_vision_model()
+        response = await model.async_generate_content(prompt)
+        text = getattr(response, "text", "") if response else ""
+        if text and text.strip():
+            return text.strip()
+    except ValueError:
+        logger.info(
+            "Gemini API key not configured, using static profile description fallback",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+    except Exception:
+        logger.warning(
+            "AI profile description generation failed, using static fallback",
+            extra={"request_id": request_id, "profile_name": profile_name},
+            exc_info=True,
+        )
+
+    return _build_static_profile_description(profile_json)
+
+
+def _build_static_profile_description(profile_json: dict) -> str:
+    """Build a non-AI profile description for environments without Gemini."""
+    profile_name = profile_json.get("name", "Imported Profile")
+    temperature = profile_json.get("temperature")
+    final_weight = profile_json.get("final_weight")
+    stages = profile_json.get("stages") or []
+    existing_description = (
+        profile_json.get("description")
+        or profile_json.get("notes")
+        or profile_json.get("summary")
+    )
+
+    if existing_description:
+        description = str(existing_description).strip()
+    else:
+        description_parts = []
+        if stages:
+            description_parts.append(f"Uses {len(stages)} extraction stage{'s' if len(stages) != 1 else ''}")
+        if temperature is not None:
+            description_parts.append(f"targets {temperature}°C")
+        if final_weight is not None:
+            description_parts.append(f"for about {final_weight}g yield")
+        description = (
+            ", ".join(description_parts) + "."
+            if description_parts
+            else "Profile imported successfully."
+        )
+
+    expected_time = "Not specified"
+    try:
+        total_stage_time = 0.0
+        for stage in stages:
+            points = stage.get("dynamics_points") if isinstance(stage, dict) else None
+            if isinstance(points, list) and points:
+                last = points[-1]
+                if isinstance(last, list) and last:
+                    total_stage_time += float(last[0])
+        if total_stage_time > 0:
+            expected_time = f"~{round(total_stage_time)}s"
+    except Exception:
+        pass
+
+    temp_text = f"{temperature}°C" if temperature is not None else "Use profile default"
+    yield_text = f"{final_weight}g" if final_weight is not None else "Use profile default"
+
+    return (
+        f"Profile Created: {profile_name}\n\n"
+        f"Description:\n"
+        f"{description}\n\n"
+        f"Preparation:\n"
+        f"• Dose: Use your standard recipe dose\n"
+        f"• Grind: Dial in to hit target flow and pressure\n"
+        f"• Temperature: {temp_text}\n"
+        f"• Target Yield: {yield_text}\n"
+        f"• Expected Time: {expected_time}\n\n"
+        f"Why This Works:\n"
+        f"This summary is generated from profile metadata and stage structure so the profile can be catalogued even when AI is unavailable.\n\n"
+        f"Special Notes:\n"
+        f"AI-enhanced description is unavailable because no Gemini API key is configured."
+    )

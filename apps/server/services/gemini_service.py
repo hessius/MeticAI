@@ -415,6 +415,11 @@ def get_gemini_client() -> genai.Client:
     return _gemini_client
 
 
+def is_ai_available() -> bool:
+    """Return True when Gemini API key is configured."""
+    return bool(os.environ.get("GEMINI_API_KEY", "").strip())
+
+
 def get_vision_model():
     """Return a wrapper that provides the old model.generate_content() interface.
     

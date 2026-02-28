@@ -338,7 +338,8 @@ async def get_tailscale_status(request: Request):
     try:
         # Load user config from settings
         from services.settings_service import load_settings
-        settings = load_settings()
+        stored_settings = load_settings()
+        settings = dict(stored_settings)
         ts_enabled = settings.get("tailscaleEnabled", False)
         ts_auth_key = settings.get("tailscaleAuthKey", "")
         # Also check env var fallback
@@ -1053,20 +1054,25 @@ async def get_settings(request: Request):
             extra={"request_id": request_id, "endpoint": "/api/settings"}
         )
         
-        settings = load_settings()
+        stored_settings = load_settings()
+        settings = dict(stored_settings)
         
         # Read current values from environment
         env_api_key = os.environ.get("GEMINI_API_KEY", "")
         env_meticulous_ip = os.environ.get("METICULOUS_IP", "")
         env_server_ip = os.environ.get("PI_IP", "")
         
+        stored_api_key = str(stored_settings.get("geminiApiKey", "") or "").strip()
+        effective_api_key = env_api_key.strip() or stored_api_key
+
         # Always show API key as stars if set (never expose the actual key)
-        if env_api_key:
-            # Show stars to indicate a key is configured
-            settings["geminiApiKey"] = "*" * min(len(env_api_key), 20)
+        if effective_api_key:
+            settings["geminiApiKey"] = "*" * min(len(effective_api_key), 20)
             settings["geminiApiKeyMasked"] = True
             settings["geminiApiKeyConfigured"] = True
         else:
+            settings["geminiApiKey"] = ""
+            settings["geminiApiKeyMasked"] = False
             settings["geminiApiKeyConfigured"] = False
         
         # Always show current IP values from environment (env takes precedence)
@@ -1217,6 +1223,10 @@ async def save_settings_endpoint(request: Request):
                 env_content += f"\nPI_IP={new_ip}"
             env_updated = True
         
+        # Transient response-only fields must never be persisted
+        current_settings.pop("geminiApiKeyMasked", None)
+        current_settings.pop("geminiApiKeyConfigured", None)
+
         # Save settings to JSON file
         save_settings(current_settings)
         

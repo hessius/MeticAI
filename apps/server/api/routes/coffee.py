@@ -6,7 +6,6 @@ import asyncio
 import io
 import os
 import re
-import subprocess
 import time
 import logging
 
@@ -22,10 +21,10 @@ from services.gemini_service import (
     get_vision_model,
     get_author_instruction,
     build_advanced_customization_section,
-    clean_gemini_output,
     PROFILING_KNOWLEDGE
 )
-from services.history_service import save_to_history
+from services.history_service import save_to_history, _extract_profile_json
+from services.meticulous_service import async_create_profile
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -252,6 +251,14 @@ USER_SUMMARY_INSTRUCTIONS = (
     "   • Special Requirements: Any special gear needed (bottom filter, specific dosage, unique prep steps)\n\n"
 )
 
+SDK_OUTPUT_INSTRUCTIONS = (
+    "SDK EXECUTION MODE (MANDATORY):\n"
+    "• Do NOT call tools. Tool usage is disabled in this request\n"
+    "• Return ONLY the final user-facing summary and a PROFILE JSON block\n"
+    "• Include PROFILE JSON as a fenced ```json block that contains the complete profile object\n"
+    "• Ensure the summary includes a 'Profile Created:' line and clear preparation guidance\n\n"
+)
+
 # Build the reference sections once
 _PROFILING_GUIDE = (
     f"ESPRESSO PROFILING GUIDE:\n"
@@ -438,14 +445,15 @@ async def analyze_and_profile(
                 advanced_section +
                 f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                 f"'{user_prefs}'\n"
-                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
-                f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
+                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
+                "TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
                 VALIDATION_RULES +
                 ERROR_RECOVERY +
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
+                SDK_OUTPUT_INSTRUCTIONS +
                 OUTPUT_FORMAT +
                 _PROFILING_GUIDE +
                 _OEPF_REFERENCE
@@ -458,7 +466,7 @@ async def analyze_and_profile(
                 f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
                 f"Coffee Analysis: '{coffee_analysis}'\n\n" +
                 advanced_section +
-                f"TASK: Create a sophisticated espresso profile for this coffee" +
+                "TASK: Create a sophisticated espresso profile for this coffee" +
                 (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
                 PROFILE_GUIDELINES +
                 VALIDATION_RULES +
@@ -466,6 +474,7 @@ async def analyze_and_profile(
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
+                SDK_OUTPUT_INSTRUCTIONS +
                 OUTPUT_FORMAT +
                 _PROFILING_GUIDE +
                 _OEPF_REFERENCE
@@ -479,7 +488,7 @@ async def analyze_and_profile(
                 advanced_section +
                 f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                 f"'{user_prefs}'\n"
-                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
+                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
                 "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
                 PROFILE_GUIDELINES +
                 VALIDATION_RULES +
@@ -487,93 +496,44 @@ async def analyze_and_profile(
                 NAMING_CONVENTION +
                 author_instruction +
                 USER_SUMMARY_INSTRUCTIONS +
+                SDK_OUTPUT_INSTRUCTIONS +
                 OUTPUT_FORMAT +
                 _PROFILING_GUIDE +
                 _OEPF_REFERENCE
             )
         
         logger.debug(
-            "Executing profile creation via Gemini",
+            "Executing profile generation via Gemini SDK",
             extra={
                 "request_id": request_id,
                 "prompt_length": len(final_prompt)
             }
         )
-        
-        # Execute profile creation via Gemini CLI
-        # Note: Using -y (yolo mode) to auto-approve tool calls.
-        # The --allowed-tools flag doesn't work with MCP-provided tools.
-        # Security is maintained because the MCP server only exposes safe tools.
-        cli_start = time.monotonic()
-        result = await asyncio.to_thread(
-            subprocess.run,
-            [
-                "gemini", "-y",
-                final_prompt
-            ],
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 minute timeout to prevent hanging forever
+        generation_start = time.monotonic()
+        model_response = await asyncio.wait_for(
+            get_vision_model().async_generate_content([final_prompt]),
+            timeout=300
         )
-        cli_elapsed = time.monotonic() - cli_start
+        generation_elapsed = time.monotonic() - generation_start
+        reply = (model_response.text or "").strip()
+
         logger.info(
-            "Gemini CLI completed",
+            "Gemini SDK generation completed",
             extra={
                 "request_id": request_id,
-                "cli_seconds": round(cli_elapsed, 1),
-                "returncode": result.returncode,
+                "generation_seconds": round(generation_elapsed, 1),
+                "reply_length": len(reply),
             }
         )
-        
-        if result.returncode != 0:
-            logger.error(
-                "Profile creation subprocess failed",
-                extra={
-                    "request_id": request_id,
-                    "returncode": result.returncode,
-                    "stderr": result.stderr,
-                    "stdout": result.stdout
-                }
-            )
-            # Parse the error to provide a user-friendly message
-            user_message = parse_gemini_error(result.stderr or result.stdout or "Unknown error")
-            return {
-                "status": "error", 
-                "analysis": coffee_analysis,
-                "message": user_message
-            }
-        
-        # Clean up Gemini CLI noise from the output
-        reply = clean_gemini_output(result.stdout)
-        
-        # Log stderr even on success — captures MCP validation errors
-        # that the LLM saw but we otherwise can't observe
-        stderr_text = result.stderr if isinstance(result.stderr, str) else ""
-        if stderr_text.strip():
-            logger.warning(
-                "Gemini CLI stderr (exit 0)",
-                extra={
-                    "request_id": request_id,
-                    "stderr": stderr_text[:2000],
-                }
-            )
-        
-        # Detect silent failure: Gemini returns exit code 0 but the LLM
-        # couldn't actually create a profile (e.g. MCP validation errors
-        # that the LLM gave up trying to fix).
-        from services.history_service import _extract_profile_json
+
         profile_json_check = _extract_profile_json(reply)
-        has_profile_created_header = bool(
-            re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
-        )
-        
-        if not profile_json_check and not has_profile_created_header:
+
+        if not profile_json_check:
             logger.error(
-                "Gemini CLI exited 0 but no profile was created (LLM failure)",
+                "Model reply missing valid profile JSON",
                 extra={
                     "request_id": request_id,
                     "reply_preview": reply[:500],
-                    "stderr": stderr_text[:1000],
                 }
             )
             # Still save to history so user can see what happened
@@ -594,13 +554,59 @@ async def analyze_and_profile(
                 ),
                 "history_id": history_entry.get("id")
             }
+
+        create_start = time.monotonic()
+        create_result = await asyncio.wait_for(
+            async_create_profile(profile_json_check),
+            timeout=300
+        )
+        create_elapsed = time.monotonic() - create_start
+
+        logger.info(
+            "Machine profile creation completed",
+            extra={
+                "request_id": request_id,
+                "create_seconds": round(create_elapsed, 1),
+            }
+        )
+
+        create_error = None
+        if isinstance(create_result, dict):
+            create_error = create_result.get("error")
+        else:
+            create_error = getattr(create_result, "error", None)
+
+        if create_error:
+            friendly_message = parse_gemini_error(str(create_error))
+            logger.error(
+                "Machine profile creation returned error",
+                extra={
+                    "request_id": request_id,
+                    "create_error": str(create_error)[:1000],
+                }
+            )
+            return {
+                "status": "error",
+                "analysis": coffee_analysis,
+                "reply": reply,
+                "message": friendly_message,
+            }
+
+        has_profile_created_header = bool(
+            re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
+        )
+        if not has_profile_created_header:
+            profile_name = profile_json_check.get("name") if isinstance(profile_json_check, dict) else None
+            if not profile_name:
+                profile_name = "Untitled Profile"
+            reply = f"**Profile Created:** {profile_name}\n\n{reply}".strip()
         
         logger.info(
             "Profile creation completed successfully",
             extra={
                 "request_id": request_id,
                 "analysis": coffee_analysis,
-                "output_preview": result.stdout[:200] if len(result.stdout) > 200 else result.stdout
+                "output_preview": reply[:200] if len(reply) > 200 else reply
             }
         )
         
@@ -618,9 +624,9 @@ async def analyze_and_profile(
             "history_id": history_entry.get("id")
         }
 
-    except subprocess.TimeoutExpired:
+    except asyncio.TimeoutError:
         logger.error(
-            "Gemini CLI timed out after 300s",
+            "Profile generation timed out after 300s",
             extra={
                 "request_id": request_id,
                 "endpoint": "/analyze_and_profile",

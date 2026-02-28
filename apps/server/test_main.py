@@ -19,6 +19,7 @@ import os
 import subprocess
 import json
 import time
+import asyncio
 import requests
 
 
@@ -175,27 +176,32 @@ class TestAnalyzeCoffeeEndpoint:
 class TestAnalyzeAndProfileEndpoint:
     """Tests for the /analyze_and_profile endpoint (consolidated endpoint)."""
 
+    PROFILE_REPLY = (
+        "**Profile Created:** Test Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+        "```\n"
+    )
+
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
+    def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_create_profile, mock_save_history, client, sample_image):
         """Test profile creation with only an image (no user preferences)."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-123"}
+        mock_create_profile.return_value = {"id": "machine-123"}
         
-        # Mock the Gemini vision response
-        mock_response = Mock()
-        mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        # Mock successful subprocess execution
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        # Mock vision model with two calls: image analysis then profile generation
+        analysis_response = Mock()
+        analysis_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -205,36 +211,30 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "success"
         assert response.json()["analysis"] == "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
-        assert "Profile uploaded" in response.json()["reply"]
+        assert "Profile Created" in response.json()["reply"]
         
         # Verify vision model was called
-        mock_vision_model.return_value.async_generate_content.assert_called_once()
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+        mock_create_profile.assert_awaited_once()
         
-        # Verify subprocess was called with correct arguments
-        mock_subprocess.assert_called_once()
-        call_args = mock_subprocess.call_args[0][0]
-        assert "gemini" in call_args
-        assert "-y" in call_args  # yolo mode for auto-approval
-        
-        # Verify the prompt contains the analysis
-        prompt = call_args[-1]
+        # Verify the final prompt contains the analysis
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         assert "Ethiopian Yirgacheffe, Light Roast, Floral Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_with_prefs_only(self, mock_subprocess, mock_save_history, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_with_prefs_only(self, mock_vision_model, mock_create_profile, mock_save_history, client):
         """Test profile creation with only user preferences (no image)."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-456"}
+        mock_create_profile.return_value = {"id": "machine-456"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
         
-        # Mock successful subprocess execution
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
-
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Strong and intense espresso"}
@@ -243,34 +243,32 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "success"
         assert response.json()["analysis"] is None  # No image, so no analysis
-        assert "Profile uploaded" in response.json()["reply"]
+        assert "Profile Created" in response.json()["reply"]
         
-        # Verify subprocess was called with user preferences
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        # Verify model prompt includes user preferences
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         assert "Strong and intense espresso" in prompt
+        mock_create_profile.assert_awaited_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
+    def test_analyze_and_profile_with_both(self, mock_vision_model, mock_create_profile, mock_save_history, client, sample_image):
         """Test profile creation with both image and user preferences."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-789"}
+        mock_create_profile.return_value = {"id": "machine-789"}
         
-        # Mock the Gemini vision response
-        mock_response = Mock()
-        mock_response.text = "Colombian Supremo, Medium Roast, Nutty"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        # Mock successful subprocess execution
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        # Mock two calls: image analysis then profile generation
+        analysis_response = Mock()
+        analysis_response.text = "Colombian Supremo, Medium Roast, Nutty"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -282,11 +280,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.json()["status"] == "success"
         assert response.json()["analysis"] == "Colombian Supremo, Medium Roast, Nutty"
         
-        # Verify subprocess was called with both coffee analysis and user preferences
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        # Verify prompt was built with both coffee analysis and user preferences
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         assert "Colombian Supremo, Medium Roast, Nutty" in prompt
         assert "Quick extraction" in prompt
+        mock_create_profile.assert_awaited_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_analyze_and_profile_missing_both(self, client):
@@ -297,22 +296,21 @@ class TestAnalyzeAndProfileEndpoint:
         assert "at least one" in response.json()["detail"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_subprocess_error(self, mock_vision_model, mock_subprocess, client, sample_image):
-        """Test error handling when subprocess fails."""
+    def test_analyze_and_profile_profile_creation_error(self, mock_vision_model, mock_create_profile, client, sample_image):
+        """Test error handling when machine profile creation fails."""
         # Mock the Gemini vision response
-        mock_response = Mock()
-        mock_response.text = "Test Coffee"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
+        analysis_response = Mock()
+        analysis_response.text = "Test Coffee"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
         
-        # Mock subprocess failure
-        mock_result = Mock()
-        mock_result.returncode = 1
-        mock_result.stdout = ""
-        mock_result.stderr = "Docker container not found"
-        mock_subprocess.return_value = mock_result
+        # Mock machine API failure
+        mock_create_profile.return_value = {"error": "Docker container not found"}
 
         response = client.post(
             "/analyze_and_profile",
@@ -322,14 +320,17 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "error"
         assert response.json()["analysis"] == "Test Coffee"
+        assert "reply" in response.json()
         assert "Docker container not found" in response.json()["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_exception(self, mock_subprocess, client):
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_exception(self, mock_vision_model, client):
         """Test handling of unexpected exceptions."""
-        # Mock an exception in subprocess
-        mock_subprocess.side_effect = Exception("Unexpected error occurred")
+        # Mock an exception in model generation
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=Exception("Unexpected error occurred")
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -339,11 +340,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 500
         assert "Unexpected error" in response.json()["detail"]["message"]
 
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_timeout(self, mock_subprocess, client):
-        """Test handling of subprocess timeout."""
-        import subprocess as sp
-        mock_subprocess.side_effect = sp.TimeoutExpired(cmd="gemini", timeout=300)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_timeout(self, mock_vision_model, client):
+        """Test handling of SDK timeout."""
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=asyncio.TimeoutError()
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -373,23 +375,16 @@ class TestAnalyzeAndProfileEndpoint:
         assert "error" in response.json()["detail"]["status"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_llm_silent_failure(self, mock_subprocess, client):
-        """Test that LLM failure is detected even when Gemini CLI exits with code 0.
-        
-        When the LLM encounters MCP validation errors it can't resolve, it returns
-        exit code 0 but with a failure message (no profile JSON, no 'Profile Created:').
-        This should be detected and returned as an error, not success.
-        """
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = (
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_llm_silent_failure(self, mock_vision_model, client):
+        """Test that missing profile JSON in model output is treated as failure."""
+        profile_response = Mock()
+        profile_response.text = (
             "I've hit a roadblock trying to create this profile. "
             "The validation system returned conflicting errors that I couldn't resolve. "
             "Could you try again with slightly different parameters?"
         )
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -404,14 +399,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert "hit a roadblock" in data["reply"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_llm_silent_failure_empty_output(self, mock_subprocess, client):
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_llm_silent_failure_empty_output(self, mock_vision_model, client):
         """Test detection of empty LLM output as a failure."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = ""
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        profile_response = Mock()
+        profile_response.text = ""
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -424,14 +417,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert "validation errors" in data["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_llm_silent_failure_with_stderr(self, mock_subprocess, client):
-        """Test that stderr is logged when Gemini CLI exits 0 but fails."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "I couldn't create the profile due to errors."
-        mock_result.stderr = "MCP tool error: ProfileValidationError: pressure limit exceeded"
-        mock_subprocess.return_value = mock_result
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_llm_silent_failure_includes_history(self, mock_vision_model, client):
+        """Test failed attempts without profile JSON are still saved to history."""
+        profile_response = Mock()
+        profile_response.text = "I couldn't create the profile due to errors."
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -445,22 +436,21 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
+    def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_create_profile, mock_save_history, client, sample_image):
         """Test profile creation with different user preferences."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-multi"}
+        mock_create_profile.return_value = {"id": "machine-multi"}
         
-        mock_response = Mock()
-        mock_response.text = "Test Coffee"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_subprocess.return_value = mock_result
+        analysis_response = Mock()
+        analysis_response.text = "Test Coffee"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response] * 4
+        )
 
         preferences = [
             "Strong and intense",
@@ -478,54 +468,44 @@ class TestAnalyzeAndProfileEndpoint:
             
             assert response.status_code == 200
             assert response.json()["status"] == "success"
+        assert mock_create_profile.await_count == 4
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_yolo_mode(self, mock_vision_model, mock_subprocess, client, sample_image):
-        """Test that yolo mode is used for auto-approval of tool calls.
-        
-        Note: The --allowed-tools flag doesn't work with MCP-provided tools,
-        so we use -y (yolo mode) instead. Security is maintained because
-        the MCP server only exposes safe tools.
-        """
-        mock_response = Mock()
-        mock_response.text = "Test Coffee"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+    def test_analyze_and_profile_sdk_create_called(self, mock_vision_model, mock_create_profile, client, sample_image):
+        """Test SDK path calls machine create API instead of subprocess."""
+        mock_create_profile.return_value = {"id": "machine-sdk"}
+        analysis_response = Mock()
+        analysis_response.text = "Test Coffee"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
             files={"file": ("test.png", sample_image, "image/png")}
         )
 
-        call_args = mock_subprocess.call_args[0][0]
-        
-        # Verify that yolo mode flag is present for auto-approval
-        assert "-y" in call_args
-        
-        # Verify the command structure is correct (direct gemini CLI call)
-        assert call_args[0] == "gemini"
-        assert "-y" in call_args
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        mock_create_profile.assert_awaited_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_special_characters(self, mock_subprocess, mock_save_history, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_special_characters(self, mock_vision_model, mock_create_profile, mock_save_history, client):
         """Test handling of special characters in input."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-special"}
+        mock_create_profile.return_value = {"id": "machine-special"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
         
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
-
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Extra-strong <intense> & 'special' \"roast\""}
@@ -605,20 +585,27 @@ class TestEdgeCases:
 class TestEnhancedBaristaPersona:
     """Tests for enhanced barista persona and profile creation features."""
 
+    PROFILE_REPLY = (
+        "**Profile Created:** Test Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+        "```\n"
+    )
+
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test that the prompt includes the modern experimental barista persona."""
-        mock_response = Mock()
-        mock_response.text = "Ethiopian Coffee, Light Roast"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-1"}
+        analysis_response = Mock()
+        analysis_response.text = "Ethiopian Coffee, Light Roast"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -626,8 +613,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt contains persona elements
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         assert "PERSONA:" in prompt
         assert "modern, experimental barista" in prompt
@@ -635,13 +622,14 @@ class TestEnhancedBaristaPersona:
         assert "creative" in prompt or "puns" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_complex_profile_support(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_complex_profile_support(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes instructions for complex profile creation."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-2"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -649,8 +637,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes complex profile guidelines
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "PROFILE CREATION GUIDELINES:" in prompt
         assert "multi-stage extraction" in prompt
@@ -658,13 +646,14 @@ class TestEnhancedBaristaPersona:
         assert "blooming" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_naming_convention(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_naming_convention(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes witty naming convention instructions."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-3"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -672,21 +661,22 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes naming guidelines
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "NAMING CONVENTION:" in prompt
         assert "witty" in prompt or "pun" in prompt
         assert "Examples:" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_user_summary_instructions(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_user_summary_instructions(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes instructions for post-creation user summary."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-4"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -694,8 +684,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes user summary requirements
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "user summary" in prompt
         assert "Profile Name" in prompt or "Description" in prompt
@@ -704,13 +694,14 @@ class TestEnhancedBaristaPersona:
         assert "Special Requirements" in prompt or "Special Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_output_format(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_output_format(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes the output format template."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-5"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -718,8 +709,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes output format
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "OUTPUT FORMAT (use this exact format):" in prompt
         assert "Profile Created:" in prompt
@@ -728,21 +719,22 @@ class TestEnhancedBaristaPersona:
         assert "Why This Works:" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_validation_rules(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_validation_rules(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes validation rules to prevent MCP rejections."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-6"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Test"}
         )
 
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
 
         # Verify validation rules are present
         assert "VALIDATION RULES" in prompt
@@ -751,40 +743,45 @@ class TestEnhancedBaristaPersona:
         assert "REQUIRED SAFETY LIMITS" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_error_recovery(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_error_recovery(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes error recovery instructions."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-7"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Test"}
         )
 
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
 
         assert "ERROR RECOVERY" in prompt
         assert "Fix ALL errors in a SINGLE retry" in prompt
         assert "NEVER give up" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test enhanced prompt when both image and preferences are provided."""
-        mock_response = Mock()
-        mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: The Berry Express"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-8"}
+        analysis_response = Mock()
+        analysis_response.text = "Kenyan AA, Medium Roast, Berry notes"
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: The Berry Express\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"The Berry Express\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -795,8 +792,8 @@ class TestEnhancedBaristaPersona:
         assert response.status_code == 200
         
         # Verify the prompt includes all elements for both inputs
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         # Should have coffee analysis
         assert "Kenyan AA, Medium Roast, Berry notes" in prompt
@@ -812,14 +809,23 @@ class TestEnhancedBaristaPersona:
 class TestAdvancedCustomization:
     """Tests for advanced_customization parameter functionality."""
 
+    PROFILE_REPLY = (
+        "**Profile Created:** Test Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+        "```\n"
+    )
+
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_parameter_parsed(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_parameter_parsed(self, mock_vision_model, mock_create_profile, client):
         """Test that advanced_customization parameter is correctly parsed."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-1"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
         
@@ -834,18 +840,19 @@ class TestAdvancedCustomization:
         assert response.status_code == 200
         
         # Verify the parameter was parsed and included in the prompt
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_advanced_customization_when_provided(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_advanced_customization_when_provided(self, mock_vision_model, mock_create_profile, client):
         """Test that prompt includes advanced customization section when provided."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-2"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
         
@@ -860,8 +867,8 @@ class TestAdvancedCustomization:
         assert response.status_code == 200
         
         # Verify the prompt includes advanced customization section
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Check for section header
         assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
@@ -871,13 +878,14 @@ class TestAdvancedCustomization:
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_omits_advanced_customization_when_not_provided(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_omits_advanced_customization_when_not_provided(self, mock_vision_model, mock_create_profile, client):
         """Test that prompt omits advanced customization section when not provided."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-3"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -887,20 +895,21 @@ class TestAdvancedCustomization:
         assert response.status_code == 200
         
         # Verify the prompt does NOT include advanced customization section
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" not in prompt
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." not in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_section_formatting(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_section_formatting(self, mock_vision_model, mock_create_profile, client):
         """Test that advanced customization section has correct formatting."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-4"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Temperature: 93°C\nDose: 18g\nBasket: 18g VST"
         
@@ -914,8 +923,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Verify all formatting elements are present
         assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
@@ -925,13 +934,14 @@ class TestAdvancedCustomization:
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_mandatory_instructions_included(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_mandatory_instructions_included(self, mock_vision_model, mock_create_profile, client):
         """Test that MANDATORY instructions are included in the advanced customization section."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-5"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -943,8 +953,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Verify all mandatory instruction bullets are present
         assert "• If a temperature is specified, set the profile temperature to that EXACT value" in prompt
@@ -954,19 +964,23 @@ class TestAdvancedCustomization:
         assert "• If bottom filter is specified, mention it in preparation notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_advanced_customization_with_image(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_advanced_customization_with_image(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test advanced_customization with image input."""
-        mock_response = Mock()
-        mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Floral Fantasy"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-6"}
+        analysis_response = Mock()
+        analysis_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral notes"
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: Floral Fantasy\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Floral Fantasy\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         advanced_params = "Temperature: 94°C, Dose: 20g"
         
@@ -978,8 +992,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         # Should have coffee analysis
         assert "Ethiopian Yirgacheffe, Light Roast, Floral notes" in prompt
@@ -988,13 +1002,19 @@ class TestAdvancedCustomization:
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_with_user_prefs(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_with_user_prefs(self, mock_vision_model, mock_create_profile, client):
         """Test advanced_customization with user preferences."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Precise Pour"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-7"}
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: Precise Pour\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Precise Pour\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Max Flow: 4 ml/s, Bottom Filter: IMS Superfine"
         user_prefs = "Emphasize clarity and sweetness"
@@ -1009,8 +1029,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Should have user preferences
         assert user_prefs in prompt
@@ -1019,19 +1039,23 @@ class TestAdvancedCustomization:
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test advanced_customization with both image and user preferences."""
-        mock_response = Mock()
-        mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Berry Bomb"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-8"}
+        analysis_response = Mock()
+        analysis_response.text = "Kenyan AA, Medium Roast, Berry notes"
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: Berry Bomb\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Berry Bomb\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         advanced_params = "Temperature: 92°C, Dose: 18g, Max Pressure: 8 bar"
         user_prefs = "Highlight berry notes with gentle extraction"
@@ -1047,8 +1071,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         # Should have coffee analysis
         assert "Kenyan AA, Medium Roast, Berry notes" in prompt
@@ -1085,13 +1109,19 @@ class TestCORS:
         assert response.headers["access-control-allow-origin"] == "*"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_cors_headers_on_analyze_and_profile(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_cors_headers_on_analyze_and_profile(self, mock_vision_model, mock_create_profile, client):
         """Test that CORS headers are present on /analyze_and_profile responses."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "cors-1"}
+        profile_response = Mock()
+        profile_response.text = (
+            "**Profile Created:** Test Profile\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -5163,6 +5193,42 @@ class TestLLMShotAnalysisEndpoint:
         
         assert response.status_code == 404
 
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_vision_model')
+    @patch('api.routes.shots._perform_local_shot_analysis')
+    def test_llm_analysis_ai_unavailable(self, mock_local_analysis, mock_get_model, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
+        """Test 503 when AI is unavailable."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_list_profiles.return_value = [partial]
+
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_get_profile.return_value = full
+
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        mock_get_model.side_effect = ValueError("GEMINI_API_KEY environment variable is required but not set")
+
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json",
+            "force_refresh": "true"
+        })
+
+        assert response.status_code == 503
+
 
 class TestConvertDescriptionEndpoint:
     """Tests for the POST /api/profile/convert-description endpoint."""
@@ -5285,6 +5351,18 @@ Adjust grind based on bean age."""
         call_args = mock_model.async_generate_content.call_args[0][0]
         assert "Detailed original description" in call_args
         assert "Complex Profile" in call_args
+
+    @patch('api.routes.profiles.get_vision_model')
+    def test_convert_description_ai_unavailable(self, mock_get_model, client):
+        """Test 503 when AI is unavailable."""
+        mock_get_model.side_effect = ValueError("GEMINI_API_KEY environment variable is required but not set")
+
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {"name": "Test", "temperature": 93.0},
+            "description": "Original"
+        })
+
+        assert response.status_code == 503
 
 
 class TestErrorHandling:
@@ -5473,8 +5551,7 @@ class TestImagePromptErrorHandling:
     """Tests for image prompt generation error handling."""
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_generate_image_with_invalid_prompt_result_none(self, mock_subprocess, mock_get_api, client):
+    def test_generate_image_with_invalid_prompt_result_none(self, mock_get_api, client):
         """Test image generation when prompt builder returns None."""
         # Mock API to return profile exists
         mock_api = MagicMock()
@@ -5497,8 +5574,7 @@ class TestImagePromptErrorHandling:
             assert "Failed to build image generation prompt" in response.json()["detail"]
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_generate_image_with_invalid_prompt_result_not_dict(self, mock_subprocess, mock_get_api, client):
+    def test_generate_image_with_invalid_prompt_result_not_dict(self, mock_get_api, client):
         """Test image generation when prompt builder returns non-dict."""
         # Mock API to return profile exists
         mock_api = MagicMock()
@@ -5521,8 +5597,7 @@ class TestImagePromptErrorHandling:
             assert "Failed to build image generation prompt" in response.json()["detail"]
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_generate_image_with_valid_prompt_result(self, mock_subprocess, mock_get_api, client):
+    def test_generate_image_with_valid_prompt_result(self, mock_get_api, client):
         """Test image generation with valid prompt result doesn't fail at validation."""
         # Mock API to return profile exists
         mock_api = MagicMock()
@@ -5538,12 +5613,6 @@ class TestImagePromptErrorHandling:
             "prompt": "A beautiful coffee image",
             "metadata": {"influences_found": 2, "selected_colors": ["brown", "cream"]}
         }
-        
-        # Mock subprocess to return error (to stop execution after validation)
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_result.stderr = "gemini error"
-        mock_subprocess.return_value = mock_result
         
         with patch('prompt_builder.build_image_prompt_with_metadata', return_value=valid_prompt):
             response = client.post(
@@ -6911,6 +6980,33 @@ class TestGetMeticulousAPI:
         
         services.meticulous_service._meticulous_api = None
 
+    def test_get_meticulous_api_reinitializes_when_target_changes(self, monkeypatch):
+        """Test cached client is reinitialized when METICULOUS_IP changes."""
+        services.meticulous_service._meticulous_api = None
+
+        class MockApi:
+            def __init__(self, base_url):
+                self.base_url = base_url
+
+        from unittest.mock import MagicMock
+        mock_module = MagicMock()
+        mock_module.Api = MockApi
+
+        import sys
+        sys.modules['meticulous'] = mock_module
+        sys.modules['meticulous.api'] = mock_module
+
+        monkeypatch.setenv("METICULOUS_IP", "192.168.1.100")
+        api1 = services.meticulous_service.get_meticulous_api()
+        assert api1.base_url == "http://192.168.1.100"
+
+        monkeypatch.setenv("METICULOUS_IP", "192.168.1.101")
+        api2 = services.meticulous_service.get_meticulous_api()
+        assert api2.base_url == "http://192.168.1.101"
+        assert api1 is not api2
+
+        services.meticulous_service._meticulous_api = None
+
 
 class TestSettingsEndpoints:
     """Test settings management endpoints."""
@@ -6941,6 +7037,34 @@ class TestSettingsEndpoints:
         
         data = response.json()
         assert data["geminiApiKeyConfigured"] is False
+
+    def test_get_settings_with_stored_api_key_masks_and_marks_configured(self, client, monkeypatch):
+        """Stored API key should be masked and marked configured when env key is absent."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        import api.routes.system as system_module
+
+        def mock_load_settings():
+            return {
+                "geminiApiKey": "stored-key-1234567890",
+                "meticulousIp": "",
+                "serverIp": "",
+                "authorName": "",
+                "mqttEnabled": True,
+                "tailscaleEnabled": False,
+                "tailscaleAuthKey": "",
+            }
+
+        monkeypatch.setattr(system_module, "load_settings", mock_load_settings)
+
+        response = client.get("/api/settings")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["geminiApiKeyConfigured"] is True
+        assert data["geminiApiKeyMasked"] is True
+        assert data["geminiApiKey"]
+        assert "stored-key" not in data["geminiApiKey"]
     
     def test_get_settings_error_handling(self, client, monkeypatch):
         """Test get_settings handles errors."""
@@ -9424,6 +9548,17 @@ class TestLastShotEndpoint:
         mock_dates.side_effect = RuntimeError("disk full")
         response = client.get("/api/last-shot")
         assert response.status_code == 500
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_machine_unreachable_connection_error(self, mock_dates, client):
+        """Returns 503 when machine is unreachable during history lookup."""
+        import requests
+        mock_dates.side_effect = requests.exceptions.ConnectionError("dns failed")
+
+        response = client.get("/api/last-shot")
+
+        assert response.status_code == 503
+        assert "unreachable" in response.json()["detail"].lower()
 
 
 # ============================================================================
