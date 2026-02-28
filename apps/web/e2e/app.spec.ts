@@ -86,10 +86,10 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     await page.getByText('Florals').first().click()
     await page.getByText('Chocolate').first().click()
     
-    // All should have the primary class (indicating selection)
-    await expect(page.locator('text=Light Body').first()).toHaveClass(/bg-primary/)
-    await expect(page.locator('text=Florals').first()).toHaveClass(/bg-primary/)
-    await expect(page.locator('text=Chocolate').first()).toHaveClass(/bg-primary/)
+    // All selected tags should use selected style classes
+    await expect(page.locator('text=Light Body').first()).toHaveClass(/shadow-sm/)
+    await expect(page.locator('text=Florals').first()).toHaveClass(/shadow-sm/)
+    await expect(page.locator('text=Chocolate').first()).toHaveClass(/shadow-sm/)
   })
 
   test('should be able to deselect tags', async ({ page }) => {
@@ -103,11 +103,11 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Select
     await lightBodyTag.click()
-    await expect(lightBodyTag).toHaveClass(/bg-primary/)
+    await expect(lightBodyTag).toHaveClass(/shadow-sm/)
     
     // Deselect
     await lightBodyTag.click()
-    await expect(lightBodyTag).not.toHaveClass(/bg-primary/)
+    await expect(lightBodyTag).not.toHaveClass(/shadow-sm/)
   })
 
   test('should have responsive design', async ({ page }) => {
