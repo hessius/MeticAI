@@ -1154,7 +1154,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               {imageUploadError && (
                 <p className="text-xs text-destructive text-center">{imageUploadError}</p>
               )}
-              {!aiConfigured && (
+              {!aiConfigured && !hideAiWhenUnavailable && (
                 <p className="text-xs text-muted-foreground text-center">AI image generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.</p>
               )}
               <p className="text-[10px] text-muted-foreground/60 text-center">
