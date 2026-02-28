@@ -58,6 +58,14 @@ describe('tags', () => {
         expect(colorClass).toMatch(/text-/)
       })
     })
+
+    it('should include explicit dark-mode overrides for readability', () => {
+      Object.values(CATEGORY_COLORS).forEach(colorClass => {
+        expect(colorClass).toContain('dark:bg-')
+        expect(colorClass).toContain('dark:border-')
+        expect(colorClass).toContain('dark:text-')
+      })
+    })
   })
 
   describe('CATEGORY_COLORS_SELECTED', () => {
@@ -73,6 +81,13 @@ describe('tags', () => {
       Object.values(CATEGORY_COLORS_SELECTED).forEach(colorClass => {
         expect(colorClass).toMatch(/bg-\w+-500/)
         expect(colorClass).toMatch(/text-white/)
+      })
+    })
+
+    it('should include dark-mode overrides for selected state', () => {
+      Object.values(CATEGORY_COLORS_SELECTED).forEach(colorClass => {
+        expect(colorClass).toContain('dark:bg-')
+        expect(colorClass).toContain('dark:border-')
       })
     })
   })
