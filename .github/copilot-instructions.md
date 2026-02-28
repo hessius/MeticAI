@@ -1,5 +1,12 @@
 # MeticAI - Copilot Instructions
 
+## Session Governance (Read First)
+
+- If `tasks.md` exists in the workspace, follow it as the session source of truth.
+- If there is any conflict between this file and `tasks.md`, **`tasks.md` takes precedence**.
+- For release-related operations (merge release PRs, publish/delete releases, create/delete release tags, rollback/restore release state), always stop and wait for **explicit user instruction in the current chat**.
+- "Ready to release" does **not** imply permission to release.
+
 ## Project Overview
 MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. It uses Google Gemini 2.0 Flash (via the Gemini CLI) to analyze coffee bags, understand roast profiles, and automatically create espresso recipes. A React-based web UI lets users interact with the system, change settings, browse shot history, and manage profiles.
 

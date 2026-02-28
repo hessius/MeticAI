@@ -273,6 +273,16 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "Script does not use docker compose --progress flags" {
+    run grep -q -- "--progress" "$SCRIPT_PATH"
+    [ "$status" -ne 0 ]
+}
+
+@test "Installer exits when compose up fails" {
+    run grep -A8 'Failed to start MeticAI containers\.' "$SCRIPT_PATH"
+    [[ "$output" == *"exit 1"* ]]
+}
+
 @test "Script does NOT use eval for docker commands" {
     run grep -c 'eval.*docker' "$SCRIPT_PATH"
     [ "$output" = "0" ]
@@ -371,7 +381,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 }
 
 @test "docker-compose.watchtower.yml binds API to localhost only" {
-    run grep -q "WATCHTOWER_HOST_PORT:-127.0.0.1:8088" "${BATS_TEST_DIRNAME}/../docker-compose.watchtower.yml"
+    run grep -q "WATCHTOWER_HOST_PORT:-127.0.0.1:18088" "${BATS_TEST_DIRNAME}/../docker-compose.watchtower.yml"
     [ "$status" -eq 0 ]
 }
 

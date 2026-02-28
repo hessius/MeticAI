@@ -711,7 +711,7 @@ generate_start_script() {
 #!/bin/bash
 cd "$(dirname "$0")"
 source .env 2>/dev/null
-docker compose ${COMPOSE_FILES:--f docker-compose.yml} up -d --progress plain
+docker compose ${COMPOSE_FILES:--f docker-compose.yml} up -d
 SCRIPT_END
     chmod +x start.sh
 }
@@ -732,9 +732,9 @@ generate_update_script() {
 cd "$(dirname "$0")"
 source .env 2>/dev/null
 echo "Pulling latest MeticAI image..."
-docker compose ${COMPOSE_FILES:--f docker-compose.yml} pull --progress plain
+docker compose ${COMPOSE_FILES:--f docker-compose.yml} pull
 echo "Restarting..."
-docker compose ${COMPOSE_FILES:--f docker-compose.yml} up -d --progress plain
+docker compose ${COMPOSE_FILES:--f docker-compose.yml} up -d
 echo "Updated!"
 SCRIPT_END
     chmod +x update.sh
@@ -824,12 +824,12 @@ echo -e "${YELLOW}[4/4] Starting MeticAI...${NC}"
 echo ""
 
 log_info "Pulling MeticAI image (this may take a few minutes)..."
-if ! docker compose ${COMPOSE_FILES} pull --progress plain 2>&1; then
+if ! docker compose ${COMPOSE_FILES} pull 2>&1; then
     log_warning "Image pull encountered errors. Continuing anyway (cached image may work)..."
 fi
 
 log_info "Starting MeticAI..."
-if ! docker compose ${COMPOSE_FILES} up -d --progress plain 2>&1; then
+if ! docker compose ${COMPOSE_FILES} up -d 2>&1; then
     log_error "Failed to start MeticAI containers."
     echo ""
     echo "  Troubleshooting:"
@@ -837,6 +837,7 @@ if ! docker compose ${COMPOSE_FILES} up -d --progress plain 2>&1; then
     echo "    2. Check logs:         docker compose ${COMPOSE_FILES} logs"
     echo "    3. Retry:              cd ${INSTALL_DIR} && docker compose ${COMPOSE_FILES} up -d"
     echo ""
+    exit 1
 fi
 
 # Wait for services
