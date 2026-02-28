@@ -293,6 +293,8 @@ async def get_update_method(request: Request):
         - method: "watchtower" | "manual"
         - watchtower_running: bool
         - can_trigger_update: bool
+        - watchtower_endpoint: str | None — the reachable Watchtower API endpoint URL, or None
+        - watchtower_error: str | None — error message if the probe failed or container reported an error
     """
     request_id = request.state.request_id
     
