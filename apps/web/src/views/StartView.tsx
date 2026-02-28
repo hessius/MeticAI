@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Coffee, Play, Gear } from '@phosphor-icons/react'
+import { Plus, Coffee, Play, Gear, Drop } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
 const IGNORED_NAMES = ['meticai', 'metic ai', 'gemini', 'admin', 'user', 'default']
@@ -47,7 +47,10 @@ interface StartViewProps {
   onGenerateNew: () => void
   onViewHistory: () => void
   onRunShot: () => void
+  onPourOver: () => void
   onSettings: () => void
+  aiConfigured?: boolean
+  hideAiWhenUnavailable?: boolean
   lastShotBanner?: React.ReactNode
 }
 
@@ -56,7 +59,10 @@ export function StartView({
   onGenerateNew,
   onViewHistory,
   onRunShot,
+  onPourOver,
   onSettings,
+  aiConfigured = true,
+  hideAiWhenUnavailable = false,
   lastShotBanner,
 }: StartViewProps) {
   const { t } = useTranslation()
@@ -114,14 +120,23 @@ export function StartView({
 
         <div className="space-y-3">
           {/* Dark Brew — deep brown, gold text */}
-          <Button
-            onClick={onGenerateNew}
-            variant="dark-brew"
-            className="w-full h-14 text-base"
-          >
-            <Plus size={20} className="mr-2" weight="bold" />
-            {t('navigation.generateNewProfile')}
-          </Button>
+          {(!hideAiWhenUnavailable || aiConfigured) && (
+            <Button
+              onClick={onGenerateNew}
+              disabled={!aiConfigured}
+              variant="dark-brew"
+              className="w-full h-14 text-base"
+            >
+              <Plus size={20} className="mr-2" weight="bold" />
+              {t('navigation.generateNewProfile')}
+            </Button>
+          )}
+
+          {!aiConfigured && (
+            <p className="text-xs text-muted-foreground text-center">
+              AI profile generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.
+            </p>
+          )}
           
           {/* Style 2: Dark Brew — deep brown, gold text */}
           <Button
@@ -141,6 +156,15 @@ export function StartView({
           >
             <Play size={20} className="mr-2" weight="fill" />
             {t('navigation.runSchedule')}
+          </Button>
+
+          <Button
+            onClick={onPourOver}
+            variant="dark-brew"
+            className="w-full h-14 text-base"
+          >
+            <Drop size={20} className="mr-2" weight="fill" />
+            Pour-over Live
           </Button>
           
           {/* Style 4: Ember — warm orange inner glow + border */}

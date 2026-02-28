@@ -54,6 +54,8 @@ const SPEED_OPTIONS: number[] = [0.5, 1, 2, 3, 5]
 interface ShotHistoryViewProps {
   profileName: string
   onBack: () => void
+  aiConfigured?: boolean
+  hideAiWhenUnavailable?: boolean
 }
 
 // Analysis result types (local analysis)
@@ -271,7 +273,7 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
   )
 }
 
-export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
+export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hideAiWhenUnavailable = false }: ShotHistoryViewProps) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
@@ -1510,6 +1512,8 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         <button 
                           onClick={handleClearComparison}
                           className="p-1 hover:bg-destructive/20 rounded-full transition-colors"
+                          title={t('common.clear')}
+                          aria-label={t('common.clear')}
                         >
                           <X size={14} weight="bold" className="text-muted-foreground" />
                         </button>
@@ -2243,7 +2247,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         </Button>
                         
                         {/* Show "View" if cached, otherwise "Get" */}
-                        {(llmAnalysisResult || isLlmCached) && !isLlmAnalyzing ? (
+                        {(!hideAiWhenUnavailable || aiConfigured) && ((llmAnalysisResult || isLlmCached) && !isLlmAnalyzing ? (
                           <Button
                             variant="default"
                             size="sm"
@@ -2258,12 +2262,16 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             variant="default"
                             size="sm"
                             onClick={handleLlmAnalysis}
-                            disabled={isLlmAnalyzing}
+                            disabled={isLlmAnalyzing || !aiConfigured}
                             className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
                             {t('shotHistory.getAiAnalysis')}
                           </Button>
+                        ))}
+
+                        {!aiConfigured && (
+                          <p className="text-[11px] text-muted-foreground text-center">AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.</p>
                         )}
                       </div>
                     </div>

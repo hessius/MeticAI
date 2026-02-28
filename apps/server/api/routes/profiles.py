@@ -1740,6 +1740,14 @@ async def import_all_profiles(request: Request):
     from fastapi.responses import StreamingResponse
     
     request_id = request.state.request_id
+
+    generate_description = True
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            generate_description = bool(body.get("generate_description", True))
+    except Exception:
+        generate_description = True
     
     async def generate_import_stream():
         """Generator that yields progress updates as JSON lines."""
@@ -1818,12 +1826,14 @@ async def import_all_profiles(request: Request):
                     profile_json = deep_convert_to_dict(profile)
                     
                     # Generate description
-                    reply = None
-                    try:
-                        reply = await _generate_profile_description(profile_json, request_id)
-                    except Exception as e:
-                        logger.warning(f"Failed to generate description for {profile_name}: {e}")
-                        reply = "Profile imported from machine. Description generation failed."
+                    if generate_description:
+                        try:
+                            reply = await _generate_profile_description(profile_json, request_id)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate description for {profile_name}: {e}")
+                            reply = "Profile imported from machine. Description generation failed."
+                    else:
+                        reply = "Profile imported from machine."
                     
                     # Create history entry
                     entry_id = str(uuid.uuid4())
@@ -2026,7 +2036,17 @@ Special Notes:
 
 Remember: NO information should be lost in this conversion!"""
 
-        model = get_vision_model()
+        try:
+            model = get_vision_model()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "message": str(e),
+                    "error": "AI features are unavailable until GEMINI_API_KEY is configured"
+                }
+            ) from e
         response = await model.async_generate_content(prompt)
         converted_description = response.text.strip()
         

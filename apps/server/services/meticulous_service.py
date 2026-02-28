@@ -66,6 +66,26 @@ _profile_list_cache: Optional[list] = None
 _profile_list_cache_time: float = 0.0
 
 
+def _resolve_meticulous_base_url() -> str:
+    """Resolve the machine base URL from environment/settings with safe defaults."""
+    meticulous_ip = os.environ.get("METICULOUS_IP", "").strip()
+
+    if not meticulous_ip:
+        try:
+            settings = load_settings()
+            meticulous_ip = (settings.get("meticulousIp") or "").strip()
+        except Exception:
+            meticulous_ip = ""
+
+    if not meticulous_ip:
+        meticulous_ip = "meticulous.local"
+
+    if not meticulous_ip.startswith("http"):
+        meticulous_ip = f"http://{meticulous_ip}"
+
+    return meticulous_ip.rstrip("/")
+
+
 def _get_http_client() -> httpx.AsyncClient:
     """Return the singleton httpx.AsyncClient, creating it if needed."""
     global _http_client
@@ -85,24 +105,25 @@ async def close_http_client():
 def get_meticulous_api():
     """Lazily initialize and return the Meticulous API client."""
     global _meticulous_api
+    desired_base_url = _resolve_meticulous_base_url()
+
     if _meticulous_api is None:
         from meticulous.api import Api
+        _meticulous_api = Api(base_url=desired_base_url)
+        return _meticulous_api
 
-        meticulous_ip = os.environ.get("METICULOUS_IP", "").strip()
-        if not meticulous_ip:
-            try:
-                settings = load_settings()
-                meticulous_ip = (settings.get("meticulousIp") or "").strip()
-            except Exception:
-                meticulous_ip = ""
+    current_base_url = str(getattr(_meticulous_api, "base_url", "")).rstrip("/")
+    if current_base_url != desired_base_url:
+        from meticulous.api import Api
+        logger.info(
+            "Meticulous API target changed, reinitializing client",
+            extra={
+                "from_base_url": current_base_url,
+                "to_base_url": desired_base_url,
+            },
+        )
+        _meticulous_api = Api(base_url=desired_base_url)
 
-        if not meticulous_ip:
-            meticulous_ip = "meticulous.local"
-
-        # Ensure we use http:// prefix
-        if not meticulous_ip.startswith("http"):
-            meticulous_ip = f"http://{meticulous_ip}"
-        _meticulous_api = Api(base_url=meticulous_ip)
     return _meticulous_api
 
 
