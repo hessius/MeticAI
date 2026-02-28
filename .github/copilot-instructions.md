@@ -10,7 +10,7 @@
 ## Project Overview
 MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. It uses Google Gemini 2.0 Flash (via the Gemini CLI) to analyze coffee bags, understand roast profiles, and automatically create espresso recipes. A React-based web UI lets users interact with the system, change settings, browse shot history, and manage profiles.
 
-**Current version**: 2.0.0
+**Current version**: 2.0.5
 
 ## Technology Stack
 
@@ -174,7 +174,7 @@ MeticAI/
 ├── docker-compose.yml          # Primary compose file (unified container)
 ├── docker-compose.tailscale.yml
 ├── docker-compose.watchtower.yml
-├── VERSION                     # Semver version string (2.0.0)
+├── VERSION                     # Semver version string (2.0.5)
 └── README.md
 ```
 
