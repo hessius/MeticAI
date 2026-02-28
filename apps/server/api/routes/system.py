@@ -1257,7 +1257,10 @@ async def save_settings_endpoint(request: Request):
                 env_content += f"\nPI_IP={new_ip}"
             env_updated = True
         
-        # Save settings to JSON file
+        # Save settings to JSON file.
+        # Strip display-only keys that should never be persisted.
+        for _display_key in ("geminiApiKeyConfigured", "geminiApiKeyMasked"):
+            current_settings.pop(_display_key, None)
         save_settings(current_settings)
         
         # Write .env file if updated (note: may fail if read-only mount)

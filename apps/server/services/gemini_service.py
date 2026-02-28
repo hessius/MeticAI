@@ -340,10 +340,17 @@ def parse_gemini_error(error_text: str) -> str:
         )
     
     # Check for authentication errors
-    if 'api key' in error_text_lower or 'authentication' in error_text_lower or 'unauthorized' in error_text_lower:
+    if (
+        'api key' in error_text_lower
+        or 'api_key' in error_text_lower
+        or 'authentication' in error_text_lower
+        or 'unauthorized' in error_text_lower
+        or 'auth method' in error_text_lower
+        or 'set an auth' in error_text_lower
+    ):
         return (
-            "API authentication failed. Please check that your GEMINI_API_KEY "
-            "is valid and properly configured in your .env file."
+            "Gemini API key is not configured. Please go to Settings and "
+            "enter a valid GEMINI_API_KEY, then try again."
         )
     
     # Check for network/connection errors
@@ -408,11 +415,21 @@ def parse_gemini_error(error_text: str) -> str:
             if len(extracted) > 10 and not extracted.startswith('/') and not extracted.startswith('file:'):
                 return extracted[:200]  # Limit length
     
-    # Fallback: return a generic message with truncated technical detail
-    if len(error_text) > 150:
-        return f"Profile generation failed. Technical details: {error_text[:100]}..."
+    # Fallback: strip Gemini CLI noise lines before returning
+    clean_error = error_text
+    for prefix in _GEMINI_NOISE_PREFIXES:
+        clean_error = '\n'.join(
+            line for line in clean_error.split('\n')
+            if not line.strip().startswith(prefix)
+        )
+    clean_error = clean_error.strip()
     
-    return f"Profile generation failed: {error_text}" if error_text else "Profile generation failed unexpectedly."
+    if not clean_error:
+        return "Profile generation failed unexpectedly. Please try again."
+    if len(clean_error) > 150:
+        return f"Profile generation failed. Technical details: {clean_error[:100]}..."
+    
+    return f"Profile generation failed: {clean_error}"
 
 
 def reset_vision_model():

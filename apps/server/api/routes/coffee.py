@@ -515,7 +515,7 @@ async def analyze_and_profile(
             ],
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout to prevent hanging forever
+            timeout=600  # 10 minute timeout for profile generation
         )
         cli_elapsed = time.monotonic() - cli_start
         logger.info(
@@ -622,7 +622,7 @@ async def analyze_and_profile(
 
     except subprocess.TimeoutExpired:
         logger.error(
-            "Gemini CLI timed out after 300s",
+            "Gemini CLI timed out after 600s",
             extra={
                 "request_id": request_id,
                 "endpoint": "/analyze_and_profile",

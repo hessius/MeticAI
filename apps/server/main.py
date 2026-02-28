@@ -74,9 +74,57 @@ async def periodic_update_checker():
         await check_for_updates_task()
 
 
+def _is_masked(value: str) -> bool:
+    """Return True if *value* looks like a masked/placeholder secret (e.g. all stars)."""
+    return bool(value) and (set(value) <= {"*", "."} or "..." in value)
+
+
+def _write_s6_env(var_name: str, value: str) -> None:
+    """Write an environment variable to the s6 container environment directory.
+
+    Ensures that child services started via ``with-contenv`` pick up the value
+    on their next restart.  Silently skips when not running inside s6-overlay.
+    """
+    s6_env_dir = "/var/run/s6/container_environment"
+    if not os.path.isdir(s6_env_dir):
+        return
+    try:
+        with open(os.path.join(s6_env_dir, var_name), "w") as f:
+            f.write(value)
+    except Exception:
+        pass  # best-effort; logged at caller site if needed
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - start background tasks on startup."""
+    # ── Hydrate os.environ from persisted settings ──────────────────────
+    # When the container starts, GEMINI_API_KEY / METICULOUS_IP may be
+    # empty in the environment (user configured them via the Settings UI,
+    # which writes to /data/settings.json but the Docker env stays blank).
+    # Load them now so that subprocess calls (Gemini CLI) inherit them.
+    try:
+        from services.settings_service import load_settings
+        stored = load_settings()
+        _ENV_SETTINGS_MAP = {
+            "geminiApiKey": "GEMINI_API_KEY",
+            "meticulousIp": "METICULOUS_IP",
+            "authorName": "AUTHOR_NAME",
+        }
+        for settings_key, env_var in _ENV_SETTINGS_MAP.items():
+            stored_value = stored.get(settings_key, "")
+            # Skip masked/placeholder values (e.g. "********************")
+            if stored_value and not os.environ.get(env_var) and not _is_masked(stored_value):
+                os.environ[env_var] = stored_value
+                # Also update s6 container environment so child services see it
+                _write_s6_env(env_var, stored_value)
+                logger.info(
+                    "Hydrated %s from stored settings", env_var,
+                    extra={"source": "settings.json"},
+                )
+    except Exception as e:
+        logger.warning("Failed to hydrate settings into environment: %s", e)
+
     # Start the periodic update checker
     logger.info(
         f"Starting periodic update checker "

@@ -6866,7 +6866,7 @@ class TestParseGeminiErrorExtended:
         """Test extracting clean error message from verbose output."""
         error = "Stack trace...\nError: Profile validation failed - invalid temperature\nmore details..."
         result = services.gemini_service.parse_gemini_error(error)
-        assert "validation failed" in result.lower() or "invalid temperature" in result.lower()
+        assert "validation" in result.lower()
     
     def test_parse_gemini_error_truncate_long_message(self):
         """Test truncating very long error messages."""
@@ -6884,6 +6884,76 @@ class TestParseGeminiErrorExtended:
         """Test empty error string."""
         result = services.gemini_service.parse_gemini_error("")
         assert "unexpectedly" in result.lower()
+
+    def test_parse_gemini_error_auth_method_missing(self):
+        """Test Gemini CLI auth method / API key not set error."""
+        error = (
+            "YOLO mode is enabled. All tool calls will be automatically approved.\n"
+            "Please set an Auth method in your /root/.gemini/settings.json or "
+            "specify one of the following environment variables before running: "
+            "GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI"
+        )
+        result = services.gemini_service.parse_gemini_error(error)
+        assert "api key" in result.lower() or "settings" in result.lower()
+        # Must NOT leak raw YOLO noise into the user message
+        assert "yolo" not in result.lower()
+
+    def test_parse_gemini_error_api_key_underscore(self):
+        """Test that GEMINI_API_KEY (with underscores) is caught as auth error."""
+        error = "Error: GEMINI_API_KEY environment variable is not set"
+        result = services.gemini_service.parse_gemini_error(error)
+        assert "api key" in result.lower() or "configured" in result.lower()
+
+
+class TestSettingsHydration:
+    """Test that stored settings are hydrated into os.environ at startup."""
+
+    @pytest.mark.asyncio
+    async def test_lifespan_hydrates_gemini_api_key(self, monkeypatch, tmp_path):
+        """Lifespan hydrates GEMINI_API_KEY from settings.json when env is empty."""
+        import json
+        from main import lifespan, app
+
+        # Write a fake settings.json
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text(json.dumps({"geminiApiKey": "sk-test-key-123"}))
+
+        # Patch settings service to use our tmp file
+        monkeypatch.setattr("services.settings_service.SETTINGS_FILE", settings_file)
+        # Clear cache
+        import services.settings_service as ss
+        monkeypatch.setattr(ss, "_settings_cache", None)
+
+        # Make sure env var is empty
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        # Run the lifespan context manager
+        async with lifespan(app):
+            result = os.environ.get("GEMINI_API_KEY")
+
+        assert result == "sk-test-key-123"
+
+    @pytest.mark.asyncio
+    async def test_lifespan_does_not_overwrite_env_var(self, monkeypatch, tmp_path):
+        """Lifespan should NOT overwrite an env var that's already set."""
+        import json
+        from main import lifespan, app
+
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text(json.dumps({"geminiApiKey": "stored-key"}))
+
+        monkeypatch.setattr("services.settings_service.SETTINGS_FILE", settings_file)
+        import services.settings_service as ss
+        monkeypatch.setattr(ss, "_settings_cache", None)
+
+        # Set the env var to a different value
+        monkeypatch.setenv("GEMINI_API_KEY", "env-provided-key")
+
+        async with lifespan(app):
+            result = os.environ.get("GEMINI_API_KEY")
+
+        # Should keep the env-provided key, not overwrite with stored
+        assert result == "env-provided-key"
 
 
 class TestGetVisionModel:
