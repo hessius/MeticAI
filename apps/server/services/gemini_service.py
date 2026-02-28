@@ -352,6 +352,30 @@ def parse_gemini_error(error_text: str) -> str:
             "Network error connecting to Gemini API. Please check your "
             "internet connection and try again."
         )
+
+    # Check for schema/validation failures produced during profile creation
+    if (
+        'validation' in error_text_lower
+        or 'schema' in error_text_lower
+        or 'invalid profile' in error_text_lower
+        or 'failed to validate' in error_text_lower
+    ):
+        return (
+            "The AI generated a profile that failed schema validation. "
+            "Please retry; if this keeps happening, simplify preferences "
+            "or try a stronger model."
+        )
+
+    # Check for long-running generation / model stall patterns
+    if (
+        'timed out after' in error_text_lower
+        or 'deadline exceeded' in error_text_lower
+        or 'took too long' in error_text_lower
+    ):
+        return (
+            "Profile generation timed out. Please retry; if this repeats, "
+            "reduce prompt complexity or use a stronger Gemini model."
+        )
     
     # Check for MCP/Meticulous connection errors
     if 'mcp' in error_text_lower or 'meticulous' in error_text_lower:
