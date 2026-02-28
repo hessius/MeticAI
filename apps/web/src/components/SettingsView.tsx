@@ -30,6 +30,7 @@ import {
   Code
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
@@ -90,6 +91,8 @@ interface TailscaleStatus {
 // Maximum expected update duration (3 minutes)
 const MAX_UPDATE_DURATION = 180000
 const PROGRESS_UPDATE_INTERVAL = 500
+const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
+const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
 export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
@@ -133,6 +136,14 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [tailscaleSaving, setTailscaleSaving] = useState(false)
   const [tailscaleSaveStatus, setTailscaleSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [tailscaleMessage, setTailscaleMessage] = useState('')
+  const [aiEnabled, setAiEnabledState] = useState(true)
+  const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
+  const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
+
+  useEffect(() => {
+    setAiEnabledState(getAiEnabled())
+    setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
+  }, [])
 
   // Load current settings on mount
   useEffect(() => {
@@ -324,6 +335,14 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const handleChange = (field: keyof Settings, value: string) => {
     setSettings(prev => ({ ...prev, [field]: value }))
     setSaveStatus('idle')
+  }
+
+  const handleCopyText = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch (err) {
+      console.error('Failed to copy snippet:', err)
+    }
   }
 
   const handleUpdate = async () => {
@@ -609,50 +628,88 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               <LanguageSelector variant="outline" showLabel={true} />
             </div>
 
-            {/* Gemini API Key */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="apiKey" className="text-sm font-medium">
-                  {t('settings.geminiApiKey')}
-                </Label>
-                {settings.geminiApiKeyConfigured && (
-                  <span className="text-xs text-success flex items-center gap-1">
-                    <CheckCircle size={12} weight="fill" />
-                    {t('settings.configured')}
-                  </span>
-                )}
+            {/* AI Assistant */}
+            <div className="space-y-3 pt-2 border-t border-border">
+              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">AI Assistant</h3>
+              <p className="text-xs text-muted-foreground">Gemini API key is optional. Add one only if you want AI-powered profile and analysis features.</p>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="apiKey" className="text-sm font-medium">
+                    {t('settings.geminiApiKey')}
+                  </Label>
+                  {hasGeminiKey && (
+                    <span className="text-xs text-success flex items-center gap-1">
+                      <CheckCircle size={12} weight="fill" />
+                      {t('settings.configured')}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    value={settings.geminiApiKey}
+                    onChange={(e) => handleChange('geminiApiKey', e.target.value)}
+                    placeholder={hasGeminiKey ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
+                    className="pr-10"
+                    readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
+                    onClick={() => {
+                      if (settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')) {
+                        handleChange('geminiApiKey', '')
+                      }
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {hasGeminiKey
+                    ? `${t('settings.apiKeyConfigured')} You can keep the key saved and disable AI features below.`
+                    : <>Optional. {t('settings.getApiKey')}{' '}
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {t('settings.googleAIStudio')}
+                      </a>
+                    </>
+                  }
+                </p>
               </div>
-              <div className="relative">
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={settings.geminiApiKey}
-                  onChange={(e) => handleChange('geminiApiKey', e.target.value)}
-                  placeholder={settings.geminiApiKeyConfigured ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
-                  className="pr-10"
-                  readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
-                  onClick={() => {
-                    if (settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')) {
-                      handleChange('geminiApiKey', '')
-                    }
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="ai-enabled-toggle" className="text-sm font-medium">Enable AI features</Label>
+                  <p className="text-xs text-muted-foreground">Turns AI tools on/off without removing your saved API key.</p>
+                </div>
+                <Switch
+                  id="ai-enabled-toggle"
+                  checked={aiEnabled}
+                  onCheckedChange={(checked) => {
+                    const next = checked as boolean
+                    setAiEnabledState(next)
+                    setAiEnabled(next)
+                  }}
+                  disabled={!hasGeminiKey}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="hide-ai-toggle" className="text-sm font-medium">Hide AI controls when unavailable</Label>
+                  <p className="text-xs text-muted-foreground">When disabled, AI controls stay visible but disabled until AI is available.</p>
+                </div>
+                <Switch
+                  id="hide-ai-toggle"
+                  checked={hideAiWhenUnavailable}
+                  onCheckedChange={(checked) => {
+                    const next = checked as boolean
+                    setHideAiWhenUnavailableState(next)
+                    setHideAiWhenUnavailable(next)
                   }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {settings.geminiApiKeyConfigured 
-                  ? t('settings.apiKeyConfigured')
-                  : <>{t('settings.getApiKey')}{' '}
-                    <a 
-                      href="https://aistudio.google.com/app/apikey" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      {t('settings.googleAIStudio')}
-                    </a>
-                  </>
-                }
-              </p>
             </div>
 
             {/* Meticulous IP */}
@@ -736,6 +793,49 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   </p>
                 </div>
               )}
+
+              <div className="space-y-2 pt-1 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium">Meticulous Add-on</h4>
+                  <a
+                    href="https://github.com/nickwilsonr/meticulous-addon"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    GitHub
+                  </a>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Copy these snippets to install or update the addon manually in the running container.
+                </p>
+                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
+                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
+                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_INSTALL_SNIPPET}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => handleCopyText(METICULOUS_ADDON_INSTALL_SNIPPET)}
+                    title="Copy install command"
+                  >
+                    <Copy size={13} />
+                  </Button>
+                </div>
+                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
+                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
+                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_UPDATE_SNIPPET}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => handleCopyText(METICULOUS_ADDON_UPDATE_SNIPPET)}
+                    title="Copy update command"
+                  >
+                    <Copy size={13} />
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Appearance */}
@@ -789,6 +889,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                     />
                   </div>
                 )}
+
               </div>
             )}
 

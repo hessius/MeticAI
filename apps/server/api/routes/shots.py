@@ -6,11 +6,14 @@ import json
 import re
 import time
 import logging
+import httpx
+import requests
 
 from services.meticulous_service import (
     fetch_shot_data,
     async_list_profiles, async_get_history_dates,
-    async_get_shot_files, async_get_profile
+    async_get_shot_files, async_get_profile,
+    MachineUnreachableError,
 )
 from services.cache_service import (
     get_cached_llm_analysis, save_llm_analysis_to_cache,
@@ -76,6 +79,20 @@ async def get_last_shot(request: Request):
 
         raise HTTPException(status_code=404, detail="No shots found")
 
+    except MachineUnreachableError:
+        raise
+    except (requests.exceptions.ConnectionError, httpx.ConnectError, httpx.ConnectTimeout) as e:
+        logger.warning(
+            f"Machine unreachable while fetching last shot: {e}",
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Espresso machine is unreachable. Check that the machine is powered on "
+                "and METICULOUS_IP is correct in Settings."
+            ),
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -832,7 +849,17 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
 """
         
         # Call LLM
-        model = get_vision_model()
+        try:
+            model = get_vision_model()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "message": str(e),
+                    "error": "AI features are unavailable until GEMINI_API_KEY is configured"
+                }
+            ) from e
         response = await model.async_generate_content(prompt)
         
         llm_analysis = response.text if response else "Analysis generation failed"

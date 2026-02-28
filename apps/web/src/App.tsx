@@ -31,6 +31,7 @@ import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon } from '@phosphor-icons/react'
+import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -39,6 +40,7 @@ import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { LiveShotView } from '@/components/LiveShotView'
+import { PourOverView } from '@/components/PourOverView'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
@@ -78,6 +80,9 @@ function App() {
 
   // Phase 3 — MQTT / WebSocket telemetry
   const [mqttEnabled, setMqttEnabled] = useState(false)
+  const [isAiConfigured, setIsAiConfigured] = useState(false)
+  const [aiEnabled, setAiEnabled] = useState(true)
+  const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useWebSocket(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
@@ -125,12 +130,27 @@ function App() {
         if (res.ok) {
           const data = await res.json()
           setMqttEnabled(data.mqttEnabled !== false)
+          const hasGeminiKey = Boolean((data.geminiApiKey || '').trim())
+          setIsAiConfigured(data.geminiApiKeyConfigured === true || hasGeminiKey)
         }
       } catch {
         // default false if unreachable
       }
     }
     fetchMqttSetting()
+  }, [])
+
+  useEffect(() => {
+    setAiEnabled(getAiEnabled())
+    setHideAiWhenUnavailable(getHideAiWhenUnavailable())
+
+    const handler = () => {
+      setAiEnabled(getAiEnabled())
+      setHideAiWhenUnavailable(getHideAiWhenUnavailable())
+    }
+
+    window.addEventListener(AI_PREFS_CHANGED_EVENT, handler)
+    return () => window.removeEventListener(AI_PREFS_CHANGED_EVENT, handler)
   }, [])
 
   // Reset shot banner dismissed state when brewing ends
@@ -214,6 +234,11 @@ function App() {
   }
 
   const handleSubmit = async () => {
+    if (!(isAiConfigured && aiEnabled)) {
+      setErrorMessage('AI profile generation is currently disabled. Enable AI in Settings and ensure an API key is configured.')
+      return
+    }
+
     if (!imageFile && !userPrefs.trim() && selectedTags.length === 0) {
       setErrorMessage(t('app.errors.provideInput'))
       return
@@ -454,6 +479,7 @@ function App() {
         break
       case 'history':
       case 'settings':
+      case 'pour-over':
       case 'live-shot':
         handleBackToStart()
         break
@@ -577,6 +603,7 @@ function App() {
   }
 
   const canSubmit = !!(imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0)
+  const aiAvailable = isAiConfigured && aiEnabled
 
   // Phase 3 layout helpers
   const showControlCenter = mqttEnabled && machineState._wsConnected
@@ -677,7 +704,10 @@ function App() {
                     setRunShotProfileName(undefined)
                     setViewState('run-shot')
                   }}
+                  onPourOver={() => setViewState('pour-over')}
                   onSettings={() => setViewState('settings')}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                   lastShotBanner={
                     mqttEnabled ? (
                       <LastShotBanner
@@ -720,6 +750,8 @@ function App() {
                   onBack={handleBackToStart}
                   onViewProfile={handleViewHistoryEntry}
                   onGenerateNew={() => setViewState('form')}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
               )}
 
@@ -728,6 +760,8 @@ function App() {
                   entry={selectedHistoryEntry}
                   onBack={() => setViewState('history')}
                   cachedImageUrl={selectedHistoryImageUrl}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                   onRunProfile={(profileId, profileName) => {
                     setRunShotProfileId(profileId)
                     setRunShotProfileName(profileName)
@@ -767,10 +801,19 @@ function App() {
                 />
               )}
 
+              {viewState === 'pour-over' && (
+                <PourOverView
+                  machineState={machineState}
+                  onBack={handleBackToStart}
+                />
+              )}
+
               {viewState === 'shot-history' && shotHistoryProfileName && (
                 <ShotHistoryView
                   profileName={shotHistoryProfileName}
                   onBack={handleBackToStart}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
               )}
 

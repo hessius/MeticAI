@@ -119,6 +119,7 @@ export type ViewState =
   | 'history-detail' 
   | 'settings' 
   | 'run-shot'
+  | 'pour-over'
   | 'live-shot'
   | 'shot-history';
 
