@@ -268,6 +268,7 @@ _OEPF_REFERENCE = (
 
 
 @router.post("/analyze_coffee")
+@router.post("/api/analyze_coffee")
 async def analyze_coffee(request: Request, file: UploadFile = File(...)):
     """Phase 1: Look at the bag."""
     request_id = request.state.request_id
@@ -335,6 +336,7 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         return {"error": str(e)}
 
 @router.post("/analyze_and_profile")
+@router.post("/api/analyze_and_profile")
 async def analyze_and_profile(
     request: Request,
     file: Optional[UploadFile] = File(None),

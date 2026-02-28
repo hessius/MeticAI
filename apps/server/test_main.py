@@ -295,6 +295,14 @@ class TestAnalyzeAndProfileEndpoint:
         
         assert response.status_code == 400
         assert "at least one" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_analyze_and_profile_missing_both_api_prefix(self, client):
+        """Test /api-prefixed route parity for analyze_and_profile endpoint."""
+        response = client.post("/api/analyze_and_profile")
+
+        assert response.status_code == 400
+        assert "At least one of" in response.json()["detail"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.subprocess.run')
