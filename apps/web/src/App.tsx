@@ -365,9 +365,28 @@ function App() {
     } catch (error) {
       clearInterval(messageInterval)
       console.error('Error:', error)
+
+      const buildFriendlyGenerateError = (err: Error): string => {
+        const message = err.message || ''
+
+        if (message.includes('HTTP error! status: 404')) {
+          return t('app.errors.generateFailed404Route')
+        }
+
+        if (message.includes('HTTP error! status: 504') || /timed out/i.test(message)) {
+          return t('app.errors.generateFailedTimeout')
+        }
+
+        if (/validation errors it couldn't resolve/i.test(message)) {
+          return t('app.errors.generateFailedValidation')
+        }
+
+        return t('app.errors.generateFailed', { message })
+      }
+
       setErrorMessage(
         error instanceof Error 
-          ? t('app.errors.generateFailed', { message: error.message }) 
+          ? buildFriendlyGenerateError(error)
           : t('app.errors.generateFailedGeneric')
       )
       setViewState('error')
