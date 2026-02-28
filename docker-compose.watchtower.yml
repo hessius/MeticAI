@@ -30,7 +30,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # - //./pipe/docker_engine:/var/run/docker.sock:ro  # Windows
     ports:
-      - "${WATCHTOWER_HOST_PORT:-127.0.0.1:8088}:8080"  # HTTP API — localhost only; configurable to avoid conflicts
+      - "${WATCHTOWER_HOST_PORT:-127.0.0.1:18088}:8080"  # HTTP API — localhost only; configurable to avoid conflicts
     logging:
       driver: json-file
       options:
