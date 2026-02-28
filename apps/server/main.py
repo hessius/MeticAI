@@ -80,19 +80,12 @@ def _is_masked(value: str) -> bool:
 
 
 def _write_s6_env(var_name: str, value: str) -> None:
-    """Write an environment variable to the s6 container environment directory.
+    """Write an env var to the s6 container environment directory.
 
-    Ensures that child services started via ``with-contenv`` pick up the value
-    on their next restart.  Silently skips when not running inside s6-overlay.
+    Thin wrapper around the shared utility for use during lifespan hydration.
     """
-    s6_env_dir = "/var/run/s6/container_environment"
-    if not os.path.isdir(s6_env_dir):
-        return
-    try:
-        with open(os.path.join(s6_env_dir, var_name), "w") as f:
-            f.write(value)
-    except Exception:
-        pass  # best-effort; logged at caller site if needed
+    from utils.s6_env import update_s6_env
+    update_s6_env(var_name, value)
 
 
 @asynccontextmanager

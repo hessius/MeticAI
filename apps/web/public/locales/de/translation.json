@@ -86,6 +86,9 @@
       "provideInput": "Please provide at least a coffee bag photo or taste preferences",
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
+      "generateFailed404Route": "Profilgenerierung fehlgeschlagen: Die Server-Route wurde nicht gefunden (404). Dies ist häufig ein Reverse-Proxy/API-Pfad-Fehler — überprüfen Sie, ob Ihr Proxy /api/* an MeticAI weiterleitet.",
+      "generateFailedTimeout": "Profilgenerierung fehlgeschlagen: Die AI-Anfrage hat das Zeitlimit überschritten. Bitte erneut versuchen; wenn das Problem weiterhin besteht, reduzieren Sie die Prompt-Komplexität oder verwenden Sie ein stärkeres Gemini-Modell.",
+      "generateFailedValidation": "Profilgenerierung fehlgeschlagen: Die AI hat ein ungültiges Profilschema erstellt. Bitte erneut versuchen — ein zweiter Versuch ist oft erfolgreich.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again."

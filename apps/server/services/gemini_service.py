@@ -353,6 +353,19 @@ def parse_gemini_error(error_text: str) -> str:
             "enter a valid GEMINI_API_KEY, then try again."
         )
     
+    # Check for long-running generation / model stall patterns
+    # (must come before the general network/connection check which also
+    # matches 'timeout' — we want the more specific message here.)
+    if (
+        'timed out after' in error_text_lower
+        or 'deadline exceeded' in error_text_lower
+        or 'took too long' in error_text_lower
+    ):
+        return (
+            "Profile generation timed out. Please retry; if this repeats, "
+            "reduce prompt complexity or use a stronger Gemini model."
+        )
+
     # Check for network/connection errors
     if 'network' in error_text_lower or 'connection' in error_text_lower or 'timeout' in error_text_lower:
         return (
@@ -371,17 +384,6 @@ def parse_gemini_error(error_text: str) -> str:
             "The AI generated a profile that failed schema validation. "
             "Please retry; if this keeps happening, simplify preferences "
             "or try a stronger model."
-        )
-
-    # Check for long-running generation / model stall patterns
-    if (
-        'timed out after' in error_text_lower
-        or 'deadline exceeded' in error_text_lower
-        or 'took too long' in error_text_lower
-    ):
-        return (
-            "Profile generation timed out. Please retry; if this repeats, "
-            "reduce prompt complexity or use a stronger Gemini model."
         )
     
     # Check for MCP/Meticulous connection errors
