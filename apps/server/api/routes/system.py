@@ -315,7 +315,6 @@ async def get_update_method(request: Request):
                     state_status = state_parts[0].strip() if state_parts else ""
                     state_error = state_parts[1].strip() if len(state_parts) > 1 else ""
                     watchtower_running = state_status == "running"
-                    can_trigger_update = watchtower_running
                     if state_error:
                         watchtower_error = state_error
             except Exception:
