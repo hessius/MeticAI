@@ -54,6 +54,9 @@ WATCHTOWER_API_ENDPOINTS = (
     "http://localhost:8088/v1/update",
 )
 
+WATCHTOWER_REACHABLE_STATUS_CODES = {200, 204, 401, 403, 404, 405}
+WATCHTOWER_TRIGGERABLE_STATUS_CODES = {200, 204}
+
 
 async def _probe_watchtower_api(method: str = "get") -> dict:
     """Probe known Watchtower API endpoints.
@@ -71,28 +74,54 @@ async def _probe_watchtower_api(method: str = "get") -> dict:
 
     errors: list[str] = []
 
+    async def _probe_one(client: httpx.AsyncClient, endpoint: str) -> dict:
+        timeout = 3.0 if method == "post" else 2.0
+        try:
+            if method == "post":
+                response = await client.post(endpoint, timeout=timeout)
+            else:
+                response = await client.get(endpoint, timeout=timeout)
+
+            status_code = response.status_code
+            return {
+                "endpoint": endpoint,
+                "status_code": status_code,
+                "reachable": status_code in WATCHTOWER_REACHABLE_STATUS_CODES,
+                "can_trigger": status_code in WATCHTOWER_TRIGGERABLE_STATUS_CODES,
+                "error": None,
+            }
+        except Exception as exc:
+            return {
+                "endpoint": endpoint,
+                "status_code": None,
+                "reachable": False,
+                "can_trigger": False,
+                "error": f"{endpoint}: {exc}",
+            }
+
     async with httpx.AsyncClient() as client:
-        for endpoint in WATCHTOWER_API_ENDPOINTS:
-            try:
-                if method == "post":
-                    response = await client.post(endpoint, timeout=10.0)
-                else:
-                    response = await client.get(endpoint, timeout=2.0)
-
-                status_code = response.status_code
-                reachable = status_code < 500
-                can_trigger = status_code in (200, 204)
-
-                if reachable:
+        tasks = [asyncio.create_task(_probe_one(client, endpoint)) for endpoint in WATCHTOWER_API_ENDPOINTS]
+        try:
+            for completed in asyncio.as_completed(tasks):
+                result = await completed
+                if result["reachable"]:
+                    for task in tasks:
+                        if not task.done():
+                            task.cancel()
                     return {
                         "reachable": True,
-                        "can_trigger": can_trigger,
-                        "endpoint": endpoint,
-                        "status_code": status_code,
+                        "can_trigger": result["can_trigger"],
+                        "endpoint": result["endpoint"],
+                        "status_code": result["status_code"],
                         "error": None,
                     }
-            except Exception as exc:
-                errors.append(f"{endpoint}: {exc}")
+                if result["error"]:
+                    errors.append(result["error"])
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     return {
         "reachable": False,
@@ -634,7 +663,7 @@ async def trigger_update(request: Request):
 
         probe = await _probe_watchtower_api(method="post")
 
-        if probe["reachable"]:
+        if probe["can_trigger"]:
             logger.info(
                 "Update triggered via Watchtower",
                 extra={
@@ -647,6 +676,16 @@ async def trigger_update(request: Request):
                 "status": "success",
                 "message": "Update triggered. Watchtower will pull the latest image and restart the container."
             }
+
+        if probe["reachable"]:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "error": f"Watchtower endpoint reachable but update not authorized (HTTP {probe['status_code']})",
+                    "message": "Automatic updates are available, but this Watchtower endpoint rejected the trigger request."
+                }
+            )
         
         # No Watchtower — manual update required
         raise HTTPException(

@@ -280,6 +280,7 @@ SCRIPT_PATH="${BATS_TEST_DIRNAME}/../scripts/install.sh"
 
 @test "Installer exits when compose up fails" {
     run grep -A8 'Failed to start MeticAI containers\.' "$SCRIPT_PATH"
+    [ "$status" -eq 0 ]
     [[ "$output" == *"exit 1"* ]]
 }
 

@@ -1316,9 +1316,10 @@ class TestTriggerUpdateEndpoint:
 
         response = client.post("/api/trigger-update")
         
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
-        assert data["status"] == "success"
+        assert data["detail"]["status"] == "error"
+        assert "rejected" in data["detail"]["message"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('httpx.AsyncClient')
@@ -4256,6 +4257,46 @@ class TestImageProxyEndpoint:
         mock_set_cache.assert_called_once_with("Data URI", b"fake_png_data")
         mock_httpx_client.assert_not_called()
 
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles._set_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_data_uri_preserves_mime_type(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_set_cache,
+        mock_httpx_client,
+        client
+    ):
+        """Test JPEG data URI responses preserve the source MIME type."""
+        import base64
+
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "JPEG Data URI"
+        partial_profile.id = "profile-jpeg"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "JPEG Data URI"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = f"data:image/jpeg;base64,{base64.b64encode(b'fake_jpeg_data').decode('utf-8')}"
+        mock_get_profile.return_value = full_profile
+
+        response = client.get("/api/profile/JPEG%20Data%20URI/image-proxy")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.content == b"fake_jpeg_data"
+        mock_set_cache.assert_called_once_with("JPEG Data URI", b"fake_jpeg_data")
+        mock_httpx_client.assert_not_called()
+
     @patch('api.routes.profiles._get_cached_image')
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
@@ -4326,7 +4367,7 @@ class TestImageProxyEndpoint:
     @patch('api.routes.profiles._get_cached_image')
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_image_proxy_absolute_url_no_machine_ip(
+    def test_image_proxy_absolute_url_rejected_when_not_allowed(
         self,
         mock_list_profiles,
         mock_get_profile,
@@ -4335,7 +4376,7 @@ class TestImageProxyEndpoint:
         mock_httpx_client_cls,
         client
     ):
-        """Test absolute image URLs do not require METICULOUS_IP."""
+        """Test absolute image URLs are rejected when host is not allowed."""
         mock_get_cache.return_value = None
 
         partial_profile = type('Profile', (), {})()
@@ -4354,6 +4395,56 @@ class TestImageProxyEndpoint:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.content = b"abs_url_png"
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_httpx_client_cls.return_value = mock_client
+
+        with patch.dict(os.environ, {}, clear=True):
+            response = client.get("/api/profile/Absolute%20URL/image-proxy")
+
+        assert response.status_code == 400
+        assert "not allowed" in response.json()["detail"].lower()
+        mock_client.get.assert_not_awaited()
+        mock_set_cache.assert_not_called()
+
+    @patch.dict(os.environ, {"METICULOUS_IP": "machine.local"})
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles._set_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_absolute_url_allowed_for_machine_host(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_set_cache,
+        mock_httpx_client_cls,
+        client
+    ):
+        """Test absolute image URLs are accepted when they match the configured machine host."""
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "Absolute URL"
+        partial_profile.id = "profile-792"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Absolute URL"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = "https://machine.local/profiles/profile-792/image"
+        mock_get_profile.return_value = full_profile
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"abs_url_png"
+        mock_response.headers = {"content-type": "image/png"}
 
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)

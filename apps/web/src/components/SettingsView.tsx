@@ -1165,7 +1165,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               </p>
               {updateMethod.watchtower_error && (
                 <p className="text-xs text-muted-foreground break-words mt-1">
-                  Watchtower status: {updateMethod.watchtower_error}
+                  {t('settings.updateMethod.watchtowerStatus')}: {updateMethod.watchtower_error}
                 </p>
               )}
             </div>

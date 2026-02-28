@@ -369,7 +369,8 @@
       "watchtower": "Automatic updates via Watchtower",
       "manual": "Manual updates only",
       "watchtowerDescription": "Updates are applied automatically when new versions are available.",
-      "manualDescription": "No automatic update mechanism detected. Update manually via docker pull."
+      "manualDescription": "No automatic update mechanism detected. Update manually via docker pull.",
+      "watchtowerStatus": "Watchtower status"
     },
     "version": "Version",
     "footer": "MeticAI • Built with ❤️ for coffee lovers"
