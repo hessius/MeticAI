@@ -47,60 +47,6 @@ _update_cache_time: Optional[datetime] = None
 UPDATE_CACHE_DURATION = timedelta(minutes=15)
 
 GITHUB_RELEASES_URL = "https://api.github.com/repos/hessius/MeticAI/releases/latest"
-WATCHTOWER_API_ENDPOINTS = (
-    "http://watchtower:8080/v1/update",
-    "http://meticai-watchtower:8080/v1/update",
-    "http://localhost:18088/v1/update",
-    "http://localhost:8088/v1/update",
-)
-
-
-async def _probe_watchtower_api(method: str = "get") -> dict:
-    """Probe known Watchtower API endpoints.
-
-    Returns:
-        {
-            "reachable": bool,
-            "can_trigger": bool,
-            "endpoint": str | None,
-            "status_code": int | None,
-            "error": str | None,
-        }
-    """
-    import httpx
-
-    errors: list[str] = []
-
-    async with httpx.AsyncClient() as client:
-        for endpoint in WATCHTOWER_API_ENDPOINTS:
-            try:
-                if method == "post":
-                    response = await client.post(endpoint, timeout=10.0)
-                else:
-                    response = await client.get(endpoint, timeout=2.0)
-
-                status_code = response.status_code
-                reachable = status_code < 500
-                can_trigger = status_code in (200, 204)
-
-                if reachable:
-                    return {
-                        "reachable": True,
-                        "can_trigger": can_trigger,
-                        "endpoint": endpoint,
-                        "status_code": status_code,
-                        "error": None,
-                    }
-            except Exception as exc:
-                errors.append(f"{endpoint}: {exc}")
-
-    return {
-        "reachable": False,
-        "can_trigger": False,
-        "endpoint": None,
-        "status_code": None,
-        "error": "; ".join(errors) if errors else "Watchtower API not reachable",
-    }
 
 
 def _get_running_version() -> str:
@@ -268,38 +214,35 @@ async def get_update_method(request: Request):
     request_id = request.state.request_id
     
     try:
-        probe = await _probe_watchtower_api(method="get")
-        watchtower_running = probe["reachable"]
-        can_trigger_update = probe["can_trigger"]
-        watchtower_error = probe["error"]
-
-        if not watchtower_running:
+        watchtower_running = False
+        
+        # Check for Watchtower: try to reach its HTTP API on port 8088
+        # or detect the container via docker socket
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                # Watchtower in the compose stack maps host 8088 → container 8080
+                resp = await client.get("http://localhost:8088/v1/update", timeout=2.0)
+                # Any response (even 401) means watchtower is there
+                watchtower_running = True
+        except Exception:
+            # Also check if watchtower container exists via docker
             try:
                 result = subprocess.run(
-                    ["docker", "inspect", "--format", "{{.State.Status}}|{{.State.Error}}", "meticai-watchtower"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
+                    ["docker", "ps", "--filter", "name=watchtower", "--format", "{{.Names}}"],
+                    capture_output=True, text=True, timeout=5
                 )
-                if result.returncode == 0:
-                    state_parts = result.stdout.strip().split("|", 1)
-                    state_status = state_parts[0].strip() if state_parts else ""
-                    state_error = state_parts[1].strip() if len(state_parts) > 1 else ""
-                    watchtower_running = state_status == "running"
-                    can_trigger_update = watchtower_running
-                    if state_error:
-                        watchtower_error = state_error
+                if result.returncode == 0 and "watchtower" in result.stdout:
+                    watchtower_running = True
             except Exception:
                 pass
-
+        
         method = "watchtower" if watchtower_running else "manual"
-
+        
         return {
             "method": method,
             "watchtower_running": watchtower_running,
-            "can_trigger_update": can_trigger_update,
-            "watchtower_endpoint": probe["endpoint"],
-            "watchtower_error": watchtower_error,
+            "can_trigger_update": watchtower_running
         }
     except Exception as e:
         logger.error(
@@ -627,21 +570,42 @@ async def trigger_update(request: Request):
     request_id = request.state.request_id
     
     try:
+        import httpx
+        
         logger.info(
             "Triggering update via Watchtower HTTP API",
             extra={"request_id": request_id, "endpoint": "/api/trigger-update"}
         )
-
-        probe = await _probe_watchtower_api(method="post")
-
-        if probe["reachable"]:
+        
+        watchtower_triggered = False
+        
+        # Try Watchtower HTTP API — POST triggers an immediate check
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "http://localhost:8088/v1/update",
+                    timeout=10.0,
+                )
+                # 200 = update started, 401 = no token (but watchtower is there)
+                if resp.status_code in (200, 204):
+                    watchtower_triggered = True
+                elif resp.status_code == 401:
+                    # Watchtower is running but requires a token
+                    watchtower_triggered = True
+                    logger.warning(
+                        "Watchtower returned 401 — update may still proceed",
+                        extra={"request_id": request_id}
+                    )
+        except Exception as wt_err:
+            logger.debug(
+                f"Watchtower HTTP API not reachable: {wt_err}",
+                extra={"request_id": request_id}
+            )
+        
+        if watchtower_triggered:
             logger.info(
                 "Update triggered via Watchtower",
-                extra={
-                    "request_id": request_id,
-                    "endpoint": probe["endpoint"],
-                    "status_code": probe["status_code"],
-                }
+                extra={"request_id": request_id}
             )
             return {
                 "status": "success",
