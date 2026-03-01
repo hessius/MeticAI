@@ -59,12 +59,14 @@ function Save-EnvMap {
     }
 
     foreach ($key in @($Map.Keys)) {
+        $val = $Map[$key]
+        $line = if ($val -match '\s') { "$key=`"$val`"" } else { "$key=$val" }
         if ($existing.ContainsKey($key)) {
             $lines = $lines | ForEach-Object {
-                if ($_ -match "^$([regex]::Escape($key))=") { "$key=$($Map[$key])" } else { $_ }
+                if ($_ -match "^$([regex]::Escape($key))=") { $line } else { $_ }
             }
         } else {
-            $lines += "$key=$($Map[$key])"
+            $lines += $line
         }
     }
 

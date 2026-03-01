@@ -328,6 +328,18 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         )
         
         return {"analysis": analysis}
+    except ValueError as e:
+        logger.warning(
+            f"Coffee analysis unavailable: {str(e)}",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_coffee",
+            }
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI features are unavailable. Please configure a Gemini API key in Settings."
+        )
     except Exception as e:
         logger.error(
             f"Coffee analysis failed: {str(e)}",
@@ -643,6 +655,18 @@ async def analyze_and_profile(
         )
     except HTTPException:
         raise
+    except ValueError as e:
+        logger.warning(
+            f"Profile creation unavailable: {str(e)}",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_and_profile",
+            }
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI features are unavailable. Please configure a Gemini API key in Settings."
+        )
     except Exception as e:
         logger.error(
             f"Profile creation failed: {str(e)}",
