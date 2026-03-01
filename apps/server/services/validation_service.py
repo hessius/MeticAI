@@ -20,12 +20,17 @@ _FULL_VALIDATOR_AVAILABLE = False
 _ProfileValidator = None
 
 try:
-    # Add MCP server path so we can import the validator
-    _mcp_src = os.path.join(
-        os.path.dirname(__file__), "..", "..", "mcp-server", "meticulous-mcp", "src"
-    )
-    if os.path.isdir(_mcp_src) and _mcp_src not in sys.path:
-        sys.path.insert(0, _mcp_src)
+    # Add MCP server paths - try Docker layout first, then local dev
+    _mcp_paths = [
+        "/app/mcp-server/meticulous-mcp/src",  # Docker container layout
+        os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "mcp-server", "meticulous-mcp", "src"
+        ),  # Local dev: apps/server/services -> apps/mcp-server
+    ]
+    for _mcp_src in _mcp_paths:
+        if os.path.isdir(_mcp_src) and _mcp_src not in sys.path:
+            sys.path.insert(0, _mcp_src)
+            break
 
     from meticulous_mcp.profile_validator import (  # type: ignore[import-untyped]
         ProfileValidator as _PV,

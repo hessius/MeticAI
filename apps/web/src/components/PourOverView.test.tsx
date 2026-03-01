@@ -135,8 +135,6 @@ describe('PourOverView', () => {
   })
 
   it('shows offline notice and disables tare when machine is disconnected', async () => {
-    const user = userEvent.setup()
-
     render(
       <PourOverView
         machineState={makeMachineState({ connected: false, shot_weight: 0 })}

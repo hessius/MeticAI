@@ -387,8 +387,8 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                   <div className="pt-1">
                     <div className="flex items-center justify-between rounded-lg border border-border/30 p-2.5">
                       <div>
-                        <p className="text-xs font-medium">Generate AI descriptions</p>
-                        <p className="text-[10px] text-muted-foreground">Adds richer profile summaries during import</p>
+                        <p className="text-xs font-medium">{t('profileImport.generateAiDescriptions')}</p>
+                        <p className="text-[10px] text-muted-foreground">{t('profileImport.generateAiDescriptionsHint')}</p>
                       </div>
                       <Switch
                         checked={generateDescriptions}
@@ -397,7 +397,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                       />
                     </div>
                     {!aiConfigured && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5 text-center">AI descriptions are unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.</p>
+                      <p className="text-[10px] text-muted-foreground mt-1.5 text-center">{t('profileImport.aiDescriptionsUnavailable')}</p>
                     )}
                   </div>
                 )}
