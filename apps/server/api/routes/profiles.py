@@ -398,8 +398,8 @@ async def generate_profile_image(
             client = get_gemini_client()
         except ValueError:
             raise HTTPException(
-                status_code=402,
-                detail="Image generation requires GEMINI_API_KEY to be set."
+                status_code=503,
+                detail="AI features are unavailable. Please configure a Gemini API key in Settings."
             )
         
         response = client.models.generate_images(
@@ -1672,9 +1672,11 @@ async def import_profile(request: Request):
                     f"Failed to generate description: {e}",
                     extra={"request_id": request_id}
                 )
-                reply = f"Profile imported from {source}. Description generation failed."
+                from services.analysis_service import _build_static_profile_description
+                reply = _build_static_profile_description(profile_json)
         else:
-            reply = f"Profile imported from {source}."
+            from services.analysis_service import _build_static_profile_description
+            reply = _build_static_profile_description(profile_json)
         
         # Create history entry
         entry_id = str(uuid.uuid4())
@@ -1831,9 +1833,11 @@ async def import_all_profiles(request: Request):
                             reply = await _generate_profile_description(profile_json, request_id)
                         except Exception as e:
                             logger.warning(f"Failed to generate description for {profile_name}: {e}")
-                            reply = "Profile imported from machine. Description generation failed."
+                            from services.analysis_service import _build_static_profile_description
+                            reply = _build_static_profile_description(profile_json)
                     else:
-                        reply = "Profile imported from machine."
+                        from services.analysis_service import _build_static_profile_description
+                        reply = _build_static_profile_description(profile_json)
                     
                     # Create history entry
                     entry_id = str(uuid.uuid4())

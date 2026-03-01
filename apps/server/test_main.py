@@ -3964,7 +3964,7 @@ class TestProfileImportEndpoint:
     @patch('api.routes.profiles.load_history', return_value=[])
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
     def test_import_profile_description_generation_fails(self, mock_generate_desc, mock_load_history, mock_save_history, client):
-        """Test import continues when description generation fails."""
+        """Test import falls back to static description when AI generation fails."""
         mock_generate_desc.side_effect = Exception("AI service unavailable")
         
         profile_json = {
@@ -3984,8 +3984,8 @@ class TestProfileImportEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        # Should have fallback message
-        assert data["has_description"] is False
+        # Should have a static fallback description (not empty)
+        assert data["has_description"] is True
         mock_save_history.assert_called_once()
 
     @patch('api.routes.profiles.save_history')
@@ -5061,7 +5061,7 @@ class TestGenerateProfileImageEndpoint:
         with patch('services.gemini_service.get_gemini_client', side_effect=ValueError("GEMINI_API_KEY environment variable is required")):
             response = client.post("/api/profile/Test/generate-image")
         
-        assert response.status_code == 402
+        assert response.status_code == 503
 
     @patch('api.routes.profiles._set_cached_image')
     @patch('api.routes.profiles.process_image_for_profile')
