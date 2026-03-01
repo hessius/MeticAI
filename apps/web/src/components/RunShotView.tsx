@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -65,6 +66,7 @@ interface RunShotViewProps {
 const PREHEAT_DURATION_MINUTES = 10
 
 export function RunShotView({ onBack, initialProfileId, initialProfileName }: RunShotViewProps) {
+  const { t } = useTranslation()
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
       ? { id: initialProfileId, name: initialProfileName } 
@@ -116,14 +118,14 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
         const response = await fetch(`${serverUrl}/api/machine/profiles`)
         if (!response.ok) {
           console.error('Failed to fetch profiles: HTTP', response.status)
-          toast.error('Failed to load profiles from machine')
+          toast.error(t('runShot.noProfilesFound'))
           return
         }
         const data = await response.json()
         setProfiles(data.profiles || [])
       } catch (err) {
         console.error('Failed to fetch profiles:', err)
-        toast.error('Failed to load profiles from machine')
+        toast.error(t('runShot.noProfilesFound'))
       } finally {
         setIsLoadingProfiles(false)
       }
@@ -183,7 +185,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
 
   const handleRunNow = async () => {
     if (!selectedProfile && !preheat) {
-      toast.error('Please select a profile or enable preheat')
+      toast.error(t('runShot.selectProfileOrPreheat'))
       return
     }
 
@@ -205,7 +207,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
         })
         
         if (!preheatResponse.ok) {
-          let errorMessage = 'Failed to start preheat'
+          let errorMessage = t('runShot.toasts.preheatFailed')
           try {
             const error = await preheatResponse.json()
             errorMessage = error?.detail || errorMessage
@@ -216,7 +218,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           throw new Error(errorMessage)
         }
         
-        toast.success(`Preheating started! Ready in ${PREHEAT_DURATION_MINUTES} minutes`)
+        toast.success(t('runShot.toasts.preheatingStarted'))
         
         // Set timeout to clear preheating state after duration
         preheatTimeoutRef.current = setTimeout(() => {
@@ -238,7 +240,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           })
 
           if (!scheduleResponse.ok) {
-            let errorMessage = 'Failed to schedule profile after preheat'
+            let errorMessage = t('runShot.toasts.scheduleFailed')
             try {
               const error = await scheduleResponse.json()
               errorMessage = error?.detail || errorMessage
@@ -248,7 +250,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
             throw new Error(errorMessage)
           }
 
-          toast.success(`Profile "${selectedProfile.name}" will run in ${PREHEAT_DURATION_MINUTES} minutes`)
+          toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
         }
       } else if (selectedProfile) {
         // Run profile immediately
@@ -257,7 +259,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
         })
         
         if (!response.ok) {
-          let errorMessage = 'Failed to run profile'
+          let errorMessage = t('runShot.toasts.runFailed')
           try {
             const error = await response.json()
             errorMessage = error?.detail || errorMessage
@@ -267,11 +269,11 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           throw new Error(errorMessage)
         }
         
-        toast.success(`Started "${selectedProfile.name}"!`)
+        toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
       }
     } catch (err) {
       console.error('Failed to run shot:', err)
-      toast.error(err instanceof Error ? err.message : 'Failed to run shot')
+      toast.error(err instanceof Error ? err.message : t('runShot.toasts.shotFailed'))
       
       // Clear preheating state and timeout on error
       setIsPreheating(false)
@@ -286,7 +288,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
 
   const handleSchedule = async () => {
     if (!selectedProfile && !preheat) {
-      toast.error('Please select a profile or enable preheat')
+      toast.error(t('runShot.selectProfileOrPreheat'))
       return
     }
 
@@ -295,7 +297,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
     if (preheat) {
       const currentMinScheduledTime = addMinutes(new Date(), PREHEAT_DURATION_MINUTES)
       if (scheduledTime < currentMinScheduledTime) {
-        toast.error(`Scheduled time must be at least ${PREHEAT_DURATION_MINUTES} minutes from now when preheat is enabled`)
+        toast.error(t('runShot.scheduledTimeError'))
         return
       }
     }
@@ -347,7 +349,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       }
     } catch (err) {
       console.error('Failed to cancel scheduled shot:', err)
-      toast.error('Failed to cancel scheduled shot')
+      toast.error(t('runShot.toasts.shotFailed'))
     }
   }
 
@@ -397,17 +399,17 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       
       if (editingRecurring) {
         setRecurringSchedules(prev => prev.map(s => s.id === editingRecurring.id ? data.schedule : s))
-        toast.success('Recurring schedule updated')
+        toast.success(t('runShot.toasts.scheduleUpdated'))
       } else {
         setRecurringSchedules(prev => [...prev, data.schedule])
-        toast.success('Recurring schedule created')
+        toast.success(t('runShot.toasts.scheduleCreated'))
       }
       
       resetRecurringForm()
       setShowRecurringForm(false)
     } catch (err) {
       console.error('Failed to save recurring schedule:', err)
-      toast.error(err instanceof Error ? err.message : 'Failed to save recurring schedule')
+      toast.error(err instanceof Error ? err.message : t('runShot.toasts.saveFailed'))
     }
   }
 
@@ -424,7 +426,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
   }
 
   const handleDeleteRecurring = async (scheduleId: string) => {
-    if (!confirm('Are you sure you want to delete this recurring schedule?')) return
+    if (!confirm(t('runShot.deleteScheduleConfirm'))) return
     
     try {
       const serverUrl = await getServerUrl()
@@ -434,11 +436,11 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       
       if (response.ok) {
         setRecurringSchedules(prev => prev.filter(s => s.id !== scheduleId))
-        toast.success('Recurring schedule deleted')
+        toast.success(t('runShot.toasts.scheduleDeleted'))
       }
     } catch (err) {
       console.error('Failed to delete recurring schedule:', err)
-      toast.error('Failed to delete recurring schedule')
+      toast.error(t('runShot.toasts.deleteFailed'))
     }
   }
 
@@ -454,22 +456,22 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       if (response.ok) {
         const data = await response.json()
         setRecurringSchedules(prev => prev.map(s => s.id === schedule.id ? data.schedule : s))
-        toast.success(schedule.enabled ? 'Schedule paused' : 'Schedule enabled')
+        toast.success(schedule.enabled ? t('runShot.toasts.schedulePaused') : t('runShot.toasts.scheduleEnabled'))
       }
     } catch (err) {
       console.error('Failed to toggle recurring schedule:', err)
-      toast.error('Failed to update schedule')
+      toast.error(t('runShot.toasts.updateFailed'))
     }
   }
 
   const getRecurrenceLabel = (schedule: RecurringSchedule) => {
     switch (schedule.recurrence_type) {
-      case 'daily': return 'Every day'
-      case 'weekdays': return 'Weekdays (Mon-Fri)'
-      case 'weekends': return 'Weekends (Sat-Sun)'
-      case 'interval': return `Every ${schedule.interval_days} day${(schedule.interval_days || 1) > 1 ? 's' : ''}`
+      case 'daily': return t('runShot.everyDay')
+      case 'weekdays': return t('runShot.weekdays')
+      case 'weekends': return t('runShot.weekends')
+      case 'interval': return t('runShot.everyXDaysCount', { count: schedule.interval_days || 1 })
       case 'specific_days': {
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        const days = [t('common.mon'), t('common.tue'), t('common.wed'), t('common.thu'), t('common.fri'), t('common.sat'), t('common.sun')]
         return (schedule.days_of_week || []).map(d => days[d]).join(', ')
       }
       default: return schedule.recurrence_type
@@ -522,11 +524,11 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           size="icon"
           onClick={onBack}
           className="shrink-0"
-          title="Back"
+          title={t('common.back')}
         >
           <CaretLeft size={22} weight="bold" />
         </Button>
-        <h2 className="text-xl font-bold">Run / Schedule</h2>
+        <h2 className="text-xl font-bold">{t('runShot.title')}</h2>
         {machineStatus !== 'unknown' && (
           <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 text-xs">
             <span className={`w-2 h-2 rounded-full ${getMachineStatusIndicatorClass(machineStatus)}`} />
@@ -547,7 +549,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
             <div className="flex items-center gap-3">
               <Fire size={24} className="text-orange-500 animate-pulse" weight="duotone" />
               <div className="flex-1">
-                <p className="font-medium text-orange-700 dark:text-orange-400">Preheating in Progress</p>
+                <p className="font-medium text-orange-700 dark:text-orange-400">{t('runShot.preheatingInProgress')}</p>
                 <p className="text-sm text-orange-600/80 dark:text-orange-400/80">
                   Machine is heating up. Ready in approximately {PREHEAT_DURATION_MINUTES} minutes.
                 </p>
@@ -565,13 +567,13 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       {/* Profile Selection */}
       <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Label className="text-base font-medium">Profile</Label>
+          <Label className="text-base font-medium">{t('runShot.profile')}</Label>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowProfileSelector(!showProfileSelector)}
           >
-            {selectedProfile ? 'Change' : 'Select Profile'}
+            {selectedProfile ? t('runShot.changeProfile') : t('runShot.selectProfile')}
           </Button>
         </div>
         
@@ -589,7 +591,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No profile selected. Select a profile or use preheat only.
+            {t('runShot.noProfileSelected')}
           </p>
         )}
 
@@ -609,7 +611,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                   </div>
                 ) : profiles.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    No profiles found on machine
+                    {t('runShot.noProfilesFound')}
                   </p>
                 ) : (
                   profiles.map(profile => (
@@ -640,17 +642,17 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
 
       {/* Options */}
       <Card className="p-6 space-y-4">
-        <h3 className="text-base font-medium">Options</h3>
+        <h3 className="text-base font-medium">{t('runShot.options')}</h3>
         
         {/* Preheat Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="preheat" className="text-sm font-medium flex items-center gap-2">
               <Fire size={18} className={preheat ? 'text-orange-500' : 'text-muted-foreground'} />
-              Preheat
+              {t('runShot.preheat')}
             </Label>
             <p className="text-xs text-muted-foreground">
-              Preheat machine for {PREHEAT_DURATION_MINUTES} minutes
+              {t('runShot.preheatDescription')}
             </p>
           </div>
           <Switch
@@ -665,10 +667,10 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           <div className="space-y-0.5">
             <Label htmlFor="schedule" className="text-sm font-medium flex items-center gap-2">
               <CalendarBlank size={18} className={scheduleMode ? 'text-primary' : 'text-muted-foreground'} />
-              Schedule
+              {t('runShot.schedule')}
             </Label>
             <p className="text-xs text-muted-foreground">
-              Run later at a specific time
+              {t('runShot.runLaterDescription')}
             </p>
           </div>
           <Switch
@@ -688,7 +690,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
               className="overflow-hidden"
             >
               <div className="pt-3 border-t space-y-2">
-                <Label className="text-sm">Scheduled Time</Label>
+                <Label className="text-sm">{t('runShot.scheduledTime')}</Label>
                 <input
                   type="datetime-local"
                   value={format(scheduledTime, "yyyy-MM-dd'T'HH:mm")}
@@ -703,10 +705,11 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                     "yyyy-MM-dd'T'HH:mm"
                   )}
                   className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                  title={t('runShot.scheduledTime')}
                 />
                 {preheat && (
                   <p className="text-xs text-muted-foreground">
-                    Preheat will start at {format(addMinutes(scheduledTime, -PREHEAT_DURATION_MINUTES), 'HH:mm')}
+                    {t('runShot.preheatStartsAt', { time: format(addMinutes(scheduledTime, -PREHEAT_DURATION_MINUTES), 'HH:mm') })}
                   </p>
                 )}
               </div>
@@ -730,22 +733,22 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           <Play size={20} className="mr-2" weight="fill" />
         )}
         {isRunning 
-          ? 'Starting...' 
+          ? t('common.loading') 
           : scheduleMode 
-            ? 'Schedule Shot'
+            ? t('runShot.scheduleShot')
             : preheat && selectedProfile 
-              ? 'Preheat & Run' 
+              ? t('runShot.preheatAndRun') 
               : preheat 
-                ? 'Start Preheat' 
-                : 'Run Now'}
+                ? t('runShot.startPreheat') 
+                : t('runShot.runNow')}
       </Button>
 
       {/* Help Text */}
       <p className="text-xs text-muted-foreground text-center">
-        {!selectedProfile && preheat && 'Preheat only - no profile will be run'}
-        {selectedProfile && !preheat && !scheduleMode && 'Profile will start immediately'}
-        {selectedProfile && preheat && !scheduleMode && `Preheat will start now, profile runs in ${PREHEAT_DURATION_MINUTES} min`}
-        {scheduleMode && preheat && `Preheat starts ${PREHEAT_DURATION_MINUTES} min before scheduled time`}
+        {!selectedProfile && preheat && t('runShot.preheatOnlyHelper')}
+        {selectedProfile && !preheat && !scheduleMode && t('runShot.preheatStartsNow')}
+        {selectedProfile && preheat && !scheduleMode && t('runShot.preheatStartsNow')}
+        {scheduleMode && preheat && t('runShot.preheatStartsBefore')}
       </p>
       </div>{/* end left column */}
 
@@ -755,7 +758,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       {/* Scheduled Shots */}
       {scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (
         <Card className="p-6 space-y-4">
-          <h3 className="text-base font-medium">Scheduled Shots</h3>
+          <h3 className="text-base font-medium">{t('runShot.scheduledShots')}</h3>
           <div className="space-y-2">
             {scheduledShots
               .filter(s => s.status !== 'completed' && s.status !== 'cancelled')
@@ -776,8 +779,8 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                       variant="ghost"
                       size="icon"
                       onClick={() => handleCancelScheduled(shot.id)}
-                      aria-label="Cancel scheduled shot"
-                      title="Cancel scheduled shot"
+                      aria-label={t('runShot.cancelScheduledShot')}
+                      title={t('runShot.cancelScheduledShot')}
                     >
                       <X size={16} />
                     </Button>
@@ -793,7 +796,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Repeat size={20} className="text-primary" />
-            <h3 className="text-base font-medium">Recurring Schedules</h3>
+            <h3 className="text-base font-medium">{t('runShot.recurringSchedules')}</h3>
           </div>
           <Button
             variant="outline"
@@ -819,44 +822,46 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
             >
               <div className="space-y-3">
                 <div>
-                  <Label className="text-sm">Schedule Name (optional)</Label>
+                  <Label className="text-sm">{t('runShot.scheduleName')}</Label>
                   <input
                     type="text"
                     value={recurringName}
                     onChange={e => setRecurringName(e.target.value)}
-                    placeholder="e.g., Morning coffee"
+                    placeholder={t('runShot.scheduleNamePlaceholder')}
                     className="w-full mt-1 px-3 py-2 bg-background border rounded-md text-sm"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-sm">Time</Label>
+                  <Label className="text-sm">{t('runShot.time')}</Label>
                   <input
                     type="time"
                     value={recurringTime}
                     onChange={e => setRecurringTime(e.target.value)}
                     className="w-full mt-1 px-3 py-2 bg-background border rounded-md text-sm"
+                    title={t('runShot.time')}
                   />
                 </div>
 
                 <div>
-                  <Label className="text-sm">Repeat</Label>
+                  <Label className="text-sm">{t('runShot.repeat')}</Label>
                   <select
                     value={recurringType}
                     onChange={e => setRecurringType(e.target.value as typeof recurringType)}
                     className="w-full mt-1 px-3 py-2 bg-background border rounded-md text-sm"
+                    title={t('runShot.repeat')}
                   >
-                    <option value="daily">Every day</option>
-                    <option value="weekdays">Weekdays (Mon-Fri)</option>
-                    <option value="weekends">Weekends (Sat-Sun)</option>
-                    <option value="interval">Every X days</option>
-                    <option value="specific_days">Specific days</option>
+                    <option value="daily">{t('runShot.everyDay')}</option>
+                    <option value="weekdays">{t('runShot.weekdays')}</option>
+                    <option value="weekends">{t('runShot.weekends')}</option>
+                    <option value="interval">{t('runShot.everyXDays')}</option>
+                    <option value="specific_days">{t('runShot.specificDays')}</option>
                   </select>
                 </div>
 
                 {recurringType === 'interval' && (
                   <div>
-                    <Label className="text-sm">Every X days</Label>
+                    <Label className="text-sm">{t('runShot.everyXDays')}</Label>
                     <input
                       type="number"
                       min={1}
@@ -864,13 +869,14 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                       value={recurringIntervalDays}
                       onChange={e => setRecurringIntervalDays(parseInt(e.target.value) || 1)}
                       className="w-full mt-1 px-3 py-2 bg-background border rounded-md text-sm"
+                      title={t('runShot.everyXDays')}
                     />
                   </div>
                 )}
 
                 {recurringType === 'specific_days' && (
                   <div>
-                    <Label className="text-sm">Select days</Label>
+                    <Label className="text-sm">{t('runShot.selectDays')}</Label>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, idx) => (
                         <Button
@@ -894,13 +900,14 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                 )}
 
                 <div>
-                  <Label className="text-sm">Profile (optional)</Label>
+                  <Label className="text-sm">{t('runShot.profileOptional')}</Label>
                   <select
                     value={recurringProfileId || ''}
                     onChange={e => setRecurringProfileId(e.target.value || null)}
                     className="w-full mt-1 px-3 py-2 bg-background border rounded-md text-sm"
+                    title={t('runShot.profileOptional')}
                   >
-                    <option value="">Preheat only</option>
+                    <option value="">{t('runShot.preheatOnly')}</option>
                     {profiles.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
@@ -908,7 +915,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm">Preheat before shot</Label>
+                  <Label className="text-sm">{t('runShot.preheatBeforeShot')}</Label>
                   <Switch checked={recurringPreheat} onCheckedChange={setRecurringPreheat} />
                 </div>
               </div>
@@ -919,13 +926,13 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                   onClick={handleSaveRecurring}
                   disabled={recurringType === 'specific_days' && recurringDaysOfWeek.length === 0}
                 >
-                  {editingRecurring ? 'Update' : 'Create'} Schedule
+                  {editingRecurring ? t('runShot.updateSchedule') : t('runShot.createSchedule')}
                 </Button>
                 <Button variant="outline" onClick={() => {
                   resetRecurringForm()
                   setShowRecurringForm(false)
                 }}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             </motion.div>
@@ -963,7 +970,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                     variant="ghost"
                     size="icon"
                     onClick={() => handleToggleRecurring(schedule)}
-                    title={schedule.enabled ? 'Pause schedule' : 'Enable schedule'}
+                    title={schedule.enabled ? t('runShot.pauseSchedule') : t('runShot.enableSchedule')}
                   >
                     {schedule.enabled ? <Clock size={16} /> : <Play size={16} />}
                   </Button>
@@ -971,7 +978,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                     variant="ghost"
                     size="icon"
                     onClick={() => handleEditRecurring(schedule)}
-                    title="Edit schedule"
+                    title={t('runShot.editSchedule')}
                   >
                     <PencilSimple size={16} />
                   </Button>
@@ -979,7 +986,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteRecurring(schedule.id)}
-                    title="Delete schedule"
+                    title={t('runShot.deleteSchedule')}
                   >
                     <Trash size={16} />
                   </Button>
@@ -991,7 +998,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
 
         {recurringSchedules.length === 0 && !showRecurringForm && (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No recurring schedules yet. Create one to automatically preheat or run shots at set times.
+            {t('runShot.noRecurringSchedules')}
           </p>
         )}
       </Card>

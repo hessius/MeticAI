@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -100,6 +101,7 @@ interface HistoryViewProps {
 }
 
 export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
+  const { t } = useTranslation()
   const { 
     entries, 
     total, 
@@ -173,7 +175,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
 
   const handleDelete = async (entryId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm('Are you sure you want to delete this profile from history?')) {
+    if (!confirm(t('history.deleteConfirm'))) {
       return
     }
     
@@ -193,18 +195,18 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
       await downloadJson(entry)
     } catch (err) {
       console.error('Failed to download:', err)
-      alert('Profile JSON not available for this entry')
+      alert(t('history.jsonNotAvailable'))
     }
   }
 
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return 'Recently added'
+    if (!dateStr) return t('history.recentlyAdded')
     try {
       const date = new Date(dateStr)
-      if (isNaN(date.getTime())) return 'Recently added'
+      if (isNaN(date.getTime())) return t('history.recentlyAdded')
       return formatDistanceToNow(date, { addSuffix: true })
     } catch {
-      return 'Recently added'
+      return t('history.recentlyAdded')
     }
   }
 
@@ -229,14 +231,14 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
             <div className="p-1.5 rounded-lg bg-primary/10">
               <Coffee size={22} className="text-primary" weight="fill" />
             </div>
-            <h2 className="text-lg font-bold tracking-tight">Profile Catalogue</h2>
+            <h2 className="text-lg font-bold tracking-tight">{t('history.title')}</h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Button
               onClick={() => setShowImportDialog(true)}
               size="icon"
               className="h-9 w-9 bg-amber-500 hover:bg-amber-600 text-zinc-900"
-              title="Add Profile"
+              title={t('history.addProfile')}
             >
               <Plus size={18} weight="bold" />
             </Button>
@@ -245,7 +247,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
               size="icon"
               onClick={() => setShowFilters(!showFilters)}
               className={`shrink-0 h-9 w-9 ${selectedFilterTags.length > 0 ? 'text-primary' : ''}`}
-              title="Filter by tags"
+              title={t('history.filterByTags')}
             >
               <Funnel size={18} weight={showFilters || selectedFilterTags.length > 0 ? "fill" : "regular"} />
             </Button>
@@ -270,7 +272,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
             >
               <div className="p-4 bg-secondary/40 rounded-xl border border-border/30 space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold text-foreground/80">Filter by Tags</Label>
+                  <Label className="text-xs font-semibold text-foreground/80">{t('history.filterByTags')}</Label>
                   <div className="flex items-center gap-2">
                     {selectedFilterTags.length > 0 && (
                       <Button
@@ -280,7 +282,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
                         className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
                       >
                         <X size={12} className="mr-1" />
-                        Clear
+                        {t('common.clear')}
                       </Button>
                     )}
                     <div className="flex items-center bg-secondary rounded-lg p-0.5 border border-border/30">
@@ -327,8 +329,8 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
                 {selectedFilterTags.length > 0 && (
                   <p className="text-xs text-muted-foreground/70">
                     {filterMode === 'OR' 
-                      ? 'Showing profiles with any of the selected tags'
-                      : 'Showing profiles with all selected tags'
+                      ? t('history.filterHintOr')
+                      : t('history.filterHintAnd')
                     }
                   </p>
                 )}
@@ -347,7 +349,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
           <div className="flex items-center justify-center py-16">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              <p className="text-sm text-muted-foreground">Loading history...</p>
+              <p className="text-sm text-muted-foreground">{t('history.loadingHistory')}</p>
             </div>
           </div>
         ) : entries.length === 0 ? (
@@ -355,9 +357,9 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
             <div className="p-4 rounded-2xl bg-secondary/40 inline-block mb-4">
               <Coffee size={40} className="text-muted-foreground/40" weight="duotone" />
             </div>
-            <p className="text-foreground/80 font-medium">No profiles yet</p>
+            <p className="text-foreground/80 font-medium">{t('history.noProfiles')}</p>
             <p className="text-sm text-muted-foreground/60 mt-1.5">
-              Add your first espresso profile to see it here
+              {t('history.noProfilesDescription')}
             </p>
           </div>
         ) : filteredEntries.length === 0 ? (
@@ -365,9 +367,9 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
             <div className="p-4 rounded-2xl bg-secondary/40 inline-block mb-4">
               <Funnel size={40} className="text-muted-foreground/40" weight="duotone" />
             </div>
-            <p className="text-foreground/80 font-medium">No matching profiles</p>
+            <p className="text-foreground/80 font-medium">{t('history.noMatchingProfiles')}</p>
             <p className="text-sm text-muted-foreground/60 mt-1.5">
-              Try adjusting your filter settings
+              {t('history.noMatchingDescription')}
             </p>
             <Button
               variant="outline"
@@ -375,7 +377,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
               onClick={clearFilters}
               className="mt-4"
             >
-              Clear Filters
+              {t('history.clearFilters')}
             </Button>
           </div>
         ) : (
@@ -407,7 +409,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
                           </h3>
                           {entry.profile_json?.author && (
                             <p className="text-[10px] text-muted-foreground/60 truncate">
-                              by {String(entry.profile_json.author)}
+                              {t('history.byAuthor', { author: String(entry.profile_json.author) })}
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground/70 mt-1">
@@ -460,7 +462,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-primary"
                               onClick={(e) => handleDownload(entry, e)}
-                              title="Download JSON"
+                              title={t('history.downloadJson')}
                             >
                               <FileJs size={16} weight="bold" />
                             </Button>
@@ -471,7 +473,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={(e) => handleDelete(entry.id, e)}
                             disabled={deletingId === entry.id}
-                            title="Delete"
+                            title={t('common.delete')}
                           >
                             <Trash size={16} weight="bold" />
                           </Button>
@@ -491,7 +493,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
           className="w-full h-12 mt-4 bg-amber-500 hover:bg-amber-600 text-zinc-900 font-semibold"
         >
           <Plus size={18} weight="bold" className="mr-2" />
-          Add Profile
+          {t('history.addProfile')}
         </Button>
       </Card>
       
@@ -514,14 +516,14 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
   )
 }
 
-// Image generation style options
+// Image generation style options - labels/descriptions resolved via i18n at render time
 const IMAGE_STYLES = [
-  { id: 'abstract', label: 'Abstract', description: 'Artistic abstract interpretation' },
-  { id: 'minimalist', label: 'Minimalist', description: 'Clean, minimal design' },
-  { id: 'pixel-art', label: 'Pixel Art', description: 'Retro pixel art style' },
-  { id: 'watercolor', label: 'Watercolor', description: 'Soft watercolor painting' },
-  { id: 'modern', label: 'Modern', description: 'Contemporary art style' },
-  { id: 'vintage', label: 'Vintage', description: 'Retro aesthetic' }
+  { id: 'abstract', labelKey: 'history.imageStyles.abstract', descKey: 'history.imageStyles.abstractDesc' },
+  { id: 'minimalist', labelKey: 'history.imageStyles.minimalist', descKey: 'history.imageStyles.minimalistDesc' },
+  { id: 'pixel-art', labelKey: 'history.imageStyles.pixelArt', descKey: 'history.imageStyles.pixelArtDesc' },
+  { id: 'watercolor', labelKey: 'history.imageStyles.watercolor', descKey: 'history.imageStyles.watercolorDesc' },
+  { id: 'modern', labelKey: 'history.imageStyles.modern', descKey: 'history.imageStyles.modernDesc' },
+  { id: 'vintage', labelKey: 'history.imageStyles.vintage', descKey: 'history.imageStyles.vintageDesc' }
 ] as const
 
 interface ProfileDetailViewProps {
@@ -534,6 +536,7 @@ interface ProfileDetailViewProps {
 }
 
 export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
+  const { t } = useTranslation()
   const { downloadJson } = useHistory()
   const { invalidate: invalidateImageCache } = useProfileImageCache()
   const [isDownloading, setIsDownloading] = useState(false)
@@ -635,8 +638,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       )
       
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'Upload failed' }))
-        throw new Error(error.detail?.message || error.message || 'Failed to upload image')
+        const error = await response.json().catch(() => ({ message: t('history.uploadFailed') }))
+        throw new Error(error.detail?.message || error.message || t('history.imageUploadFailed'))
       }
       
       // Invalidate the image cache so the catalogue will re-fetch
@@ -649,7 +652,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       setTimeout(() => setImageUploadSuccess(false), 3000)
     } catch (err) {
       console.error('Failed to upload profile image:', err)
-      setImageUploadError(err instanceof Error ? err.message : 'Failed to upload image')
+      setImageUploadError(err instanceof Error ? err.message : t('history.imageUploadFailed'))
     } finally {
       setIsUploadingImage(false)
       // Reset file input
@@ -663,7 +666,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     const file = e.target.files?.[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
-        setImageUploadError('Please select an image file')
+        setImageUploadError(t('history.selectImageFile'))
         return
       }
       // Create object URL for cropping
@@ -693,13 +696,13 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       )
       
       if (response.status === 402) {
-        setGenerateError('Image generation requires a paid Gemini API key. Please configure GEMINI_API_KEY.')
+        setGenerateError(t('history.paidKeyRequired'))
         return
       }
       
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Generation failed' }))
-        throw new Error(typeof error.detail === 'string' ? error.detail : error.detail?.message || 'Failed to generate image')
+        const error = await response.json().catch(() => ({ detail: t('history.generationFailed') }))
+        throw new Error(typeof error.detail === 'string' ? error.detail : error.detail?.message || t('history.imageGenerationFailed'))
       }
       
       const data = await response.json()
@@ -712,11 +715,11 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
         setShowPreviewDialog(true)
         setShowStylePicker(false)
       } else {
-        throw new Error('No image data received from server')
+        throw new Error(t('history.noImageData'))
       }
     } catch (err) {
       console.error('Failed to generate image:', err)
-      setGenerateError(err instanceof Error ? err.message : 'Failed to generate image')
+      setGenerateError(err instanceof Error ? err.message : t('history.imageGenerationFailed'))
     } finally {
       setIsGeneratingImage(false)
     }
@@ -740,8 +743,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       )
       
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Failed to apply image' }))
-        throw new Error(typeof error.detail === 'string' ? error.detail : 'Failed to apply image')
+        const error = await response.json().catch(() => ({ detail: t('history.applyImageFailed') }))
+        throw new Error(typeof error.detail === 'string' ? error.detail : t('history.applyImageFailed'))
       }
       
       // Close dialog and update image immediately
@@ -754,11 +757,11 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       // Immediately set the new profile image URL with cache buster
       setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${newCacheBuster}`)
       setImageUploadSuccess(true)
-      toast.success('Image applied successfully')
+      toast.success(t('history.imageApplied'))
       setTimeout(() => setImageUploadSuccess(false), 3000)
     } catch (err) {
       console.error('Failed to apply image:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to apply image'
+      const errorMessage = err instanceof Error ? err.message : t('history.applyImageFailed')
       toast.error(errorMessage)
       // Still close the dialog on error - user can try again
       setShowPreviewDialog(false)
@@ -779,7 +782,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       await downloadJson(entry)
     } catch (err) {
       console.error('Failed to download:', err)
-      alert('Profile JSON not available for this entry')
+      alert(t('history.jsonNotAvailable'))
     } finally {
       setIsDownloading(false)
     }
@@ -842,7 +845,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     } catch (error) {
       console.error('Error saving results:', error)
       setIsCapturing(false)
-      alert('Failed to save image. Please try again.')
+      alert(t('history.saveImageFailed'))
     }
   }
 
@@ -932,7 +935,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 Metic<span className="text-primary">AI</span>
               </h1>
             </div>
-            <p className="text-muted-foreground text-sm">Meticulous Espresso Profile Generator</p>
+            <p className="text-muted-foreground text-sm">{t('history.captureSubtitle')}</p>
           </div>
         )}
         <Card className={`p-6 ${isCapturing ? 'space-y-4' : 'space-y-5'}`}>
@@ -952,9 +955,9 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 </h2>
                 <p className="text-xs text-muted-foreground/70">
                   {(() => {
-                    if (!entry.created_at) return 'Added to MeticAI'
+                    if (!entry.created_at) return t('history.addedToMeticAI')
                     const date = new Date(entry.created_at)
-                    if (isNaN(date.getTime())) return 'Added to MeticAI'
+                    if (isNaN(date.getTime())) return t('history.addedToMeticAI')
                     return date.toLocaleDateString(undefined, {
                       year: 'numeric',
                       month: 'long',
@@ -969,7 +972,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               <div 
                 className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30 shrink-0 cursor-pointer hover:border-primary/50 transition-colors bg-secondary/60"
                 onClick={profileImage ? () => setShowLightbox(true) : undefined}
-                title={profileImage ? "Click to enlarge" : undefined}
+                title={profileImage ? t('history.clickToEnlarge') : undefined}
               >
                 {profileImage ? (
                   <img 
@@ -1001,7 +1004,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               className="flex-1 min-w-[180px] h-12 text-sm font-semibold"
             >
               <ChartLine size={18} className="mr-2" weight="bold" />
-              Shot History & Analysis
+              {t('history.shotHistoryAndAnalysis')}
             </Button>
             
             {/* Run / Schedule Button */}
@@ -1011,7 +1014,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 className="flex-1 min-w-[180px] h-12 text-sm font-semibold bg-success hover:bg-success/90"
               >
                 <Play size={18} className="mr-2" weight="fill" />
-                Run / Schedule Shot
+                {t('results.runScheduleShot')}
               </Button>
             )}
           </div>
@@ -1030,7 +1033,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               className="space-y-2"
             >
               <Label className="text-sm font-semibold tracking-wide text-primary">
-                Coffee Analysis
+                {t('results.coffeeAnalysis')}
               </Label>
               <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">
                 <p className="text-sm leading-relaxed text-foreground/90">
@@ -1064,7 +1067,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
           ) : (
             <div className="space-y-2">
               <Label className="text-sm font-semibold tracking-wide text-amber-700 dark:text-amber-400">
-                Profile
+                {t('results.profileLabel')}
               </Label>
               <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">
                 <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
@@ -1091,7 +1094,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Profile Image Upload */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground block text-center">Profile Picture</Label>
+              <Label className="text-xs font-medium text-muted-foreground block text-center">{t('history.profilePicture')}</Label>
               <input
                 ref={imageInputRef}
                 type="file"
@@ -1112,17 +1115,17 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                       {isUploadingImage ? (
                         <>
                           <SpinnerGap size={18} className="mr-1.5 animate-spin" weight="bold" />
-                          Uploading...
+                          {t('history.uploading')}
                         </>
                       ) : imageUploadSuccess ? (
                         <>
                           <CheckCircle size={18} className="mr-1.5 text-success" weight="fill" />
-                          Uploaded!
+                          {t('history.uploaded')}
                         </>
                       ) : (
                         <>
                           <Camera size={18} className="mr-1.5" weight="bold" />
-                          Upload
+                          {t('history.upload')}
                         </>
                       )}
                     </span>
@@ -1140,12 +1143,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                     {isGeneratingImage ? (
                       <>
                         <SpinnerGap size={18} className="mr-1.5 animate-spin" weight="bold" />
-                        Generating...
+                        {t('history.generating')}
                       </>
                     ) : (
                       <>
                         <MagicWand size={18} className="mr-1.5" weight="bold" />
-                        Generate
+                        {t('history.generate')}
                       </>
                     )}
                   </Button>
@@ -1155,10 +1158,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 <p className="text-xs text-destructive text-center">{imageUploadError}</p>
               )}
               {!aiConfigured && !hideAiWhenUnavailable && (
-                <p className="text-xs text-muted-foreground text-center">AI image generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.</p>
+                <p className="text-xs text-muted-foreground text-center">{t('history.aiImageUnavailable')}</p>
               )}
               <p className="text-[10px] text-muted-foreground/60 text-center">
-                Image will be cropped to square and synced to your machine
+                {t('history.imageSyncNote')}
               </p>
               
               <AnimatePresence>
@@ -1170,7 +1173,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                       className="overflow-hidden"
                     >
                       <div className="mt-3 p-3 bg-secondary/40 rounded-lg border border-border/20 space-y-3">
-                        <Label className="text-xs font-medium text-muted-foreground">Select Style</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">{t('history.selectStyle')}</Label>
                         <div className="grid grid-cols-2 gap-2">
                           {IMAGE_STYLES.map((style) => (
                             <button
@@ -1182,8 +1185,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                                   : 'border-border/30 hover:border-border/50 text-foreground/80'
                               }`}
                             >
-                              <div className="text-xs font-medium">{style.label}</div>
-                              <div className="text-[10px] text-muted-foreground mt-0.5">{style.description}</div>
+                              <div className="text-xs font-medium">{t(style.labelKey)}</div>
+                              <div className="text-[10px] text-muted-foreground mt-0.5">{t(style.descKey)}</div>
                             </button>
                           ))}
                         </div>
@@ -1194,7 +1197,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                           disabled={isGeneratingImage}
                         >
                           <MagicWand size={16} className="mr-1.5" weight="bold" />
-                          Generate {selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} Image
+                          {t('history.generateStyleImage', { style: selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1) })}
                         </Button>
                         
                         {generateError && (
@@ -1204,7 +1207,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                         <div className="flex items-start gap-1.5 p-2 bg-amber-500/10 rounded-md border border-amber-500/20">
                           <Info size={14} className="text-amber-500 shrink-0 mt-0.5" weight="fill" />
                           <p className="text-[10px] text-amber-500/90 leading-relaxed">
-                            AI image generation requires a paid Gemini API key. Free tier keys may not work.
+                            {t('history.paidKeyWarning')}
                           </p>
                         </div>
                       </div>
@@ -1215,16 +1218,16 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
             
             {/* Export Buttons */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground block text-center">Export as</Label>
+              <Label className="text-xs font-medium text-muted-foreground block text-center">{t('history.exportAs')}</Label>
               <div className={`grid gap-2.5 ${entry.profile_json ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <Button
                   onClick={handleSaveImage}
                   variant="outline"
                   className="h-11 text-sm font-semibold"
-                  title="Save results as image"
+                  title={t('results.saveAsImage')}
                 >
                   <Image size={18} className="mr-1.5" weight="bold" />
-                  Image
+                  {t('results.image')}
                 </Button>
                 {entry.profile_json && (
                   <Button
@@ -1234,7 +1237,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                     className="h-11 text-sm font-semibold"
                   >
                     <FileJs size={18} className="mr-1.5" weight="bold" />
-                    JSON
+                    {t('results.json')}
                   </Button>
                 )}
               </div>
@@ -1321,17 +1324,17 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               className="relative max-w-md w-full bg-card rounded-2xl p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-bold text-center mb-4">Generated Image Preview</h3>
+              <h3 className="text-lg font-bold text-center mb-4">{t('history.generatedImagePreview')}</h3>
               <div className="rounded-xl overflow-hidden border-2 border-primary/30 mb-6">
                 <img 
                   key={previewImage?.substring(0, 100)}
                   src={previewImage}
-                  alt="Generated preview"
+                  alt={t('history.generatedPreviewAlt')}
                   className="w-full h-auto object-contain"
                 />
               </div>
               <p className="text-sm text-muted-foreground text-center mb-6">
-                Would you like to use this image for your profile?
+                {t('history.useImagePrompt')}
               </p>
               <div className="flex gap-3">
                 <Button
@@ -1341,7 +1344,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                   disabled={isApplyingImage}
                 >
                   <XCircle size={20} className="mr-2" weight="bold" />
-                  Discard
+                  {t('history.discard')}
                 </Button>
                 <Button
                   className="flex-1 h-12"
@@ -1353,7 +1356,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                   ) : (
                     <Check size={20} className="mr-2" weight="bold" />
                   )}
-                  {isApplyingImage ? 'Applying...' : 'Apply'}
+                  {isApplyingImage ? t('history.applying') : t('history.apply')}
                 </Button>
               </div>
             </motion.div>

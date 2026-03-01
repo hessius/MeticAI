@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { useMemo, type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -89,6 +90,7 @@ export function ResultsView({
   onViewHistory,
   onRunProfile
 }: ResultsViewProps) {
+  const { t } = useTranslation()
   const sections = useMemo(() => parseProfileSections(apiResponse?.reply), [apiResponse?.reply])
   const profileName = useMemo(() => {
     const profileNameMatch = apiResponse?.reply?.match(/Profile Created:\s*(.+?)(?:\n|$)/i)
@@ -116,7 +118,7 @@ export function ResultsView({
                 Metic<span className="text-primary">AI</span>
               </h1>
             </div>
-            <p className="text-muted-foreground text-sm">Meticulous Espresso AI Profiler</p>
+            <p className="text-muted-foreground text-sm">{t('app.title')}</p>
           </div>
         )}
         <Card className={`p-6 ${isCapturing ? 'space-y-4' : 'space-y-5'}`}>
@@ -136,8 +138,8 @@ export function ResultsView({
                   size="icon"
                   onClick={onBack}
                   className="shrink-0"
-                  title="Back to form"
-                  aria-label="Back to form"
+                  title={t('results.backToForm')}
+                  aria-label={t('results.backToForm')}
                 >
                   <CaretLeft size={22} weight="bold" />
                 </Button>
@@ -147,9 +149,9 @@ export function ResultsView({
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-lg font-bold text-foreground break-words leading-tight">
-                      {profileName || 'Profile Generated!'}
+                      {profileName || t('results.profileGenerated')}
                     </h2>
-                    <p className="text-xs text-muted-foreground">Profile saved to device</p>
+                    <p className="text-xs text-muted-foreground">{t('results.savedToDevice')}</p>
                   </div>
                 </div>
               </div>
@@ -165,7 +167,7 @@ export function ResultsView({
                 className="space-y-2"
               >
                 <Label className="text-sm font-semibold tracking-wide text-primary">
-                  Coffee Analysis
+                  {t('results.coffeeAnalysis')}
                 </Label>
                 <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">
                   <p className="text-sm leading-relaxed text-foreground/90">
@@ -199,7 +201,7 @@ export function ResultsView({
             ) : (
               <div className="space-y-2">
                 <Label className="text-sm font-semibold tracking-wide text-primary">
-                  Profile
+                  {t('results.profileLabel')}
                 </Label>
                 <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">
                   <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
@@ -219,7 +221,7 @@ export function ResultsView({
               <Alert className="bg-success/8 border-success/20 rounded-xl">
                 <Info className="h-4 w-4 text-success" />
                 <AlertDescription className="text-sm text-foreground/80">
-                  Profile has been saved to your Meticulous device and history
+                  {t('results.savedToHistory')}
                 </AlertDescription>
               </Alert>
 
@@ -230,21 +232,21 @@ export function ResultsView({
                   className="w-full h-12 text-sm font-semibold"
                 >
                   <Play size={18} className="mr-1.5" weight="fill" />
-                  Run / Schedule Shot
+                  {t('results.runScheduleShot')}
                 </Button>
               )}
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground block text-center">Export as</Label>
+                <Label className="text-xs font-medium text-muted-foreground block text-center">{t('results.exportAs')}</Label>
                 <div className={`grid gap-2.5 ${currentProfileJson ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   <Button
                     onClick={onSaveResults}
                     variant="outline"
                     className="h-11 text-sm font-semibold"
-                    title="Save results as image"
+                    title={t('results.saveAsImage')}
                   >
                     <Image size={18} className="mr-1.5" weight="bold" />
-                    Image
+                    {t('results.image')}
                   </Button>
                   {currentProfileJson && (
                     <Button
@@ -253,7 +255,7 @@ export function ResultsView({
                       className="h-11 text-sm font-semibold"
                     >
                       <FileJs size={18} className="mr-1.5" weight="bold" />
-                      JSON
+                      {t('results.json')}
                     </Button>
                   )}
                 </div>
@@ -265,7 +267,7 @@ export function ResultsView({
                 className="w-full h-12 text-sm font-semibold"
               >
                 <Coffee size={18} className="mr-1.5" weight="fill" />
-                Profile Catalogue
+                {t('history.title')}
               </Button>
             </>
           )}

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -47,6 +48,7 @@ export function FormView({
   onBack,
   onViewHistory
 }: FormViewProps) {
+  const { t } = useTranslation()
   return (
     <motion.div
       key="form"
@@ -63,16 +65,16 @@ export function FormView({
             size="icon"
             onClick={onBack}
             className="shrink-0"
-            aria-label="Back"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={22} weight="bold" />
           </Button>
-          <h2 className="text-lg font-bold tracking-tight">New Profile</h2>
+          <h2 className="text-lg font-bold tracking-tight">{t('navigation.newProfile')}</h2>
         </div>
 
         <div className="space-y-3">
           <Label className="text-sm font-semibold tracking-wide text-foreground/90">
-            Coffee Bag Photo <span className="text-muted-foreground font-normal">(Optional)</span>
+            {t('profileGeneration.coffeeBagPhoto')} <span className="text-muted-foreground font-normal">({t('profileGeneration.optional')})</span>
           </Label>
           <input
             ref={fileInputRef}
@@ -96,8 +98,8 @@ export function FormView({
                     <Upload size={28} weight="duotone" className="group-hover:text-primary transition-colors" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-medium">Tap to upload or take photo</p>
-                    <p className="text-xs mt-1.5 text-muted-foreground">JPG, PNG, or other image formats</p>
+                    <p className="text-sm font-medium">{t('profileGeneration.tapToUpload')}</p>
+                    <p className="text-xs mt-1.5 text-muted-foreground">{t('profileGeneration.imageFormats')}</p>
                   </div>
                 </div>
               </motion.div>
@@ -127,7 +129,7 @@ export function FormView({
 
         <div className="space-y-3">
           <Label htmlFor="preferences" className="text-sm font-semibold tracking-wide text-foreground/90">
-            Taste Preferences <span className="text-muted-foreground font-normal">(Optional)</span>
+            {t('profileGeneration.tastePreferences')} <span className="text-muted-foreground font-normal">({t('profileGeneration.optional')})</span>
           </Label>
           
           <div className="space-y-4">
@@ -135,12 +137,12 @@ export function FormView({
               id="preferences"
               value={userPrefs}
               onChange={(e) => onUserPrefsChange(e.target.value)}
-              placeholder="e.g., Balanced extraction, nutty notes..."
+              placeholder={t('profileGeneration.placeholderText')}
               className="min-h-[90px] resize-none bg-secondary/50 border-border/50 focus:border-primary/60 focus:bg-secondary/80 transition-all duration-200 rounded-xl text-sm placeholder:text-muted-foreground/60"
             />
             
             <div className="space-y-2.5">
-              <p className="text-xs text-muted-foreground font-medium">Or select preset tags:</p>
+              <p className="text-xs text-muted-foreground font-medium">{t('profileGeneration.selectPresetTags')}</p>
               <div className="flex flex-wrap gap-2">
                 {PRESET_TAGS.map((tag) => {
                   const isSelected = selectedTags.includes(tag.label)
@@ -169,7 +171,7 @@ export function FormView({
           </div>
           
           <p className="text-xs text-muted-foreground/80 mt-3">
-            Describe your ideal espresso flavor profile using text, tags, or both
+            {t('profileGeneration.describeFlavor')}
           </p>
         </div>
 
@@ -198,7 +200,7 @@ export function FormView({
             className="w-full h-13 text-base transition-all duration-200"
           >
             <Sparkle size={18} weight="fill" className="mr-1" />
-            Generate Profile
+            {t('profileGeneration.generateProfile')}
           </Button>
           
           {/* Only show catalogue button when no profiles exist (no back button visible) */}
@@ -209,7 +211,7 @@ export function FormView({
               className="w-full h-11 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               <Coffee size={18} className="mr-2" weight="fill" />
-              Profile Catalogue
+              {t('history.title')}
             </Button>
           )}
         </div>
