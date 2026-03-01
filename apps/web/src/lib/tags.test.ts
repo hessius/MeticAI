@@ -51,11 +51,15 @@ describe('tags', () => {
       })
     })
 
-    it('should include background, border and text classes', () => {
+    it('should use tag- CSS class names for each category', () => {
+      Object.entries(CATEGORY_COLORS).forEach(([category, colorClass]) => {
+        expect(colorClass).toMatch(`tag-${category}`)
+      })
+    })
+
+    it('should NOT use dark: Tailwind variants (handled by CSS .dark selector)', () => {
       Object.values(CATEGORY_COLORS).forEach(colorClass => {
-        expect(colorClass).toMatch(/bg-/)
-        expect(colorClass).toMatch(/border-/)
-        expect(colorClass).toMatch(/text-/)
+        expect(colorClass).not.toContain('dark:')
       })
     })
   })
@@ -69,10 +73,16 @@ describe('tags', () => {
       })
     })
 
-    it('should include solid background colors', () => {
-      Object.values(CATEGORY_COLORS_SELECTED).forEach(colorClass => {
-        expect(colorClass).toMatch(/bg-\w+-500/)
+    it('should use tag-*-selected CSS class names with text-white', () => {
+      Object.entries(CATEGORY_COLORS_SELECTED).forEach(([category, colorClass]) => {
+        expect(colorClass).toMatch(`tag-${category}-selected`)
         expect(colorClass).toMatch(/text-white/)
+      })
+    })
+
+    it('should NOT use dark: Tailwind variants (handled by CSS .dark selector)', () => {
+      Object.values(CATEGORY_COLORS_SELECTED).forEach(colorClass => {
+        expect(colorClass).not.toContain('dark:')
       })
     })
   })
@@ -113,11 +123,9 @@ describe('tags', () => {
       expect(colorClass).toBe(CATEGORY_COLORS_SELECTED.body)
     })
 
-    it('should return gray fallback for unknown tags', () => {
+    it('should return tag-default fallback for unknown tags', () => {
       const colorClass = getTagColorClass('Unknown Tag', false)
-      expect(colorClass).toMatch(/bg-gray/)
-      expect(colorClass).toMatch(/border-gray/)
-      expect(colorClass).toMatch(/text-gray/)
+      expect(colorClass).toBe('tag-default')
     })
 
     it('should be case-insensitive', () => {

@@ -7,6 +7,12 @@ import os
 import logging
 import asyncio
 import uuid
+import base64
+import binascii
+import ipaddress
+import socket
+import httpx
+from urllib.parse import urlparse
 
 # Register HEIC/HEIF support with Pillow
 try:
@@ -27,6 +33,7 @@ from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
 from services.history_service import HISTORY_FILE, load_history, save_history
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
+from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
 from utils.file_utils import atomic_write_json, deep_convert_to_dict
 
@@ -34,6 +41,77 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
+
+
+def _parse_data_image_uri(image_uri: str) -> tuple[str, bytes]:
+    """Parse and decode a base64 data:image URI.
+
+    Returns:
+        Tuple of (mime_type, decoded_bytes)
+    """
+    try:
+        header, encoded_image = image_uri.split(",", 1)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid profile image data") from exc
+
+    if not header.endswith(";base64") or not header.startswith("data:image/"):
+        raise HTTPException(status_code=400, detail="Invalid profile image data")
+
+    mime_type = header[5:-7].strip().lower()  # strip "data:" prefix and ";base64" suffix
+    if not mime_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Invalid profile image data")
+
+    try:
+        image_bytes = base64.b64decode(encoded_image, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise HTTPException(status_code=400, detail="Invalid profile image data") from exc
+
+    return mime_type, image_bytes
+
+
+def _canonical_host(value: str) -> str:
+    parsed = urlparse(value if "://" in value else f"http://{value}")
+    host = (parsed.hostname or "").strip().lower()
+    if host in {"", "localhost"}:
+        return host
+    try:
+        return str(ipaddress.ip_address(host))
+    except ValueError:
+        return host.rstrip(".")
+
+
+def _is_allowed_machine_image_url(image_url: str) -> bool:
+    parsed = urlparse(image_url)
+    if parsed.scheme not in ("http", "https"):
+        return False
+
+    target_host = (parsed.hostname or "").strip().lower()
+    if not target_host:
+        return False
+
+    meticulous_ip = os.getenv("METICULOUS_IP")
+    if not meticulous_ip:
+        settings = load_settings()
+        meticulous_ip = (settings.get("meticulousIp") or "").strip()
+    if not meticulous_ip:
+        return False
+
+    allowed_host = _canonical_host(meticulous_ip)
+    candidate_host = _canonical_host(target_host)
+    if candidate_host == allowed_host:
+        return True
+
+    try:
+        allowed_resolved = {socket.gethostbyname(allowed_host)}
+    except Exception:
+        allowed_resolved = set()
+
+    try:
+        candidate_resolved = {socket.gethostbyname(candidate_host)}
+    except Exception:
+        candidate_resolved = set()
+
+    return bool(allowed_resolved and candidate_resolved and (allowed_resolved & candidate_resolved))
 
 
 def process_image_for_profile(image_data: bytes, content_type: str = "image/png") -> tuple[str, bytes]:
@@ -662,16 +740,32 @@ async def proxy_profile_image(
                     raise HTTPException(status_code=404, detail="Profile has no image")
                 
                 image_path = full_profile.display.image
+
+                if image_path.startswith("data:image/"):
+                    mime_type, image_bytes = _parse_data_image_uri(image_path)
+
+                    _set_cached_image(profile_name, image_bytes)
+                    return Response(
+                        content=image_bytes,
+                        media_type=mime_type
+                    )
                 
-                # Construct full URL to the machine
-                meticulous_ip = os.getenv("METICULOUS_IP")
-                if not meticulous_ip:
-                    raise HTTPException(status_code=500, detail="METICULOUS_IP not configured")
-                
-                image_url = f"http://{meticulous_ip}{image_path}"
+                if image_path.startswith(("http://", "https://")):
+                    image_url = image_path
+                    if not _is_allowed_machine_image_url(image_url):
+                        raise HTTPException(status_code=400, detail="Profile image URL host is not allowed")
+                else:
+                    # Construct full URL to the machine
+                    meticulous_ip = os.getenv("METICULOUS_IP")
+                    if not meticulous_ip:
+                        settings = load_settings()
+                        meticulous_ip = settings.get("meticulousIp", "").strip()
+                    if not meticulous_ip:
+                        raise HTTPException(status_code=500, detail="METICULOUS_IP not configured")
+
+                    image_url = f"http://{meticulous_ip}{image_path}"
                 
                 # Fetch the image from the machine
-                import httpx
                 async with httpx.AsyncClient() as client:
                     response = await client.get(image_url, timeout=10.0)
                     
@@ -681,13 +775,21 @@ async def proxy_profile_image(
                             detail="Failed to fetch image from machine"
                         )
                     
+                    raw_content_type = response.headers.get("content-type") if hasattr(response, "headers") else None
+                    if not isinstance(raw_content_type, str):
+                        raw_content_type = "image/png"
+
+                    media_type = raw_content_type.split(";", 1)[0].strip() or "image/png"
+                    if not media_type.startswith("image/"):
+                        media_type = "image/png"
+
                     # Cache the image for future requests
                     _set_cached_image(profile_name, response.content)
                     
                     # Return the image with appropriate content type
                     return Response(
                         content=response.content,
-                        media_type="image/png"
+                        media_type=media_type
                     )
         
         raise HTTPException(
@@ -697,6 +799,18 @@ async def proxy_profile_image(
         
     except HTTPException:
         raise
+    except httpx.TimeoutException as e:
+        logger.warning(
+            f"Timed out while proxying profile image: {str(e)}",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        raise HTTPException(status_code=504, detail="Timed out fetching profile image")
+    except httpx.HTTPError as e:
+        logger.warning(
+            f"HTTP error while proxying profile image: {str(e)}",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        raise HTTPException(status_code=502, detail="Failed to fetch image from machine")
     except Exception as e:
         logger.error(
             f"Failed to proxy profile image: {str(e)}",

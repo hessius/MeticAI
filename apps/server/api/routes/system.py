@@ -47,6 +47,89 @@ _update_cache_time: Optional[datetime] = None
 UPDATE_CACHE_DURATION = timedelta(minutes=15)
 
 GITHUB_RELEASES_URL = "https://api.github.com/repos/hessius/MeticAI/releases/latest"
+WATCHTOWER_API_ENDPOINTS = (
+    "http://watchtower:8080/v1/update",
+    "http://meticai-watchtower:8080/v1/update",
+    "http://localhost:18088/v1/update",
+    "http://localhost:8088/v1/update",
+)
+
+WATCHTOWER_REACHABLE_STATUS_CODES = {200, 204, 401, 403, 404, 405}
+WATCHTOWER_TRIGGERABLE_STATUS_CODES = {200, 204}
+
+
+async def _probe_watchtower_api(method: str = "get") -> dict:
+    """Probe known Watchtower API endpoints.
+
+    Returns:
+        {
+            "reachable": bool,
+            "can_trigger": bool,
+            "endpoint": str | None,
+            "status_code": int | None,
+            "error": str | None,
+        }
+    """
+    import httpx
+
+    errors: list[str] = []
+
+    async def _probe_one(client: httpx.AsyncClient, endpoint: str) -> dict:
+        timeout = 3.0 if method == "post" else 2.0
+        try:
+            if method == "post":
+                response = await client.post(endpoint, timeout=timeout)
+            else:
+                response = await client.get(endpoint, timeout=timeout)
+
+            status_code = response.status_code
+            return {
+                "endpoint": endpoint,
+                "status_code": status_code,
+                "reachable": status_code in WATCHTOWER_REACHABLE_STATUS_CODES,
+                "can_trigger": status_code in WATCHTOWER_TRIGGERABLE_STATUS_CODES,
+                "error": None,
+            }
+        except Exception as exc:
+            return {
+                "endpoint": endpoint,
+                "status_code": None,
+                "reachable": False,
+                "can_trigger": False,
+                "error": f"{endpoint}: {exc}",
+            }
+
+    async with httpx.AsyncClient() as client:
+        tasks = [asyncio.create_task(_probe_one(client, endpoint)) for endpoint in WATCHTOWER_API_ENDPOINTS]
+        try:
+            for completed in asyncio.as_completed(tasks):
+                result = await completed
+                if result["reachable"]:
+                    for task in tasks:
+                        if not task.done():
+                            task.cancel()
+                    return {
+                        "reachable": True,
+                        "can_trigger": result["can_trigger"],
+                        "endpoint": result["endpoint"],
+                        "status_code": result["status_code"],
+                        "error": None,
+                    }
+                if result["error"]:
+                    errors.append(result["error"])
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    return {
+        "reachable": False,
+        "can_trigger": False,
+        "endpoint": None,
+        "status_code": None,
+        "error": "; ".join(errors) if errors else "Watchtower API not reachable",
+    }
 
 
 def _get_running_version() -> str:
@@ -210,39 +293,43 @@ async def get_update_method(request: Request):
         - method: "watchtower" | "manual"
         - watchtower_running: bool
         - can_trigger_update: bool
+        - watchtower_endpoint: str | None — the reachable Watchtower API endpoint URL, or None
+        - watchtower_error: str | None — error message if the probe failed or container reported an error
     """
     request_id = request.state.request_id
     
     try:
-        watchtower_running = False
-        
-        # Check for Watchtower: try to reach its HTTP API on port 8088
-        # or detect the container via docker socket
-        try:
-            import httpx
-            async with httpx.AsyncClient() as client:
-                # Watchtower in the compose stack maps host 8088 → container 8080
-                resp = await client.get("http://localhost:8088/v1/update", timeout=2.0)
-                # Any response (even 401) means watchtower is there
-                watchtower_running = True
-        except Exception:
-            # Also check if watchtower container exists via docker
+        probe = await _probe_watchtower_api(method="get")
+        watchtower_running = probe["reachable"]
+        can_trigger_update = probe["can_trigger"]
+        watchtower_error = probe["error"]
+
+        if not watchtower_running:
             try:
                 result = subprocess.run(
-                    ["docker", "ps", "--filter", "name=watchtower", "--format", "{{.Names}}"],
-                    capture_output=True, text=True, timeout=5
+                    ["docker", "inspect", "--format", "{{.State.Status}}|{{.State.Error}}", "meticai-watchtower"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
-                if result.returncode == 0 and "watchtower" in result.stdout:
-                    watchtower_running = True
+                if result.returncode == 0:
+                    state_parts = result.stdout.strip().split("|", 1)
+                    state_status = state_parts[0].strip() if state_parts else ""
+                    state_error = state_parts[1].strip() if len(state_parts) > 1 else ""
+                    watchtower_running = state_status == "running"
+                    if state_error:
+                        watchtower_error = state_error
             except Exception:
                 pass
-        
+
         method = "watchtower" if watchtower_running else "manual"
-        
+
         return {
             "method": method,
             "watchtower_running": watchtower_running,
-            "can_trigger_update": watchtower_running
+            "can_trigger_update": can_trigger_update,
+            "watchtower_endpoint": probe["endpoint"],
+            "watchtower_error": watchtower_error,
         }
     except Exception as e:
         logger.error(
@@ -570,47 +657,36 @@ async def trigger_update(request: Request):
     request_id = request.state.request_id
     
     try:
-        import httpx
-        
         logger.info(
             "Triggering update via Watchtower HTTP API",
             extra={"request_id": request_id, "endpoint": "/api/trigger-update"}
         )
-        
-        watchtower_triggered = False
-        
-        # Try Watchtower HTTP API — POST triggers an immediate check
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "http://localhost:8088/v1/update",
-                    timeout=10.0,
-                )
-                # 200 = update started, 401 = no token (but watchtower is there)
-                if resp.status_code in (200, 204):
-                    watchtower_triggered = True
-                elif resp.status_code == 401:
-                    # Watchtower is running but requires a token
-                    watchtower_triggered = True
-                    logger.warning(
-                        "Watchtower returned 401 — update may still proceed",
-                        extra={"request_id": request_id}
-                    )
-        except Exception as wt_err:
-            logger.debug(
-                f"Watchtower HTTP API not reachable: {wt_err}",
-                extra={"request_id": request_id}
-            )
-        
-        if watchtower_triggered:
+
+        probe = await _probe_watchtower_api(method="post")
+
+        if probe["can_trigger"]:
             logger.info(
                 "Update triggered via Watchtower",
-                extra={"request_id": request_id}
+                extra={
+                    "request_id": request_id,
+                    "endpoint": probe["endpoint"],
+                    "status_code": probe["status_code"],
+                }
             )
             return {
                 "status": "success",
                 "message": "Update triggered. Watchtower will pull the latest image and restart the container."
             }
+
+        if probe["reachable"]:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "error": f"Watchtower endpoint reachable but update not authorized (HTTP {probe['status_code']})",
+                    "message": "Automatic updates are available, but this Watchtower endpoint rejected the trigger request."
+                }
+            )
         
         # No Watchtower — manual update required
         raise HTTPException(
@@ -1062,39 +1138,12 @@ async def get_settings(request: Request):
 
 
 def _update_s6_env(var_name: str, value: str, request_id: str = "") -> None:
-    """Write an environment variable to the s6 container environment directory.
+    """Write an env var to the s6 container environment directory.
 
-    s6-overlay services started with ``#!/command/with-contenv sh`` read their
-    environment from ``/var/run/s6/container_environment/``.  Updating a file
-    there ensures that the *next* service restart picks up the new value —
-    something that ``os.environ[…]`` alone cannot achieve because the FastAPI
-    process is separate from the s6 supervision tree.
+    Delegates to the shared ``utils.s6_env.update_s6_env`` implementation.
     """
-    s6_env_dir = "/var/run/s6/container_environment"
-    if not os.path.isdir(s6_env_dir):
-        logger.debug(
-            "s6 container environment dir not found (%s) — probably not running "
-            "inside s6-overlay; skipping",
-            s6_env_dir,
-            extra={"request_id": request_id},
-        )
-        return
-    try:
-        env_file = os.path.join(s6_env_dir, var_name)
-        with open(env_file, "w") as f:
-            f.write(value)
-        logger.info(
-            "Updated s6 container env %s",
-            var_name,
-            extra={"request_id": request_id},
-        )
-    except Exception as e:
-        logger.warning(
-            "Failed to update s6 container env %s: %s",
-            var_name,
-            e,
-            extra={"request_id": request_id},
-        )
+    from utils.s6_env import update_s6_env
+    update_s6_env(var_name, value, request_id=request_id)
 
 
 @router.post("/api/settings")
@@ -1181,7 +1230,10 @@ async def save_settings_endpoint(request: Request):
                 env_content += f"\nPI_IP={new_ip}"
             env_updated = True
         
-        # Save settings to JSON file
+        # Save settings to JSON file.
+        # Strip display-only keys that should never be persisted.
+        for _display_key in ("geminiApiKeyConfigured", "geminiApiKeyMasked"):
+            current_settings.pop(_display_key, None)
         save_settings(current_settings)
         
         # Write .env file if updated (note: may fail if read-only mount)

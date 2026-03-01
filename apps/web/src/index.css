@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
 @layer base {
   * {
     @apply border-border;
@@ -700,3 +702,70 @@ ul:not([class]) li::before,
     grid-column: 1 / -1;
   }
 }
+
+/*
+ * Tag category colors
+ * Uses .dark class selector directly (not Tailwind dark: variant) to avoid
+ * the @media (prefers-color-scheme: dark) issue in Tailwind v4 compat mode.
+ * The .dark class is toggled by next-themes and is reliable.
+ */
+.tag-body         { background-color: var(--color-amber-200);   border-color: var(--color-amber-500);   color: var(--color-amber-950); }
+.tag-flavor       { background-color: var(--color-rose-200);    border-color: var(--color-rose-500);    color: var(--color-rose-950); }
+.tag-mouthfeel    { background-color: var(--color-sky-200);     border-color: var(--color-sky-500);     color: var(--color-sky-950); }
+.tag-style        { background-color: var(--color-violet-200);  border-color: var(--color-violet-500);  color: var(--color-violet-950); }
+.tag-extraction   { background-color: var(--color-emerald-200); border-color: var(--color-emerald-500); color: var(--color-emerald-950); }
+.tag-roast        { background-color: var(--color-orange-200);  border-color: var(--color-orange-500);  color: var(--color-orange-950); }
+.tag-characteristic { background-color: var(--color-teal-200);  border-color: var(--color-teal-500);    color: var(--color-teal-950); }
+.tag-process      { background-color: var(--color-indigo-200);  border-color: var(--color-indigo-500);  color: var(--color-indigo-950); }
+.tag-default      { background-color: var(--color-gray-200);    border-color: var(--color-gray-500);    color: var(--color-gray-950); }
+
+@media (hover: hover) {
+  .tag-body:hover         { background-color: var(--color-amber-300);   border-color: var(--color-amber-600); }
+  .tag-flavor:hover       { background-color: var(--color-rose-300);    border-color: var(--color-rose-600); }
+  .tag-mouthfeel:hover    { background-color: var(--color-sky-300);     border-color: var(--color-sky-600); }
+  .tag-style:hover        { background-color: var(--color-violet-300);  border-color: var(--color-violet-600); }
+  .tag-extraction:hover   { background-color: var(--color-emerald-300); border-color: var(--color-emerald-600); }
+  .tag-roast:hover        { background-color: var(--color-orange-300);  border-color: var(--color-orange-600); }
+  .tag-characteristic:hover { background-color: var(--color-teal-300);  border-color: var(--color-teal-600); }
+  .tag-process:hover      { background-color: var(--color-indigo-300);  border-color: var(--color-indigo-600); }
+}
+
+.dark .tag-body         { background-color: color-mix(in oklab, var(--color-amber-500)   20%, transparent); border-color: color-mix(in oklab, var(--color-amber-500)   40%, transparent); color: var(--color-amber-200); }
+.dark .tag-flavor       { background-color: color-mix(in oklab, var(--color-rose-500)    20%, transparent); border-color: color-mix(in oklab, var(--color-rose-500)    40%, transparent); color: var(--color-rose-200); }
+.dark .tag-mouthfeel    { background-color: color-mix(in oklab, var(--color-sky-500)     20%, transparent); border-color: color-mix(in oklab, var(--color-sky-500)     40%, transparent); color: var(--color-sky-200); }
+.dark .tag-style        { background-color: color-mix(in oklab, var(--color-violet-500)  20%, transparent); border-color: color-mix(in oklab, var(--color-violet-500)  40%, transparent); color: var(--color-violet-200); }
+.dark .tag-extraction   { background-color: color-mix(in oklab, var(--color-emerald-500) 20%, transparent); border-color: color-mix(in oklab, var(--color-emerald-500) 40%, transparent); color: var(--color-emerald-200); }
+.dark .tag-roast        { background-color: color-mix(in oklab, var(--color-orange-500)  20%, transparent); border-color: color-mix(in oklab, var(--color-orange-500)  40%, transparent); color: var(--color-orange-200); }
+.dark .tag-characteristic { background-color: color-mix(in oklab, var(--color-teal-500)  20%, transparent); border-color: color-mix(in oklab, var(--color-teal-500)    40%, transparent); color: var(--color-teal-200); }
+.dark .tag-process      { background-color: color-mix(in oklab, var(--color-indigo-500)  20%, transparent); border-color: color-mix(in oklab, var(--color-indigo-500)  40%, transparent); color: var(--color-indigo-200); }
+.dark .tag-default      { background-color: color-mix(in oklab, var(--color-gray-500)    20%, transparent); border-color: color-mix(in oklab, var(--color-gray-500)    40%, transparent); color: var(--color-gray-200); }
+
+@media (hover: hover) {
+  .dark .tag-body:hover         { background-color: color-mix(in oklab, var(--color-amber-500)   30%, transparent); border-color: color-mix(in oklab, var(--color-amber-500)   55%, transparent); }
+  .dark .tag-flavor:hover       { background-color: color-mix(in oklab, var(--color-rose-500)    30%, transparent); border-color: color-mix(in oklab, var(--color-rose-500)    55%, transparent); }
+  .dark .tag-mouthfeel:hover    { background-color: color-mix(in oklab, var(--color-sky-500)     30%, transparent); border-color: color-mix(in oklab, var(--color-sky-500)     55%, transparent); }
+  .dark .tag-style:hover        { background-color: color-mix(in oklab, var(--color-violet-500)  30%, transparent); border-color: color-mix(in oklab, var(--color-violet-500)  55%, transparent); }
+  .dark .tag-extraction:hover   { background-color: color-mix(in oklab, var(--color-emerald-500) 30%, transparent); border-color: color-mix(in oklab, var(--color-emerald-500) 55%, transparent); }
+  .dark .tag-roast:hover        { background-color: color-mix(in oklab, var(--color-orange-500)  30%, transparent); border-color: color-mix(in oklab, var(--color-orange-500)  55%, transparent); }
+  .dark .tag-characteristic:hover { background-color: color-mix(in oklab, var(--color-teal-500)  30%, transparent); border-color: color-mix(in oklab, var(--color-teal-500)    55%, transparent); }
+  .dark .tag-process:hover      { background-color: color-mix(in oklab, var(--color-indigo-500)  30%, transparent); border-color: color-mix(in oklab, var(--color-indigo-500)  55%, transparent); }
+}
+
+/* Selected tag states */
+.tag-body-selected         { background-color: var(--color-amber-600);   border-color: var(--color-amber-700); }
+.tag-flavor-selected       { background-color: var(--color-rose-600);    border-color: var(--color-rose-700); }
+.tag-mouthfeel-selected    { background-color: var(--color-sky-600);     border-color: var(--color-sky-700); }
+.tag-style-selected        { background-color: var(--color-violet-600);  border-color: var(--color-violet-700); }
+.tag-extraction-selected   { background-color: var(--color-emerald-600); border-color: var(--color-emerald-700); }
+.tag-roast-selected        { background-color: var(--color-orange-600);  border-color: var(--color-orange-700); }
+.tag-characteristic-selected { background-color: var(--color-teal-600);  border-color: var(--color-teal-700); }
+.tag-process-selected      { background-color: var(--color-indigo-600);  border-color: var(--color-indigo-700); }
+
+.dark .tag-body-selected         { background-color: var(--color-amber-500);   border-color: var(--color-amber-400); }
+.dark .tag-flavor-selected       { background-color: var(--color-rose-500);    border-color: var(--color-rose-400); }
+.dark .tag-mouthfeel-selected    { background-color: var(--color-sky-500);     border-color: var(--color-sky-400); }
+.dark .tag-style-selected        { background-color: var(--color-violet-500);  border-color: var(--color-violet-400); }
+.dark .tag-extraction-selected   { background-color: var(--color-emerald-500); border-color: var(--color-emerald-400); }
+.dark .tag-roast-selected        { background-color: var(--color-orange-500);  border-color: var(--color-orange-400); }
+.dark .tag-characteristic-selected { background-color: var(--color-teal-500);  border-color: var(--color-teal-400); }
+.dark .tag-process-selected      { background-color: var(--color-indigo-500);  border-color: var(--color-indigo-400); }
