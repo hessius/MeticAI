@@ -936,7 +936,7 @@ async def analyze_and_profile(
                     profile_name = "Untitled Profile"
                 reply = f"**Profile Created:** {profile_name}\n\n{reply}".strip()
 
-            total_elapsed = time.monotonic() - (generation_start if 'generation_start' in dir() else progress.created_at)
+            total_elapsed = time.monotonic() - generation_start
         
             logger.info(
                 "Profile creation completed successfully",

@@ -65,14 +65,12 @@ class GenerationState:
         blocks until new events arrive.
         """
         # Replay existing events
-        idx = 0
         for event in list(self.events):
             yield event
-            idx += 1
 
         # Stream new events as they arrive
         while not self._completed:
-            waiter: asyncio.Future = asyncio.get_event_loop().create_future()
+            waiter: asyncio.Future = asyncio.get_running_loop().create_future()
             self._waiters.append(waiter)
             try:
                 event = await asyncio.wait_for(waiter, timeout=60)
