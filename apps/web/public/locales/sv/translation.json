@@ -611,7 +611,9 @@
       "pressure": "Tryck (bar)",
       "flow": "Flöde (ml/s)",
       "pressureLabel": "Tryck",
-      "flowLabel": "Flöde"
+      "flowLabel": "Flöde",
+      "power": "Effekt",
+      "temp": "Temp"
     },
     "actions": {
       "start": "Starta",
