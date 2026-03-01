@@ -281,6 +281,49 @@ Note: No pressure target, entirely flow-controlled
 """
 
 
+# Distilled version of the profiling knowledge for token-optimized prompts.
+# Focuses on decision heuristics and practical rules rather than theory.
+# ~2.5K chars vs ~10.8K chars for the full version.
+PROFILING_KNOWLEDGE_DISTILLED = """\
+# Espresso Profiling Quick Reference
+
+## Roast → Profile Matching
+- Light roast: higher temp (92-96°C), lower pressure (6-7 bar), higher ratio (1:2.5-1:3+), flow-controlled, turbo-style
+- Medium roast: balanced temp (90-93°C), classic 9 bar pressure, standard ratio (1:2-1:2.5)
+- Dark roast: lower temp (82-90°C), gentler pressure (7-8 bar), shorter ratio (1:1.5-1:2), avoid over-extraction
+- Very fresh (<7 days): add bloom/dwell phase (5-30s at zero flow) to release CO2
+
+## Four-Phase Structure
+1. **Pre-infusion**: Flow 2-4 ml/s, pressure limit ~2 bar, exit on pressure threshold or weight ~5-8g
+2. **Bloom** (optional): Zero flow, hold 0.5-1.5 bar, 5-30s. Use for fresh coffee or light roasts
+3. **Infusion**: Ramp to target pressure/flow. This is where 60-75% of yield extracts
+4. **Taper**: Decline pressure/flow over final 20-30% of yield. Reduces bitterness and astringency
+
+## Profile Blueprints (compressed)
+- **Classic Lever** (medium-dark): Pre-infuse→9 bar hold→taper 9→5 bar. Ratio 1:2
+- **Turbo** (light/single origin): Pre-infuse→6 bar→taper 6→3 bar. Ratio 1:3. Fast, bright, clear
+- **Allongé/Soup** (very light): Pre-wet→high flow (8 ml/s). Ratio 1:4. Tea-like, no pressure target
+- **Bloom & Extract** (very fresh): Pre-infuse→20s bloom→8 bar→taper 8→4 bar
+
+## Troubleshooting
+- Sour/thin → increase pressure, extend extraction, raise temp
+- Bitter/astringent → lower pressure, taper earlier, lower temp
+- Gushing → grind finer, reduce pre-infusion flow
+- Choking → grind coarser, add bloom phase, increase initial pressure
+
+## Control Strategy
+- **Flow-controlled**: Adapts to puck resistance, forgiving of grind variance. Better for consistency
+- **Pressure-controlled**: Traditional approach, needs precise grind. Better for body/texture targeting
+- **Hybrid** (recommended): Pressure control with flow limits, or flow control with pressure limits
+
+## Key Design Rules
+- Dynamics points x-axis is ALWAYS relative to stage start (0 = stage start)
+- Gentle pressure ramps (3-4s) prevent channeling; aggressive (<2s) risk it
+- Keep profiles to 3-4 stages (5-6 max). Simpler = more reliable
+- Pre-infusion: ~5-10% of yield. Infusion: 60-75%. Taper: remaining 20-30%
+"""
+
+
 def clean_gemini_output(text: str) -> str:
     """Strip Gemini CLI noise lines and ANSI codes from output.
     

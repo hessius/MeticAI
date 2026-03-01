@@ -772,11 +772,11 @@ class TestEnhancedBaristaPersona:
         prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
         prompt = prompt_payload[0]
 
-        # Verify validation rules are present
+        # Verify validation rules are present (distilled mode is the default)
         assert "VALIDATION RULES" in prompt
         assert "PARADOX" in prompt
-        assert "BACKUP EXIT TRIGGERS" in prompt
-        assert "REQUIRED SAFETY LIMITS" in prompt
+        assert "BACKUP TRIGGER" in prompt
+        assert "CROSS-TYPE LIMITS" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
@@ -799,6 +799,53 @@ class TestEnhancedBaristaPersona:
         assert "ERROR RECOVERY" in prompt
         assert "Fix ALL errors in a SINGLE retry" in prompt
         assert "NEVER give up" in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_distilled_mode_is_default(self, mock_vision_model, mock_create_profile, client):
+        """Test that distilled (compact) prompt mode is the default."""
+        mock_create_profile.return_value = {"id": "persona-d1"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test"}
+        )
+
+        prompt = mock_vision_model.return_value.async_generate_content.call_args[0][0][0]
+
+        # Distilled mode uses compact versions
+        assert "PROFILING QUICK REFERENCE" in prompt
+        assert "OEPF FORMAT SUMMARY" in prompt
+        # Should NOT contain the full verbose sections
+        assert "Understanding Puck Dynamics" not in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_detailed_knowledge_mode(self, mock_vision_model, mock_create_profile, client):
+        """Test that detailed_knowledge=true includes full profiling knowledge."""
+        mock_create_profile.return_value = {"id": "persona-d2"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test", "detailed_knowledge": "true"}
+        )
+
+        prompt = mock_vision_model.return_value.async_generate_content.call_args[0][0][0]
+
+        # Full mode uses verbose versions
+        assert "ESPRESSO PROFILING GUIDE" in prompt
+        assert "Understanding Puck Dynamics" in prompt
+        assert "BACKUP EXIT TRIGGERS" in prompt
+        # Should NOT contain the compact versions
+        assert "PROFILING QUICK REFERENCE" not in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)

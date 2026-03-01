@@ -22,7 +22,8 @@ from services.gemini_service import (
     get_vision_model,
     get_author_instruction,
     build_advanced_customization_section,
-    PROFILING_KNOWLEDGE
+    PROFILING_KNOWLEDGE,
+    PROFILING_KNOWLEDGE_DISTILLED
 )
 from services.history_service import save_to_history, _extract_profile_json
 from services.meticulous_service import async_create_profile
@@ -266,6 +267,62 @@ SDK_OUTPUT_INSTRUCTIONS = (
     "• Ensure the summary includes a 'Profile Created:' line and clear preparation guidance\n\n"
 )
 
+# ── Distilled prompt sections for token-optimized mode ──────────────────────────
+# These compressed versions cut total prompt from ~22K+ to ≤20K chars by
+# removing redundancy between PROFILE_GUIDELINES and VALIDATION_RULES,
+# condensing JSON examples, and keeping only decision-critical rules.
+
+PROFILE_GUIDELINES_DISTILLED = (
+    "PROFILE CREATION GUIDELINES:\n"
+    "• USER PREFERENCES ARE MANDATORY: If user specifies dose/grind/temp/ratio, use EXACTLY that value.\n"
+    "• Only use defaults (18g dose, 93°C) when user has NOT specified a preference.\n"
+    "• Design for the specific bean: origin, roast level, flavor notes.\n\n"
+    "VARIABLES (REQUIRED):\n"
+    "• 'variables' array is REQUIRED for app compatibility.\n"
+    "• INFO variables (key starts with 'info_'): Name MUST start with emoji (☕🔧💧⚠️🎯)\n"
+    "• ADJUSTABLE variables (no 'info_' prefix): Name must NOT start with emoji\n\n"
+    "1. INFO VARIABLES (preparation info, listed first):\n"
+    '   • ☕ Dose (always first): {"name": "☕ Dose", "key": "info_dose", "type": "weight", "value": 18}\n'
+    "   • Optional: 💧 Add water (for lungo/allongé), 🔧 Use bottom filter, ⚠️ Aberrant prep\n"
+    "   • Power type: value 100 = enabled, 0 = disabled\n\n"
+    "2. ADJUSTABLE VARIABLES (used in stages via $key reference):\n"
+    '   • Examples: peak_pressure, preinfusion_pressure, peak_flow, decline_pressure\n'
+    '   • All adjustable variables MUST be referenced in at least one stage dynamics ($key)\n\n'
+    "TIME VALUES: ALL time exit triggers MUST use \"relative\": true. dynamics_points x-axis always relative to stage start.\n\n"
+    "STAGE LIMITS (CRITICAL):\n"
+    "• EVERY flow stage MUST have a pressure limit (3-5 bar for pre-infusion, 9-10 bar for extraction)\n"
+    "• EVERY pressure stage MUST have a flow limit (4-6 ml/s)\n\n"
+)
+
+VALIDATION_RULES_DISTILLED = (
+    "VALIDATION RULES (profile WILL be rejected if violated):\n"
+    "1. EXIT TRIGGER PARADOX: Flow stage cannot have flow exit trigger. Pressure stage cannot have pressure exit trigger.\n"
+    "2. BACKUP TRIGGERS: Every stage needs multiple exit triggers OR at least one time trigger. Single non-time trigger = rejected.\n"
+    '   Pattern: [{"type": "weight", ...}, {"type": "time", "value": 60, "comparison": ">=", "relative": true}]\n'
+    "3. CROSS-TYPE LIMITS: Flow stage → pressure limit. Pressure stage → flow limit. Same-type limit = rejected.\n"
+    "4. INTERPOLATION: Only 'linear' or 'curve' (2+ points). 'none' is NOT supported.\n"
+    "5. DYNAMICS.OVER: Only 'time', 'weight', or 'piston_position'.\n"
+    "6. STAGE TYPES: Only 'power', 'flow', or 'pressure'.\n"
+    "7. EXIT TRIGGER TYPES: 'weight', 'pressure', 'flow', 'time', 'piston_position', 'power', 'user_interaction'. Comparison: '>=' or '<='.\n"
+    "8. PRESSURE: Max 15 bar. No negatives.\n"
+    "9. ABSOLUTE WEIGHT: Must be strictly increasing across stages. Prefer relative: true.\n"
+    "10. VARIABLE NAMES: info_ keys → emoji prefix required. Adjustable → no emoji. All adjustable must be used in stages.\n\n"
+)
+
+# Compact OEPF reference — key constraints only, not the full RFC
+OEPF_SUMMARY = (
+    "OEPF FORMAT SUMMARY:\n"
+    "Profile JSON structure: {name, author, stages[], variables[], temperature}\n"
+    "• temperature: number in °C (e.g., 93)\n"
+    "• Each stage: {name, type, dynamics, limits[], exit_triggers[], exit_type?}\n"
+    "• dynamics: {points: [[x, y], ...], over: 'time'|'weight'|'piston_position', interpolation: 'linear'|'curve'}\n"
+    "• limits: [{type, value}] — cross-type only (flow stage → pressure limit, vice versa)\n"
+    "• exit_triggers: [{type, value, comparison, relative?}] — comparison is '>=' or '<='\n"
+    "• exit_type: 'or' (default, first trigger wins) or 'and' (all must be met)\n"
+    "• variables: [{name, key, type, value}] — type is 'pressure'|'flow'|'weight'|'power'|'time'\n"
+    "• Reference variables in dynamics with $ prefix: {\"points\": [[0, \"$peak_pressure\"]]}\n\n"
+)
+
 # Build the reference sections once
 _PROFILING_GUIDE = (
     f"ESPRESSO PROFILING GUIDE:\n"
@@ -279,6 +336,16 @@ _OEPF_REFERENCE = (
     f"Use the following specification to ensure your profile JSON is valid and well-structured.\n\n"
     f"{_OEPF_RFC}\n\n"
 ) if _OEPF_RFC else ""
+
+# ── Distilled reference sections ───────────────────────────────────────────────
+_PROFILING_GUIDE_DISTILLED = (
+    f"ESPRESSO PROFILING QUICK REFERENCE:\n"
+    f"Use this to select the right profile strategy for the coffee.\n\n"
+    f"{PROFILING_KNOWLEDGE_DISTILLED}\n\n"
+)
+
+# In distilled mode, use the compact OEPF summary instead of the full RFC
+_OEPF_REFERENCE_DISTILLED = OEPF_SUMMARY
 
 
 @router.post("/analyze_coffee")
@@ -367,7 +434,8 @@ async def analyze_and_profile(
     request: Request,
     file: Optional[UploadFile] = File(None),
     user_prefs: Optional[str] = Form(None),
-    advanced_customization: Optional[str] = Form(None)
+    advanced_customization: Optional[str] = Form(None),
+    detailed_knowledge: Optional[str] = Form(None)
 ):
     """Unified endpoint: Analyze coffee bag and generate profile in a single LLM pass.
     
@@ -377,6 +445,8 @@ async def analyze_and_profile(
     
     Optional:
     - advanced_customization: Advanced equipment/extraction settings (basket, temp, dose, etc.)
+    - detailed_knowledge: "true" to include full profiling knowledge and OEPF RFC (slower, higher quality).
+                          Default is distilled/compact mode for faster generation.
     """
     request_id = request.state.request_id
     
@@ -423,6 +493,7 @@ async def analyze_and_profile(
                     "has_image": file is not None,
                     "has_preferences": user_prefs is not None,
                     "has_advanced_customization": advanced_customization is not None,
+                    "knowledge_mode": "detailed" if (detailed_knowledge and detailed_knowledge.lower() == "true") else "distilled",
                     "upload_filename": file.filename if file else None,
                     "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs,
                     "advanced_customization_preview": (
@@ -473,6 +544,33 @@ async def analyze_and_profile(
             # Build advanced customization section if provided
             advanced_section = build_advanced_customization_section(advanced_customization)
         
+            # Select prompt sections based on knowledge mode
+            use_detailed = detailed_knowledge and detailed_knowledge.lower() == "true"
+            if use_detailed:
+                guidelines = PROFILE_GUIDELINES
+                validation = VALIDATION_RULES
+                profiling_guide = _PROFILING_GUIDE
+                oepf_ref = _OEPF_REFERENCE
+            else:
+                guidelines = PROFILE_GUIDELINES_DISTILLED
+                validation = VALIDATION_RULES_DISTILLED
+                profiling_guide = _PROFILING_GUIDE_DISTILLED
+                oepf_ref = _OEPF_REFERENCE_DISTILLED
+
+            # Common tail shared by all three prompt branches
+            prompt_tail = (
+                guidelines +
+                validation +
+                ERROR_RECOVERY +
+                NAMING_CONVENTION +
+                author_instruction +
+                USER_SUMMARY_INSTRUCTIONS +
+                SDK_OUTPUT_INSTRUCTIONS +
+                OUTPUT_FORMAT +
+                profiling_guide +
+                oepf_ref
+            )
+
             # Construct the profile creation prompt
             if coffee_analysis and user_prefs:
                 # Both image and preferences provided
@@ -486,16 +584,7 @@ async def analyze_and_profile(
                     f"'{user_prefs}'\n"
                     f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
                     "TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
-                    PROFILE_GUIDELINES +
-                    VALIDATION_RULES +
-                    ERROR_RECOVERY +
-                    NAMING_CONVENTION +
-                    author_instruction +
-                    USER_SUMMARY_INSTRUCTIONS +
-                    SDK_OUTPUT_INSTRUCTIONS +
-                    OUTPUT_FORMAT +
-                    _PROFILING_GUIDE +
-                    _OEPF_REFERENCE
+                    prompt_tail
                 )
             elif coffee_analysis:
                 # Only image provided (may still have advanced customization)
@@ -507,16 +596,7 @@ async def analyze_and_profile(
                     advanced_section +
                     "TASK: Create a sophisticated espresso profile for this coffee" +
                     (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
-                    PROFILE_GUIDELINES +
-                    VALIDATION_RULES +
-                    ERROR_RECOVERY +
-                    NAMING_CONVENTION +
-                    author_instruction +
-                    USER_SUMMARY_INSTRUCTIONS +
-                    SDK_OUTPUT_INSTRUCTIONS +
-                    OUTPUT_FORMAT +
-                    _PROFILING_GUIDE +
-                    _OEPF_REFERENCE
+                    prompt_tail
                 )
             else:
                 # Only user preferences provided (may still have advanced customization)
@@ -529,23 +609,15 @@ async def analyze_and_profile(
                     f"'{user_prefs}'\n"
                     f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
                     "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
-                    PROFILE_GUIDELINES +
-                    VALIDATION_RULES +
-                    ERROR_RECOVERY +
-                    NAMING_CONVENTION +
-                    author_instruction +
-                    USER_SUMMARY_INSTRUCTIONS +
-                    SDK_OUTPUT_INSTRUCTIONS +
-                    OUTPUT_FORMAT +
-                    _PROFILING_GUIDE +
-                    _OEPF_REFERENCE
+                    prompt_tail
                 )
         
             logger.debug(
                 "Executing profile generation via Gemini SDK",
                 extra={
                     "request_id": request_id,
-                    "prompt_length": len(final_prompt)
+                    "prompt_length": len(final_prompt),
+                    "knowledge_mode": "detailed" if use_detailed else "distilled"
                 }
             )
             generation_start = time.monotonic()

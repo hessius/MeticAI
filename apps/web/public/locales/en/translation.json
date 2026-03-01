@@ -499,6 +499,11 @@
     "yes": "Yes",
     "no": "No"
   },
+  "advanced": {
+    "detailedKnowledge": "Detailed AI Knowledge",
+    "detailedKnowledgeDescription": "Include full profiling guide and OEPF specification for higher quality profiles",
+    "detailedKnowledgeWarning": "Detailed mode sends significantly more context to the AI. This may increase generation time, especially on low-powered hardware."
+  },
   "qrCode": {
     "title": "Open on Mobile",
     "description": "Scan this QR code with your phone's camera to open this page on your mobile device",

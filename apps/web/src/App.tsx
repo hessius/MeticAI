@@ -304,6 +304,11 @@ function App() {
         if (advancedParams.length > 0) {
           formData.append('advanced_customization', advancedParams.join(', '))
         }
+        
+        // Pass detailed knowledge mode flag
+        if (advancedOptions.detailedKnowledge) {
+          formData.append('detailed_knowledge', 'true')
+        }
       }
 
       const serverUrl = await getServerUrl()
