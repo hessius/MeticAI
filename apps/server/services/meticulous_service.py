@@ -2,13 +2,14 @@
 
 import json
 import time
+import uuid
 import zstandard
 import httpx
 import asyncio
 import os
 import functools
 import requests.exceptions
-from typing import Optional
+from typing import Any, Dict, Optional
 from fastapi import HTTPException
 from logging_config import get_logger
 from services.settings_service import load_settings
@@ -278,14 +279,136 @@ async def async_load_profile_by_id(profile_id: str):
     return await loop.run_in_executor(None, api.load_profile_by_id, profile_id)
 
 
+def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, Any]:
+    """Enrich and normalize espresso-profile-schema JSON for the machine REST API.
+
+    The AI model produces JSON conforming to the OEPF espresso-profile-schema,
+    but the Meticulous machine's ``/api/v1/profile/save`` endpoint requires
+    several additional fields.  This function — borrowing the same conventions
+    used by the MCP server's ``create_profile`` tool — fills in the gaps so the
+    profile can be saved directly.
+
+    Added / defaulted fields:
+        - ``id`` — random UUID if missing
+        - ``author`` / ``author_id`` — ``"MeticAI"`` + random UUID
+        - ``temperature`` — defaults to 90.0 °C
+        - ``final_weight`` — defaults to 40.0 g
+        - ``variables`` — always present (empty list if missing)
+        - ``previous_authors`` — always present (empty list if missing)
+        - Per-stage ``key`` — auto-generated from type + index if missing
+        - Per-stage ``limits`` — always an array (never None / absent)
+        - ``dynamics.interpolation`` — defaults to ``"linear"``
+        - ``dynamics.points`` — each point coerced to ``[x, y]`` list form
+        - Exit-trigger ``relative`` — defaults to ``True`` for time, ``False``
+          otherwise (matches MCP profile_builder behaviour)
+        - Exit-trigger ``comparison`` — defaults to ``">="``
+    """
+    data = dict(profile_json)  # shallow copy
+
+    # ── Top-level identity & metadata ────────────────────────────────────
+    if "id" not in data or not data["id"]:
+        data["id"] = str(uuid.uuid4())
+    data.setdefault("author", "MeticAI")
+    if "author_id" not in data or not data["author_id"]:
+        data["author_id"] = str(uuid.uuid4())
+    data.setdefault("temperature", 90.0)
+    data.setdefault("final_weight", 40.0)
+    # The Meticulous app crashes if variables array is absent
+    if "variables" not in data or data.get("variables") is None:
+        data["variables"] = []
+    data.setdefault("previous_authors", [])
+
+    # ── Display metadata ─────────────────────────────────────────────────
+    # The OEPF schema supports display.description / display.shortDescription
+    # which the Meticulous app stores alongside the profile.
+    display = data.get("display") or {}
+    if not isinstance(display, dict):
+        display = {}
+    # Preserve any existing description; normalise structure
+    data["display"] = display
+
+    # ── Per-stage normalisation ──────────────────────────────────────────
+    for idx, stage in enumerate(data.get("stages") or []):
+        # type — default to "flow" if missing
+        stage.setdefault("type", "flow")
+        stage_type = stage["type"]
+
+        # name — required, default to "Stage N" if missing
+        stage.setdefault("name", f"Stage {idx + 1}")
+
+        # key — unique string identifier
+        if "key" not in stage or not stage["key"]:
+            stage["key"] = f"{stage_type}_{idx}"
+
+        # exit_triggers — required, must be a list
+        if "exit_triggers" not in stage or stage.get("exit_triggers") is None:
+            stage["exit_triggers"] = []
+
+        # limits — must always be a list
+        if "limits" not in stage or stage.get("limits") is None:
+            stage["limits"] = []
+
+        # dynamics — required; ensure it exists with all required sub-fields
+        dynamics = stage.get("dynamics") or {}
+        dynamics.setdefault("interpolation", "linear")
+        dynamics.setdefault("over", "time")
+        dynamics.setdefault("points", [])
+
+        # dynamics.points — coerce dicts like {"value": 2} to [0, 2]
+        raw_points = dynamics.get("points") or []
+        normalised_points = []
+        for pt in raw_points:
+            if isinstance(pt, dict):
+                # Single-value shorthand {"value": v} → [0, v]
+                normalised_points.append([0.0, pt.get("value", 0)])
+            elif isinstance(pt, (list, tuple)):
+                normalised_points.append(list(pt))
+            else:
+                normalised_points.append([0.0, float(pt)])
+        dynamics["points"] = normalised_points
+        stage["dynamics"] = dynamics
+
+        # exit_triggers — ensure relative & comparison are present
+        for trigger in stage.get("exit_triggers") or []:
+            if "relative" not in trigger or trigger.get("relative") is None:
+                trigger["relative"] = trigger.get("type") == "time"
+            trigger.setdefault("comparison", ">=")
+
+    return data
+
+
 @_wrap_machine_call
 async def async_create_profile(profile_json):
-    """create_profile() offloaded to a thread."""
-    api = get_meticulous_api()
-    loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, api.create_profile, profile_json)
+    """Upload a profile to the machine via its REST API.
+
+    Normalises the espresso-profile-schema JSON (as produced by the AI model)
+    into the machine-compatible format and POSTs it to ``/api/v1/profile/save``,
+    following the same approach used by the MCP server's ``create_profile`` tool.
+    """
+    normalised = _normalize_profile_for_machine(profile_json)
+    base_url = _resolve_meticulous_base_url()
+    client = _get_http_client()
+    response = await client.post(
+        f"{base_url}/api/v1/profile/save",
+        json=normalised,
+        timeout=30.0,
+    )
+    if response.status_code != 200:
+        body = response.text
+        logger.error(
+            "Machine rejected profile save: %s",
+            body[:1000],
+            extra={
+                "status": response.status_code,
+                "profile_name": normalised.get("name"),
+                "profile_keys": list(normalised.keys()),
+                "stage_count": len(normalised.get("stages", [])),
+                "stage_keys": [s.get("key") for s in normalised.get("stages", [])],
+            }
+        )
+    response.raise_for_status()
     invalidate_profile_list_cache()
-    return result
+    return response.json()
 
 
 @_wrap_machine_call

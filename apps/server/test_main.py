@@ -1125,6 +1125,68 @@ class TestValidationRetry:
         assert len(data["generation_id"]) == 8
 
 
+class TestUnicodeEscapeInReSubFix:
+    """Test that re.sub replacement with Unicode JSON doesn't raise PatternError.
+
+    Regression test for a bug where json.dumps output containing \\uXXXX
+    sequences caused re.PatternError('bad escape \\u') when used directly
+    as the replacement string in re.sub().
+    """
+
+    # Profile with Unicode characters that produce \uXXXX in json.dumps
+    UNICODE_PROFILE_REPLY = (
+        "**Profile Created:** Café Résumé\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Caf\\u00e9 R\\u00e9sum\\u00e9\",\"stages\":[{\"name\":\"Pre-infusion\","
+        "\"type\":\"flow\",\"dynamics\":{\"points\":[{\"value\":2}],\"over\":\"time\"},"
+        "\"exit_triggers\":[{\"type\":\"time\",\"value\":10}],"
+        "\"limits\":[{\"type\":\"pressure\",\"value\":3}]}],\"variables\":[]}\n"
+        "```\n"
+    )
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_unicode_in_fixed_json_does_not_raise(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Validation fix path replaces JSON with unicode chars without error."""
+        mock_save_history.return_value = {"id": "test-unicode"}
+        mock_create_profile.return_value = {"id": "machine-unicode"}
+
+        # First validation fails, second passes — forces the re.sub code path
+        invalid_result = Mock()
+        invalid_result.is_valid = False
+        invalid_result.errors = ["Stage missing limit"]
+        invalid_result.error_summary.return_value = "1. Stage missing limit"
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+
+        mock_validate.side_effect = [invalid_result, valid_result]
+
+        gen_response = Mock()
+        gen_response.text = self.UNICODE_PROFILE_REPLY
+        fix_response = Mock()
+        fix_response.text = self.UNICODE_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[gen_response, fix_response]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test unicode handling"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # The re.sub path was exercised (2 model calls = generation + fix)
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+
+
 class TestAdvancedCustomization:
     """Tests for advanced_customization parameter functionality."""
 
@@ -9602,6 +9664,203 @@ class TestMeticulousServiceCoverage:
         
         # Function should exist
         assert callable(get_meticulous_api)
+
+
+class TestNormalizeProfileForMachine:
+    """Tests for _normalize_profile_for_machine (profile upload enrichment)."""
+
+    def _normalize(self, data):
+        from services.meticulous_service import _normalize_profile_for_machine
+        return _normalize_profile_for_machine(data)
+
+    def test_adds_uuid_id(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert "id" in result and len(result["id"]) == 36  # UUID format
+
+    def test_preserves_existing_id(self):
+        result = self._normalize({"name": "X", "id": "keep-me", "stages": []})
+        assert result["id"] == "keep-me"
+
+    def test_adds_author_and_author_id(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["author"] == "MeticAI"
+        assert len(result["author_id"]) == 36
+
+    def test_preserves_existing_author(self):
+        result = self._normalize({"name": "X", "author": "User", "stages": []})
+        assert result["author"] == "User"
+
+    def test_defaults_temperature_and_weight(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["temperature"] == 90.0
+        assert result["final_weight"] == 40.0
+
+    def test_preserves_explicit_temperature(self):
+        result = self._normalize({"name": "X", "temperature": 93.5, "stages": []})
+        assert result["temperature"] == 93.5
+
+    def test_variables_defaults_to_empty_list(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["variables"] == []
+
+    def test_variables_none_becomes_empty_list(self):
+        result = self._normalize({"name": "X", "variables": None, "stages": []})
+        assert result["variables"] == []
+
+    def test_variables_preserved_if_present(self):
+        v = [{"name": "P", "key": "p_1", "type": "pressure", "value": 8}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"] == v
+
+    def test_previous_authors_defaults_to_empty(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["previous_authors"] == []
+
+    def test_stage_key_auto_generated(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [[0, 2]], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["key"] == "flow_0"
+
+    def test_stage_key_preserved(self):
+        stage = {"name": "S1", "key": "my_key", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["key"] == "my_key"
+
+    def test_stage_limits_defaults_to_empty_list(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["limits"] == []
+
+    def test_stage_limits_none_becomes_empty(self):
+        stage = {"name": "S1", "type": "flow", "limits": None, "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["limits"] == []
+
+    def test_dynamics_interpolation_defaults_to_linear(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["interpolation"] == "linear"
+
+    def test_dynamics_interpolation_preserved(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time", "interpolation": "curve"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["interpolation"] == "curve"
+
+    def test_dynamics_dict_points_coerced_to_lists(self):
+        """Points like {"value": 2} are coerced to [0, 2]."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [{"value": 2}], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["points"] == [[0.0, 2]]
+
+    def test_dynamics_list_points_preserved(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [[0, 1.5], [5, 3]], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["points"] == [[0, 1.5], [5, 3]]
+
+    def test_exit_trigger_relative_defaults_true_for_time(self):
+        trigger = {"type": "time", "value": 10}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["relative"] is True
+
+    def test_exit_trigger_relative_defaults_false_for_pressure(self):
+        trigger = {"type": "pressure", "value": 3}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["relative"] is False
+
+    def test_exit_trigger_relative_preserved_if_set(self):
+        trigger = {"type": "time", "value": 10, "relative": False}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["relative"] is False
+
+    def test_exit_trigger_comparison_defaults_to_gte(self):
+        trigger = {"type": "weight", "value": 30}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["comparison"] == ">="
+
+    def test_exit_trigger_comparison_preserved(self):
+        trigger = {"type": "weight", "value": 30, "comparison": "<="}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["comparison"] == "<="
+
+    def test_multi_stage_keys_auto_numbered(self):
+        s1 = {"name": "A", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        s2 = {"name": "B", "type": "pressure", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [s1, s2]})
+        assert result["stages"][0]["key"] == "flow_0"
+        assert result["stages"][1]["key"] == "pressure_1"
+
+    def test_does_not_mutate_original(self):
+        """The original dict should not be modified."""
+        original = {"name": "X", "stages": []}
+        self._normalize(original)
+        assert "id" not in original  # shallow copy
+
+    def test_dynamics_over_defaults_to_time(self):
+        """Missing dynamics.over defaults to 'time'."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [[0, 1]]}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["over"] == "time"
+
+    def test_dynamics_points_defaults_to_empty(self):
+        """Missing dynamics.points defaults to []."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["points"] == []
+
+    def test_dynamics_missing_entirely_gets_defaults(self):
+        """Missing dynamics entirely gets all defaults."""
+        stage = {"name": "S1", "type": "flow", "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        dyn = result["stages"][0]["dynamics"]
+        assert dyn["interpolation"] == "linear"
+        assert dyn["over"] == "time"
+        assert dyn["points"] == []
+
+    def test_exit_triggers_missing_defaults_to_empty(self):
+        """Missing exit_triggers defaults to []."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"] == []
+
+    def test_stage_type_defaults_to_flow(self):
+        """Missing stage type defaults to 'flow'."""
+        stage = {"name": "S1", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["type"] == "flow"
+
+    def test_stage_name_defaults_to_numbered(self):
+        """Missing stage name gets auto-generated 'Stage N'."""
+        stage = {"type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["name"] == "Stage 1"
+
+    def test_display_preserved_with_description(self):
+        """Existing display.description is preserved."""
+        data = {"name": "X", "stages": [],
+                "display": {"description": "A great profile", "accentColor": "#FF0000"}}
+        result = self._normalize(data)
+        assert result["display"]["description"] == "A great profile"
+        assert result["display"]["accentColor"] == "#FF0000"
+
+    def test_display_created_if_missing(self):
+        """display dict is created when absent."""
+        result = self._normalize({"name": "X", "stages": []})
+        assert isinstance(result["display"], dict)
+
+    def test_display_none_normalised_to_dict(self):
+        """display=None is normalised to {}."""
+        result = self._normalize({"name": "X", "stages": [], "display": None})
+        assert isinstance(result["display"], dict)
+
+    def test_display_non_dict_normalised(self):
+        """Non-dict display value is replaced with {}."""
+        result = self._normalize({"name": "X", "stages": [], "display": "bad"})
+        assert isinstance(result["display"], dict)
 
 
 # ---------------------------------------------------------------------------

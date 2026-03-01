@@ -284,7 +284,8 @@ SDK_OUTPUT_INSTRUCTIONS = (
     "• Do NOT call tools. Tool usage is disabled in this request\n"
     "• Return ONLY the final user-facing summary and a PROFILE JSON block\n"
     "• Include PROFILE JSON as a fenced ```json block that contains the complete profile object\n"
-    "• Ensure the summary includes a 'Profile Created:' line and clear preparation guidance\n\n"
+    "• Ensure the summary includes a 'Profile Created:' line and clear preparation guidance\n"
+    "• In the profile JSON, include a 'display' object with a 'description' field containing a markdown-formatted description of what the profile does and why (2-4 sentences). This is stored on the machine and shown in the profile details page.\n\n"
 )
 
 # ── Distilled prompt sections for token-optimized mode ──────────────────────────
@@ -826,9 +827,12 @@ async def analyze_and_profile(
                     if fixed_json:
                         profile_json_check = fixed_json
                         # Update the JSON in the reply so the user sees the corrected version
+                        # Use a lambda replacement to avoid re.sub interpreting
+                        # \uXXXX sequences in the JSON as regex escape sequences
+                        _replacement = '```json\n' + json.dumps(fixed_json, indent=2) + '\n```'
                         reply = re.sub(
                             r'```json\s*[\s\S]*?```',
-                            '```json\n' + json.dumps(fixed_json, indent=2) + '\n```',
+                            lambda _m: _replacement,
                             reply,
                             count=1
                         )

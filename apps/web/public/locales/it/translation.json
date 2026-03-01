@@ -16,7 +16,14 @@
     "or": "O",
     "and": "E",
     "selected": "Selezionato",
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "mon": "Lun",
+    "tue": "Mar",
+    "wed": "Mer",
+    "thu": "Gio",
+    "fri": "Ven",
+    "sat": "Sab",
+    "sun": "Dom"
   },
   "greetings": {
     "morning": [
@@ -73,7 +80,16 @@
       "Verifica incrociata con i forum di Decent...",
       "Quasi pronto..."
     ],
-    "pleaseWait": "Potrebbero volerci 120-180 secondi"
+    "pleaseWait": "Potrebbero volerci 120-180 secondi",
+    "elapsed": "{{seconds}}s trascorsi",
+    "phases": {
+      "analyze": "Analizza",
+      "done": "Fatto",
+      "generate": "Genera",
+      "upload": "Carica",
+      "validate": "Valida"
+    },
+    "retryAttempt": "tentativo {{attempt}}/{{max}}"
   },
   "app": {
     "title": "Profilatore AI Meticulous Espresso",
@@ -91,7 +107,8 @@
       "generateFailedValidation": "Generazione profilo fallita: L'AI ha generato uno schema di profilo non valido. Riprova — un secondo tentativo spesso ha successo.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
-      "saveFailed": "Failed to save results. Please try again."
+      "saveFailed": "Failed to save results. Please try again.",
+      "generateBusy": "Un profilo è già in fase di generazione. Il modulo è stato salvato — riprova tra qualche minuto."
     }
   },
   "navigation": {
@@ -132,7 +149,55 @@
     "profilePicture": "Immagine profilo",
     "selectStyle": "Seleziona stile",
     "exportAs": "Esporta come",
-    "generatedImagePreview": "Anteprima immagine generata"
+    "generatedImagePreview": "Anteprima immagine generata",
+    "addedToMeticAI": "Aggiunto a MeticAI",
+    "aiImageUnavailable": "La generazione di immagini IA non è disponibile. Abilita le funzionalità IA nelle Impostazioni e assicurati che una chiave API Gemini sia configurata.",
+    "apply": "Applica",
+    "applyImageFailed": "Impossibile applicare l'immagine",
+    "applying": "Applicazione in corso...",
+    "byAuthor": "di {{author}}",
+    "captureSubtitle": "Generatore di profili espresso Meticulous",
+    "clearFilters": "Cancella filtri",
+    "clickToEnlarge": "Clicca per ingrandire",
+    "discard": "Scarta",
+    "filterHintAnd": "Mostra profili con tutti i tag selezionati",
+    "filterHintOr": "Mostra profili con uno qualsiasi dei tag selezionati",
+    "generate": "Genera",
+    "generateStyleImage": "Genera immagine {{style}}",
+    "generatedPreviewAlt": "Anteprima generata",
+    "generating": "Generazione in corso...",
+    "generationFailed": "Generazione fallita",
+    "imageApplied": "Immagine applicata con successo",
+    "imageGenerationFailed": "Generazione immagine fallita",
+    "imageStyles": {
+      "abstract": "Astratto",
+      "abstractDesc": "Interpretazione artistica astratta",
+      "minimalist": "Minimalista",
+      "minimalistDesc": "Design pulito e minimale",
+      "modern": "Moderno",
+      "modernDesc": "Stile artistico contemporaneo",
+      "pixelArt": "Pixel Art",
+      "pixelArtDesc": "Stile retro pixel art",
+      "vintage": "Vintage",
+      "vintageDesc": "Estetica retrò",
+      "watercolor": "Acquerello",
+      "watercolorDesc": "Pittura ad acquerello delicata"
+    },
+    "imageSyncNote": "L'immagine verrà ritagliata in formato quadrato e sincronizzata con la macchina",
+    "imageUploadFailed": "Caricamento immagine fallito",
+    "noImageData": "Nessun dato immagine ricevuto dal server",
+    "noMatchingDescription": "Prova a regolare le impostazioni dei filtri",
+    "noProfilesDescription": "Aggiungi il tuo primo profilo espresso per vederlo qui",
+    "paidKeyRequired": "La generazione di immagini richiede una chiave API Gemini a pagamento. Configura GEMINI_API_KEY.",
+    "paidKeyWarning": "La generazione di immagini IA richiede una chiave API Gemini a pagamento. Le chiavi gratuite potrebbero non funzionare.",
+    "saveImageFailed": "Impossibile salvare l'immagine. Riprova.",
+    "selectImageFile": "Seleziona un file immagine",
+    "shotHistoryAndAnalysis": "Cronologia shot e analisi",
+    "upload": "Carica",
+    "uploadFailed": "Caricamento fallito",
+    "uploaded": "Caricato!",
+    "uploading": "Caricamento...",
+    "useImagePrompt": "Vuoi usare questa immagine per il tuo profilo?"
   },
   "runShot": {
     "title": "Esegui / Programma",
@@ -195,7 +260,11 @@
       "saveFailed": "Impossibile salvare programmazione ricorrente",
       "deleteFailed": "Impossibile eliminare programmazione ricorrente",
       "updateFailed": "Impossibile aggiornare programmazione"
-    }
+    },
+    "changeProfile": "Cambia",
+    "everyXDaysCount": "Ogni {{count}} giorni",
+    "noProfileSelected": "Nessun profilo selezionato. Seleziona un profilo o usa solo il preriscaldamento.",
+    "selectProfile": "Seleziona profilo"
   },
   "shotHistory": {
     "duration": "Durata",
@@ -361,7 +430,8 @@
       "watchtower": "Aggiornamenti automatici tramite Watchtower",
       "manual": "Solo aggiornamenti manuali",
       "watchtowerDescription": "Gli aggiornamenti vengono applicati automaticamente quando sono disponibili nuove versioni.",
-      "manualDescription": "Nessun meccanismo di aggiornamento automatico rilevato. Aggiorna manualmente tramite docker pull."
+      "manualDescription": "Nessun meccanismo di aggiornamento automatico rilevato. Aggiorna manualmente tramite docker pull.",
+      "watchtowerStatus": "Stato Watchtower"
     },
     "version": "Versione",
     "footer": "MeticAI • Realizzato con ❤️ per gli amanti del caffè",
@@ -536,7 +606,9 @@
       "pressure": "Pressione (bar)",
       "flow": "Flusso (ml/s)",
       "pressureLabel": "Pressione",
-      "flowLabel": "Flusso"
+      "flowLabel": "Flusso",
+      "power": "Potenza",
+      "temp": "Temp"
     },
     "actions": {
       "start": "Avvia",
@@ -683,5 +755,56 @@
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
     "animationsDescription": "Show animated background effects"
+  },
+  "advanced": {
+    "detailedKnowledge": "Conoscenza IA dettagliata",
+    "detailedKnowledgeDescription": "Includere guida completa di profilazione e specifica OEPF per profili di qualità superiore",
+    "detailedKnowledgeWarning": "La modalità dettagliata invia significativamente più contesto all'IA. Questo può aumentare il tempo di generazione, specialmente su hardware poco potente."
+  },
+  "pourOver": {
+    "autoStartDescription": "Si avvia quando viene rilevato il versamento, ma ignora i picchi rapidi.",
+    "autoStartTimer": "Avvio automatico timer",
+    "bloomDescription": "Mostra un conto alla rovescia del bloom durante i primi secondi di infusione.",
+    "bloomDone": "fatto",
+    "bloomDuration": "Durata bloom (sec)",
+    "bloomIndicator": "Indicatore bloom",
+    "doseLabel": "Dose (g)",
+    "flow": "Flusso",
+    "flowLegend": "flusso",
+    "freeMode": "Modalità libera",
+    "offlineNotice": "La macchina è offline. Le azioni della bilancia sono disabilitate fino al ripristino della connessione.",
+    "pause": "Pausa",
+    "progress": "Progresso",
+    "ratioLabel": "Rapporto (1:x)",
+    "ratioMode": "Modalità rapporto",
+    "remaining": "Rimanente",
+    "reset": "Ripristina",
+    "start": "Avvia",
+    "tare": "Tara",
+    "targetWater": "Acqua target",
+    "timer": "Timer",
+    "title": "Pour-over",
+    "unitFlowRate": "g/s",
+    "unitGrams": "g",
+    "unitTime": "mm:ss",
+    "waitingForWeight": "In attesa dei dati di peso…",
+    "weighFromScale": "Pesare dalla bilancia",
+    "weighFromScaleTitle": "Cattura il peso attuale della bilancia come dose",
+    "weight": "Peso",
+    "weightLegend": "peso",
+    "weightTrendLabel": "Andamento peso"
+  },
+  "results": {
+    "backToForm": "Torna al modulo",
+    "coffeeAnalysis": "Analisi del caffè",
+    "exportAs": "Esporta come",
+    "image": "Immagine",
+    "json": "JSON",
+    "profileGenerated": "Profilo generato!",
+    "profileLabel": "Profilo",
+    "runScheduleShot": "Esegui / Programma shot",
+    "saveAsImage": "Salva risultati come immagine",
+    "savedToDevice": "Profilo salvato sul dispositivo",
+    "savedToHistory": "Il profilo è stato salvato sul dispositivo Meticulous e nella cronologia"
   }
 }
