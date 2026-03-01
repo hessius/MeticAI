@@ -114,9 +114,38 @@ describe('PourOverView', () => {
 
     expect(screen.getByText('Machine is offline. Scale actions are disabled until connection is restored.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Tare' })).toBeDisabled()
+  })
+
+  it('captures scale weight into dose via "Weigh from scale" button', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <PourOverView
+        machineState={makeMachineState({ shot_weight: 18.5 })}
+        onBack={vi.fn()}
+      />,
+    )
 
     await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
-    const ratioTare = screen.getAllByRole('button', { name: 'Tare' })
-    expect(ratioTare[0]).toBeDisabled()
+
+    const weighBtn = screen.getByRole('button', { name: 'Weigh from scale' })
+    expect(weighBtn).toBeEnabled()
+
+    await user.click(weighBtn)
+
+    const doseInput = screen.getByLabelText('Dose (g)') as HTMLInputElement
+    expect(doseInput.value).toBe('18.5')
+  })
+
+  it('shows flow rate card alongside weight and timer', () => {
+    render(
+      <PourOverView
+        machineState={makeMachineState({ shot_weight: 10 })}
+        onBack={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Flow')).toBeInTheDocument()
+    expect(screen.getByText('g/s')).toBeInTheDocument()
   })
 })
