@@ -542,6 +542,34 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "success"
 
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_analyze_and_profile_returns_409_when_locked(self, client):
+        """Test that a concurrent request returns 409 when generation is in progress."""
+        from api.routes import coffee as coffee_module
+        # Simulate the lock being held by another request
+        with patch.object(coffee_module._profile_generation_lock, 'locked', return_value=True):
+            response = client.post(
+                "/analyze_and_profile",
+                data={"user_prefs": "Some espresso"}
+            )
+
+        assert response.status_code == 409
+        detail = response.json()["detail"]
+        assert detail["status"] == "busy"
+        assert "already being generated" in detail["message"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_analyze_and_profile_409_with_api_prefix(self, client):
+        """Test that the /api/ prefixed route also returns 409 when locked."""
+        from api.routes import coffee as coffee_module
+        with patch.object(coffee_module._profile_generation_lock, 'locked', return_value=True):
+            response = client.post(
+                "/api/analyze_and_profile",
+                data={"user_prefs": "Some espresso"}
+            )
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["status"] == "busy"
 
 
 class TestHealthAndStartup:
