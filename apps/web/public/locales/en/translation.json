@@ -73,7 +73,7 @@
       "Cross-referencing with the Decent forums...",
       "Almost there..."
     ],
-    "pleaseWait": "This may take 120-180 seconds"
+    "pleaseWait": "This may take several minutes"
   },
   "app": {
     "title": "Meticulous Espresso AI Profiler",
@@ -89,6 +89,7 @@
       "generateFailed404Route": "Failed to generate profile: The server route was not found (404). This is often a reverse-proxy/API path mismatch — verify your proxy forwards /api/* to MeticAI.",
       "generateFailedTimeout": "Failed to generate profile: The AI request timed out. Please retry; if this repeats, reduce prompt complexity or try a stronger Gemini model.",
       "generateFailedValidation": "Failed to generate profile: The AI generated an invalid profile schema. Please retry — a second attempt often succeeds.",
+      "generateBusy": "A profile is already being generated. Your form has been preserved — please try again in a few minutes.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again."

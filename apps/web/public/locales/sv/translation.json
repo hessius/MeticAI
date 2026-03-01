@@ -73,7 +73,7 @@
       "Korskontrollerar med Decent-forumet...",
       "Nästan klar..."
     ],
-    "pleaseWait": "Detta kan ta 120-180 sekunder"
+    "pleaseWait": "Detta kan ta flera minuter"
   },
   "app": {
     "title": "Meticulous Espresso AI-profilerare",
@@ -89,6 +89,7 @@
       "generateFailed404Route": "Kunde inte generera profil: Server-routen hittades inte (404). Detta beror ofta på fel i reverse-proxy/API-path — kontrollera att proxyn skickar /api/* till MeticAI.",
       "generateFailedTimeout": "Kunde inte generera profil: AI-förfrågan fick timeout. Försök igen; om det fortsätter, minska promptens komplexitet eller prova en starkare Gemini-modell.",
       "generateFailedValidation": "Kunde inte generera profil: AI:n skapade en ogiltig profilschema. Försök igen — ett andra försök lyckas ofta.",
+      "generateBusy": "En profil genereras redan. Ditt formulär har sparats — försök igen om några minuter.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again."

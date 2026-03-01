@@ -97,7 +97,7 @@ export function LoadingView({ currentMessage }: LoadingViewProps) {
               style={{ background: 'linear-gradient(135deg, #FFC107 0%, #FF8F00 50%, #FF6F00 100%)' }}
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
-              transition={{ duration: 180, ease: "linear" }}
+              transition={{ duration: 420, ease: "linear" }}
             />
           </div>
         </div>

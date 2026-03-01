@@ -285,6 +285,14 @@ function App() {
 
       clearInterval(messageInterval)
 
+      // Handle "busy" — another generation is already in progress.
+      // Return the user to the form (preserving their input) with a toast.
+      if (response.status === 409) {
+        toast.warning(t('app.errors.generateBusy'))
+        setViewState('form')
+        return
+      }
+
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
