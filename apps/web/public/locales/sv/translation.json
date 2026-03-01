@@ -499,6 +499,11 @@
     "yes": "Ja",
     "no": "Nej"
   },
+  "advanced": {
+    "detailedKnowledge": "Detaljerad AI-kunskap",
+    "detailedKnowledgeDescription": "Inkludera fullständig profilguide och OEPF-specifikation för profiler av högre kvalitet",
+    "detailedKnowledgeWarning": "Detaljerat läge skickar betydligt mer kontext till AI:n. Det kan öka genereringstiden, särskilt på svagare hårdvara."
+  },
   "qrCode": {
     "title": "Öppna på mobil",
     "description": "Skanna denna QR-kod med din telefons kamera för att öppna denna sida på din mobila enhet",
