@@ -889,6 +889,242 @@ class TestEnhancedBaristaPersona:
         assert "OUTPUT FORMAT (use this exact format):" in prompt
 
 
+class TestValidationRetry:
+    """Tests for profile validation and retry logic (#229)."""
+
+    VALID_PROFILE_REPLY = (
+        "**Profile Created:** Retry Test\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Retry Test\",\"stages\":[{\"name\":\"Pre-infusion\","
+        "\"type\":\"flow\",\"dynamics\":{\"points\":[{\"value\":2}],\"over\":\"time\"},"
+        "\"exit_triggers\":[{\"type\":\"time\",\"value\":10}],"
+        "\"limits\":[{\"type\":\"pressure\",\"value\":3}]}],\"variables\":[]}\n"
+        "```\n"
+    )
+
+    INVALID_PROFILE_REPLY = (
+        "**Profile Created:** Bad Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Bad Profile\",\"stages\":[]}\n"
+        "```\n"
+    )
+
+    NO_JSON_REPLY = (
+        "I had trouble creating the profile. "
+        "Let me try a different approach next time."
+    )
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_validation_passes_first_try(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that validation passing on first attempt skips retry."""
+        mock_save_history.return_value = {"id": "test-v1"}
+        mock_create_profile.return_value = {"id": "machine-v1"}
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+        mock_validate.return_value = valid_result
+
+        profile_response = Mock()
+        profile_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Fruity and bright"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Vision model called once for generation, no retries
+        assert mock_vision_model.return_value.async_generate_content.call_count == 1
+        mock_validate.assert_called_once()
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_validation_fails_then_succeeds_on_retry(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that a validation failure triggers retry and succeeds."""
+        mock_save_history.return_value = {"id": "test-v2"}
+        mock_create_profile.return_value = {"id": "machine-v2"}
+
+        # First validation fails, second passes
+        invalid_result = Mock()
+        invalid_result.is_valid = False
+        invalid_result.errors = ["Stage 'Pre-infusion': pressure stage must have a flow limit"]
+        invalid_result.error_summary.return_value = "1. Stage 'Pre-infusion': pressure stage must have a flow limit"
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+
+        mock_validate.side_effect = [invalid_result, valid_result]
+
+        # First call: original generation, second call: fix response
+        gen_response = Mock()
+        gen_response.text = self.VALID_PROFILE_REPLY
+        fix_response = Mock()
+        fix_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[gen_response, fix_response]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Clean and balanced"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Generation + fix retry = 2 calls
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+        assert mock_validate.call_count == 2
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_validation_exhausts_retries(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that exhausting retries still proceeds with best-effort profile."""
+        mock_save_history.return_value = {"id": "test-v3"}
+        mock_create_profile.return_value = {"id": "machine-v3"}
+
+        # All validation attempts fail
+        invalid_result = Mock()
+        invalid_result.is_valid = False
+        invalid_result.errors = ["Error that persists"]
+        invalid_result.error_summary.return_value = "1. Error that persists"
+        mock_validate.return_value = invalid_result
+
+        gen_response = Mock()
+        gen_response.text = self.VALID_PROFILE_REPLY
+        fix_response = Mock()
+        fix_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[gen_response, fix_response, fix_response]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Rich and bold"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        # Should still proceed with best-effort profile upload
+        assert data["status"] == "success"
+        # Generation + 2 fix retries = 3 calls
+        assert mock_vision_model.return_value.async_generate_content.call_count == 3
+        # 3 validations: initial + 2 retries
+        assert mock_validate.call_count == 3
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_no_json_retries_then_fails(self, mock_vision_model, mock_validate, mock_save_history, client):
+        """Test that missing JSON triggers retries and eventually fails."""
+        mock_save_history.return_value = {"id": "test-v4"}
+
+        # All responses lack JSON
+        no_json = Mock()
+        no_json.text = self.NO_JSON_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=no_json)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Something impossible"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "error"
+        assert "validation errors" in data["message"]
+        # Initial generation + 2 retries = 3 calls
+        assert mock_vision_model.return_value.async_generate_content.call_count == 3
+        # validate_profile should never be called since no JSON was extracted
+        mock_validate.assert_not_called()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_no_json_then_json_on_retry(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that missing JSON on first try but found on retry succeeds."""
+        mock_save_history.return_value = {"id": "test-v5"}
+        mock_create_profile.return_value = {"id": "machine-v5"}
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+        mock_validate.return_value = valid_result
+
+        no_json = Mock()
+        no_json.text = self.NO_JSON_REPLY
+        with_json = Mock()
+        with_json.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[no_json, with_json]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Light and delicate"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # 2 calls: initial (no JSON) + retry (with JSON)
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+        mock_validate.assert_called_once()
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_response_includes_generation_id(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that the response includes a generation_id for SSE tracking."""
+        mock_save_history.return_value = {"id": "test-v6"}
+        mock_create_profile.return_value = {"id": "machine-v6"}
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+        mock_validate.return_value = valid_result
+
+        profile_response = Mock()
+        profile_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Bright acidity"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "generation_id" in data
+        assert len(data["generation_id"]) == 8
+
+
 class TestAdvancedCustomization:
     """Tests for advanced_customization parameter functionality."""
 
