@@ -377,6 +377,11 @@ async def analyze_and_profile(
     # Only one profile generation can run at a time.  If the lock is already
     # held, return 409 so the frontend can show a friendly "busy" message
     # and let the user try again without losing their form data.
+    #
+    # TOCTOU note: There is no `await` between `.locked()` and the
+    # `async with _profile_generation_lock:` below, so no other coroutine
+    # can acquire the lock in between on CPython's single-threaded event
+    # loop.  Do NOT insert an `await` between the check and the `async with`.
     if _profile_generation_lock.locked():
         logger.warning(
             "Profile generation already in progress — rejecting concurrent request",
