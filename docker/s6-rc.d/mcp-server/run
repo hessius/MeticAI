@@ -1,11 +1,8 @@
 #!/command/with-contenv sh
 
-# MCP server is optional — only needed for external MCP clients (Claude Desktop, etc.)
-# Core profile creation now uses the Python Gemini SDK directly (#214).
-if [ -z "${GEMINI_API_KEY}" ]; then
-    echo "mcp-server: GEMINI_API_KEY not set — skipping (AI features disabled)"
-    exec sleep infinity
-fi
+# MCP server provides Meticulous machine tools for external MCP clients (Claude Desktop, etc.)
+# External clients may use their own LLM/API key — MeticAI's GEMINI_API_KEY is not required.
+# Core profile creation uses the Python Gemini SDK directly (#214).
 
 cd /app/mcp-server
 export PYTHONPATH=/app/mcp-server/meticulous-mcp/src

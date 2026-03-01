@@ -12,11 +12,16 @@ log_success() { echo -e "${GREEN}v${NC} $1"; }
 log_warning() { echo -e "${YELLOW}!${NC} $1"; }
 log_error() { echo -e "${RED}x${NC} $1"; }
 
-INSTALL_DIR=""
+INSTALL_DIR="${INSTALL_DIR:-}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
 
 find_install_dir() {
+    # Honor INSTALL_DIR env var if set and valid
+    if [[ -n "$INSTALL_DIR" && -f "$INSTALL_DIR/.env" && -f "$INSTALL_DIR/docker-compose.yml" ]]; then
+        return 0
+    fi
+
     local candidates=("$PWD" "$HOME/MeticAI" "/opt/meticai")
     for dir in "${candidates[@]}"; do
         if [[ -f "$dir/.env" && -f "$dir/docker-compose.yml" ]]; then
@@ -26,7 +31,7 @@ find_install_dir() {
     done
 
     log_error "Could not find a MeticAI installation directory."
-    log_info "Run this from your install folder or set INSTALL_DIR first."
+    log_info "Run this from your install folder or export INSTALL_DIR=/path/to/meticai first."
     exit 1
 }
 

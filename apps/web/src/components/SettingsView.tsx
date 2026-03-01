@@ -630,8 +630,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
             {/* AI Assistant */}
             <div className="space-y-3 pt-2 border-t border-border">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">AI Assistant</h3>
-              <p className="text-xs text-muted-foreground">Gemini API key is optional. Add one only if you want AI-powered profile and analysis features.</p>
+              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{t('settings.aiAssistant')}</h3>
+              <p className="text-xs text-muted-foreground">{t('settings.aiAssistantDescription')}</p>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -663,8 +663,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {hasGeminiKey
-                    ? `${t('settings.apiKeyConfigured')} You can keep the key saved and disable AI features below.`
-                    : <>Optional. {t('settings.getApiKey')}{' '}
+                    ? t('settings.apiKeyConfiguredExtended')
+                    : <>{t('settings.aiAssistantOptional')} {t('settings.getApiKey')}{' '}
                       <a
                         href="https://aistudio.google.com/app/apikey"
                         target="_blank"
@@ -680,8 +680,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="ai-enabled-toggle" className="text-sm font-medium">Enable AI features</Label>
-                  <p className="text-xs text-muted-foreground">Turns AI tools on/off without removing your saved API key.</p>
+                  <Label htmlFor="ai-enabled-toggle" className="text-sm font-medium">{t('settings.enableAiFeatures')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.enableAiFeaturesDescription')}</p>
                 </div>
                 <Switch
                   id="ai-enabled-toggle"
@@ -697,8 +697,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="hide-ai-toggle" className="text-sm font-medium">Hide AI controls when unavailable</Label>
-                  <p className="text-xs text-muted-foreground">When disabled, AI controls stay visible but disabled until AI is available.</p>
+                  <Label htmlFor="hide-ai-toggle" className="text-sm font-medium">{t('settings.hideAiWhenUnavailable')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.hideAiWhenUnavailableDescription')}</p>
                 </div>
                 <Switch
                   id="hide-ai-toggle"
