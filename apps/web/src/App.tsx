@@ -23,6 +23,7 @@ import { FormView } from '@/views/FormView'
 import { LoadingView, LOADING_MESSAGE_COUNT } from '@/views/LoadingView'
 import { ResultsView } from '@/views/ResultsView'
 import { ErrorView } from '@/views/ErrorView'
+import { useGenerationProgress } from '@/hooks/useGenerationProgress'
 
 import { AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
 import type { APIResponse, ViewState } from '@/types'
@@ -57,6 +58,9 @@ function App() {
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedCustomizationOptions>({})
   const [currentMessage, setCurrentMessage] = useState(0)
   const [apiResponse, setApiResponse] = useState<APIResponse | null>(null)
+
+  // SSE progress for real-time generation updates
+  const { progress: generationProgress } = useGenerationProgress(viewState === 'loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [isCapturing, setIsCapturing] = useState(false)
   const [qrDialogOpen, setQrDialogOpen] = useState(false)
@@ -828,7 +832,7 @@ function App() {
               )}
 
               {viewState === 'loading' && (
-                <LoadingView currentMessage={currentMessage} />
+                <LoadingView currentMessage={currentMessage} progress={generationProgress} />
               )}
 
               {viewState === 'results' && apiResponse && (

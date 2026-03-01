@@ -80,7 +80,16 @@
       "Korskontrollerar med Decent-forumet...",
       "Nästan klar..."
     ],
-    "pleaseWait": "Detta kan ta flera minuter"
+    "pleaseWait": "Detta kan ta flera minuter",
+    "phases": {
+      "analyze": "Analysera",
+      "generate": "Generera",
+      "validate": "Validera",
+      "upload": "Ladda upp",
+      "done": "Klar"
+    },
+    "elapsed": "{{seconds}}s förflutit",
+    "retryAttempt": "försök {{attempt}}/{{max}}"
   },
   "app": {
     "title": "Meticulous Espresso AI-profilerare",

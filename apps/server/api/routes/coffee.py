@@ -1,13 +1,16 @@
 """Coffee analysis and profiling endpoints."""
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
+from sse_starlette.sse import EventSourceResponse
 from typing import Optional
 from PIL import Image
 import asyncio
 import io
+import json
 import os
 import re
 import time
+import uuid
 import logging
 
 # Register HEIC/HEIF support with Pillow
@@ -27,6 +30,11 @@ from services.gemini_service import (
 )
 from services.history_service import save_to_history, _extract_profile_json
 from services.meticulous_service import async_create_profile
+from services.validation_service import validate_profile
+from services.generation_progress import (
+    GenerationPhase, ProgressEvent, GenerationState,
+    create_generation, get_generation, get_latest_generation, remove_generation,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -36,6 +44,18 @@ logger = logging.getLogger(__name__)
 # for memory/CPU and cause timeouts. A single asyncio.Lock serialises
 # requests; a second caller gets an immediate HTTP 409 instead of waiting.
 _profile_generation_lock = asyncio.Lock()
+
+# Maximum validation-fix retry attempts. Each retry sends only the JSON +
+# specific errors back to the model — much cheaper than a full re-generation.
+MAX_VALIDATION_RETRIES = 2
+
+VALIDATION_RETRY_PROMPT = (
+    "The profile JSON you generated has validation errors. "
+    "Fix ALL of the following errors and return ONLY the corrected JSON "
+    "in a fenced ```json block. Do not include any other text.\n\n"
+    "ERRORS:\n{errors}\n\n"
+    "ORIGINAL JSON:\n```json\n{json}\n```\n"
+)
 
 # ── Load OEPF RFC once at import time ──────────────────────────────────────────
 # Embedding the RFC directly in the prompt eliminates a round-trip where the
@@ -428,6 +448,53 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         )
         return {"error": str(e)}
 
+
+# ── SSE progress endpoint ──────────────────────────────────────────────────────
+
+@router.get("/generate/progress")
+@router.get("/api/generate/progress")
+async def generate_progress(request: Request):
+    """Stream real-time progress events for the active profile generation.
+
+    Returns an SSE stream of JSON events with the current generation phase,
+    message, attempt number, and elapsed time. Clients should reconnect if
+    the stream closes unexpectedly.
+
+    Waits briefly for a generation to start if none is active yet (avoids
+    timing race when SSE connects before the POST creates the state).
+    """
+    # Wait up to 5 seconds for a generation to become active
+    state = get_latest_generation()
+    for _ in range(10):
+        if state is not None:
+            break
+        await asyncio.sleep(0.5)
+        state = get_latest_generation()
+
+    if state is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "No active generation"}
+        )
+
+    async def event_generator():
+        async for event in state.stream():
+            data = {
+                "phase": event.phase.value,
+                "message": event.message,
+                "attempt": event.attempt,
+                "max_attempts": event.max_attempts,
+                "elapsed": event.elapsed,
+            }
+            if event.result:
+                data["result"] = event.result
+            if event.error:
+                data["error"] = event.error
+            yield {"event": "progress", "data": json.dumps(data)}
+
+    return EventSourceResponse(event_generator())
+
+
 @router.post("/analyze_and_profile")
 @router.post("/api/analyze_and_profile")
 async def analyze_and_profile(
@@ -482,6 +549,8 @@ async def analyze_and_profile(
         )
     
     coffee_analysis = None
+    generation_id = str(uuid.uuid4())[:8]
+    progress = create_generation(generation_id)
     
     async with _profile_generation_lock:
         try:
@@ -489,6 +558,7 @@ async def analyze_and_profile(
                 "Starting profile creation",
                 extra={
                     "request_id": request_id,
+                    "generation_id": generation_id,
                     "endpoint": "/analyze_and_profile",
                     "has_image": file is not None,
                     "has_preferences": user_prefs is not None,
@@ -504,8 +574,12 @@ async def analyze_and_profile(
                 }
             )
         
-            # If image is provided, analyze it first
+            # ── Phase: Analyzing ──────────────────────────────────────────
             if file:
+                progress.emit(ProgressEvent(
+                    phase=GenerationPhase.ANALYZING,
+                    message="Analyzing coffee image..."
+                ))
                 logger.debug("Reading and analyzing image", extra={"request_id": request_id})
                 contents = await file.read()
             
@@ -612,6 +686,11 @@ async def analyze_and_profile(
                     prompt_tail
                 )
         
+            # ── Phase: Generating ─────────────────────────────────────────
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.GENERATING,
+                message="Generating espresso profile..."
+            ))
             logger.debug(
                 "Executing profile generation via Gemini SDK",
                 extra={
@@ -637,11 +716,142 @@ async def analyze_and_profile(
                 }
             )
 
+            # ── Phase: Validating ─────────────────────────────────────────
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.VALIDATING,
+                message="Validating profile schema..."
+            ))
+
             profile_json_check = _extract_profile_json(reply)
 
+            # Validation + retry loop
+            attempt = 0
+            while attempt <= MAX_VALIDATION_RETRIES:
+                if not profile_json_check:
+                    if attempt < MAX_VALIDATION_RETRIES:
+                        # No JSON extracted — ask model to regenerate
+                        attempt += 1
+                        progress.emit(ProgressEvent(
+                            phase=GenerationPhase.RETRYING,
+                            message=f"No valid JSON found, retrying ({attempt}/{MAX_VALIDATION_RETRIES})...",
+                            attempt=attempt,
+                            max_attempts=MAX_VALIDATION_RETRIES + 1,
+                        ))
+                        logger.warning(
+                            "No profile JSON extracted, requesting retry",
+                            extra={"request_id": request_id, "attempt": attempt}
+                        )
+                        retry_prompt = (
+                            "Your previous response did not contain a valid JSON profile block. "
+                            "Please generate the complete profile JSON in a fenced ```json block. "
+                            "Include the full profile object with name, stages, variables, and temperature."
+                        )
+                        retry_start = time.monotonic()
+                        retry_response = await asyncio.wait_for(
+                            get_vision_model().async_generate_content([retry_prompt]),
+                            timeout=120
+                        )
+                        retry_elapsed = time.monotonic() - retry_start
+                        retry_text = (retry_response.text or "").strip()
+                        profile_json_check = _extract_profile_json(retry_text)
+                        # Merge retry JSON into the original reply if extraction succeeded
+                        if profile_json_check:
+                            reply = reply + "\n\nPROFILE JSON:\n```json\n" + json.dumps(profile_json_check, indent=2) + "\n```"
+                        logger.info(
+                            "Retry generation completed",
+                            extra={
+                                "request_id": request_id,
+                                "attempt": attempt,
+                                "retry_seconds": round(retry_elapsed, 1),
+                                "has_json": profile_json_check is not None,
+                            }
+                        )
+                        continue
+                    else:
+                        # Exhausted retries with no JSON
+                        break
+
+                # We have JSON — validate it
+                validation_result = validate_profile(profile_json_check)
+
+                if validation_result.is_valid:
+                    logger.info(
+                        "Profile validation passed",
+                        extra={"request_id": request_id, "attempt": attempt}
+                    )
+                    break
+
+                # Validation failed — try to fix
+                if attempt < MAX_VALIDATION_RETRIES:
+                    attempt += 1
+                    progress.emit(ProgressEvent(
+                        phase=GenerationPhase.RETRYING,
+                        message=f"Fixing validation issues (attempt {attempt}/{MAX_VALIDATION_RETRIES})...",
+                        attempt=attempt,
+                        max_attempts=MAX_VALIDATION_RETRIES + 1,
+                    ))
+                    logger.warning(
+                        "Profile validation failed, requesting fix",
+                        extra={
+                            "request_id": request_id,
+                            "attempt": attempt,
+                            "error_count": len(validation_result.errors),
+                            "errors": validation_result.errors[:5],
+                        }
+                    )
+
+                    fix_prompt = VALIDATION_RETRY_PROMPT.format(
+                        errors=validation_result.error_summary(),
+                        json=json.dumps(profile_json_check, indent=2)
+                    )
+                    retry_start = time.monotonic()
+                    fix_response = await asyncio.wait_for(
+                        get_vision_model().async_generate_content([fix_prompt]),
+                        timeout=120
+                    )
+                    retry_elapsed = time.monotonic() - retry_start
+                    fix_text = (fix_response.text or "").strip()
+                    fixed_json = _extract_profile_json(fix_text)
+
+                    logger.info(
+                        "Validation fix attempt completed",
+                        extra={
+                            "request_id": request_id,
+                            "attempt": attempt,
+                            "retry_seconds": round(retry_elapsed, 1),
+                            "has_json": fixed_json is not None,
+                        }
+                    )
+
+                    if fixed_json:
+                        profile_json_check = fixed_json
+                        # Update the JSON in the reply so the user sees the corrected version
+                        reply = re.sub(
+                            r'```json\s*[\s\S]*?```',
+                            '```json\n' + json.dumps(fixed_json, indent=2) + '\n```',
+                            reply,
+                            count=1
+                        )
+                    continue
+                else:
+                    # Exhausted retries — log and proceed with what we have
+                    logger.warning(
+                        "Validation retries exhausted, proceeding with best-effort profile",
+                        extra={
+                            "request_id": request_id,
+                            "final_errors": validation_result.errors[:5],
+                        }
+                    )
+                    break
+
             if not profile_json_check:
+                progress.emit(ProgressEvent(
+                    phase=GenerationPhase.FAILED,
+                    message="Failed to generate valid profile JSON",
+                    error="No valid profile JSON after retries",
+                ))
                 logger.error(
-                    "Model reply missing valid profile JSON",
+                    "Model reply missing valid profile JSON after retries",
                     extra={
                         "request_id": request_id,
                         "reply_preview": reply[:500],
@@ -657,6 +867,7 @@ async def analyze_and_profile(
                     "status": "error",
                     "analysis": coffee_analysis,
                     "reply": reply,
+                    "generation_id": generation_id,
                     "message": (
                         "The AI attempted to create a profile but encountered "
                         "validation errors it couldn't resolve. Please try again — "
@@ -665,6 +876,12 @@ async def analyze_and_profile(
                     ),
                     "history_id": history_entry.get("id")
                 }
+
+            # ── Phase: Uploading ──────────────────────────────────────────
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.UPLOADING,
+                message="Uploading profile to machine..."
+            ))
 
             create_start = time.monotonic()
             create_result = await asyncio.wait_for(
@@ -689,6 +906,11 @@ async def analyze_and_profile(
 
             if create_error:
                 friendly_message = parse_gemini_error(str(create_error))
+                progress.emit(ProgressEvent(
+                    phase=GenerationPhase.FAILED,
+                    message="Machine rejected the profile",
+                    error=friendly_message,
+                ))
                 logger.error(
                     "Machine profile creation returned error",
                     extra={
@@ -700,9 +922,11 @@ async def analyze_and_profile(
                     "status": "error",
                     "analysis": coffee_analysis,
                     "reply": reply,
+                    "generation_id": generation_id,
                     "message": friendly_message,
                 }
 
+            # ── Phase: Complete ───────────────────────────────────────────
             has_profile_created_header = bool(
                 re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
             )
@@ -711,12 +935,16 @@ async def analyze_and_profile(
                 if not profile_name:
                     profile_name = "Untitled Profile"
                 reply = f"**Profile Created:** {profile_name}\n\n{reply}".strip()
+
+            total_elapsed = time.monotonic() - (generation_start if 'generation_start' in dir() else progress.created_at)
         
             logger.info(
                 "Profile creation completed successfully",
                 extra={
                     "request_id": request_id,
+                    "generation_id": generation_id,
                     "analysis": coffee_analysis,
+                    "total_seconds": round(total_elapsed, 1),
                     "output_preview": reply[:200] if len(reply) > 200 else reply
                 }
             )
@@ -727,15 +955,27 @@ async def analyze_and_profile(
                 user_prefs=user_prefs,
                 reply=reply
             )
+
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.COMPLETE,
+                message="Profile created!",
+                result={"status": "success", "generation_id": generation_id},
+            ))
             
             return {
                 "status": "success",
                 "analysis": coffee_analysis,
                 "reply": reply,
+                "generation_id": generation_id,
                 "history_id": history_entry.get("id")
             }
 
         except asyncio.TimeoutError:
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.FAILED,
+                message="Profile generation timed out",
+                error="Timed out after 300 seconds",
+            ))
             logger.error(
                 "Profile generation timed out after 300s",
                 extra={
@@ -755,6 +995,11 @@ async def analyze_and_profile(
         except HTTPException:
             raise
         except ValueError as e:
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.FAILED,
+                message="AI features unavailable",
+                error=str(e),
+            ))
             logger.warning(
                 f"Profile creation unavailable: {str(e)}",
                 extra={
@@ -767,6 +1012,11 @@ async def analyze_and_profile(
                 detail="AI features are unavailable. Please configure a Gemini API key in Settings."
             )
         except Exception as e:
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.FAILED,
+                message="Profile creation failed",
+                error=str(e),
+            ))
             logger.error(
                 f"Profile creation failed: {str(e)}",
                 exc_info=True,
@@ -787,3 +1037,9 @@ async def analyze_and_profile(
                     "message": str(e)
                 }
             )
+        finally:
+            # Clean up generation state after a delay to allow SSE clients to read final event
+            async def _cleanup():
+                await asyncio.sleep(30)
+                remove_generation(generation_id)
+            asyncio.create_task(_cleanup())

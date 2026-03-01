@@ -80,7 +80,16 @@
       "Cross-referencing with the Decent forums...",
       "Almost there..."
     ],
-    "pleaseWait": "This may take several minutes"
+    "pleaseWait": "This may take several minutes",
+    "phases": {
+      "analyze": "Analyze",
+      "generate": "Generate",
+      "validate": "Validate",
+      "upload": "Upload",
+      "done": "Done"
+    },
+    "elapsed": "{{seconds}}s elapsed",
+    "retryAttempt": "retry {{attempt}}/{{max}}"
   },
   "app": {
     "title": "Meticulous Espresso AI Profiler",

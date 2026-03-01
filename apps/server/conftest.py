@@ -8,6 +8,7 @@ import os
 import tempfile
 import shutil
 import pytest
+from unittest.mock import Mock, patch
 
 # Set test environment variables BEFORE main.py is imported
 # This runs at import time, ensuring environment is set up early
@@ -57,4 +58,27 @@ def _reset_in_memory_caches():
         settings_file.unlink()
 
     yield
+
+
+@pytest.fixture(autouse=True)
+def _mock_validate_profile():
+    """Auto-mock validate_profile to return valid for all tests.
+
+    Tests that specifically exercise validation retry logic should
+    override this by patching again inside the test body.
+    """
+    result = Mock()
+    result.is_valid = True
+    result.errors = []
+    with patch("api.routes.coffee.validate_profile", return_value=result):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_generation_progress():
+    """Clear in-memory generation state between tests."""
+    from services.generation_progress import _active_generations
+    _active_generations.clear()
+    yield
+    _active_generations.clear()
 
