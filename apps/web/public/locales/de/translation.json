@@ -116,7 +116,8 @@
     "profileCatalogue": "Profilkatalog",
     "runSchedule": "Ausführen / Planen",
     "settings": "Einstellungen",
-    "newProfile": "Neues Profil"
+    "newProfile": "Neues Profil",
+    "aiUnavailable": "KI-Profilgenerierung ist nicht verfügbar. Aktivieren Sie die KI-Funktionen in den Einstellungen und stellen Sie sicher, dass ein Gemini API-Schlüssel konfiguriert ist."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Kaffeetüten-Foto",
@@ -759,7 +760,7 @@
   "advanced": {
     "detailedKnowledge": "Detailliertes KI-Wissen",
     "detailedKnowledgeDescription": "Vollständigen Profilierungsleitfaden und OEPF-Spezifikation für höhere Profilqualität einbeziehen",
-    "detailedKnowledgeWarning": "Der detaillierte Modus sendet deutlich mehr Kontext an die KI. Dies kann die Generierungszeit erhöhen, besonders auf leistungsschwacher Hardware."
+    "detailedKnowledgeWarning": "Warnung: Der detaillierte Modus verwendet ca. 4× mehr Input-Token (~40K vs ~10K). Dies erhöht die API-Kosten erheblich und kann kostenlose Limits überschreiten. Nicht empfohlen mit kostenlosen Gemini API-Schlüsseln."
   },
   "pourOver": {
     "autoStartDescription": "Startet bei erkanntem Aufguss, ignoriert aber schnelle Spritzer.",

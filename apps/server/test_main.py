@@ -9862,6 +9862,30 @@ class TestNormalizeProfileForMachine:
         result = self._normalize({"name": "X", "stages": [], "display": "bad"})
         assert isinstance(result["display"], dict)
 
+    def test_info_variable_emoji_added_when_missing(self):
+        """Info variables (key starts with info_) get emoji prefix if missing."""
+        v = [{"name": "Dose", "key": "info_dose", "type": "numeric", "value": 18}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "ℹ️ Dose"
+
+    def test_info_variable_emoji_preserved(self):
+        """Info variables with existing emoji are not modified."""
+        v = [{"name": "☕ Dose", "key": "info_dose", "type": "numeric", "value": 18}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "☕ Dose"
+
+    def test_adjustable_variable_no_emoji_added(self):
+        """Adjustable variables (no info_ prefix) don't get emoji."""
+        v = [{"name": "Pressure", "key": "pressure_main", "type": "pressure", "value": 9}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "Pressure"
+
+    def test_info_variable_empty_name_gets_default(self):
+        """Info variable with empty name gets default emoji and text."""
+        v = [{"name": "", "key": "info_test", "type": "numeric", "value": 0}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "ℹ️ Info"
+
 
 # ---------------------------------------------------------------------------
 # Bridge / MQTT Control Center

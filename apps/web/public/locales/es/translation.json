@@ -116,7 +116,8 @@
     "profileCatalogue": "Catálogo de perfiles",
     "runSchedule": "Ejecutar / Programar",
     "settings": "Configuración",
-    "newProfile": "Nuevo perfil"
+    "newProfile": "Nuevo perfil",
+    "aiUnavailable": "La generación de perfiles con IA no está disponible. Habilita las funciones de IA en Configuración y asegúrate de que una clave de API de Gemini esté configurada."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Foto del paquete de café",
@@ -759,7 +760,7 @@
   "advanced": {
     "detailedKnowledge": "Conocimiento detallado de IA",
     "detailedKnowledgeDescription": "Incluir guía completa de perfilado y especificación OEPF para perfiles de mayor calidad",
-    "detailedKnowledgeWarning": "El modo detallado envía significativamente más contexto a la IA. Esto puede aumentar el tiempo de generación, especialmente en hardware de baja potencia."
+    "detailedKnowledgeWarning": "Advertencia: El modo detallado usa aproximadamente 4× más tokens de entrada (~40K vs ~10K). Esto aumenta significativamente los costos de API y puede exceder los límites gratuitos. No recomendado con claves API de Gemini gratuitas."
   },
   "pourOver": {
     "autoStartDescription": "Se inicia al detectar el vertido, pero ignora picos rápidos.",

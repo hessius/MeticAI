@@ -116,7 +116,8 @@
     "profileCatalogue": "Profilkatalog",
     "runSchedule": "Kör / Schemalägg",
     "settings": "Inställningar",
-    "newProfile": "Ny profil"
+    "newProfile": "Ny profil",
+    "aiUnavailable": "AI-profilgenerering är inte tillgänglig. Aktivera AI-funktioner i Inställningar och säkerställ att en Gemini API-nyckel är konfigurerad."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Kaffepaket-foto",
@@ -511,7 +512,7 @@
   "advanced": {
     "detailedKnowledge": "Detaljerad AI-kunskap",
     "detailedKnowledgeDescription": "Inkludera fullständig profilguide och OEPF-specifikation för profiler av högre kvalitet",
-    "detailedKnowledgeWarning": "Detaljerat läge skickar betydligt mer kontext till AI:n. Det kan öka genereringstiden, särskilt på svagare hårdvara."
+    "detailedKnowledgeWarning": "Varning: Detaljerat läge använder ca 4× fler input-tokens (~40K vs ~10K). Detta ökar API-kostnader betydligt och kan överskrida gratisplaner. Rekommenderas inte med gratis Gemini API-nycklar."
   },
   "qrCode": {
     "title": "Öppna på mobil",
@@ -762,7 +763,7 @@
     "animationsDescription": "Visa animerade bakgrundseffekter"
   },
   "pourOver": {
-    "title": "Pour-over",
+    "title": "Pour Over",
     "weight": "Vikt",
     "timer": "Timer",
     "flow": "Flöde",

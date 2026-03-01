@@ -116,7 +116,8 @@
     "profileCatalogue": "Catalogue de profils",
     "runSchedule": "Exécuter / Programmer",
     "settings": "Paramètres",
-    "newProfile": "Nouveau profil"
+    "newProfile": "Nouveau profil",
+    "aiUnavailable": "La génération de profils par IA n'est pas disponible. Activez les fonctionnalités IA dans les Paramètres et assurez-vous qu'une clé API Gemini est configurée."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Photo du paquet de café",
@@ -759,7 +760,7 @@
   "advanced": {
     "detailedKnowledge": "Connaissances IA détaillées",
     "detailedKnowledgeDescription": "Inclure le guide de profilage complet et la spécification OEPF pour des profils de meilleure qualité",
-    "detailedKnowledgeWarning": "Le mode détaillé envoie significativement plus de contexte à l'IA. Cela peut augmenter le temps de génération, surtout sur du matériel peu puissant."
+    "detailedKnowledgeWarning": "Attention : Le mode détaillé utilise environ 4× plus de tokens d'entrée (~40K vs ~10K). Cela augmente considérablement les coûts API et peut dépasser les limites gratuites. Non recommandé avec les clés API Gemini gratuites."
   },
   "pourOver": {
     "autoStartDescription": "Démarre lorsque le versement est détecté, mais ignore les pics rapides.",
