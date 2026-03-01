@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   create-release:
@@ -102,3 +103,13 @@ jobs:
         run: |
           echo "⏭️ Skipping release - tag v${{ steps.version.outputs.version }} already exists"
           echo "To create a new release, increment the version in VERSION file"
+
+      - name: Trigger Docker build and publish
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          echo "🐳 Triggering build-publish workflow for tag v${{ steps.version.outputs.version }}"
+          # Wait briefly for the tag to propagate before dispatching
+          sleep 5
+          gh workflow run build-publish.yml --ref "v${{ steps.version.outputs.version }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
