@@ -1,5 +1,6 @@
 """Coffee analysis and profiling endpoints."""
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse
 from typing import Optional
 from PIL import Image
 import asyncio
@@ -28,6 +29,12 @@ from services.meticulous_service import async_create_profile
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Concurrency guard: only one profile generation at a time.
+# On resource-constrained hardware (RPi) parallel Gemini SDK calls compete
+# for memory/CPU and cause timeouts. A single asyncio.Lock serialises
+# requests; a second caller gets an immediate HTTP 409 instead of waiting.
+_profile_generation_lock = asyncio.Lock()
 
 # ── Load OEPF RFC once at import time ──────────────────────────────────────────
 # Embedding the RFC directly in the prompt eliminates a round-trip where the
@@ -275,6 +282,7 @@ _OEPF_REFERENCE = (
 
 
 @router.post("/analyze_coffee")
+@router.post("/api/analyze_coffee")
 async def analyze_coffee(request: Request, file: UploadFile = File(...)):
     """Phase 1: Look at the bag."""
     request_id = request.state.request_id
@@ -354,6 +362,7 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         return {"error": str(e)}
 
 @router.post("/analyze_and_profile")
+@router.post("/api/analyze_and_profile")
 async def analyze_and_profile(
     request: Request,
     file: Optional[UploadFile] = File(None),
@@ -385,306 +394,324 @@ async def analyze_and_profile(
             detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"
         )
     
-    coffee_analysis = None
-    
-    try:
+    # Fast-reject if another generation is already running.
+    # Safe in CPython's single-threaded event loop: no await between the
+    # .locked() check and the ``async with`` acquisition, so no other
+    # coroutine can sneak in between the two statements (no TOCTOU issue).
+    if _profile_generation_lock.locked():
         logger.info(
-            "Starting profile creation",
-            extra={
-                "request_id": request_id,
-                "endpoint": "/analyze_and_profile",
-                "has_image": file is not None,
-                "has_preferences": user_prefs is not None,
-                "has_advanced_customization": advanced_customization is not None,
-                "upload_filename": file.filename if file else None,
-                "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs,
-                "advanced_customization_preview": (
-                    advanced_customization[:100]
-                    if advanced_customization and len(advanced_customization) > 100
-                    else advanced_customization
-                )
+            "Profile generation rejected — another request is in progress",
+            extra={"request_id": request_id, "endpoint": "/analyze_and_profile"}
+        )
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "busy",
+                "message": "A profile is already being generated. Please wait and try again."
             }
         )
-        
-        # If image is provided, analyze it first
-        if file:
-            logger.debug("Reading and analyzing image", extra={"request_id": request_id})
-            contents = await file.read()
-            
-            # Offload CPU-bound PIL ops to a thread
-            def _open_image(data: bytes):
-                img = Image.open(io.BytesIO(data))
-                if img.mode not in ('RGB', 'L'):
-                    img = img.convert('RGB')
-                return img
-            
-            loop = asyncio.get_running_loop()
-            image = await loop.run_in_executor(None, _open_image, contents)
-            
-            # Analyze the coffee bag
-            analysis_start = time.monotonic()
-            analysis_response = await get_vision_model().async_generate_content([
-                "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
-                "Return ONLY a single concise sentence describing the coffee.", 
-                image
-            ])
-            coffee_analysis = analysis_response.text.strip()
-            analysis_elapsed = time.monotonic() - analysis_start
-            
+    
+    coffee_analysis = None
+    
+    async with _profile_generation_lock:
+        try:
             logger.info(
-                "Coffee analysis completed",
+                "Starting profile creation",
+                extra={
+                    "request_id": request_id,
+                    "endpoint": "/analyze_and_profile",
+                    "has_image": file is not None,
+                    "has_preferences": user_prefs is not None,
+                    "has_advanced_customization": advanced_customization is not None,
+                    "upload_filename": file.filename if file else None,
+                    "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs,
+                    "advanced_customization_preview": (
+                        advanced_customization[:100]
+                        if advanced_customization and len(advanced_customization) > 100
+                        else advanced_customization
+                    )
+                }
+            )
+        
+            # If image is provided, analyze it first
+            if file:
+                logger.debug("Reading and analyzing image", extra={"request_id": request_id})
+                contents = await file.read()
+            
+                # Offload CPU-bound PIL ops to a thread
+                def _open_image(data: bytes):
+                    img = Image.open(io.BytesIO(data))
+                    if img.mode not in ('RGB', 'L'):
+                        img = img.convert('RGB')
+                    return img
+            
+                loop = asyncio.get_running_loop()
+                image = await loop.run_in_executor(None, _open_image, contents)
+            
+                # Analyze the coffee bag
+                analysis_start = time.monotonic()
+                analysis_response = await get_vision_model().async_generate_content([
+                    "Analyze this coffee bag. Extract: Roaster, Origin, Roast Level, and Flavor Notes. "
+                    "Return ONLY a single concise sentence describing the coffee.", 
+                    image
+                ])
+                coffee_analysis = analysis_response.text.strip()
+                analysis_elapsed = time.monotonic() - analysis_start
+            
+                logger.info(
+                    "Coffee analysis completed",
+                    extra={
+                        "request_id": request_id,
+                        "analysis": coffee_analysis,
+                        "analysis_seconds": round(analysis_elapsed, 1),
+                    }
+                )
+        
+            # Get author instruction with configured name
+            author_instruction = get_author_instruction()
+        
+            # Build advanced customization section if provided
+            advanced_section = build_advanced_customization_section(advanced_customization)
+        
+            # Construct the profile creation prompt
+            if coffee_analysis and user_prefs:
+                # Both image and preferences provided
+                final_prompt = (
+                    BARISTA_PERSONA +
+                    SAFETY_RULES +
+                    f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
+                    f"Coffee Analysis: '{coffee_analysis}'\n\n" +
+                    advanced_section +
+                    f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
+                    f"'{user_prefs}'\n"
+                    f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
+                    "TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
+                    PROFILE_GUIDELINES +
+                    VALIDATION_RULES +
+                    ERROR_RECOVERY +
+                    NAMING_CONVENTION +
+                    author_instruction +
+                    USER_SUMMARY_INSTRUCTIONS +
+                    SDK_OUTPUT_INSTRUCTIONS +
+                    OUTPUT_FORMAT +
+                    _PROFILING_GUIDE +
+                    _OEPF_REFERENCE
+                )
+            elif coffee_analysis:
+                # Only image provided (may still have advanced customization)
+                final_prompt = (
+                    BARISTA_PERSONA +
+                    SAFETY_RULES +
+                    f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
+                    f"Coffee Analysis: '{coffee_analysis}'\n\n" +
+                    advanced_section +
+                    "TASK: Create a sophisticated espresso profile for this coffee" +
+                    (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
+                    PROFILE_GUIDELINES +
+                    VALIDATION_RULES +
+                    ERROR_RECOVERY +
+                    NAMING_CONVENTION +
+                    author_instruction +
+                    USER_SUMMARY_INSTRUCTIONS +
+                    SDK_OUTPUT_INSTRUCTIONS +
+                    OUTPUT_FORMAT +
+                    _PROFILING_GUIDE +
+                    _OEPF_REFERENCE
+                )
+            else:
+                # Only user preferences provided (may still have advanced customization)
+                final_prompt = (
+                    BARISTA_PERSONA +
+                    SAFETY_RULES +
+                    f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n\n" +
+                    advanced_section +
+                    f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
+                    f"'{user_prefs}'\n"
+                    f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
+                    "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
+                    PROFILE_GUIDELINES +
+                    VALIDATION_RULES +
+                    ERROR_RECOVERY +
+                    NAMING_CONVENTION +
+                    author_instruction +
+                    USER_SUMMARY_INSTRUCTIONS +
+                    SDK_OUTPUT_INSTRUCTIONS +
+                    OUTPUT_FORMAT +
+                    _PROFILING_GUIDE +
+                    _OEPF_REFERENCE
+                )
+        
+            logger.debug(
+                "Executing profile generation via Gemini SDK",
+                extra={
+                    "request_id": request_id,
+                    "prompt_length": len(final_prompt)
+                }
+            )
+            generation_start = time.monotonic()
+            model_response = await asyncio.wait_for(
+                get_vision_model().async_generate_content([final_prompt]),
+                timeout=300
+            )
+            generation_elapsed = time.monotonic() - generation_start
+            reply = (model_response.text or "").strip()
+
+            logger.info(
+                "Gemini SDK generation completed",
+                extra={
+                    "request_id": request_id,
+                    "generation_seconds": round(generation_elapsed, 1),
+                    "reply_length": len(reply),
+                }
+            )
+
+            profile_json_check = _extract_profile_json(reply)
+
+            if not profile_json_check:
+                logger.error(
+                    "Model reply missing valid profile JSON",
+                    extra={
+                        "request_id": request_id,
+                        "reply_preview": reply[:500],
+                    }
+                )
+                # Still save to history so user can see what happened
+                history_entry = save_to_history(
+                    coffee_analysis=coffee_analysis,
+                    user_prefs=user_prefs,
+                    reply=reply
+                )
+                return {
+                    "status": "error",
+                    "analysis": coffee_analysis,
+                    "reply": reply,
+                    "message": (
+                        "The AI attempted to create a profile but encountered "
+                        "validation errors it couldn't resolve. Please try again — "
+                        "the AI will often succeed on a second attempt with a "
+                        "different approach."
+                    ),
+                    "history_id": history_entry.get("id")
+                }
+
+            create_start = time.monotonic()
+            create_result = await asyncio.wait_for(
+                async_create_profile(profile_json_check),
+                timeout=300
+            )
+            create_elapsed = time.monotonic() - create_start
+
+            logger.info(
+                "Machine profile creation completed",
+                extra={
+                    "request_id": request_id,
+                    "create_seconds": round(create_elapsed, 1),
+                }
+            )
+
+            create_error = None
+            if isinstance(create_result, dict):
+                create_error = create_result.get("error")
+            else:
+                create_error = getattr(create_result, "error", None)
+
+            if create_error:
+                friendly_message = parse_gemini_error(str(create_error))
+                logger.error(
+                    "Machine profile creation returned error",
+                    extra={
+                        "request_id": request_id,
+                        "create_error": str(create_error)[:1000],
+                    }
+                )
+                return {
+                    "status": "error",
+                    "analysis": coffee_analysis,
+                    "reply": reply,
+                    "message": friendly_message,
+                }
+
+            has_profile_created_header = bool(
+                re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
+            )
+            if not has_profile_created_header:
+                profile_name = profile_json_check.get("name") if isinstance(profile_json_check, dict) else None
+                if not profile_name:
+                    profile_name = "Untitled Profile"
+                reply = f"**Profile Created:** {profile_name}\n\n{reply}".strip()
+        
+            logger.info(
+                "Profile creation completed successfully",
                 extra={
                     "request_id": request_id,
                     "analysis": coffee_analysis,
-                    "analysis_seconds": round(analysis_elapsed, 1),
+                    "output_preview": reply[:200] if len(reply) > 200 else reply
                 }
             )
         
-        # Get author instruction with configured name
-        author_instruction = get_author_instruction()
-        
-        # Build advanced customization section if provided
-        advanced_section = build_advanced_customization_section(advanced_customization)
-        
-        # Construct the profile creation prompt
-        if coffee_analysis and user_prefs:
-            # Both image and preferences provided
-            final_prompt = (
-                BARISTA_PERSONA +
-                SAFETY_RULES +
-                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"Coffee Analysis: '{coffee_analysis}'\n\n" +
-                advanced_section +
-                f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
-                f"'{user_prefs}'\n"
-                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
-                "TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
-                PROFILE_GUIDELINES +
-                VALIDATION_RULES +
-                ERROR_RECOVERY +
-                NAMING_CONVENTION +
-                author_instruction +
-                USER_SUMMARY_INSTRUCTIONS +
-                SDK_OUTPUT_INSTRUCTIONS +
-                OUTPUT_FORMAT +
-                _PROFILING_GUIDE +
-                _OEPF_REFERENCE
-            )
-        elif coffee_analysis:
-            # Only image provided (may still have advanced customization)
-            final_prompt = (
-                BARISTA_PERSONA +
-                SAFETY_RULES +
-                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
-                f"Coffee Analysis: '{coffee_analysis}'\n\n" +
-                advanced_section +
-                "TASK: Create a sophisticated espresso profile for this coffee" +
-                (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
-                PROFILE_GUIDELINES +
-                VALIDATION_RULES +
-                ERROR_RECOVERY +
-                NAMING_CONVENTION +
-                author_instruction +
-                USER_SUMMARY_INSTRUCTIONS +
-                SDK_OUTPUT_INSTRUCTIONS +
-                OUTPUT_FORMAT +
-                _PROFILING_GUIDE +
-                _OEPF_REFERENCE
-            )
-        else:
-            # Only user preferences provided (may still have advanced customization)
-            final_prompt = (
-                BARISTA_PERSONA +
-                SAFETY_RULES +
-                f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n\n" +
-                advanced_section +
-                f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
-                f"'{user_prefs}'\n"
-                f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
-                "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
-                PROFILE_GUIDELINES +
-                VALIDATION_RULES +
-                ERROR_RECOVERY +
-                NAMING_CONVENTION +
-                author_instruction +
-                USER_SUMMARY_INSTRUCTIONS +
-                SDK_OUTPUT_INSTRUCTIONS +
-                OUTPUT_FORMAT +
-                _PROFILING_GUIDE +
-                _OEPF_REFERENCE
-            )
-        
-        logger.debug(
-            "Executing profile generation via Gemini SDK",
-            extra={
-                "request_id": request_id,
-                "prompt_length": len(final_prompt)
-            }
-        )
-        generation_start = time.monotonic()
-        model_response = await asyncio.wait_for(
-            get_vision_model().async_generate_content([final_prompt]),
-            timeout=300
-        )
-        generation_elapsed = time.monotonic() - generation_start
-        reply = (model_response.text or "").strip()
-
-        logger.info(
-            "Gemini SDK generation completed",
-            extra={
-                "request_id": request_id,
-                "generation_seconds": round(generation_elapsed, 1),
-                "reply_length": len(reply),
-            }
-        )
-
-        profile_json_check = _extract_profile_json(reply)
-
-        if not profile_json_check:
-            logger.error(
-                "Model reply missing valid profile JSON",
-                extra={
-                    "request_id": request_id,
-                    "reply_preview": reply[:500],
-                }
-            )
-            # Still save to history so user can see what happened
+            # Save to history
             history_entry = save_to_history(
                 coffee_analysis=coffee_analysis,
                 user_prefs=user_prefs,
                 reply=reply
             )
+            
             return {
-                "status": "error",
+                "status": "success",
                 "analysis": coffee_analysis,
                 "reply": reply,
-                "message": (
-                    "The AI attempted to create a profile but encountered "
-                    "validation errors it couldn't resolve. Please try again — "
-                    "the AI will often succeed on a second attempt with a "
-                    "different approach."
-                ),
                 "history_id": history_entry.get("id")
             }
 
-        create_start = time.monotonic()
-        create_result = await asyncio.wait_for(
-            async_create_profile(profile_json_check),
-            timeout=300
-        )
-        create_elapsed = time.monotonic() - create_start
-
-        logger.info(
-            "Machine profile creation completed",
-            extra={
-                "request_id": request_id,
-                "create_seconds": round(create_elapsed, 1),
-            }
-        )
-
-        create_error = None
-        if isinstance(create_result, dict):
-            create_error = create_result.get("error")
-        else:
-            create_error = getattr(create_result, "error", None)
-
-        if create_error:
-            friendly_message = parse_gemini_error(str(create_error))
+        except asyncio.TimeoutError:
             logger.error(
-                "Machine profile creation returned error",
+                "Profile generation timed out after 300s",
                 extra={
                     "request_id": request_id,
-                    "create_error": str(create_error)[:1000],
+                    "endpoint": "/analyze_and_profile",
+                    "coffee_analysis": coffee_analysis
                 }
             )
-            return {
-                "status": "error",
-                "analysis": coffee_analysis,
-                "reply": reply,
-                "message": friendly_message,
-            }
-
-        has_profile_created_header = bool(
-            re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
-        )
-        if not has_profile_created_header:
-            profile_name = profile_json_check.get("name") if isinstance(profile_json_check, dict) else None
-            if not profile_name:
-                profile_name = "Untitled Profile"
-            reply = f"**Profile Created:** {profile_name}\n\n{reply}".strip()
-        
-        logger.info(
-            "Profile creation completed successfully",
-            extra={
-                "request_id": request_id,
-                "analysis": coffee_analysis,
-                "output_preview": reply[:200] if len(reply) > 200 else reply
-            }
-        )
-        
-        # Save to history
-        history_entry = save_to_history(
-            coffee_analysis=coffee_analysis,
-            user_prefs=user_prefs,
-            reply=reply
-        )
-            
-        return {
-            "status": "success",
-            "analysis": coffee_analysis,
-            "reply": reply,
-            "history_id": history_entry.get("id")
-        }
-
-    except asyncio.TimeoutError:
-        logger.error(
-            "Profile generation timed out after 300s",
-            extra={
-                "request_id": request_id,
-                "endpoint": "/analyze_and_profile",
-                "coffee_analysis": coffee_analysis
-            }
-        )
-        raise HTTPException(
-            status_code=504,
-            detail={
-                "status": "error",
-                "analysis": coffee_analysis if coffee_analysis else None,
-                "message": "Profile creation timed out. The AI took too long to respond. Please try again."
-            }
-        )
-    except HTTPException:
-        raise
-    except ValueError as e:
-        logger.warning(
-            f"Profile creation unavailable: {str(e)}",
-            extra={
-                "request_id": request_id,
-                "endpoint": "/analyze_and_profile",
-            }
-        )
-        raise HTTPException(
-            status_code=503,
-            detail="AI features are unavailable. Please configure a Gemini API key in Settings."
-        )
-    except Exception as e:
-        logger.error(
-            f"Profile creation failed: {str(e)}",
-            exc_info=True,
-            extra={
-                "request_id": request_id,
-                "endpoint": "/analyze_and_profile",
-                "error_type": type(e).__name__,
-                "coffee_analysis": coffee_analysis,
-                "has_image": file is not None,
-                "has_preferences": user_prefs is not None
-            }
-        )
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status": "error",
-                "analysis": coffee_analysis if coffee_analysis else None,
-                "message": str(e)
-            }
-        )
+            raise HTTPException(
+                status_code=504,
+                detail={
+                    "status": "error",
+                    "analysis": coffee_analysis if coffee_analysis else None,
+                    "message": "Profile creation timed out. The AI took too long to respond. Please try again."
+                }
+            )
+        except HTTPException:
+            raise
+        except ValueError as e:
+            logger.warning(
+                f"Profile creation unavailable: {str(e)}",
+                extra={
+                    "request_id": request_id,
+                    "endpoint": "/analyze_and_profile",
+                }
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="AI features are unavailable. Please configure a Gemini API key in Settings."
+            )
+        except Exception as e:
+            logger.error(
+                f"Profile creation failed: {str(e)}",
+                exc_info=True,
+                extra={
+                    "request_id": request_id,
+                    "endpoint": "/analyze_and_profile",
+                    "error_type": type(e).__name__,
+                    "coffee_analysis": coffee_analysis,
+                    "has_image": file is not None,
+                    "has_preferences": user_prefs is not None
+                }
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "status": "error",
+                    "analysis": coffee_analysis if coffee_analysis else None,
+                    "message": str(e)
+                }
+            )

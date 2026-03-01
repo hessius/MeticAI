@@ -534,9 +534,9 @@ class TestAnalyzeAndProfileEndpoint:
             )
 
         assert response.status_code == 409
-        detail = response.json()["detail"]
-        assert detail["status"] == "busy"
-        assert "already being generated" in detail["message"]
+        body = response.json()
+        assert body["status"] == "busy"
+        assert "already being generated" in body["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_analyze_and_profile_409_with_api_prefix(self, client):
@@ -549,7 +549,7 @@ class TestAnalyzeAndProfileEndpoint:
             )
 
         assert response.status_code == 409
-        assert response.json()["detail"]["status"] == "busy"
+        assert response.json()["status"] == "busy"
 
 
 class TestHealthAndStartup:
@@ -8527,7 +8527,9 @@ class TestMeticulousServiceDirect:
         
         with patch.dict(os.environ, {"METICULOUS_IP": "192.168.1.100"}):
             with patch('meticulous.api.Api') as mock_api_class:
-                mock_api_class.return_value = MagicMock()
+                mock_instance = MagicMock()
+                mock_instance.base_url = "http://192.168.1.100"
+                mock_api_class.return_value = mock_instance
                 
                 api = meticulous_service.get_meticulous_api()
                 
