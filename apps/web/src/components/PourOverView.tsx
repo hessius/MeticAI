@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Scales, Timer, Drop, Pause, Play, ArrowClockwise } from '@phosphor-icons/react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ArrowLeft, Scales, Timer, Drop, Pause, Play, ArrowClockwise, Target } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { tareScale } from '@/lib/mqttCommands'
@@ -42,6 +42,7 @@ function parsePositiveNumber(value: string): number | null {
 interface WeightPoint {
   t: number
   w: number
+  flow?: number // g/s flow rate at this point
 }
 
 function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWeight: number | null }) {
@@ -60,11 +61,21 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
   const maxPointWeight = Math.max(...points.map(point => point.w), 0.1)
   const yMax = Math.max(maxPointWeight, targetWeight ?? 0, 1)
 
+  // Flow rate axis: independent scale
+  const flowValues = points.map(p => p.flow ?? 0).filter(f => f >= 0)
+  const maxFlow = Math.max(...flowValues, 1)
+
   const toX = (time: number) => (time / maxX) * width
   const toY = (weight: number) => height - (weight / yMax) * height
+  const toFlowY = (flow: number) => height - (flow / maxFlow) * height
 
   const polyline = points
     .map(point => `${toX(point.t).toFixed(2)},${toY(point.w).toFixed(2)}`)
+    .join(' ')
+
+  const flowPolyline = points
+    .filter(point => point.flow !== undefined && point.flow >= 0)
+    .map(point => `${toX(point.t).toFixed(2)},${toFlowY(point.flow!).toFixed(2)}`)
     .join(' ')
 
   const targetY = targetWeight !== null ? toY(targetWeight) : null
@@ -76,9 +87,16 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
           <line x1="0" y1={targetY} x2={width} y2={targetY} stroke="currentColor" strokeDasharray="4 3" className="text-primary/60" />
         )}
         <polyline fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground" points={polyline} />
+        {flowPolyline && (
+          <polyline fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.5" className="text-primary" points={flowPolyline} />
+        )}
       </svg>
       <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
         <span>0s</span>
+        <span className="flex items-center gap-2">
+          <span className="inline-block w-3 h-0.5 bg-foreground rounded" /> weight
+          <span className="inline-block w-3 h-0.5 bg-primary/50 rounded" /> flow
+        </span>
         <span>{Math.round(maxX)}s</span>
       </div>
     </div>
@@ -97,6 +115,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [bloomEnabled, setBloomEnabled] = useState(false)
   const [bloomSeconds, setBloomSeconds] = useState('30')
   const [weightTrend, setWeightTrend] = useState<WeightPoint[]>([])
+  const [flowRate, setFlowRate] = useState<number>(0)
 
   const previousWeightRef = useRef<number | null>(null)
   const previousWeightTimestampRef = useRef<number | null>(null)
@@ -168,13 +187,22 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       trendStartTimestampRef.current = now
     }
     const trendTimeSeconds = (now - trendStartTimestampRef.current) / 1000
-    setWeightTrend(prev => {
-      const next = [...prev, { t: trendTimeSeconds, w: currentWeight }]
-      return next.slice(-90)
-    })
 
     const previousWeight = previousWeightRef.current
     const previousTimestamp = previousWeightTimestampRef.current
+
+    // Compute instantaneous flow rate (g/s)
+    let currentFlowRate = 0
+    if (previousWeight !== null && previousTimestamp !== null) {
+      const deltaSeconds = Math.max((now - previousTimestamp) / 1000, 0.01)
+      currentFlowRate = Math.max((currentWeight - previousWeight) / deltaSeconds, 0)
+    }
+    setFlowRate(currentFlowRate)
+
+    setWeightTrend(prev => {
+      const next = [...prev, { t: trendTimeSeconds, w: currentWeight, flow: currentFlowRate }]
+      return next.slice(-90)
+    })
 
     if (
       autoStartEnabled
@@ -203,6 +231,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       transition={{ duration: 0.25, ease: 'easeOut' }}
     >
       <Card className="p-6 space-y-5">
+        {/* ── Header ── */}
         <div className="flex items-center gap-3 -mt-1 -mx-1">
           <Button
             variant="ghost"
@@ -216,136 +245,146 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <h2 className="text-lg font-bold tracking-tight">Pour-over</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-2">
+        {/* ── 1. Weight + Timer + Flow rate (always visible) ── */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
             <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
               <Scales size={14} weight="bold" />
               Weight
             </div>
-            <div className="text-4xl font-bold tabular-nums text-foreground">{weight.toFixed(1)}</div>
-            <div className="text-sm text-muted-foreground">grams</div>
+            <div className="text-3xl font-bold tabular-nums text-foreground">{weight.toFixed(1)}</div>
+            <div className="text-xs text-muted-foreground">g</div>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-2">
+          <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
             <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
               <Timer size={14} weight="bold" />
               Timer
             </div>
-            <div className="text-4xl font-bold tabular-nums text-foreground">{formatStopwatch(elapsedMs)}</div>
-            <div className="text-sm text-muted-foreground">mm:ss.cc</div>
+            <div className="text-3xl font-bold tabular-nums text-foreground">{formatStopwatch(elapsedMs)}</div>
+            <div className="text-xs text-muted-foreground">mm:ss</div>
+          </div>
+
+          <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
+            <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
+              <Drop size={14} weight="bold" />
+              Flow
+            </div>
+            <div className="text-3xl font-bold tabular-nums text-foreground">{flowRate.toFixed(1)}</div>
+            <div className="text-xs text-muted-foreground">g/s</div>
           </div>
         </div>
 
-        <Tabs value={mode} onValueChange={(value) => setMode(value as 'free' | 'ratio')}>
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="free">Free mode</TabsTrigger>
-            <TabsTrigger value="ratio">Ratio mode</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="free" className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <Button
-                onClick={startOrPause}
-                variant="dark-brew"
-                className="h-11"
-              >
-                {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
-                {isRunning ? 'Pause' : 'Start'}
-              </Button>
-
-              <Button
-                onClick={resetTimer}
-                variant="outline"
-                className="h-11"
-              >
-                <ArrowClockwise size={18} weight="bold" className="mr-1.5" />
-                Reset
-              </Button>
-
-              <Button
-                onClick={() => cmd(tareScale, 'tared')}
-                variant="outline"
-                className="h-11"
-                disabled={!machineState.connected}
-              >
-                <Drop size={18} weight="duotone" className="mr-1.5" />
-                Tare
-              </Button>
+        {/* ── 2. Target + Remaining (ratio mode only) ── */}
+        {mode === 'ratio' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <Target size={12} weight="bold" />
+                Target water
+              </p>
+              <p className="text-2xl font-semibold tabular-nums">
+                {targetWeight !== null ? `${targetWeight.toFixed(1)} g` : '—'}
+              </p>
             </div>
-          </TabsContent>
+            <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Remaining</p>
+              <p className="text-2xl font-semibold tabular-nums">
+                {remainingWeight !== null ? `${remainingWeight.toFixed(1)} g` : '—'}
+              </p>
+            </div>
+          </div>
+        )}
 
-          <TabsContent value="ratio" className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="pour-over-dose">Dose (g)</Label>
+        {/* ── 3. Graph + Progress (ratio mode only) ── */}
+        {mode === 'ratio' && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Progress</span>
+              <span>{ratioProgress.toFixed(0)}%</span>
+            </div>
+            <Progress value={ratioProgress} />
+            <WeightTrend points={weightTrend} targetWeight={targetWeight} />
+          </div>
+        )}
+
+        {/* ── Free mode: weight trend chart ── */}
+        {mode === 'free' && weightTrend.length >= 2 && (
+          <WeightTrend points={weightTrend} targetWeight={null} />
+        )}
+
+        {/* ── 4. Action buttons (always visible) ── */}
+        <div className="grid grid-cols-3 gap-2.5">
+          <Button
+            onClick={startOrPause}
+            variant="dark-brew"
+            className="h-11"
+          >
+            {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
+            {isRunning ? 'Pause' : 'Start'}
+          </Button>
+
+          <Button
+            onClick={resetTimer}
+            variant="outline"
+            className="h-11"
+          >
+            <ArrowClockwise size={18} weight="bold" className="mr-1.5" />
+            Reset
+          </Button>
+
+          <Button
+            onClick={() => cmd(tareScale, 'tared')}
+            variant="outline"
+            className="h-11"
+            disabled={!machineState.connected}
+          >
+            <Drop size={18} weight="duotone" className="mr-1.5" />
+            Tare
+          </Button>
+        </div>
+
+        {/* ── 5. Dose + ratio inputs (ratio mode — set once before brewing) ── */}
+        {mode === 'ratio' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="pour-over-dose">Dose (g)</Label>
+              <div className="flex gap-1.5">
                 <Input
                   id="pour-over-dose"
                   inputMode="decimal"
                   value={doseGrams}
                   onChange={(event) => setDoseGrams(event.target.value)}
                   placeholder="20"
+                  className="flex-1"
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="pour-over-ratio">Ratio (1:x)</Label>
-                <Input
-                  id="pour-over-ratio"
-                  inputMode="decimal"
-                  value={brewRatio}
-                  onChange={(event) => setBrewRatio(event.target.value)}
-                  placeholder="15"
-                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 h-10 w-10"
+                  disabled={!machineState.connected || weight <= 0}
+                  onClick={() => setDoseGrams(weight.toFixed(1))}
+                  title="Capture current scale weight as dose"
+                  aria-label="Weigh from scale"
+                >
+                  <Scales size={16} weight="bold" />
+                </Button>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Target water</p>
-                <p className="text-2xl font-semibold tabular-nums">
-                  {targetWeight !== null ? `${targetWeight.toFixed(1)} g` : '—'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Remaining</p>
-                <p className="text-2xl font-semibold tabular-nums">
-                  {remainingWeight !== null ? `${remainingWeight.toFixed(1)} g` : '—'}
-                </p>
-              </div>
-            </div>
-
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Progress</span>
-                <span>{ratioProgress.toFixed(0)}%</span>
-              </div>
-              <Progress value={ratioProgress} />
+              <Label htmlFor="pour-over-ratio">Ratio (1:x)</Label>
+              <Input
+                id="pour-over-ratio"
+                inputMode="decimal"
+                value={brewRatio}
+                onChange={(event) => setBrewRatio(event.target.value)}
+                placeholder="15"
+              />
             </div>
+          </div>
+        )}
 
-            <WeightTrend points={weightTrend} targetWeight={targetWeight} />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <Button
-                onClick={startOrPause}
-                variant="dark-brew"
-                className="h-11"
-              >
-                {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
-                {isRunning ? 'Pause' : 'Start'}
-              </Button>
-
-              <Button
-                onClick={() => cmd(tareScale, 'tared')}
-                variant="outline"
-                className="h-11"
-                disabled={!machineState.connected}
-              >
-                <Drop size={18} weight="duotone" className="mr-1.5" />
-                Tare
-              </Button>
-            </div>
-          </TabsContent>
-        </Tabs>
-
+        {/* ── Settings (auto-start, bloom) ── */}
         <div className="rounded-xl border border-border/60 bg-secondary/30 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div>
@@ -387,6 +426,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             Machine is offline. Scale actions are disabled until connection is restored.
           </p>
         )}
+
+        {/* ── 6. Mode tabs at the bottom ── */}
+        <Tabs value={mode} onValueChange={(value) => setMode(value as 'free' | 'ratio')}>
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="free">Free mode</TabsTrigger>
+            <TabsTrigger value="ratio">Ratio mode</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </Card>
     </motion.div>
   )
