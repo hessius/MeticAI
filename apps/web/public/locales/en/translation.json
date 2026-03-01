@@ -116,7 +116,8 @@
     "profileCatalogue": "Profile Catalogue",
     "runSchedule": "Run / Schedule",
     "settings": "Settings",
-    "newProfile": "New Profile"
+    "newProfile": "New Profile",
+    "aiUnavailable": "AI profile generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Coffee Bag Photo",
@@ -511,7 +512,7 @@
   "advanced": {
     "detailedKnowledge": "Detailed AI Knowledge",
     "detailedKnowledgeDescription": "Include full profiling guide and OEPF specification for higher quality profiles",
-    "detailedKnowledgeWarning": "Detailed mode sends significantly more context to the AI. This may increase generation time, especially on low-powered hardware."
+    "detailedKnowledgeWarning": "Warning: Detailed mode uses approximately 4× more input tokens (~40K vs ~10K). This significantly increases API costs and may exceed free-tier limits. Not recommended with free Gemini API keys."
   },
   "qrCode": {
     "title": "Open on Mobile",

@@ -1,6 +1,7 @@
 """Meticulous service for espresso machine API and shot data management."""
 
 import json
+import re
 import time
 import uuid
 import zstandard
@@ -317,6 +318,23 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
     if "variables" not in data or data.get("variables") is None:
         data["variables"] = []
     data.setdefault("previous_authors", [])
+
+    # ── Info variable emoji normalization ────────────────────────────────
+    # Info variables (key starts with "info_") MUST have an emoji prefix in name.
+    # This distinguishes them from adjustable variables (no emoji, used in stages).
+    emoji_pattern = re.compile(
+        r'^[\U0001F300-\U0001F9FF'   # Supplemental Symbols and Pictographs
+        r'\U0001F600-\U0001F64F'      # Emoticons
+        r'\U0001F680-\U0001F6FF'      # Transport and Map Symbols  
+        r'\U00002600-\U000026FF'      # Misc symbols
+        r'\U00002700-\U000027BF]'     # Dingbats
+    )
+    for var in data.get("variables") or []:
+        key = var.get("key", "")
+        name = var.get("name", "")
+        # If it's an info variable and name doesn't start with emoji, add default ℹ️
+        if key.startswith("info_") and not emoji_pattern.match(name):
+            var["name"] = f"ℹ️ {name}" if name else "ℹ️ Info"
 
     # ── Display metadata ─────────────────────────────────────────────────
     # The OEPF schema supports display.description / display.shortDescription

@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -42,6 +43,10 @@ const FALLBACK_LOADING_MESSAGES = [
 
 export const LOADING_MESSAGE_COUNT = FALLBACK_LOADING_MESSAGES.length
 
+// Timing for cycling between progress and funny messages
+const SHOW_PROGRESS_MS = 5000
+const SHOW_FUNNY_MS = 4000
+
 interface LoadingViewProps {
   currentMessage: number
   /** Real-time progress event from SSE, if available. */
@@ -66,8 +71,62 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
 
   // When we have real progress, show the phase message instead of random quips
   const hasProgress = progress && progress.phase !== 'queued'
-  const displayMessage = hasProgress ? progress.message : loadingMessages[safeIndex]
-  const messageKey = hasProgress ? `sse-${progress.phase}-${progress.attempt}` : `msg-${currentMessage}`
+  
+  // Track whether to show the progress message or a funny string
+  const [showFunny, setShowFunny] = useState(false)
+  const [funnyIndex, setFunnyIndex] = useState(0)
+  const lastPhaseRef = useRef<string | null>(null)
+  
+  // Pick a random funny message when switching to funny mode
+  const pickRandomFunny = useCallback(() => {
+    setFunnyIndex(Math.floor(Math.random() * loadingMessages.length))
+  }, [loadingMessages.length])
+  
+  // When progress phase changes, reset to show progress message
+  useEffect(() => {
+    if (hasProgress && progress.phase !== lastPhaseRef.current) {
+      lastPhaseRef.current = progress.phase
+      setShowFunny(false)
+    }
+  }, [hasProgress, progress?.phase])
+  
+  // Cycle between showing progress message and funny strings
+  useEffect(() => {
+    if (!hasProgress) return
+    
+    // After SHOW_PROGRESS_MS, switch to funny; after SHOW_FUNNY_MS, switch back
+    const interval = showFunny ? SHOW_FUNNY_MS : SHOW_PROGRESS_MS
+    
+    const timer = setTimeout(() => {
+      if (showFunny) {
+        // Was showing funny, switch back to progress
+        setShowFunny(false)
+      } else {
+        // Was showing progress, switch to a random funny
+        pickRandomFunny()
+        setShowFunny(true)
+      }
+    }, interval)
+    
+    return () => clearTimeout(timer)
+  }, [hasProgress, showFunny, pickRandomFunny])
+  
+  // Determine what message to display
+  const displayMessage = useMemo(() => {
+    if (!hasProgress) {
+      return loadingMessages[safeIndex]
+    }
+    if (showFunny) {
+      return loadingMessages[funnyIndex]
+    }
+    return progress.message
+  }, [hasProgress, showFunny, progress?.message, loadingMessages, safeIndex, funnyIndex])
+  
+  const messageKey = useMemo(() => {
+    if (!hasProgress) return `msg-${currentMessage}`
+    if (showFunny) return `funny-${funnyIndex}`
+    return `sse-${progress.phase}-${progress.attempt}`
+  }, [hasProgress, showFunny, currentMessage, funnyIndex, progress?.phase, progress?.attempt])
 
   // Calculate progress fraction
   const fraction = hasProgress ? phaseProgress(progress.phase) : 0

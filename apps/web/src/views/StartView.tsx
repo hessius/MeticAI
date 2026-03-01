@@ -134,7 +134,7 @@ export function StartView({
 
           {!aiConfigured && !hideAiWhenUnavailable && (
             <p className="text-xs text-muted-foreground text-center">
-              AI profile generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.
+              {t('navigation.aiUnavailable')}
             </p>
           )}
           
@@ -164,7 +164,7 @@ export function StartView({
             className="w-full h-14 text-base"
           >
             <Drop size={20} className="mr-2" weight="fill" />
-            Pour-over Live
+            {t('pourOver.title')}
           </Button>
           
           {/* Style 4: Ember — warm orange inner glow + border */}

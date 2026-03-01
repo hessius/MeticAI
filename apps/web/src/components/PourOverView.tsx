@@ -26,12 +26,6 @@ function formatStopwatch(totalMs: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`
 }
 
-function formatSeconds(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-}
-
 function parsePositiveNumber(value: string): number | null {
   const parsed = Number(value)
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -123,8 +117,22 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const previousWeightRef = useRef<number | null>(null)
   const previousWeightTimestampRef = useRef<number | null>(null)
   const trendStartTimestampRef = useRef<number | null>(null)
+  const justTaredRef = useRef(false)
 
   const { cmd } = useMachineActions(machineState)
+
+  const handleTare = useCallback(() => {
+    // Mark that we just tared so the next weight update doesn't auto-start
+    justTaredRef.current = true
+    // Reset graph and refs
+    setWeightTrend([])
+    previousWeightRef.current = null
+    previousWeightTimestampRef.current = null
+    trendStartTimestampRef.current = null
+    setFlowRate(0)
+    // Send tare command
+    cmd(tareScale, 'tared')
+  }, [cmd])
 
   useEffect(() => {
     if (!isRunning) return
@@ -170,17 +178,23 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const weight = machineState.shot_weight ?? 0
   const parsedDose = parsePositiveNumber(doseGrams)
   const parsedRatio = parsePositiveNumber(brewRatio)
-  const parsedBloomSeconds = parsePositiveNumber(bloomSeconds)
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
   const remainingWeight = targetWeight !== null ? Math.max(targetWeight - weight, 0) : null
   const ratioProgress = targetWeight !== null && targetWeight > 0 ? Math.min((weight / targetWeight) * 100, 100) : 0
-  const bloomRemainingSeconds = bloomEnabled && parsedBloomSeconds !== null
-    ? Math.max(Math.ceil((parsedBloomSeconds * 1000 - elapsedMs) / 1000), 0)
-    : 0
 
   useEffect(() => {
     const currentWeight = machineState.shot_weight
     if (currentWeight === null || currentWeight === undefined) {
+      return
+    }
+
+    // Skip auto-start logic immediately after tare
+    const wasTare = justTaredRef.current
+    if (wasTare) {
+      justTaredRef.current = false
+      // Don't record this weight for auto-start detection
+      previousWeightRef.current = currentWeight
+      previousWeightTimestampRef.current = Date.now()
       return
     }
 
@@ -249,7 +263,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         </div>
 
         {/* ── 1. Weight + Timer + Flow rate (always visible) ── */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
             <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
               <Scales size={14} weight="bold" />
@@ -259,7 +273,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             <div className="text-xs text-muted-foreground">{t('pourOver.unitGrams')}</div>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
+          <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1 col-span-2 sm:col-span-1 order-first sm:order-none">
             <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
               <Timer size={14} weight="bold" />
               {t('pourOver.timer')}
@@ -280,7 +294,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
         {/* ── 2. Target + Remaining (ratio mode only) ── */}
         {mode === 'ratio' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                 <Target size={12} weight="bold" />
@@ -337,7 +351,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           </Button>
 
           <Button
-            onClick={() => cmd(tareScale, 'tared')}
+            onClick={handleTare}
             variant="outline"
             className="h-11"
             disabled={!machineState.connected}
@@ -349,7 +363,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
         {/* ── 5. Dose + ratio inputs (ratio mode — set once before brewing) ── */}
         {mode === 'ratio' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="pour-over-dose">{t('pourOver.doseLabel')}</Label>
               <div className="flex gap-1.5">
@@ -359,18 +373,18 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   value={doseGrams}
                   onChange={(event) => setDoseGrams(event.target.value)}
                   placeholder="20"
-                  className="flex-1"
+                  className="w-20 text-center bg-slate-200 dark:bg-[rgba(0,0,0,0.3)]"
                 />
                 <Button
                   variant="outline"
-                  size="icon"
-                  className="shrink-0 h-10 w-10"
+                  size="sm"
+                  className="shrink-0 h-10 px-2"
                   disabled={!machineState.connected || weight <= 0}
                   onClick={() => setDoseGrams(weight.toFixed(1))}
                   title={t('pourOver.weighFromScaleTitle')}
-                  aria-label={t('pourOver.weighFromScale')}
                 >
-                  <Scales size={16} weight="bold" />
+                  <Scales size={16} weight="bold" className="mr-1" />
+                  {t('pourOver.weighFromScale')}
                 </Button>
               </div>
             </div>
@@ -382,6 +396,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 value={brewRatio}
                 onChange={(event) => setBrewRatio(event.target.value)}
                 placeholder="15"
+                className="w-20 text-center bg-slate-200 dark:bg-[rgba(0,0,0,0.3)]"
               />
             </div>
           </div>
@@ -406,20 +421,16 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           </div>
 
           {bloomEnabled && (
-            <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
-              <div className="space-y-1.5">
-                <Label htmlFor="pour-over-bloom">{t('pourOver.bloomDuration')}</Label>
-                <Input
-                  id="pour-over-bloom"
-                  inputMode="numeric"
-                  value={bloomSeconds}
-                  onChange={(event) => setBloomSeconds(event.target.value)}
-                  placeholder="30"
-                />
-              </div>
-              <div className="text-sm tabular-nums text-muted-foreground min-w-16 text-right pb-2">
-                {bloomRemainingSeconds > 0 ? formatSeconds(bloomRemainingSeconds) : t('pourOver.bloomDone')}
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pour-over-bloom">{t('pourOver.bloomDuration')}</Label>
+              <Input
+                id="pour-over-bloom"
+                inputMode="numeric"
+                value={bloomSeconds}
+                onChange={(event) => setBloomSeconds(event.target.value)}
+                placeholder="30"
+                className="w-20 text-center bg-slate-200 dark:bg-[rgba(0,0,0,0.3)]"
+              />
             </div>
           )}
         </div>
