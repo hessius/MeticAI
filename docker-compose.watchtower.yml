@@ -37,3 +37,7 @@ services:
         max-size: "5m"
         max-file: "2"
     command: --http-api-metrics --http-api-periodic-polls --interval 21600
+
+  meticai:
+    environment:
+      - WATCHTOWER_TOKEN=${WATCHTOWER_TOKEN:-}

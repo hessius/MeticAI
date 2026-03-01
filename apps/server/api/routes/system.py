@@ -61,6 +61,9 @@ WATCHTOWER_TRIGGERABLE_STATUS_CODES = {200, 204}
 async def _probe_watchtower_api(method: str = "get") -> dict:
     """Probe known Watchtower API endpoints.
 
+    Sends an Authorization header when the ``WATCHTOWER_TOKEN`` env-var is
+    set so that the probe (and trigger) succeeds on token-protected instances.
+
     Returns:
         {
             "reachable": bool,
@@ -72,15 +75,20 @@ async def _probe_watchtower_api(method: str = "get") -> dict:
     """
     import httpx
 
+    token = os.environ.get("WATCHTOWER_TOKEN", "").strip()
+    headers: dict[str, str] = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     errors: list[str] = []
 
     async def _probe_one(client: httpx.AsyncClient, endpoint: str) -> dict:
         timeout = 3.0 if method == "post" else 2.0
         try:
             if method == "post":
-                response = await client.post(endpoint, timeout=timeout)
+                response = await client.post(endpoint, timeout=timeout, headers=headers)
             else:
-                response = await client.get(endpoint, timeout=timeout)
+                response = await client.get(endpoint, timeout=timeout, headers=headers)
 
             status_code = response.status_code
             return {

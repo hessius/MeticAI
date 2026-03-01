@@ -1428,6 +1428,83 @@ class TestUpdateMethodEndpoint:
         assert data["can_trigger_update"] is False
         assert "address already in use" in data["watchtower_error"]
 
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "WATCHTOWER_TOKEN": "test-token-123"})
+    @patch('httpx.AsyncClient')
+    def test_update_method_sends_auth_header_when_token_set(self, mock_client_cls, client):
+        """Sends Authorization header when WATCHTOWER_TOKEN env var is set."""
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/update-method")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["method"] == "watchtower"
+        assert data["watchtower_running"] is True
+        assert data["can_trigger_update"] is True
+
+        # Verify the auth header was sent
+        call_kwargs = mock_client.get.call_args
+        assert call_kwargs is not None
+        assert call_kwargs.kwargs.get("headers", {}).get("Authorization") == "Bearer test-token-123"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"}, clear=False)
+    @patch('httpx.AsyncClient')
+    def test_update_method_no_auth_header_without_token(self, mock_client_cls, client):
+        """Does not send Authorization header when WATCHTOWER_TOKEN is unset."""
+        # Ensure WATCHTOWER_TOKEN is not in environment
+        import os as _os
+        _os.environ.pop("WATCHTOWER_TOKEN", None)
+
+        mock_response = AsyncMock()
+        mock_response.status_code = 401
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/update-method")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["method"] == "watchtower"
+        assert data["watchtower_running"] is True
+        assert data["can_trigger_update"] is False
+
+        # Verify no auth header was sent
+        call_kwargs = mock_client.get.call_args
+        assert call_kwargs is not None
+        assert call_kwargs.kwargs.get("headers", {}) == {}
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "WATCHTOWER_TOKEN": "trigger-token"})
+    @patch('httpx.AsyncClient')
+    def test_trigger_update_sends_auth_header(self, mock_client_cls, client):
+        """Trigger-update POST sends Authorization header when token is set."""
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
+
+        response = client.post("/api/trigger-update")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+
+        # Verify the auth header was sent on POST
+        call_kwargs = mock_client.post.call_args
+        assert call_kwargs is not None
+        assert call_kwargs.kwargs.get("headers", {}).get("Authorization") == "Bearer trigger-token"
+
 
 class TestHistoryAPI:
     """Tests for the profile history API endpoints."""
