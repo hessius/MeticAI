@@ -132,7 +132,7 @@ export function StartView({
             </Button>
           )}
 
-          {!aiConfigured && (
+          {!aiConfigured && !hideAiWhenUnavailable && (
             <p className="text-xs text-muted-foreground text-center">
               AI profile generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.
             </p>

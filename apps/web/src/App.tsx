@@ -121,7 +121,8 @@ function App() {
     })()
   }, [viewState, machineState.active_profile])
 
-  // Fetch mqttEnabled from settings on mount
+  // Fetch mqttEnabled from settings on mount and when returning from Settings view
+  const prevViewStateRef = useRef<ViewState | null>(null)
   useEffect(() => {
     const fetchMqttSetting = async () => {
       try {
@@ -137,8 +138,12 @@ function App() {
         // default false if unreachable
       }
     }
-    fetchMqttSetting()
-  }, [])
+    // Fetch on mount or when leaving the settings view
+    if (prevViewStateRef.current === null || (prevViewStateRef.current === 'settings' && viewState !== 'settings')) {
+      fetchMqttSetting()
+    }
+    prevViewStateRef.current = viewState
+  }, [viewState])
 
   useEffect(() => {
     setAiEnabled(getAiEnabled())
