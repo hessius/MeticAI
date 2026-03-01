@@ -39,7 +39,8 @@ test.describe('Accessibility - Automated Scans', () => {
   test('should pass axe accessibility scan on form view', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    // Use force: true because button may be disabled when AI is unavailable
+    await page.getByRole('button', { name: /Generate New Profile/i }).click({ force: true })
     await page.waitForSelector('text=New Profile')
 
     const results = await new AxeBuilder({ page })
@@ -53,7 +54,8 @@ test.describe('Accessibility - Automated Scans', () => {
   test('should pass axe scan with form filled', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    // Use force: true because button may be disabled when AI is unavailable
+    await page.getByRole('button', { name: /Generate New Profile/i }).click({ force: true })
 
     await page.getByPlaceholder(/Balanced extraction/).fill('I prefer fruity and bright espresso')
     await page.getByText('Light Body').first().click()
