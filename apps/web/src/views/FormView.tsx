@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Camera, Sparkle, Warning, Upload, X, Coffee, CaretLeft } from '@phosphor-icons/react'
-import { PRESET_TAGS, CATEGORY_COLORS } from '@/lib/tags'
+import { PRESET_TAGS, getTagColorClass } from '@/lib/tags'
 import { AdvancedCustomization, AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
 import type { RefObject, ChangeEvent } from 'react'
 
@@ -47,10 +47,6 @@ export function FormView({
   onBack,
   onViewHistory
 }: FormViewProps) {
-  const getCategoryColor = (category: string) => {
-    return CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS] || ''
-  }
-
   return (
     <motion.div
       key="form"
@@ -157,13 +153,10 @@ export function FormView({
                       className="relative"
                     >
                       <Badge
-                        variant={isSelected ? "default" : "outline"}
+                        variant="outline"
                         className={`
                           px-3 py-1.5 text-xs font-medium cursor-pointer transition-all duration-200
-                          ${isSelected 
-                            ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20' 
-                            : `${getCategoryColor(tag.category)} border`
-                          }
+                          ${getTagColorClass(tag.label, isSelected)}
                         `}
                       >
                         {tag.label}

@@ -295,6 +295,14 @@ class TestAnalyzeAndProfileEndpoint:
         
         assert response.status_code == 400
         assert "at least one" in response.json()["detail"].lower()
+    
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_analyze_and_profile_missing_both_api_prefix(self, client):
+        """Test /api-prefixed route parity for analyze_and_profile endpoint."""
+        response = client.post("/api/analyze_and_profile")
+
+        assert response.status_code == 400
+        assert "At least one of" in response.json()["detail"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.subprocess.run')
@@ -1316,9 +1324,10 @@ class TestTriggerUpdateEndpoint:
 
         response = client.post("/api/trigger-update")
         
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
-        assert data["status"] == "success"
+        assert data["detail"]["status"] == "error"
+        assert "rejected" in data["detail"]["message"].lower()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('httpx.AsyncClient')
@@ -1366,6 +1375,58 @@ class TestTriggerUpdateEndpoint:
         openapi_data = response.json()
         assert "/api/trigger-update" in openapi_data["paths"]
         assert "post" in openapi_data["paths"]["/api/trigger-update"]
+
+
+class TestUpdateMethodEndpoint:
+    """Tests for the /api/update-method endpoint."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.system._probe_watchtower_api', new_callable=AsyncMock)
+    def test_update_method_watchtower_reachable(self, mock_probe, client):
+        """Returns watchtower mode when API is reachable via any probe endpoint."""
+        mock_probe.return_value = {
+            "reachable": True,
+            "can_trigger": False,
+            "endpoint": "http://watchtower:8080/v1/update",
+            "status_code": 401,
+            "error": None,
+        }
+
+        response = client.get("/api/update-method")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["method"] == "watchtower"
+        assert data["watchtower_running"] is True
+        assert data["can_trigger_update"] is False
+        assert data["watchtower_endpoint"] == "http://watchtower:8080/v1/update"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('subprocess.run')
+    @patch('api.routes.system._probe_watchtower_api', new_callable=AsyncMock)
+    def test_update_method_reports_container_error(self, mock_probe, mock_subprocess_run, client):
+        """Surfaces watchtower container startup failures in response diagnostics."""
+        mock_probe.return_value = {
+            "reachable": False,
+            "can_trigger": False,
+            "endpoint": None,
+            "status_code": None,
+            "error": "http://localhost:8088/v1/update: connection refused",
+        }
+
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "created|failed to bind host port 127.0.0.1:8088/tcp: address already in use"
+        mock_subprocess_run.return_value = mock_result
+
+        response = client.get("/api/update-method")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["method"] == "manual"
+        assert data["watchtower_running"] is False
+        assert data["can_trigger_update"] is False
+        assert "address already in use" in data["watchtower_error"]
 
 
 class TestHistoryAPI:
@@ -4164,6 +4225,299 @@ class TestImageProxyEndpoint:
         
         assert response.status_code == 404
 
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles._set_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_data_uri_success(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_set_cache,
+        mock_httpx_client,
+        client
+    ):
+        """Test that data URI images are decoded and returned without machine HTTP fetch."""
+        import base64
+
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "Data URI"
+        partial_profile.id = "profile-789"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Data URI"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = f"data:image/png;base64,{base64.b64encode(b'fake_png_data').decode('utf-8')}"
+        mock_get_profile.return_value = full_profile
+
+        response = client.get("/api/profile/Data%20URI/image-proxy")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == b"fake_png_data"
+        mock_set_cache.assert_called_once_with("Data URI", b"fake_png_data")
+        mock_httpx_client.assert_not_called()
+
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles._set_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_data_uri_preserves_mime_type(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_set_cache,
+        mock_httpx_client,
+        client
+    ):
+        """Test JPEG data URI responses preserve the source MIME type."""
+        import base64
+
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "JPEG Data URI"
+        partial_profile.id = "profile-jpeg"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "JPEG Data URI"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = f"data:image/jpeg;base64,{base64.b64encode(b'fake_jpeg_data').decode('utf-8')}"
+        mock_get_profile.return_value = full_profile
+
+        response = client.get("/api/profile/JPEG%20Data%20URI/image-proxy")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.content == b"fake_jpeg_data"
+        mock_set_cache.assert_called_once_with("JPEG Data URI", b"fake_jpeg_data")
+        mock_httpx_client.assert_not_called()
+
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_data_uri_invalid(self, mock_list_profiles, mock_get_profile, mock_get_cache, client):
+        """Test malformed data URI returns 400 instead of 500."""
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "Bad Data"
+        partial_profile.id = "profile-790"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Bad Data"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = "data:image/png;base64,!!!not-valid!!!"
+        mock_get_profile.return_value = full_profile
+
+        response = client.get("/api/profile/Bad%20Data/image-proxy")
+
+        assert response.status_code == 400
+
+    @patch.dict(os.environ, {"METICULOUS_IP": "127.0.0.1"})
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_timeout_maps_to_504(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_httpx_client_cls,
+        client
+    ):
+        """Test machine fetch timeout maps to 504 Gateway Timeout."""
+        import httpx
+
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "Remote Path"
+        partial_profile.id = "profile-791"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Remote Path"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = "/profiles/profile-791/image"
+        mock_get_profile.return_value = full_profile
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+        mock_httpx_client_cls.return_value = mock_client
+
+        response = client.get("/api/profile/Remote%20Path/image-proxy")
+
+        assert response.status_code == 504
+
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles._set_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_absolute_url_rejected_when_not_allowed(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_set_cache,
+        mock_httpx_client_cls,
+        client
+    ):
+        """Test absolute image URLs are rejected when host is not allowed."""
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "Absolute URL"
+        partial_profile.id = "profile-792"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Absolute URL"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = "https://machine.local/profiles/profile-792/image"
+        mock_get_profile.return_value = full_profile
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"abs_url_png"
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_httpx_client_cls.return_value = mock_client
+
+        with patch.dict(os.environ, {}, clear=True):
+            response = client.get("/api/profile/Absolute%20URL/image-proxy")
+
+        assert response.status_code == 400
+        assert "not allowed" in response.json()["detail"].lower()
+        mock_client.get.assert_not_awaited()
+        mock_set_cache.assert_not_called()
+
+    @patch.dict(os.environ, {"METICULOUS_IP": "machine.local"})
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles._set_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_absolute_url_allowed_for_machine_host(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_set_cache,
+        mock_httpx_client_cls,
+        client
+    ):
+        """Test absolute image URLs are accepted when they match the configured machine host."""
+        mock_get_cache.return_value = None
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "Absolute URL"
+        partial_profile.id = "profile-792"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Absolute URL"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = "https://machine.local/profiles/profile-792/image"
+        mock_get_profile.return_value = full_profile
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"abs_url_png"
+        mock_response.headers = {"content-type": "image/png"}
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_httpx_client_cls.return_value = mock_client
+
+        response = client.get("/api/profile/Absolute%20URL/image-proxy")
+
+        assert response.status_code == 200
+        assert response.content == b"abs_url_png"
+        mock_client.get.assert_awaited_once_with("https://machine.local/profiles/profile-792/image", timeout=10.0)
+        mock_set_cache.assert_called_once_with("Absolute URL", b"abs_url_png")
+
+    @patch('httpx.AsyncClient')
+    @patch('api.routes.profiles.load_settings')
+    @patch('api.routes.profiles._set_cached_image')
+    @patch('api.routes.profiles._get_cached_image')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_image_proxy_fallback_to_settings_ip(
+        self,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_get_cache,
+        mock_set_cache,
+        mock_load_settings,
+        mock_httpx_client_cls,
+        client
+    ):
+        """Test settings meticulousIp is used when METICULOUS_IP env var is unset."""
+        mock_get_cache.return_value = None
+        mock_load_settings.return_value = {"meticulousIp": "192.168.50.10"}
+
+        partial_profile = type('Profile', (), {})()
+        partial_profile.name = "Settings IP"
+        partial_profile.id = "profile-793"
+        partial_profile.error = None
+        mock_list_profiles.return_value = [partial_profile]
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.name = "Settings IP"
+        full_profile.error = None
+        full_profile.display = type('Display', (), {})()
+        full_profile.display.image = "/profiles/profile-793/image"
+        mock_get_profile.return_value = full_profile
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"settings_ip_png"
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_httpx_client_cls.return_value = mock_client
+
+        with patch.dict(os.environ, {}, clear=True):
+            response = client.get("/api/profile/Settings%20IP/image-proxy")
+
+        assert response.status_code == 200
+        assert response.content == b"settings_ip_png"
+        mock_client.get.assert_awaited_once_with("http://192.168.50.10/profiles/profile-793/image", timeout=10.0)
+        mock_set_cache.assert_called_once_with("Settings IP", b"settings_ip_png")
+
 
 class TestAdditionalEndpoints:
     """Tests for additional utility endpoints."""
@@ -6512,7 +6866,7 @@ class TestParseGeminiErrorExtended:
         """Test extracting clean error message from verbose output."""
         error = "Stack trace...\nError: Profile validation failed - invalid temperature\nmore details..."
         result = services.gemini_service.parse_gemini_error(error)
-        assert "validation failed" in result.lower() or "invalid temperature" in result.lower()
+        assert "validation" in result.lower()
     
     def test_parse_gemini_error_truncate_long_message(self):
         """Test truncating very long error messages."""
@@ -6530,6 +6884,76 @@ class TestParseGeminiErrorExtended:
         """Test empty error string."""
         result = services.gemini_service.parse_gemini_error("")
         assert "unexpectedly" in result.lower()
+
+    def test_parse_gemini_error_auth_method_missing(self):
+        """Test Gemini CLI auth method / API key not set error."""
+        error = (
+            "YOLO mode is enabled. All tool calls will be automatically approved.\n"
+            "Please set an Auth method in your /root/.gemini/settings.json or "
+            "specify one of the following environment variables before running: "
+            "GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI"
+        )
+        result = services.gemini_service.parse_gemini_error(error)
+        assert "api key" in result.lower() or "settings" in result.lower()
+        # Must NOT leak raw YOLO noise into the user message
+        assert "yolo" not in result.lower()
+
+    def test_parse_gemini_error_api_key_underscore(self):
+        """Test that GEMINI_API_KEY (with underscores) is caught as auth error."""
+        error = "Error: GEMINI_API_KEY environment variable is not set"
+        result = services.gemini_service.parse_gemini_error(error)
+        assert "api key" in result.lower() or "configured" in result.lower()
+
+
+class TestSettingsHydration:
+    """Test that stored settings are hydrated into os.environ at startup."""
+
+    @pytest.mark.asyncio
+    async def test_lifespan_hydrates_gemini_api_key(self, monkeypatch, tmp_path):
+        """Lifespan hydrates GEMINI_API_KEY from settings.json when env is empty."""
+        import json
+        from main import lifespan, app
+
+        # Write a fake settings.json
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text(json.dumps({"geminiApiKey": "sk-test-key-123"}))
+
+        # Patch settings service to use our tmp file
+        monkeypatch.setattr("services.settings_service.SETTINGS_FILE", settings_file)
+        # Clear cache
+        import services.settings_service as ss
+        monkeypatch.setattr(ss, "_settings_cache", None)
+
+        # Make sure env var is empty
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        # Run the lifespan context manager
+        async with lifespan(app):
+            result = os.environ.get("GEMINI_API_KEY")
+
+        assert result == "sk-test-key-123"
+
+    @pytest.mark.asyncio
+    async def test_lifespan_does_not_overwrite_env_var(self, monkeypatch, tmp_path):
+        """Lifespan should NOT overwrite an env var that's already set."""
+        import json
+        from main import lifespan, app
+
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text(json.dumps({"geminiApiKey": "stored-key"}))
+
+        monkeypatch.setattr("services.settings_service.SETTINGS_FILE", settings_file)
+        import services.settings_service as ss
+        monkeypatch.setattr(ss, "_settings_cache", None)
+
+        # Set the env var to a different value
+        monkeypatch.setenv("GEMINI_API_KEY", "env-provided-key")
+
+        async with lifespan(app):
+            result = os.environ.get("GEMINI_API_KEY")
+
+        # Should keep the env-provided key, not overwrite with stored
+        assert result == "env-provided-key"
 
 
 class TestGetVisionModel:

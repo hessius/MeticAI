@@ -35,26 +35,28 @@ export const PRESET_TAGS = [
 export type TagCategory = typeof PRESET_TAGS[number]['category']
 
 // Refined color palette - high contrast for readability
+// Uses custom CSS classes (defined in index.css) with .dark selector
+// to bypass Tailwind v4 compat-mode media-query dark variant issue
 export const CATEGORY_COLORS: Record<TagCategory, string> = {
-  body: 'bg-amber-100 border-amber-400/60 hover:bg-amber-200 hover:border-amber-500/70 text-amber-900 dark:bg-amber-500/20 dark:border-amber-500/40 dark:hover:bg-amber-500/30 dark:hover:border-amber-500/55 dark:text-amber-200',
-  flavor: 'bg-rose-100 border-rose-400/60 hover:bg-rose-200 hover:border-rose-500/70 text-rose-900 dark:bg-rose-500/20 dark:border-rose-500/40 dark:hover:bg-rose-500/30 dark:hover:border-rose-500/55 dark:text-rose-200',
-  mouthfeel: 'bg-sky-100 border-sky-400/60 hover:bg-sky-200 hover:border-sky-500/70 text-sky-900 dark:bg-sky-500/20 dark:border-sky-500/40 dark:hover:bg-sky-500/30 dark:hover:border-sky-500/55 dark:text-sky-200',
-  style: 'bg-violet-100 border-violet-400/60 hover:bg-violet-200 hover:border-violet-500/70 text-violet-900 dark:bg-violet-500/20 dark:border-violet-500/40 dark:hover:bg-violet-500/30 dark:hover:border-violet-500/55 dark:text-violet-200',
-  extraction: 'bg-emerald-100 border-emerald-400/60 hover:bg-emerald-200 hover:border-emerald-500/70 text-emerald-900 dark:bg-emerald-500/20 dark:border-emerald-500/40 dark:hover:bg-emerald-500/30 dark:hover:border-emerald-500/55 dark:text-emerald-200',
-  roast: 'bg-orange-100 border-orange-400/60 hover:bg-orange-200 hover:border-orange-500/70 text-orange-900 dark:bg-orange-500/20 dark:border-orange-500/40 dark:hover:bg-orange-500/30 dark:hover:border-orange-500/55 dark:text-orange-200',
-  characteristic: 'bg-teal-100 border-teal-400/60 hover:bg-teal-200 hover:border-teal-500/70 text-teal-900 dark:bg-teal-500/20 dark:border-teal-500/40 dark:hover:bg-teal-500/30 dark:hover:border-teal-500/55 dark:text-teal-200',
-  process: 'bg-indigo-100 border-indigo-400/60 hover:bg-indigo-200 hover:border-indigo-500/70 text-indigo-900 dark:bg-indigo-500/20 dark:border-indigo-500/40 dark:hover:bg-indigo-500/30 dark:hover:border-indigo-500/55 dark:text-indigo-200',
+  body: 'tag-body',
+  flavor: 'tag-flavor',
+  mouthfeel: 'tag-mouthfeel',
+  style: 'tag-style',
+  extraction: 'tag-extraction',
+  roast: 'tag-roast',
+  characteristic: 'tag-characteristic',
+  process: 'tag-process',
 }
 
 export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
-  body: 'bg-amber-600 border-amber-700 text-white shadow-sm shadow-amber-500/25 dark:bg-amber-500 dark:border-amber-400',
-  flavor: 'bg-rose-600 border-rose-700 text-white shadow-sm shadow-rose-500/25 dark:bg-rose-500 dark:border-rose-400',
-  mouthfeel: 'bg-sky-600 border-sky-700 text-white shadow-sm shadow-sky-500/25 dark:bg-sky-500 dark:border-sky-400',
-  style: 'bg-violet-600 border-violet-700 text-white shadow-sm shadow-violet-500/25 dark:bg-violet-500 dark:border-violet-400',
-  extraction: 'bg-emerald-600 border-emerald-700 text-white shadow-sm shadow-emerald-500/25 dark:bg-emerald-500 dark:border-emerald-400',
-  roast: 'bg-orange-600 border-orange-700 text-white shadow-sm shadow-orange-500/25 dark:bg-orange-500 dark:border-orange-400',
-  characteristic: 'bg-teal-600 border-teal-700 text-white shadow-sm shadow-teal-500/25 dark:bg-teal-500 dark:border-teal-400',
-  process: 'bg-indigo-600 border-indigo-700 text-white shadow-sm shadow-indigo-500/25 dark:bg-indigo-500 dark:border-indigo-400',
+  body: 'tag-body-selected text-white shadow-sm',
+  flavor: 'tag-flavor-selected text-white shadow-sm',
+  mouthfeel: 'tag-mouthfeel-selected text-white shadow-sm',
+  style: 'tag-style-selected text-white shadow-sm',
+  extraction: 'tag-extraction-selected text-white shadow-sm',
+  roast: 'tag-roast-selected text-white shadow-sm',
+  characteristic: 'tag-characteristic-selected text-white shadow-sm',
+  process: 'tag-process-selected text-white shadow-sm',
 }
 
 // Get category for a tag label
@@ -66,7 +68,7 @@ export function getTagCategory(label: string): TagCategory | null {
 // Get color classes for a tag
 export function getTagColorClass(label: string, selected = false): string {
   const category = getTagCategory(label)
-  if (!category) return 'bg-gray-500/15 border-gray-500/35 text-gray-800 dark:text-gray-200'
+  if (!category) return 'tag-default'
   return selected ? CATEGORY_COLORS_SELECTED[category] : CATEGORY_COLORS[category]
 }
 

@@ -340,17 +340,50 @@ def parse_gemini_error(error_text: str) -> str:
         )
     
     # Check for authentication errors
-    if 'api key' in error_text_lower or 'authentication' in error_text_lower or 'unauthorized' in error_text_lower:
+    if (
+        'api key' in error_text_lower
+        or 'api_key' in error_text_lower
+        or 'authentication' in error_text_lower
+        or 'unauthorized' in error_text_lower
+        or 'auth method' in error_text_lower
+        or 'set an auth' in error_text_lower
+    ):
         return (
-            "API authentication failed. Please check that your GEMINI_API_KEY "
-            "is valid and properly configured in your .env file."
+            "Gemini API key is not configured. Please go to Settings and "
+            "enter a valid GEMINI_API_KEY, then try again."
         )
     
+    # Check for long-running generation / model stall patterns
+    # (must come before the general network/connection check which also
+    # matches 'timeout' — we want the more specific message here.)
+    if (
+        'timed out after' in error_text_lower
+        or 'deadline exceeded' in error_text_lower
+        or 'took too long' in error_text_lower
+    ):
+        return (
+            "Profile generation timed out. Please retry; if this repeats, "
+            "reduce prompt complexity or use a stronger Gemini model."
+        )
+
     # Check for network/connection errors
     if 'network' in error_text_lower or 'connection' in error_text_lower or 'timeout' in error_text_lower:
         return (
             "Network error connecting to Gemini API. Please check your "
             "internet connection and try again."
+        )
+
+    # Check for schema/validation failures produced during profile creation
+    if (
+        'validation' in error_text_lower
+        or 'schema' in error_text_lower
+        or 'invalid profile' in error_text_lower
+        or 'failed to validate' in error_text_lower
+    ):
+        return (
+            "The AI generated a profile that failed schema validation. "
+            "Please retry; if this keeps happening, simplify preferences "
+            "or try a stronger model."
         )
     
     # Check for MCP/Meticulous connection errors
@@ -384,11 +417,21 @@ def parse_gemini_error(error_text: str) -> str:
             if len(extracted) > 10 and not extracted.startswith('/') and not extracted.startswith('file:'):
                 return extracted[:200]  # Limit length
     
-    # Fallback: return a generic message with truncated technical detail
-    if len(error_text) > 150:
-        return f"Profile generation failed. Technical details: {error_text[:100]}..."
+    # Fallback: strip Gemini CLI noise lines before returning
+    clean_error = error_text
+    for prefix in _GEMINI_NOISE_PREFIXES:
+        clean_error = '\n'.join(
+            line for line in clean_error.split('\n')
+            if not line.strip().startswith(prefix)
+        )
+    clean_error = clean_error.strip()
     
-    return f"Profile generation failed: {error_text}" if error_text else "Profile generation failed unexpectedly."
+    if not clean_error:
+        return "Profile generation failed unexpectedly. Please try again."
+    if len(clean_error) > 150:
+        return f"Profile generation failed. Technical details: {clean_error[:100]}..."
+    
+    return f"Profile generation failed: {clean_error}"
 
 
 def reset_vision_model():

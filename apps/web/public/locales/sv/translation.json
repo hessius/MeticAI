@@ -86,6 +86,9 @@
       "provideInput": "Please provide at least a coffee bag photo or taste preferences",
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
+      "generateFailed404Route": "Kunde inte generera profil: Server-routen hittades inte (404). Detta beror ofta på fel i reverse-proxy/API-path — kontrollera att proxyn skickar /api/* till MeticAI.",
+      "generateFailedTimeout": "Kunde inte generera profil: AI-förfrågan fick timeout. Försök igen; om det fortsätter, minska promptens komplexitet eller prova en starkare Gemini-modell.",
+      "generateFailedValidation": "Kunde inte generera profil: AI:n skapade en ogiltig profilschema. Försök igen — ett andra försök lyckas ofta.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again."
@@ -358,7 +361,8 @@
       "watchtower": "Automatiska uppdateringar via Watchtower",
       "manual": "Endast manuella uppdateringar",
       "watchtowerDescription": "Uppdateringar tillämpas automatiskt när nya versioner är tillgängliga.",
-      "manualDescription": "Ingen automatisk uppdateringsmekanism hittades. Uppdatera manuellt via docker pull."
+      "manualDescription": "Ingen automatisk uppdateringsmekanism hittades. Uppdatera manuellt via docker pull.",
+      "watchtowerStatus": "Watchtower-status"
     },
     "version": "Version",
     "footer": "MeticAI • Byggd med ❤️ för kaffeälskare",

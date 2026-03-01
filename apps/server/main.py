@@ -74,9 +74,50 @@ async def periodic_update_checker():
         await check_for_updates_task()
 
 
+def _is_masked(value: str) -> bool:
+    """Return True if *value* looks like a masked/placeholder secret (e.g. all stars)."""
+    return bool(value) and (set(value) <= {"*", "."} or "..." in value)
+
+
+def _write_s6_env(var_name: str, value: str) -> None:
+    """Write an env var to the s6 container environment directory.
+
+    Thin wrapper around the shared utility for use during lifespan hydration.
+    """
+    from utils.s6_env import update_s6_env
+    update_s6_env(var_name, value)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - start background tasks on startup."""
+    # ── Hydrate os.environ from persisted settings ──────────────────────
+    # When the container starts, GEMINI_API_KEY / METICULOUS_IP may be
+    # empty in the environment (user configured them via the Settings UI,
+    # which writes to /data/settings.json but the Docker env stays blank).
+    # Load them now so that subprocess calls (Gemini CLI) inherit them.
+    try:
+        from services.settings_service import load_settings
+        stored = load_settings()
+        _ENV_SETTINGS_MAP = {
+            "geminiApiKey": "GEMINI_API_KEY",
+            "meticulousIp": "METICULOUS_IP",
+            "authorName": "AUTHOR_NAME",
+        }
+        for settings_key, env_var in _ENV_SETTINGS_MAP.items():
+            stored_value = stored.get(settings_key, "")
+            # Skip masked/placeholder values (e.g. "********************")
+            if stored_value and not os.environ.get(env_var) and not _is_masked(stored_value):
+                os.environ[env_var] = stored_value
+                # Also update s6 container environment so child services see it
+                _write_s6_env(env_var, stored_value)
+                logger.info(
+                    "Hydrated %s from stored settings", env_var,
+                    extra={"source": "settings.json"},
+                )
+    except Exception as e:
+        logger.warning("Failed to hydrate settings into environment: %s", e)
+
     # Start the periodic update checker
     logger.info(
         f"Starting periodic update checker "
