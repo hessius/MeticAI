@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -46,13 +47,14 @@ interface WeightPoint {
 }
 
 function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWeight: number | null }) {
+  const { t } = useTranslation()
   const width = 360
   const height = 96
 
   if (points.length < 2) {
     return (
       <div className="h-24 rounded-lg border border-border/60 bg-secondary/30 flex items-center justify-center text-xs text-muted-foreground">
-        Waiting for weight updates…
+        {t('pourOver.waitingForWeight')}
       </div>
     )
   }
@@ -82,7 +84,7 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
 
   return (
     <div className="rounded-lg border border-border/60 bg-secondary/30 p-2">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20" preserveAspectRatio="none" role="img" aria-label="Weight trend">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20" preserveAspectRatio="none" role="img" aria-label={t('pourOver.weightTrendLabel')}>
         {targetY !== null && (
           <line x1="0" y1={targetY} x2={width} y2={targetY} stroke="currentColor" strokeDasharray="4 3" className="text-primary/60" />
         )}
@@ -94,8 +96,8 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
       <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
         <span>0s</span>
         <span className="flex items-center gap-2">
-          <span className="inline-block w-3 h-0.5 bg-foreground rounded" /> weight
-          <span className="inline-block w-3 h-0.5 bg-primary/50 rounded" /> flow
+          <span className="inline-block w-3 h-0.5 bg-foreground rounded" /> {t('pourOver.weightLegend')}
+          <span className="inline-block w-3 h-0.5 bg-primary/50 rounded" /> {t('pourOver.flowLegend')}
         </span>
         <span>{Math.round(maxX)}s</span>
       </div>
@@ -104,6 +106,7 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
 }
 
 export function PourOverView({ machineState, onBack }: PourOverViewProps) {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<'free' | 'ratio'>('free')
   const [isRunning, setIsRunning] = useState(false)
   const [baseElapsedMs, setBaseElapsedMs] = useState(0)
@@ -238,11 +241,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             size="icon"
             onClick={onBack}
             className="shrink-0"
-            aria-label="Back"
+            aria-label={t('common.back')}
           >
             <ArrowLeft size={22} weight="bold" />
           </Button>
-          <h2 className="text-lg font-bold tracking-tight">Pour-over</h2>
+          <h2 className="text-lg font-bold tracking-tight">{t('pourOver.title')}</h2>
         </div>
 
         {/* ── 1. Weight + Timer + Flow rate (always visible) ── */}
@@ -250,28 +253,28 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
             <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
               <Scales size={14} weight="bold" />
-              Weight
+              {t('pourOver.weight')}
             </div>
             <div className="text-3xl font-bold tabular-nums text-foreground">{weight.toFixed(1)}</div>
-            <div className="text-xs text-muted-foreground">g</div>
+            <div className="text-xs text-muted-foreground">{t('pourOver.unitGrams')}</div>
           </div>
 
           <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
             <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
               <Timer size={14} weight="bold" />
-              Timer
+              {t('pourOver.timer')}
             </div>
             <div className="text-3xl font-bold tabular-nums text-foreground">{formatStopwatch(elapsedMs)}</div>
-            <div className="text-xs text-muted-foreground">mm:ss</div>
+            <div className="text-xs text-muted-foreground">{t('pourOver.unitTime')}</div>
           </div>
 
           <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
             <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
               <Drop size={14} weight="bold" />
-              Flow
+              {t('pourOver.flow')}
             </div>
             <div className="text-3xl font-bold tabular-nums text-foreground">{flowRate.toFixed(1)}</div>
-            <div className="text-xs text-muted-foreground">g/s</div>
+            <div className="text-xs text-muted-foreground">{t('pourOver.unitFlowRate')}</div>
           </div>
         </div>
 
@@ -281,14 +284,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                 <Target size={12} weight="bold" />
-                Target water
+                {t('pourOver.targetWater')}
               </p>
               <p className="text-2xl font-semibold tabular-nums">
                 {targetWeight !== null ? `${targetWeight.toFixed(1)} g` : '—'}
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Remaining</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('pourOver.remaining')}</p>
               <p className="text-2xl font-semibold tabular-nums">
                 {remainingWeight !== null ? `${remainingWeight.toFixed(1)} g` : '—'}
               </p>
@@ -300,7 +303,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         {mode === 'ratio' && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Progress</span>
+              <span>{t('pourOver.progress')}</span>
               <span>{ratioProgress.toFixed(0)}%</span>
             </div>
             <Progress value={ratioProgress} />
@@ -321,7 +324,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             className="h-11"
           >
             {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
-            {isRunning ? 'Pause' : 'Start'}
+            {isRunning ? t('pourOver.pause') : t('pourOver.start')}
           </Button>
 
           <Button
@@ -330,7 +333,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             className="h-11"
           >
             <ArrowClockwise size={18} weight="bold" className="mr-1.5" />
-            Reset
+            {t('pourOver.reset')}
           </Button>
 
           <Button
@@ -340,7 +343,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             disabled={!machineState.connected}
           >
             <Drop size={18} weight="duotone" className="mr-1.5" />
-            Tare
+            {t('pourOver.tare')}
           </Button>
         </div>
 
@@ -348,7 +351,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         {mode === 'ratio' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="pour-over-dose">Dose (g)</Label>
+              <Label htmlFor="pour-over-dose">{t('pourOver.doseLabel')}</Label>
               <div className="flex gap-1.5">
                 <Input
                   id="pour-over-dose"
@@ -364,15 +367,15 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   className="shrink-0 h-10 w-10"
                   disabled={!machineState.connected || weight <= 0}
                   onClick={() => setDoseGrams(weight.toFixed(1))}
-                  title="Capture current scale weight as dose"
-                  aria-label="Weigh from scale"
+                  title={t('pourOver.weighFromScaleTitle')}
+                  aria-label={t('pourOver.weighFromScale')}
                 >
                   <Scales size={16} weight="bold" />
                 </Button>
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pour-over-ratio">Ratio (1:x)</Label>
+              <Label htmlFor="pour-over-ratio">{t('pourOver.ratioLabel')}</Label>
               <Input
                 id="pour-over-ratio"
                 inputMode="decimal"
@@ -388,16 +391,16 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         <div className="rounded-xl border border-border/60 bg-secondary/30 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Auto-start timer</p>
-              <p className="text-xs text-muted-foreground">Starts when pour is detected, but ignores fast grounds-style spikes.</p>
+              <p className="text-sm font-medium">{t('pourOver.autoStartTimer')}</p>
+              <p className="text-xs text-muted-foreground">{t('pourOver.autoStartDescription')}</p>
             </div>
             <Switch checked={autoStartEnabled} onCheckedChange={setAutoStartEnabled} />
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Bloom indicator</p>
-              <p className="text-xs text-muted-foreground">Shows a bloom countdown during the first seconds of brewing.</p>
+              <p className="text-sm font-medium">{t('pourOver.bloomIndicator')}</p>
+              <p className="text-xs text-muted-foreground">{t('pourOver.bloomDescription')}</p>
             </div>
             <Switch checked={bloomEnabled} onCheckedChange={setBloomEnabled} />
           </div>
@@ -405,7 +408,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           {bloomEnabled && (
             <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
               <div className="space-y-1.5">
-                <Label htmlFor="pour-over-bloom">Bloom duration (sec)</Label>
+                <Label htmlFor="pour-over-bloom">{t('pourOver.bloomDuration')}</Label>
                 <Input
                   id="pour-over-bloom"
                   inputMode="numeric"
@@ -415,7 +418,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 />
               </div>
               <div className="text-sm tabular-nums text-muted-foreground min-w-16 text-right pb-2">
-                {bloomRemainingSeconds > 0 ? formatSeconds(bloomRemainingSeconds) : 'done'}
+                {bloomRemainingSeconds > 0 ? formatSeconds(bloomRemainingSeconds) : t('pourOver.bloomDone')}
               </div>
             </div>
           )}
@@ -423,15 +426,15 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
         {!machineState.connected && (
           <p className="text-xs text-center text-muted-foreground">
-            Machine is offline. Scale actions are disabled until connection is restored.
+            {t('pourOver.offlineNotice')}
           </p>
         )}
 
         {/* ── 6. Mode tabs at the bottom ── */}
         <Tabs value={mode} onValueChange={(value) => setMode(value as 'free' | 'ratio')}>
           <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="free">Free mode</TabsTrigger>
-            <TabsTrigger value="ratio">Ratio mode</TabsTrigger>
+            <TabsTrigger value="free">{t('pourOver.freeMode')}</TabsTrigger>
+            <TabsTrigger value="ratio">{t('pourOver.ratioMode')}</TabsTrigger>
           </TabsList>
         </Tabs>
       </Card>

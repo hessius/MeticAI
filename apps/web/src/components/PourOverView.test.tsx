@@ -7,6 +7,38 @@ import type { MachineState } from '@/hooks/useWebSocket'
 
 const mockCmd = vi.fn()
 
+// Mock react-i18next to return English translations
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        'pourOver.title': 'Pour-over',
+        'pourOver.freeMode': 'Free mode',
+        'pourOver.ratioMode': 'Ratio mode',
+        'pourOver.weight': 'Weight',
+        'pourOver.timer': 'Timer',
+        'pourOver.flow': 'Flow',
+        'pourOver.unitGrams': 'g',
+        'pourOver.unitTime': 's',
+        'pourOver.unitFlowRate': 'g/s',
+        'pourOver.start': 'Start',
+        'pourOver.stop': 'Stop',
+        'pourOver.reset': 'Reset',
+        'pourOver.tare': 'Tare',
+        'pourOver.targetWater': 'Target water',
+        'pourOver.remaining': 'Remaining',
+        'pourOver.offlineNotice': 'Machine is offline. Scale actions are disabled until connection is restored.',
+        'pourOver.doseLabel': 'Dose (g)',
+        'pourOver.ratioLabel': 'Ratio (1:x)',
+        'pourOver.weighFromScale': 'Weigh from scale',
+        'common.back': 'Back',
+      }
+      return translations[key] || key
+    },
+    i18n: { language: 'en' },
+  }),
+}))
+
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
