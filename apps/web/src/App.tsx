@@ -226,6 +226,19 @@ function App() {
     }
   }
 
+  const handleFileDrop = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage(t('app.errors.uploadImage'))
+      return
+    }
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }, [t])
+
   const handleRemoveImage = () => {
     setImageFile(null)
     setImagePreview(null)
@@ -749,6 +762,7 @@ function App() {
                   profileCount={profileCount}
                   fileInputRef={fileInputRef}
                   onFileSelect={handleFileSelect}
+                  onFileDrop={handleFileDrop}
                   onRemoveImage={handleRemoveImage}
                   onUserPrefsChange={setUserPrefs}
                   onToggleTag={toggleTag}

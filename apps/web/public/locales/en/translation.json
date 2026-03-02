@@ -124,6 +124,7 @@
     "optional": "Optional",
     "tastePreferences": "Taste Preferences",
     "tapToUpload": "Tap to upload or take photo",
+    "dropImage": "Drop image here",
     "imageFormats": "JPG, PNG, or other image formats",
     "selectPresetTags": "Or select preset tags:",
     "describeFlavor": "Describe your ideal espresso flavor profile using text, tags, or both",
