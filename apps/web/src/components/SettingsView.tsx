@@ -1417,15 +1417,17 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           {/* Beta channel toggle */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
-              <p className="font-medium">{t('settings.beta.enableUpdates')}</p>
+              <label htmlFor="beta-channel-switch" className="font-medium cursor-pointer">{t('settings.beta.enableUpdates')}</label>
               <p className="text-sm text-muted-foreground">
                 {t('settings.beta.enableDescription')}
               </p>
             </div>
             <Switch
+              id="beta-channel-switch"
               checked={betaChannelEnabled}
               onCheckedChange={handleBetaChannelToggle}
               disabled={betaSwitching}
+              aria-label={t('settings.beta.enableUpdates')}
             />
           </div>
 

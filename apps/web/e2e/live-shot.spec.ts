@@ -12,8 +12,10 @@ import { test, expect } from '@playwright/test'
  * Note: Full functionality requires running machine and MQTT
  */
 
-const BASE = process.env.BASE_URL || 'http://localhost:3550'
-const needsDocker = BASE.includes('3550')
+// Only run when BASE_URL is explicitly set to Docker container
+const BASE_URL_SET = !!process.env.BASE_URL
+const BASE = process.env.BASE_URL || 'http://localhost:5173'
+const needsDocker = BASE_URL_SET && BASE.includes('3550')
 
 test.describe('Live Shot View', () => {
   test.use({ baseURL: BASE })

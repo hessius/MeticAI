@@ -10,8 +10,10 @@ import { test, expect } from '@playwright/test'
  * - Shot comparison
  */
 
-const BASE = process.env.BASE_URL || 'http://localhost:3550'
-const needsDocker = BASE.includes('3550')
+// Only run when BASE_URL is explicitly set to Docker container
+const BASE_URL_SET = !!process.env.BASE_URL
+const BASE = process.env.BASE_URL || 'http://localhost:5173'
+const needsDocker = BASE_URL_SET && BASE.includes('3550')
 
 test.describe('Shot History View', () => {
   test.use({ baseURL: BASE })

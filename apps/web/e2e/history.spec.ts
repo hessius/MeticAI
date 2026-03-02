@@ -69,7 +69,8 @@ test.describe('History View', () => {
 
 test.describe('Profile Import from Machine', () => {
   // These tests require a running backend with machine connection
-  const needsBackend = process.env.BASE_URL?.includes('3550') || false
+  // Only run when BASE_URL is explicitly set to Docker container
+const needsBackend = !!process.env.BASE_URL && (process.env.BASE_URL?.includes('3550') || false)
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
