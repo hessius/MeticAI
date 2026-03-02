@@ -131,7 +131,8 @@ describe('PourOverView', () => {
     expect(screen.getByText('300.0 g')).toBeInTheDocument()
     expect(screen.getByText('Remaining')).toBeInTheDocument()
     expect(screen.getByText('180.0 g')).toBeInTheDocument()
-    expect(screen.getByText('40%')).toBeInTheDocument()
+    // Two 40% elements: one for mobile layout, one for desktop layout
+    expect(screen.getAllByText('40%').length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows offline notice and disables tare when machine is disconnected', async () => {
