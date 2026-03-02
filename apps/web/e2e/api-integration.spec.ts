@@ -156,11 +156,17 @@ test.describe('API Integration - Shots', () => {
     }
   })
 
-  test('GET /api/last-shot returns last shot info', async () => {
-    // This test is flaky across browsers due to large JSON response handling
-    // The API request sometimes fails with the large shot data (16KB+)
-    // Skipped until we can implement proper response streaming
-    test.skip()
+  test('GET /api/last-shot returns last shot info', async ({ request }) => {
+    if (!needsDocker) {
+      test.skip()
+      return
+    }
+
+    const response = await request.get('/api/last-shot')
+    expect(response.ok()).toBe(true)
+    
+    const data = await response.json()
+    expect(data).toBeDefined()
   })
 })
 

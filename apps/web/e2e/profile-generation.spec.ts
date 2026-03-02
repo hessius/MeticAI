@@ -151,6 +151,11 @@ test.describe('Profile Generation - Results', () => {
   // Note: Actually submitting requires a backend with AI configured
   // These tests verify the results view structure when data is available
 
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await page.waitForSelector('text=MeticAI')
+  })
+
   test('should show loading state during generation', async ({ page }) => {
     // This would require mocking - just verify the view structure exists
     await page.goto('/')
@@ -162,8 +167,6 @@ test.describe('Profile Generation - Results', () => {
   })
 
   test('should navigate back from form to start', async ({ page }) => {
-    await page.waitForLoadState('networkidle')
-    
     const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
     await expect(generateButton).toBeVisible({ timeout: 5000 })
     
