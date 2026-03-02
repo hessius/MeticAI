@@ -407,9 +407,9 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
                           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
                             {cleanProfileName(entry.profile_name)}
                           </h3>
-                          {entry.profile_json?.author && (
+                          {typeof entry.profile_json?.author === 'string' && entry.profile_json.author && (
                             <p className="text-[10px] text-muted-foreground/60 truncate">
-                              {t('history.byAuthor', { author: String(entry.profile_json.author) })}
+                              {t('history.byAuthor', { author: entry.profile_json.author })}
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground/70 mt-1">
