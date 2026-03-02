@@ -140,6 +140,16 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
   const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
 
+  // Beta channel state
+  const [betaChannelEnabled, setBetaChannelEnabled] = useState(false)
+  const [betaSwitching, setBetaSwitching] = useState(false)
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'question' | 'general'>('general')
+  const [feedbackTitle, setFeedbackTitle] = useState('')
+  const [feedbackDescription, setFeedbackDescription] = useState('')
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
+  const [feedbackResult, setFeedbackResult] = useState<{ status: string; url?: string; message?: string } | null>(null)
+
   useEffect(() => {
     setAiEnabledState(getAiEnabled())
     setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
@@ -213,6 +223,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             commit: data.commit || undefined,
             repoUrl: data.repo_url || 'https://github.com/hessius/MeticAI'
           })
+          // Also set beta channel status from version endpoint
+          setBetaChannelEnabled(data.beta_channel_enabled || false)
         }
       } catch (err) {
         console.error('Failed to load version info:', err)
@@ -505,6 +517,75 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       setTailscaleMessage(err instanceof Error ? err.message : t('settings.tailscale.saveFailed'))
     } finally {
       setTailscaleSaving(false)
+    }
+  }
+
+  const handleBetaChannelToggle = async (enabled: boolean) => {
+    setBetaSwitching(true)
+    
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/beta-channel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      })
+      
+      if (response.ok) {
+        setBetaChannelEnabled(enabled)
+      } else {
+        throw new Error('Failed to switch beta channel')
+      }
+    } catch (err) {
+      console.error('Beta channel toggle failed:', err)
+      // Revert the toggle state
+      setBetaChannelEnabled(!enabled)
+    } finally {
+      setBetaSwitching(false)
+    }
+  }
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackTitle.trim() || !feedbackDescription.trim()) return
+    
+    setFeedbackSubmitting(true)
+    setFeedbackResult(null)
+    
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: feedbackType,
+          title: feedbackTitle,
+          description: feedbackDescription,
+          include_logs: false
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setFeedbackResult({
+          status: data.status,
+          url: data.issue_url,
+          message: data.message
+        })
+        // Clear form on success
+        if (data.status === 'success') {
+          setFeedbackTitle('')
+          setFeedbackDescription('')
+        }
+      } else {
+        throw new Error('Failed to submit feedback')
+      }
+    } catch (err) {
+      setFeedbackResult({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Failed to submit feedback'
+      })
+    } finally {
+      setFeedbackSubmitting(false)
     }
   }
 
@@ -1325,6 +1406,122 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           >
             <ArrowClockwise size={18} className={isChecking ? 'animate-spin' : ''} />
           </Button>
+        </div>
+      </Card>
+
+      {/* Beta Testing Section */}
+      <Card className="p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-primary">{t('settings.beta.title')}</h3>
+        
+        <div className="space-y-4">
+          {/* Beta channel toggle */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <p className="font-medium">{t('settings.beta.enableUpdates')}</p>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.beta.enableDescription')}
+              </p>
+            </div>
+            <Switch
+              checked={betaChannelEnabled}
+              onCheckedChange={handleBetaChannelToggle}
+              disabled={betaSwitching}
+            />
+          </div>
+
+          {/* Warning about beta versions */}
+          <Alert className="bg-yellow-500/10 border-yellow-500/30">
+            <Warning size={16} className="text-yellow-500" />
+            <AlertDescription className="text-sm">
+              {t('settings.beta.warning')}
+            </AlertDescription>
+          </Alert>
+
+          {/* Current channel indicator */}
+          <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/50">
+            <div className={`w-2 h-2 rounded-full ${betaChannelEnabled ? 'bg-yellow-500' : 'bg-green-500'}`} />
+            <span className="text-sm">
+              {t('settings.beta.currentChannel')}: <strong>{betaChannelEnabled ? 'Beta' : 'Stable'}</strong>
+            </span>
+          </div>
+
+          {/* Feedback section - only visible in beta mode */}
+          {betaChannelEnabled && (
+            <div className="space-y-3 pt-2 border-t border-border/40">
+              <h4 className="font-medium">{t('settings.beta.sendFeedback')}</h4>
+              
+              {/* Feedback type selector */}
+              <div className="flex gap-2 flex-wrap">
+                {(['bug', 'feature', 'question', 'general'] as const).map((type) => (
+                  <Button
+                    key={type}
+                    variant={feedbackType === type ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFeedbackType(type)}
+                  >
+                    {t(`settings.beta.feedbackType.${type}`)}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Feedback form */}
+              <div className="space-y-2">
+                <Label htmlFor="feedback-title">{t('settings.beta.feedbackTitle')}</Label>
+                <Input
+                  id="feedback-title"
+                  value={feedbackTitle}
+                  onChange={(e) => setFeedbackTitle(e.target.value)}
+                  placeholder={t('settings.beta.feedbackTitlePlaceholder')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="feedback-description">{t('settings.beta.feedbackDescription')}</Label>
+                <textarea
+                  id="feedback-description"
+                  value={feedbackDescription}
+                  onChange={(e) => setFeedbackDescription(e.target.value)}
+                  placeholder={t('settings.beta.feedbackDescriptionPlaceholder')}
+                  className="w-full h-24 px-3 py-2 rounded-md border border-input bg-background text-sm resize-none"
+                />
+              </div>
+
+              <Button
+                onClick={handleFeedbackSubmit}
+                disabled={feedbackSubmitting || !feedbackTitle.trim() || !feedbackDescription.trim()}
+                className="w-full"
+              >
+                {feedbackSubmitting ? (
+                  <ArrowClockwise size={18} className="animate-spin mr-2" />
+                ) : null}
+                {t('settings.beta.submitFeedback')}
+              </Button>
+
+              {/* Feedback result */}
+              {feedbackResult && (
+                <Alert className={feedbackResult.status === 'success' ? 'bg-green-500/10 border-green-500/30' : feedbackResult.status === 'error' ? 'bg-red-500/10 border-red-500/30' : 'bg-blue-500/10 border-blue-500/30'}>
+                  {feedbackResult.status === 'success' ? (
+                    <CheckCircle size={16} className="text-green-500" />
+                  ) : feedbackResult.status === 'error' ? (
+                    <Warning size={16} className="text-red-500" />
+                  ) : null}
+                  <AlertDescription className="text-sm">
+                    {feedbackResult.message}
+                    {feedbackResult.url && (
+                      <a
+                        href={feedbackResult.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block mt-1 text-primary hover:underline"
+                      >
+                        {t('settings.beta.viewOnGitHub')}
+                      </a>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 

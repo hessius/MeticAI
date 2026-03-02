@@ -40,6 +40,7 @@ import { useLastShot } from '@/hooks/useLastShot'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
+import { BetaBanner } from '@/components/BetaBanner'
 import { LiveShotView } from '@/components/LiveShotView'
 import { PourOverView } from '@/components/PourOverView'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
@@ -644,6 +645,9 @@ function App() {
   return (
     <>
       {showBlobs && <AmbientBackground />}
+
+      {/* Beta version banner — fixed at top */}
+      <BetaBanner />
 
       {/* Shot detection banner — fixed at top, across all views */}
       <ShotDetectionBanner

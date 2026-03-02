@@ -336,6 +336,11 @@
     "noOtherShots": "No other shots available to compare",
     "timeTooltip": "Time: {{value}}s"
   },
+  "betaBanner": {
+    "runningBeta": "You're running MeticAI beta {{version}}",
+    "betaChannelEnabled": "Beta updates enabled — you'll receive pre-release versions",
+    "reportIssue": "Report Issue"
+  },
   "settings": {
     "title": "Settings",
     "aboutMeticAI": "About MeticAI",
@@ -446,6 +451,26 @@
       "guideStep2": "Sign in with the same account used during MeticAI setup",
       "guideStep3": "Open this URL from any device on your Tailscale network:",
       "setupGuide": "Setup Guide"
+    },
+    "beta": {
+      "title": "Beta Testing",
+      "enableUpdates": "Enable beta updates",
+      "enableDescription": "Get early access to new features before they're released.",
+      "warning": "Beta versions may contain bugs and unexpected behavior. You can switch back to stable anytime.",
+      "currentChannel": "Current channel",
+      "sendFeedback": "Send Beta Feedback",
+      "feedbackTitle": "Title",
+      "feedbackTitlePlaceholder": "Brief summary of your feedback",
+      "feedbackDescription": "Description",
+      "feedbackDescriptionPlaceholder": "Please describe your feedback in detail...",
+      "submitFeedback": "Submit Feedback",
+      "viewOnGitHub": "View on GitHub →",
+      "feedbackType": {
+        "bug": "Bug",
+        "feature": "Feature Request",
+        "question": "Question",
+        "general": "General"
+      }
     },
     "updateMethod": {
       "watchtower": "Automatic updates via Watchtower",

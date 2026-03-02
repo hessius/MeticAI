@@ -19,7 +19,8 @@ _DEFAULT_SETTINGS = {
     "authorName": "",
     "mqttEnabled": True,
     "tailscaleEnabled": False,
-    "tailscaleAuthKey": ""
+    "tailscaleAuthKey": "",
+    "betaChannel": False
 }
 
 
