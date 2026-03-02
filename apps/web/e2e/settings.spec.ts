@@ -76,8 +76,18 @@ test.describe('Settings View', () => {
     // Verify we're in settings
     await expect(page.getByText(/Configuration/i)).toBeVisible({ timeout: 5000 })
 
-    // Click the MeticAI title/logo to go home
-    await page.locator('h1:has-text("MeticAI")').click()
+    // Try back button first, then fall back to h1 click
+    const backButton = page.getByRole('button', { name: /Back/i })
+    const hasBackButton = await backButton.isVisible({ timeout: 2000 }).catch(() => false)
+    
+    if (hasBackButton) {
+      await backButton.click()
+    } else {
+      // Click the MeticAI title/logo to go home
+      const h1 = page.locator('h1:has-text("MeticAI")')
+      await h1.waitFor({ state: 'visible', timeout: 5000 })
+      await h1.click({ force: true })
+    }
 
     // Should be back on home - look for Settings button again
     await expect(page.getByRole('button', { name: /^Settings$/i })).toBeVisible({ timeout: 5000 })

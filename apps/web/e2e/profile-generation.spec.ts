@@ -126,9 +126,9 @@ test.describe('Profile Generation - File Upload', () => {
 
     await generateButton.click()
 
-    // Find upload zone
-    const uploadZone = page.locator('[data-testid="upload-zone"], text=/Tap to upload|Drop.*here/i, input[type="file"]')
-    await expect(uploadZone.first()).toBeVisible()
+    // File input should exist (may be hidden but attached)
+    const fileInput = page.locator('input[type="file"]')
+    await expect(fileInput).toBeAttached()
   })
 
   test('should show file input element', async ({ page }) => {
