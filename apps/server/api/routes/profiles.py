@@ -42,6 +42,14 @@ logger = logging.getLogger(__name__)
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
+# Simple placeholder SVG for profiles without images (coffee bean icon)
+PLACEHOLDER_SVG = b'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256">
+<rect width="256" height="256" fill="#2d2d2d"/>
+<path fill="#6b5b47" d="M128 32c-53 0-96 43-96 96s43 96 96 96 96-43 96-96-43-96-96-96zm0 176c-44.2 0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z"/>
+<path fill="#8b7355" d="M128 56c-39.8 0-72 32.2-72 72s32.2 72 72 72 72-32.2 72-72-32.2-72-72-72zm0 128c-30.9 0-56-25.1-56-56s25.1-56 56-56 56 25.1 56 56-25.1 56-56 56z"/>
+<ellipse cx="128" cy="128" rx="32" ry="40" fill="#6b5b47"/>
+</svg>'''
+
 
 def _parse_data_image_uri(image_uri: str) -> tuple[str, bytes]:
     """Parse and decode a base64 data:image URI.
@@ -792,12 +800,24 @@ async def proxy_profile_image(
                         media_type=media_type
                     )
         
-        raise HTTPException(
-            status_code=404,
-            detail=f"Profile '{profile_name}' not found"
+        # Profile not found on machine - return placeholder instead of 404
+        # This prevents browser console errors for deleted/missing profiles
+        logger.debug(
+            f"Profile '{profile_name}' not found on machine, returning placeholder",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        return Response(
+            content=PLACEHOLDER_SVG,
+            media_type="image/svg+xml"
         )
         
-    except HTTPException:
+    except HTTPException as he:
+        # If it's a "no image" case, return placeholder
+        if he.status_code == 404:
+            return Response(
+                content=PLACEHOLDER_SVG,
+                media_type="image/svg+xml"
+            )
         raise
     except httpx.TimeoutException as e:
         logger.warning(
@@ -971,10 +991,17 @@ async def get_profile_info(
                 
                 return result
         
-        raise HTTPException(
-            status_code=404,
-            detail=f"Profile '{profile_name}' not found on machine"
+        # Profile not found - return graceful response instead of 404
+        # This prevents browser console errors when viewing history with deleted profiles
+        logger.info(
+            f"Profile not found on machine: {profile_name}",
+            extra={"request_id": request_id, "profile_name": profile_name}
         )
+        return {
+            "status": "not_found",
+            "profile": None,
+            "message": f"Profile '{profile_name}' not found on machine"
+        }
         
     except HTTPException:
         raise
