@@ -1,15 +1,12 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * E2E Tests for Live Shot View
+ * E2E Tests for Live Shot / Run Shot View
  *
- * Tests the live shot monitoring during espresso extraction:
- * - Real-time telemetry display
- * - Shot progress graph
- * - Profile information
- * - Shot detection banner
- *
- * Note: Full functionality requires running machine and MQTT
+ * Tests the Run / Schedule view and live shot monitoring:
+ * - Navigation to run shot view
+ * - Profile selection
+ * - Start button availability
  */
 
 // Only run when BASE_URL is explicitly set to Docker container
@@ -23,125 +20,17 @@ test.describe('Live Shot View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('text=MeticAI')
+    await page.waitForLoadState('networkidle')
   })
 
-  test('should navigate to live shot from run shot', async ({ page }) => {
-    // Navigate to Run Shot first
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
+  test('should navigate to run shot view', async ({ page }) => {
+    // Navigate to Run / Schedule
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
-    // Look for "watch live" or similar button (appears during active shot)
-    // This may not be visible unless a shot is actually running
-    await page.locator('button:has-text("Watch"), button:has-text("Live"), button:has-text("Monitor")').count()
-    
-    // Just verify we're in the run shot view
-    await expect(page.getByText(/Run Shot|Select Profile|Start|Past Shots/i).first()).toBeVisible()
-  })
-})
-
-test.describe('Live Shot View - Telemetry Display', () => {
-  test.use({ baseURL: BASE })
-
-  test('should display weight during shot when available', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
-    await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
-
-    // Navigate to run shot
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
-    await runShotButton.click()
-
-    // Look for weight indicator
-    const weightDisplay = page.locator('text=/\\d+\\.?\\d*\\s*g/i, [data-testid="weight-display"]')
-    const hasWeight = await weightDisplay.first().isVisible({ timeout: 3000 }).catch(() => false)
-    
-    // Weight may or may not be visible depending on machine state
-    expect(hasWeight || true).toBe(true) // Pass either way - just checking structure
-  })
-
-  test('should display temperature during shot when available', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
-    await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
-
-    // Navigate to run shot
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
-    await runShotButton.click()
-
-    // Look for temperature indicator
-    const tempDisplay = page.locator('text=/\\d+\\.?\\d*\\s*°[CF]/i, [data-testid="temp-display"]')
-    const hasTemp = await tempDisplay.first().isVisible({ timeout: 3000 }).catch(() => false)
-    
-    expect(hasTemp || true).toBe(true)
-  })
-})
-
-test.describe('Shot Detection Banner', () => {
-  test.use({ baseURL: BASE })
-
-  test('shot detection banner verification', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
-    await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
-
-    // Shot detection banner only appears when actively brewing
-    // We verify the page loads successfully and WebSocket connects
-    // Actual banner testing requires a real brewing session
-    const pageLoaded = await page.title()
-    expect(pageLoaded).toBeTruthy()
-  })
-
-  test('can dismiss shot detection banner', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
-    await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
-
-    // Look for dismiss button on banner if present
-    const dismissButton = page.locator('[data-testid="shot-detection-banner"] button, text=Dismiss')
-    const hasBanner = await dismissButton.isVisible({ timeout: 2000 }).catch(() => false)
-    
-    if (hasBanner) {
-      await dismissButton.click()
-      // Banner should be dismissed
-      await expect(dismissButton).not.toBeVisible({ timeout: 2000 })
-    }
-    
-    // Pass either way
-    expect(true).toBe(true)
+    // Verify we're in the run shot view
+    await expect(page.getByText('Run / Schedule')).toBeVisible({ timeout: 5000 })
   })
 })
 
@@ -151,38 +40,53 @@ test.describe('Run Shot View - Profile Selection', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('text=MeticAI')
+    await page.waitForLoadState('networkidle')
   })
 
   test('should display profile selector', async ({ page }) => {
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
+    if (!needsDocker) {
       test.skip()
       return
     }
 
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
-    // Look for profile selection area
-    const profileSection = page.locator('text=/Select Profile|Choose Profile|Active Profile/i, [data-testid="profile-selector"]')
-    await expect(profileSection.first()).toBeVisible({ timeout: 5000 })
+    // Should have profile selection
+    const selectProfile = page.getByRole('button', { name: /Select Profile/i })
+    await expect(selectProfile).toBeVisible({ timeout: 5000 })
   })
 
-  test('should show start button', async ({ page }) => {
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
+  test('should show run now button', async ({ page }) => {
+    if (!needsDocker) {
       test.skip()
       return
     }
 
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
-    // Look for start shot button
-    const startButton = page.getByRole('button', { name: /Start Shot|Begin|Extract/i })
-    const hasStart = await startButton.isVisible({ timeout: 3000 }).catch(() => false)
-    
-    // Start button may be disabled without profile selected
-    expect(hasStart || true).toBe(true)
+    // Should have Run Now button
+    const runNowButton = page.getByRole('button', { name: /Run Now/i })
+    await expect(runNowButton).toBeVisible({ timeout: 5000 })
+  })
+
+  test('should navigate back to start', async ({ page }) => {
+    if (!needsDocker) {
+      test.skip()
+      return
+    }
+
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
+    await runShotButton.click()
+
+    // Click logo to go back
+    await page.locator('text=MeticAI').first().click()
+
+    // Should be back on start
+    await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })
   })
 })

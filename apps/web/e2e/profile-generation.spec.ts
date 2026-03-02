@@ -162,17 +162,13 @@ test.describe('Profile Generation - Results', () => {
   })
 
   test('should navigate back from form to start', async ({ page }) => {
+    await page.waitForLoadState('networkidle')
+    
     const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    await expect(generateButton).toBeVisible({ timeout: 5000 })
     
-    // Wait for button and check if it exists and is enabled
-    const buttonVisible = await generateButton.isVisible({ timeout: 3000 }).catch(() => false)
-    if (!buttonVisible) {
-      test.skip()
-      return
-    }
-    
-    const buttonDisabled = await generateButton.isDisabled().catch(() => true)
-    if (buttonDisabled) {
+    // Skip if button is disabled (AI not configured)
+    if (await generateButton.isDisabled()) {
       test.skip()
       return
     }

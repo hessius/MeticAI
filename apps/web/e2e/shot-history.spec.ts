@@ -1,73 +1,85 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * E2E Tests for Shot History and Analysis
+ * E2E Tests for Shot Scheduling and Run View
  *
  * Tests:
- * - Shot history list/display
- * - Shot analysis (static and LLM)
- * - Shot data caching
- * - Shot comparison
+ * - Run/Schedule view navigation
+ * - Profile selection
+ * - Scheduling options
  */
 
-// Only run when BASE_URL is explicitly set to Docker container
+// Only run full tests when BASE_URL is explicitly set to Docker container
 const BASE_URL_SET = !!process.env.BASE_URL
 const BASE = process.env.BASE_URL || 'http://localhost:5173'
 const needsDocker = BASE_URL_SET && BASE.includes('3550')
 
-test.describe('Shot History View', () => {
+test.describe('Run / Schedule View', () => {
   test.use({ baseURL: BASE })
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('text=MeticAI')
+    await page.waitForLoadState('networkidle')
   })
 
-  test('should access shot history from run shot view', async ({ page }) => {
-    // Navigate to Run Shot view
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
+  test('should access run schedule view', async ({ page }) => {
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
-    // Look for shot history or past shots section
-    const shotsSection = page.getByText(/Past Shots|Shot History|Recent Shots/i)
-    await expect(shotsSection).toBeVisible({ timeout: 5000 })
+    // Should show Run / Schedule heading
+    await expect(page.getByText('Run / Schedule')).toBeVisible({ timeout: 5000 })
   })
 
-  test('should display shot list when shots are available', async ({ page }) => {
+  test('should display scheduling options', async ({ page }) => {
     if (!needsDocker) {
       test.skip()
       return
     }
 
-    // Navigate to shot history
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
+    await runShotButton.click()
+
+    // Should show Options and Recurring Schedules sections
+    await expect(page.getByText('Options')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('heading', { name: 'Recurring Schedules' })).toBeVisible({ timeout: 5000 })
+  })
+
+  test('should have profile selection button', async ({ page }) => {
+    if (!needsDocker) {
       test.skip()
       return
     }
 
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
-    // Wait for shot list to load
-    await page.waitForTimeout(2000)
+    // Should have Select Profile button
+    await expect(page.getByRole('button', { name: /Select Profile/i })).toBeVisible({ timeout: 5000 })
+  })
 
-    // Should show either shot cards or empty state
-    const shotContent = page.locator('[data-testid="shot-item"], .shot-card, text=/No shots|No history/i')
-    await expect(shotContent.first()).toBeVisible({ timeout: 5000 })
+  test('should have Run Now button', async ({ page }) => {
+    if (!needsDocker) {
+      test.skip()
+      return
+    }
+
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
+    await runShotButton.click()
+
+    // Should have Run Now button
+    await expect(page.getByRole('button', { name: /Run Now/i })).toBeVisible({ timeout: 5000 })
   })
 })
 
-test.describe('Shot Analysis', () => {
+test.describe('Shot Scheduling - Recurring', () => {
   test.use({ baseURL: BASE })
 
-  test('should display analysis when clicking on a shot', async ({ page }) => {
+  test('should show add schedule button', async ({ page }) => {
     if (!needsDocker) {
       test.skip()
       return
@@ -75,146 +87,13 @@ test.describe('Shot Analysis', () => {
 
     await page.goto('/')
     await page.waitForSelector('text=MeticAI')
+    await page.waitForLoadState('networkidle')
 
-    // Navigate to shot history
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
+    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
-    // Wait for shots to load and click on first one if available
-    const shotItem = page.locator('[data-testid="shot-item"], .shot-card').first()
-    
-    const shotExists = await shotItem.isVisible({ timeout: 3000 }).catch(() => false)
-    
-    if (shotExists) {
-      await shotItem.click()
-      
-      // Should show shot details/analysis view
-      await expect(page.getByText(/Analysis|Details|Shot Data/i)).toBeVisible({ timeout: 5000 })
-    } else {
-      test.skip()
-    }
-  })
-
-  test('should show shot graph with data points', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
-    await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
-
-    // Navigate to shot history and click a shot
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
-    await runShotButton.click()
-
-    const shotItem = page.locator('[data-testid="shot-item"], .shot-card').first()
-    const shotExists = await shotItem.isVisible({ timeout: 3000 }).catch(() => false)
-    
-    if (shotExists) {
-      await shotItem.click()
-      
-      // Look for chart/graph element
-      const chart = page.locator('svg.recharts-surface, [data-testid="shot-chart"], canvas')
-      await expect(chart.first()).toBeVisible({ timeout: 5000 })
-    } else {
-      test.skip()
-    }
-  })
-})
-
-test.describe('Shot Analysis - LLM', () => {
-  test.use({ baseURL: BASE })
-
-  test('should show AI analysis button when AI is configured', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
-    await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
-
-    // Navigate through to a shot analysis
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
-    await runShotButton.click()
-
-    const shotItem = page.locator('[data-testid="shot-item"], .shot-card').first()
-    const shotExists = await shotItem.isVisible({ timeout: 3000 }).catch(() => false)
-    
-    if (shotExists) {
-      await shotItem.click()
-      
-      // Look for AI analysis button
-      const aiButton = page.getByRole('button', { name: /AI Analysis|Analyze|Expert Analysis/i })
-      const aiVisible = await aiButton.isVisible({ timeout: 3000 }).catch(() => false)
-      
-      if (aiVisible) {
-        await expect(aiButton).toBeEnabled()
-      }
-      // AI button may not be visible if Gemini not configured - OK to pass
-    }
-  })
-})
-
-test.describe('Shot Caching', () => {
-  test.use({ baseURL: BASE })
-
-  test('cached shots load faster on revisit', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
-    await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
-
-    // Navigate to shot history
-    const runShotButton = page.getByRole('button', { name: /Run Shot|Start Shot/i })
-    
-    if (!(await runShotButton.isVisible({ timeout: 2000 }).catch(() => false))) {
-      test.skip()
-      return
-    }
-
-    await runShotButton.click()
-    
-    // First load - measure time
-    const startTime1 = Date.now()
-    await page.waitForTimeout(1000) // Allow data to load
-    const loadTime1 = Date.now() - startTime1
-
-    // Go back and revisit
-    await page.locator('text=MeticAI').first().click()
-    await page.waitForTimeout(500)
-    
-    await runShotButton.click()
-    
-    // Second load - should use cache
-    const startTime2 = Date.now()
-    await page.waitForTimeout(1000)
-    const loadTime2 = Date.now() - startTime2
-
-    // Second load should be roughly same or faster (at least not significantly slower)
-    // This is a sanity check - actual caching is tested in unit tests
-    expect(loadTime2).toBeLessThanOrEqual(loadTime1 + 2000)
+    // Should have Add button for recurring schedules
+    await expect(page.getByRole('button', { name: /Add/i })).toBeVisible({ timeout: 5000 })
   })
 })
