@@ -40,6 +40,49 @@ interface WeightPoint {
   flow?: number // g/s flow rate at this point
 }
 
+/** Increment/decrement button with hold-to-repeat support */
+function IncrementButton({ onIncrement, label }: { onIncrement: () => void; label: string }) {
+  const intervalRef = useRef<number | null>(null)
+  const timeoutRef = useRef<number | null>(null)
+
+  const startIncrementing = useCallback(() => {
+    onIncrement() // Fire once immediately
+    // After 400ms delay, start repeating every 100ms
+    timeoutRef.current = window.setTimeout(() => {
+      intervalRef.current = window.setInterval(onIncrement, 100)
+    }, 400)
+  }, [onIncrement])
+
+  const stopIncrementing = useCallback(() => {
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => stopIncrementing()
+  }, [stopIncrementing])
+
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="h-10 w-10 shrink-0 text-lg font-semibold select-none"
+      onPointerDown={startIncrementing}
+      onPointerUp={stopIncrementing}
+      onPointerLeave={stopIncrementing}
+      onPointerCancel={stopIncrementing}
+    >
+      {label}
+    </Button>
+  )
+}
+
 function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWeight: number | null }) {
   const { t } = useTranslation()
   const width = 360
@@ -64,9 +107,9 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
   const maxPointWeight = Math.max(...points.map(point => point.w), 0.1)
   const yMax = Math.max(maxPointWeight, targetWeight ?? 0, 1)
 
-  // Flow rate axis: independent scale
+  // Flow rate axis: independent scale, default max of 20 g/s
   const flowValues = points.map(p => p.flow ?? 0).filter(f => f >= 0)
-  const maxFlow = Math.max(...flowValues, 1)
+  const maxFlow = Math.max(Math.max(...flowValues, 1), 20)
 
   const toX = (time: number) => (time / xAxisMax) * width
   const toY = (weight: number) => height - (weight / yMax) * height
@@ -119,9 +162,9 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
           )}
         </svg>
         {/* Y-axis: Flow scale (right) */}
-        <div className="flex flex-col justify-between text-[9px] text-primary/60 w-7 text-left pl-0.5">
-          <span>{maxFlow.toFixed(1)}</span>
-          <span>0</span>
+        <div className="flex flex-col justify-between text-[9px] text-primary/60 w-10 text-left pl-0.5">
+          <span>{Math.round(maxFlow)} g/s</span>
+          <span>0 g/s</span>
         </div>
       </div>
       <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
@@ -428,42 +471,62 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         {/* ── 5. Dose + ratio inputs (ratio mode — set once before brewing) ── */}
         {mode === 'ratio' && (
           <div className="space-y-3">
-            {/* Dose row */}
-            <div className="space-y-1.5">
-              <Label htmlFor="pour-over-dose">{t('pourOver.doseLabel')}</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="pour-over-dose"
-                  inputMode="decimal"
-                  value={doseGrams}
-                  onChange={(event) => setDoseGrams(event.target.value)}
-                  placeholder="20"
-                  className="w-20 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 h-10 px-3"
-                  disabled={!machineState.connected || weight <= 0}
-                  onClick={() => setDoseGrams(weight.toFixed(1))}
-                  title={t('pourOver.weighFromScaleTitle')}
-                >
-                  <Scales size={16} weight="bold" className="mr-1.5" />
-                  {t('pourOver.weighFromScale')}
-                </Button>
+            {/* Dose + Ratio row - side by side on desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Dose */}
+              <div className="space-y-1.5">
+                <Label htmlFor="pour-over-dose">{t('pourOver.doseLabel')}</Label>
+                <div className="flex items-center gap-1.5">
+                  <IncrementButton
+                    onIncrement={() => setDoseGrams(prev => String(Math.max(1, (parseFloat(prev) || 0) - 1)))}
+                    label="−"
+                  />
+                  <Input
+                    id="pour-over-dose"
+                    inputMode="decimal"
+                    value={doseGrams}
+                    onChange={(event) => setDoseGrams(event.target.value)}
+                    placeholder="20"
+                    className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
+                  />
+                  <IncrementButton
+                    onIncrement={() => setDoseGrams(prev => String((parseFloat(prev) || 0) + 1))}
+                    label="+"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 h-10 px-2.5 ml-1"
+                    disabled={!machineState.connected || weight <= 0}
+                    onClick={() => setDoseGrams(weight.toFixed(1))}
+                    title={t('pourOver.weighFromScaleTitle')}
+                  >
+                    <Scales size={16} weight="bold" />
+                  </Button>
+                </div>
               </div>
-            </div>
-            {/* Ratio row */}
-            <div className="space-y-1.5">
-              <Label htmlFor="pour-over-ratio">{t('pourOver.ratioLabel')}</Label>
-              <Input
-                id="pour-over-ratio"
-                inputMode="decimal"
-                value={brewRatio}
-                onChange={(event) => setBrewRatio(event.target.value)}
-                placeholder="15"
-                className="w-20 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
-              />
+              {/* Ratio */}
+              <div className="space-y-1.5">
+                <Label htmlFor="pour-over-ratio">{t('pourOver.ratioLabel')}</Label>
+                <div className="flex items-center gap-1.5">
+                  <IncrementButton
+                    onIncrement={() => setBrewRatio(prev => String(Math.max(1, (parseFloat(prev) || 0) - 1)))}
+                    label="−"
+                  />
+                  <Input
+                    id="pour-over-ratio"
+                    inputMode="decimal"
+                    value={brewRatio}
+                    onChange={(event) => setBrewRatio(event.target.value)}
+                    placeholder="15"
+                    className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
+                  />
+                  <IncrementButton
+                    onIncrement={() => setBrewRatio(prev => String((parseFloat(prev) || 0) + 1))}
+                    label="+"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
