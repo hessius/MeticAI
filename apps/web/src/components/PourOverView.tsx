@@ -45,6 +45,14 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
   const width = 360
   const height = 96
 
+  // X-axis: default to 3 minutes (180s), expand in 30-second increments
+  const DEFAULT_X_DURATION = 180  // 3 minutes
+  const X_INCREMENT = 30  // 30 second increments
+  const lastTime = points.length > 0 ? (points[points.length - 1]?.t ?? 0) : 0
+  const xAxisMax = lastTime <= DEFAULT_X_DURATION
+    ? DEFAULT_X_DURATION
+    : Math.ceil(lastTime / X_INCREMENT) * X_INCREMENT
+
   if (points.length < 2) {
     return (
       <div className="h-24 rounded-lg border border-border/60 bg-secondary/30 flex items-center justify-center text-xs text-muted-foreground">
@@ -53,7 +61,6 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
     )
   }
 
-  const maxX = points[points.length - 1]?.t ?? 1
   const maxPointWeight = Math.max(...points.map(point => point.w), 0.1)
   const yMax = Math.max(maxPointWeight, targetWeight ?? 0, 1)
 
@@ -61,7 +68,7 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
   const flowValues = points.map(p => p.flow ?? 0).filter(f => f >= 0)
   const maxFlow = Math.max(...flowValues, 1)
 
-  const toX = (time: number) => (time / maxX) * width
+  const toX = (time: number) => (time / xAxisMax) * width
   const toY = (weight: number) => height - (weight / yMax) * height
   const toFlowY = (flow: number) => height - (flow / maxFlow) * height
 
@@ -69,31 +76,63 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
     .map(point => `${toX(point.t).toFixed(2)},${toY(point.w).toFixed(2)}`)
     .join(' ')
 
-  const flowPolyline = points
-    .filter(point => point.flow !== undefined && point.flow >= 0)
-    .map(point => `${toX(point.t).toFixed(2)},${toFlowY(point.flow!).toFixed(2)}`)
+  // Smooth flow data using a simple moving average
+  const flowPoints = points.filter(point => point.flow !== undefined && point.flow >= 0)
+  const SMOOTH_WINDOW = 5
+  const smoothedFlowPoints = flowPoints.map((point, i) => {
+    const windowStart = Math.max(0, i - Math.floor(SMOOTH_WINDOW / 2))
+    const windowEnd = Math.min(flowPoints.length, i + Math.ceil(SMOOTH_WINDOW / 2))
+    const windowSlice = flowPoints.slice(windowStart, windowEnd)
+    const avgFlow = windowSlice.reduce((sum, p) => sum + (p.flow ?? 0), 0) / windowSlice.length
+    return { t: point.t, flow: avgFlow }
+  })
+
+  const flowPolyline = smoothedFlowPoints
+    .map(point => `${toX(point.t).toFixed(2)},${toFlowY(point.flow).toFixed(2)}`)
     .join(' ')
 
   const targetY = targetWeight !== null ? toY(targetWeight) : null
 
+  // Format time for display (e.g., 180s -> "3:00", 210s -> "3:30")
+  const formatAxisTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
   return (
     <div className="rounded-lg border border-border/60 bg-secondary/30 p-2">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20" preserveAspectRatio="none" role="img" aria-label={t('pourOver.weightTrendLabel')}>
-        {targetY !== null && (
-          <line x1="0" y1={targetY} x2={width} y2={targetY} stroke="currentColor" strokeDasharray="4 3" className="text-primary/60" />
-        )}
-        <polyline fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground" points={polyline} />
-        {flowPolyline && (
-          <polyline fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.5" className="text-primary" points={flowPolyline} />
-        )}
-      </svg>
+      <div className="flex items-stretch gap-1">
+        {/* Y-axis: Weight scale (left) */}
+        <div className="flex flex-col justify-between text-[9px] text-muted-foreground w-6 text-right pr-0.5">
+          <span>{Math.round(yMax)}g</span>
+          <span>0g</span>
+        </div>
+        {/* Chart area */}
+        <svg viewBox={`0 0 ${width} ${height}`} className="flex-1 h-20" preserveAspectRatio="none" role="img" aria-label={t('pourOver.weightTrendLabel')}>
+          {targetY !== null && (
+            <line x1="0" y1={targetY} x2={width} y2={targetY} stroke="currentColor" strokeDasharray="4 3" className="text-primary/60" />
+          )}
+          <polyline fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground" points={polyline} />
+          {flowPolyline && (
+            <polyline fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.5" className="text-primary" points={flowPolyline} />
+          )}
+        </svg>
+        {/* Y-axis: Flow scale (right) */}
+        <div className="flex flex-col justify-between text-[9px] text-primary/60 w-7 text-left pl-0.5">
+          <span>{maxFlow.toFixed(1)}</span>
+          <span>0</span>
+        </div>
+      </div>
       <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
-        <span>0s</span>
+        <span className="w-6" />
+        <span>0:00</span>
         <span className="flex items-center gap-2">
           <span className="inline-block w-3 h-0.5 bg-foreground rounded" /> {t('pourOver.weightLegend')}
           <span className="inline-block w-3 h-0.5 bg-primary/50 rounded" /> {t('pourOver.flowLegend')}
         </span>
-        <span>{Math.round(maxX)}s</span>
+        <span>{formatAxisTime(xAxisMax)}</span>
+        <span className="w-7" />
       </div>
     </div>
   )
@@ -118,6 +157,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const previousWeightTimestampRef = useRef<number | null>(null)
   const trendStartTimestampRef = useRef<number | null>(null)
   const justTaredRef = useRef(false)
+  // Track continuous flow start time for auto-start confirmation
+  const flowStartTimestampRef = useRef<number | null>(null)
+  const FLOW_CONFIRMATION_MS = 2000 // Require 2 seconds of continuous flow
 
   const { cmd } = useMachineActions(machineState)
 
@@ -129,6 +171,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     previousWeightRef.current = null
     previousWeightTimestampRef.current = null
     trendStartTimestampRef.current = null
+    flowStartTimestampRef.current = null
     setFlowRate(0)
     // Send tare command
     cmd(tareScale, 'tared')
@@ -147,8 +190,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     return baseElapsedMs + (Date.now() - startedAtMs)
   }, [baseElapsedMs, isRunning, startedAtMs, tick])
 
-  const startTimer = useCallback(() => {
-    setStartedAtMs(Date.now())
+  const startTimer = useCallback((backdateMs = 0) => {
+    // backdateMs: how far back to set the timer (for auto-start confirmation delay)
+    setStartedAtMs(Date.now() - backdateMs)
     setIsRunning(true)
   }, [])
 
@@ -218,7 +262,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
     setWeightTrend(prev => {
       const next = [...prev, { t: trendTimeSeconds, w: currentWeight, flow: currentFlowRate }]
-      return next.slice(-90)
+      // Keep enough points for a full 5-minute pour-over (~900 points at 3Hz)
+      return next.slice(-900)
     })
 
     if (
@@ -227,12 +272,31 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       && previousWeight !== null
       && previousTimestamp !== null
       && currentWeight > previousWeight
+      && currentWeight >= 1 // Require at least 1g to avoid false starts from taring
     ) {
       const deltaSeconds = Math.max((now - previousTimestamp) / 1000, 0.01)
       const gramsPerSecond = (currentWeight - previousWeight) / deltaSeconds
-      if (gramsPerSecond >= 0.5 && gramsPerSecond <= 14.5) {
-        startTimer()
+      const isValidFlow = gramsPerSecond >= 0.5 && gramsPerSecond <= 14.5
+
+      if (isValidFlow) {
+        // Track when continuous flow started
+        if (flowStartTimestampRef.current === null) {
+          flowStartTimestampRef.current = now
+        }
+        // Check if we've had continuous flow for the confirmation period
+        const flowDuration = now - flowStartTimestampRef.current
+        if (flowDuration >= FLOW_CONFIRMATION_MS) {
+          // Start timer, backdated to when flow actually started
+          startTimer(flowDuration)
+          flowStartTimestampRef.current = null
+        }
+      } else {
+        // Flow stopped or out of range, reset confirmation
+        flowStartTimestampRef.current = null
       }
+    } else if (!isRunning) {
+      // No valid flow condition, reset confirmation
+      flowStartTimestampRef.current = null
     }
 
     previousWeightRef.current = currentWeight
@@ -269,7 +333,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               <Scales size={14} weight="bold" />
               {t('pourOver.weight')}
             </div>
-            <div className="text-3xl font-bold tabular-nums text-foreground">{weight.toFixed(1)}</div>
+            <div className="text-2xl sm:text-3xl font-bold tabular-nums text-foreground">{weight.toFixed(1)}</div>
             <div className="text-xs text-muted-foreground">{t('pourOver.unitGrams')}</div>
           </div>
 
@@ -278,7 +342,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               <Timer size={14} weight="bold" />
               {t('pourOver.timer')}
             </div>
-            <div className="text-3xl font-bold tabular-nums text-foreground">{formatStopwatch(elapsedMs)}</div>
+            <div className="text-2xl sm:text-3xl font-bold tabular-nums text-foreground">{formatStopwatch(elapsedMs)}</div>
             <div className="text-xs text-muted-foreground">{t('pourOver.unitTime')}</div>
           </div>
 
@@ -287,7 +351,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               <Drop size={14} weight="bold" />
               {t('pourOver.flow')}
             </div>
-            <div className="text-3xl font-bold tabular-nums text-foreground">{flowRate.toFixed(1)}</div>
+            <div className="text-2xl sm:text-3xl font-bold tabular-nums text-foreground">{flowRate.toFixed(1)}</div>
             <div className="text-xs text-muted-foreground">{t('pourOver.unitFlowRate')}</div>
           </div>
         </div>
@@ -300,13 +364,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 <Target size={12} weight="bold" />
                 {t('pourOver.targetWater')}
               </p>
-              <p className="text-2xl font-semibold tabular-nums">
+              <p className="text-xl sm:text-2xl font-semibold tabular-nums">
                 {targetWeight !== null ? `${targetWeight.toFixed(1)} g` : '—'}
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('pourOver.remaining')}</p>
-              <p className="text-2xl font-semibold tabular-nums">
+              <p className="text-xl sm:text-2xl font-semibold tabular-nums">
                 {remainingWeight !== null ? `${remainingWeight.toFixed(1)} g` : '—'}
               </p>
             </div>
@@ -326,7 +390,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         )}
 
         {/* ── Free mode: weight trend chart ── */}
-        {mode === 'free' && weightTrend.length >= 2 && (
+        {mode === 'free' && (
           <WeightTrend points={weightTrend} targetWeight={null} />
         )}
 
@@ -335,7 +399,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <Button
             onClick={startOrPause}
             variant="dark-brew"
-            className="h-11"
+            className="h-11 rounded-xl"
           >
             {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
             {isRunning ? t('pourOver.pause') : t('pourOver.start')}
@@ -363,31 +427,33 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
         {/* ── 5. Dose + ratio inputs (ratio mode — set once before brewing) ── */}
         {mode === 'ratio' && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
+            {/* Dose row */}
             <div className="space-y-1.5">
               <Label htmlFor="pour-over-dose">{t('pourOver.doseLabel')}</Label>
-              <div className="flex gap-1.5">
+              <div className="flex items-center gap-2">
                 <Input
                   id="pour-over-dose"
                   inputMode="decimal"
                   value={doseGrams}
                   onChange={(event) => setDoseGrams(event.target.value)}
                   placeholder="20"
-                  className="w-20 text-center bg-slate-200 dark:bg-[rgba(0,0,0,0.3)]"
+                  className="w-20 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
                 />
                 <Button
                   variant="outline"
                   size="sm"
-                  className="shrink-0 h-10 px-2"
+                  className="shrink-0 h-10 px-3"
                   disabled={!machineState.connected || weight <= 0}
                   onClick={() => setDoseGrams(weight.toFixed(1))}
                   title={t('pourOver.weighFromScaleTitle')}
                 >
-                  <Scales size={16} weight="bold" className="mr-1" />
+                  <Scales size={16} weight="bold" className="mr-1.5" />
                   {t('pourOver.weighFromScale')}
                 </Button>
               </div>
             </div>
+            {/* Ratio row */}
             <div className="space-y-1.5">
               <Label htmlFor="pour-over-ratio">{t('pourOver.ratioLabel')}</Label>
               <Input
@@ -396,7 +462,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 value={brewRatio}
                 onChange={(event) => setBrewRatio(event.target.value)}
                 placeholder="15"
-                className="w-20 text-center bg-slate-200 dark:bg-[rgba(0,0,0,0.3)]"
+                className="w-20 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
               />
             </div>
           </div>
@@ -404,20 +470,20 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
         {/* ── Settings (auto-start, bloom) ── */}
         <div className="rounded-xl border border-border/60 bg-secondary/30 p-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">{t('pourOver.autoStartTimer')}</p>
               <p className="text-xs text-muted-foreground">{t('pourOver.autoStartDescription')}</p>
             </div>
-            <Switch checked={autoStartEnabled} onCheckedChange={setAutoStartEnabled} />
+            <Switch checked={autoStartEnabled} onCheckedChange={setAutoStartEnabled} className="shrink-0" />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">{t('pourOver.bloomIndicator')}</p>
               <p className="text-xs text-muted-foreground">{t('pourOver.bloomDescription')}</p>
             </div>
-            <Switch checked={bloomEnabled} onCheckedChange={setBloomEnabled} />
+            <Switch checked={bloomEnabled} onCheckedChange={setBloomEnabled} className="shrink-0" />
           </div>
 
           {bloomEnabled && (
@@ -429,7 +495,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 value={bloomSeconds}
                 onChange={(event) => setBloomSeconds(event.target.value)}
                 placeholder="30"
-                className="w-20 text-center bg-slate-200 dark:bg-[rgba(0,0,0,0.3)]"
+                className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
               />
             </div>
           )}
