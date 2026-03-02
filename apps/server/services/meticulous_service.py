@@ -332,8 +332,9 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
     for var in data.get("variables") or []:
         key = var.get("key", "")
         name = var.get("name", "")
+        is_info = key.startswith("info_") or var.get("adjustable") is False
         # If it's an info variable and name doesn't start with emoji, add default ℹ️
-        if key.startswith("info_") and not emoji_pattern.match(name):
+        if is_info and not emoji_pattern.match(name):
             var["name"] = f"ℹ️ {name}" if name else "ℹ️ Info"
 
     # ── Display metadata ─────────────────────────────────────────────────
