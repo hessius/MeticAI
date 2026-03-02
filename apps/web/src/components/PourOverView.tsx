@@ -500,6 +500,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     disabled={!machineState.connected || weight <= 0}
                     onClick={() => setDoseGrams(weight.toFixed(1))}
                     title={t('pourOver.weighFromScaleTitle')}
+                    aria-label={t('pourOver.weighFromScale')}
                   >
                     <Scales size={16} weight="bold" />
                   </Button>
