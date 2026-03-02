@@ -9886,6 +9886,18 @@ class TestNormalizeProfileForMachine:
         result = self._normalize({"name": "X", "variables": v, "stages": []})
         assert result["variables"][0]["name"] == "ℹ️ Info"
 
+    def test_adjustable_false_variable_gets_emoji(self):
+        """Variables with adjustable: false (without info_ prefix) also get emoji."""
+        v = [{"name": "Dose", "key": "dose", "type": "numeric", "value": 18, "adjustable": False}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "ℹ️ Dose"
+
+    def test_adjustable_true_variable_no_emoji(self):
+        """Variables with adjustable: true should NOT get emoji added."""
+        v = [{"name": "Dose", "key": "dose", "type": "numeric", "value": 18, "adjustable": True}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "Dose"
+
 
 # ---------------------------------------------------------------------------
 # Bridge / MQTT Control Center
