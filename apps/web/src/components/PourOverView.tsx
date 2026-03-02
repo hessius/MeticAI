@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Scales, Timer, Drop, Pause, Play, Stopwatch, Target } from '@phosphor-icons/react'
+import { ArrowLeft, Scales, Timer, Drop, Pause, Play, ArrowClockwise, Target } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { tareScale } from '@/lib/mqttCommands'
@@ -495,7 +495,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             variant="outline"
             className="h-11"
           >
-            <Stopwatch size={18} weight="bold" className="mr-1.5" />
+            <Timer size={18} weight="bold" className="mr-1.5" />
             {t('pourOver.reset')}
           </Button>
 
