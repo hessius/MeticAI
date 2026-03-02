@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Scales, Timer, Drop, Pause, Play, ArrowClockwise, Target } from '@phosphor-icons/react'
+import { ArrowLeft, Scales, Timer, Drop, Pause, Play, Stopwatch, Target } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { tareScale } from '@/lib/mqttCommands'
@@ -83,10 +83,25 @@ function IncrementButton({ onIncrement, label }: { onIncrement: () => void; labe
   )
 }
 
-function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWeight: number | null }) {
+// Chart colors matching LiveShotView (from chartConstants.ts)
+const CHART_COLORS = {
+  weight: '#fbbf24',    // Amber/Yellow
+  flow: '#67e8f9',      // Light cyan/blue
+  targetLine: '#ef4444', // Red for target weight line
+} as const
+
+interface WeightTrendProps {
+  points: WeightPoint[]
+  targetWeight: number | null
+  mode: 'free' | 'ratio'
+}
+
+function WeightTrend({ points, targetWeight, mode }: WeightTrendProps) {
   const { t } = useTranslation()
   const width = 360
-  const height = 96
+  // Base height varies by viewport: taller on desktop (h-40 → 160), mobile (h-32 → 128)
+  // We use CSS classes for responsive sizing; SVG viewBox uses a fixed height
+  const svgHeight = 160
 
   // X-axis: default to 3 minutes (180s), expand in 30-second increments
   const DEFAULT_X_DURATION = 180  // 3 minutes
@@ -96,24 +111,41 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
     ? DEFAULT_X_DURATION
     : Math.ceil(lastTime / X_INCREMENT) * X_INCREMENT
 
+  // Always show waiting state when no data, on both mobile and desktop
   if (points.length < 2) {
     return (
-      <div className="h-24 rounded-lg border border-border/60 bg-secondary/30 flex items-center justify-center text-xs text-muted-foreground">
+      <div className="h-32 sm:h-40 rounded-lg border border-border/60 bg-secondary/30 flex items-center justify-center text-xs text-muted-foreground">
         {t('pourOver.waitingForWeight')}
       </div>
     )
   }
 
+  // Weight scale logic:
+  // - Free mode: fixed 0-300g scale
+  // - Ratio mode: target weight + 25g, with 50g increments when within 10 of max
   const maxPointWeight = Math.max(...points.map(point => point.w), 0.1)
-  const yMax = Math.max(maxPointWeight, targetWeight ?? 0, 1)
+  let yMax: number
+  if (mode === 'free') {
+    yMax = 300 // Fixed scale for free mode
+  } else {
+    // Ratio mode: target + 25g, expanding in 50g increments
+    const baseMax = (targetWeight ?? 0) + 25
+    // If current weight is within 10g of the max, expand by 50g
+    if (maxPointWeight > baseMax - 10) {
+      yMax = Math.ceil((maxPointWeight + 10) / 50) * 50
+    } else {
+      yMax = Math.max(baseMax, maxPointWeight + 25)
+    }
+  }
 
-  // Flow rate axis: independent scale, default max of 20 g/s
+  // Flow rate axis: 0-35 ml/s (g/s) scale
+  const FLOW_SCALE_MAX = 35
   const flowValues = points.map(p => p.flow ?? 0).filter(f => f >= 0)
-  const maxFlow = Math.max(Math.max(...flowValues, 1), 20)
+  const maxFlow = Math.max(Math.max(...flowValues, 1), FLOW_SCALE_MAX)
 
   const toX = (time: number) => (time / xAxisMax) * width
-  const toY = (weight: number) => height - (weight / yMax) * height
-  const toFlowY = (flow: number) => height - (flow / maxFlow) * height
+  const toY = (weight: number) => svgHeight - (weight / yMax) * svgHeight
+  const toFlowY = (flow: number) => svgHeight - (flow / maxFlow) * svgHeight
 
   const polyline = points
     .map(point => `${toX(point.t).toFixed(2)},${toY(point.w).toFixed(2)}`)
@@ -146,23 +178,26 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
   return (
     <div className="rounded-lg border border-border/60 bg-secondary/30 p-2">
       <div className="flex items-stretch gap-1">
-        {/* Y-axis: Weight scale (left) */}
-        <div className="flex flex-col justify-between text-[9px] text-muted-foreground w-6 text-right pr-0.5">
+        {/* Y-axis: Weight scale (left) - amber color matching weight line */}
+        <div className="flex flex-col justify-between text-[9px] w-6 text-right pr-0.5 text-[#fbbf24]">
           <span>{Math.round(yMax)}g</span>
           <span>0g</span>
         </div>
-        {/* Chart area */}
-        <svg viewBox={`0 0 ${width} ${height}`} className="flex-1 h-20" preserveAspectRatio="none" role="img" aria-label={t('pourOver.weightTrendLabel')}>
+        {/* Chart area - responsive height: h-32 (128px) mobile, h-40 (160px) desktop */}
+        <svg viewBox={`0 0 ${width} ${svgHeight}`} className="flex-1 h-32 sm:h-40" preserveAspectRatio="none" role="img" aria-label={t('pourOver.weightTrendLabel')}>
+          {/* Target weight line - red dashed */}
           {targetY !== null && (
-            <line x1="0" y1={targetY} x2={width} y2={targetY} stroke="currentColor" strokeDasharray="4 3" className="text-primary/60" />
+            <line x1="0" y1={targetY} x2={width} y2={targetY} stroke={CHART_COLORS.targetLine} strokeDasharray="4 3" strokeOpacity="0.8" />
           )}
-          <polyline fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground" points={polyline} />
+          {/* Weight line - amber/yellow matching LiveShotView */}
+          <polyline fill="none" stroke={CHART_COLORS.weight} strokeWidth="2" points={polyline} />
+          {/* Flow line - cyan/blue matching LiveShotView */}
           {flowPolyline && (
-            <polyline fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.5" className="text-primary" points={flowPolyline} />
+            <polyline fill="none" stroke={CHART_COLORS.flow} strokeWidth="1.5" strokeOpacity="0.7" points={flowPolyline} />
           )}
         </svg>
-        {/* Y-axis: Flow scale (right) */}
-        <div className="flex flex-col justify-between text-[9px] text-primary/60 w-10 text-left pl-0.5">
+        {/* Y-axis: Flow scale (right) - cyan color matching flow line */}
+        <div className="flex flex-col justify-between text-[9px] w-10 text-left pl-0.5 text-[#67e8f9]/80">
           <span>{Math.round(maxFlow)} g/s</span>
           <span>0 g/s</span>
         </div>
@@ -171,8 +206,8 @@ function WeightTrend({ points, targetWeight }: { points: WeightPoint[]; targetWe
         <span className="w-6" />
         <span>0:00</span>
         <span className="flex items-center gap-2">
-          <span className="inline-block w-3 h-0.5 bg-foreground rounded" /> {t('pourOver.weightLegend')}
-          <span className="inline-block w-3 h-0.5 bg-primary/50 rounded" /> {t('pourOver.flowLegend')}
+          <span className="inline-block w-3 h-0.5 bg-[#fbbf24] rounded" /> {t('pourOver.weightLegend')}
+          <span className="inline-block w-3 h-0.5 bg-[#67e8f9]/70 rounded" /> {t('pourOver.flowLegend')}
         </span>
         <span>{formatAxisTime(xAxisMax)}</span>
         <span className="w-7" />
@@ -202,7 +237,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const justTaredRef = useRef(false)
   // Track continuous flow start time for auto-start confirmation
   const flowStartTimestampRef = useRef<number | null>(null)
-  const FLOW_CONFIRMATION_MS = 2000 // Require 2 seconds of continuous flow
+  // Require 750ms of continuous valid flow to trigger auto-start
+  // Shorter than before (2s) to be more responsive while still filtering bumps
+  const FLOW_CONFIRMATION_MS = 750
 
   const { cmd } = useMachineActions(machineState)
 
@@ -319,7 +356,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     ) {
       const deltaSeconds = Math.max((now - previousTimestamp) / 1000, 0.01)
       const gramsPerSecond = (currentWeight - previousWeight) / deltaSeconds
-      const isValidFlow = gramsPerSecond >= 0.5 && gramsPerSecond <= 14.5
+      // Valid pour-over flow: 0.3 to 25 g/s (wider range than espresso)
+      // Lower bound filters out scale drift, upper bound allows aggressive pours
+      const isValidFlow = gramsPerSecond >= 0.3 && gramsPerSecond <= 25
 
       if (isValidFlow) {
         // Track when continuous flow started
@@ -428,21 +467,24 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               <span>{ratioProgress.toFixed(0)}%</span>
             </div>
             <Progress value={ratioProgress} />
-            <WeightTrend points={weightTrend} targetWeight={targetWeight} />
+            <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" />
           </div>
         )}
 
         {/* ── Free mode: weight trend chart ── */}
         {mode === 'free' && (
-          <WeightTrend points={weightTrend} targetWeight={null} />
+          <WeightTrend points={weightTrend} targetWeight={null} mode="free" />
         )}
 
         {/* ── 4. Action buttons (always visible) ── */}
         <div className="grid grid-cols-3 gap-2.5">
+          {/* Start/Pause button: 
+              - When autoStart enabled: dark-brew style (blends in)
+              - When autoStart disabled: accent style (stands out to prompt manual start) */}
           <Button
             onClick={startOrPause}
-            variant="dark-brew"
-            className="h-11 rounded-xl"
+            variant={autoStartEnabled ? "outline" : "default"}
+            className={`h-11 rounded-xl ${!autoStartEnabled && !isRunning ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : ''}`}
           >
             {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
             {isRunning ? t('pourOver.pause') : t('pourOver.start')}
@@ -453,7 +495,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
             variant="outline"
             className="h-11"
           >
-            <ArrowClockwise size={18} weight="bold" className="mr-1.5" />
+            <Stopwatch size={18} weight="bold" className="mr-1.5" />
             {t('pourOver.reset')}
           </Button>
 
@@ -496,13 +538,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="shrink-0 h-10 px-2.5 ml-1"
+                    className="shrink-0 h-10 px-3 ml-1 gap-1.5"
                     disabled={!machineState.connected || weight <= 0}
                     onClick={() => setDoseGrams(weight.toFixed(1))}
                     title={t('pourOver.weighFromScaleTitle')}
                     aria-label={t('pourOver.weighFromScale')}
                   >
                     <Scales size={16} weight="bold" />
+                    <span className="text-xs">{t('pourOver.weighFromScaleShort')}</span>
                   </Button>
                 </div>
               </div>

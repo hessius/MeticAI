@@ -793,6 +793,7 @@
     "ratioLabel": "Ratio (1:x)",
     "weighFromScale": "Väg från våg",
     "weighFromScaleTitle": "Använd aktuell vågvikt som dos",
+    "weighFromScaleShort": "Våg",
     "autoStartTimer": "Starta timer automatiskt",
     "autoStartDescription": "Startar vid hällning men ignorerar snabba spikar.",
     "bloomIndicator": "Bloom-indikator",

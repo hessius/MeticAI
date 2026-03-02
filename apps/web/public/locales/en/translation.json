@@ -793,6 +793,7 @@
     "ratioLabel": "Ratio (1:x)",
     "weighFromScale": "Weigh from scale",
     "weighFromScaleTitle": "Capture current scale weight as dose",
+    "weighFromScaleShort": "Use scale",
     "autoStartTimer": "Auto-start timer",
     "autoStartDescription": "Starts when pour is detected, but ignores fast grounds-style spikes.",
     "bloomIndicator": "Bloom indicator",

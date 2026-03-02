@@ -803,6 +803,7 @@
     "waitingForWeight": "Warte auf Gewichtsdaten…",
     "weighFromScale": "Von Waage wiegen",
     "weighFromScaleTitle": "Aktuelles Waagengewicht als Dosis erfassen",
+    "weighFromScaleShort": "Waage",
     "weight": "Gewicht",
     "weightLegend": "Gewicht",
     "weightTrendLabel": "Gewichtsverlauf"
