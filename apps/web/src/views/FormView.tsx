@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Camera, Sparkle, Warning, Upload, X, Coffee, CaretLeft } from '@phosphor-icons/react'
 import { PRESET_TAGS, getTagColorClass } from '@/lib/tags'
 import { AdvancedCustomization, AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
-import type { RefObject, ChangeEvent } from 'react'
+import type { RefObject, ChangeEvent, DragEvent } from 'react'
 
 interface FormViewProps {
   imagePreview: string | null
@@ -21,6 +22,7 @@ interface FormViewProps {
   profileCount: number | null
   fileInputRef: RefObject<HTMLInputElement | null>
   onFileSelect: (e: ChangeEvent<HTMLInputElement>) => void
+  onFileDrop: (file: File) => void
   onRemoveImage: () => void
   onUserPrefsChange: (value: string) => void
   onToggleTag: (tag: string) => void
@@ -40,6 +42,7 @@ export function FormView({
   profileCount,
   fileInputRef,
   onFileSelect,
+  onFileDrop,
   onRemoveImage,
   onUserPrefsChange,
   onToggleTag,
@@ -49,6 +52,41 @@ export function FormView({
   onViewHistory
 }: FormViewProps) {
   const { t } = useTranslation()
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleDragEnter = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set dragging to false if we're leaving the drop zone (not entering a child)
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setIsDragging(false)
+  }, [])
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      const file = files[0]
+      if (file.type.startsWith('image/')) {
+        onFileDrop(file)
+      }
+    }
+  }, [onFileDrop])
+
   return (
     <motion.div
       key="form"
@@ -86,24 +124,39 @@ export function FormView({
           />
           
           {!imagePreview ? (
-            <label htmlFor="file-upload">
-              <motion.div 
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className="border-2 border-dashed border-border/50 hover:border-primary/50 rounded-2xl p-10 cursor-pointer transition-all duration-200 group bg-secondary/40 hover:bg-secondary/60"
-              >
-                <div className="flex flex-col items-center gap-4 text-muted-foreground group-hover:text-foreground transition-colors duration-200">
-                  <div className="flex gap-3">
-                    <Camera size={28} weight="duotone" className="group-hover:text-primary transition-colors" />
-                    <Upload size={28} weight="duotone" className="group-hover:text-primary transition-colors" />
+            <div
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
+              <label htmlFor="file-upload">
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className={`border-2 border-dashed rounded-2xl p-10 cursor-pointer transition-all duration-200 group ${
+                    isDragging 
+                      ? 'border-primary bg-primary/10 scale-[1.02]' 
+                      : 'border-border/50 hover:border-primary/50 bg-secondary/40 hover:bg-secondary/60'
+                  }`}
+                >
+                  <div className={`flex flex-col items-center gap-4 transition-colors duration-200 ${
+                    isDragging ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                  }`}>
+                    <div className="flex gap-3">
+                      <Camera size={28} weight="duotone" className={isDragging ? 'text-primary' : 'group-hover:text-primary transition-colors'} />
+                      <Upload size={28} weight="duotone" className={isDragging ? 'text-primary' : 'group-hover:text-primary transition-colors'} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium">
+                        {isDragging ? t('profileGeneration.dropImage') : t('profileGeneration.tapToUpload')}
+                      </p>
+                      <p className="text-xs mt-1.5 text-muted-foreground">{t('profileGeneration.imageFormats')}</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium">{t('profileGeneration.tapToUpload')}</p>
-                    <p className="text-xs mt-1.5 text-muted-foreground">{t('profileGeneration.imageFormats')}</p>
-                  </div>
-                </div>
-              </motion.div>
-            </label>
+                </motion.div>
+              </label>
+            </div>
           ) : (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
