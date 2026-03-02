@@ -803,6 +803,7 @@
     "waitingForWeight": "En attente des données de poids…",
     "weighFromScale": "Peser sur la balance",
     "weighFromScaleTitle": "Capturer le poids actuel de la balance comme dose",
+    "weighFromScaleShort": "Balance",
     "weight": "Poids",
     "weightLegend": "poids",
     "weightTrendLabel": "Tendance du poids"

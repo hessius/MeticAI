@@ -803,6 +803,7 @@
     "waitingForWeight": "Esperando datos de peso…",
     "weighFromScale": "Pesar en báscula",
     "weighFromScaleTitle": "Capturar el peso actual de la báscula como dosis",
+    "weighFromScaleShort": "Báscula",
     "weight": "Peso",
     "weightLegend": "peso",
     "weightTrendLabel": "Tendencia de peso"
