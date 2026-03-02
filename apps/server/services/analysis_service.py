@@ -1424,8 +1424,10 @@ def _build_static_profile_description(profile_json: dict) -> str:
         f"• Expected Time: {expected_time}\n\n"
         f"Why This Works:\n"
         f"This is a summary generated from the profile's stage structure and metadata. "
-        f"Enable AI features for a detailed barista-level analysis.\n\n"
+        f"Enable AI features in Settings and configure a Gemini API key for a detailed "
+        f"barista-level analysis with expert brewing recommendations.\n\n"
         f"Special Notes:\n"
         f"This description was generated without AI assistance and may not capture "
-        f"all nuances of the extraction design."
+        f"all nuances of the extraction design. To generate a full AI summary, delete this "
+        f"profile from the MeticAI catalogue and re-import it after enabling AI features."
     )
