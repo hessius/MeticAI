@@ -26,6 +26,7 @@ from services.meticulous_service import (
     async_list_profiles,
     async_get_profile,
     async_save_profile,
+    async_create_profile,
     async_load_profile_by_id,
     async_execute_action,
 )
@@ -1729,6 +1730,23 @@ async def import_profile(request: Request):
         
         save_history(history)
         
+        # Upload profile to the Meticulous machine when imported from a file.
+        # Profiles imported from the machine (source="machine") already exist there.
+        machine_profile_id = None
+        if source == "file":
+            try:
+                result = await async_create_profile(profile_json)
+                machine_profile_id = result.get("id") if isinstance(result, dict) else None
+                logger.info(
+                    f"Profile uploaded to machine: {profile_name}",
+                    extra={"request_id": request_id, "machine_profile_id": machine_profile_id}
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"Profile saved to history but failed to upload to machine: {exc}",
+                    extra={"request_id": request_id, "error_type": type(exc).__name__}
+                )
+        
         logger.info(
             f"Profile imported successfully: {profile_name}",
             extra={"request_id": request_id, "entry_id": entry_id}
@@ -1738,7 +1756,8 @@ async def import_profile(request: Request):
             "status": "success",
             "entry_id": entry_id,
             "profile_name": profile_name,
-            "has_description": reply is not None and "Description generation failed" not in reply
+            "has_description": reply is not None and "Description generation failed" not in reply,
+            "uploaded_to_machine": machine_profile_id is not None
         }
         
     except HTTPException:
