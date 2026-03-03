@@ -462,13 +462,6 @@ elif [[ -f "$HAS_V2" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
         case "$CHOICE" in
             1)
                 log_info "Proceeding with reinstall..."
-                # Stop existing containers before reinstalling
-                if [[ -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
-                    log_info "Stopping existing containers..."
-                    cd "$INSTALL_DIR"
-                    docker compose down 2>/dev/null || true
-                    cd "$HOME"
-                fi
                 ;;
             *)
                 log_info "Cancelled"
@@ -476,6 +469,17 @@ elif [[ -f "$HAS_V2" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
                 ;;
         esac
     fi
+
+    # Always stop existing containers before reinstalling
+    log_info "Stopping existing containers..."
+    if [[ -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
+        cd "$INSTALL_DIR"
+        docker compose down --remove-orphans 2>/dev/null || true
+        cd "$HOME"
+    fi
+    # Remove named containers directly in case compose project has changed
+    docker rm -f meticai 2>/dev/null || true
+    docker rm -f meticai-watchtower 2>/dev/null || true
 fi
 
 # ==============================================================================
@@ -829,6 +833,10 @@ if ! docker compose ${COMPOSE_FILES} pull 2>&1; then
 fi
 
 log_info "Starting MeticAI..."
+# Remove any leftover containers that could conflict
+docker rm -f meticai 2>/dev/null || true
+docker rm -f meticai-watchtower 2>/dev/null || true
+
 if ! docker compose ${COMPOSE_FILES} up -d 2>&1; then
     log_error "Failed to start MeticAI containers."
     echo ""
