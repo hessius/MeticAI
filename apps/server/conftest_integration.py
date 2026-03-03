@@ -5,10 +5,18 @@ This module provides fixtures for integration tests that require a real
 Meticulous machine connection. Integration tests are opt-in and require
 the TEST_INTEGRATION environment variable to be set.
 
+Note: Pytest does not auto-load this file because it is not named
+      ``conftest.py``. You must explicitly load it as a plugin.
+
 Usage:
     export METICULOUS_IP=192.168.x.x
     export TEST_INTEGRATION=true
-    cd apps/server && pytest test_integration*.py -v
+    # From apps/server/, explicitly load this module as a Pytest plugin
+    pytest -p conftest_integration test_integration*.py -v
+
+    # Alternatively, set the environment variable:
+    export PYTEST_PLUGINS=conftest_integration
+    pytest test_integration*.py -v
 """
 
 import os

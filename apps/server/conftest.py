@@ -52,6 +52,7 @@ def _reset_in_memory_caches():
     _ms._profile_list_cache = None
     _ms._profile_list_cache_time = 0.0
     _tps._set_active(None)
+    _tps._reset_lock()
 
     # Also reset settings file on disk to defaults to prevent cross-test leaks
     from config import DATA_DIR
@@ -66,8 +67,10 @@ def _reset_in_memory_caches():
 def _mock_validate_profile():
     """Auto-mock validate_profile to return valid for all tests.
 
-    Tests that specifically exercise validation retry logic should
-    override this by patching again inside the test body.
+    This is autouse=True at *function* scope so every test gets a clean
+    mock.  Tests that specifically exercise validation retry logic should
+    override this by patching again inside the test body.  If autouse
+    becomes too broad, consider converting to an explicit fixture request.
     """
     result = Mock()
     result.is_valid = True

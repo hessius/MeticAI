@@ -97,6 +97,14 @@ vi.mock('@/lib/pourOverApi', () => ({
   cleanupPourOver: vi.fn().mockResolvedValue({ deleted: true, purged: true }),
   forceCleanupPourOver: vi.fn().mockResolvedValue({ deleted: true }),
   getActivePourOver: vi.fn().mockResolvedValue({ active: false }),
+  getPourOverPreferences: vi.fn().mockResolvedValue({
+    free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+  }),
+  savePourOverPreferences: vi.fn().mockResolvedValue({
+    free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+  }),
 }))
 
 vi.mock('sonner', () => ({
@@ -139,7 +147,7 @@ function makeMachineState(overrides: Partial<MachineState> = {}): MachineState {
 }
 
 describe('PourOverView', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockCmd.mockReset()
     // Reset machine actions to defaults
     mockMachineActions.cmd = mockCmd
@@ -149,6 +157,17 @@ describe('PourOverView', () => {
     mockMachineActions.isClickToPurge = false
     mockMachineActions.stateLC = 'idle'
     mockMachineActions.isIdle = true
+
+    // Reset preferences mocks to default values
+    const { getPourOverPreferences, savePourOverPreferences } = await import('@/lib/pourOverApi')
+    vi.mocked(getPourOverPreferences).mockResolvedValue({
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    })
+    vi.mocked(savePourOverPreferences).mockResolvedValue({
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    })
   })
 
   it('renders free mode by default with live weight and timer controls', () => {
@@ -293,6 +312,7 @@ describe('PourOverView', () => {
 
   it('disables auto-start when integration is toggled on', async () => {
     const user = userEvent.setup()
+    const { getPourOverPreferences } = await import('@/lib/pourOverApi')
 
     render(
       <PourOverView
@@ -301,6 +321,11 @@ describe('PourOverView', () => {
       />,
     )
 
+    // Wait for preferences to be loaded before interacting
+    await vi.waitFor(() => {
+      expect(getPourOverPreferences).toHaveBeenCalled()
+    })
+
     // Switch to ratio mode
     await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
 
@@ -308,9 +333,11 @@ describe('PourOverView', () => {
     const integrationSwitch = screen.getByText('Machine integration').closest('div')?.parentElement?.querySelector('[role="switch"]')
     await user.click(integrationSwitch!)
 
-    // Auto-start switch should be disabled
-    const autoStartSwitch = screen.getByText('Auto-start timer').closest('div')?.parentElement?.querySelector('[role="switch"]')
-    expect(autoStartSwitch).toHaveAttribute('disabled')
+    // Auto-start switch should be disabled (wait for state to propagate)
+    await vi.waitFor(() => {
+      const autoStartSwitch = screen.getByText('Auto-start timer').closest('div')?.parentElement?.querySelector('[role="switch"]')
+      expect(autoStartSwitch).toHaveAttribute('disabled')
+    })
   })
 
   it('disables integration toggle when machine is disconnected', async () => {
@@ -330,5 +357,78 @@ describe('PourOverView', () => {
     // Integration switch should be disabled
     const integrationSwitch = screen.getByText('Machine integration').closest('div')?.parentElement?.querySelector('[role="switch"]')
     expect(integrationSwitch).toHaveAttribute('disabled')
+  })
+
+  it('loads preferences from server on mount', async () => {
+    const { getPourOverPreferences } = await import('@/lib/pourOverApi')
+
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    expect(getPourOverPreferences).toHaveBeenCalled()
+  })
+
+  it('applies stored preferences for ratio mode when switching tabs', async () => {
+    const { getPourOverPreferences } = await import('@/lib/pourOverApi')
+    const user = userEvent.setup()
+
+    // Return different prefs per mode: ratio has autoStart off
+    vi.mocked(getPourOverPreferences).mockResolvedValue({
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, machineIntegration: false },
+    })
+
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Wait for prefs to load
+    await vi.waitFor(() => {
+      expect(getPourOverPreferences).toHaveBeenCalled()
+    })
+
+    // Switch to ratio mode – bloom should be off
+    await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
+
+    const bloomSwitch = screen.getByText('Bloom indicator').closest('div')?.parentElement?.querySelector('[role="switch"]')
+    expect(bloomSwitch).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('saves preferences to server when a toggle changes', async () => {
+    const { savePourOverPreferences, getPourOverPreferences } = await import('@/lib/pourOverApi')
+    const user = userEvent.setup()
+
+    vi.mocked(getPourOverPreferences).mockResolvedValue({
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    })
+
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Wait for prefs to load
+    await vi.waitFor(() => {
+      expect(getPourOverPreferences).toHaveBeenCalled()
+    })
+
+    // Toggle bloom off
+    const bloomSwitch = screen.getByText('Bloom indicator').closest('div')?.parentElement?.querySelector('[role="switch"]')
+    await user.click(bloomSwitch!)
+
+    // save is debounced (500ms), advance timers
+    await vi.waitFor(() => {
+      expect(savePourOverPreferences).toHaveBeenCalled()
+    }, { timeout: 2000 })
   })
 })

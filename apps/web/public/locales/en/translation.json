@@ -108,7 +108,8 @@
       "generateBusy": "A profile is already being generated. Your form has been preserved — please try again in a few minutes.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
-      "saveFailed": "Failed to save results. Please try again."
+      "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "AI profile generation is currently disabled. Enable AI in Settings and ensure an API key is configured."
     }
   },
   "navigation": {
@@ -322,7 +323,8 @@
     "exportAsImage": "Export as Image",
     "viewAiAnalysis": "View AI Analysis",
     "getAiAnalysis": "Get AI Analysis",
-    "runAnalysisForOverlay": "Run analysis to see graph overlay"
+    "runAnalysisForOverlay": "Run analysis to see graph overlay",
+    "aiUnavailable": "AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured."
   },
   "shotComparison": {
     "title": "Shot Comparison",
@@ -576,6 +578,8 @@
     "preparing": "Preparing...",
     "percentComplete": "{{percent}}% complete",
     "generatingDescriptions": "Generating AI descriptions for each profile...",
+    "importingWithoutDescriptions": "Importing profiles without AI-generated descriptions",
+    "importFileAriaLabel": "Import profile JSON file",
     "readingFile": "Reading file...",
     "importingProfile": "Importing profile...",
     "fetchingProfile": "Fetching profile from machine...",

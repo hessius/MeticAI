@@ -11727,6 +11727,174 @@ class TestPourOverEndpoints:
 
 
 # ============================================================================
+# Pour-Over Preferences Tests
+# ============================================================================
+
+
+class TestPourOverPreferencesService:
+    """Unit tests for services.pour_over_preferences."""
+
+    def test_load_returns_defaults_when_no_file(self, tmp_path, monkeypatch):
+        """load_preferences returns defaults when no file exists."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        result = prefs.load_preferences()
+        assert result["free"]["autoStart"] is True
+        assert result["free"]["bloomEnabled"] is True
+        assert result["free"]["bloomSeconds"] == 30
+        assert result["free"]["machineIntegration"] is False
+        assert result["ratio"]["autoStart"] is True
+
+    def test_save_and_load_round_trip(self, tmp_path, monkeypatch):
+        """Preferences survive a save+clear+load cycle."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        prefs.save_preferences({
+            "free": {"autoStart": False, "bloomEnabled": False,
+                     "bloomSeconds": 45, "machineIntegration": True},
+            "ratio": {"autoStart": True, "bloomEnabled": True,
+                      "bloomSeconds": 20, "machineIntegration": True},
+        })
+
+        prefs.reset_cache()
+        result = prefs.load_preferences()
+        assert result["free"]["autoStart"] is False
+        assert result["free"]["bloomSeconds"] == 45
+        assert result["ratio"]["bloomSeconds"] == 20
+        assert result["ratio"]["machineIntegration"] is True
+
+    def test_save_drops_unknown_keys(self, tmp_path, monkeypatch):
+        """Unknown keys in the payload are silently dropped."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        prefs.save_preferences({
+            "free": {"autoStart": True, "extraKey": "nope"},
+            "ratio": {},
+        })
+
+        prefs.reset_cache()
+        result = prefs.load_preferences()
+        assert "extraKey" not in result["free"]
+        # defaults still present
+        assert result["free"]["bloomEnabled"] is True
+
+    def test_load_handles_corrupt_json(self, tmp_path, monkeypatch):
+        """Corrupt JSON on disk falls back to defaults."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        prefs_file = tmp_path / "prefs.json"
+        prefs_file.write_text("NOT-JSON!!!")
+        monkeypatch.setattr(prefs, "PREFS_FILE", prefs_file)
+
+        result = prefs.load_preferences()
+        assert result["free"]["autoStart"] is True
+        assert result["ratio"]["bloomSeconds"] == 30
+
+    def test_load_uses_cache(self, tmp_path, monkeypatch):
+        """Second call returns cached copy without re-reading disk."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        prefs_file = tmp_path / "prefs.json"
+        monkeypatch.setattr(prefs, "PREFS_FILE", prefs_file)
+
+        first = prefs.load_preferences()
+        # Overwrite file with garbage – cache should still work
+        prefs_file.write_text("GARBAGE")
+        second = prefs.load_preferences()
+        assert first is second
+
+    def test_save_partial_mode_fills_defaults(self, tmp_path, monkeypatch):
+        """If a mode dict is missing keys, defaults are used."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        result = prefs.save_preferences({"free": {"autoStart": False}, "ratio": {}})
+        assert result["free"]["autoStart"] is False
+        assert result["free"]["bloomEnabled"] is True  # default
+        assert result["ratio"]["autoStart"] is True    # default
+
+
+class TestPourOverPreferencesEndpoints:
+    """Integration tests for /api/pour-over/preferences endpoints."""
+
+    def setup_method(self):
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+
+    def test_get_preferences_defaults(self, client, tmp_path, monkeypatch):
+        """GET /api/pour-over/preferences returns defaults."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        response = client.get("/api/pour-over/preferences")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["free"]["autoStart"] is True
+        assert data["ratio"]["machineIntegration"] is False
+
+    def test_put_preferences(self, client, tmp_path, monkeypatch):
+        """PUT /api/pour-over/preferences saves and returns preferences."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        payload = {
+            "free": {"autoStart": False, "bloomEnabled": True,
+                     "bloomSeconds": 45, "machineIntegration": False},
+            "ratio": {"autoStart": True, "bloomEnabled": False,
+                      "bloomSeconds": 20, "machineIntegration": True},
+        }
+        response = client.put("/api/pour-over/preferences", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["free"]["autoStart"] is False
+        assert data["free"]["bloomSeconds"] == 45
+        assert data["ratio"]["bloomEnabled"] is False
+        assert data["ratio"]["machineIntegration"] is True
+
+    def test_put_then_get_round_trip(self, client, tmp_path, monkeypatch):
+        """PUT then GET returns the same preferences."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        payload = {
+            "free": {"autoStart": False, "bloomEnabled": False,
+                     "bloomSeconds": 60, "machineIntegration": True},
+            "ratio": {"autoStart": False, "bloomEnabled": True,
+                      "bloomSeconds": 15, "machineIntegration": False},
+        }
+        client.put("/api/pour-over/preferences", json=payload)
+
+        prefs.reset_cache()  # force re-read from disk
+        response = client.get("/api/pour-over/preferences")
+        data = response.json()
+        assert data["free"]["autoStart"] is False
+        assert data["free"]["bloomSeconds"] == 60
+        assert data["ratio"]["bloomSeconds"] == 15
+
+    def test_put_partial_payload_defaults(self, client, tmp_path, monkeypatch):
+        """PUT with partial data fills missing fields from defaults."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        response = client.put("/api/pour-over/preferences", json={
+            "free": {"autoStart": False},
+            "ratio": {},
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["free"]["autoStart"] is False
+        assert data["free"]["bloomEnabled"] is True  # default
+        assert data["ratio"]["autoStart"] is True     # default
+
+
+# ============================================================================
 # Profile shortDescription Validation Tests
 # ============================================================================
 

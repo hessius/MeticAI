@@ -78,6 +78,12 @@ class GenerationState:
             except asyncio.TimeoutError:
                 # Send keepalive / client can reconnect
                 break
+            finally:
+                # Remove the waiter so emit() doesn't set results on orphans
+                try:
+                    self._waiters.remove(waiter)
+                except ValueError:
+                    pass  # already removed by emit()
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize current state for SSE."""

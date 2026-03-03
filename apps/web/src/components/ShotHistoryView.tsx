@@ -2271,7 +2271,7 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
                         ))}
 
                         {!aiConfigured && !hideAiWhenUnavailable && (
-                          <p className="text-[11px] text-muted-foreground text-center">AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.</p>
+                          <p className="text-[11px] text-muted-foreground text-center">{t('shotHistory.aiUnavailable')}</p>
                         )}
                       </div>
                     </div>

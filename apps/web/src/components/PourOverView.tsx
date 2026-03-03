@@ -13,7 +13,8 @@ import { ArrowLeft, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffe
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { tareScale, startShot, stopShot } from '@/lib/mqttCommands'
-import { preparePourOver, cleanupPourOver, forceCleanupPourOver } from '@/lib/pourOverApi'
+import { preparePourOver, cleanupPourOver, forceCleanupPourOver, getPourOverPreferences, savePourOverPreferences } from '@/lib/pourOverApi'
+import type { PourOverPreferences } from '@/lib/pourOverApi'
 
 interface PourOverViewProps {
   machineState: MachineState
@@ -313,6 +314,80 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // Track previous brewing state for transition detection
   const prevBrewingRef = useRef(false)
 
+  // ── Server-side preferences persistence ──
+  const prefsRef = useRef<PourOverPreferences | null>(null)
+  const prefsLoadedRef = useRef(false)
+
+  // Load preferences from server on mount
+  useEffect(() => {
+    let cancelled = false
+    getPourOverPreferences()
+      .then((prefs) => {
+        if (cancelled) return
+        prefsRef.current = prefs
+        prefsLoadedRef.current = true
+        // Apply the current mode's preferences
+        const mp = prefs.free // starts on 'free'
+        setAutoStartEnabled(mp.autoStart)
+        setBloomEnabled(mp.bloomEnabled)
+        setBloomSeconds(String(mp.bloomSeconds))
+        setMeticulousIntegration(mp.machineIntegration)
+      })
+      .catch(() => {
+        // Silently keep defaults if server unreachable
+        prefsLoadedRef.current = true
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  // Apply stored preferences when mode changes (after initial load)
+  const applyModePrefs = useCallback((newMode: 'free' | 'ratio') => {
+    setMode(newMode)
+    if (!prefsRef.current) return
+    const mp = prefsRef.current[newMode]
+    setAutoStartEnabled(mp.autoStart)
+    setBloomEnabled(mp.bloomEnabled)
+    setBloomSeconds(String(mp.bloomSeconds))
+    setMeticulousIntegration(mp.machineIntegration)
+  }, [])
+
+  // Persist preferences to server (fire-and-forget, debounce-safe via ref)
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const persistPrefs = useCallback(() => {
+    if (!prefsLoadedRef.current) return
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current)
+    persistTimerRef.current = setTimeout(() => {
+      if (prefsRef.current) {
+        savePourOverPreferences(prefsRef.current).catch(() => {})
+      }
+    }, 500)
+  }, [])
+
+  // Helpers that update local state + prefs ref + trigger persist
+  const updateAutoStart = useCallback((v: boolean) => {
+    setAutoStartEnabled(v)
+    if (prefsRef.current) { prefsRef.current[mode].autoStart = v; persistPrefs() }
+  }, [mode, persistPrefs])
+
+  const updateBloomEnabled = useCallback((v: boolean) => {
+    setBloomEnabled(v)
+    if (prefsRef.current) { prefsRef.current[mode].bloomEnabled = v; persistPrefs() }
+  }, [mode, persistPrefs])
+
+  const updateBloomSeconds = useCallback((v: string) => {
+    setBloomSeconds(v)
+    const n = Number(v)
+    if (prefsRef.current && !isNaN(n) && n > 0) {
+      prefsRef.current[mode].bloomSeconds = n
+      persistPrefs()
+    }
+  }, [mode, persistPrefs])
+
+  const updateMachineIntegration = useCallback((v: boolean) => {
+    setMeticulousIntegration(v)
+    if (prefsRef.current) { prefsRef.current[mode].machineIntegration = v; persistPrefs() }
+  }, [mode, persistPrefs])
+
   const previousWeightRef = useRef<number | null>(null)
   const previousWeightTimestampRef = useRef<number | null>(null)
   const trendStartTimestampRef = useRef<number | null>(null)
@@ -530,13 +605,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       forceCleanupPourOver().catch(() => {})
       setMachineLifecycle('idle')
     }
-    setMeticulousIntegration(enabled)
+    updateMachineIntegration(enabled)
     if (enabled) {
       setMachineLifecycle('idle')
       // Disable auto-start when integration is active
-      setAutoStartEnabled(false)
+      updateAutoStart(false)
     }
-  }, [machineLifecycle])
+  }, [machineLifecycle, updateMachineIntegration, updateAutoStart])
 
   // Reset machine lifecycle when done (allow starting again)
   const resetMachineLifecycle = useCallback(() => {
@@ -886,19 +961,19 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                         onIncrement={() => setDoseGrams(prev => String((parseFloat(prev) || 0) + 1))}
                         label="+"
                       />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 h-10 px-3 ml-1 gap-1.5"
-                        disabled={!machineState.connected || weight <= 0}
-                        onClick={() => { setDoseGrams(weight.toFixed(1)); handleTare(); }}
-                        title={t('pourOver.weighFromScaleTitle')}
-                        aria-label={t('pourOver.weighFromScale')}
-                      >
-                        <Scales size={16} weight="bold" />
-                        <span className="text-xs">{t('pourOver.weighFromScaleShort')}</span>
-                      </Button>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-9 gap-1.5"
+                      disabled={!machineState.connected || weight <= 0}
+                      onClick={() => { setDoseGrams(weight.toFixed(1)); handleTare(); }}
+                      title={t('pourOver.weighFromScaleTitle')}
+                      aria-label={t('pourOver.weighFromScale')}
+                    >
+                      <Scales size={16} weight="bold" />
+                      <span className="text-xs">{t('pourOver.weighFromScaleShort')}</span>
+                    </Button>
                   </div>
                   {/* Ratio */}
                   <div className="space-y-1.5">
@@ -951,7 +1026,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 </div>
                 <Switch
                   checked={autoStartEnabled}
-                  onCheckedChange={setAutoStartEnabled}
+                  onCheckedChange={updateAutoStart}
                   disabled={meticulousIntegration}
                   className="shrink-0"
                 />
@@ -962,7 +1037,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   <p className="text-sm font-medium">{t('pourOver.bloomIndicator')}</p>
                   <p className="text-xs text-muted-foreground">{t('pourOver.bloomDescription')}</p>
                 </div>
-                <Switch checked={bloomEnabled} onCheckedChange={setBloomEnabled} className="shrink-0" />
+                <Switch checked={bloomEnabled} onCheckedChange={updateBloomEnabled} className="shrink-0" />
               </div>
 
               {bloomEnabled && (
@@ -972,7 +1047,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     id="pour-over-bloom"
                     inputMode="numeric"
                     value={bloomSeconds}
-                    onChange={(event) => setBloomSeconds(event.target.value)}
+                    onChange={(event) => updateBloomSeconds(event.target.value)}
                     placeholder="30"
                     className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
                   />
@@ -1006,7 +1081,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         )}
 
         {/* ── 6. Mode tabs at the bottom ── */}
-        <Tabs value={mode} onValueChange={(value) => setMode(value as 'free' | 'ratio')}>
+        <Tabs value={mode} onValueChange={(value) => applyModePrefs(value as 'free' | 'ratio')}>
           <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="free">{t('pourOver.freeMode')}</TabsTrigger>
             <TabsTrigger value="ratio">{t('pourOver.ratioMode')}</TabsTrigger>
