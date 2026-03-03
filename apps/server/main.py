@@ -95,7 +95,7 @@ async def lifespan(app: FastAPI):
     # When the container starts, GEMINI_API_KEY / METICULOUS_IP may be
     # empty in the environment (user configured them via the Settings UI,
     # which writes to /data/settings.json but the Docker env stays blank).
-    # Load them now so that subprocess calls (Gemini CLI) inherit them.
+    # Load them now so that all services see them.
     try:
         from services.settings_service import load_settings
         stored = load_settings()
@@ -143,6 +143,18 @@ async def lifespan(app: FastAPI):
     from services.mqtt_service import get_mqtt_subscriber
     mqtt_sub = get_mqtt_subscriber()
     mqtt_sub.start(asyncio.get_running_loop())
+    
+    # Clean up any orphaned temp profiles from previous sessions
+    try:
+        from services.temp_profile_service import cleanup_stale
+        stale_result = await cleanup_stale()
+        if stale_result.get("deleted", 0) > 0:
+            logger.info(
+                "Cleaned %d stale temp profile(s) at startup",
+                stale_result["deleted"],
+            )
+    except Exception as e:
+        logger.warning("Failed to clean stale temp profiles at startup: %s", e)
     
     yield
     
@@ -212,7 +224,7 @@ async def _httpx_connect_timeout(_request: Request, exc: httpx.ConnectTimeout):
 
 
 # Import route modules
-from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands
+from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands, pour_over
 
 # Middleware for request logging and tracking
 @app.middleware("http")
@@ -304,6 +316,7 @@ app.include_router(scheduling.router)
 app.include_router(bridge.router)
 app.include_router(websocket.router)
 app.include_router(commands.router)
+app.include_router(pour_over.router)
 
 
 # ============================================================================

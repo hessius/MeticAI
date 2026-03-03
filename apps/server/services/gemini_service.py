@@ -14,15 +14,12 @@ logger = get_logger()
 _gemini_client: Optional[genai.Client] = None
 _MODEL_NAME = "gemini-2.0-flash"
 
-# Lines the Gemini CLI may leak into stdout that are not part of the response
+# Noise prefixes to filter from error messages (used by parse_gemini_error)
 _GEMINI_NOISE_PREFIXES = (
     "YOLO mode is enabled",
     "Hook registry initialized",
     "Error executing tool ",
 )
-
-# ANSI escape code pattern
-_ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
 
 # Shared espresso profiling knowledge for LLM context.
 # Used by shot analysis, profile description generation, and description conversion.
@@ -324,40 +321,11 @@ PROFILING_KNOWLEDGE_DISTILLED = """\
 """
 
 
-def clean_gemini_output(text: str) -> str:
-    """Strip Gemini CLI noise lines and ANSI codes from output.
-    
-    The Gemini CLI sometimes leaks diagnostic lines (YOLO mode, hook registry,
-    MCP tool error retries) into stdout. This function removes them so only
-    the actual LLM response is returned to the user.
-    
-    Args:
-        text: Raw stdout from the Gemini CLI
-        
-    Returns:
-        Cleaned text with only the LLM response
-    """
-    if not text:
-        return text
-    
-    # Strip ANSI escape codes
-    text = _ANSI_ESCAPE.sub('', text)
-    
-    # Filter out noise lines
-    lines = text.split('\n')
-    clean_lines = [
-        line for line in lines
-        if not any(line.strip().startswith(prefix) for prefix in _GEMINI_NOISE_PREFIXES)
-    ]
-    
-    return '\n'.join(clean_lines).strip()
-
-
 def parse_gemini_error(error_text: str) -> str:
-    """Parse Gemini CLI error output and return a user-friendly message.
+    """Parse Gemini SDK/API error output and return a user-friendly message.
     
-    The Gemini CLI often returns verbose stack traces. This function extracts
-    the meaningful error message for display to end users.
+    Extracts the meaningful error message from verbose error details
+    for display to end users.
     
     Args:
         error_text: Raw stderr output from the Gemini CLI
@@ -460,7 +428,7 @@ def parse_gemini_error(error_text: str) -> str:
             if len(extracted) > 10 and not extracted.startswith('/') and not extracted.startswith('file:'):
                 return extracted[:200]  # Limit length
     
-    # Fallback: strip Gemini CLI noise lines before returning
+    # Fallback: strip noise lines before returning
     clean_error = error_text
     for prefix in _GEMINI_NOISE_PREFIXES:
         clean_error = '\n'.join(

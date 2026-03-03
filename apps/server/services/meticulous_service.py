@@ -343,6 +343,11 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
     display = data.get("display") or {}
     if not isinstance(display, dict):
         display = {}
+    # Truncate shortDescription to 99 chars — the Meticulous app rejects
+    # longer values and may display garbled text.
+    short_desc = display.get("shortDescription")
+    if isinstance(short_desc, str) and len(short_desc) > 99:
+        display["shortDescription"] = short_desc[:99]
     # Preserve any existing description; normalise structure
     data["display"] = display
 
@@ -396,6 +401,11 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
     return data
 
 
+class DuplicateProfileNameError(ValueError):
+    """Raised when attempting to create a profile with a name that already exists."""
+    pass
+
+
 @_wrap_machine_call
 async def async_create_profile(profile_json):
     """Upload a profile to the machine via its REST API.
@@ -403,7 +413,28 @@ async def async_create_profile(profile_json):
     Normalises the espresso-profile-schema JSON (as produced by the AI model)
     into the machine-compatible format and POSTs it to ``/api/v1/profile/save``,
     following the same approach used by the MCP server's ``create_profile`` tool.
+    
+    Raises:
+        DuplicateProfileNameError: If a profile with the same name already exists.
     """
+    # Check for duplicate profile names (uses cached list, ~0ms if warm)
+    profile_name = profile_json.get("name") if isinstance(profile_json, dict) else None
+    if profile_name:
+        try:
+            existing_profiles = await async_list_profiles()
+            if existing_profiles and not isinstance(existing_profiles, dict):
+                existing_names = [getattr(p, "name", None) for p in existing_profiles]
+                if profile_name in existing_names:
+                    raise DuplicateProfileNameError(
+                        f"A profile named '{profile_name}' already exists. "
+                        f"Please choose a unique name."
+                    )
+        except DuplicateProfileNameError:
+            raise
+        except Exception as e:
+            # Don't block creation if we can't check duplicates
+            logger.warning("Could not check for duplicate profile names: %s", e)
+    
     normalised = _normalize_profile_for_machine(profile_json)
     base_url = _resolve_meticulous_base_url()
     client = _get_http_client()

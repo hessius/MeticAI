@@ -831,7 +831,31 @@
     "waitingForWeight": "Waiting for weight updates…",
     "weightLegend": "weight",
     "flowLegend": "flow",
-    "weightTrendLabel": "Weight trend"
+    "weightTrendLabel": "Weight trend",
+    "integration": {
+      "toggle": "Machine integration",
+      "toggleDescription": "Create and run a profile on your Meticulous machine with these pour-over settings.",
+      "startOnMachine": "Start on machine",
+      "stop": "Stop",
+      "newShot": "New shot",
+      "profileReady": "Profile loaded — starting shot on machine.",
+      "cleanupSuccess": "Temporary profile cleaned up.",
+      "forceCleanupUsed": "Profile cleaned up (purge skipped).",
+      "cleanupFailed": "Failed to clean up temporary profile.",
+      "abortCleanupSuccess": "Shot stopped and profile removed.",
+      "prepareFailed": "Failed to prepare profile on machine.",
+      "invalidWeight": "Set a valid dose and ratio to calculate target weight.",
+      "shotEndedAt": "Shot ended at",
+      "status": {
+        "preparing": "Preparing profile…",
+        "ready": "Profile loaded — waiting for machine…",
+        "brewing": "Brewing on machine…",
+        "drawdown": "Target reached — timing drawdown…",
+        "purging": "Cleaning up profile…",
+        "done": "Shot complete!",
+        "error": "Something went wrong."
+      }
+    }
   },
   "results": {
     "profileGenerated": "Profile Generated!",

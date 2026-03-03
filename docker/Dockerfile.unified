@@ -153,6 +153,10 @@ RUN chmod +x /etc/s6-overlay/scripts/data-migrate
 # Create data directory for persistent storage
 VOLUME ["/data"]
 
+# Copy default data files (templates, etc.)
+# These are placed in /app/defaults and copied to /data at startup if missing
+COPY data/PourOverBase.json /app/defaults/PourOverBase.json
+
 # Environment variables
 ENV DATA_DIR=/data
 ENV METICULOUS_IP=meticulous.local

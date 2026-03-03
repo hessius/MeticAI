@@ -8,20 +8,20 @@
 - "Ready to release" does **not** imply permission to release.
 
 ## Project Overview
-MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. It uses Google Gemini 2.0 Flash (via the Gemini CLI) to analyze coffee bags, understand roast profiles, and automatically create espresso recipes. A React-based web UI lets users interact with the system, change settings, browse shot history, and manage profiles.
+MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. It uses Google Gemini 2.0 Flash (via the Python SDK) to analyze coffee bags, understand roast profiles, and automatically create espresso recipes. A React-based web UI lets users interact with the system, change settings, browse shot history, and manage profiles.
 
-**Current version**: 2.0.5
+**Current version**: 2.1.0
 
 ## Technology Stack
 
 ### Core Technologies
 - **Python 3.12** (FastAPI backend)
 - **React + TypeScript** (Web frontend, built with Vite/Bun)
-- **Gemini CLI** (`@google/gemini-cli`, installed globally via npm)
+- **Google Gemini Python SDK** (`google-genai`) for AI/Vision
 - **Docker & Docker Compose** (Single unified container)
 - **s6-overlay** (Process supervision inside the container)
 - **nginx** (Reverse proxy — single entry point on port 3550)
-- **FastMCP v1.26.0** (MCP server for Meticulous machine communication)
+- **FastMCP v1.26.0** (MCP server for external integrations - optional)
 - **Google Gemini 2.0 Flash** (AI/Vision model)
 
 ### Key Python Dependencies
@@ -40,18 +40,17 @@ Everything runs inside a **single Docker container** (`meticai`), managed by **s
 
 Internal services:
 1. **nginx** (port 3550) — Serves the React SPA and proxies `/api/*` to the FastAPI server
-2. **server** (port 8000, internal) — FastAPI application: coffee analysis, profile management, settings, shot history, scheduling, MQTT commands
-3. **mcp-server** (port 8080, internal) — FastMCP streamable-http server providing `create_profile` and `apply_profile` tools to the Gemini CLI
+2. **server** (port 8000, internal) — FastAPI application: coffee analysis, profile generation via Gemini SDK, profile management, settings, shot history, scheduling, MQTT commands
+3. **mcp-server** (port 8080, internal) — FastMCP streamable-http server for external integrations (Claude Desktop, Cursor, etc.) — optional, not required for core profile creation
 4. **mosquitto** (port 1883, internal) — Lightweight MQTT broker for real-time machine telemetry
 5. **meticulous-bridge** — Socket.IO → MQTT bridge based on `@nickwilsonr/meticulous-addon`; connects to the Meticulous machine and publishes sensor data to mosquitto
-6. **Gemini CLI** — Invoked as a subprocess by the FastAPI server when profile creation is needed; connects to the MCP server at `http://localhost:8080/mcp`
 
 ### Request Flow
 ```
 User/iOS Shortcut → :3550 (nginx) → /api/* → :8000 (FastAPI)
                                    → /*    → React SPA
 
-FastAPI → subprocess: gemini CLI → MCP tools → :8080 (FastMCP) → Meticulous machine
+FastAPI → Gemini Python SDK → profile JSON → direct HTTP to Meticulous machine
 
 Meticulous machine ← Socket.IO → meticulous-bridge → MQTT → mosquitto (:1883)
 FastAPI → WebSocket /api/ws/live ← subscribes to MQTT topics → browser

@@ -43,6 +43,7 @@ def _reset_in_memory_caches():
     import services.settings_service as _ss
     import services.history_service as _hs
     import services.meticulous_service as _ms
+    import services.temp_profile_service as _tps
 
     _cs._llm_cache = None
     _cs._shot_cache = None
@@ -50,6 +51,7 @@ def _reset_in_memory_caches():
     _hs._history_cache = None
     _ms._profile_list_cache = None
     _ms._profile_list_cache_time = 0.0
+    _tps._set_active(None)
 
     # Also reset settings file on disk to defaults to prevent cross-test leaks
     from config import DATA_DIR

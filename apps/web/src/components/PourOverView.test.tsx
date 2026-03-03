@@ -7,6 +7,22 @@ import type { MachineState } from '@/hooks/useWebSocket'
 
 const mockCmd = vi.fn()
 
+// Track mock state for useMachineActions
+const mockMachineActions = {
+  cmd: mockCmd,
+  isBrewing: false,
+  isConnected: true,
+  canStart: true,
+  isClickToPurge: false,
+  stateLC: 'idle',
+  isIdle: true,
+  isPreheating: false,
+  isHeating: false,
+  isReady: false,
+  isPourWater: false,
+  canAbortWarmup: false,
+}
+
 // Mock react-i18next to return English translations
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -31,6 +47,25 @@ vi.mock('react-i18next', () => ({
         'pourOver.doseLabel': 'Dose (g)',
         'pourOver.ratioLabel': 'Ratio (1:x)',
         'pourOver.weighFromScale': 'Weigh from scale',
+        'pourOver.integration.toggle': 'Machine integration',
+        'pourOver.integration.toggleDescription': 'Create and run a profile on your Meticulous machine.',
+        'pourOver.integration.startOnMachine': 'Start on machine',
+        'pourOver.integration.stop': 'Stop',
+        'pourOver.integration.newShot': 'New shot',
+        'pourOver.integration.invalidWeight': 'Set a valid dose and ratio.',
+        'pourOver.integration.status.preparing': 'Preparing profile…',
+        'pourOver.integration.status.ready': 'Profile loaded',
+        'pourOver.integration.status.brewing': 'Brewing on machine…',
+        'pourOver.integration.status.drawdown': 'Target reached — timing drawdown…',
+        'pourOver.integration.status.purging': 'Cleaning up profile…',
+        'pourOver.integration.status.done': 'Shot complete!',
+        'pourOver.integration.status.error': 'Something went wrong.',
+        'pourOver.integration.shotEndedAt': 'Shot ended at',
+        'pourOver.autoStartTimer': 'Auto-start timer',
+        'pourOver.autoStartDescription': 'Starts when pour is detected.',
+        'pourOver.bloomIndicator': 'Bloom indicator',
+        'pourOver.bloomDescription': 'Shows a bloom countdown.',
+        'pourOver.bloomDuration': 'Bloom duration (sec)',
         'common.back': 'Back',
       }
       return translations[key] || key
@@ -48,11 +83,28 @@ vi.mock('framer-motion', () => ({
 }))
 
 vi.mock('@/hooks/useMachineActions', () => ({
-  useMachineActions: () => ({ cmd: mockCmd }),
+  useMachineActions: () => mockMachineActions,
 }))
 
 vi.mock('@/lib/mqttCommands', () => ({
   tareScale: 'tare_scale',
+  startShot: vi.fn().mockResolvedValue({ success: true }),
+  stopShot: vi.fn().mockResolvedValue({ success: true }),
+}))
+
+vi.mock('@/lib/pourOverApi', () => ({
+  preparePourOver: vi.fn().mockResolvedValue({ profile_id: 'test-id', profile_name: 'MeticAI Ratio Pour-Over', loaded: true }),
+  cleanupPourOver: vi.fn().mockResolvedValue({ deleted: true, purged: true }),
+  forceCleanupPourOver: vi.fn().mockResolvedValue({ deleted: true }),
+  getActivePourOver: vi.fn().mockResolvedValue({ active: false }),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  },
 }))
 
 function makeMachineState(overrides: Partial<MachineState> = {}): MachineState {
@@ -89,6 +141,14 @@ function makeMachineState(overrides: Partial<MachineState> = {}): MachineState {
 describe('PourOverView', () => {
   beforeEach(() => {
     mockCmd.mockReset()
+    // Reset machine actions to defaults
+    mockMachineActions.cmd = mockCmd
+    mockMachineActions.isBrewing = false
+    mockMachineActions.isConnected = true
+    mockMachineActions.canStart = true
+    mockMachineActions.isClickToPurge = false
+    mockMachineActions.stateLC = 'idle'
+    mockMachineActions.isIdle = true
   })
 
   it('renders free mode by default with live weight and timer controls', () => {
@@ -178,5 +238,97 @@ describe('PourOverView', () => {
 
     expect(screen.getByText('Flow')).toBeInTheDocument()
     expect(screen.getByText('g/s')).toBeInTheDocument()
+  })
+
+  it('shows machine integration toggle in ratio mode settings', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Switch to ratio mode
+    await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
+
+    // Integration toggle should be visible
+    expect(screen.getByText('Machine integration')).toBeInTheDocument()
+  })
+
+  it('does not show integration toggle in free mode', () => {
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Free mode by default — no integration toggle
+    expect(screen.queryByText('Machine integration')).not.toBeInTheDocument()
+  })
+
+  it('shows "Start on machine" button when integration is enabled', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Switch to ratio mode
+    await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
+
+    // Enable integration
+    const integrationSwitch = screen.getByText('Machine integration').closest('div')?.parentElement?.querySelector('[role="switch"]')
+    expect(integrationSwitch).toBeInTheDocument()
+    await user.click(integrationSwitch!)
+
+    // Should show machine-specific start button
+    expect(screen.getByRole('button', { name: /Start on machine/i })).toBeInTheDocument()
+  })
+
+  it('disables auto-start when integration is toggled on', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Switch to ratio mode
+    await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
+
+    // Enable integration
+    const integrationSwitch = screen.getByText('Machine integration').closest('div')?.parentElement?.querySelector('[role="switch"]')
+    await user.click(integrationSwitch!)
+
+    // Auto-start switch should be disabled
+    const autoStartSwitch = screen.getByText('Auto-start timer').closest('div')?.parentElement?.querySelector('[role="switch"]')
+    expect(autoStartSwitch).toHaveAttribute('disabled')
+  })
+
+  it('disables integration toggle when machine is disconnected', async () => {
+    const user = userEvent.setup()
+    mockMachineActions.isConnected = false
+
+    render(
+      <PourOverView
+        machineState={makeMachineState({ connected: false })}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Switch to ratio mode
+    await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
+
+    // Integration switch should be disabled
+    const integrationSwitch = screen.getByText('Machine integration').closest('div')?.parentElement?.querySelector('[role="switch"]')
+    expect(integrationSwitch).toHaveAttribute('disabled')
   })
 })
