@@ -3,20 +3,24 @@ import { test, expect } from '@playwright/test'
 /**
  * E2E Tests for Pour-Over Mode
  *
+ * These tests require a running MeticAI container (localhost:3550).
+ * They are skipped in CI unless BASE_URL is explicitly set.
+ *
  * Tests:
  * - Navigation to pour-over
  * - Timer controls
  * - View elements
  */
 
-const BASE_URL_SET = !!process.env.BASE_URL
 const BASE = process.env.BASE_URL || 'http://localhost:3550'
-const needsDocker = BASE_URL_SET && BASE.includes('3550')
+// These tests need a running server — skip when none is configured
+const serverAvailable = !!process.env.BASE_URL
 
 test.describe('Pour-Over View', () => {
   test.use({ baseURL: BASE })
 
   test.beforeEach(async ({ page }) => {
+    test.skip(!serverAvailable, 'Requires running MeticAI server (set BASE_URL)')
     await page.goto('/')
     await page.waitForSelector('text=MeticAI')
     await page.waitForLoadState('networkidle')
@@ -33,11 +37,6 @@ test.describe('Pour-Over View', () => {
   })
 
   test('should display timer controls', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
     const pourOverButton = page.getByRole('button', { name: /Pour-over/i })
     await expect(pourOverButton).toBeVisible({ timeout: 5000 })
     await pourOverButton.click()
@@ -48,11 +47,6 @@ test.describe('Pour-Over View', () => {
   })
 
   test('should display recipe settings', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
     const pourOverButton = page.getByRole('button', { name: /Pour-over/i })
     await expect(pourOverButton).toBeVisible({ timeout: 5000 })
     await pourOverButton.click()
@@ -64,11 +58,6 @@ test.describe('Pour-Over View', () => {
   })
 
   test('should allow navigation back', async ({ page }) => {
-    if (!needsDocker) {
-      test.skip()
-      return
-    }
-
     const pourOverButton = page.getByRole('button', { name: /Pour-over/i })
     await expect(pourOverButton).toBeVisible({ timeout: 5000 })
     await pourOverButton.click()
