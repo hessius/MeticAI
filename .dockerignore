@@ -37,6 +37,7 @@ apps/web/STORYBOOK.md
 
 # Local data and logs
 data/
+!data/PourOverBase.json
 logs/
 *.log
 

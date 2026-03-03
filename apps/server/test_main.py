@@ -4672,21 +4672,24 @@ class TestImageProxyEndpoint:
 
     @patch('api.routes.profiles._get_cached_image')
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_image_proxy_profile_not_found(self, mock_list_profiles, mock_get_cache, client):
-        """Test error when profile not found."""
+    def test_image_proxy_profile_not_found_returns_placeholder(self, mock_list_profiles, mock_get_cache, client):
+        """Test placeholder SVG returned when profile not found."""
         mock_get_cache.return_value = None
         
         mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/Nonexistent/image-proxy")
         
-        assert response.status_code == 404
+        # Returns placeholder SVG instead of 404
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert b"<svg" in response.content
 
     @patch('api.routes.profiles._get_cached_image')
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_image_proxy_no_image(self, mock_list_profiles, mock_get_profile, mock_get_cache, client):
-        """Test error when profile has no image."""
+    def test_image_proxy_no_image_returns_placeholder(self, mock_list_profiles, mock_get_profile, mock_get_cache, client):
+        """Test placeholder SVG returned when profile has no image."""
         mock_get_cache.return_value = None
         
         mock_profile = type('Profile', (), {})()
@@ -4703,7 +4706,10 @@ class TestImageProxyEndpoint:
         
         response = client.get("/api/profile/No%20Image/image-proxy")
         
-        assert response.status_code == 404
+        # Returns placeholder SVG instead of 404
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert b"<svg" in response.content
 
     @patch('httpx.AsyncClient')
     @patch('api.routes.profiles._set_cached_image')
@@ -5054,14 +5060,16 @@ class TestGetProfileInfoEndpoint:
         assert data["profile"]["accent_color"] == "#FF5733"
 
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_get_profile_info_not_found(self, mock_list_profiles, client):
-        """Test error when profile not found."""
+    def test_get_profile_info_not_found_returns_status(self, mock_list_profiles, client):
+        """Test graceful response when profile not found."""
         mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/Nonexistent")
         
-        assert response.status_code == 404
-        assert "not found" in response.json()["detail"]
+        # Returns 200 with status: not_found instead of 404
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "not_found"
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
@@ -9340,13 +9348,16 @@ class TestProfileEndpointsCoverage:
     """Additional tests for profile endpoints coverage."""
 
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_get_profile_not_found(self, mock_list_profiles, client):
-        """Test get profile when profile doesn't exist."""
+    def test_get_profile_not_found_returns_status(self, mock_list_profiles, client):
+        """Test get profile returns graceful response when profile doesn't exist."""
         mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/NonExistent")
         
-        assert response.status_code == 404
+        # Returns 200 with status: not_found instead of 404
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "not_found"
 
 
 class TestMachineControlEndpoints:
@@ -11235,4 +11246,547 @@ class TestDataLoadingHardening:
             hs.HISTORY_FILE = old_file
             hs._history_cache = old_cache
 
+
+# ============================================================================
+# Pour-Over Profile Adaptation Tests
+# ============================================================================
+
+
+class TestAdaptPourOverProfile:
+    """Tests for services.pour_over_adapter.adapt_pour_over_profile()."""
+
+    def test_adapt_basic_with_bloom(self):
+        """Adaptation with bloom enabled produces correct profile structure."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=250.0,
+            bloom_enabled=True,
+            bloom_seconds=45.0,
+            dose_grams=18.0,
+            brew_ratio=13.9,
+        )
+
+        assert profile["final_weight"] == 250.0
+        assert profile["name"] == "MeticAI Ratio Pour-Over"
+        assert len(profile["stages"]) == 2
+
+        # Bloom stage
+        bloom = profile["stages"][0]
+        assert "Bloom" in bloom["name"]
+        assert "45s" in bloom["name"]
+        time_triggers = [t for t in bloom["exit_triggers"] if t["type"] == "time"]
+        assert len(time_triggers) == 1
+        assert time_triggers[0]["value"] == 45.0
+
+        # Infusion stage
+        infusion = profile["stages"][1]
+        assert "Infusion" in infusion["name"]
+        assert "250g" in infusion["name"]
+        weight_triggers = [t for t in infusion["exit_triggers"] if t["type"] == "weight"]
+        assert len(weight_triggers) == 1
+        assert weight_triggers[0]["value"] == 250.0
+
+    def test_adapt_without_bloom(self):
+        """Adaptation with bloom disabled removes bloom stage."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=300.0,
+            bloom_enabled=False,
+        )
+
+        assert profile["final_weight"] == 300.0
+        assert len(profile["stages"]) == 1
+        assert profile["name"] == "MeticAI Ratio Pour-Over"
+
+        stage = profile["stages"][0]
+        assert "Infusion" in stage["name"]
+        assert "300g" in stage["name"]
+        weight_triggers = [t for t in stage["exit_triggers"] if t["type"] == "weight"]
+        assert weight_triggers[0]["value"] == 300.0
+
+    def test_adapt_unique_id(self):
+        """Each adaptation generates a unique profile ID."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        p1 = adapt_pour_over_profile(target_weight=200.0)
+        p2 = adapt_pour_over_profile(target_weight=200.0)
+        assert p1["id"] != p2["id"]
+
+    def test_adapt_short_description(self):
+        """Short description includes target, dose, and ratio info."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=250.0,
+            dose_grams=18.0,
+            brew_ratio=13.9,
+        )
+        short_desc = profile.get("display", {}).get("shortDescription", "")
+        assert "250g" in short_desc
+        assert "18.0g" in short_desc
+        assert "13.9" in short_desc
+        assert len(short_desc) <= 99
+
+    def test_adapt_short_description_truncated(self):
+        """Short description is truncated to 99 chars."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=250.0,
+            dose_grams=18.0,
+            brew_ratio=13.9,
+        )
+        short_desc = profile.get("display", {}).get("shortDescription", "")
+        assert len(short_desc) <= 99
+
+    def test_adapt_does_not_mutate_template(self):
+        """Adaptation does not modify the loaded template."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        p1 = adapt_pour_over_profile(target_weight=100.0, bloom_enabled=False)
+        p2 = adapt_pour_over_profile(target_weight=500.0, bloom_enabled=True, bloom_seconds=60.0)
+
+        # p2 should still have 2 stages (bloom not removed from template)
+        assert len(p2["stages"]) == 2
+        assert p2["final_weight"] == 500.0
+
+    def test_adapt_default_bloom_seconds(self):
+        """Default bloom seconds is 30."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(target_weight=200.0, bloom_enabled=True)
+        bloom = profile["stages"][0]
+        time_triggers = [t for t in bloom["exit_triggers"] if t["type"] == "time"]
+        assert time_triggers[0]["value"] == 30.0
+
+    def test_adapt_preserves_template_structure(self):
+        """Adapted profile preserves variables, dynamics, etc."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(target_weight=200.0)
+        assert "variables" in profile
+        assert profile["temperature"] == 0
+        for stage in profile["stages"]:
+            assert "dynamics" in stage
+            assert "exit_triggers" in stage
+
+
+# ============================================================================
+# TempProfileService Tests
+# ============================================================================
+
+
+class TestTempProfileService:
+    """Tests for services.temp_profile_service."""
+
+    def setup_method(self):
+        """Reset module state before each test."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+    def test_get_active_none(self):
+        """get_active returns None when no temp profile is active."""
+        import services.temp_profile_service as tps
+        assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_create_and_load_success(self):
+        """create_and_load creates a profile, loads it, and tracks it."""
+        import services.temp_profile_service as tps
+
+        mock_profile_json = {"name": "MeticAI Ratio Pour-Over", "id": "test-uuid-123"}
+
+        with patch("services.temp_profile_service.async_create_profile") as mock_create, \
+             patch("services.temp_profile_service.async_load_profile_by_id") as mock_load, \
+             patch("services.temp_profile_service.async_list_profiles", return_value=[]):
+            mock_create.return_value = {"id": "machine-uuid-456"}
+            mock_load.return_value = None
+
+            result = await tps.create_and_load(mock_profile_json, params={"target_weight": 250})
+
+            assert result["profile_id"] == "machine-uuid-456"
+            assert result["profile_name"] == "MeticAI Ratio Pour-Over"
+            mock_create.assert_called_once()
+            mock_load.assert_called_once_with("machine-uuid-456")
+
+            active = tps.get_active()
+            assert active is not None
+            assert active["profile_id"] == "machine-uuid-456"
+            assert active["original_params"]["target_weight"] == 250
+
+    @pytest.mark.asyncio
+    async def test_create_and_load_preserves_name(self):
+        """create_and_load preserves the profile name from caller."""
+        import services.temp_profile_service as tps
+
+        mock_profile = {"name": "MeticAI Ratio Pour-Over", "id": "test-id"}
+
+        with patch("services.temp_profile_service.async_create_profile") as mock_create, \
+             patch("services.temp_profile_service.async_load_profile_by_id"), \
+             patch("services.temp_profile_service.async_list_profiles", return_value=[]):
+            mock_create.return_value = {"id": "abc"}
+            await tps.create_and_load(mock_profile)
+
+            created_profile = mock_create.call_args[0][0]
+            assert created_profile["name"] == "MeticAI Ratio Pour-Over"
+
+    @pytest.mark.asyncio
+    async def test_create_and_load_replaces_existing(self):
+        """create_and_load force-cleans existing temp profile first."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="old-id", profile_name="Old Profile"
+        ))
+
+        with patch("services.temp_profile_service.async_create_profile") as mock_create, \
+             patch("services.temp_profile_service.async_load_profile_by_id"), \
+             patch("services.temp_profile_service.async_delete_profile") as mock_delete, \
+             patch("services.temp_profile_service.async_list_profiles", return_value=[]):
+            mock_create.return_value = {"id": "new-id"}
+            await tps.create_and_load({"name": "New", "id": "new-id"})
+
+            # Should have deleted old active + no pre-existing profiles found
+            mock_delete.assert_called_once_with("old-id")
+            active = tps.get_active()
+            assert active["profile_id"] == "new-id"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_success(self):
+        """cleanup purges and deletes the active temp profile."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="cleanup-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+
+        with patch("services.temp_profile_service.async_delete_profile") as mock_delete, \
+             patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
+             patch("api.routes.commands._do_publish"):
+            mock_delete.return_value = None
+            result = await tps.cleanup()
+
+            assert result["status"] == "cleaned_up"
+            assert result["deleted_profile"] == "MeticAI Ratio Pour-Over"
+            mock_delete.assert_called_once_with("cleanup-id")
+            assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_no_active(self):
+        """cleanup returns no_active_profile when nothing is active."""
+        import services.temp_profile_service as tps
+        result = await tps.cleanup()
+        assert result["status"] == "no_active_profile"
+
+    @pytest.mark.asyncio
+    async def test_force_cleanup_success(self):
+        """force_cleanup deletes without purging."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="force-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+
+        with patch("services.temp_profile_service.async_delete_profile") as mock_delete:
+            mock_delete.return_value = None
+            result = await tps.force_cleanup()
+
+            assert result["status"] == "force_cleaned_up"
+            assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_force_cleanup_no_active(self):
+        """force_cleanup returns no_active_profile when nothing is active."""
+        import services.temp_profile_service as tps
+        result = await tps.force_cleanup()
+        assert result["status"] == "no_active_profile"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_delete_fails_gracefully(self):
+        """cleanup reports delete_failed when delete raises."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="fail-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+
+        with patch("services.temp_profile_service.async_delete_profile") as mock_delete, \
+             patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
+             patch("api.routes.commands._do_publish"):
+            mock_delete.side_effect = Exception("Delete error")
+            result = await tps.cleanup()
+
+            assert result["status"] == "delete_failed"
+            assert "Delete error" in result["error"]
+            assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_success(self):
+        """cleanup_stale removes orphaned [Temp] profiles."""
+        import services.temp_profile_service as tps
+
+        mock_profile1 = Mock()
+        mock_profile1.name = "MeticAI Ratio Pour-Over"
+        mock_profile1.id = "stale-1"
+
+        mock_profile2 = Mock()
+        mock_profile2.name = "Regular Profile"
+        mock_profile2.id = "regular-1"
+
+        mock_profile3 = Mock()
+        mock_profile3.name = "Some Other Profile"
+        mock_profile3.id = "other-1"
+
+        with patch("services.temp_profile_service.async_list_profiles") as mock_list, \
+             patch("services.temp_profile_service.async_delete_profile") as mock_delete:
+            mock_list.return_value = [mock_profile1, mock_profile2, mock_profile3]
+            mock_delete.return_value = None
+
+            result = await tps.cleanup_stale()
+
+            assert result["deleted"] == 1
+            assert mock_delete.call_count == 1
+            # Only the known temp profile name should be deleted
+            deleted_ids = [call[0][0] for call in mock_delete.call_args_list]
+            assert "stale-1" in deleted_ids
+            assert "regular-1" not in deleted_ids
+            assert "other-1" not in deleted_ids
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_machine_unreachable(self):
+        """cleanup_stale handles machine unreachable gracefully."""
+        import services.temp_profile_service as tps
+        from services.meticulous_service import MachineUnreachableError
+
+        with patch("services.temp_profile_service.async_list_profiles") as mock_list:
+            mock_list.side_effect = MachineUnreachableError()
+            result = await tps.cleanup_stale()
+
+            assert result["deleted"] == 0
+            assert result.get("skipped") == "machine_unreachable"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_no_profiles(self):
+        """cleanup_stale handles empty profile list."""
+        import services.temp_profile_service as tps
+
+        with patch("services.temp_profile_service.async_list_profiles") as mock_list:
+            mock_list.return_value = []
+            result = await tps.cleanup_stale()
+            assert result["deleted"] == 0
+
+
+# ============================================================================
+# Pour-Over API Endpoint Tests
+# ============================================================================
+
+
+class TestPourOverEndpoints:
+    """Tests for /api/pour-over/* endpoints."""
+
+    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
+    @patch("services.temp_profile_service.async_create_profile")
+    @patch("services.temp_profile_service.async_load_profile_by_id")
+    def test_prepare_success(self, mock_load, mock_create, mock_list, client):
+        """POST /api/pour-over/prepare creates and loads a temp profile."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        mock_create.return_value = {"id": "prep-id-123"}
+        mock_load.return_value = None
+
+        response = client.post("/api/pour-over/prepare", json={
+            "target_weight": 250.0,
+            "bloom_enabled": True,
+            "bloom_seconds": 45.0,
+            "dose_grams": 18.0,
+            "brew_ratio": 13.9,
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_id"] == "prep-id-123"
+        assert data["profile_name"] == "MeticAI Ratio Pour-Over"
+
+    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
+    @patch("services.temp_profile_service.async_create_profile")
+    @patch("services.temp_profile_service.async_load_profile_by_id")
+    def test_prepare_without_bloom(self, mock_load, mock_create, mock_list, client):
+        """POST /api/pour-over/prepare works without bloom."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        mock_create.return_value = {"id": "no-bloom-id"}
+
+        response = client.post("/api/pour-over/prepare", json={
+            "target_weight": 300.0,
+            "bloom_enabled": False,
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_id"] == "no-bloom-id"
+
+    def test_prepare_invalid_weight(self, client):
+        """POST /api/pour-over/prepare rejects non-positive weight."""
+        response = client.post("/api/pour-over/prepare", json={
+            "target_weight": 0,
+        })
+        assert response.status_code == 422
+
+    def test_prepare_missing_weight(self, client):
+        """POST /api/pour-over/prepare requires target_weight."""
+        response = client.post("/api/pour-over/prepare", json={})
+        assert response.status_code == 422
+
+    @patch("services.temp_profile_service.async_delete_profile")
+    def test_cleanup_success(self, mock_delete, client):
+        """POST /api/pour-over/cleanup cleans up the active profile."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="cleanup-ep-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+        mock_delete.return_value = None
+
+        with patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
+             patch("api.routes.commands._do_publish"):
+            response = client.post("/api/pour-over/cleanup")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "cleaned_up"
+
+    def test_cleanup_no_active(self, client):
+        """POST /api/pour-over/cleanup returns no_active_profile."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        response = client.post("/api/pour-over/cleanup")
+        assert response.status_code == 200
+        assert response.json()["status"] == "no_active_profile"
+
+    @patch("services.temp_profile_service.async_delete_profile")
+    def test_force_cleanup_success(self, mock_delete, client):
+        """POST /api/pour-over/force-cleanup deletes without purge."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="force-ep-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+        mock_delete.return_value = None
+
+        response = client.post("/api/pour-over/force-cleanup")
+        assert response.status_code == 200
+        assert response.json()["status"] == "force_cleaned_up"
+
+    def test_force_cleanup_no_active(self, client):
+        """POST /api/pour-over/force-cleanup returns no_active_profile."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        response = client.post("/api/pour-over/force-cleanup")
+        assert response.status_code == 200
+        assert response.json()["status"] == "no_active_profile"
+
+    def test_get_active_none(self, client):
+        """GET /api/pour-over/active returns active=false when none."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        response = client.get("/api/pour-over/active")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["active"] is False
+        assert data["profile_id"] is None
+
+    def test_get_active_with_profile(self, client):
+        """GET /api/pour-over/active returns profile details when active."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="active-id", profile_name="MeticAI Ratio Pour-Over",
+            original_params={"target_weight": 250}
+        ))
+
+        response = client.get("/api/pour-over/active")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["active"] is True
+        assert data["profile_id"] == "active-id"
+        assert data["profile_name"] == "MeticAI Ratio Pour-Over"
+        assert data["original_params"]["target_weight"] == 250
+
+
+# ============================================================================
+# Profile shortDescription Validation Tests
+# ============================================================================
+
+
+class TestShortDescriptionValidation:
+    """Tests for shortDescription truncation in _normalize_profile_for_machine."""
+
+    def test_short_desc_under_limit_unchanged(self):
+        """shortDescription under 99 chars is left unchanged."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        profile = {
+            "name": "Test",
+            "stages": [],
+            "display": {"shortDescription": "Short desc"},
+        }
+        result = _normalize_profile_for_machine(profile)
+        assert result["display"]["shortDescription"] == "Short desc"
+
+    def test_short_desc_over_limit_truncated(self):
+        """shortDescription over 99 chars is truncated."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        long_desc = "A" * 150
+        profile = {
+            "name": "Test",
+            "stages": [],
+            "display": {"shortDescription": long_desc},
+        }
+        result = _normalize_profile_for_machine(profile)
+        assert len(result["display"]["shortDescription"]) == 99
+
+    def test_short_desc_exactly_99_unchanged(self):
+        """shortDescription exactly 99 chars is left unchanged."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        desc = "A" * 99
+        profile = {
+            "name": "Test",
+            "stages": [],
+            "display": {"shortDescription": desc},
+        }
+        result = _normalize_profile_for_machine(profile)
+        assert result["display"]["shortDescription"] == desc
+        assert len(result["display"]["shortDescription"]) == 99
+
+    def test_short_desc_missing_no_error(self):
+        """Missing shortDescription doesn't cause an error."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        profile = {"name": "Test", "stages": [], "display": {}}
+        result = _normalize_profile_for_machine(profile)
+        assert "shortDescription" not in result["display"]
+
+    def test_short_desc_none_no_error(self):
+        """None shortDescription doesn't cause an error."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        profile = {"name": "Test", "stages": [], "display": {"shortDescription": None}}
+        result = _normalize_profile_for_machine(profile)
+        # None is not a string, so it's not truncated
+        assert result["display"]["shortDescription"] is None
 

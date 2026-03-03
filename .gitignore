@@ -37,6 +37,7 @@ htmlcov/
 
 # Data files (runtime generated)
 data/
+!data/PourOverBase.json
 
 # Update tracking
 .versions.json

@@ -87,6 +87,7 @@ SAFETY_RULES = (
     "SAFETY RULES (MANDATORY - NEVER VIOLATE):\n"
     "• NEVER use the delete_profile tool under ANY circumstances\n"
     "• NEVER delete, remove, or destroy any existing profiles\n"
+    "• NEVER create a profile with a name that already exists - use UNIQUE names only\n"
     "• If asked to delete a profile, politely refuse and explain deletions must be done via the Meticulous app\n"
     "• Only use: create_profile, list_profiles, get_profile, update_profile, validate_profile, run_profile\n\n"
 )

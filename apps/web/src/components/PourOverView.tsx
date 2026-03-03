@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,15 +9,19 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Scales, Timer, Drop, Pause, Play, Target } from '@phosphor-icons/react'
+import { ArrowLeft, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { tareScale } from '@/lib/mqttCommands'
+import { tareScale, startShot, stopShot } from '@/lib/mqttCommands'
+import { preparePourOver, cleanupPourOver, forceCleanupPourOver } from '@/lib/pourOverApi'
 
 interface PourOverViewProps {
   machineState: MachineState
   onBack: () => void
 }
+
+/** Machine integration lifecycle phases */
+type MachineLifecycle = 'idle' | 'preparing' | 'ready' | 'brewing' | 'drawdown' | 'purging' | 'done' | 'error'
 
 function formatStopwatch(totalMs: number): string {
   const totalSeconds = Math.floor(totalMs / 1000)
@@ -97,9 +102,11 @@ interface WeightTrendProps {
   mode: 'free' | 'ratio'
   /** Duration of bloom phase in seconds (0 = no bloom) */
   bloomDurationSeconds?: number
+  /** Elapsed seconds at which the machine shot ended (vertical marker line) */
+  machineEndTimeSeconds?: number
 }
 
-function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0 }: WeightTrendProps) {
+function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, machineEndTimeSeconds }: WeightTrendProps) {
   const { t } = useTranslation()
   const width = 360
   // Base height varies by viewport: taller on desktop (h-40 → 160), mobile (h-32 → 128)
@@ -248,6 +255,19 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0 }: W
           {flowPolyline && (
             <polyline fill="none" stroke={CHART_COLORS.flow} strokeWidth="1.5" strokeOpacity="0.7" points={flowPolyline} />
           )}
+          {/* Machine shot end marker — green dashed vertical line */}
+          {machineEndTimeSeconds !== undefined && machineEndTimeSeconds > 0 && (
+            <line
+              x1={toX(machineEndTimeSeconds)}
+              y1={0}
+              x2={toX(machineEndTimeSeconds)}
+              y2={svgHeight}
+              stroke="#22c55e"
+              strokeDasharray="3 2"
+              strokeWidth="1.5"
+              strokeOpacity="0.8"
+            />
+          )}
         </svg>
         {/* Y-axis: Flow scale (right) - cyan color matching flow line */}
         <div className="flex flex-col justify-between text-[9px] w-10 text-left pl-0.5 text-[#67e8f9]/80">
@@ -280,10 +300,18 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [doseGrams, setDoseGrams] = useState('20')
   const [brewRatio, setBrewRatio] = useState('15')
   const [autoStartEnabled, setAutoStartEnabled] = useState(true)
-  const [bloomEnabled, setBloomEnabled] = useState(false)
+  const [bloomEnabled, setBloomEnabled] = useState(true)
   const [bloomSeconds, setBloomSeconds] = useState('30')
   const [weightTrend, setWeightTrend] = useState<WeightPoint[]>([])
   const [flowRate, setFlowRate] = useState<number>(0)
+
+  // Machine integration state
+  const [meticulousIntegration, setMeticulousIntegration] = useState(false)
+  const [machineLifecycle, setMachineLifecycle] = useState<MachineLifecycle>('idle')
+  // Elapsed time at which the machine shot ended (for graph marker + timer annotation)
+  const [machineEndElapsedMs, setMachineEndElapsedMs] = useState<number | null>(null)
+  // Track previous brewing state for transition detection
+  const prevBrewingRef = useRef(false)
 
   const previousWeightRef = useRef<number | null>(null)
   const previousWeightTimestampRef = useRef<number | null>(null)
@@ -291,11 +319,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const justTaredRef = useRef(false)
   // Track continuous flow start time for auto-start confirmation
   const flowStartTimestampRef = useRef<number | null>(null)
-  // Require 750ms of continuous valid flow to trigger auto-start
-  // Shorter than before (2s) to be more responsive while still filtering bumps
-  const FLOW_CONFIRMATION_MS = 750
+  // Require 2000ms of continuous valid flow to trigger auto-start
+  // Longer confirmation prevents false starts from adding grounds to the brewer
+  const FLOW_CONFIRMATION_MS = 2000
 
-  const { cmd } = useMachineActions(machineState)
+  const { cmd, isBrewing, isConnected, canStart, isClickToPurge } = useMachineActions(machineState)
 
   const handleTare = useCallback(() => {
     // Mark that we just tared so the next weight update doesn't auto-start
@@ -362,6 +390,159 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
   const remainingWeight = targetWeight !== null ? Math.max(targetWeight - weight, 0) : null
   const ratioProgress = targetWeight !== null && targetWeight > 0 ? Math.min((weight / targetWeight) * 100, 100) : 0
+
+  // ── Machine integration: detect brewing state transitions ──
+  useEffect(() => {
+    if (!meticulousIntegration) {
+      prevBrewingRef.current = isBrewing
+      return
+    }
+
+    const wasBrewing = prevBrewingRef.current
+    prevBrewingRef.current = isBrewing
+
+    // Machine started brewing → transition to brewing phase
+    if (!wasBrewing && isBrewing && machineLifecycle === 'ready') {
+      setMachineLifecycle('brewing')
+      // Auto-start the local timer when machine starts brewing
+      startTimer()
+    }
+
+    // Machine stopped brewing → transition to drawdown (timer keeps running!)
+    if (wasBrewing && !isBrewing && machineLifecycle === 'brewing') {
+      // Record the elapsed time for the graph marker and timer annotation
+      const endMs = startedAtMs !== null
+        ? baseElapsedMs + (Date.now() - startedAtMs)
+        : baseElapsedMs
+      setMachineEndElapsedMs(endMs)
+      setMachineLifecycle('drawdown')
+      // Cleanup profile in background — timer continues for drawdown timing
+      cleanupPourOver()
+        .then(() => {
+          toast.success(t('pourOver.integration.cleanupSuccess'))
+        })
+        .catch(() => {
+          // Purge may fail if user manually purged; try force cleanup
+          forceCleanupPourOver()
+            .then(() => toast.info(t('pourOver.integration.forceCleanupUsed')))
+            .catch(() => toast.error(t('pourOver.integration.cleanupFailed')))
+        })
+    }
+  }, [isBrewing, meticulousIntegration, machineLifecycle, t, startTimer, startedAtMs, baseElapsedMs])
+
+  // ── Machine integration: detect click-to-purge state ──
+  useEffect(() => {
+    if (!meticulousIntegration) return
+    if (isClickToPurge && machineLifecycle === 'brewing') {
+      // Machine automatically transitioned to purge prompt — shot is done
+      const endMs = startedAtMs !== null
+        ? baseElapsedMs + (Date.now() - startedAtMs)
+        : baseElapsedMs
+      setMachineEndElapsedMs(endMs)
+      setMachineLifecycle('drawdown')
+      // Cleanup profile in background — timer continues for drawdown timing
+      cleanupPourOver()
+        .then(() => toast.success(t('pourOver.integration.cleanupSuccess')))
+        .catch(() => {
+          forceCleanupPourOver().catch(() => {})
+        })
+    }
+  }, [isClickToPurge, meticulousIntegration, machineLifecycle, t, startedAtMs, baseElapsedMs])
+
+  // ── Machine integration: handle start on machine ──
+  const handleMachineStart = useCallback(async () => {
+    if (!meticulousIntegration || machineLifecycle !== 'idle') return
+
+    const parsedTargetWeight = targetWeight
+    if (parsedTargetWeight === null || parsedTargetWeight <= 0) {
+      toast.error(t('pourOver.integration.invalidWeight'))
+      return
+    }
+
+    setMachineLifecycle('preparing')
+    try {
+      await preparePourOver({
+        target_weight: parsedTargetWeight,
+        bloom_enabled: bloomEnabled,
+        bloom_seconds: parsePositiveNumber(bloomSeconds) ?? 30,
+        dose_grams: parsePositiveNumber(doseGrams) ?? 20,
+        brew_ratio: parsePositiveNumber(brewRatio) ?? 15,
+      })
+      setMachineLifecycle('ready')
+      toast.success(t('pourOver.integration.profileReady'))
+
+      // Start the shot on the machine
+      await cmd(startShot, 'started')
+    } catch (err) {
+      setMachineLifecycle('error')
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : t('pourOver.integration.prepareFailed'),
+      )
+    }
+  }, [meticulousIntegration, machineLifecycle, targetWeight, bloomEnabled, bloomSeconds, doseGrams, brewRatio, t, cmd])
+
+  // ── Machine integration: handle abort / stop ──
+  const handleMachineStop = useCallback(async () => {
+    if (!meticulousIntegration) return
+
+    if (machineLifecycle === 'brewing') {
+      // User manually aborted — stop shot, purge, delete
+      await cmd(stopShot, 'stopped')
+      pauseTimer()
+      setMachineLifecycle('purging')
+      // Wait for machine to process the stop command before purging
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      try {
+        await cleanupPourOver()
+        setMachineLifecycle('done')
+        toast.success(t('pourOver.integration.abortCleanupSuccess'))
+      } catch {
+        try {
+          await forceCleanupPourOver()
+          setMachineLifecycle('done')
+          toast.info(t('pourOver.integration.forceCleanupUsed'))
+        } catch {
+          setMachineLifecycle('error')
+          toast.error(t('pourOver.integration.cleanupFailed'))
+        }
+      }
+    } else if (machineLifecycle === 'drawdown') {
+      // Machine shot ended naturally, timer still running for drawdown — just stop it
+      pauseTimer()
+      setMachineLifecycle('done')
+    } else if (machineLifecycle === 'ready' || machineLifecycle === 'preparing') {
+      // Haven't started brewing yet, just force-cleanup
+      try {
+        await forceCleanupPourOver()
+      } catch {
+        // Ignore — profile might not exist yet
+      }
+      setMachineLifecycle('idle')
+    }
+  }, [meticulousIntegration, machineLifecycle, t, cmd, pauseTimer])
+
+  // ── Machine integration: reset lifecycle when toggled off or mode changes ──
+  const handleIntegrationToggle = useCallback((enabled: boolean) => {
+    if (!enabled && machineLifecycle !== 'idle') {
+      // Force cleanup on toggle-off if there's an active profile
+      forceCleanupPourOver().catch(() => {})
+      setMachineLifecycle('idle')
+    }
+    setMeticulousIntegration(enabled)
+    if (enabled) {
+      setMachineLifecycle('idle')
+      // Disable auto-start when integration is active
+      setAutoStartEnabled(false)
+    }
+  }, [machineLifecycle])
+
+  // Reset machine lifecycle when done (allow starting again)
+  const resetMachineLifecycle = useCallback(() => {
+    setMachineLifecycle('idle')
+    setMachineEndElapsedMs(null)
+  }, [])
 
   useEffect(() => {
     const currentWeight = machineState.shot_weight
@@ -512,6 +693,12 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   }
                   return null
                 })()}
+                {/* Machine shot end marker in timer — shows during drawdown */}
+                {machineEndElapsedMs !== null && isRunning && machineLifecycle === 'drawdown' && (
+                  <div className="text-xs font-medium text-green-500 dark:text-green-400 uppercase tracking-wider">
+                    {t('pourOver.integration.shotEndedAt')} {formatStopwatch(machineEndElapsedMs)}
+                  </div>
+                )}
                 {!bloomEnabled && <div className="text-xs text-muted-foreground">{t('pourOver.unitTime')}</div>}
               </div>
 
@@ -555,44 +742,125 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     <span>{ratioProgress.toFixed(0)}%</span>
                   </div>
                   <Progress value={ratioProgress} />
-                  <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} />
+                  <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
                 </div>
               )}
               {mode === 'free' && (
-                <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} />
+                <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
               )}
             </div>
 
             {/* ── 4. Action buttons (always visible) ── */}
-            <div className="grid grid-cols-3 gap-2.5">
-              <Button
-                onClick={startOrPause}
-                variant={autoStartEnabled ? "outline" : "default"}
-                className={`h-11 rounded-xl ${!autoStartEnabled && !isRunning ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : ''}`}
-              >
-                {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
-                {isRunning ? t('pourOver.pause') : t('pourOver.start')}
-              </Button>
+            {meticulousIntegration && mode === 'ratio' ? (
+              /* Machine integration action buttons */
+              <div className="space-y-2.5">
+                {/* Machine lifecycle status banner */}
+                {machineLifecycle !== 'idle' && (
+                  <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+                    machineLifecycle === 'preparing' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                    machineLifecycle === 'ready' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                    machineLifecycle === 'brewing' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
+                    machineLifecycle === 'drawdown' ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400' :
+                    machineLifecycle === 'purging' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' :
+                    machineLifecycle === 'done' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                    'bg-red-500/10 text-red-600 dark:text-red-400'
+                  }`}>
+                    {machineLifecycle === 'preparing' && <CircleNotch size={16} weight="bold" className="animate-spin" />}
+                    {machineLifecycle === 'ready' && <Coffee size={16} weight="fill" />}
+                    {machineLifecycle === 'brewing' && <Coffee size={16} weight="fill" className="animate-pulse" />}
+                    {machineLifecycle === 'drawdown' && <Drop size={16} weight="fill" />}
+                    {machineLifecycle === 'purging' && <CircleNotch size={16} weight="bold" className="animate-spin" />}
+                    {machineLifecycle === 'done' && <CheckCircle size={16} weight="fill" />}
+                    {machineLifecycle === 'error' && <XCircle size={16} weight="fill" />}
+                    <span>{t(`pourOver.integration.status.${machineLifecycle}`)}</span>
+                  </div>
+                )}
 
-              <Button
-                onClick={resetTimer}
-                variant="outline"
-                className="h-11"
-              >
-                <Timer size={18} weight="bold" className="mr-1.5" />
-                {t('pourOver.reset')}
-              </Button>
+                {/* Start / Stop / New shot — own row for mobile readability */}
+                {machineLifecycle === 'idle' ? (
+                  <Button
+                    onClick={handleMachineStart}
+                    variant="default"
+                    className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
+                    disabled={!isConnected || !canStart || targetWeight === null || targetWeight <= 0}
+                  >
+                    <Coffee size={18} weight="fill" className="mr-1.5" />
+                    {t('pourOver.integration.startOnMachine')}
+                  </Button>
+                ) : machineLifecycle === 'done' || machineLifecycle === 'error' ? (
+                  <Button
+                    onClick={resetMachineLifecycle}
+                    variant="default"
+                    className="w-full h-11 rounded-xl"
+                  >
+                    <Play size={18} weight="fill" className="mr-1.5" />
+                    {t('pourOver.integration.newShot')}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleMachineStop}
+                    variant="destructive"
+                    className="w-full h-11 rounded-xl"
+                    disabled={machineLifecycle === 'purging'}
+                  >
+                    <Pause size={18} weight="fill" className="mr-1.5" />
+                    {t('pourOver.integration.stop')}
+                  </Button>
+                )}
 
-              <Button
-                onClick={handleTare}
-                variant="outline"
-                className="h-11"
-                disabled={!machineState.connected}
-              >
-                <Drop size={18} weight="duotone" className="mr-1.5" />
-                {t('pourOver.tare')}
-              </Button>
-            </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Button
+                    onClick={resetTimer}
+                    variant="outline"
+                    className="h-11"
+                  >
+                    <Timer size={18} weight="bold" className="mr-1.5" />
+                    {t('pourOver.reset')}
+                  </Button>
+
+                  <Button
+                    onClick={handleTare}
+                    variant="outline"
+                    className="h-11"
+                    disabled={!machineState.connected}
+                  >
+                    <Drop size={18} weight="duotone" className="mr-1.5" />
+                    {t('pourOver.tare')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Standard timer action buttons */
+              <div className="grid grid-cols-3 gap-2.5">
+                <Button
+                  onClick={startOrPause}
+                  variant={autoStartEnabled ? "outline" : "default"}
+                  className={`h-11 rounded-xl ${!autoStartEnabled && !isRunning ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : ''}`}
+                >
+                  {isRunning ? <Pause size={18} weight="fill" className="mr-1.5" /> : <Play size={18} weight="fill" className="mr-1.5" />}
+                  {isRunning ? t('pourOver.pause') : t('pourOver.start')}
+                </Button>
+
+                <Button
+                  onClick={resetTimer}
+                  variant="outline"
+                  className="h-11"
+                >
+                  <Timer size={18} weight="bold" className="mr-1.5" />
+                  {t('pourOver.reset')}
+                </Button>
+
+                <Button
+                  onClick={handleTare}
+                  variant="outline"
+                  className="h-11"
+                  disabled={!machineState.connected}
+                >
+                  <Drop size={18} weight="duotone" className="mr-1.5" />
+                  {t('pourOver.tare')}
+                </Button>
+              </div>
+            )}
 
             {/* ── 5. Dose + ratio inputs (ratio mode — set once before brewing) ── */}
             {mode === 'ratio' && (
@@ -623,7 +891,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                         size="sm"
                         className="shrink-0 h-10 px-3 ml-1 gap-1.5"
                         disabled={!machineState.connected || weight <= 0}
-                        onClick={() => setDoseGrams(weight.toFixed(1))}
+                        onClick={() => { setDoseGrams(weight.toFixed(1)); handleTare(); }}
                         title={t('pourOver.weighFromScaleTitle')}
                         aria-label={t('pourOver.weighFromScale')}
                       >
@@ -658,14 +926,35 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               </div>
             )}
 
-            {/* ── Settings (auto-start, bloom) ── */}
+            {/* ── Settings (auto-start, bloom, integration) ── */}
             <div className="rounded-xl border border-border/60 bg-secondary/30 p-3 space-y-3">
+              {/* Machine integration toggle — only in ratio mode */}
+              {mode === 'ratio' && (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{t('pourOver.integration.toggle')}</p>
+                    <p className="text-xs text-muted-foreground">{t('pourOver.integration.toggleDescription')}</p>
+                  </div>
+                  <Switch
+                    checked={meticulousIntegration}
+                    onCheckedChange={handleIntegrationToggle}
+                    disabled={!isConnected}
+                    className="shrink-0"
+                  />
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{t('pourOver.autoStartTimer')}</p>
                   <p className="text-xs text-muted-foreground">{t('pourOver.autoStartDescription')}</p>
                 </div>
-                <Switch checked={autoStartEnabled} onCheckedChange={setAutoStartEnabled} className="shrink-0" />
+                <Switch
+                  checked={autoStartEnabled}
+                  onCheckedChange={setAutoStartEnabled}
+                  disabled={meticulousIntegration}
+                  className="shrink-0"
+                />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -701,11 +990,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   <span>{ratioProgress.toFixed(0)}%</span>
                 </div>
                 <Progress value={ratioProgress} />
-                <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} />
+                <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
               </div>
             )}
             {mode === 'free' && (
-              <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} />
+              <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
             )}
           </div>{/* End right column */}
         </div>{/* End two-column layout */}
