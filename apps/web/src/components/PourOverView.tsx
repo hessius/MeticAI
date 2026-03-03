@@ -326,6 +326,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [machineEndElapsedMs, setMachineEndElapsedMs] = useState<number | null>(null)
   // Track previous brewing state for transition detection
   const prevBrewingRef = useRef(false)
+  // Always-current machine state string for async polling
+  const machineStateRef = useRef(machineState.state)
 
   // ── Server-side preferences persistence ──
   const prefsRef = useRef<PourOverPreferences | null>(null)
@@ -412,6 +414,35 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const FLOW_CONFIRMATION_MS = 2000
 
   const { cmd, isBrewing, isConnected, canStart, isClickToPurge } = useMachineActions(machineState)
+
+  // Keep machineStateRef in sync with the latest prop value
+  useEffect(() => {
+    machineStateRef.current = machineState.state
+  }, [machineState.state])
+
+  /**
+   * Poll machineStateRef until it matches `target` (case-insensitive),
+   * checking every `intervalMs`. Rejects after `timeoutMs`.
+   */
+  const waitForState = useCallback(
+    (target: string, timeoutMs = 8000, intervalMs = 150): Promise<void> =>
+      new Promise((resolve, reject) => {
+        const deadline = Date.now() + timeoutMs
+        const check = () => {
+          if ((machineStateRef.current ?? '').toLowerCase() === target.toLowerCase()) {
+            resolve()
+            return
+          }
+          if (Date.now() >= deadline) {
+            reject(new Error(`Timed out waiting for machine state "${target}"`))
+            return
+          }
+          setTimeout(check, intervalMs)
+        }
+        check()
+      }),
+    [],
+  )
 
   const handleTare = useCallback(() => {
     // Mark that we just tared so the next weight update doesn't auto-start
@@ -559,11 +590,16 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
 
-      // Start the shot — send continue twice with a short delay.
-      // The first continue may only skip the (fast) temperature control
-      // phase, so a second continue actually begins extraction.
+      // Auto-start the shot:
+      // 1. First continue advances past the temperature control phase.
+      // 2. Wait for machine to reach "Click to start" (press-to-start state).
+      // 3. Second continue actually begins extraction.
       await cmd(continueShot, 'started')
-      await new Promise(resolve => setTimeout(resolve, 300))
+      try {
+        await waitForState('click to start')
+      } catch {
+        // Timeout — machine may already be past this state; try anyway
+      }
       await cmd(continueShot, 'started')
     } catch (err) {
       setMachineLifecycle('error')
@@ -573,7 +609,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           : t('pourOver.integration.prepareFailed'),
       )
     }
-  }, [meticulousIntegration, machineLifecycle, targetWeight, bloomEnabled, bloomSeconds, doseGrams, brewRatio, t, cmd])
+  }, [meticulousIntegration, machineLifecycle, targetWeight, bloomEnabled, bloomSeconds, doseGrams, brewRatio, t, cmd, waitForState])
 
   // ── Machine integration: handle abort / stop ──
   const handleMachineStop = useCallback(async () => {
