@@ -21,6 +21,7 @@ class GenerationPhase(str, Enum):
     UPLOADING = "uploading"
     COMPLETE = "complete"
     FAILED = "failed"
+    KEEPALIVE = "keepalive"
 
 
 @dataclass
@@ -76,8 +77,10 @@ class GenerationState:
                 event = await asyncio.wait_for(waiter, timeout=60)
                 yield event
             except asyncio.TimeoutError:
-                # Send keepalive / client can reconnect
-                break
+                # Yield keepalive so the SSE connection stays open for
+                # long-running generations (retries, slow models, etc.)
+                yield ProgressEvent(phase=GenerationPhase.KEEPALIVE, message="keepalive")
+                continue
             finally:
                 # Remove the waiter so emit() doesn't set results on orphans
                 try:

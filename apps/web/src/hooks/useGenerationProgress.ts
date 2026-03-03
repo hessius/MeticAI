@@ -112,7 +112,10 @@ export function useGenerationProgress(active: boolean): UseGenerationProgressRet
         }
 
         es.onerror = () => {
-          // EventSource reconnects automatically — mark disconnected briefly
+          // Close the stale EventSource so autoreconnect won't 404-loop.
+          // The next call to connect() (via useEffect) will create a fresh one.
+          es.close()
+          esRef.current = null
           setConnected(false)
         }
       } catch {

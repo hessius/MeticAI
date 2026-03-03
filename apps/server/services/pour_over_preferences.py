@@ -38,7 +38,7 @@ def _ensure_file() -> None:
     """Create the prefs file with defaults if it doesn't exist yet."""
     PREFS_FILE.parent.mkdir(parents=True, exist_ok=True)
     if not PREFS_FILE.exists():
-        PREFS_FILE.write_text(json.dumps(_DEFAULT_PREFS, indent=2))
+        atomic_write_json(PREFS_FILE, _DEFAULT_PREFS)
 
 
 def load_preferences() -> dict:
