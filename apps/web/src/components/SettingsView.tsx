@@ -143,7 +143,6 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   // Beta channel state
   const [betaChannelEnabled, setBetaChannelEnabled] = useState(false)
   const [betaSwitching, setBetaSwitching] = useState(false)
-  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
   const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'question' | 'general'>('general')
   const [feedbackTitle, setFeedbackTitle] = useState('')
   const [feedbackDescription, setFeedbackDescription] = useState('')
