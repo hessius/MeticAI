@@ -408,7 +408,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                   accept=".json,application/json"
                   onChange={handleFileSelect}
                   className="hidden"
-                  aria-label="Import profile JSON file"
+                  aria-label={t('profileImport.importFileAriaLabel')}
                 />
               </motion.div>
             )}
@@ -546,7 +546,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                 )}
                 
                 <p className="text-xs text-center text-muted-foreground/70">
-                  {generateDescriptions ? t('profileImport.generatingDescriptions') : 'Importing profiles without AI-generated descriptions'}
+                  {generateDescriptions ? t('profileImport.generatingDescriptions') : t('profileImport.importingWithoutDescriptions')}
                 </p>
               </motion.div>
             )}

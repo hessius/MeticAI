@@ -176,10 +176,10 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
             {/* Show elapsed time when progress is available */}
             {hasProgress && progress.elapsed > 0 ? (
               <p className="text-sm text-muted-foreground">
-                {Math.round(progress.elapsed)}s elapsed
+                {t('loading.elapsed', { seconds: Math.round(progress.elapsed) })}
                 {progress.phase === 'retrying' && (
                   <span className="ml-1">
-                    — retry {progress.attempt}/{progress.max_attempts - 1}
+                    — {t('loading.retryAttempt', { attempt: progress.attempt, max: progress.max_attempts - 1 })}
                   </span>
                 )}
               </p>
@@ -240,8 +240,8 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
                 className="h-full rounded-full"
                 style={{ background: 'linear-gradient(135deg, #FFC107 0%, #FF8F00 50%, #FF6F00 100%)' }}
                 initial={{ width: "0%" }}
-                animate={{ width: `${Math.min(fraction * 100, 95)}%` }}
-                transition={{ duration: 420, ease: "linear" }}
+                animate={{ width: "95%" }}
+                transition={{ duration: 120, ease: "easeOut" }}
               />
             </div>
           )}

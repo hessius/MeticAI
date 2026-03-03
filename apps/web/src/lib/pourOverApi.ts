@@ -101,3 +101,49 @@ export async function getActivePourOver(): Promise<ActiveResponse> {
   }
   return res.json()
 }
+
+// ---------------------------------------------------------------------------
+// Preferences
+// ---------------------------------------------------------------------------
+
+export interface ModePreferences {
+  autoStart: boolean
+  bloomEnabled: boolean
+  bloomSeconds: number
+  machineIntegration: boolean
+}
+
+export interface PourOverPreferences {
+  free: ModePreferences
+  ratio: ModePreferences
+}
+
+/**
+ * Load stored per-mode pour-over preferences from the server.
+ */
+export async function getPourOverPreferences(): Promise<PourOverPreferences> {
+  const base = await getServerUrl()
+  const res = await fetch(`${base}/api/pour-over/preferences`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as Record<string, string>).detail ?? `Get preferences failed: ${res.statusText}`)
+  }
+  return res.json()
+}
+
+/**
+ * Save per-mode pour-over preferences to the server.
+ */
+export async function savePourOverPreferences(prefs: PourOverPreferences): Promise<PourOverPreferences> {
+  const base = await getServerUrl()
+  const res = await fetch(`${base}/api/pour-over/preferences`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(prefs),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as Record<string, string>).detail ?? `Save preferences failed: ${res.statusText}`)
+  }
+  return res.json()
+}

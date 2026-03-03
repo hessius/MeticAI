@@ -32,6 +32,24 @@ logger = logging.getLogger(__name__)
 # Used by cleanup_stale() to remove orphans on startup.
 TEMP_PROFILE_NAMES = frozenset({"MeticAI Ratio Pour-Over"})
 
+# Async lock guarding _active state to prevent interleaved mutations
+# from concurrent calls to create_and_load / cleanup / force_cleanup.
+_lock: asyncio.Lock | None = None
+
+
+def _get_lock() -> asyncio.Lock:
+    """Lazy-initialise the lock to avoid cross-event-loop issues in tests."""
+    global _lock
+    if _lock is None:
+        _lock = asyncio.Lock()
+    return _lock
+
+
+def _reset_lock() -> None:
+    """Reset the lock (for tests that run in different event loops)."""
+    global _lock
+    _lock = None
+
 
 @dataclass
 class ActiveTempProfile:
@@ -68,12 +86,13 @@ async def create_and_load(
 ) -> Dict[str, Any]:
     """Create a temporary profile on the machine, load it, and track it.
 
-    The profile name is prefixed with ``[Temp] `` so it can be identified
-    for cleanup.  If a temp profile is already active it is force-cleaned
-    first.
+    The profile name is taken from ``profile_json["name"]`` (or defaults to
+    ``"Temp Profile"``). Callers should use a well-known temporary profile
+    name (see ``TEMP_PROFILE_NAMES``) so the profile can be identified for
+    cleanup. If a temp profile is already active it is force-cleaned first.
 
     Args:
-        profile_json: Full profile JSON (will be mutated to add prefix).
+        profile_json: Full profile JSON including the desired temp profile name.
         params: Optional dict of original user parameters for bookkeeping.
 
     Returns:
@@ -83,12 +102,21 @@ async def create_and_load(
         MachineUnreachableError: If the machine cannot be reached.
         HTTPException: If profile creation or loading fails.
     """
+    async with _get_lock():
+        return await _create_and_load_locked(profile_json, params)
+
+
+async def _create_and_load_locked(
+    profile_json: Dict[str, Any],
+    params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Inner implementation of create_and_load, called under lock."""
     # Force-cleanup any lingering temp profile
     if _active is not None:
         logger.warning(
             "Replacing already-active temp profile %s", _active.profile_name
         )
-        await force_cleanup()
+        await _force_cleanup_inner()
 
     name = profile_json.get("name", "Temp Profile")
 
@@ -139,31 +167,32 @@ async def cleanup() -> Dict[str, str]:
     Returns:
         Dict with ``status`` key.
     """
-    if _active is None:
-        return {"status": "no_active_profile"}
+    async with _get_lock():
+        if _active is None:
+            return {"status": "no_active_profile"}
 
-    profile_id = _active.profile_id
-    profile_name = _active.profile_name
-    _set_active(None)
+        profile_id = _active.profile_id
+        profile_name = _active.profile_name
+        _set_active(None)
 
-    # Purge first (flush water), then delete the profile
-    try:
-        from api.routes.commands import _do_publish, _get_snapshot, _require_idle
-        snapshot = _get_snapshot()
-        # Only purge if machine is idle (shot already stopped)
-        if not snapshot.get("brewing"):
-            _do_publish("purge")
-    except Exception as exc:
-        logger.warning("Purge before cleanup failed (non-fatal): %s", exc)
+        # Purge first (flush water), then delete the profile
+        try:
+            from api.routes.commands import _do_publish, _get_snapshot, _require_idle
+            snapshot = _get_snapshot()
+            # Only purge if machine is idle (shot already stopped)
+            if not snapshot.get("brewing"):
+                _do_publish("purge")
+        except Exception as exc:
+            logger.warning("Purge before cleanup failed (non-fatal): %s", exc)
 
-    try:
-        await async_delete_profile(profile_id)
-        logger.info("Temp profile deleted: %s (%s)", profile_name, profile_id)
-    except Exception as exc:
-        logger.error("Failed to delete temp profile %s: %s", profile_id, exc)
-        return {"status": "delete_failed", "error": str(exc)}
+        try:
+            await async_delete_profile(profile_id)
+            logger.info("Temp profile deleted: %s (%s)", profile_name, profile_id)
+        except Exception as exc:
+            logger.error("Failed to delete temp profile %s: %s", profile_id, exc)
+            return {"status": "delete_failed", "error": str(exc)}
 
-    return {"status": "cleaned_up", "deleted_profile": profile_name}
+        return {"status": "cleaned_up", "deleted_profile": profile_name}
 
 
 async def force_cleanup() -> Dict[str, str]:
@@ -172,6 +201,13 @@ async def force_cleanup() -> Dict[str, str]:
     Returns:
         Dict with ``status`` key.
     """
+    async with _get_lock():
+        return await _force_cleanup_inner()
+
+
+async def _force_cleanup_inner() -> Dict[str, str]:
+    """Inner force-cleanup logic, must be called under ``_get_lock()``."""
+    global _active
     if _active is None:
         return {"status": "no_active_profile"}
 

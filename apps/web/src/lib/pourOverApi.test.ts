@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { preparePourOver, cleanupPourOver, forceCleanupPourOver, getActivePourOver } from './pourOverApi'
+import { preparePourOver, cleanupPourOver, forceCleanupPourOver, getActivePourOver, getPourOverPreferences, savePourOverPreferences } from './pourOverApi'
 
 // Mock getServerUrl
 vi.mock('@/lib/config', () => ({
@@ -139,6 +139,70 @@ describe('pourOverApi', () => {
 
       const result = await getActivePourOver()
       expect(result.active).toBe(false)
+    })
+  })
+
+  describe('getPourOverPreferences', () => {
+    it('sends GET and returns preferences', async () => {
+      const prefs = {
+        free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+        ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, machineIntegration: true },
+      }
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(prefs),
+      })
+
+      const result = await getPourOverPreferences()
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3550/api/pour-over/preferences')
+      expect(result).toEqual(prefs)
+    })
+
+    it('throws on non-ok response', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Internal Server Error',
+        json: () => Promise.resolve({ detail: 'Read failed' }),
+      })
+
+      await expect(getPourOverPreferences()).rejects.toThrow('Read failed')
+    })
+  })
+
+  describe('savePourOverPreferences', () => {
+    it('sends PUT with body and returns saved preferences', async () => {
+      const prefs = {
+        free: { autoStart: false, bloomEnabled: true, bloomSeconds: 60, machineIntegration: false },
+        ratio: { autoStart: true, bloomEnabled: false, bloomSeconds: 20, machineIntegration: true },
+      }
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(prefs),
+      })
+
+      const result = await savePourOverPreferences(prefs)
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:3550/api/pour-over/preferences',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(prefs),
+        },
+      )
+      expect(result).toEqual(prefs)
+    })
+
+    it('throws on non-ok response', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Bad Request',
+        json: () => Promise.resolve({ detail: 'Validation error' }),
+      })
+
+      await expect(savePourOverPreferences({
+        free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+        ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      })).rejects.toThrow('Validation error')
     })
   })
 })

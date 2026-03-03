@@ -47,6 +47,10 @@ data/
 .restart-requested
 .update-requested
 
+# Benchmark artifacts
+benchmark_results.jsonl
+*.jsonl
+
 # Development safety marker (prevents uninstaller from deleting dev folder)
 .meticai-dev
 

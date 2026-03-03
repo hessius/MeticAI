@@ -258,7 +258,7 @@ function App() {
 
   const handleSubmit = async () => {
     if (!(isAiConfigured && aiEnabled)) {
-      setErrorMessage('AI profile generation is currently disabled. Enable AI in Settings and ensure an API key is configured.')
+      setErrorMessage(t('app.errors.aiDisabled'))
       return
     }
 

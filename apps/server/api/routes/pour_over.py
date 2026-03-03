@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from services.pour_over_adapter import adapt_pour_over_profile
 from services import temp_profile_service
+from services import pour_over_preferences
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -117,3 +118,33 @@ async def get_active_pour_over():
         profile_name=active["profile_name"],
         original_params=active["original_params"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Preferences
+# ---------------------------------------------------------------------------
+
+
+class ModePreferences(BaseModel):
+    autoStart: bool = True
+    bloomEnabled: bool = True
+    bloomSeconds: float = 30
+    machineIntegration: bool = False
+
+
+class PreferencesPayload(BaseModel):
+    free: ModePreferences = Field(default_factory=ModePreferences)
+    ratio: ModePreferences = Field(default_factory=ModePreferences)
+
+
+@router.get("/api/pour-over/preferences")
+async def get_preferences():
+    """Return the stored per-mode pour-over preferences."""
+    return pour_over_preferences.load_preferences()
+
+
+@router.put("/api/pour-over/preferences")
+async def save_preferences(body: PreferencesPayload):
+    """Save per-mode pour-over preferences."""
+    saved = pour_over_preferences.save_preferences(body.model_dump())
+    return saved
