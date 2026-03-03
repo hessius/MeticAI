@@ -635,10 +635,25 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   }, [machineLifecycle, updateMachineIntegration, updateAutoStart])
 
   // Reset machine lifecycle when done (allow starting again)
+  // Also tare the scale, reset the timer, and clear the graph
   const resetMachineLifecycle = useCallback(() => {
     setMachineLifecycle('idle')
     setMachineEndElapsedMs(null)
-  }, [])
+    // Reset timer
+    setIsRunning(false)
+    setStartedAtMs(null)
+    setBaseElapsedMs(0)
+    // Clear graph
+    setWeightTrend([])
+    trendStartTimestampRef.current = null
+    previousWeightRef.current = null
+    previousWeightTimestampRef.current = null
+    flowStartTimestampRef.current = null
+    setFlowRate(0)
+    // Tare the scale
+    justTaredRef.current = true
+    cmd(tareScale, 'tared')
+  }, [cmd])
 
   useEffect(() => {
     const currentWeight = machineState.shot_weight
