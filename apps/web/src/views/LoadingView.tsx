@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import { Sparkle } from '@phosphor-icons/react'
 import type { ProgressEvent } from '@/hooks/useGenerationProgress'
-import { PHASE_ORDER, phaseProgress } from '@/hooks/useGenerationProgress'
+import { PHASE_ORDER } from '@/hooks/useGenerationProgress'
 
 // Fallback messages in case i18n is not loaded
 const FALLBACK_LOADING_MESSAGES = [
@@ -128,8 +128,6 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
     return `sse-${progress.phase}-${progress.attempt}`
   }, [hasProgress, showFunny, currentMessage, funnyIndex, progress?.phase, progress?.attempt])
 
-  // Calculate progress fraction
-  const fraction = hasProgress ? phaseProgress(progress.phase) : 0
   // Determine which segments are completed
   const currentPhaseIdx = hasProgress
     ? (progress.phase === 'retrying'
