@@ -68,14 +68,21 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 **Linux / macOS:**
 
+**Quick Install:**
 ```bash
-git clone https://github.com/hessius/MeticAI.git && cd MeticAI
-cat > .env << EOF
-GEMINI_API_KEY=your_api_key_here
-METICULOUS_IP=meticulous.local
-EOF
-docker compose up -d
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
 ```
+
+**Docker:**
+```bash
+docker pull ghcr.io/hessius/meticai:v2.0.6
+```
+
+**Upgrading from v1.x:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/migrate-to-unified.sh | bash
+```
+
 
 **Windows:** See the [Windows Installation Guide](WINDOWS.md) for PowerShell installer and Windows-specific notes.
 
