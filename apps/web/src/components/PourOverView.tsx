@@ -564,7 +564,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
     if (machineLifecycle === 'brewing') {
       // User manually aborted — stop shot, purge, delete
-      await cmd(stopShot, 'stopped')
+      try {
+        await cmd(stopShot, 'stopped')
+      } catch {
+        // Machine stop may fail (e.g. already stopped) — continue with cleanup
+      }
       pauseTimer()
       setMachineLifecycle('purging')
       // Wait for machine to process the stop command before purging

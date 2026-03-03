@@ -17,7 +17,7 @@ describe('pourOverApi', () => {
 
   describe('preparePourOver', () => {
     it('sends POST with correct body and returns response', async () => {
-      const response = { profile_id: 'abc-123', profile_name: '[Temp] Pour-Over', loaded: true }
+      const response = { profile_id: 'abc-123', profile_name: '[Temp] Pour-Over' }
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(response),
@@ -71,7 +71,7 @@ describe('pourOverApi', () => {
 
   describe('cleanupPourOver', () => {
     it('sends POST and returns cleanup response', async () => {
-      const response = { deleted: true, purged: true }
+      const response = { status: 'cleaned_up', deleted_profile: '[Temp] Pour-Over' }
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(response),
@@ -99,7 +99,7 @@ describe('pourOverApi', () => {
 
   describe('forceCleanupPourOver', () => {
     it('sends POST and returns response', async () => {
-      const response = { deleted: true }
+      const response = { status: 'force_cleaned_up', deleted_profile: '[Temp] Pour-Over' }
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(response),
@@ -117,7 +117,7 @@ describe('pourOverApi', () => {
 
   describe('getActivePourOver', () => {
     it('sends GET and returns active status', async () => {
-      const response = { active: true, profile_id: 'abc', profile_name: '[Temp] Test', created_at: '2025-01-01T00:00:00' }
+      const response = { active: true, profile_id: 'abc', profile_name: '[Temp] Test', original_params: { target_weight: 300 } }
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(response),

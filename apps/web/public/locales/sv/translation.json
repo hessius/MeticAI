@@ -813,7 +813,31 @@
     "waitingForWeight": "Väntar på viktuppdateringar…",
     "weightLegend": "vikt",
     "flowLegend": "flöde",
-    "weightTrendLabel": "Vikttrend"
+    "weightTrendLabel": "Vikttrend",
+    "integration": {
+      "toggle": "Maskinintegration",
+      "toggleDescription": "Skapa och kör en profil på din Meticulous-maskin med dessa pour-over-inställningar.",
+      "startOnMachine": "Starta på maskin",
+      "stop": "Stopp",
+      "newShot": "Ny shot",
+      "profileReady": "Profil laddad — startar shot på maskinen.",
+      "cleanupSuccess": "Temporär profil städad.",
+      "forceCleanupUsed": "Profil städad (rensning överhoppad).",
+      "cleanupFailed": "Kunde inte städa temporär profil.",
+      "abortCleanupSuccess": "Shot stoppad och profil borttagen.",
+      "prepareFailed": "Kunde inte förbereda profil på maskinen.",
+      "invalidWeight": "Ange en giltig dos och ratio för att beräkna målvikt.",
+      "shotEndedAt": "Shot avslutad vid",
+      "status": {
+        "preparing": "Förbereder profil…",
+        "ready": "Profil laddad — väntar på maskinen…",
+        "brewing": "Brygger på maskinen…",
+        "drawdown": "Mål nått — mäter avrinningstid…",
+        "purging": "Städar profil…",
+        "done": "Shot klar!",
+        "error": "Något gick fel."
+      }
+    }
   },
   "results": {
     "profileGenerated": "Profil skapad!",

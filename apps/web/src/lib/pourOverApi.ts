@@ -19,20 +19,19 @@ export interface PrepareRequest {
 export interface PrepareResponse {
   profile_id: string
   profile_name: string
-  loaded: boolean
 }
 
 export interface CleanupResponse {
-  deleted: boolean
-  purged?: boolean
-  message?: string
+  status: string
+  deleted_profile?: string
+  error?: string
 }
 
 export interface ActiveResponse {
   active: boolean
   profile_id?: string
   profile_name?: string
-  created_at?: string
+  original_params?: Record<string, unknown>
 }
 
 // ---------------------------------------------------------------------------

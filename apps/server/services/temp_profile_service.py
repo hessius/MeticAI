@@ -22,7 +22,6 @@ from services.meticulous_service import (
     async_delete_profile,
     async_list_profiles,
     async_load_profile_by_id,
-    DuplicateProfileNameError,
     MachineUnreachableError,
 )
 
@@ -177,6 +176,8 @@ async def cleanup() -> Dict[str, str]:
 
         # Purge first (flush water), then delete the profile
         try:
+            # Deferred import to avoid circular dependency:
+            # commands → temp_profile_service → commands
             from api.routes.commands import _do_publish, _get_snapshot, _require_idle
             snapshot = _get_snapshot()
             # Only purge if machine is idle (shot already stopped)
