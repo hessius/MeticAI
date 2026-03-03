@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowLeft, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { tareScale, startShot, stopShot } from '@/lib/mqttCommands'
+import { tareScale, continueShot, stopShot } from '@/lib/mqttCommands'
 import { preparePourOver, cleanupPourOver, forceCleanupPourOver, getPourOverPreferences, savePourOverPreferences } from '@/lib/pourOverApi'
 import type { PourOverPreferences } from '@/lib/pourOverApi'
 
@@ -149,10 +149,11 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, mac
     }
   }
 
-  // Flow rate axis: 0-35 ml/s (g/s) scale
+  // Flow rate axis: fixed 0-35 g/s scale — clamp spikes so they
+  // don't blow up the axis (raw scale deltas can spike on tare/pour start)
   const FLOW_SCALE_MAX = 35
-  const flowValues = points.map(p => p.flow ?? 0).filter(f => f >= 0)
-  const maxFlow = Math.max(Math.max(...flowValues, 1), FLOW_SCALE_MAX)
+  const FLOW_CLAMP = 50  // discard any reading above 50 g/s as noise
+  const maxFlow = FLOW_SCALE_MAX
 
   const toX = (time: number) => (time / xAxisMax) * width
   const toY = (weight: number) => svgHeight - (weight / yMax) * svgHeight
@@ -162,15 +163,15 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, mac
     .map(point => `${toX(point.t).toFixed(2)},${toY(point.w).toFixed(2)}`)
     .join(' ')
 
-  // Smooth flow data using a simple moving average
+  // Smooth flow data using a wider rolling average and clamp outliers
   const flowPoints = points.filter(point => point.flow !== undefined && point.flow >= 0)
-  const SMOOTH_WINDOW = 5
+  const SMOOTH_WINDOW = 15  // ~3-5 seconds at typical update rate
   const smoothedFlowPoints = flowPoints.map((point, i) => {
     const windowStart = Math.max(0, i - Math.floor(SMOOTH_WINDOW / 2))
     const windowEnd = Math.min(flowPoints.length, i + Math.ceil(SMOOTH_WINDOW / 2))
     const windowSlice = flowPoints.slice(windowStart, windowEnd)
-    const avgFlow = windowSlice.reduce((sum, p) => sum + (p.flow ?? 0), 0) / windowSlice.length
-    return { t: point.t, flow: avgFlow }
+    const avgFlow = windowSlice.reduce((sum, p) => sum + Math.min(p.flow ?? 0, FLOW_CLAMP), 0) / windowSlice.length
+    return { t: point.t, flow: Math.min(avgFlow, FLOW_CLAMP) }
   })
 
   const flowPolyline = smoothedFlowPoints
@@ -215,11 +216,17 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, mac
   return (
     <div className="rounded-lg border border-border/60 bg-secondary/30 p-2">
       <div className="flex items-stretch gap-1">
-        {/* Y-axis: Weight scale (left) - amber color matching weight line */}
-        <div className="flex flex-col justify-between text-[9px] w-7 text-right pr-0.5 text-[#fbbf24]">
-          <span>{weightTicks[weightTicks.length - 1]}g</span>
-          {weightTicks.length > 2 && <span>{weightTicks[Math.floor(weightTicks.length / 2)]}g</span>}
-          <span>0g</span>
+        {/* Y-axis: Weight scale (left) - positioned to match grid lines */}
+        <div className="relative text-[9px] w-7 text-right pr-0.5 text-[#fbbf24]">
+          {weightTicks.map(tick => (
+            <span
+              key={`wl-${tick}`}
+              className="absolute right-0.5 -translate-y-1/2 leading-none"
+              style={{ top: `${(1 - tick / yMax) * 100}%` }}
+            >
+              {tick}g
+            </span>
+          ))}
         </div>
         {/* Chart area - responsive height: h-32 (128px) mobile, h-40 (160px) desktop */}
         <svg viewBox={`0 0 ${width} ${svgHeight}`} className="flex-1 h-32 sm:h-40" preserveAspectRatio="none" role="img" aria-label={t('pourOver.weightTrendLabel')}>
@@ -270,11 +277,17 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, mac
             />
           )}
         </svg>
-        {/* Y-axis: Flow scale (right) - cyan color matching flow line */}
-        <div className="flex flex-col justify-between text-[9px] w-10 text-left pl-0.5 text-[#67e8f9]/80">
-          <span>{flowTicks[flowTicks.length - 1]} g/s</span>
-          {flowTicks.length > 2 && <span>{flowTicks[Math.floor(flowTicks.length / 2)]} g/s</span>}
-          <span>0 g/s</span>
+        {/* Y-axis: Flow scale (right) - positioned to match grid lines */}
+        <div className="relative text-[9px] w-10 text-left pl-0.5 text-[#67e8f9]/80">
+          {flowTicks.map(tick => (
+            <span
+              key={`fl-${tick}`}
+              className="absolute left-0.5 -translate-y-1/2 leading-none"
+              style={{ top: `${(1 - tick / maxFlow) * 100}%` }}
+            >
+              {tick} g/s
+            </span>
+          ))}
         </div>
       </div>
       <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
@@ -546,8 +559,12 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
 
-      // Start the shot on the machine
-      await cmd(startShot, 'started')
+      // Start the shot — send continue twice with a short delay.
+      // The first continue may only skip the (fast) temperature control
+      // phase, so a second continue actually begins extraction.
+      await cmd(continueShot, 'started')
+      await new Promise(resolve => setTimeout(resolve, 300))
+      await cmd(continueShot, 'started')
     } catch (err) {
       setMachineLifecycle('error')
       toast.error(
