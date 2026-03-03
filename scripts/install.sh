@@ -480,6 +480,12 @@ elif [[ -f "$HAS_V2" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
     # Remove named containers directly in case compose project has changed
     docker rm -f meticai 2>/dev/null || true
     docker rm -f meticai-watchtower 2>/dev/null || true
+
+    # Clean up .git directory if present (leftover from old git-clone installs)
+    if [[ -d "${INSTALL_DIR}/.git" ]]; then
+        log_info "Removing leftover .git directory from previous installation..."
+        rm -rf "${INSTALL_DIR}/.git"
+    fi
 fi
 
 # ==============================================================================
