@@ -108,6 +108,7 @@
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "La generación de perfiles con IA está actualmente desactivada. Activa la IA en Ajustes y asegúrate de que haya una clave API configurada.",
       "generateBusy": "Ya se está generando un perfil. Su formulario se ha conservado — inténtelo de nuevo en unos minutos."
     }
   },
@@ -336,6 +337,11 @@
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare"
   },
+  "betaBanner": {
+    "runningBeta": "Estás usando MeticAI beta {{version}}",
+    "betaChannelEnabled": "Actualizaciones beta activadas — recibirás versiones previas",
+    "reportIssue": "Reportar problema"
+  },
   "settings": {
     "title": "Configuración",
     "aboutMeticAI": "Acerca de MeticAI",
@@ -435,6 +441,26 @@
       "guideStep2": "Inicia sesión con la misma cuenta utilizada durante la configuración de MeticAI",
       "guideStep3": "Abre esta URL desde cualquier dispositivo en tu red de Tailscale:",
       "setupGuide": "Guía de configuración"
+    },
+    "beta": {
+      "title": "Pruebas beta",
+      "enableUpdates": "Activar actualizaciones beta",
+      "enableDescription": "Obtén acceso anticipado a nuevas funciones antes de que sean lanzadas.",
+      "warning": "Las versiones beta pueden contener errores y comportamiento inesperado. Puedes volver a la versión estable en cualquier momento.",
+      "currentChannel": "Canal actual",
+      "sendFeedback": "Enviar comentarios beta",
+      "feedbackTitle": "Título",
+      "feedbackTitlePlaceholder": "Breve resumen de tus comentarios",
+      "feedbackDescription": "Descripción",
+      "feedbackDescriptionPlaceholder": "Por favor describe tus comentarios en detalle...",
+      "submitFeedback": "Enviar comentarios",
+      "viewOnGitHub": "Ver en GitHub →",
+      "feedbackType": {
+        "bug": "Error",
+        "feature": "Solicitud de función",
+        "question": "Pregunta",
+        "general": "General"
+      }
     },
     "updateMethod": {
       "watchtower": "Actualizaciones automáticas vía Watchtower",
@@ -546,6 +572,8 @@
     "preparing": "Preparando...",
     "percentComplete": "{{percent}}% completado",
     "generatingDescriptions": "Generando descripciones AI para cada perfil...",
+    "importingWithoutDescriptions": "Importando perfiles sin descripciones generadas por IA",
+    "importFileAriaLabel": "Importar archivo JSON de perfil",
     "readingFile": "Leyendo archivo...",
     "importingProfile": "Importando perfil...",
     "fetchingProfile": "Obteniendo perfil de la máquina...",
@@ -806,7 +834,31 @@
     "weighFromScaleShort": "Báscula",
     "weight": "Peso",
     "weightLegend": "peso",
-    "weightTrendLabel": "Tendencia de peso"
+    "weightTrendLabel": "Tendencia de peso",
+    "integration": {
+      "toggle": "Integración con máquina",
+      "toggleDescription": "Crea y ejecuta un perfil en tu máquina Meticulous con esta configuración de pour-over.",
+      "startOnMachine": "Iniciar en máquina",
+      "stop": "Detener",
+      "newShot": "Nueva extracción",
+      "profileReady": "Perfil cargado — iniciando extracción en la máquina.",
+      "cleanupSuccess": "Perfil temporal eliminado.",
+      "forceCleanupUsed": "Perfil eliminado (purga omitida).",
+      "cleanupFailed": "No se pudo eliminar el perfil temporal.",
+      "abortCleanupSuccess": "Extracción detenida y perfil eliminado.",
+      "prepareFailed": "No se pudo preparar el perfil en la máquina.",
+      "invalidWeight": "Establece una dosis y ratio válidos para calcular el peso objetivo.",
+      "shotEndedAt": "Extracción terminada en",
+      "status": {
+        "preparing": "Preparando perfil…",
+        "ready": "Perfil cargado — esperando la máquina…",
+        "brewing": "Extrayendo en la máquina…",
+        "drawdown": "Objetivo alcanzado — midiendo tiempo de goteo…",
+        "purging": "Limpiando perfil…",
+        "done": "¡Extracción completa!",
+        "error": "Algo salió mal."
+      }
+    }
   },
   "results": {
     "backToForm": "Volver al formulario",

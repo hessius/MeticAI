@@ -108,6 +108,7 @@
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "La génération de profils par IA est actuellement désactivée. Activez l'IA dans les Paramètres et assurez-vous qu'une clé API est configurée.",
       "generateBusy": "Un profil est déjà en cours de génération. Votre formulaire a été conservé — veuillez réessayer dans quelques minutes."
     }
   },
@@ -336,6 +337,11 @@
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare"
   },
+  "betaBanner": {
+    "runningBeta": "Vous utilisez MeticAI bêta {{version}}",
+    "betaChannelEnabled": "Mises à jour bêta activées — vous recevrez des versions préliminaires",
+    "reportIssue": "Signaler un problème"
+  },
   "settings": {
     "title": "Paramètres",
     "aboutMeticAI": "À propos de MeticAI",
@@ -435,6 +441,26 @@
       "guideStep2": "Connectez-vous avec le même compte utilisé lors de la configuration de MeticAI",
       "guideStep3": "Ouvrez cette URL depuis n'importe quel appareil sur votre réseau Tailscale :",
       "setupGuide": "Guide d'installation"
+    },
+    "beta": {
+      "title": "Tests bêta",
+      "enableUpdates": "Activer les mises à jour bêta",
+      "enableDescription": "Obtenez un accès anticipé aux nouvelles fonctionnalités avant leur sortie.",
+      "warning": "Les versions bêta peuvent contenir des bugs et un comportement inattendu. Vous pouvez revenir à la version stable à tout moment.",
+      "currentChannel": "Canal actuel",
+      "sendFeedback": "Envoyer des commentaires bêta",
+      "feedbackTitle": "Titre",
+      "feedbackTitlePlaceholder": "Bref résumé de vos commentaires",
+      "feedbackDescription": "Description",
+      "feedbackDescriptionPlaceholder": "Veuillez décrire vos commentaires en détail...",
+      "submitFeedback": "Envoyer les commentaires",
+      "viewOnGitHub": "Voir sur GitHub →",
+      "feedbackType": {
+        "bug": "Bug",
+        "feature": "Demande de fonctionnalité",
+        "question": "Question",
+        "general": "Général"
+      }
     },
     "updateMethod": {
       "watchtower": "Mises à jour automatiques via Watchtower",
@@ -546,6 +572,8 @@
     "preparing": "Préparation...",
     "percentComplete": "{{percent}}% terminé",
     "generatingDescriptions": "Génération de descriptions IA pour chaque profil...",
+    "importingWithoutDescriptions": "Importation de profils sans descriptions générées par IA",
+    "importFileAriaLabel": "Importer le fichier JSON du profil",
     "readingFile": "Lecture du fichier...",
     "importingProfile": "Importation du profil...",
     "fetchingProfile": "Récupération du profil depuis la machine...",
@@ -806,7 +834,31 @@
     "weighFromScaleShort": "Balance",
     "weight": "Poids",
     "weightLegend": "poids",
-    "weightTrendLabel": "Tendance du poids"
+    "weightTrendLabel": "Tendance du poids",
+    "integration": {
+      "toggle": "Intégration machine",
+      "toggleDescription": "Créez et exécutez un profil sur votre machine Meticulous avec ces paramètres de pour-over.",
+      "startOnMachine": "Démarrer sur la machine",
+      "stop": "Arrêter",
+      "newShot": "Nouvelle extraction",
+      "profileReady": "Profil chargé — démarrage de l'extraction sur la machine.",
+      "cleanupSuccess": "Profil temporaire supprimé.",
+      "forceCleanupUsed": "Profil supprimé (purge ignorée).",
+      "cleanupFailed": "Impossible de supprimer le profil temporaire.",
+      "abortCleanupSuccess": "Extraction arrêtée et profil supprimé.",
+      "prepareFailed": "Impossible de préparer le profil sur la machine.",
+      "invalidWeight": "Définissez une dose et un ratio valides pour calculer le poids cible.",
+      "shotEndedAt": "Extraction terminée à",
+      "status": {
+        "preparing": "Préparation du profil…",
+        "ready": "Profil chargé — en attente de la machine…",
+        "brewing": "Extraction en cours sur la machine…",
+        "drawdown": "Objectif atteint — mesure du temps d'écoulement…",
+        "purging": "Nettoyage du profil…",
+        "done": "Extraction terminée !",
+        "error": "Quelque chose s'est mal passé."
+      }
+    }
   },
   "results": {
     "backToForm": "Retour au formulaire",

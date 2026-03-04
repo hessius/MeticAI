@@ -109,7 +109,6 @@
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
-      "aiDisabled": "AI-profilgenerering är för närvarande inaktiverad. Aktivera AI i Inställningar och se till att en API-nyckel är konfigurerad.",
       "aiDisabled": "AI-profilgenerering är för närvarande inaktiverad. Aktivera AI i Inställningar och se till att en API-nyckel är konfigurerad."
     }
   },
@@ -339,6 +338,11 @@
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare"
   },
+  "betaBanner": {
+    "runningBeta": "Du kör MeticAI beta {{version}}",
+    "betaChannelEnabled": "Beta-uppdateringar aktiverade — du tar emot förhandsversioner",
+    "reportIssue": "Rapportera problem"
+  },
   "settings": {
     "title": "Inställningar",
     "aboutMeticAI": "Om MeticAI",
@@ -438,6 +442,26 @@
       "guideStep2": "Logga in med samma konto som användes vid konfigurering av MeticAI",
       "guideStep3": "Öppna denna URL från valfri enhet på ditt Tailscale-nätverk:",
       "setupGuide": "Installationsguide"
+    },
+    "beta": {
+      "title": "Beta-testning",
+      "enableUpdates": "Aktivera beta-uppdateringar",
+      "enableDescription": "Få tidig tillgång till nya funktioner innan de lanseras.",
+      "warning": "Beta-versioner kan innehålla buggar och oväntat beteende. Du kan när som helst byta tillbaka till stabil version.",
+      "currentChannel": "Nuvarande kanal",
+      "sendFeedback": "Skicka beta-feedback",
+      "feedbackTitle": "Titel",
+      "feedbackTitlePlaceholder": "Kort sammanfattning av din feedback",
+      "feedbackDescription": "Beskrivning",
+      "feedbackDescriptionPlaceholder": "Beskriv din feedback i detalj...",
+      "submitFeedback": "Skicka feedback",
+      "viewOnGitHub": "Visa på GitHub →",
+      "feedbackType": {
+        "bug": "Bugg",
+        "feature": "Funktionsförfrågan",
+        "question": "Fråga",
+        "general": "Allmänt"
+      }
     },
     "updateMethod": {
       "watchtower": "Automatiska uppdateringar via Watchtower",
@@ -554,8 +578,6 @@
     "preparing": "Förbereder...",
     "percentComplete": "{{percent}}% klart",
     "generatingDescriptions": "Genererar AI-beskrivningar för varje profil...",
-    "importingWithoutDescriptions": "Importerar profiler utan AI-genererade beskrivningar",
-    "importFileAriaLabel": "Importera profil-JSON-fil",
     "importingWithoutDescriptions": "Importerar profiler utan AI-genererade beskrivningar",
     "importFileAriaLabel": "Importera profil-JSON-fil",
     "readingFile": "Läser fil...",

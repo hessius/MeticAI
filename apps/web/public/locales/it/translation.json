@@ -108,6 +108,7 @@
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "La generazione di profili AI è attualmente disabilitata. Abilita l'AI nelle Impostazioni e assicurati che sia configurata una chiave API.",
       "generateBusy": "Un profilo è già in fase di generazione. Il modulo è stato salvato — riprova tra qualche minuto."
     }
   },
@@ -336,6 +337,11 @@
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare"
   },
+  "betaBanner": {
+    "runningBeta": "Stai usando MeticAI beta {{version}}",
+    "betaChannelEnabled": "Aggiornamenti beta attivi — riceverai versioni preliminari",
+    "reportIssue": "Segnala problema"
+  },
   "settings": {
     "title": "Impostazioni",
     "aboutMeticAI": "Informazioni su MeticAI",
@@ -435,6 +441,26 @@
       "guideStep2": "Accedi con lo stesso account utilizzato durante la configurazione di MeticAI",
       "guideStep3": "Apri questo URL da qualsiasi dispositivo sulla tua rete Tailscale:",
       "setupGuide": "Guida alla configurazione"
+    },
+    "beta": {
+      "title": "Test beta",
+      "enableUpdates": "Attiva aggiornamenti beta",
+      "enableDescription": "Ottieni accesso anticipato alle nuove funzionalità prima che vengano rilasciate.",
+      "warning": "Le versioni beta possono contenere bug e comportamenti imprevisti. Puoi tornare alla versione stabile in qualsiasi momento.",
+      "currentChannel": "Canale corrente",
+      "sendFeedback": "Invia feedback beta",
+      "feedbackTitle": "Titolo",
+      "feedbackTitlePlaceholder": "Breve riepilogo del tuo feedback",
+      "feedbackDescription": "Descrizione",
+      "feedbackDescriptionPlaceholder": "Descrivi il tuo feedback in dettaglio...",
+      "submitFeedback": "Invia feedback",
+      "viewOnGitHub": "Guarda su GitHub →",
+      "feedbackType": {
+        "bug": "Bug",
+        "feature": "Richiesta funzionalità",
+        "question": "Domanda",
+        "general": "Generale"
+      }
     },
     "updateMethod": {
       "watchtower": "Aggiornamenti automatici tramite Watchtower",
@@ -546,6 +572,8 @@
     "preparing": "Preparazione...",
     "percentComplete": "{{percent}}% completato",
     "generatingDescriptions": "Generazione descrizioni AI per ogni profilo...",
+    "importingWithoutDescriptions": "Importazione profili senza descrizioni generate dall'AI",
+    "importFileAriaLabel": "Importa file JSON del profilo",
     "readingFile": "Lettura file...",
     "importingProfile": "Importazione profilo...",
     "fetchingProfile": "Recupero profilo dalla macchina...",
@@ -806,7 +834,31 @@
     "weighFromScaleShort": "Bilancia",
     "weight": "Peso",
     "weightLegend": "peso",
-    "weightTrendLabel": "Andamento peso"
+    "weightTrendLabel": "Andamento peso",
+    "integration": {
+      "toggle": "Integrazione macchina",
+      "toggleDescription": "Crea ed esegui un profilo sulla tua macchina Meticulous con queste impostazioni pour-over.",
+      "startOnMachine": "Avvia sulla macchina",
+      "stop": "Ferma",
+      "newShot": "Nuova estrazione",
+      "profileReady": "Profilo caricato — avvio estrazione sulla macchina.",
+      "cleanupSuccess": "Profilo temporaneo rimosso.",
+      "forceCleanupUsed": "Profilo rimosso (spurgo saltato).",
+      "cleanupFailed": "Impossibile rimuovere il profilo temporaneo.",
+      "abortCleanupSuccess": "Estrazione fermata e profilo rimosso.",
+      "prepareFailed": "Impossibile preparare il profilo sulla macchina.",
+      "invalidWeight": "Imposta una dose e un rapporto validi per calcolare il peso target.",
+      "shotEndedAt": "Estrazione terminata a",
+      "status": {
+        "preparing": "Preparazione profilo…",
+        "ready": "Profilo caricato — in attesa della macchina…",
+        "brewing": "Estrazione in corso sulla macchina…",
+        "drawdown": "Obiettivo raggiunto — misurazione del tempo di deflusso…",
+        "purging": "Pulizia profilo…",
+        "done": "Estrazione completata!",
+        "error": "Qualcosa è andato storto."
+      }
+    }
   },
   "results": {
     "backToForm": "Torna al modulo",
