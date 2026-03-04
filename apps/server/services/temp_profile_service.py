@@ -57,6 +57,8 @@ class ActiveTempProfile:
     profile_id: str
     profile_name: str
     original_params: Dict[str, Any] = field(default_factory=dict)
+    previous_profile_id: Optional[str] = None
+    previous_profile_name: Optional[str] = None
 
 
 # Module-level singleton state
@@ -82,6 +84,8 @@ def get_active() -> Optional[Dict[str, Any]]:
 async def create_and_load(
     profile_json: Dict[str, Any],
     params: Optional[Dict[str, Any]] = None,
+    previous_profile_id: Optional[str] = None,
+    previous_profile_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a temporary profile on the machine, load it, and track it.
 
@@ -93,6 +97,8 @@ async def create_and_load(
     Args:
         profile_json: Full profile JSON including the desired temp profile name.
         params: Optional dict of original user parameters for bookkeeping.
+        previous_profile_id: ID of the profile to restore after cleanup.
+        previous_profile_name: Name of the profile to restore after cleanup.
 
     Returns:
         Dict with ``profile_id`` and ``profile_name`` of the created profile.
@@ -102,20 +108,28 @@ async def create_and_load(
         HTTPException: If profile creation or loading fails.
     """
     async with _get_lock():
-        return await _create_and_load_locked(profile_json, params)
+        return await _create_and_load_locked(profile_json, params, previous_profile_id, previous_profile_name)
 
 
 async def _create_and_load_locked(
     profile_json: Dict[str, Any],
     params: Optional[Dict[str, Any]] = None,
+    previous_profile_id: Optional[str] = None,
+    previous_profile_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Inner implementation of create_and_load, called under lock."""
-    # Force-cleanup any lingering temp profile
+    # Force-cleanup any lingering temp profile (without restoring — we're about
+    # to load a new temp profile, so we inherit the tracked previous profile)
     if _active is not None:
         logger.warning(
             "Replacing already-active temp profile %s", _active.profile_name
         )
-        await _force_cleanup_inner()
+        # Inherit the previous profile from the one being replaced so we can
+        # still restore the original profile when the new temp finishes.
+        if previous_profile_id is None:
+            previous_profile_id = _active.previous_profile_id
+            previous_profile_name = _active.previous_profile_name
+        await _force_cleanup_inner(restore=False)
 
     name = profile_json.get("name", "Temp Profile")
 
@@ -151,6 +165,8 @@ async def _create_and_load_locked(
         profile_id=profile_id,
         profile_name=name,
         original_params=params or {},
+        previous_profile_id=previous_profile_id,
+        previous_profile_name=previous_profile_name,
     ))
 
     logger.info("Temp profile created and loaded: %s (%s)", name, profile_id)
@@ -161,7 +177,8 @@ async def cleanup() -> Dict[str, str]:
     """Run a purge cycle and then delete the active temp profile.
 
     This is the normal post-shot cleanup path: purge flushes water through
-    the group head, then the temporary profile is removed from the machine.
+    the group head, then the temporary profile is removed from the machine
+    and the previously-active profile is restored.
 
     Returns:
         Dict with ``status`` key.
@@ -172,6 +189,8 @@ async def cleanup() -> Dict[str, str]:
 
         profile_id = _active.profile_id
         profile_name = _active.profile_name
+        previous_profile_id = _active.previous_profile_id
+        previous_profile_name = _active.previous_profile_name
         _set_active(None)
 
         # Purge first (flush water), then delete the profile
@@ -193,6 +212,20 @@ async def cleanup() -> Dict[str, str]:
             logger.error("Failed to delete temp profile %s: %s", profile_id, exc)
             return {"status": "delete_failed", "error": str(exc)}
 
+        # Restore the previously-active profile
+        if previous_profile_id:
+            try:
+                await async_load_profile_by_id(previous_profile_id)
+                logger.info(
+                    "Restored previous profile: %s (%s)",
+                    previous_profile_name, previous_profile_id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to restore previous profile %s: %s",
+                    previous_profile_name, exc,
+                )
+
         return {"status": "cleaned_up", "deleted_profile": profile_name}
 
 
@@ -203,10 +236,10 @@ async def force_cleanup() -> Dict[str, str]:
         Dict with ``status`` key.
     """
     async with _get_lock():
-        return await _force_cleanup_inner()
+        return await _force_cleanup_inner(restore=True)
 
 
-async def _force_cleanup_inner() -> Dict[str, str]:
+async def _force_cleanup_inner(restore: bool = True) -> Dict[str, str]:
     """Inner force-cleanup logic, must be called under ``_get_lock()``."""
     global _active
     if _active is None:
@@ -214,6 +247,8 @@ async def _force_cleanup_inner() -> Dict[str, str]:
 
     profile_id = _active.profile_id
     profile_name = _active.profile_name
+    previous_profile_id = _active.previous_profile_id if restore else None
+    previous_profile_name = _active.previous_profile_name if restore else None
     _set_active(None)
 
     try:
@@ -222,6 +257,20 @@ async def _force_cleanup_inner() -> Dict[str, str]:
     except Exception as exc:
         logger.error("Failed to force-delete temp profile %s: %s", profile_id, exc)
         return {"status": "delete_failed", "error": str(exc)}
+
+    # Restore the previously-active profile
+    if previous_profile_id:
+        try:
+            await async_load_profile_by_id(previous_profile_id)
+            logger.info(
+                "Restored previous profile: %s (%s)",
+                previous_profile_name, previous_profile_id,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to restore previous profile %s: %s",
+                previous_profile_name, exc,
+            )
 
     return {"status": "force_cleaned_up", "deleted_profile": profile_name}
 

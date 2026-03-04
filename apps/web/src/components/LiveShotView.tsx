@@ -33,7 +33,7 @@ import {
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { continueShot, stopShot, abortShot, purge } from '@/lib/mqttCommands'
+import { continueShot, stopShot, abortShot, purge, tareScale } from '@/lib/mqttCommands'
 import { EspressoChart } from '@/components/charts'
 import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
 import { extractStageRanges, STAGE_COLORS, STAGE_BORDER_COLORS } from '@/components/charts/chartConstants'
@@ -472,6 +472,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       value={ms.shot_weight?.toFixed(1) ?? '0.0'}
                       unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
                       label={t('controlCenter.metrics.weight')}
+                      onClick={() => tareScale()}
                     />
                     <MetricTile
                       icon={<Thermometer size={14} />}
@@ -718,15 +719,19 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricTile({ icon, value, unit, label, progress }: {
+function MetricTile({ icon, value, unit, label, progress, onClick }: {
   icon?: React.ReactNode
   value: string
   unit: string
   label: string
   progress?: number
+  onClick?: () => void
 }) {
   return (
-    <div className="bg-muted/50 rounded-lg px-3 py-2 text-center">
+    <div
+      className={`bg-muted/50 rounded-lg px-3 py-2 text-center ${onClick ? 'cursor-pointer hover:bg-muted/75 active:bg-muted transition-colors select-none' : ''}`}
+      onClick={onClick}
+    >
       <div className="text-lg font-bold tabular-nums text-foreground flex items-center justify-center gap-1">
         {icon}
         {value}
