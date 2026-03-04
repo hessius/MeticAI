@@ -108,6 +108,7 @@
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "KI-Profilerstellung ist derzeit deaktiviert. Aktivieren Sie KI in den Einstellungen und stellen Sie sicher, dass ein API-Schlüssel konfiguriert ist.",
       "generateBusy": "Ein Profil wird bereits generiert. Ihr Formular wurde gespeichert — bitte versuchen Sie es in wenigen Minuten erneut."
     }
   },
@@ -336,6 +337,11 @@
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare"
   },
+  "betaBanner": {
+    "runningBeta": "Sie verwenden MeticAI Beta {{version}}",
+    "betaChannelEnabled": "Beta-Updates aktiv — Sie erhalten Vorabversionen",
+    "reportIssue": "Problem melden"
+  },
   "settings": {
     "title": "Einstellungen",
     "aboutMeticAI": "Über MeticAI",
@@ -435,6 +441,26 @@
       "guideStep2": "Melde dich mit demselben Konto an, das bei der Einrichtung von MeticAI verwendet wurde",
       "guideStep3": "Öffne diese URL von einem beliebigen Gerät in deinem Tailscale-Netzwerk:",
       "setupGuide": "Einrichtungsanleitung"
+    },
+    "beta": {
+      "title": "Beta-Tests",
+      "enableUpdates": "Beta-Updates aktivieren",
+      "enableDescription": "Erhalten Sie frühen Zugang zu neuen Funktionen vor ihrer Veröffentlichung.",
+      "warning": "Beta-Versionen können Fehler und unerwartetes Verhalten enthalten. Sie können jederzeit zur stabilen Version zurückkehren.",
+      "currentChannel": "Aktueller Kanal",
+      "sendFeedback": "Beta-Feedback senden",
+      "feedbackTitle": "Titel",
+      "feedbackTitlePlaceholder": "Kurze Zusammenfassung Ihres Feedbacks",
+      "feedbackDescription": "Beschreibung",
+      "feedbackDescriptionPlaceholder": "Bitte beschreiben Sie Ihr Feedback ausführlich...",
+      "submitFeedback": "Feedback senden",
+      "viewOnGitHub": "Auf GitHub ansehen →",
+      "feedbackType": {
+        "bug": "Fehler",
+        "feature": "Funktionswunsch",
+        "question": "Frage",
+        "general": "Allgemein"
+      }
     },
     "updateMethod": {
       "watchtower": "Automatische Updates über Watchtower",
@@ -545,6 +571,8 @@
     "importing": "Importiere {{current}}/{{total}}",
     "preparing": "Vorbereitung...",
     "percentComplete": "{{percent}}% abgeschlossen",
+    "importingWithoutDescriptions": "Profile ohne KI-generierte Beschreibungen importieren",
+    "importFileAriaLabel": "Profil-JSON-Datei importieren",
     "generatingDescriptions": "Generiere KI-Beschreibungen für jedes Profil...",
     "readingFile": "Lese Datei...",
     "importingProfile": "Importiere Profil...",
@@ -806,7 +834,31 @@
     "weighFromScaleShort": "Waage",
     "weight": "Gewicht",
     "weightLegend": "Gewicht",
-    "weightTrendLabel": "Gewichtsverlauf"
+    "weightTrendLabel": "Gewichtstrend",
+    "integration": {
+      "toggle": "Maschinenintegration",
+      "toggleDescription": "Erstelle und führe ein Profil auf deiner Meticulous-Maschine mit diesen Pour-Over-Einstellungen aus.",
+      "startOnMachine": "Auf Maschine starten",
+      "stop": "Stopp",
+      "newShot": "Neuer Shot",
+      "profileReady": "Profil geladen — Shot auf Maschine wird gestartet.",
+      "cleanupSuccess": "Temporäres Profil bereinigt.",
+      "forceCleanupUsed": "Profil bereinigt (Spülung übersprungen).",
+      "cleanupFailed": "Temporäres Profil konnte nicht bereinigt werden.",
+      "abortCleanupSuccess": "Shot gestoppt und Profil entfernt.",
+      "prepareFailed": "Profil konnte nicht auf der Maschine vorbereitet werden.",
+      "invalidWeight": "Gültige Dosis und Ratio angeben, um das Zielgewicht zu berechnen.",
+      "shotEndedAt": "Shot beendet bei",
+      "status": {
+        "preparing": "Profil wird vorbereitet…",
+        "ready": "Profil geladen — warte auf Maschine…",
+        "brewing": "Brüht auf der Maschine…",
+        "drawdown": "Ziel erreicht — Ablaufzeit wird gemessen…",
+        "purging": "Profil wird bereinigt…",
+        "done": "Shot fertig!",
+        "error": "Etwas ist schief gelaufen."
+      }
+    }
   },
   "results": {
     "backToForm": "Zurück zum Formular",

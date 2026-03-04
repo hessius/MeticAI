@@ -189,7 +189,6 @@ async def cleanup() -> Dict[str, str]:
 
         profile_id = _active.profile_id
         profile_name = _active.profile_name
-        previous_profile_id = _active.previous_profile_id
         previous_profile_name = _active.previous_profile_name
         _set_active(None)
 
@@ -213,13 +212,11 @@ async def cleanup() -> Dict[str, str]:
             return {"status": "delete_failed", "error": str(exc)}
 
         # Restore the previously-active profile
-        if previous_profile_id:
+        if previous_profile_name:
             try:
-                await async_load_profile_by_id(previous_profile_id)
-                logger.info(
-                    "Restored previous profile: %s (%s)",
-                    previous_profile_name, previous_profile_id,
-                )
+                from api.routes.commands import _do_publish
+                _do_publish("select_profile", previous_profile_name)
+                logger.info("Restored previous profile: %s", previous_profile_name)
             except Exception as exc:
                 logger.warning(
                     "Failed to restore previous profile %s: %s",
@@ -247,7 +244,6 @@ async def _force_cleanup_inner(restore: bool = True) -> Dict[str, str]:
 
     profile_id = _active.profile_id
     profile_name = _active.profile_name
-    previous_profile_id = _active.previous_profile_id if restore else None
     previous_profile_name = _active.previous_profile_name if restore else None
     _set_active(None)
 
@@ -259,13 +255,11 @@ async def _force_cleanup_inner(restore: bool = True) -> Dict[str, str]:
         return {"status": "delete_failed", "error": str(exc)}
 
     # Restore the previously-active profile
-    if previous_profile_id:
+    if previous_profile_name:
         try:
-            await async_load_profile_by_id(previous_profile_id)
-            logger.info(
-                "Restored previous profile: %s (%s)",
-                previous_profile_name, previous_profile_id,
-            )
+            from api.routes.commands import _do_publish
+            _do_publish("select_profile", previous_profile_name)
+            logger.info("Restored previous profile: %s", previous_profile_name)
         except Exception as exc:
             logger.warning(
                 "Failed to restore previous profile %s: %s",

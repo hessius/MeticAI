@@ -472,7 +472,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       value={ms.shot_weight?.toFixed(1) ?? '0.0'}
                       unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
                       label={t('controlCenter.metrics.weight')}
-                      onClick={() => tareScale()}
+                      onClick={() => cmd(tareScale, 'tared')}
                     />
                     <MetricTile
                       icon={<Thermometer size={14} />}

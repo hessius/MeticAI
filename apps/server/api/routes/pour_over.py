@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from services.pour_over_adapter import adapt_pour_over_profile
 from services import temp_profile_service
 from services import pour_over_preferences
-from services.meticulous_service import async_get_last_profile
+from services.mqtt_service import get_mqtt_subscriber
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -76,20 +76,16 @@ async def prepare_pour_over(body: PrepareRequest):
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # Capture the currently-active profile so we can restore it after cleanup
-    previous_profile_id = None
+    # Capture the currently-loaded profile name from the MQTT snapshot so
+    # we can restore it after the temporary pour-over profile is cleaned up.
     previous_profile_name = None
     try:
-        last_profile = await async_get_last_profile()
-        if hasattr(last_profile, 'profile') and last_profile.profile:
-            p = last_profile.profile
-            _name = getattr(p, 'name', None)
-            _id = getattr(p, 'id', None)
-            if _name and _name not in temp_profile_service.TEMP_PROFILE_NAMES:
-                previous_profile_id = _id
-                previous_profile_name = _name
+        snapshot = get_mqtt_subscriber().get_snapshot()
+        name = snapshot.get("active_profile")
+        if name and name not in temp_profile_service.TEMP_PROFILE_NAMES:
+            previous_profile_name = name
     except Exception as exc:
-        logger.warning("Could not fetch previous profile before pour-over: %s", exc)
+        logger.warning("Could not read active profile from MQTT snapshot: %s", exc)
 
     result = await temp_profile_service.create_and_load(
         profile_json,
@@ -100,7 +96,6 @@ async def prepare_pour_over(body: PrepareRequest):
             "dose_grams": body.dose_grams,
             "brew_ratio": body.brew_ratio,
         },
-        previous_profile_id=previous_profile_id,
         previous_profile_name=previous_profile_name,
     )
 

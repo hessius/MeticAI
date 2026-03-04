@@ -640,6 +640,7 @@ function App() {
     mqttEnabled &&
     machineState.brewing &&
     viewState !== 'live-shot' &&
+    viewState !== 'pour-over' &&
     !shotBannerDismissed
 
   return (
