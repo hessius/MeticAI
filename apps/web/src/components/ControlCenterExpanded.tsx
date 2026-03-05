@@ -92,9 +92,14 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   } = useMachineActions(machineState)
 
   // Build the profile image URL when active_profile changes
+  // Suppress MeticAI-managed temp profiles — transient, deleted after pour-over cleanup.
+  const activeProfile = (machineState.active_profile &&
+    !machineState.active_profile.startsWith('MeticAI '))
+    ? machineState.active_profile : null
+
   useEffect(() => {
     let cancelled = false
-    if (!machineState.active_profile) {
+    if (!activeProfile) {
       setProfileImgUrl(null)
       setProfileImgError(false)
       return
@@ -102,12 +107,12 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     ;(async () => {
       const base = await getServerUrl()
       if (!cancelled) {
-        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(machineState.active_profile!)}/image-proxy`)
+        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
         setProfileImgError(false)
       }
     })()
     return () => { cancelled = true }
-  }, [machineState.active_profile])
+  }, [activeProfile])
 
   // Fetch machine profiles once when expanded
   useEffect(() => {
@@ -188,7 +193,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
               {profileImgUrl && !profileImgError ? (
                 <img
                   src={profileImgUrl}
-                  alt={machineState.active_profile ?? ''}
+                  alt={activeProfile ?? ''}
                   className="h-full w-full object-cover"
                   onError={() => setProfileImgError(true)}
                 />
@@ -198,7 +203,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-foreground font-medium truncate block">
-                {machineState.active_profile ?? '—'}
+                {activeProfile ?? '—'}
               </span>
               {profileAuthor && (
                 <span className="text-[10px] text-muted-foreground truncate block">
@@ -212,7 +217,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           {profilesLoaded && machineProfiles.length > 0 && (isIdle || isPreheating || isReady) && (
             <div>
               <Select
-                value={machineState.active_profile ?? ''}
+                value={activeProfile ?? ''}
                 onValueChange={async (name) => {
                   const res = await loadProfile(name)
                   if (res.success) {

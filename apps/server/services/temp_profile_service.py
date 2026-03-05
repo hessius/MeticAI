@@ -221,17 +221,18 @@ async def cleanup() -> Dict[str, str]:
             logger.error("Failed to delete temp profile %s: %s", profile_id, exc)
             return {"status": "delete_failed", "error": str(exc)}
 
-        # Restore the previously-active profile
-        if previous_profile_name:
-            try:
-                from api.routes.commands import _do_publish
-                _do_publish("select_profile", previous_profile_name)
+        # Restore the previously-active profile, or deselect if none tracked
+        try:
+            from api.routes.commands import _do_publish
+            _do_publish("select_profile", previous_profile_name or "")
+            if previous_profile_name:
                 logger.info("Restored previous profile: %s", previous_profile_name)
-            except Exception as exc:
-                logger.warning(
-                    "Failed to restore previous profile %s: %s",
-                    previous_profile_name, exc,
-                )
+            else:
+                logger.info("No previous profile — sent deselect after cleanup")
+        except Exception as exc:
+            logger.warning(
+                "Failed to restore/deselect profile after cleanup: %s", exc
+            )
 
         return {"status": "cleaned_up", "deleted_profile": profile_name}
 
@@ -264,16 +265,18 @@ async def _force_cleanup_inner(restore: bool = True) -> Dict[str, str]:
         logger.error("Failed to force-delete temp profile %s: %s", profile_id, exc)
         return {"status": "delete_failed", "error": str(exc)}
 
-    # Restore the previously-active profile
-    if previous_profile_name:
+    # Restore the previously-active profile, or deselect if none tracked
+    if restore:
         try:
             from api.routes.commands import _do_publish
-            _do_publish("select_profile", previous_profile_name)
-            logger.info("Restored previous profile: %s", previous_profile_name)
+            _do_publish("select_profile", previous_profile_name or "")
+            if previous_profile_name:
+                logger.info("Restored previous profile: %s", previous_profile_name)
+            else:
+                logger.info("No previous profile — sent deselect after force-cleanup")
         except Exception as exc:
             logger.warning(
-                "Failed to restore previous profile %s: %s",
-                previous_profile_name, exc,
+                "Failed to restore/deselect profile after force-cleanup: %s", exc
             )
 
     return {"status": "force_cleaned_up", "deleted_profile": profile_name}

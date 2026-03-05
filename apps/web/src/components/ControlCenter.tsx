@@ -108,9 +108,14 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   } = useMachineActions(machineState)
 
   // Build the profile image URL when active_profile changes
+  // Suppress MeticAI-managed temp profiles — they're transient and deleted after cleanup.
+  const activeProfile = (machineState.active_profile &&
+    !machineState.active_profile.startsWith('MeticAI '))
+    ? machineState.active_profile : null
+
   useEffect(() => {
     let cancelled = false
-    if (!machineState.active_profile) {
+    if (!activeProfile) {
       setProfileImgUrl(null)
       setProfileImgError(false)
       setProfileAuthor(null)
@@ -119,7 +124,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     ;(async () => {
       const base = await getServerUrl()
       if (!cancelled) {
-        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(machineState.active_profile!)}/image-proxy`)
+        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
         setProfileImgError(false)
       }
       // Fetch profile author from machine profiles
@@ -128,7 +133,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
         if (res.ok && !cancelled) {
           const data = await res.json()
           const match = (data.profiles ?? []).find(
-            (p: { name: string; author?: string }) => p.name === machineState.active_profile
+            (p: { name: string; author?: string }) => p.name === activeProfile
           )
           setProfileAuthor(match?.author ?? null)
         }
@@ -137,7 +142,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       }
     })()
     return () => { cancelled = true }
-  }, [machineState.active_profile])
+  }, [activeProfile])
 
   // 🎉 Confetti celebration for every 100th shot
   useEffect(() => {
@@ -245,7 +250,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
           })()}
 
           {/* Active profile with image + author */}
-          {machineState.active_profile && (
+          {activeProfile && (
             <div className="space-y-1">
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('controlCenter.sections.activeProfile')}
@@ -255,7 +260,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}
-                    alt={machineState.active_profile ?? ''}
+                    alt={activeProfile ?? ''}
                     className="h-full w-full object-cover"
                     onError={() => setProfileImgError(true)}
                   />
@@ -265,7 +270,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               </div>
               <div className="min-w-0 flex-1">
                 <span className="text-xs text-foreground font-medium truncate block">
-                  {machineState.active_profile}
+                  {activeProfile}
                 </span>
                 {profileAuthor && (
                   <span className="text-[10px] text-muted-foreground truncate block">
