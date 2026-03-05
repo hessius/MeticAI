@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   create-release:
@@ -102,3 +103,33 @@ jobs:
         run: |
           echo "⏭️ Skipping release - tag v${{ steps.version.outputs.version }} already exists"
           echo "To create a new release, increment the version in VERSION file"
+
+      - name: Trigger Docker build and publish
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="v${{ steps.version.outputs.version }}"
+          echo "🐳 Triggering build-publish workflow for tag $VERSION"
+          
+          # Wait for the tag to become visible via the GitHub API before dispatching
+          MAX_ATTEMPTS=20
+          SLEEP_SECONDS=3
+          
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" --silent >/dev/null 2>&1; then
+              echo "✅ Tag $VERSION is now visible to the GitHub API (attempt $attempt)"
+              break
+            fi
+            
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "❌ Tag $VERSION did not become visible after $((MAX_ATTEMPTS * SLEEP_SECONDS)) seconds."
+              echo "Aborting without dispatching build-publish.yml."
+              exit 1
+            fi
+            
+            echo "⏳ Tag $VERSION not yet visible (attempt $attempt/$MAX_ATTEMPTS). Retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+          
+          gh workflow run build-publish.yml --ref "$VERSION"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
