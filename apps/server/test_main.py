@@ -11986,7 +11986,7 @@ class TestRecipeAdapter:
         from services.recipe_adapter import load_recipe
         recipe = load_recipe("4-6-method")
         assert recipe["slug"] == "4-6-method"
-        assert recipe["metadata"]["name"] == "Tetsu Kasuya 4:6"
+        assert recipe["metadata"]["name"] == "Tetsu Kasuya 4:6 (Stronger)"
         assert recipe["ingredients"]["coffee_g"] == 20.0
         assert recipe["ingredients"]["water_g"] == 300.0
         assert len(recipe["protocol"]) == 9
@@ -12004,7 +12004,7 @@ class TestRecipeAdapter:
         assert isinstance(recipes, list)
         assert len(recipes) >= 4
         names = {r["metadata"]["name"] for r in recipes}
-        assert "Tetsu Kasuya 4:6" in names
+        assert any("Tetsu Kasuya 4:6" in n for n in names)
 
     def test_list_recipes_each_has_slug(self):
         """Every recipe returned by list_recipes has a slug field."""
@@ -12018,7 +12018,7 @@ class TestRecipeAdapter:
         recipe = load_recipe("4-6-method")
         profile = adapt_recipe_to_profile(recipe)
 
-        assert profile["name"] == "MeticAI Recipe: Tetsu Kasuya 4:6"
+        assert profile["name"] == "MeticAI Recipe: Tetsu Kasuya 4:6 (Stronger)"
         assert profile["final_weight"] == 300.0
         assert len(profile["stages"]) == 9
 
@@ -12150,7 +12150,7 @@ class TestRecipeEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert data["slug"] == "4-6-method"
-        assert data["metadata"]["name"] == "Tetsu Kasuya 4:6"
+        assert data["metadata"]["name"] == "Tetsu Kasuya 4:6 (Stronger)"
         assert data["ingredients"]["water_g"] == 300.0
         assert len(data["protocol"]) == 9
 

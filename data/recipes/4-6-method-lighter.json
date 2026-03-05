@@ -1,9 +1,9 @@
 {
   "version": "1.1.0",
   "metadata": {
-    "name": "Tetsu Kasuya 4:6 (Stronger)",
+    "name": "Tetsu Kasuya 4:6 (Lighter)",
     "author": "Tetsu Kasuya",
-    "description": "Adjust sweetness with the first 40% of water (pours 1–2) and strength with the final 60% (pours 3–5). Use a coarse grind for clarity.",
+    "description": "Lighter-bodied 4:6 with a single strength pour. First 40% (two pours of 60g) controls sweetness; final 60% (one pour of 180g) produces a lighter, cleaner cup. Use a coarse grind for clarity.",
     "compatibility": ["V60", "April", "Origami"],
     "visualizer_hint": "pulse_block"
   },
@@ -21,10 +21,6 @@
     { "step": 2, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
     { "step": 3, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Second pour — controls sweetness" },
     { "step": 4, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 5, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Third pour — controls strength" },
-    { "step": 6, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 7, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Fourth pour — controls strength" },
-    { "step": 8, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 9, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Fifth pour — controls strength" }
+    { "step": 5, "action": "pour", "water_g": 180, "duration_s": 90, "notes": "Single combined strength pour to 300g total" }
   ]
 }

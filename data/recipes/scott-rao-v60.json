@@ -3,7 +3,7 @@
   "metadata": {
     "name": "Scott Rao V60",
     "author": "Scott Rao",
-    "description": "Centre-pour technique with an aggressive bloom spin (Rao Spin), two main pours separated by a 70%-drained wait, each finished with a gentle spin. Targets 22–24.5% extraction.",
+    "description": "Centre-pour technique with an aggressive bloom spin (5–7 revolutions), two equal main pours separated by a 50%-drained wait, each followed by a gentle 2-revolution spin. Targets 22–24.5% extraction.",
     "compatibility": ["V60"],
     "visualizer_hint": "pulse_block"
   },
@@ -17,12 +17,13 @@
     "grind_setting": "Medium"
   },
   "protocol": [
-    { "step": 1, "action": "bloom", "water_g": 60, "duration_s": 5, "notes": "Pour 60g, then immediately spin the bloom aggressively (Rao Spin)" },
-    { "step": 2, "action": "wait", "duration_s": 40, "notes": "Wait 40 seconds" },
-    { "step": 3, "action": "pour", "water_g": 140, "duration_s": 45, "flow_rate": "slow", "notes": "Pour to 200g total. Slow, nearly-vertical stream. Circle around the slurry." },
-    { "step": 4, "action": "swirl", "duration_s": 5, "notes": "Very gentle spin to fill the ribbed channels (less than one second)" },
-    { "step": 5, "action": "wait", "duration_s": 90, "notes": "Wait until slurry is ~70% drained (visual check)" },
-    { "step": 6, "action": "pour", "water_g": 130, "duration_s": 40, "flow_rate": "slow", "notes": "Pour to 330g total. Same slow, steady technique." },
-    { "step": 7, "action": "swirl", "duration_s": 5, "notes": "Final very gentle spin" }
+    { "step": 1, "action": "bloom", "water_g": 60, "duration_s": 5, "notes": "Spiral pour for 60g bloom" },
+    { "step": 2, "action": "swirl", "duration_s": 10, "notes": "Rao Spin — aggressive swirl 5–7 revolutions to fully saturate the bed" },
+    { "step": 3, "action": "wait", "duration_s": 35, "notes": "Wait — total bloom 45s" },
+    { "step": 4, "action": "pour", "water_g": 135, "duration_s": 30, "flow_rate": "fast", "notes": "Pour to 195g total as fast as possible with a nearly vertical stream" },
+    { "step": 5, "action": "swirl", "duration_s": 5, "notes": "Gentle spin — 2 revolutions to fill ribbed channels" },
+    { "step": 6, "action": "wait", "duration_s": 45, "notes": "Wait until slurry is ~50% drained (visual check)" },
+    { "step": 7, "action": "pour", "water_g": 135, "duration_s": 30, "flow_rate": "fast", "notes": "Pour to 330g total — same fast, vertical technique" },
+    { "step": 8, "action": "swirl", "duration_s": 5, "notes": "Final gentle spin — 2 revolutions to level the bed and break channels" }
   ]
 }
