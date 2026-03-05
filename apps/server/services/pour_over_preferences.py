@@ -27,6 +27,8 @@ _MODE_DEFAULTS = {
 
 _RECIPE_MODE_DEFAULTS = {
     "machineIntegration": False,
+    "autoStart": True,
+    "progressionMode": "weight",  # "weight" = advance pours on scale, "time" = advance all on timer
 }
 
 _DEFAULT_PREFS = {

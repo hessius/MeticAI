@@ -79,7 +79,7 @@ function getStepLabel(step: RecipeStep): string {
     case 'bloom':
       return step.water_g !== undefined ? `Bloom ${step.water_g}g` : 'Bloom'
     case 'pour':
-      return step.water_g !== undefined ? `Pour to ${step.water_g}g` : 'Pour'
+      return step.water_g !== undefined ? `Pour ${step.water_g}g` : 'Pour'
     case 'wait':
       return `Wait ${formatDuration(step.duration_s)}`
     case 'swirl':

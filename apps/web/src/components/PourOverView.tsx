@@ -366,6 +366,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null)
   const [recipeCurrentStep, setRecipeCurrentStep] = useState(0)
   const [recipeShowBreakdown, setRecipeShowBreakdown] = useState(false)
+  // 'weight': advance pour steps when scale reaches target; 'time': advance all steps by timer
+  const [recipeProgressionMode, setRecipeProgressionMode] = useState<'weight' | 'time'>('weight')
 
   // Machine integration state
   const [meticulousIntegration, setMeticulousIntegration] = useState(false)
@@ -409,6 +411,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (!prefsRef.current) return
     if (newMode === 'recipe') {
       setMeticulousIntegration(prefsRef.current.recipe.machineIntegration)
+      setAutoStartEnabled(prefsRef.current.recipe.autoStart ?? true)
+      setRecipeProgressionMode(prefsRef.current.recipe.progressionMode ?? 'weight')
     } else {
       const mp = prefsRef.current[newMode]
       setAutoStartEnabled(mp.autoStart)
@@ -433,8 +437,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // Helpers that update local state + prefs ref + trigger persist
   const updateAutoStart = useCallback((v: boolean) => {
     setAutoStartEnabled(v)
-    if (prefsRef.current && (mode === 'free' || mode === 'ratio')) {
-      prefsRef.current[mode].autoStart = v; persistPrefs()
+    if (prefsRef.current) {
+      if (mode === 'free' || mode === 'ratio') {
+        prefsRef.current[mode].autoStart = v
+      } else {
+        prefsRef.current.recipe.autoStart = v
+      }
+      persistPrefs()
     }
   }, [mode, persistPrefs])
 
@@ -781,6 +790,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     setIsRunning(false)
     setStartedAtMs(null)
     setBaseElapsedMs(0)
+    setRecipeCurrentStep(0)
     // Clear graph
     setWeightTrend([])
     trendStartTimestampRef.current = null
@@ -891,16 +901,24 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (recipeCurrentStep >= recipeTimings.length - 1) return
     const timing = recipeTimings[recipeCurrentStep]
     if (!timing) return
-    if (timing.action === 'bloom' || timing.action === 'pour') {
-      if (weight >= timing.cumulativeWeight && timing.cumulativeWeight > 0) {
+
+    // In integrated mode use the machine's elapsed shot timer for time-based advance
+    const timeMs = meticulousIntegration
+      ? (machineState.shot_timer ?? 0) * 1000
+      : elapsedMs
+
+    if (timing.action === 'pour' && recipeProgressionMode === 'weight') {
+      // Pour steps: advance on weight with ±5g tolerance
+      if (weight >= timing.cumulativeWeight - 5 && timing.cumulativeWeight > 0) {
         setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))
       }
     } else {
-      if (elapsedMs >= timing.endTimeSec * 1000) {
+      // Bloom, wait, swirl, stir (and pour in time mode): advance on elapsed time
+      if (timeMs >= timing.endTimeSec * 1000) {
         setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))
       }
     }
-  }, [mode, recipeTimings, recipeCurrentStep, isRunning, weight, elapsedMs])
+  }, [mode, recipeTimings, recipeCurrentStep, isRunning, weight, elapsedMs, recipeProgressionMode, meticulousIntegration, machineState.shot_timer])
 
   return (
     <motion.div
@@ -947,7 +965,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold tabular-nums text-foreground">{formatStopwatch(elapsedMs)}</div>
                 {/* Bloom indicator: shows during bloom phase or "done" right after */}
-                {bloomEnabled && (isRunning || baseElapsedMs > 0) && (() => {
+                {mode !== 'recipe' && bloomEnabled && (isRunning || baseElapsedMs > 0) && (() => {
                   const bloomDurationMs = (parsePositiveNumber(bloomSeconds) ?? 30) * 1000
                   const bloomRemaining = Math.max(0, bloomDurationMs - elapsedMs)
                   const isInBloom = bloomRemaining > 0
@@ -1034,6 +1052,73 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 </div>
               </div>
             )}
+
+            {/* ── Step guidance card (recipe mode, when running) ── */}
+            {mode === 'recipe' && selectedRecipe && isRunning && recipeTimings.length > 0 && recipeCurrentStep < recipeTimings.length && (() => {
+              const timing = recipeTimings[recipeCurrentStep]
+              const isPourStep = timing.action === 'bloom' || timing.action === 'pour'
+              const prevCw = recipeCurrentStep > 0
+                ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).at(-1)?.cumulativeWeight ?? 0
+                : 0
+              const pourProgress = isPourStep && timing.cumulativeWeight > prevCw
+                ? Math.min(100, ((weight - prevCw) / (timing.cumulativeWeight - prevCw)) * 100)
+                : 0
+              const stepEndMs = timing.endTimeSec * 1000
+              const remaining = Math.max(0, stepEndMs - elapsedMs)
+              const overallProgress = recipeCurrentStep / recipeTimings.length
+
+              return (
+                <div className="p-3 rounded-xl border border-border/60 bg-secondary/40 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                      Step {recipeCurrentStep + 1} of {recipeTimings.length}
+                    </span>
+                    {/* SVG pie showing overall recipe progress */}
+                    <svg width="20" height="20" viewBox="0 0 20 20" className="shrink-0">
+                      <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
+                      <circle
+                        cx="10" cy="10" r="8"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeDasharray={`${(overallProgress * 50.27).toFixed(2)} 50.27`}
+                        strokeDashoffset="-12.57"
+                        strokeLinecap="round"
+                        className="text-primary"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-base font-bold text-foreground leading-tight">{timing.label}</p>
+                  {timing.notes && <p className="text-xs text-muted-foreground">{timing.notes}</p>}
+                  {isPourStep && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{t('pourOver.targetWater')}: {timing.cumulativeWeight}g</span>
+                        <span>{weight.toFixed(1)}g</span>
+                      </div>
+                      <Progress value={Math.max(0, pourProgress)} className="h-1.5" />
+                    </div>
+                  )}
+                  {!isPourStep && (
+                    <p className="text-sm font-medium text-amber-500 dark:text-amber-400">
+                      ⏱ {Math.ceil(remaining / 1000)}s remaining
+                    </p>
+                  )}
+                  {recipeCurrentStep < recipeTimings.length - 1 && (
+                    <p className="text-xs text-muted-foreground">Next: {recipeTimings[recipeCurrentStep + 1].label}</p>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-8 text-xs"
+                    onClick={() => setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))}
+                    disabled={recipeCurrentStep >= recipeTimings.length - 1}
+                  >
+                    {t('pourOver.nextStep')}
+                  </Button>
+                </div>
+              )
+            })()}
 
             {/* ── Graph on mobile only (shows inside left column) ── */}
             <div className="lg:hidden">
@@ -1288,59 +1373,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                       </Button>
                     </div>
 
-                    {/* Step guidance (when running) */}
-                    {isRunning && recipeTimings.length > 0 && recipeCurrentStep < recipeTimings.length && (() => {
-                      const timing = recipeTimings[recipeCurrentStep]
-                      const isPourStep = timing.action === 'bloom' || timing.action === 'pour'
-                      const prevCw = recipeCurrentStep > 0
-                        ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).at(-1)?.cumulativeWeight ?? 0
-                        : 0
-                      const pourProgress = isPourStep && timing.cumulativeWeight > prevCw
-                        ? Math.min(100, ((weight - prevCw) / (timing.cumulativeWeight - prevCw)) * 100)
-                        : 0
-                      const stepEndMs = timing.endTimeSec * 1000
-                      const remaining = Math.max(0, stepEndMs - elapsedMs)
-
-                      return (
-                        <div className="p-3 rounded-xl border border-border/60 bg-secondary/40 space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                              Step {recipeCurrentStep + 1} of {recipeTimings.length}
-                            </span>
-                            <Progress value={(recipeCurrentStep / recipeTimings.length) * 100} className="w-16 h-1" />
-                          </div>
-                          <p className="text-base font-bold text-foreground leading-tight">{timing.label}</p>
-                          {timing.notes && <p className="text-xs text-muted-foreground">{timing.notes}</p>}
-                          {isPourStep && (
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>{t('pourOver.targetWater')}: {timing.cumulativeWeight}g</span>
-                                <span>{weight.toFixed(1)}g</span>
-                              </div>
-                              <Progress value={Math.max(0, pourProgress)} className="h-1.5" />
-                            </div>
-                          )}
-                          {!isPourStep && (
-                            <p className="text-sm font-medium text-amber-500 dark:text-amber-400">
-                              ⏱ {Math.ceil(remaining / 1000)}s remaining
-                            </p>
-                          )}
-                          {recipeCurrentStep < recipeTimings.length - 1 && (
-                            <p className="text-xs text-muted-foreground">Next: {recipeTimings[recipeCurrentStep + 1].label}</p>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-8 text-xs"
-                            onClick={() => setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))}
-                            disabled={recipeCurrentStep >= recipeTimings.length - 1}
-                          >
-                            {t('pourOver.nextStep')}
-                          </Button>
-                        </div>
-                      )
-                    })()}
-
                     {/* Recipe breakdown toggle */}
                     <Button
                       variant="ghost"
@@ -1375,7 +1407,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 </div>
               )}
 
-              {mode !== 'recipe' && (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{t('pourOver.autoStartTimer')}</p>
@@ -1388,6 +1419,27 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   className="shrink-0"
                 />
               </div>
+
+              {/* Progression mode toggle — recipe mode only, standalone */}
+              {mode === 'recipe' && !meticulousIntegration && (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{t('pourOver.followWeight')}</p>
+                    <p className="text-xs text-muted-foreground">{t('pourOver.followWeightDescription')}</p>
+                  </div>
+                  <Switch
+                    checked={recipeProgressionMode === 'weight'}
+                    onCheckedChange={(v) => {
+                      const next: 'weight' | 'time' = v ? 'weight' : 'time'
+                      setRecipeProgressionMode(next)
+                      if (prefsRef.current) {
+                        prefsRef.current.recipe.progressionMode = next
+                        persistPrefs()
+                      }
+                    }}
+                    className="shrink-0"
+                  />
+                </div>
               )}
 
               {mode !== 'recipe' && (
@@ -1444,16 +1496,16 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         )}
 
         {/* ── 6. Mode tabs at the bottom ── */}
-        <Tabs value={mode} onValueChange={(value) => applyModePrefs(value as 'free' | 'ratio' | 'recipe')}>
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="free">{t('pourOver.freeMode')}</TabsTrigger>
-            <TabsTrigger value="ratio">{t('pourOver.ratioMode')}</TabsTrigger>
-            <TabsTrigger value="recipe">
-              <BookOpen size={14} className="mr-1" />
-              {t('pourOver.recipeMode')}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="sticky bottom-0 -mx-6 -mb-6 pt-3 px-6 pb-6 bg-card rounded-b-xl border-t border-border/40">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest text-center mb-2">{t('pourOver.mode')}</p>
+          <Tabs value={mode} onValueChange={(value) => applyModePrefs(value as 'free' | 'ratio' | 'recipe')}>
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="free">{t('pourOver.freeMode')}</TabsTrigger>
+              <TabsTrigger value="ratio">{t('pourOver.ratioMode')}</TabsTrigger>
+              <TabsTrigger value="recipe">{t('pourOver.recipeMode')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </Card>
     </motion.div>
   )

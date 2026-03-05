@@ -114,6 +114,8 @@ export interface ModePreferences {
 
 export interface RecipeModePreferences {
   machineIntegration: boolean
+  autoStart: boolean
+  progressionMode: 'weight' | 'time'
 }
 
 export interface PourOverPreferences {

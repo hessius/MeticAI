@@ -165,12 +165,12 @@ describe('PourOverView', () => {
     vi.mocked(getPourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-      recipe: { machineIntegration: false },
+      recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
     vi.mocked(savePourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-      recipe: { machineIntegration: false },
+      recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
   })
 
@@ -384,7 +384,7 @@ describe('PourOverView', () => {
     vi.mocked(getPourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, machineIntegration: false },
-      recipe: { machineIntegration: false },
+      recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
 
     render(
@@ -413,7 +413,7 @@ describe('PourOverView', () => {
     vi.mocked(getPourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-      recipe: { machineIntegration: false },
+      recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
 
     render(

@@ -163,19 +163,27 @@ def adapt_recipe_to_profile(recipe: Dict[str, Any]) -> Dict[str, Any]:
         if action in ("bloom", "pour"):
             cumulative_water += water_g
             if action == "bloom":
-                stage["name"] = f"Bloom ({water_g:.0f}g)"
+                stage["name"] = f"Bloom ({water_g:.0f}g / {duration_s:.0f}s)"
+                # Bloom exits on time so the rest period is honoured
+                stage["exit_triggers"] = [
+                    {
+                        "type": "time",
+                        "value": duration_s,
+                        "relative": False,
+                        "comparison": ">=",
+                    }
+                ]
             else:
                 pour_count += 1
-                stage["name"] = f"Pour {pour_count} ({cumulative_water:.0f}g)"
-
-            stage["exit_triggers"] = [
-                {
-                    "type": "weight",
-                    "value": cumulative_water,
-                    "relative": False,
-                    "comparison": ">=",
-                }
-            ]
+                stage["name"] = f"Pour {pour_count} (to {cumulative_water:.0f}g)"
+                stage["exit_triggers"] = [
+                    {
+                        "type": "weight",
+                        "value": cumulative_water,
+                        "relative": False,
+                        "comparison": ">=",
+                    }
+                ]
 
         elif action in ("wait", "swirl", "stir"):
             if action == "swirl":
