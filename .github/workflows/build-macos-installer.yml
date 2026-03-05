@@ -113,7 +113,7 @@ jobs:
           echo "✅ Notarization complete"
 
       - name: Upload DMG Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: MeticAI-macOS-Installer
           path: macos-installer/build/MeticAI.dmg
