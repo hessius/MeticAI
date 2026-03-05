@@ -100,10 +100,12 @@ vi.mock('@/lib/pourOverApi', () => ({
   getPourOverPreferences: vi.fn().mockResolvedValue({
     free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
     ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    recipe: { machineIntegration: false },
   }),
   savePourOverPreferences: vi.fn().mockResolvedValue({
     free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
     ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    recipe: { machineIntegration: false },
   }),
 }))
 
@@ -163,10 +165,12 @@ describe('PourOverView', () => {
     vi.mocked(getPourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      recipe: { machineIntegration: false },
     })
     vi.mocked(savePourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      recipe: { machineIntegration: false },
     })
   })
 
@@ -380,6 +384,7 @@ describe('PourOverView', () => {
     vi.mocked(getPourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, machineIntegration: false },
+      recipe: { machineIntegration: false },
     })
 
     render(
@@ -408,6 +413,7 @@ describe('PourOverView', () => {
     vi.mocked(getPourOverPreferences).mockResolvedValue({
       free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
       ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      recipe: { machineIntegration: false },
     })
 
     render(

@@ -147,6 +147,7 @@ describe('pourOverApi', () => {
       const prefs = {
         free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
         ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, machineIntegration: true },
+        recipe: { machineIntegration: false },
       }
       mockFetch.mockResolvedValue({
         ok: true,
@@ -174,6 +175,7 @@ describe('pourOverApi', () => {
       const prefs = {
         free: { autoStart: false, bloomEnabled: true, bloomSeconds: 60, machineIntegration: false },
         ratio: { autoStart: true, bloomEnabled: false, bloomSeconds: 20, machineIntegration: true },
+        recipe: { machineIntegration: false },
       }
       mockFetch.mockResolvedValue({
         ok: true,
@@ -202,6 +204,7 @@ describe('pourOverApi', () => {
       await expect(savePourOverPreferences({
         free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
         ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+        recipe: { machineIntegration: false },
       })).rejects.toThrow('Validation error')
     })
   })

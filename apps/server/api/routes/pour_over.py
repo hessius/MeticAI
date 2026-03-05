@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from services.pour_over_adapter import adapt_pour_over_profile
 from services import temp_profile_service
+from services.temp_profile_service import is_temp_profile
 from services import pour_over_preferences
 from services.mqtt_service import get_mqtt_subscriber
 
@@ -53,6 +54,10 @@ class ActiveResponse(BaseModel):
     original_params: Optional[dict] = None
 
 
+class PrepareRecipeRequest(BaseModel):
+    recipe_slug: str = Field(..., min_length=1, description="Recipe slug identifier")
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -82,7 +87,7 @@ async def prepare_pour_over(body: PrepareRequest):
     try:
         snapshot = get_mqtt_subscriber().get_snapshot()
         name = snapshot.get("active_profile")
-        if name and name not in temp_profile_service.TEMP_PROFILE_NAMES:
+        if name and not is_temp_profile(name):
             previous_profile_name = name
     except Exception as exc:
         logger.warning("Could not read active profile from MQTT snapshot: %s", exc)
@@ -96,6 +101,46 @@ async def prepare_pour_over(body: PrepareRequest):
             "dose_grams": body.dose_grams,
             "brew_ratio": body.brew_ratio,
         },
+        previous_profile_name=previous_profile_name,
+    )
+
+    return PrepareResponse(
+        profile_id=result["profile_id"],
+        profile_name=result["profile_name"],
+    )
+
+
+@router.post("/api/pour-over/prepare-recipe", response_model=PrepareResponse)
+async def prepare_recipe(body: PrepareRecipeRequest):
+    """Adapt an OPOS recipe to a machine profile and load it.
+
+    Creates a temporary profile for the given recipe, uploads it to the
+    machine, and selects it so the user can press Start.
+    """
+    from services.recipe_adapter import adapt_recipe_to_profile, load_recipe
+
+    try:
+        recipe = load_recipe(body.recipe_slug)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    try:
+        profile_json = adapt_recipe_to_profile(recipe)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to adapt recipe: {exc}") from exc
+
+    previous_profile_name = None
+    try:
+        snapshot = get_mqtt_subscriber().get_snapshot()
+        name = snapshot.get("active_profile")
+        if name and not is_temp_profile(name):
+            previous_profile_name = name
+    except Exception as exc:
+        logger.warning("Could not read active profile from MQTT snapshot: %s", exc)
+
+    result = await temp_profile_service.create_and_load(
+        profile_json,
+        params={"recipe_slug": body.recipe_slug},
         previous_profile_name=previous_profile_name,
     )
 
@@ -145,9 +190,14 @@ class ModePreferences(BaseModel):
     machineIntegration: bool = False
 
 
+class RecipeModePreferences(BaseModel):
+    machineIntegration: bool = False
+
+
 class PreferencesPayload(BaseModel):
     free: ModePreferences = Field(default_factory=ModePreferences)
     ratio: ModePreferences = Field(default_factory=ModePreferences)
+    recipe: RecipeModePreferences = Field(default_factory=RecipeModePreferences)
 
 
 @router.get("/api/pour-over/preferences")

@@ -31,6 +31,16 @@ logger = logging.getLogger(__name__)
 # Used by cleanup_stale() to remove orphans on startup.
 TEMP_PROFILE_NAMES = frozenset({"MeticAI Ratio Pour-Over"})
 
+# Prefixes for temporary profile names (e.g. recipe profiles).
+TEMP_PROFILE_PREFIXES = frozenset({"MeticAI Recipe: "})
+
+
+def is_temp_profile(name: str) -> bool:
+    """Return True if *name* belongs to a MeticAI temporary profile."""
+    return name in TEMP_PROFILE_NAMES or any(
+        name.startswith(prefix) for prefix in TEMP_PROFILE_PREFIXES
+    )
+
 # Async lock guarding _active state to prevent interleaved mutations
 # from concurrent calls to create_and_load / cleanup / force_cleanup.
 _lock: asyncio.Lock | None = None
@@ -288,7 +298,7 @@ async def cleanup_stale() -> Dict[str, Any]:
         for profile in profiles:
             name = getattr(profile, "name", None) or ""
             profile_id = getattr(profile, "id", None)
-            if name in TEMP_PROFILE_NAMES and profile_id:
+            if is_temp_profile(name) and profile_id:
                 try:
                     await async_delete_profile(profile_id)
                     deleted.append(name)

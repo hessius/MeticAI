@@ -25,9 +25,14 @@ _MODE_DEFAULTS = {
     "machineIntegration": False,
 }
 
+_RECIPE_MODE_DEFAULTS = {
+    "machineIntegration": False,
+}
+
 _DEFAULT_PREFS = {
     "free": dict(_MODE_DEFAULTS),
     "ratio": dict(_MODE_DEFAULTS),
+    "recipe": dict(_RECIPE_MODE_DEFAULTS),
 }
 
 # In-memory cache – loaded lazily, write-through on save.
@@ -66,6 +71,12 @@ def load_preferences() -> dict:
             stored = {}
         result[mode] = {**_MODE_DEFAULTS, **stored}
 
+    # Recipe mode uses its own smaller defaults
+    stored_recipe = data.get("recipe", {})
+    if not isinstance(stored_recipe, dict):
+        stored_recipe = {}
+    result["recipe"] = {**_RECIPE_MODE_DEFAULTS, **stored_recipe}
+
     _cache = result
     return _cache
 
@@ -89,6 +100,16 @@ def save_preferences(prefs: dict) -> dict:
             if key in incoming:
                 merged[key] = incoming[key]
         result[mode] = merged
+
+    # Recipe mode preferences
+    incoming_recipe = prefs.get("recipe", {})
+    if not isinstance(incoming_recipe, dict):
+        incoming_recipe = {}
+    merged_recipe = dict(_RECIPE_MODE_DEFAULTS)
+    for key in _RECIPE_MODE_DEFAULTS:
+        if key in incoming_recipe:
+            merged_recipe[key] = incoming_recipe[key]
+    result["recipe"] = merged_recipe
 
     _cache = result
     atomic_write_json(PREFS_FILE, result)

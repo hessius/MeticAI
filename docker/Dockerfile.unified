@@ -156,6 +156,7 @@ VOLUME ["/data"]
 # Copy default data files (templates, etc.)
 # These are placed in /app/defaults and copied to /data at startup if missing
 COPY data/PourOverBase.json /app/defaults/PourOverBase.json
+COPY data/recipes/ /app/defaults/recipes/
 
 # Environment variables
 ENV DATA_DIR=/data

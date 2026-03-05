@@ -1,0 +1,27 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "James Hoffmann V2",
+    "author": "James Hoffmann",
+    "description": "Better 1-Cup V60 technique. Bloom with 2–3× water, two pours with a brief rest, then a gentle swirl to level the bed before drawdown.",
+    "compatibility": ["V60"],
+    "visualizer_hint": "pulse_block"
+  },
+  "equipment": {
+    "dripper": { "model": "V60", "material": "Plastic" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 15.0,
+    "water_g": 250.0,
+    "grind_setting": "Medium-Fine"
+  },
+  "protocol": [
+    { "step": 1, "action": "bloom", "water_g": 50, "duration_s": 45, "notes": "Saturate grounds with 2–3× dose weight, then swirl gently" },
+    { "step": 2, "action": "pour", "water_g": 100, "duration_s": 30, "notes": "Pour to 150g total" },
+    { "step": 3, "action": "wait", "duration_s": 10 },
+    { "step": 4, "action": "pour", "water_g": 100, "duration_s": 30, "notes": "Pour to 250g total" },
+    { "step": 5, "action": "swirl", "duration_s": 5, "notes": "Gentle swirl to flatten the bed" },
+    { "step": 6, "action": "wait", "duration_s": 90, "notes": "Allow to drain completely" }
+  ]
+}

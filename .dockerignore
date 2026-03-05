@@ -38,6 +38,7 @@ apps/web/STORYBOOK.md
 # Local data and logs
 data/
 !data/PourOverBase.json
+!data/recipes/
 logs/
 *.log
 

@@ -1,0 +1,26 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "Tetsu Kasuya God/Devil",
+    "author": "Tetsu Kasuya",
+    "description": "Hybrid percolation then immersion for the Hario Switch. Hot percolation phase followed by immersion and thermal decline for a unique cup.",
+    "compatibility": ["Hario Switch"],
+    "visualizer_hint": "pulse_block"
+  },
+  "equipment": {
+    "dripper": { "model": "Switch", "material": "Glass" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 20.0,
+    "water_g": 280.0,
+    "grind_setting": "Medium-Fine"
+  },
+  "protocol": [
+    { "step": 1, "action": "pour", "water_g": 100, "duration_s": 15, "valve_state": "open", "notes": "Valve open — hot percolation phase" },
+    { "step": 2, "action": "wait", "duration_s": 30, "valve_state": "closed", "notes": "Close the valve" },
+    { "step": 3, "action": "pour", "water_g": 180, "duration_s": 20, "valve_state": "closed", "notes": "Valve closed — immersion phase" },
+    { "step": 4, "action": "wait", "duration_s": 120, "valve_state": "closed", "notes": "Steep and allow to cool" },
+    { "step": 5, "action": "wait", "duration_s": 60, "valve_state": "open", "notes": "Open valve — drain" }
+  ]
+}
