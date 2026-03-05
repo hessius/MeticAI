@@ -24,7 +24,7 @@ try:
     _mcp_paths = [
         "/app/mcp-server/meticulous-mcp/src",  # Docker container layout
         os.path.join(
-            os.path.dirname(__file__), "..", "..", "..", "mcp-server", "meticulous-mcp", "src"
+            os.path.dirname(__file__), "..", "..", "mcp-server", "meticulous-mcp", "src"
         ),  # Local dev: apps/server/services -> apps/mcp-server
     ]
     for _mcp_src in _mcp_paths:
