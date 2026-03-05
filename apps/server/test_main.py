@@ -12043,7 +12043,7 @@ class TestRecipeAdapter:
 
         first_stage = profile["stages"][0]
         assert "Bloom" in first_stage["name"]
-        assert first_stage["exit_triggers"][0]["type"] == "weight"
+        assert first_stage["exit_triggers"][0]["type"] == "time"
 
     def test_adapt_recipe_name_prefix(self):
         """All adapted profiles have the 'MeticAI Recipe: ' prefix."""
@@ -12104,8 +12104,8 @@ class TestRecipeAdapter:
 
         bloom = profile["stages"][0]
         assert "Bloom" in bloom["name"]
-        assert bloom["exit_triggers"][0]["type"] == "weight"
-        assert bloom["exit_triggers"][0]["value"] == pytest.approx(45.0)
+        assert bloom["exit_triggers"][0]["type"] == "time"
+        assert bloom["exit_triggers"][0]["value"] == pytest.approx(30.0)
 
         wait = profile["stages"][1]
         assert wait["exit_triggers"][0]["type"] == "time"
