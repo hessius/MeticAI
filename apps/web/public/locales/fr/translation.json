@@ -837,7 +837,7 @@
     "weightTrendLabel": "Tendance du poids",
     "integration": {
       "toggle": "Intégration machine",
-      "toggleDescription": "Créez et exécutez un profil sur votre machine Meticulous avec ces paramètres de pour-over.",
+      "toggleDescription": "Suit votre pour-over sur l'écran Meticulous. Le minuteur démarre automatiquement — commencez à verser quand vous entendez le signal.",
       "startOnMachine": "Démarrer sur la machine",
       "stop": "Arrêter",
       "newShot": "Nouvelle extraction",

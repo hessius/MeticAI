@@ -837,7 +837,7 @@
     "weightTrendLabel": "Gewichtstrend",
     "integration": {
       "toggle": "Maschinenintegration",
-      "toggleDescription": "Erstelle und führe ein Profil auf deiner Meticulous-Maschine mit diesen Pour-Over-Einstellungen aus.",
+      "toggleDescription": "Verfolgt dein Pour-Over auf dem Meticulous-Display. Der Timer startet automatisch — beginne mit dem Gießen, wenn du den Ton hörst.",
       "startOnMachine": "Auf Maschine starten",
       "stop": "Stopp",
       "newShot": "Neuer Shot",

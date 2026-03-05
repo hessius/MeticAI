@@ -943,12 +943,24 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <h2 className="text-lg font-bold tracking-tight">{t('pourOver.title')}</h2>
         </div>
 
+        {/* ── Mode tabs at the top ── */}
+        <div className="sticky top-0 -mx-6 px-6 py-3 bg-card border-b border-border/40 z-10">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest text-center mb-2">{t('pourOver.mode')}</p>
+          <Tabs value={mode} onValueChange={(value) => applyModePrefs(value as 'free' | 'ratio' | 'recipe')}>
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="free">{t('pourOver.freeMode')}</TabsTrigger>
+              <TabsTrigger value="ratio">{t('pourOver.ratioMode')}</TabsTrigger>
+              <TabsTrigger value="recipe">{t('pourOver.recipeMode')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         {/* ── Two-column layout for desktop ── */}
         <div className="desktop-two-col">
           {/* Left column: Controls and stats */}
           <div className="space-y-5">
             {/* ── 1. Weight + Timer + Flow rate (always visible) ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
                   <Scales size={14} weight="bold" />
@@ -958,7 +970,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 <div className="text-xs text-muted-foreground">{t('pourOver.unitGrams')}</div>
               </div>
 
-              <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1 col-span-2 sm:col-span-1 order-first sm:order-none">
+              <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 flex flex-col items-center justify-center gap-1 col-span-2 lg:col-span-1 order-first lg:order-none">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
                   <Timer size={14} weight="bold" />
                   {t('pourOver.timer')}
@@ -1455,14 +1467,24 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               {mode !== 'recipe' && bloomEnabled && (
                 <div className="space-y-1.5">
                   <Label htmlFor="pour-over-bloom">{t('pourOver.bloomDuration')}</Label>
-                  <Input
-                    id="pour-over-bloom"
-                    inputMode="numeric"
-                    value={bloomSeconds}
-                    onChange={(event) => updateBloomSeconds(event.target.value)}
-                    placeholder="30"
-                    className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <IncrementButton
+                      onIncrement={() => updateBloomSeconds(String(Math.max(0, (parseInt(bloomSeconds) || 0) - 5)))}
+                      label="−"
+                    />
+                    <Input
+                      id="pour-over-bloom"
+                      inputMode="numeric"
+                      value={bloomSeconds}
+                      onChange={(event) => updateBloomSeconds(event.target.value)}
+                      placeholder="30"
+                      className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
+                    />
+                    <IncrementButton
+                      onIncrement={() => updateBloomSeconds(String((parseInt(bloomSeconds) || 0) + 5))}
+                      label="+"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -1495,17 +1517,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           </p>
         )}
 
-        {/* ── 6. Mode tabs at the bottom ── */}
-        <div className="sticky bottom-0 -mx-6 -mb-6 pt-3 px-6 pb-6 bg-card rounded-b-xl border-t border-border/40">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest text-center mb-2">{t('pourOver.mode')}</p>
-          <Tabs value={mode} onValueChange={(value) => applyModePrefs(value as 'free' | 'ratio' | 'recipe')}>
-            <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="free">{t('pourOver.freeMode')}</TabsTrigger>
-              <TabsTrigger value="ratio">{t('pourOver.ratioMode')}</TabsTrigger>
-              <TabsTrigger value="recipe">{t('pourOver.recipeMode')}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
       </Card>
     </motion.div>
   )
