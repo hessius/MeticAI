@@ -731,6 +731,9 @@ function MetricTile({ icon, value, unit, label, progress, onClick }: {
     <div
       className={`bg-muted/50 rounded-lg px-3 py-2 text-center ${onClick ? 'cursor-pointer hover:bg-muted/75 active:bg-muted transition-colors select-none' : ''}`}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
     >
       <div className="text-lg font-bold tabular-nums text-foreground flex items-center justify-center gap-1">
         {icon}

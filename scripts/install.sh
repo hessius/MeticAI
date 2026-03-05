@@ -531,14 +531,19 @@ echo ""
 
 # --- Gemini API Key ---
 if [[ -z "$GEMINI_API_KEY" ]]; then
-    echo "Get your API key from: https://aistudio.google.com/app/apikey"
-    echo "(Press Enter to skip — AI features will be disabled, but MeticAI will still work)"
-    read -p "Gemini API Key: " GEMINI_API_KEY < /dev/tty
-    if [[ -z "$GEMINI_API_KEY" ]]; then
+    if [[ "${METICAI_NON_INTERACTIVE}" == "true" ]]; then
         log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
         log_info "You can add a key later in Settings within the MeticAI web UI"
     else
-        log_success "API key configured"
+        echo "Get your API key from: https://aistudio.google.com/app/apikey"
+        echo "(Press Enter to skip — AI features will be disabled, but MeticAI will still work)"
+        read -p "Gemini API Key: " GEMINI_API_KEY < /dev/tty
+        if [[ -z "$GEMINI_API_KEY" ]]; then
+            log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
+            log_info "You can add a key later in Settings within the MeticAI web UI"
+        else
+            log_success "API key configured"
+        fi
     fi
 fi
 

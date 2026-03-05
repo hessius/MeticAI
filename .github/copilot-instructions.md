@@ -10,7 +10,7 @@
 ## Project Overview
 MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. It uses Google Gemini 2.0 Flash (via the Python SDK) to analyze coffee bags, understand roast profiles, and automatically create espresso recipes. A React-based web UI lets users interact with the system, change settings, browse shot history, and manage profiles.
 
-**Current version**: 2.1.0
+**Current version**: 2.1.0-beta.1
 
 ## Technology Stack
 
