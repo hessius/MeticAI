@@ -849,7 +849,7 @@
     "weightTrendLabel": "Weight trend",
     "integration": {
       "toggle": "Machine integration",
-      "toggleDescription": "Create and run a profile on your Meticulous machine with these pour-over settings.",
+      "toggleDescription": "Tracks your pour-over on the Meticulous screen. The brew timer starts automatically — start pouring when you hear the chime.",
       "startOnMachine": "Start on machine",
       "stop": "Stop",
       "newShot": "New Shot",

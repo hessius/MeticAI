@@ -837,7 +837,7 @@
     "weightTrendLabel": "Tendencia de peso",
     "integration": {
       "toggle": "Integración con máquina",
-      "toggleDescription": "Crea y ejecuta un perfil en tu máquina Meticulous con esta configuración de pour-over.",
+      "toggleDescription": "Rastrea tu pour-over en la pantalla Meticulous. El temporizador se inicia automáticamente — empieza a verter cuando escuches el sonido.",
       "startOnMachine": "Iniciar en máquina",
       "stop": "Detener",
       "newShot": "Nueva extracción",

@@ -838,7 +838,7 @@
     "weightTrendLabel": "Vikttrend",
     "integration": {
       "toggle": "Maskinintegration",
-      "toggleDescription": "Skapa och kör en profil på din Meticulous-maskin med dessa pour-over-inställningar.",
+      "toggleDescription": "Följer ditt pour-over på Meticulous-skärmen. Timern startar automatiskt — börja hälla när du hör signalen.",
       "startOnMachine": "Starta på maskin",
       "stop": "Stopp",
       "newShot": "Ny shot",
