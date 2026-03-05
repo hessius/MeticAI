@@ -3,7 +3,7 @@
   "metadata": {
     "name": "Tetsu Kasuya God/Devil",
     "author": "Tetsu Kasuya",
-    "description": "Hybrid percolation then immersion for the Hario Switch. Hot percolation phase followed by immersion and thermal decline for a unique cup.",
+    "description": "Hario Switch recipe. Open-valve hot percolation for the first 120g, then close the valve for cool immersion to 280g. Requires a gooseneck kettle with adjustable temperature.",
     "compatibility": ["Hario Switch"],
     "visualizer_hint": "pulse_block"
   },
@@ -17,10 +17,12 @@
     "grind_setting": "Medium-Fine"
   },
   "protocol": [
-    { "step": 1, "action": "pour", "water_g": 100, "duration_s": 15, "valve_state": "open", "notes": "Valve open — hot percolation phase" },
-    { "step": 2, "action": "wait", "duration_s": 30, "valve_state": "closed", "notes": "Close the valve" },
-    { "step": 3, "action": "pour", "water_g": 180, "duration_s": 20, "valve_state": "closed", "notes": "Valve closed — immersion phase" },
-    { "step": 4, "action": "wait", "duration_s": 120, "valve_state": "closed", "notes": "Steep and allow to cool" },
-    { "step": 5, "action": "wait", "duration_s": 60, "valve_state": "open", "notes": "Open valve — drain" }
+    { "step": 1, "action": "pour", "water_g": 60, "duration_s": 15, "valve_state": "open", "notes": "Valve OPEN — pour 60g at 90°C" },
+    { "step": 2, "action": "wait", "duration_s": 15, "valve_state": "open", "notes": "Wait — valve remains open, percolating" },
+    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 20, "valve_state": "open", "notes": "Pour 60g more to 120g total — still at 90°C. Begin lowering kettle temperature to 70°C now." },
+    { "step": 4, "action": "wait", "duration_s": 25, "valve_state": "open", "notes": "Wait until ~1:15. Ensure water is at 70°C before next step." },
+    { "step": 5, "action": "pour", "water_g": 160, "duration_s": 25, "valve_state": "closed", "notes": "CLOSE valve, then pour 160g at 70°C to 280g total — immersion phase begins" },
+    { "step": 6, "action": "wait", "duration_s": 30, "valve_state": "closed", "notes": "Steep with valve closed" },
+    { "step": 7, "action": "wait", "duration_s": 60, "valve_state": "open", "notes": "OPEN valve — drain. Aim to complete by 3-minute mark." }
   ]
 }
