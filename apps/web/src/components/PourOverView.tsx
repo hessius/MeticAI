@@ -745,7 +745,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
       await cmd(continueShot, 'started')
-      try { await waitForState('click to start') } catch {}
+      try {
+        await waitForState('click to start')
+      } catch {
+        // Timeout — machine may already be past this state; try anyway
+      }
       await cmd(continueShot, 'started')
     } catch (err) {
       setMachineLifecycle('error')
