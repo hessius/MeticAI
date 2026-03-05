@@ -282,7 +282,7 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
 
     // Add remaining text
     if (lastIndex < text.length) {
-      parts.push(<span key={`t-${lineIndex}-${key++}`}>{text.substring(lastIndex)}</span>)
+      parts.push(<span key={`t-${lineIndex}-${key}`}>{text.substring(lastIndex)}</span>)
     }
 
     // If no matches found, return original text
