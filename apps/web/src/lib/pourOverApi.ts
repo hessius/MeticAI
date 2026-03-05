@@ -112,9 +112,14 @@ export interface ModePreferences {
   machineIntegration: boolean
 }
 
+export interface RecipeModePreferences {
+  machineIntegration: boolean
+}
+
 export interface PourOverPreferences {
   free: ModePreferences
   ratio: ModePreferences
+  recipe: RecipeModePreferences
 }
 
 /**
@@ -143,6 +148,43 @@ export async function savePourOverPreferences(prefs: PourOverPreferences): Promi
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as Record<string, string>).detail ?? `Save preferences failed: ${res.statusText}`)
+  }
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Recipes
+// ---------------------------------------------------------------------------
+
+import type { Recipe } from '@/types'
+
+/**
+ * Fetch the full list of bundled pour-over recipes.
+ */
+export async function getRecipes(): Promise<Recipe[]> {
+  const base = await getServerUrl()
+  const res = await fetch(`${base}/api/recipes`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as Record<string, string>).detail ?? `Failed to load recipes: ${res.statusText}`)
+  }
+  return res.json()
+}
+
+/**
+ * Prepare a temporary recipe profile on the machine.
+ * Converts the OPOS recipe to a Meticulous profile, uploads it, and loads it.
+ */
+export async function prepareRecipe(recipe_slug: string): Promise<PrepareResponse> {
+  const base = await getServerUrl()
+  const res = await fetch(`${base}/api/pour-over/prepare-recipe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recipe_slug }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as Record<string, string>).detail ?? `Prepare recipe failed: ${res.statusText}`)
   }
   return res.json()
 }

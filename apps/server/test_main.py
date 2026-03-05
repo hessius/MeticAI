@@ -11958,3 +11958,270 @@ class TestShortDescriptionValidation:
         # None is not a string, so it's not truncated
         assert result["display"]["shortDescription"] is None
 
+
+# ============================================================================
+# Recipe Adapter Tests
+# ============================================================================
+
+
+class TestRecipeAdapter:
+    """Tests for services/recipe_adapter.py — OPOS → Meticulous profile."""
+
+    def test_list_recipe_slugs_returns_list(self):
+        """list_recipe_slugs returns a non-empty sorted list."""
+        from services.recipe_adapter import list_recipe_slugs
+        slugs = list_recipe_slugs()
+        assert isinstance(slugs, list)
+        assert len(slugs) >= 4
+
+    def test_list_recipe_slugs_contains_known_recipes(self):
+        """list_recipe_slugs includes the four confirmed bundled recipes."""
+        from services.recipe_adapter import list_recipe_slugs
+        slugs = list_recipe_slugs()
+        for expected in ("4-6-method", "hoffmann-v2", "lance-hedrick-single-pour"):
+            assert expected in slugs, f"Expected slug '{expected}' not found in {slugs}"
+
+    def test_load_recipe_success(self):
+        """load_recipe loads the 4:6 recipe and injects the slug key."""
+        from services.recipe_adapter import load_recipe
+        recipe = load_recipe("4-6-method")
+        assert recipe["slug"] == "4-6-method"
+        assert recipe["metadata"]["name"] == "Tetsu Kasuya 4:6"
+        assert recipe["ingredients"]["coffee_g"] == 20.0
+        assert recipe["ingredients"]["water_g"] == 300.0
+        assert len(recipe["protocol"]) == 9
+
+    def test_load_recipe_not_found_raises(self):
+        """load_recipe raises FileNotFoundError for an unknown slug."""
+        from services.recipe_adapter import load_recipe
+        with pytest.raises(FileNotFoundError):
+            load_recipe("nonexistent-recipe-xyz-abc")
+
+    def test_list_recipes_returns_all_bundled(self):
+        """list_recipes returns at least the four confirmed recipes."""
+        from services.recipe_adapter import list_recipes
+        recipes = list_recipes()
+        assert isinstance(recipes, list)
+        assert len(recipes) >= 4
+        names = {r["metadata"]["name"] for r in recipes}
+        assert "Tetsu Kasuya 4:6" in names
+
+    def test_list_recipes_each_has_slug(self):
+        """Every recipe returned by list_recipes has a slug field."""
+        from services.recipe_adapter import list_recipes
+        for recipe in list_recipes():
+            assert "slug" in recipe, f"Recipe missing slug: {recipe.get('metadata', {}).get('name')}"
+
+    def test_adapt_recipe_46_method_stages(self):
+        """4:6 recipe produces 9 stages: 5 pours (weight exit) + 4 waits (time exit)."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("4-6-method")
+        profile = adapt_recipe_to_profile(recipe)
+
+        assert profile["name"] == "MeticAI Recipe: Tetsu Kasuya 4:6"
+        assert profile["final_weight"] == 300.0
+        assert len(profile["stages"]) == 9
+
+        pour_stages = [s for s in profile["stages"] if "Pour" in s.get("name", "")]
+        wait_stages = [s for s in profile["stages"] if "Wait" in s.get("name", "")]
+        assert len(pour_stages) == 5
+        assert len(wait_stages) == 4
+
+        for s in pour_stages:
+            assert s["exit_triggers"][0]["type"] == "weight"
+        for s in wait_stages:
+            assert s["exit_triggers"][0]["type"] == "time"
+
+        # Cumulative weight of all 5 × 60g pours = 300g
+        assert pour_stages[-1]["exit_triggers"][0]["value"] == pytest.approx(300.0)
+
+    def test_adapt_recipe_hoffmann_has_bloom(self):
+        """Hoffmann V2 profile has a Bloom stage as first stage."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("hoffmann-v2")
+        profile = adapt_recipe_to_profile(recipe)
+
+        first_stage = profile["stages"][0]
+        assert "Bloom" in first_stage["name"]
+        assert first_stage["exit_triggers"][0]["type"] == "weight"
+
+    def test_adapt_recipe_name_prefix(self):
+        """All adapted profiles have the 'MeticAI Recipe: ' prefix."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("hoffmann-v2")
+        profile = adapt_recipe_to_profile(recipe)
+        assert profile["name"].startswith("MeticAI Recipe: ")
+
+    def test_adapt_recipe_unique_ids(self):
+        """Two calls to adapt_recipe_to_profile produce different UUIDs."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("4-6-method")
+        p1 = adapt_recipe_to_profile(recipe)
+        p2 = adapt_recipe_to_profile(recipe)
+        assert p1["id"] != p2["id"]
+
+    def test_adapt_recipe_stages_use_power_type(self):
+        """All stages use type 'power' (pour-over has no heating/pressure)."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("4-6-method")
+        for stage in adapt_recipe_to_profile(recipe)["stages"]:
+            assert stage["type"] == "power"
+
+    def test_adapt_lance_hedrick_final_weight(self):
+        """Lance Hedrick profile's final_weight matches recipe water_g."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("lance-hedrick-single-pour")
+        profile = adapt_recipe_to_profile(recipe)
+        assert profile["final_weight"] == pytest.approx(recipe["ingredients"]["water_g"])
+
+    def test_adapt_recipe_missing_recipes_dir_returns_empty_list(self, tmp_path, monkeypatch):
+        """When recipes directory doesn't exist, list_recipe_slugs returns []."""
+        import services.recipe_adapter as ra
+        monkeypatch.setattr(ra, "_SEARCH_DIRS", (tmp_path / "nonexistent_dir",))
+        slugs = ra.list_recipe_slugs()
+        assert slugs == []
+
+    def test_adapt_recipe_from_custom_dir(self, tmp_path, monkeypatch):
+        """adapt_recipe_to_profile works with a custom recipe JSON."""
+        import services.recipe_adapter as ra
+
+        custom_recipe = {
+            "version": "1.1.0",
+            "metadata": {"name": "Test Custom Recipe"},
+            "equipment": {"dripper": {"model": "V60"}},
+            "ingredients": {"coffee_g": 15.0, "water_g": 250.0, "grind_setting": "Medium"},
+            "protocol": [
+                {"step": 1, "action": "bloom", "water_g": 45, "duration_s": 30},
+                {"step": 2, "action": "wait", "duration_s": 15},
+                {"step": 3, "action": "pour", "water_g": 205, "duration_s": 90},
+            ],
+        }
+
+        profile = ra.adapt_recipe_to_profile(custom_recipe)
+        assert profile["name"] == "MeticAI Recipe: Test Custom Recipe"
+        assert profile["final_weight"] == pytest.approx(250.0)
+        assert len(profile["stages"]) == 3
+
+        bloom = profile["stages"][0]
+        assert "Bloom" in bloom["name"]
+        assert bloom["exit_triggers"][0]["type"] == "weight"
+        assert bloom["exit_triggers"][0]["value"] == pytest.approx(45.0)
+
+        wait = profile["stages"][1]
+        assert wait["exit_triggers"][0]["type"] == "time"
+        assert wait["exit_triggers"][0]["value"] == pytest.approx(15.0)
+
+        pour = profile["stages"][2]
+        assert pour["exit_triggers"][0]["type"] == "weight"
+        assert pour["exit_triggers"][0]["value"] == pytest.approx(250.0)  # cumulative
+
+
+# ============================================================================
+# Recipe Endpoint Tests
+# ============================================================================
+
+
+class TestRecipeEndpoints:
+    """Tests for GET /api/recipes and GET /api/recipes/{slug}."""
+
+    def test_list_recipes_returns_200(self, client):
+        """GET /api/recipes returns HTTP 200."""
+        response = client.get("/api/recipes")
+        assert response.status_code == 200
+
+    def test_list_recipes_returns_list(self, client):
+        """GET /api/recipes body is a JSON list."""
+        body = client.get("/api/recipes").json()
+        assert isinstance(body, list)
+        assert len(body) >= 4
+
+    def test_list_recipes_each_has_required_fields(self, client):
+        """Each item in GET /api/recipes has slug, metadata.name, ingredients, protocol."""
+        for recipe in client.get("/api/recipes").json():
+            assert "slug" in recipe
+            assert "metadata" in recipe
+            assert "name" in recipe["metadata"]
+            assert "ingredients" in recipe
+            assert "protocol" in recipe
+
+    def test_get_recipe_by_slug_returns_correct_data(self, client):
+        """GET /api/recipes/4-6-method returns Tetsu Kasuya 4:6 with 9 steps."""
+        response = client.get("/api/recipes/4-6-method")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["slug"] == "4-6-method"
+        assert data["metadata"]["name"] == "Tetsu Kasuya 4:6"
+        assert data["ingredients"]["water_g"] == 300.0
+        assert len(data["protocol"]) == 9
+
+    def test_get_recipe_unknown_slug_returns_404(self, client):
+        """GET /api/recipes/<unknown> returns HTTP 404."""
+        response = client.get("/api/recipes/no-such-recipe-xyz")
+        assert response.status_code == 404
+
+    def test_get_all_bundled_recipes_individually(self, client):
+        """Each recipe that appears in the list can also be fetched by slug."""
+        slugs = [r["slug"] for r in client.get("/api/recipes").json()]
+        for slug in slugs:
+            resp = client.get(f"/api/recipes/{slug}")
+            assert resp.status_code == 200, f"Slug '{slug}' returned {resp.status_code}"
+
+    def test_recipe_slug_field_matches_url_slug(self, client):
+        """The slug field in each recipe matches the URL slug used to fetch it."""
+        for recipe in client.get("/api/recipes").json():
+            fetched = client.get(f"/api/recipes/{recipe['slug']}").json()
+            assert fetched["slug"] == recipe["slug"]
+
+
+# ============================================================================
+# Prepare Recipe Endpoint Tests
+# ============================================================================
+
+
+class TestPrepareRecipeEndpoint:
+    """Tests for POST /api/pour-over/prepare-recipe."""
+
+    @patch('api.routes.pour_over.temp_profile_service')
+    @patch('api.routes.pour_over.get_mqtt_subscriber')
+    def test_prepare_recipe_success(self, mock_mqtt_sub, mock_temp_svc, client):
+        """POST /api/pour-over/prepare-recipe with valid slug returns 200."""
+        mock_mqtt_sub.return_value.get_snapshot.return_value = {}
+
+        async def _fake_create_and_load(profile_json, params, previous_profile_name=None):
+            return {
+                "profile_id": "test-uuid-1234",
+                "profile_name": "MeticAI Recipe: Tetsu Kasuya 4:6",
+            }
+
+        mock_temp_svc.create_and_load = _fake_create_and_load
+
+        response = client.post(
+            "/api/pour-over/prepare-recipe",
+            json={"recipe_slug": "4-6-method"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "profile_id" in data
+        assert "profile_name" in data
+
+    def test_prepare_recipe_unknown_slug_returns_404(self, client):
+        """POST /api/pour-over/prepare-recipe with unknown slug returns 404."""
+        response = client.post(
+            "/api/pour-over/prepare-recipe",
+            json={"recipe_slug": "nonexistent-slug-xyz-abc"},
+        )
+        assert response.status_code == 404
+
+    def test_prepare_recipe_missing_recipe_slug_field_returns_422(self, client):
+        """POST /api/pour-over/prepare-recipe without recipe_slug returns 422."""
+        response = client.post("/api/pour-over/prepare-recipe", json={})
+        assert response.status_code == 422
+
+    def test_prepare_recipe_empty_slug_returns_422(self, client):
+        """POST /api/pour-over/prepare-recipe with empty string slug returns 422."""
+        response = client.post(
+            "/api/pour-over/prepare-recipe",
+            json={"recipe_slug": ""},
+        )
+        assert response.status_code == 422
+

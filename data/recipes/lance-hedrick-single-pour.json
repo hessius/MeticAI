@@ -1,0 +1,23 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "Lance Hedrick Single Pour",
+    "author": "Lance Hedrick",
+    "description": "Long bloom then one continuous centre pour for high extraction with minimal fines migration.",
+    "compatibility": ["V60"],
+    "visualizer_hint": "linear_ramp"
+  },
+  "equipment": {
+    "dripper": { "model": "V60", "material": "Plastic" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 20.0,
+    "water_g": 340.0,
+    "grind_setting": "Medium-Coarse"
+  },
+  "protocol": [
+    { "step": 1, "action": "bloom", "water_g": 60, "duration_s": 60, "notes": "3× dose bloom — saturate all grounds evenly" },
+    { "step": 2, "action": "pour", "water_g": 280, "duration_s": 120, "flow_rate": "steady", "notes": "Single continuous centre pour to 340g" }
+  ]
+}
