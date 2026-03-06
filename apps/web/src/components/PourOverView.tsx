@@ -204,18 +204,22 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, mac
 
   // Generate Y-axis ticks for weight scale
   // Use nice round numbers (e.g., 0, 50, 100, 150, 200, 250, 300)
+  // Always filter to ≤ yMax so labels with small yMax don't overflow above the chart container
   const getWeightTicks = () => {
-    if (yMax <= 50) return [0, 25, 50]
-    if (yMax <= 100) return [0, 50, 100]
-    if (yMax <= 150) return [0, 50, 100, 150]
-    if (yMax <= 200) return [0, 100, 200]
-    if (yMax <= 300) return [0, 100, 200, 300]
-    // For larger scales, use 100g increments
-    const ticks: number[] = []
-    for (let v = 0; v <= yMax; v += 100) {
-      ticks.push(v)
+    let ticks: number[]
+    if (yMax <= 50) ticks = [0, 25, 50]
+    else if (yMax <= 100) ticks = [0, 50, 100]
+    else if (yMax <= 150) ticks = [0, 50, 100, 150]
+    else if (yMax <= 200) ticks = [0, 100, 200]
+    else if (yMax <= 300) ticks = [0, 100, 200, 300]
+    else {
+      // For larger scales, use 100g increments
+      ticks = []
+      for (let v = 0; v <= yMax; v += 100) {
+        ticks.push(v)
+      }
     }
-    return ticks
+    return ticks.filter(t => t <= yMax)
   }
   const weightTicks = getWeightTicks()
 
