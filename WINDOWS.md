@@ -109,5 +109,6 @@ Remove-Item -Recurse -Force MeticAI
 | Can't resolve `meticulous.local` | Use the machine's IP address directly in your `.env` file |
 | Container won't start | Run `docker compose logs -f` and check for errors |
 | Port 3550 in use | Stop other services on that port, or edit `docker-compose.yml` to change the port mapping |
+| Installer exits silently / nothing happens | Do **not** pipe directly with `irm ... \| iex` — use the two-step download shown in Option A above. If the window still closes immediately, open a PowerShell window first, then run `.\install.ps1` from inside it so output stays visible. Alternatively use **Option B (Manual Setup)** — it is equally fast and always works. |
 
 For additional help, see the [main troubleshooting section](README.md#-troubleshooting) or [open an issue](https://github.com/hessius/MeticAI/issues).
