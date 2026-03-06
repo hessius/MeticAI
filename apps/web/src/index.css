@@ -235,6 +235,20 @@
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+/* Success glow — emerald green for target-reached state */
+@keyframes success-glow {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.3), 0 0 12px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.5), 0 0 26px rgba(16, 185, 129, 0.3);
+  }
+}
+
+.animate-success-glow {
+  animation: success-glow 1.8s ease-in-out infinite;
+}
+
 /* Smooth fade-in animation */
 @keyframes fade-in {
   from {
