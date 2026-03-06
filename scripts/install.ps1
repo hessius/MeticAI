@@ -14,11 +14,12 @@
     https://github.com/hessius/MeticAI/issues
 
 .EXAMPLE
-    # Run directly:
+    # Download and run (recommended — keeps the window open):
+    irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 -OutFile install.ps1
     .\install.ps1
 
-    # Or download and run:
-    irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 | iex
+    # Avoid: irm ... | iex — on some Windows configurations the window closes
+    # before you can read the output, making errors impossible to diagnose.
 
 .NOTES
     Requirements:
