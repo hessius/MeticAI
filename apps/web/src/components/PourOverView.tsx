@@ -582,6 +582,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
   const remainingWeight = targetWeight !== null ? Math.max(targetWeight - weight, 0) : null
   const ratioProgress = targetWeight !== null && targetWeight > 0 ? Math.min((weight / targetWeight) * 100, 100) : 0
+  const targetReached =
+    (mode === 'ratio' && isRunning && targetWeight !== null && targetWeight > 0 && weight >= targetWeight) ||
+    (mode === 'recipe' && isRunning && selectedRecipe !== null && weight >= selectedRecipe.ingredients.water_g)
 
   const recipeTimings = useMemo((): RecipeStepTiming[] => {
     if (!selectedRecipe) return []
@@ -1035,9 +1038,20 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     {targetWeight !== null ? `${targetWeight.toFixed(1)} g` : '—'}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('pourOver.remaining')}</p>
-                  <p className="text-xl sm:text-2xl font-semibold tabular-nums">
+                <div className={`rounded-xl border p-3 transition-all duration-500 ${
+                  targetReached
+                    ? 'border-emerald-500/50 bg-emerald-500/10 animate-success-glow'
+                    : 'border-border/60 bg-secondary/40'
+                }`}>
+                  <p className={`text-xs uppercase tracking-wide flex items-center gap-1 ${
+                    targetReached ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+                  }`}>
+                    {targetReached && <CheckCircle size={12} weight="fill" />}
+                    {targetReached ? t('pourOver.targetReached') : t('pourOver.remaining')}
+                  </p>
+                  <p className={`text-xl sm:text-2xl font-semibold tabular-nums ${
+                    targetReached ? 'text-emerald-600 dark:text-emerald-400' : ''
+                  }`}>
                     {remainingWeight !== null ? `${remainingWeight.toFixed(1)} g` : '—'}
                   </p>
                 </div>
@@ -1056,9 +1070,20 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     {selectedRecipe.ingredients.water_g} g
                   </p>
                 </div>
-                <div className="rounded-xl border border-border/60 bg-secondary/40 p-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('pourOver.remaining')}</p>
-                  <p className="text-xl sm:text-2xl font-semibold tabular-nums">
+                <div className={`rounded-xl border p-3 transition-all duration-500 ${
+                  targetReached
+                    ? 'border-emerald-500/50 bg-emerald-500/10 animate-success-glow'
+                    : 'border-border/60 bg-secondary/40'
+                }`}>
+                  <p className={`text-xs uppercase tracking-wide flex items-center gap-1 ${
+                    targetReached ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+                  }`}>
+                    {targetReached && <CheckCircle size={12} weight="fill" />}
+                    {targetReached ? t('pourOver.targetReached') : t('pourOver.remaining')}
+                  </p>
+                  <p className={`text-xl sm:text-2xl font-semibold tabular-nums ${
+                    targetReached ? 'text-emerald-600 dark:text-emerald-400' : ''
+                  }`}>
                     {Math.max(0, selectedRecipe.ingredients.water_g - weight).toFixed(1)} g
                   </p>
                 </div>
