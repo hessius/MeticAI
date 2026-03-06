@@ -88,9 +88,46 @@ def _write_s6_env(var_name: str, value: str) -> None:
     update_s6_env(var_name, value)
 
 
+def _sync_defaults() -> None:
+    """Sync bundled defaults from /app/defaults into DATA_DIR.
+
+    - PourOverBase.json: copied only if missing (preserves any live customisation)
+    - Recipes: always overwritten — bundled recipes are read-only managed defaults
+    """
+    import shutil
+    from config import DATA_DIR
+
+    defaults_base = Path("/app/defaults")
+    if not defaults_base.exists():
+        return  # Not running in Docker — nothing to sync
+
+    # PourOverBase.json — copy only if the volume doesn't have it yet
+    src_template = defaults_base / "PourOverBase.json"
+    dst_template = DATA_DIR / "PourOverBase.json"
+    if src_template.exists() and not dst_template.exists():
+        dst_template.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_template, dst_template)
+        logger.info("Copied default PourOverBase.json to %s", dst_template)
+
+    # Recipes — always overwrite so new/updated bundled recipes appear on upgrade
+    src_recipes = defaults_base / "recipes"
+    dst_recipes = DATA_DIR / "recipes"
+    if src_recipes.exists():
+        dst_recipes.mkdir(parents=True, exist_ok=True)
+        synced = 0
+        for recipe_file in src_recipes.glob("*.json"):
+            shutil.copy2(recipe_file, dst_recipes / recipe_file.name)
+            synced += 1
+        if synced:
+            logger.info("Synced %d default recipe(s) to %s", synced, dst_recipes)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - start background tasks on startup."""
+    # ── Sync bundled defaults into the data volume ───────────────────────
+    _sync_defaults()
+
     # ── Hydrate os.environ from persisted settings ──────────────────────
     # When the container starts, GEMINI_API_KEY / METICULOUS_IP may be
     # empty in the environment (user configured them via the Settings UI,

@@ -32,12 +32,15 @@ _SEARCH_PATHS = (_TEMPLATE_PATH, _FALLBACK_TEMPLATE_PATH, _DOCKER_TEMPLATE_PATH)
 
 def _load_template() -> Dict[str, Any]:
     """Load the PourOverBase.json template, trying DATA_DIR first."""
-    for path in _SEARCH_PATHS:
+    # Deduplicate while preserving order (in Docker, _FALLBACK_TEMPLATE_PATH
+    # resolves to the same path as _TEMPLATE_PATH due to directory depth)
+    unique_paths = list(dict.fromkeys(_SEARCH_PATHS))
+    for path in unique_paths:
         if path.exists():
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
     raise FileNotFoundError(
-        f"PourOverBase.json not found at any of: {', '.join(str(p) for p in _SEARCH_PATHS)}"
+        f"PourOverBase.json not found at any of: {', '.join(str(p) for p in unique_paths)}"
     )
 
 
