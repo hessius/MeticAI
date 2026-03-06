@@ -430,6 +430,11 @@ function App() {
       const buildFriendlyGenerateError = (err: Error): string => {
         const message = err.message || ''
 
+        // Network-level failure — fetch never got an HTTP response (no connection, CORS, etc.)
+        if (/NetworkError|Failed to fetch|network request failed|fetch failed/i.test(message) && !message.includes('HTTP error')) {
+          return t('app.errors.generateFailedNetwork')
+        }
+
         if (message.includes('HTTP error! status: 404')) {
           return t('app.errors.generateFailed404Route')
         }
@@ -442,7 +447,25 @@ function App() {
           return t('app.errors.generateFailedValidation')
         }
 
-        return t('app.errors.generateFailed', { message })
+        // Extract the detail string from JSON error bodies returned by the server
+        // e.g. body: {"detail": "quota exhausted..."} or {"detail": {"message": "..."}}
+        let friendlyDetail = message
+        const bodyMatch = message.match(/body:\s*(\{[\s\S]+\})$/)
+        if (bodyMatch) {
+          try {
+            const parsed = JSON.parse(bodyMatch[1])
+            const detail = parsed.detail
+            if (typeof detail === 'string') {
+              friendlyDetail = detail
+            } else if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+              friendlyDetail = detail.message
+            }
+          } catch {
+            // keep friendlyDetail as the raw message
+          }
+        }
+
+        return t('app.errors.generateFailed', { message: friendlyDetail })
       }
 
       setErrorMessage(
