@@ -1,229 +1,253 @@
-# MeticAI - Copilot Instructions
+# MeticAI — Agent Instructions
 
-## Session Governance (Read First)
+## Session Governance
 
-- If `tasks.md` exists in the workspace, follow it as the session source of truth.
-- If there is any conflict between this file and `tasks.md`, **`tasks.md` takes precedence**.
-- For release-related operations (merge release PRs, publish/delete releases, create/delete release tags, rollback/restore release state), always stop and wait for **explicit user instruction in the current chat**.
-- "Ready to release" does **not** imply permission to release.
+- If `tasks.md` exists in the workspace root, treat it as the **session source of truth**. It takes precedence over this file in any conflict.
+- If `tasks.md` is not present, follow the standards in this file.
+- For release-related operations (merge release PRs, publish/delete releases, create/delete release tags, rollback), always stop and **wait for explicit user instruction in the current chat**. "Ready to release" is not permission to release.
+- See `tasks.md` for the full session workflow, safety rules, test commands, and current task list.
+
+---
 
 ## Project Overview
-MeticAI is an autonomous AI agent that controls a Meticulous Espresso Machine. It uses Google Gemini 2.0 Flash (via the Python SDK) to analyze coffee bags, understand roast profiles, and automatically create espresso recipes. A React-based web UI lets users interact with the system, change settings, browse shot history, and manage profiles.
 
-**Current version**: 2.1.0-beta.1
+MeticAI is an AI-powered controller for the Meticulous Espresso Machine. It uses Google Gemini (via the Python SDK) to analyse coffee bag images, interpret roast profiles, and automatically generate espresso shot profiles. A React-based web UI lets users interact with the system, browse shot history, manage profiles, and run pour-over sessions.
+
+**Repository:** https://github.com/hessius/MeticAI
+**OPOS recipe format:** https://github.com/hessius/OPOS
+**Version file:** `VERSION` (semver string — changing this triggers the auto-release workflow)
+
+---
 
 ## Technology Stack
 
-### Core Technologies
-- **Python 3.12** (FastAPI backend)
-- **React + TypeScript** (Web frontend, built with Vite/Bun)
-- **Google Gemini Python SDK** (`google-genai`) for AI/Vision
-- **Docker & Docker Compose** (Single unified container)
-- **s6-overlay** (Process supervision inside the container)
-- **nginx** (Reverse proxy — single entry point on port 3550)
-- **FastMCP v1.26.0** (MCP server for external integrations - optional)
-- **Google Gemini 2.0 Flash** (AI/Vision model)
+### Core
+- **Python 3.13** — FastAPI backend
+- **React + TypeScript** — Web frontend (Vite / Bun)
+- **Google Gemini Python SDK** (`google-genai`) — AI / vision
+- **Docker & Docker Compose** — Single unified container
+- **s6-overlay** — Process supervision inside the container
+- **nginx** — Reverse proxy, single entry point on port 3550
+- **FastMCP** — MCP server for external integrations (optional)
 
-### Key Python Dependencies
-- `fastapi==0.109.1` (web framework)
-- `uvicorn==0.40.0` (ASGI server)
-- `google-generativeai==0.8.6` (Gemini SDK — used for image analysis)
-- `pillow>=10.3.0` (image processing)
-- `python-multipart==0.0.22` (multipart form handling)
-- `pyMeticulous>=0.3.1` (Meticulous machine API client)
-- `httpx==0.26.0` (HTTP client)
+### Key Python packages
+See `apps/server/requirements.txt` for pinned versions. Key packages:
+- `fastapi` — web framework
+- `uvicorn` — ASGI server
+- `google-genai` — Gemini SDK for image analysis
+- `pyMeticulous` — Meticulous machine API client
+- `httpx` — async HTTP client
+- `pydantic` — data validation
+
+### Key frontend packages
+See `apps/web/package.json`. Key packages:
+- `react` / `react-dom` — UI framework
+- `vite` / `bun` — build toolchain
+- `@tanstack/react-query` — data fetching
+- `framer-motion` — animation
+- `lucide-react` — icons
+- `eslint` v10 + `eslint-plugin-react-hooks` v7 — linting
+
+---
 
 ## Architecture
 
-### Unified Container (v2.0)
-Everything runs inside a **single Docker container** (`meticai`), managed by **s6-overlay**. Port **3550** is the only exposed port.
+### Unified Container
 
-Internal services:
-1. **nginx** (port 3550) — Serves the React SPA and proxies `/api/*` to the FastAPI server
-2. **server** (port 8000, internal) — FastAPI application: coffee analysis, profile generation via Gemini SDK, profile management, settings, shot history, scheduling, MQTT commands
-3. **mcp-server** (port 8080, internal) — FastMCP streamable-http server for external integrations (Claude Desktop, Cursor, etc.) — optional, not required for core profile creation
-4. **mosquitto** (port 1883, internal) — Lightweight MQTT broker for real-time machine telemetry
-5. **meticulous-bridge** — Socket.IO → MQTT bridge based on `@nickwilsonr/meticulous-addon`; connects to the Meticulous machine and publishes sensor data to mosquitto
+Everything runs inside a single Docker container (`meticai`) managed by **s6-overlay**. Port **3550** is the only exposed port.
+
+| Internal service | Port | Role |
+|---|---|---|
+| nginx | 3550 | Serves React SPA; proxies `/api/*` to FastAPI |
+| server (FastAPI) | 8000 | Coffee analysis, profile management, scheduling, MQTT commands |
+| mcp-server (FastMCP) | 8080 | External MCP integrations (Claude Desktop, Cursor) — optional |
+| mosquitto | 1883 | MQTT broker for real-time machine telemetry |
+| meticulous-bridge | — | Socket.IO → MQTT bridge (connects to Meticulous machine) |
 
 ### Request Flow
+
 ```
-User/iOS Shortcut → :3550 (nginx) → /api/* → :8000 (FastAPI)
-                                   → /*    → React SPA
+User / iOS Shortcut → :3550 (nginx) → /api/* → :8000 (FastAPI)
+                                      → /*    → React SPA
 
-FastAPI → Gemini Python SDK → profile JSON → direct HTTP to Meticulous machine
+FastAPI → Gemini Python SDK → profile JSON → Meticulous machine (HTTP)
 
-Meticulous machine ← Socket.IO → meticulous-bridge → MQTT → mosquitto (:1883)
-FastAPI → WebSocket /api/ws/live ← subscribes to MQTT topics → browser
+Meticulous machine ← Socket.IO → meticulous-bridge → MQTT → mosquitto
+FastAPI WebSocket /api/ws/live ← MQTT subscriber → browser
 ```
-
-### s6-overlay Services
-Located in `docker/s6-rc.d/`:
-- `server/` — FastAPI backend (uvicorn)
-- `mcp-server/` — FastMCP HTTP server
-- `mosquitto/` — MQTT broker
-- `meticulous-bridge/` — Socket.IO → MQTT bridge
-- `nginx/` — Reverse proxy
-- `user/` — s6 user bundle (depends on above services)
 
 ### Settings Hot-Reload
-When `METICULOUS_IP` or `GEMINI_API_KEY` are changed via the settings UI:
+
+When `METICULOUS_IP` or `GEMINI_API_KEY` change via the settings UI:
 - `os.environ` is updated in-process
-- The cached Meticulous API client is reset (`reset_meticulous_api()`)
-- The MCP server s6 service is restarted via `s6-svc -r /run/service/mcp-server`
-- The meticulous-bridge s6 service is restarted via `s6-svc -r /run/service/meticulous-bridge`
-- No full container restart is required
+- Meticulous API client is reset (`reset_meticulous_api()`)
+- `mcp-server` and `meticulous-bridge` services are restarted via s6 (`s6-svc -r`)
+- No full container restart required
 
-## Coding Standards
-
-### Python Code Style
-- Follow PEP 8 conventions
-- Use type hints where appropriate
-- Keep functions focused and single-purpose
-- Write comprehensive docstrings for public APIs
-- Maintain 100% test coverage for new code
-
-### Testing Requirements
-- **Python**: Use pytest with comprehensive test coverage (424+ tests)
-- **Bash**: Use BATS (Bash Automated Testing System)
-- All tests must pass before merging
-- Aim for 100% code coverage on critical paths
-- Test both success and failure scenarios
-- Include edge cases in test coverage
-
-### Test Commands
-```bash
-# Python tests (run from apps/server directory)
-pip install -r requirements-test.txt
-TEST_MODE=true python -m pytest test_main.py -v --cov=main
-
-# Inside the running container
-docker exec meticai bash -c "cd /app/server && TEST_MODE=true python -m pytest test_main.py -x -q"
-
-# Bash tests (run from repository root)
-bats tests/test_local_install.bats
-```
-
-> **Note:** Tests require `pytest-asyncio` to be installed. The `TEST_MODE=true` env var disables real service connections.
-
-## Security Practices
-
-### Critical Security Requirements
-- **NEVER** commit API keys or secrets to the repository
-- Use environment variables for sensitive configuration (`.env` file)
-- Keep dependencies up to date for security patches
-- Version pinning is required for reproducibility
-- Only whitelist safe MCP tools (`create_profile`, `apply_profile`)
-- No dangerous operations allowed (e.g., `delete_profile`)
-
+---
 
 ## Project Structure
 
 ```
 MeticAI/
 ├── .github/
-│   └── workflows/              # CI/CD (tests.yml, build-publish.yml, auto-release.yml)
+│   ├── copilot-instructions.md     # This file — project reference for agents
+│   └── workflows/                  # CI/CD (tests.yml, build-publish.yml, auto-release.yml)
 ├── apps/
-│   ├── server/                 # FastAPI backend
-│   │   ├── main.py             # App entry point, lifespan, middleware
-│   │   ├── config.py           # Central configuration
-│   │   ├── logging_config.py   # Structured logging setup
-│   │   ├── prompt_builder.py   # Gemini prompt construction
-│   │   ├── api/routes/         # Route modules
-│   │   │   ├── coffee.py       # /analyze_coffee, /analyze_and_profile
-│   │   │   ├── profiles.py     # Profile CRUD
-│   │   │   ├── shots.py        # Shot history
-│   │   │   ├── history.py      # Analysis history
-│   │   │   ├── scheduling.py   # Scheduled shots
-│   │   │   └── system.py       # Settings, version, health, restart, logs
-│   │   ├── services/           # Business logic
-│   │   │   ├── gemini_service.py       # AI model config, output cleaning
-│   │   │   ├── meticulous_service.py   # Machine API client (lazy singleton)
-│   │   │   ├── analysis_service.py     # Coffee analysis orchestration
-│   │   │   ├── cache_service.py        # LLM response caching
-│   │   │   ├── history_service.py      # Analysis history persistence
-│   │   │   ├── settings_service.py     # Settings read/write
-│   │   │   └── scheduling_state.py     # Shot scheduling state
-│   │   ├── models/             # Pydantic models
-│   │   ├── requirements.txt    # Production dependencies
-│   │   ├── requirements-test.txt
-│   │   ├── test_main.py        # 424+ pytest tests
-│   │   └── conftest.py         # Test fixtures
-│   ├── web/                    # React + TypeScript frontend (Vite/Bun)
+│   ├── server/                     # FastAPI backend
+│   │   ├── main.py                 # App entry point, lifespan, middleware
+│   │   ├── config.py               # Central configuration
+│   │   ├── logging_config.py       # Structured logging
+│   │   ├── prompt_builder.py       # Gemini prompt construction
+│   │   ├── api/routes/             # Route modules (coffee, profiles, shots, history,
+│   │   │                           #   scheduling, bridge, websocket, commands,
+│   │   │                           #   pour_over, recipes, system)
+│   │   ├── services/               # Business logic
+│   │   │   ├── gemini_service.py
+│   │   │   ├── meticulous_service.py
+│   │   │   ├── analysis_service.py
+│   │   │   ├── cache_service.py
+│   │   │   ├── history_service.py
+│   │   │   ├── settings_service.py
+│   │   │   ├── scheduling_state.py
+│   │   │   └── temp_profile_service.py
+│   │   ├── models/                 # Pydantic models
+│   │   ├── requirements.txt        # Production dependencies (pinned)
+│   │   ├── requirements-test.txt   # Test dependencies
+│   │   ├── test_main.py            # Main pytest suite (700+ tests)
+│   │   ├── test_logging.py         # Logging tests
+│   │   └── .venv/                  # Local virtualenv (not committed)
+│   ├── web/                        # React + TypeScript frontend (Vite / Bun)
 │   │   ├── src/
+│   │   │   ├── components/         # React components
+│   │   │   ├── views/              # Top-level view components
+│   │   │   ├── hooks/              # Custom React hooks
+│   │   │   └── lib/                # Utilities, API clients, types
+│   │   ├── e2e/                    # Playwright E2E tests
 │   │   ├── package.json
-│   │   ├── index.html
-│   │   └── ...
-│   └── mcp-server/             # MCP server for Meticulous communication
-│       ├── meticulous-mcp/     # Fork of twchad/meticulous-mcp
-│       ├── run_http.py         # FastMCP streamable-http entry point
-│       ├── Dockerfile          # Standalone MCP server image (optional)
-│       └── ...
+│   │   └── bun.lock                # Must be committed and kept in sync with package.json
+│   └── mcp-server/                 # FastMCP server for Meticulous communication
 ├── docker/
-│   ├── Dockerfile.unified      # Multi-stage build (web → python deps → runtime)
-│   ├── nginx.conf              # nginx reverse proxy config
-│   ├── gemini-settings.json    # Gemini CLI MCP config (httpUrl key)
-│   └── s6-rc.d/                # s6-overlay service definitions
-│       ├── server/
-│       ├── mcp-server/
-│       ├── nginx/
-│       └── user/
-├── data/                       # Persistent data (profiles, caches, settings)
-├── scripts/                    # Install scripts (bash, PowerShell)
-├── tests/                      # BATS tests for installers
-├── docker-compose.yml          # Primary compose file (unified container)
+│   ├── Dockerfile.unified          # Multi-stage build (web → Python deps → runtime)
+│   ├── nginx.conf
+│   └── s6-rc.d/                    # s6-overlay service definitions
+├── data/                           # Persistent data (profiles, caches, settings)
+├── scripts/                        # Install scripts (bash, PowerShell)
+├── tests/                          # BATS tests for install scripts
+├── docker-compose.yml              # Production compose (pulls from GHCR)
+├── docker-compose.dev.yml          # Dev overlay — adds build context for local builds
 ├── docker-compose.tailscale.yml
 ├── docker-compose.watchtower.yml
-├── VERSION                     # Semver version string (2.0.5)
-└── README.md
+└── VERSION                         # Semver string — triggers auto-release on change
 ```
 
-## Build & Run Instructions
+---
 
-### Local Development
+## Coding Standards
+
+### Python
+- Follow PEP 8; use type hints throughout
+- Keep functions focused and single-purpose
+- Write docstrings for public APIs
+- All new code must have tests; aim for full coverage on critical paths
+- Test both success and failure paths; include edge cases
+
+### TypeScript / React
+- Functional components with hooks; no class components
+- Use `eslint-plugin-react-hooks` rules — currently 5 v7 strict rules are downgraded to `warn` (see issue #256); do not introduce new violations
+- Imports from `lucide-react` must use the public package path, not private dist paths
+- All `bun.lock` changes must be committed alongside `package.json` changes
+
+### Commits
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`
+- Commit message body should explain *why*, not just *what*
+
+### UI Design
+- All new UI must be responsive — mobile-first, then tablet, then desktop
+- Pour-over view has distinct mobile (single-column) and desktop (multi-column) layouts; ensure no overflow at intermediate viewport widths
+- Components from `apps/web/src/components/ui/` are from shadcn/ui — extend, do not replace
+
+---
+
+## Build & Run
+
+### Local Development (from source)
+
 ```bash
-# 1. Clone repository
-git clone https://github.com/hessius/MeticAI.git
-cd MeticAI
+# 1. Clone
+git clone https://github.com/hessius/MeticAI.git && cd MeticAI
 
-# 2. Create .env file
-cat > .env << 'EOF'
-GEMINI_API_KEY=your_key_here
-METICULOUS_IP=192.168.x.x
-EOF
+# 2. Create .env
+echo "GEMINI_API_KEY=your_key\nMETICULOUS_IP=meticulous.local" > .env
 
-# 3. Build and run the unified container
-docker compose up -d --build
+# 3. Build from local source and run
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
-# 4. Open the web UI
+# 4. Open UI
 open http://localhost:3550
 ```
 
-### Quick Install
-```bash
-# Remote installation
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
-
-# macOS app wrapper
-./macos-installer/build-macos-app.sh
-```
+> **Always use `docker-compose.dev.yml` as an overlay for local builds.** The base `docker-compose.yml` uses `image: ghcr.io/...` — without the overlay, `--build` does nothing and you get the remote image.
 
 ### Rebuild After Code Changes
+
 ```bash
-docker compose down && docker compose up -d --build
+# Full rebuild (no cache) — use after dependency changes
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache \
+  && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Quick rebuild — use after code-only changes
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
+
+### Quick Install (end-user)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
+```
+
+---
+
+## Debugging
+
+```bash
+# Container logs (live)
+docker logs meticai -f
+
+# s6 service status
+docker exec meticai s6-rc -a list
+
+# Restart a single service (e.g. after hot-reload issues)
+docker exec meticai s6-svc -r /run/service/server
+
+# FastAPI interactive docs
+open http://localhost:3550/docs
+
+# MCP server logs
+docker exec meticai cat /var/log/mcp-server.log
+
+# Health endpoint
+curl -sf http://localhost:3550/health
+```
+
+---
 
 ## API Endpoints
 
-All endpoints are served through nginx at port 3550 under the `/api` prefix.
+All endpoints are served through nginx at `:3550` under the `/api` prefix.
 
 ### Coffee Analysis
-- `POST /api/analyze_coffee` — Analyze a coffee bag image
-- `POST /api/analyze_and_profile` — Analyze + create a profile on the machine
+- `POST /api/analyze_coffee` — Analyse a coffee bag image
+- `POST /api/analyze_and_profile` — Analyse + create profile on the machine
 
 ### Profiles
 - `GET /api/profiles` — List profiles on machine
 - `POST /api/profiles/{id}/apply` — Apply a profile
 - `DELETE /api/profiles/{id}` — Delete a profile
+
+### Pour-Over / Recipes
+- `GET /api/pour-over/recipes` — List built-in pour-over recipes
+- `POST /api/pour-over/start` — Start machine-integrated pour-over session
 
 ### Shots & History
 - `GET /api/last-shot` — Last shot data
@@ -234,148 +258,115 @@ All endpoints are served through nginx at port 3550 under the `/api` prefix.
 - `GET /api/bridge/status` — Bridge and MQTT broker health
 - `POST /api/bridge/restart` — Restart bridge service
 - `WS /api/ws/live` — WebSocket for real-time machine telemetry
-- `POST /api/machine/command/{cmd}` — Machine commands via MQTT (start, stop, abort, continue, preheat, tare, home-plunger, purge, load-profile, brightness, sounds)
+- `POST /api/machine/command/{cmd}` — MQTT commands (start, stop, abort, continue, preheat, tare, home-plunger, purge, load-profile, brightness, sounds, select_profile)
 
 ### System
 - `GET /api/status` — Machine connection status
 - `GET /api/version` — Server version
-- `GET /api/settings` — Current settings
-- `POST /api/settings` — Save settings (triggers hot-reload)
+- `GET /api/settings` / `POST /api/settings` — Read / write settings (triggers hot-reload)
 - `POST /api/restart` — Restart container services
-- `GET /api/health` — Health check
+- `GET /api/health` — Health check (`{"status":"ok"}`)
 
-See `API.md` for full endpoint documentation.
+See `API.md` for full documentation.
 
-## Barista Persona Guidelines
-
-### Profile Naming Conventions
-- **Witty and pun-heavy** but never cryptic
-- Clear indication of profile characteristics
-- Memorable for quick selection
-- Professional barista humor
-- Examples: "Slow-Mo Blossom", "Pressure Point", "Bean There, Done That"
-
-### Profile Creation Features
-- Support complex multi-stage extractions
-- Include pre-infusion and blooming phases
-- Provide pressure ramping and flow profiling
-- Tailor to specific bean characteristics
-- Validated against the `espresso-profile-schema` JSON schema
-
-### Post-Creation Summary Format
-Must include:
-- **Profile Created**: [Name]
-- **Description**: What makes it special
-- **Preparation**: Dose, grind, temperature recommendations
-- **Why This Works**: Expert reasoning
-- **Special Notes**: Equipment requirements or technique notes
-
-## Docker Best Practices
-
-### Unified Dockerfile (`docker/Dockerfile.unified`)
-- Multi-stage build: web (Bun) → Python deps → final runtime
-- s6-overlay for process supervision
-- Espresso profile schema cloned at build time
-- Gemini CLI installed globally via npm
-- Health check against `/health` on port 3550
-
-### Docker Compose
-- `docker-compose.yml` — Default compose file (unified container)
-- Optional overlays: `docker-compose.tailscale.yml`, `docker-compose.watchtower.yml`
-- Single `meticai-data` named volume for persistent `/data`
-- `restart: unless-stopped` policy
-
-## Contribution Workflow
-
-1. **Before making changes**: Run existing tests to ensure baseline
-2. **Write tests first** (TDD approach) for new features
-3. **Make minimal changes** to achieve the goal
-4. **Run tests** after changes to verify functionality
-5. **Maintain 100% coverage** on new critical code
-6. **Update documentation** if APIs or behavior changes
-7. **Check security** — run vulnerability scans on dependency changes
-
-## CI/CD Pipeline
-
-### GitHub Actions Workflows
-- `tests.yml` — Python tests, BATS tests, integration check, lint
-- `build-publish.yml` — Build and push Docker image to GHCR
-- `auto-release.yml` — Automatic releases from VERSION file changes
+---
 
 ## Common Tasks
 
-### Adding New Python Dependencies
-1. Add to `apps/server/requirements.txt` with exact version
-2. Rebuild Docker image
+### Adding Python dependencies
+1. Add to `apps/server/requirements.txt` with pinned version
+2. Rebuild container (`docker-compose.dev.yml` overlay)
 3. Run full test suite
-4. Check for security vulnerabilities
 
-### Adding New API Routes
-1. Create route module in `apps/server/api/routes/`
+### Adding API routes
+1. Create module in `apps/server/api/routes/`
 2. Register router in `apps/server/main.py`
 3. Add tests in `apps/server/test_main.py`
 
-### Updating Gemini CLI Configuration
+### Adding frontend dependencies
+1. `cd apps/web && bun add <package>`
+2. Commit both `package.json` and `bun.lock`
+
+### Updating Gemini CLI config
 - Edit `docker/gemini-settings.json`
-- Key format: `"httpUrl"` (not `"uri"`) for streamable-http transport
+- Use `"httpUrl"` key (not `"uri"`) for streamable-http transport
 - Include `"trust": true` to skip MCP tool approval prompts
 - Rebuild container to apply
 
-### Debugging
-- View logs: `docker logs meticai -f`
-- Check s6 service status: `docker exec meticai s6-rc -a list`
-- Restart a single service: `docker exec meticai s6-svc -r /run/service/server`
-- Access FastAPI docs: `http://localhost:3550/docs`
-- MCP server logs: `docker exec meticai cat /var/log/mcp-server.log`
+---
 
-## Important Files
+## CI/CD Pipeline
 
-- `VERSION` — Semver version string, triggers auto-release on change
-- `docker/Dockerfile.unified` — The single Dockerfile for the entire system
-- `docker/gemini-settings.json` — Gemini CLI ↔ MCP server connection config
-- `apps/server/main.py` — FastAPI app entry point
-- `apps/server/services/gemini_service.py` — AI model configuration and output cleaning
-- `apps/server/services/meticulous_service.py` — Machine API client (lazy singleton with reset)
-- `apps/mcp-server/run_http.py` — MCP server entry point
-- `API.md` — Full API endpoint documentation
-- `PROFILING_AXIOMS.md` — Coffee profiling knowledge base
+### Workflows (`.github/workflows/`)
 
-## External Dependencies
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `tests.yml` | push to `main`/`develop`/`version/2.0.0`; PR targeting those branches | Python tests, web tests + lint, E2E, Docker build test, Windows installer tests |
+| `build-publish.yml` | Version tags (`v*`); manual dispatch | Builds unified Docker image, pushes to `ghcr.io/hessius/meticai` |
+| `auto-release.yml` | Push to `main` changing `VERSION` | Creates GitHub release and version tag |
 
-### Meticulous MCP
-Based on the excellent work by twchad:
-- Repository: https://github.com/hessius/meticulous-mcp (fork)
-- Bundled at `apps/mcp-server/meticulous-mcp/`
-- Provides `create_profile` and `apply_profile` MCP tools
-- Uses `espresso-profile-schema` for JSON validation (cloned at Docker build time)
+### CI notes
+- `bun install --frozen-lockfile` is used in CI — always commit `bun.lock` when `package.json` changes
+- Python tests use `requirements-test.txt`; run with `TEST_MODE=true` to disable live service connections
+- Docker build test runs Playwright `verify-tasks.spec.ts` against the built container
+
+---
+
+## External Dependencies & Related Repos
+
+| Repo | Role |
+|---|---|
+| https://github.com/hessius/meticulous-mcp | Fork of twchad/meticulous-mcp — bundled at `apps/mcp-server/meticulous-mcp/` |
+| https://github.com/hessius/OPOS | Open Pour-Over Specification — defines the recipe format used in MeticAI |
+| `espresso-profile-schema` (git submodule) | JSON schema for Meticulous espresso profiles, cloned at Docker build time |
+
+---
 
 ## Environment Variables
 
-Required in `.env` (or passed via Docker Compose):
+Required (in `.env` or via Docker Compose env):
 - `GEMINI_API_KEY` — Google Gemini API key (https://aistudio.google.com/app/apikey)
-- `METICULOUS_IP` — IP or hostname of the Meticulous Espresso Machine (default: `meticulous.local`)
+- `METICULOUS_IP` — IP or hostname of the machine (default: `meticulous.local`)
 
 Set automatically inside the container:
-- `DATA_DIR=/data` — Persistent data directory
-- `SERVER_PORT=8000` — FastAPI server port
-- `MCP_SERVER_PORT=8080` — MCP server port
+- `DATA_DIR=/data`
+- `SERVER_PORT=8000`
+- `MCP_SERVER_PORT=8080`
+- `TEST_MODE=true` — disables real service connections when running tests
 
-## Deployment Considerations
+---
 
-- Designed to run on low-powered servers (e.g., Raspberry Pi)
-- Single container, single port (3550) — easy firewall/reverse proxy setup
-- Requires network access to the Meticulous machine
-- Supports iOS Shortcuts integration
-- Can be triggered via curl from any HTTP client
-- Optional Tailscale overlay for secure remote access
-- Optional Watchtower overlay for automatic image updates
-- Published to `ghcr.io/hessius/meticai:latest`
+## AI / Barista Persona
+
+### Profile Naming
+- Witty and pun-heavy but never cryptic
+- Clear indication of profile characteristics
+- Examples: "Slow-Mo Blossom", "Pressure Point", "Bean There, Done That"
+
+### Post-Creation Summary Format
+- **Profile Created:** [Name]
+- **Description:** What makes it special
+- **Preparation:** Dose, grind, temperature recommendations
+- **Why This Works:** Expert reasoning
+- **Special Notes:** Equipment requirements or technique notes
+
+---
+
+## Deployment Notes
+
+- Designed for low-powered servers (Raspberry Pi, Mac Mini, NAS)
+- Single container, single port (3550) — simple firewall / reverse proxy setup
+- Requires LAN access to the Meticulous machine
+- Supports iOS Shortcuts and curl-based integrations
+- Optional overlays: `docker-compose.tailscale.yml` (remote access), `docker-compose.watchtower.yml` (auto-updates)
+- Published image: `ghcr.io/hessius/meticai:latest`
+
+---
 
 ## Additional Resources
 
-- [Gemini API Documentation](https://ai.google.dev/gemini-api/docs)
-- [Gemini CLI](https://github.com/google-gemini/gemini-cli)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [s6-overlay Documentation](https://github.com/just-containers/s6-overlay)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Gemini API Docs](https://ai.google.dev/gemini-api/docs)
+- [FastAPI Docs](https://fastapi.tiangolo.com/)
+- [s6-overlay Docs](https://github.com/just-containers/s6-overlay)
 - [MCP Protocol](https://modelcontextprotocol.io/)
+- [OPOS Specification](https://github.com/hessius/OPOS)
