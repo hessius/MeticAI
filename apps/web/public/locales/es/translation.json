@@ -809,7 +809,7 @@
     "bloomDescription": "Muestra una cuenta regresiva de bloom durante los primeros segundos de extracción.",
     "bloomDone": "listo",
     "bloomWeightMultiplier": "Peso objetivo del bloom",
-    "bloomWeightMultiplierDescription": "El bloom termina cuando el peso alcanza este múltiplo de la dosis.",
+    "bloomWeightMultiplierDescription": "Peso objetivo del agua durante el bloom, como múltiplo de la dosis.",
     "bloomDuration": "Duración del bloom (seg)",
     "bloomIndicator": "Indicador de bloom",
     "doseLabel": "Dosis (g)",

@@ -68,7 +68,7 @@ vi.mock('react-i18next', () => ({
         'pourOver.bloomDuration': 'Bloom duration (sec)',
         'pourOver.bloomDone': 'done',
         'pourOver.bloomWeightMultiplier': 'Bloom weight target',
-        'pourOver.bloomWeightMultiplierDescription': 'Bloom ends when weight reaches this multiple of your dose.',
+        'pourOver.bloomWeightMultiplierDescription': 'Target water weight during bloom, as a multiple of your dose.',
         'common.back': 'Back',
       }
       return translations[key] || key
