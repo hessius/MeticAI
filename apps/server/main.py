@@ -91,7 +91,7 @@ def _write_s6_env(var_name: str, value: str) -> None:
 def _sync_defaults() -> None:
     """Sync bundled defaults from /app/defaults into DATA_DIR.
 
-    - PourOverBase.json: copied only if missing (preserves any live customisation)
+    - PourOverBase.json: always overwritten (read-only template)
     - Recipes: always overwritten — bundled recipes are read-only managed defaults
     """
     import shutil
@@ -101,13 +101,15 @@ def _sync_defaults() -> None:
     if not defaults_base.exists():
         return  # Not running in Docker — nothing to sync
 
-    # PourOverBase.json — copy only if the volume doesn't have it yet
+    # PourOverBase.json — always overwrite from bundled defaults so template
+    # updates are applied on container restart (this is a read-only template,
+    # not user-editable data)
     src_template = defaults_base / "PourOverBase.json"
     dst_template = DATA_DIR / "PourOverBase.json"
-    if src_template.exists() and not dst_template.exists():
+    if src_template.exists():
         dst_template.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_template, dst_template)
-        logger.info("Copied default PourOverBase.json to %s", dst_template)
+        logger.info("Synced PourOverBase.json to %s", dst_template)
 
     # Recipes — always overwrite so new/updated bundled recipes appear on upgrade
     src_recipes = defaults_base / "recipes"
