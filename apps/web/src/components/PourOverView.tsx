@@ -109,9 +109,11 @@ interface WeightTrendProps {
   /** Elapsed seconds at which the machine shot ended (vertical marker line) */
   machineEndTimeSeconds?: number
   recipeTimings?: RecipeStepTiming[]
+  /** Whether the brew is currently running — used to contract x-axis after stop */
+  isRunning?: boolean
 }
 
-function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, machineEndTimeSeconds, recipeTimings }: WeightTrendProps) {
+function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, machineEndTimeSeconds, recipeTimings, isRunning = true }: WeightTrendProps) {
   const { t } = useTranslation()
   const width = 360
   // Base height varies by viewport: taller on desktop (h-40 → 160), mobile (h-32 → 128)
@@ -126,9 +128,15 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, mac
     ? recipeTimings[recipeTimings.length - 1]?.endTimeSec ?? 0
     : 0
   const xAxisMin = recipeTotal > DEFAULT_X_DURATION ? recipeTotal : DEFAULT_X_DURATION
-  const xAxisMax = lastTime <= xAxisMin
+  let xAxisMax = lastTime <= xAxisMin
     ? xAxisMin
     : Math.ceil(lastTime / X_INCREMENT) * X_INCREMENT
+
+  // After brew stops, contract the x-axis to the actual brew duration
+  // if the brew was significantly shorter (>30s) than the default axis
+  if (!isRunning && lastTime > 0 && xAxisMax - lastTime > 30) {
+    xAxisMax = Math.max(Math.ceil(lastTime / X_INCREMENT) * X_INCREMENT, X_INCREMENT)
+  }
 
   // Always show waiting state when no data, on both mobile and desktop
   if (points.length < 2) {
@@ -1170,14 +1178,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     <span>{ratioProgress.toFixed(0)}%</span>
                   </div>
                   <Progress value={ratioProgress} />
-                  <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
+                  <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
                 </div>
               )}
               {mode === 'free' && (
-                <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
+                <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
               )}
               {mode === 'recipe' && (
-                <WeightTrend points={weightTrend} targetWeight={null} mode="recipe" recipeTimings={recipeTimings} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
+                <WeightTrend points={weightTrend} targetWeight={null} mode="recipe" recipeTimings={recipeTimings} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
               )}
             </div>
 
@@ -1528,14 +1536,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   <span>{ratioProgress.toFixed(0)}%</span>
                 </div>
                 <Progress value={ratioProgress} />
-                <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
+                <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
               </div>
             )}
             {mode === 'free' && (
-              <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
+              <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
             )}
             {mode === 'recipe' && (
-              <WeightTrend points={weightTrend} targetWeight={null} mode="recipe" recipeTimings={recipeTimings} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined} />
+              <WeightTrend points={weightTrend} targetWeight={null} mode="recipe" recipeTimings={recipeTimings} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
             )}
           </div>{/* End right column */}
         </div>{/* End two-column layout */}
