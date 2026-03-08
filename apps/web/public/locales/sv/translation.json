@@ -825,6 +825,8 @@
     "weighFromScale": "Väg från våg",
     "weighFromScaleTitle": "Använd aktuell vågvikt som dos",
     "weighFromScaleShort": "Våg",
+    "addCoffee": "Lägg till kaffe...",
+    "addCoffeeTitle": "Lägg kaffe på vågen — dosen registreras automatiskt",
     "autoStartTimer": "Starta timer automatiskt",
     "autoStartDescription": "Startar vid hällning men ignorerar snabba spikar.",
     "bloomIndicator": "Bloom-indikator",

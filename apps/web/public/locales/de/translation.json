@@ -836,6 +836,8 @@
     "weighFromScale": "Von Waage wiegen",
     "weighFromScaleTitle": "Aktuelles Waagengewicht als Dosis erfassen",
     "weighFromScaleShort": "Waage",
+    "addCoffee": "Kaffee hinzufügen...",
+    "addCoffeeTitle": "Kaffee auf die Waage geben — Dosis wird automatisch erfasst",
     "weight": "Gewicht",
     "weightLegend": "Gewicht",
     "weightTrendLabel": "Gewichtstrend",
