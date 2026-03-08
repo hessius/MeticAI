@@ -109,6 +109,7 @@ export interface ModePreferences {
   autoStart: boolean
   bloomEnabled: boolean
   bloomSeconds: number
+  bloomWeightMultiplier: number
   machineIntegration: boolean
 }
 
