@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -400,6 +401,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // Machine integration state
   const [meticulousIntegration, setMeticulousIntegration] = useState(false)
   const [machineLifecycle, setMachineLifecycle] = useState<MachineLifecycle>('idle')
+  // "Set dose from scale" validation: warn when weight > 50g (likely forgot to tare)
+  const [showDoseWarning, setShowDoseWarning] = useState(false)
   // Elapsed time at which the machine shot ended (for graph marker + timer annotation)
   const [machineEndElapsedMs, setMachineEndElapsedMs] = useState<number | null>(null)
   // Track previous brewing state for transition detection
@@ -522,16 +525,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const flowStartTimestampRef = useRef<number | null>(null)
   // Track weight when continuous flow started (for weight-based escape hatch)
   const flowStartWeightRef = useRef<number | null>(null)
-  // "Use Scale" two-phase flow: tare → detect stable coffee weight → set dose → tare
-  const [awaitingDose, setAwaitingDose] = useState(false)
-  const doseStableWeightRef = useRef<number | null>(null)
-  const doseStableTimestampRef = useRef<number | null>(null)
-  // 1.2s of stable weight before capturing dose (filters ongoing pouring/settling)
-  const DOSE_STABLE_MS = 1200
-  // Weight must not change by more than 0.5g to be considered stable
-  const DOSE_TOLERANCE_G = 0.5
-  // Minimum weight to consider as a valid dose (ignore noise after tare)
-  const DOSE_MIN_G = 3
   // Require 800ms of continuous valid flow to trigger auto-start
   // Filters momentary disturbances while remaining responsive to quick pours
   const FLOW_CONFIRMATION_MS = 800
@@ -581,8 +574,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     trendStartTimestampRef.current = null
     flowStartTimestampRef.current = null
     flowStartWeightRef.current = null
-    doseStableWeightRef.current = null
-    doseStableTimestampRef.current = null
     setFlowRate(0)
     // Send tare command
     cmd(tareScale, 'tared')
@@ -632,10 +623,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     // Reset graph data when timer is reset
     setWeightTrend([])
     trendStartTimestampRef.current = null
-    // Clear awaiting-dose state
-    setAwaitingDose(false)
-    doseStableWeightRef.current = null
-    doseStableTimestampRef.current = null
   }
 
   const weight = machineState.shot_weight ?? 0
@@ -867,10 +854,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     flowStartTimestampRef.current = null
     flowStartWeightRef.current = null
     setFlowRate(0)
-    // Clear awaiting-dose state
-    setAwaitingDose(false)
-    doseStableWeightRef.current = null
-    doseStableTimestampRef.current = null
     // Tare the scale
     justTaredRef.current = true
     cmd(tareScale, 'tared')
@@ -887,30 +870,6 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (wasTare) {
       justTaredRef.current = false
       // Don't record this weight for auto-start detection
-      previousWeightRef.current = currentWeight
-      previousWeightTimestampRef.current = Date.now()
-      return
-    }
-
-    // "Use Scale" two-phase: detect stable coffee weight after tare
-    if (awaitingDose && currentWeight >= DOSE_MIN_G) {
-      const now = Date.now()
-      if (
-        doseStableWeightRef.current === null ||
-        Math.abs(currentWeight - doseStableWeightRef.current) > DOSE_TOLERANCE_G
-      ) {
-        // Weight still changing — reset stability timer
-        doseStableWeightRef.current = currentWeight
-        doseStableTimestampRef.current = now
-      } else if (now - (doseStableTimestampRef.current ?? now) >= DOSE_STABLE_MS) {
-        // Weight stable long enough — capture as dose, then tare for water
-        setDoseGrams(currentWeight.toFixed(1))
-        setAwaitingDose(false)
-        doseStableWeightRef.current = null
-        doseStableTimestampRef.current = null
-        handleTare()
-      }
-      // Don't process auto-start while awaiting dose
       previousWeightRef.current = currentWeight
       previousWeightTimestampRef.current = Date.now()
       return
@@ -989,7 +948,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
     previousWeightRef.current = currentWeight
     previousWeightTimestampRef.current = now
-  }, [autoStartEnabled, awaitingDose, handleTare, isRunning, machineState.shot_weight, startTimer])
+  }, [autoStartEnabled, isRunning, machineState.shot_weight, startTimer])
 
   // ── Load recipes when entering recipe mode ──
   useEffect(() => {
@@ -1428,32 +1387,23 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      className={`w-full h-9 gap-1.5${awaitingDose ? ' border-amber-500 dark:border-amber-400' : ''}`}
-                      disabled={!machineState.connected || (weight <= 0 && !awaitingDose)}
+                      className="w-full h-9 gap-1.5"
+                      disabled={!machineState.connected || weight <= 0}
                       onClick={() => {
-                        if (awaitingDose) {
-                          // Cancel awaiting mode; if weight is valid, capture now
-                          if (weight >= DOSE_MIN_G) {
-                            setDoseGrams(weight.toFixed(1))
-                            handleTare()
-                          }
-                          setAwaitingDose(false)
-                          doseStableWeightRef.current = null
-                          doseStableTimestampRef.current = null
+                        if (weight > 50) {
+                          setShowDoseWarning(true)
                         } else {
-                          // Phase 1: tare and start waiting for coffee
+                          setDoseGrams(weight.toFixed(1))
                           handleTare()
-                          setAwaitingDose(true)
                         }
                       }}
-                      title={awaitingDose ? t('pourOver.addCoffeeTitle') : t('pourOver.weighFromScaleTitle')}
-                      aria-label={awaitingDose ? t('pourOver.addCoffee') : t('pourOver.weighFromScale')}
+                      title={t('pourOver.weighFromScaleTitle')}
+                      aria-label={t('pourOver.weighFromScale')}
                     >
-                      <Scales size={16} weight="bold" className={awaitingDose ? 'animate-pulse' : ''} />
-                      <span className="text-xs">
-                        {awaitingDose ? t('pourOver.addCoffee') : t('pourOver.weighFromScaleShort')}
-                      </span>
+                      <Scales size={16} weight="bold" />
+                      <span className="text-xs">{t('pourOver.weighFromScaleShort')}</span>
                     </Button>
+                    <p className="text-xs text-muted-foreground">{t('pourOver.weighFromScaleDescription')}</p>
                   </div>
                   {/* Ratio */}
                   <div className="space-y-1.5">
@@ -1684,6 +1634,27 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         )}
 
       </Card>
+
+      {/* Dose warning dialog: shown when "Set dose from scale" captures > 50g */}
+      <AlertDialog open={showDoseWarning} onOpenChange={setShowDoseWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('pourOver.doseWarningTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('pourOver.doseWarningDescription', { weight: weight.toFixed(1) })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setDoseGrams(weight.toFixed(1))
+              handleTare()
+            }}>
+              {t('pourOver.doseWarningConfirm', { weight: weight.toFixed(0) })}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   )
 }
