@@ -832,7 +832,7 @@
     "bloomDuration": "Bloom-tid (sek)",
     "bloomDone": "klar",
     "bloomWeightMultiplier": "Bloom-viktmål",
-    "bloomWeightMultiplierDescription": "Bloom avslutas när vikten når denna multipel av dosen.",
+    "bloomWeightMultiplierDescription": "Målvikt för vatten under bloom, som en multipel av dosen.",
     "offlineNotice": "Maskinen är offline. Vågfunktioner är inaktiverade tills anslutningen återställs.",
     "freeMode": "Fritt läge",
     "ratioMode": "Ratio-läge",

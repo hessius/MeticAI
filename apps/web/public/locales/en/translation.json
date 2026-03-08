@@ -833,7 +833,7 @@
     "bloomDuration": "Bloom duration (sec)",
     "bloomDone": "done",
     "bloomWeightMultiplier": "Bloom weight target",
-    "bloomWeightMultiplierDescription": "Bloom ends when weight reaches this multiple of your dose.",
+    "bloomWeightMultiplierDescription": "Target water weight during bloom, as a multiple of your dose.",
     "recipeMode": "Recipes",
     "selectRecipe": "Select a recipe",
     "noRecipes": "No recipes found",

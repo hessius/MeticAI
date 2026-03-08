@@ -1043,19 +1043,20 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   const bloomTimeRemaining = Math.max(0, bloomDurationMs - elapsedMs)
                   const bloomTimeUp = bloomTimeRemaining <= 0
                   const bloomWeightReached = bloomWeightTarget !== null && weight >= bloomWeightTarget
-                  const isBloomDone = bloomTimeUp || bloomWeightReached
-                  const justFinishedBloom = isBloomDone && elapsedMs < bloomDurationMs + 3000
+                  const justFinishedBloom = bloomTimeUp && elapsedMs < bloomDurationMs + 3000
 
-                  if (!isBloomDone) {
+                  if (!bloomTimeUp) {
                     return (
                       <div className="text-xs font-medium text-amber-500 dark:text-amber-400 uppercase tracking-wider animate-pulse">
                         {t('pourOver.bloomIndicator')}: {Math.ceil(bloomTimeRemaining / 1000)}s
                         {bloomWeightTarget !== null && (
-                          <span className="ml-1.5">/ {weight.toFixed(0)}/{bloomWeightTarget.toFixed(0)}g</span>
+                          bloomWeightReached
+                            ? <span className="ml-1.5 text-green-500 dark:text-green-400">✓ {bloomWeightTarget.toFixed(0)}g</span>
+                            : <span className="ml-1.5">/ {weight.toFixed(0)}/{bloomWeightTarget.toFixed(0)}g</span>
                         )}
                       </div>
                     )
-                  } else if (justFinishedBloom || (isBloomDone && !bloomTimeUp)) {
+                  } else if (justFinishedBloom) {
                     return (
                       <div className="text-xs font-medium text-green-500 dark:text-green-400 uppercase tracking-wider">
                         {t('pourOver.bloomIndicator')} {t('pourOver.bloomDone')}
