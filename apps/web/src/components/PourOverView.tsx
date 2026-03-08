@@ -98,6 +98,7 @@ const CHART_COLORS = {
   flow: '#67e8f9',      // Light cyan/blue
   targetLine: '#ef4444', // Red for target weight line
   bloomBackground: 'rgba(251, 191, 36, 0.15)', // Light amber for bloom phase
+  bloomWeightLine: 'rgba(251, 191, 36, 0.7)', // Amber dashed line for bloom weight target
 } as const
 
 interface WeightTrendProps {
@@ -106,6 +107,8 @@ interface WeightTrendProps {
   mode: 'free' | 'ratio' | 'recipe'
   /** Duration of bloom phase in seconds (0 = no bloom) */
   bloomDurationSeconds?: number
+  /** Bloom weight target in grams — rendered as horizontal dashed line */
+  bloomWeightTarget?: number | null
   /** Elapsed seconds at which the machine shot ended (vertical marker line) */
   machineEndTimeSeconds?: number
   recipeTimings?: RecipeStepTiming[]
@@ -113,7 +116,7 @@ interface WeightTrendProps {
   isRunning?: boolean
 }
 
-function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, machineEndTimeSeconds, recipeTimings, isRunning = true }: WeightTrendProps) {
+function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, bloomWeightTarget, machineEndTimeSeconds, recipeTimings, isRunning = true }: WeightTrendProps) {
   const { t } = useTranslation()
   const width = 360
   // Base height varies by viewport: taller on desktop (h-40 → 160), mobile (h-32 → 128)
@@ -267,6 +270,18 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, mac
               fill={CHART_COLORS.bloomBackground}
             />
           )}
+          {/* Bloom weight target — horizontal dashed line (only within bloom area) */}
+          {bloomDurationSeconds > 0 && bloomWeightTarget != null && bloomWeightTarget > 0 && (
+            <line
+              x1="0"
+              y1={toY(bloomWeightTarget)}
+              x2={toX(bloomDurationSeconds)}
+              y2={toY(bloomWeightTarget)}
+              stroke={CHART_COLORS.bloomWeightLine}
+              strokeDasharray="4 2"
+              strokeWidth="1"
+            />
+          )}
           {/* Horizontal grid lines at weight tick positions */}
           {weightTicks.map(tick => (
             <line
@@ -369,6 +384,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [autoStartEnabled, setAutoStartEnabled] = useState(true)
   const [bloomEnabled, setBloomEnabled] = useState(true)
   const [bloomSeconds, setBloomSeconds] = useState('30')
+  const [bloomWeightMultiplier, setBloomWeightMultiplier] = useState('2')
   const [weightTrend, setWeightTrend] = useState<WeightPoint[]>([])
   const [flowRate, setFlowRate] = useState<number>(0)
 
@@ -408,6 +424,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         setAutoStartEnabled(mp.autoStart)
         setBloomEnabled(mp.bloomEnabled)
         setBloomSeconds(String(mp.bloomSeconds))
+        setBloomWeightMultiplier(String(mp.bloomWeightMultiplier ?? 2))
         setMeticulousIntegration(mp.machineIntegration)
       })
       .catch(() => {
@@ -430,6 +447,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setAutoStartEnabled(mp.autoStart)
       setBloomEnabled(mp.bloomEnabled)
       setBloomSeconds(String(mp.bloomSeconds))
+      setBloomWeightMultiplier(String(mp.bloomWeightMultiplier ?? 2))
       setMeticulousIntegration(mp.machineIntegration)
     }
   }, [])
@@ -475,6 +493,15 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     }
   }, [mode, persistPrefs])
 
+  const updateBloomWeightMultiplier = useCallback((v: string) => {
+    setBloomWeightMultiplier(v)
+    const n = Number(v)
+    if (prefsRef.current && !isNaN(n) && n > 0 && (mode === 'free' || mode === 'ratio')) {
+      prefsRef.current[mode].bloomWeightMultiplier = n
+      persistPrefs()
+    }
+  }, [mode, persistPrefs])
+
   const updateMachineIntegration = useCallback((v: boolean) => {
     setMeticulousIntegration(v)
     if (prefsRef.current) {
@@ -493,9 +520,15 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const justTaredRef = useRef(false)
   // Track continuous flow start time for auto-start confirmation
   const flowStartTimestampRef = useRef<number | null>(null)
-  // Require 2000ms of continuous valid flow to trigger auto-start
-  // Longer confirmation prevents false starts from adding grounds to the brewer
-  const FLOW_CONFIRMATION_MS = 2000
+  // Track weight when continuous flow started (for weight-based escape hatch)
+  const flowStartWeightRef = useRef<number | null>(null)
+  // Require 800ms of continuous valid flow to trigger auto-start
+  // Filters momentary disturbances while remaining responsive to quick pours
+  const FLOW_CONFIRMATION_MS = 800
+  // If total weight gain since flow started exceeds this threshold,
+  // trigger auto-start immediately regardless of elapsed time.
+  // 3g is unambiguously a pour, not grounds settling or scale drift.
+  const FLOW_WEIGHT_ESCAPE_G = 3
 
   const { cmd, isBrewing, isConnected, canStart, isClickToPurge } = useMachineActions(machineState)
 
@@ -537,6 +570,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     previousWeightTimestampRef.current = null
     trendStartTimestampRef.current = null
     flowStartTimestampRef.current = null
+    flowStartWeightRef.current = null
     setFlowRate(0)
     // Send tare command
     cmd(tareScale, 'tared')
@@ -592,6 +626,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const parsedDose = parsePositiveNumber(doseGrams)
   const parsedRatio = parsePositiveNumber(brewRatio)
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
+  const bloomWeightTarget = parsedDose !== null && bloomEnabled
+    ? parsedDose * (parsePositiveNumber(bloomWeightMultiplier) ?? 2)
+    : null
   const remainingWeight = targetWeight !== null ? Math.max(targetWeight - weight, 0) : null
   const ratioProgress = targetWeight !== null && targetWeight > 0 ? Math.min((weight / targetWeight) * 100, 100) : 0
   const targetReached =
@@ -812,6 +849,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     previousWeightRef.current = null
     previousWeightTimestampRef.current = null
     flowStartTimestampRef.current = null
+    flowStartWeightRef.current = null
     setFlowRate(0)
     // Tare the scale
     justTaredRef.current = true
@@ -880,21 +918,29 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         // Track when continuous flow started
         if (flowStartTimestampRef.current === null) {
           flowStartTimestampRef.current = now
+          flowStartWeightRef.current = currentWeight
         }
-        // Check if we've had continuous flow for the confirmation period
+        // Check if we've had continuous flow for the confirmation period,
+        // or if weight gain exceeds escape hatch threshold
         const flowDuration = now - flowStartTimestampRef.current
-        if (flowDuration >= FLOW_CONFIRMATION_MS) {
+        const weightGain = flowStartWeightRef.current !== null
+          ? currentWeight - flowStartWeightRef.current
+          : 0
+        if (flowDuration >= FLOW_CONFIRMATION_MS || weightGain >= FLOW_WEIGHT_ESCAPE_G) {
           // Start timer, backdated to when flow actually started
           startTimer(flowDuration)
           flowStartTimestampRef.current = null
+          flowStartWeightRef.current = null
         }
       } else {
         // Flow stopped or out of range, reset confirmation
         flowStartTimestampRef.current = null
+        flowStartWeightRef.current = null
       }
     } else if (!isRunning) {
       // No valid flow condition, reset confirmation
       flowStartTimestampRef.current = null
+      flowStartWeightRef.current = null
     }
 
     previousWeightRef.current = currentWeight
@@ -994,17 +1040,22 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 {/* Bloom indicator: shows during bloom phase or "done" right after */}
                 {mode !== 'recipe' && bloomEnabled && (isRunning || baseElapsedMs > 0) && (() => {
                   const bloomDurationMs = (parsePositiveNumber(bloomSeconds) ?? 30) * 1000
-                  const bloomRemaining = Math.max(0, bloomDurationMs - elapsedMs)
-                  const isInBloom = bloomRemaining > 0
-                  const justFinishedBloom = elapsedMs >= bloomDurationMs && elapsedMs < bloomDurationMs + 3000
-                  
-                  if (isInBloom) {
+                  const bloomTimeRemaining = Math.max(0, bloomDurationMs - elapsedMs)
+                  const bloomTimeUp = bloomTimeRemaining <= 0
+                  const bloomWeightReached = bloomWeightTarget !== null && weight >= bloomWeightTarget
+                  const isBloomDone = bloomTimeUp || bloomWeightReached
+                  const justFinishedBloom = isBloomDone && elapsedMs < bloomDurationMs + 3000
+
+                  if (!isBloomDone) {
                     return (
                       <div className="text-xs font-medium text-amber-500 dark:text-amber-400 uppercase tracking-wider animate-pulse">
-                        {t('pourOver.bloomIndicator')}: {Math.ceil(bloomRemaining / 1000)}s
+                        {t('pourOver.bloomIndicator')}: {Math.ceil(bloomTimeRemaining / 1000)}s
+                        {bloomWeightTarget !== null && (
+                          <span className="ml-1.5">/ {weight.toFixed(0)}/{bloomWeightTarget.toFixed(0)}g</span>
+                        )}
                       </div>
                     )
-                  } else if (justFinishedBloom) {
+                  } else if (justFinishedBloom || (isBloomDone && !bloomTimeUp)) {
                     return (
                       <div className="text-xs font-medium text-green-500 dark:text-green-400 uppercase tracking-wider">
                         {t('pourOver.bloomIndicator')} {t('pourOver.bloomDone')}
@@ -1178,11 +1229,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     <span>{ratioProgress.toFixed(0)}%</span>
                   </div>
                   <Progress value={ratioProgress} />
-                  <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
+                  <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} bloomWeightTarget={bloomWeightTarget} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
                 </div>
               )}
               {mode === 'free' && (
-                <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
+                <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} bloomWeightTarget={bloomWeightTarget} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
               )}
               {mode === 'recipe' && (
                 <WeightTrend points={weightTrend} targetWeight={null} mode="recipe" recipeTimings={recipeTimings} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
@@ -1524,6 +1575,22 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   </div>
                 </div>
               )}
+
+              {mode !== 'recipe' && bloomEnabled && parsedDose !== null && (
+                <div className="space-y-1.5">
+                  <Label>{t('pourOver.bloomWeightMultiplier')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('pourOver.bloomWeightMultiplierDescription')}</p>
+                  <Tabs value={bloomWeightMultiplier} onValueChange={updateBloomWeightMultiplier}>
+                    <TabsList className="w-full grid grid-cols-5">
+                      <TabsTrigger value="1">1x</TabsTrigger>
+                      <TabsTrigger value="1.5">1.5x</TabsTrigger>
+                      <TabsTrigger value="2">2x</TabsTrigger>
+                      <TabsTrigger value="2.5">2.5x</TabsTrigger>
+                      <TabsTrigger value="3">3x</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              )}
             </div>
           </div>{/* End left column */}
 
@@ -1536,11 +1603,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                   <span>{ratioProgress.toFixed(0)}%</span>
                 </div>
                 <Progress value={ratioProgress} />
-                <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
+                <WeightTrend points={weightTrend} targetWeight={targetWeight} mode="ratio" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} bloomWeightTarget={bloomWeightTarget} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
               </div>
             )}
             {mode === 'free' && (
-              <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
+              <WeightTrend points={weightTrend} targetWeight={null} mode="free" bloomDurationSeconds={bloomEnabled ? (parsePositiveNumber(bloomSeconds) ?? 30) : 0} bloomWeightTarget={bloomWeightTarget} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
             )}
             {mode === 'recipe' && (
               <WeightTrend points={weightTrend} targetWeight={null} mode="recipe" recipeTimings={recipeTimings} machineEndTimeSeconds={machineEndElapsedMs !== null ? machineEndElapsedMs / 1000 : undefined}  isRunning={isRunning} />
