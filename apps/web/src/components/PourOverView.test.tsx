@@ -47,6 +47,8 @@ vi.mock('react-i18next', () => ({
         'pourOver.doseLabel': 'Dose (g)',
         'pourOver.ratioLabel': 'Ratio (1:x)',
         'pourOver.weighFromScale': 'Weigh from scale',
+        'pourOver.addCoffee': 'Add coffee...',
+        'pourOver.addCoffeeTitle': 'Add coffee to the scale',
         'pourOver.integration.toggle': 'Machine integration',
         'pourOver.integration.toggleDescription': 'Create and run a profile on your Meticulous machine.',
         'pourOver.integration.startOnMachine': 'Start on machine',
@@ -233,7 +235,7 @@ describe('PourOverView', () => {
     expect(screen.getByRole('button', { name: 'Tare' })).toBeDisabled()
   })
 
-  it('captures scale weight into dose via "Weigh from scale" button', async () => {
+  it('captures scale weight into dose via "Weigh from scale" two-phase flow', async () => {
     const user = userEvent.setup()
 
     render(
@@ -248,7 +250,12 @@ describe('PourOverView', () => {
     const weighBtn = screen.getByRole('button', { name: 'Weigh from scale' })
     expect(weighBtn).toBeEnabled()
 
+    // Phase 1: click enters awaiting-dose mode (tares + waits for coffee)
     await user.click(weighBtn)
+    expect(screen.getByText('Add coffee...')).toBeInTheDocument()
+
+    // Phase 2: clicking again while weight > 3g captures dose immediately
+    await user.click(screen.getByRole('button', { name: 'Add coffee...' }))
 
     const doseInput = screen.getByLabelText('Dose (g)') as HTMLInputElement
     expect(doseInput.value).toBe('18.5')

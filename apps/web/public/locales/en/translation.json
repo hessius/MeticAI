@@ -826,6 +826,8 @@
     "weighFromScale": "Weigh from scale",
     "weighFromScaleTitle": "Capture current scale weight as dose",
     "weighFromScaleShort": "Use scale",
+    "addCoffee": "Add coffee...",
+    "addCoffeeTitle": "Add coffee to the scale — dose will be captured automatically",
     "autoStartTimer": "Auto-start timer",
     "autoStartDescription": "Starts when pour is detected, but ignores fast grounds-style spikes.",
     "bloomIndicator": "Bloom indicator",

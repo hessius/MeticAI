@@ -836,6 +836,8 @@
     "weighFromScale": "Pesare dalla bilancia",
     "weighFromScaleTitle": "Cattura il peso attuale della bilancia come dose",
     "weighFromScaleShort": "Bilancia",
+    "addCoffee": "Aggiungi caffè...",
+    "addCoffeeTitle": "Aggiungi il caffè sulla bilancia — la dose verrà catturata automaticamente",
     "weight": "Peso",
     "weightLegend": "peso",
     "weightTrendLabel": "Andamento peso",

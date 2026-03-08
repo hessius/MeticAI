@@ -836,6 +836,8 @@
     "weighFromScale": "Pesar en báscula",
     "weighFromScaleTitle": "Capturar el peso actual de la báscula como dosis",
     "weighFromScaleShort": "Báscula",
+    "addCoffee": "Añadir café...",
+    "addCoffeeTitle": "Añade café a la báscula — la dosis se capturará automáticamente",
     "weight": "Peso",
     "weightLegend": "peso",
     "weightTrendLabel": "Tendencia de peso",
