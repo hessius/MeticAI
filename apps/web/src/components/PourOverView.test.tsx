@@ -47,8 +47,11 @@ vi.mock('react-i18next', () => ({
         'pourOver.doseLabel': 'Dose (g)',
         'pourOver.ratioLabel': 'Ratio (1:x)',
         'pourOver.weighFromScale': 'Weigh from scale',
-        'pourOver.addCoffee': 'Add coffee...',
-        'pourOver.addCoffeeTitle': 'Add coffee to the scale',
+        'pourOver.weighFromScaleShort': 'Set dose from scale',
+        'pourOver.weighFromScaleDescription': 'Transfers the current scale reading as your coffee dose',
+        'pourOver.doseWarningTitle': 'Dose seems high',
+        'pourOver.doseWarningDescription': 'You\'re about to set {{weight}}g as your dose. Did you forget to tare the scale?',
+        'pourOver.doseWarningConfirm': 'Use {{weight}}g',
         'pourOver.integration.toggle': 'Machine integration',
         'pourOver.integration.toggleDescription': 'Create and run a profile on your Meticulous machine.',
         'pourOver.integration.startOnMachine': 'Start on machine',
@@ -235,7 +238,7 @@ describe('PourOverView', () => {
     expect(screen.getByRole('button', { name: 'Tare' })).toBeDisabled()
   })
 
-  it('captures scale weight into dose via "Weigh from scale" two-phase flow', async () => {
+  it('captures scale weight into dose via "Set dose from scale" button', async () => {
     const user = userEvent.setup()
 
     render(
@@ -250,15 +253,30 @@ describe('PourOverView', () => {
     const weighBtn = screen.getByRole('button', { name: 'Weigh from scale' })
     expect(weighBtn).toBeEnabled()
 
-    // Phase 1: click enters awaiting-dose mode (tares + waits for coffee)
+    // Single click captures dose immediately
     await user.click(weighBtn)
-    expect(screen.getByText('Add coffee...')).toBeInTheDocument()
-
-    // Phase 2: clicking again while weight > 3g captures dose immediately
-    await user.click(screen.getByRole('button', { name: 'Add coffee...' }))
 
     const doseInput = screen.getByLabelText('Dose (g)') as HTMLInputElement
     expect(doseInput.value).toBe('18.5')
+  })
+
+  it('shows warning dialog when scale weight > 50g on dose capture', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <PourOverView
+        machineState={makeMachineState({ shot_weight: 120 })}
+        onBack={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: 'Ratio mode' }))
+
+    const weighBtn = screen.getByRole('button', { name: 'Weigh from scale' })
+    await user.click(weighBtn)
+
+    // Warning dialog should appear
+    expect(screen.getByText('Dose seems high')).toBeInTheDocument()
   })
 
   it('shows flow rate card alongside weight and timer', () => {
