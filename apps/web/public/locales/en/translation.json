@@ -832,6 +832,8 @@
     "bloomDescription": "Shows a bloom countdown during the first seconds of brewing.",
     "bloomDuration": "Bloom duration (sec)",
     "bloomDone": "done",
+    "bloomWeightMultiplier": "Bloom weight target",
+    "bloomWeightMultiplierDescription": "Bloom ends when weight reaches this multiple of your dose.",
     "recipeMode": "Recipes",
     "selectRecipe": "Select a recipe",
     "noRecipes": "No recipes found",

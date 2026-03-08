@@ -145,8 +145,8 @@ describe('pourOverApi', () => {
   describe('getPourOverPreferences', () => {
     it('sends GET and returns preferences', async () => {
       const prefs = {
-        free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-        ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, machineIntegration: true },
+        free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+        ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, bloomWeightMultiplier: 2, machineIntegration: true },
         recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
       }
       mockFetch.mockResolvedValue({
@@ -173,8 +173,8 @@ describe('pourOverApi', () => {
   describe('savePourOverPreferences', () => {
     it('sends PUT with body and returns saved preferences', async () => {
       const prefs = {
-        free: { autoStart: false, bloomEnabled: true, bloomSeconds: 60, machineIntegration: false },
-        ratio: { autoStart: true, bloomEnabled: false, bloomSeconds: 20, machineIntegration: true },
+        free: { autoStart: false, bloomEnabled: true, bloomSeconds: 60, bloomWeightMultiplier: 2, machineIntegration: false },
+        ratio: { autoStart: true, bloomEnabled: false, bloomSeconds: 20, bloomWeightMultiplier: 2, machineIntegration: true },
         recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
       }
       mockFetch.mockResolvedValue({
@@ -202,8 +202,8 @@ describe('pourOverApi', () => {
       })
 
       await expect(savePourOverPreferences({
-        free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-        ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+        free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+        ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
         recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
       })).rejects.toThrow('Validation error')
     })

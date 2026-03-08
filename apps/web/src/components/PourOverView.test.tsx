@@ -66,6 +66,9 @@ vi.mock('react-i18next', () => ({
         'pourOver.bloomIndicator': 'Bloom indicator',
         'pourOver.bloomDescription': 'Shows a bloom countdown.',
         'pourOver.bloomDuration': 'Bloom duration (sec)',
+        'pourOver.bloomDone': 'done',
+        'pourOver.bloomWeightMultiplier': 'Bloom weight target',
+        'pourOver.bloomWeightMultiplierDescription': 'Bloom ends when weight reaches this multiple of your dose.',
         'common.back': 'Back',
       }
       return translations[key] || key
@@ -98,13 +101,13 @@ vi.mock('@/lib/pourOverApi', () => ({
   forceCleanupPourOver: vi.fn().mockResolvedValue({ deleted: true }),
   getActivePourOver: vi.fn().mockResolvedValue({ active: false }),
   getPourOverPreferences: vi.fn().mockResolvedValue({
-    free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-    ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+    ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
     recipe: { machineIntegration: false },
   }),
   savePourOverPreferences: vi.fn().mockResolvedValue({
-    free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-    ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+    free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+    ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
     recipe: { machineIntegration: false },
   }),
 }))
@@ -163,13 +166,13 @@ describe('PourOverView', () => {
     // Reset preferences mocks to default values
     const { getPourOverPreferences, savePourOverPreferences } = await import('@/lib/pourOverApi')
     vi.mocked(getPourOverPreferences).mockResolvedValue({
-      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
       recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
     vi.mocked(savePourOverPreferences).mockResolvedValue({
-      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
       recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
   })
@@ -382,8 +385,8 @@ describe('PourOverView', () => {
 
     // Return different prefs per mode: ratio has autoStart off
     vi.mocked(getPourOverPreferences).mockResolvedValue({
-      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-      ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, machineIntegration: false },
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+      ratio: { autoStart: false, bloomEnabled: false, bloomSeconds: 45, bloomWeightMultiplier: 2, machineIntegration: false },
       recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
 
@@ -411,8 +414,8 @@ describe('PourOverView', () => {
     const user = userEvent.setup()
 
     vi.mocked(getPourOverPreferences).mockResolvedValue({
-      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
-      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, machineIntegration: false },
+      free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
+      ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
       recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' as const },
     })
 

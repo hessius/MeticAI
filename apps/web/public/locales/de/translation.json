@@ -808,6 +808,8 @@
     "autoStartTimer": "Timer automatisch starten",
     "bloomDescription": "Zeigt einen Bloom-Countdown während der ersten Sekunden des Brühvorgangs.",
     "bloomDone": "fertig",
+    "bloomWeightMultiplier": "Bloom-Gewichtsziel",
+    "bloomWeightMultiplierDescription": "Bloom endet, wenn das Gewicht dieses Vielfache der Dosis erreicht.",
     "bloomDuration": "Bloom-Dauer (Sek.)",
     "bloomIndicator": "Bloom-Anzeige",
     "doseLabel": "Dosis (g)",

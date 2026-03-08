@@ -22,6 +22,7 @@ _MODE_DEFAULTS = {
     "autoStart": True,
     "bloomEnabled": True,
     "bloomSeconds": 30,
+    "bloomWeightMultiplier": 2,
     "machineIntegration": False,
 }
 

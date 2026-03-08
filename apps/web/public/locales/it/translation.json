@@ -808,6 +808,8 @@
     "autoStartTimer": "Avvio automatico timer",
     "bloomDescription": "Mostra un conto alla rovescia del bloom durante i primi secondi di infusione.",
     "bloomDone": "fatto",
+    "bloomWeightMultiplier": "Peso obiettivo bloom",
+    "bloomWeightMultiplierDescription": "Il bloom termina quando il peso raggiunge questo multiplo della dose.",
     "bloomDuration": "Durata bloom (sec)",
     "bloomIndicator": "Indicatore bloom",
     "doseLabel": "Dose (g)",
