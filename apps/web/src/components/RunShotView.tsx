@@ -326,11 +326,11 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       setScheduledShots(prev => [...prev, data.scheduled_shot])
       
       const preheatInfo = preheat ? ` (preheat starts ${PREHEAT_DURATION_MINUTES} min before)` : ''
-      toast.success(`Shot scheduled for ${format(scheduledTime, 'HH:mm')}${preheatInfo}`)
+      toast.success(t('runShot.toasts.shotScheduled', { time: format(scheduledTime, 'HH:mm'), preheatInfo }))
       setScheduleMode(false)
     } catch (err) {
       console.error('Failed to schedule shot:', err)
-      toast.error(err instanceof Error ? err.message : 'Failed to schedule shot')
+      toast.error(err instanceof Error ? err.message : t('runShot.toasts.shotScheduleFailed'))
     } finally {
       setIsRunning(false)
     }
@@ -345,7 +345,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       
       if (response.ok) {
         setScheduledShots(prev => prev.filter(s => s.id !== scheduleId))
-        toast.success('Scheduled shot cancelled')
+        toast.success(t('runShot.toasts.shotCancelled'))
       }
     } catch (err) {
       console.error('Failed to cancel scheduled shot:', err)

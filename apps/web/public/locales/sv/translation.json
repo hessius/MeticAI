@@ -267,7 +267,10 @@
       "shotFailed": "Misslyckades köra körning",
       "saveFailed": "Misslyckades spara återkommande schema",
       "deleteFailed": "Misslyckades ta bort återkommande schema",
-      "updateFailed": "Misslyckades uppdatera schema"
+      "updateFailed": "Misslyckades uppdatera schema",
+      "shotScheduled": "Shot schemalagd till {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Misslyckades schemalägg shot",
+      "shotCancelled": "Schemalagd shot avbruten"
     }
   },
   "shotHistory": {
@@ -462,7 +465,9 @@
         "feature": "Funktionsförfrågan",
         "question": "Fråga",
         "general": "Allmänt"
-      }
+      },
+      "betaAvailable": "Beta v{{version}} finns tillgänglig med nya funktioner. Aktivera beta-uppdateringar för att prova.",
+      "stableCaughtUp": "Stabil v{{version}} finns nu tillgänglig. Du kan byta tillbaka till den stabila kanalen."
     },
     "updateMethod": {
       "watchtower": "Automatiska uppdateringar via Watchtower",
@@ -886,6 +891,8 @@
     "exportAs": "Exportera som",
     "saveAsImage": "Spara resultat som bild",
     "image": "Bild",
-    "json": "JSON"
+    "json": "JSON",
+    "noProfileJson": "Ingen profil-JSON tillgänglig",
+    "profileJsonDownloaded": "Profil-JSON nedladdad!"
   }
 }

@@ -47,6 +47,7 @@ _update_cache_time: Optional[datetime] = None
 UPDATE_CACHE_DURATION = timedelta(minutes=15)
 
 GITHUB_RELEASES_URL = "https://api.github.com/repos/hessius/MeticAI/releases/latest"
+GITHUB_ALL_RELEASES_URL = "https://api.github.com/repos/hessius/MeticAI/releases"
 WATCHTOWER_API_ENDPOINTS = (
     "http://watchtower:8080/v1/update",
     "http://meticai-watchtower:8080/v1/update",
@@ -158,8 +159,18 @@ def _version_tuple(v: str):
         return (0, 0, 0)
 
 
+def _is_prerelease_version(v: str) -> bool:
+    """Check if a version string has a pre-release tag (beta, alpha, rc)."""
+    v = v.lstrip("v")
+    return any(tag in v.lower() for tag in ["-beta", "-alpha", "-rc"])
+
+
 async def _fetch_latest_release() -> dict:
-    """Query GitHub Releases API for the latest published version."""
+    """Query GitHub Releases API for the latest published version.
+
+    Fetches all recent releases to determine the latest stable and beta
+    versions separately, enabling cross-channel notifications.
+    """
     global _update_cache, _update_cache_time
     
     now = datetime.now(timezone.utc)
@@ -172,25 +183,52 @@ async def _fetch_latest_release() -> dict:
         import httpx
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                GITHUB_RELEASES_URL,
+                GITHUB_ALL_RELEASES_URL,
+                params={"per_page": 30},
                 headers={"Accept": "application/vnd.github+json"},
                 timeout=10.0,
             )
             if resp.status_code == 200:
-                data = resp.json()
-                latest_version = data.get("tag_name", "").lstrip("v")
+                releases = resp.json()
                 running_version = _get_running_version()
+
+                # Find the latest stable and beta releases
+                latest_stable_version = None
+                latest_beta_version = None
+                latest_release_url = None
+
+                for release in releases:
+                    tag = release.get("tag_name", "").lstrip("v")
+                    if not tag:
+                        continue
+                    is_pre = release.get("prerelease", False) or _is_prerelease_version(tag)
+                    if is_pre:
+                        if latest_beta_version is None:
+                            latest_beta_version = tag
+                    else:
+                        if latest_stable_version is None:
+                            latest_stable_version = tag
+                            latest_release_url = release.get("html_url")
+                    if latest_stable_version and latest_beta_version:
+                        break
+
+                # Primary update_available uses the latest stable release
+                # (matches the previous /releases/latest behaviour)
+                latest_version = latest_stable_version or ""
                 update_available = (
-                    latest_version != "unknown"
+                    latest_version != ""
                     and running_version != "unknown"
                     and _version_tuple(latest_version) > _version_tuple(running_version)
                 )
+
                 result = {
                     "update_available": update_available,
                     "latest_version": latest_version,
                     "current_version": running_version,
                     "last_check": now.isoformat(),
-                    "release_url": data.get("html_url"),
+                    "release_url": latest_release_url,
+                    "latest_stable_version": latest_stable_version,
+                    "latest_beta_version": latest_beta_version,
                 }
                 _update_cache = result
                 _update_cache_time = now
@@ -206,6 +244,8 @@ async def _fetch_latest_release() -> dict:
         "current_version": _get_running_version(),
         "latest_version": None,
         "last_check": None,
+        "latest_stable_version": None,
+        "latest_beta_version": None,
         "error": "Could not reach GitHub API",
     }
 

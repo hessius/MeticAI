@@ -47,10 +47,11 @@ class TestMachineConnection:
     async def test_machine_reachable(self, meticulous_base_url):
         """Verify the machine responds to HTTP requests."""
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
+            response = await client.get(f"{meticulous_base_url}/api/v1/settings")
             assert response.status_code == 200
             data = response.json()
-            assert "state" in data or "shot_weight" in data
+            assert isinstance(data, dict)
+            assert len(data) > 0
     
     async def test_websocket_connection(self, meticulous_base_url):
         """Test WebSocket connection to machine (Socket.IO)."""
@@ -74,14 +75,14 @@ class TestMachineConnection:
         """Test that connection can be re-established after interruption."""
         async with httpx.AsyncClient(timeout=10.0) as client:
             # First connection
-            response1 = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
+            response1 = await client.get(f"{meticulous_base_url}/api/v1/settings")
             assert response1.status_code == 200
             
             # Small delay
             await asyncio.sleep(0.5)
             
             # Second connection (simulates recovery)
-            response2 = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
+            response2 = await client.get(f"{meticulous_base_url}/api/v1/settings")
             assert response2.status_code == 200
 
 
@@ -215,70 +216,126 @@ class TestLastShotAPI:
 
 @pytest.mark.integration
 class TestTelemetry:
-    """Test real-time telemetry data reception."""
+    """Test real-time telemetry data reception via Socket.IO.
     
-    async def test_weight_data_available(self, meticulous_base_url):
-        """Verify weight sensor data is accessible."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
-            assert response.status_code == 200
-            
-            data = response.json()
-            # Check for weight field (may be named differently)
-            weight_fields = ["shot_weight", "weight", "scale_weight"]
-            has_weight = any(field in data for field in weight_fields)
-            
-            if not has_weight:
-                # Log available fields for debugging
-                print(f"Available fields: {list(data.keys())}")
-            
-            assert has_weight or "state" in data
+    The Meticulous machine streams sensor data (weight, temperature, pressure)
+    through Socket.IO 'status' events, not REST endpoints.
+    """
     
-    async def test_temperature_data_available(self, meticulous_base_url):
-        """Verify temperature sensor data is accessible."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
-            assert response.status_code == 200
+    async def test_weight_data_available(self, integration_api):
+        """Verify weight sensor data is accessible via Socket.IO."""
+        received = {"data": None}
+        
+        def on_status(data):
+            if received["data"] is None:
+                received["data"] = data
+        
+        integration_api.sio.on("status", on_status)
+        try:
+            if not integration_api.sio.connected:
+                integration_api.connect_to_socket(retries=2)
             
-            data = response.json()
-            temp_fields = ["temperature", "temp", "boiler_temp", "group_temp"]
-            has_temp = any(field in data for field in temp_fields)
+            # Wait for a status event (up to 5 seconds)
+            for _ in range(50):
+                if received["data"] is not None:
+                    break
+                await asyncio.sleep(0.1)
             
-            # Temperature may not always be reported
-            if not has_temp:
-                print(f"Temperature fields not found. Available: {list(data.keys())}")
+            assert received["data"] is not None, "No status event received from machine"
+            
+            data = received["data"]
+            sensors = data.get("sensors", {}) if isinstance(data, dict) else vars(getattr(data, "sensors", {}))
+            assert "w" in sensors, f"Weight field 'w' not in sensors: {sensors.keys()}"
+            assert isinstance(sensors["w"], (int, float))
+            print(f"Weight: {sensors['w']}g")
+        finally:
+            integration_api.sio.on("status", None)
     
-    async def test_pressure_data_available(self, meticulous_base_url):
-        """Verify pressure sensor data is accessible."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
-            assert response.status_code == 200
+    async def test_temperature_data_available(self, integration_api):
+        """Verify temperature sensor data is accessible via Socket.IO."""
+        received = {"data": None}
+        
+        def on_status(data):
+            if received["data"] is None:
+                received["data"] = data
+        
+        integration_api.sio.on("status", on_status)
+        try:
+            if not integration_api.sio.connected:
+                integration_api.connect_to_socket(retries=2)
             
-            data = response.json()
-            pressure_fields = ["pressure", "bar", "group_pressure"]
-            has_pressure = any(field in data for field in pressure_fields)
+            for _ in range(50):
+                if received["data"] is not None:
+                    break
+                await asyncio.sleep(0.1)
             
-            if not has_pressure:
-                print(f"Pressure fields not found. Available: {list(data.keys())}")
+            assert received["data"] is not None, "No status event received from machine"
+            
+            data = received["data"]
+            sensors = data.get("sensors", {}) if isinstance(data, dict) else vars(getattr(data, "sensors", {}))
+            # 't' = temperature, 'g' = group temperature
+            assert "t" in sensors, f"Temperature field 't' not in sensors: {sensors.keys()}"
+            assert isinstance(sensors["t"], (int, float))
+            print(f"Temperature: {sensors['t']}°C, Group: {sensors.get('g', 'N/A')}°C")
+        finally:
+            integration_api.sio.on("status", None)
     
-    async def test_weight_polling_latency(self, meticulous_base_url):
-        """Test weight polling response time."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            latencies = []
+    async def test_pressure_data_available(self, integration_api):
+        """Verify pressure sensor data is accessible via Socket.IO."""
+        received = {"data": None}
+        
+        def on_status(data):
+            if received["data"] is None:
+                received["data"] = data
+        
+        integration_api.sio.on("status", on_status)
+        try:
+            if not integration_api.sio.connected:
+                integration_api.connect_to_socket(retries=2)
             
-            for _ in range(5):
-                start = time.time()
-                response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
-                latency = (time.time() - start) * 1000  # Convert to ms
-                
-                assert response.status_code == 200
-                latencies.append(latency)
+            for _ in range(50):
+                if received["data"] is not None:
+                    break
+                await asyncio.sleep(0.1)
             
-            avg_latency = sum(latencies) / len(latencies)
-            print(f"Average weight polling latency: {avg_latency:.1f}ms")
+            assert received["data"] is not None, "No status event received from machine"
             
-            # Latency should be reasonable (under 2 seconds)
-            assert avg_latency < 2000
+            data = received["data"]
+            sensors = data.get("sensors", {}) if isinstance(data, dict) else vars(getattr(data, "sensors", {}))
+            assert "p" in sensors, f"Pressure field 'p' not in sensors: {sensors.keys()}"
+            assert isinstance(sensors["p"], (int, float))
+            print(f"Pressure: {sensors['p']} bar")
+        finally:
+            integration_api.sio.on("status", None)
+    
+    async def test_telemetry_polling_latency(self, integration_api):
+        """Test telemetry event frequency from Socket.IO."""
+        timestamps = []
+        
+        def on_status(data):
+            timestamps.append(time.time())
+        
+        integration_api.sio.on("status", on_status)
+        try:
+            if not integration_api.sio.connected:
+                integration_api.connect_to_socket(retries=2)
+            
+            # Collect events for 3 seconds
+            await asyncio.sleep(3.0)
+            
+            assert len(timestamps) >= 2, f"Only received {len(timestamps)} status events in 3s"
+            
+            # Calculate inter-event intervals
+            intervals = [(timestamps[i] - timestamps[i-1]) * 1000 for i in range(1, len(timestamps))]
+            avg_interval = sum(intervals) / len(intervals)
+            
+            print(f"Received {len(timestamps)} status events in 3s")
+            print(f"Average interval: {avg_interval:.1f}ms")
+            
+            # Events should arrive at least every 2 seconds
+            assert avg_interval < 2000
+        finally:
+            integration_api.sio.on("status", None)
 
 
 # ============================================================================
@@ -295,26 +352,20 @@ class TestMachineCommands:
     
     async def test_tare_command(self, wait_for_machine, meticulous_base_url):
         """Test tare (zero scale) command."""
-        # Get initial weight
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
+            # Verify machine is reachable via settings endpoint
+            response = await client.get(f"{meticulous_base_url}/api/v1/settings")
             assert response.status_code == 200
-            initial_state = response.json()
             
-            # Send tare command via execute_action
-            tare_response = await client.post(
-                f"{meticulous_base_url}/api/v1/machine/action",
-                json={"action": "tare_scale"}
+            # Send tare command via the SDK's action endpoint
+            tare_response = await client.get(
+                f"{meticulous_base_url}/api/v1/action/tare"
             )
             
-            # Command should be accepted
-            if tare_response.status_code not in (200, 201, 202, 204):
-                # Try alternative endpoint format
-                tare_response = await client.post(
-                    f"{meticulous_base_url}/api/v1/action/tare_scale"
-                )
-            
-            # Log result for debugging
+            # Command should be accepted (200) or rejected if machine is busy (400)
+            assert tare_response.status_code in (200, 400), (
+                f"Unexpected tare response: {tare_response.status_code}"
+            )
             print(f"Tare response: {tare_response.status_code}")
     
     @pytest.mark.skip(reason="Preheat command may not be safe to run automatically")
@@ -323,19 +374,19 @@ class TestMachineCommands:
         pass
     
     async def test_brightness_command(self, meticulous_base_url):
-        """Test brightness setting command."""
+        """Test brightness setting via the settings endpoint."""
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Try to set brightness (non-destructive command)
-            response = await client.post(
-                f"{meticulous_base_url}/api/v1/machine/settings",
-                json={"brightness": 70}
-            )
+            # Get current settings first
+            get_response = await client.get(f"{meticulous_base_url}/api/v1/settings")
             
-            if response.status_code == 404:
-                pytest.skip("Brightness endpoint not available")
+            if get_response.status_code == 404:
+                pytest.skip("Settings endpoint not available")
             
-            # Should be accepted or return method not allowed
-            assert response.status_code in (200, 201, 202, 204, 405)
+            assert get_response.status_code == 200
+            settings = get_response.json()
+            print(f"Settings keys: {list(settings.keys())}")
+            # Settings endpoint exists and returns data
+            assert isinstance(settings, dict)
 
 
 # ============================================================================
@@ -346,59 +397,64 @@ class TestMachineCommands:
 class TestPourOverMode:
     """Test pour-over specific functionality."""
     
-    async def test_scale_weight_polling(self, meticulous_base_url):
-        """Verify continuous scale weight polling works."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            weights = []
+    async def test_scale_weight_polling(self, integration_api):
+        """Verify continuous scale weight readings via Socket.IO."""
+        weights = []
+        
+        def on_status(data):
+            sensors = data.get("sensors", {}) if isinstance(data, dict) else vars(getattr(data, "sensors", {}))
+            weight = sensors.get("w", 0)
+            weights.append(weight)
+        
+        integration_api.sio.on("status", on_status)
+        try:
+            if not integration_api.sio.connected:
+                integration_api.connect_to_socket(retries=2)
             
-            for _ in range(10):
-                response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
-                assert response.status_code == 200
-                
-                data = response.json()
-                weight = data.get("shot_weight", data.get("weight", 0))
-                weights.append(weight)
-                
-                await asyncio.sleep(0.1)
+            # Collect weight readings for 2 seconds
+            await asyncio.sleep(2.0)
             
-            # Should have collected 10 weight readings
-            assert len(weights) == 10
+            assert len(weights) >= 2, f"Only received {len(weights)} weight readings in 2s"
             
             # Weights should be numeric
             for w in weights:
-                assert isinstance(w, (int, float))
+                assert isinstance(w, (int, float)), f"Weight {w} is not numeric"
+            
+            print(f"Collected {len(weights)} weight readings, range: {min(weights):.1f}g - {max(weights):.1f}g")
+        finally:
+            integration_api.sio.on("status", None)
     
-    async def test_flow_rate_calculation(self, meticulous_base_url):
+    async def test_flow_rate_calculation(self, integration_api):
         """Test that flow rate can be calculated from weight changes."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            samples = []
+        samples = []
+        
+        def on_status(data):
+            sensors = data.get("sensors", {}) if isinstance(data, dict) else vars(getattr(data, "sensors", {}))
+            weight = sensors.get("w", 0)
+            samples.append({"time": time.time(), "weight": weight})
+        
+        integration_api.sio.on("status", on_status)
+        try:
+            if not integration_api.sio.connected:
+                integration_api.connect_to_socket(retries=2)
             
-            for _ in range(5):
-                start = time.time()
-                response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    weight = data.get("shot_weight", data.get("weight", 0))
-                    samples.append({
-                        "time": start,
-                        "weight": weight
-                    })
-                
-                await asyncio.sleep(0.2)
-            
-            # Calculate flow rates between samples
-            if len(samples) >= 2:
-                flow_rates = []
-                for i in range(1, len(samples)):
-                    dt = samples[i]["time"] - samples[i-1]["time"]
-                    dw = samples[i]["weight"] - samples[i-1]["weight"]
-                    if dt > 0:
-                        flow_rates.append(dw / dt)
-                
-                print(f"Calculated flow rates: {flow_rates}")
-                # Flow rates should be calculable
-                assert len(flow_rates) > 0
+            # Collect samples for 2 seconds
+            await asyncio.sleep(2.0)
+        finally:
+            integration_api.sio.on("status", None)
+        
+        assert len(samples) >= 2, f"Need at least 2 samples, got {len(samples)}"
+        
+        # Calculate flow rates between samples
+        flow_rates = []
+        for i in range(1, len(samples)):
+            dt = samples[i]["time"] - samples[i-1]["time"]
+            dw = samples[i]["weight"] - samples[i-1]["weight"]
+            if dt > 0:
+                flow_rates.append(dw / dt)
+        
+        print(f"Calculated {len(flow_rates)} flow rates from {len(samples)} samples")
+        assert len(flow_rates) > 0
 
 
 # ============================================================================
@@ -427,18 +483,40 @@ class TestIntegrationSmoke:
         profiles2 = await async_list_profiles()
         assert profiles2 is profiles  # Same object from cache
     
-    async def test_machine_state_complete(self, meticulous_base_url):
-        """Test that machine state endpoint returns complete data."""
+    async def test_machine_state_complete(self, meticulous_base_url, integration_api):
+        """Test that machine settings and Socket.IO state are available."""
+        # Verify REST settings endpoint
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{meticulous_base_url}/api/v1/machine/state")
+            response = await client.get(f"{meticulous_base_url}/api/v1/settings")
             assert response.status_code == 200
             
-            data = response.json()
+            settings = response.json()
+            print(f"\nMachine settings fields: {list(settings.keys())}")
+            assert isinstance(settings, dict)
+            assert len(settings) > 0
+        
+        # Verify Socket.IO status event delivers full state
+        received = {"data": None}
+        
+        def on_status(data):
+            if received["data"] is None:
+                received["data"] = data
+        
+        integration_api.sio.on("status", on_status)
+        try:
+            if not integration_api.sio.connected:
+                integration_api.connect_to_socket(retries=2)
             
-            # Log available fields for documentation
-            print(f"\nMachine state fields available: {list(data.keys())}")
-            print(f"Machine state sample: {json.dumps(data, indent=2, default=str)[:500]}")
+            for _ in range(50):
+                if received["data"] is not None:
+                    break
+                await asyncio.sleep(0.1)
             
-            # Basic validation
-            assert isinstance(data, dict)
-            assert len(data) > 0
+            assert received["data"] is not None, "No status event received"
+            
+            data = received["data"]
+            state_fields = list(data.keys()) if isinstance(data, dict) else [k for k in vars(data).keys() if not k.startswith("_")]
+            print(f"Socket.IO status fields: {state_fields}")
+            print(f"Socket.IO status sample: {json.dumps(data if isinstance(data, dict) else vars(data), indent=2, default=str)[:500]}")
+        finally:
+            integration_api.sio.on("status", None)

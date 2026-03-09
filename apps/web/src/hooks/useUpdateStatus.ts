@@ -8,6 +8,8 @@ interface UpdateStatus {
   latest_version?: string
   release_url?: string
   fresh_check?: boolean
+  latest_stable_version?: string | null
+  latest_beta_version?: string | null
 }
 
 interface UseUpdateStatusReturn {
@@ -16,6 +18,8 @@ interface UseUpdateStatusReturn {
   error: string | null
   checkForUpdates: () => Promise<{ updateAvailable: boolean; error: string | null }>
   lastChecked: string | null
+  latestStableVersion: string | null
+  latestBetaVersion: string | null
 }
 
 // Check cached status every 5 minutes (queries GitHub Releases API with server-side cache)
@@ -27,6 +31,8 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
   const [isChecking, setIsChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastChecked, setLastChecked] = useState<string | null>(null)
+  const [latestStableVersion, setLatestStableVersion] = useState<string | null>(null)
+  const [latestBetaVersion, setLatestBetaVersion] = useState<string | null>(null)
 
   // Read cached status from the server
   const readCachedStatus = useCallback(async (): Promise<{ updateAvailable: boolean; error: string | null }> => {
@@ -42,6 +48,8 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
       const hasUpdate = data.update_available || false
       setUpdateAvailable(hasUpdate)
       setLastChecked(data.last_check || null)
+      setLatestStableVersion(data.latest_stable_version ?? null)
+      setLatestBetaVersion(data.latest_beta_version ?? null)
       return { updateAvailable: hasUpdate, error: null }
     } catch (err) {
       console.error('Error reading cached status:', err)
@@ -70,6 +78,8 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
       const hasUpdate = data.update_available || false
       setUpdateAvailable(hasUpdate)
       setLastChecked(data.last_check || new Date().toISOString())
+      setLatestStableVersion(data.latest_stable_version ?? null)
+      setLatestBetaVersion(data.latest_beta_version ?? null)
       return { updateAvailable: hasUpdate, error: null }
     } catch (err) {
       console.error('Error checking for updates:', err)
@@ -96,5 +106,7 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
     error,
     checkForUpdates,
     lastChecked,
+    latestStableVersion,
+    latestBetaVersion,
   }
 }

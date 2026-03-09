@@ -85,9 +85,9 @@ def wait_for_machine(integration_api):
     
     base_url = integration_api.base_url
     
-    # Check machine is reachable
+    # Use /api/v1/settings as liveness check (machine has no /api/v1/machine/state)
     try:
-        response = httpx.get(f"{base_url}/api/v1/machine/state", timeout=5.0)
+        response = httpx.get(f"{base_url}/api/v1/settings", timeout=5.0)
         response.raise_for_status()
     except Exception as e:
         pytest.skip(f"Machine not reachable: {e}")
@@ -112,32 +112,42 @@ class IntegrationTestHelpers:
     
     @staticmethod
     def wait_for_weight_stable(api, timeout: float = 5.0, tolerance: float = 0.1) -> float:
-        """Wait for scale weight to stabilize and return the value."""
-        import httpx
+        """Wait for scale weight to stabilize using Socket.IO status events."""
+        import threading
         
         start_time = time.time()
         last_weight = None
         stable_count = 0
+        result = {"weight": None, "error": None}
         
-        while time.time() - start_time < timeout:
+        def on_status(data):
+            nonlocal last_weight, stable_count
             try:
-                response = httpx.get(f"{api.base_url}/api/v1/machine/state", timeout=2.0)
-                data = response.json()
-                weight = data.get("shot_weight", 0)
+                weight = data.get("sensors", {}).get("w", 0) if isinstance(data, dict) else getattr(getattr(data, "sensors", None), "w", 0)
                 
                 if last_weight is not None and abs(weight - last_weight) < tolerance:
                     stable_count += 1
                     if stable_count >= 3:
-                        return weight
+                        result["weight"] = weight
                 else:
                     stable_count = 0
-                
                 last_weight = weight
-                time.sleep(0.2)
             except Exception:
-                time.sleep(0.5)
+                pass
         
-        raise TimeoutError("Weight did not stabilize within timeout")
+        api.sio.on("status", on_status)
+        try:
+            if not api.sio.connected:
+                api.connect_to_socket(retries=2)
+            
+            while time.time() - start_time < timeout:
+                if result["weight"] is not None:
+                    return result["weight"]
+                time.sleep(0.2)
+            
+            raise TimeoutError("Weight did not stabilize within timeout")
+        finally:
+            api.sio.on("status", None)
     
     @staticmethod
     def wait_for_connection(host: str, port: int, timeout: float = 10.0) -> bool:
