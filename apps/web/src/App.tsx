@@ -555,7 +555,7 @@ function App() {
   const handleDownloadJson = () => {
     const jsonData = selectedHistoryEntry?.profile_json || currentProfileJson
     if (!jsonData) {
-      toast.error('No profile JSON available')
+      toast.error(t('results.noProfileJson'))
       return
     }
 
@@ -579,7 +579,7 @@ function App() {
     link.click()
     URL.revokeObjectURL(url)
     
-    toast.success('Profile JSON downloaded!')
+    toast.success(t('results.profileJsonDownloaded'))
   }
 
   const handleSaveResults = async () => {

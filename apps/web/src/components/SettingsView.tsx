@@ -27,7 +27,8 @@ import {
   Link as LinkIcon,
   Copy,
   Question,
-  Code
+  Code,
+  Info
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
@@ -122,7 +123,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [aboutExpanded, setAboutExpanded] = useState(false)
   
   // Update functionality
-  const { updateAvailable, checkForUpdates, isChecking } = useUpdateStatus()
+  const { updateAvailable, checkForUpdates, isChecking, latestStableVersion, latestBetaVersion } = useUpdateStatus()
   const { triggerUpdate, isUpdating, updateError } = useUpdateTrigger()
   const [updateProgress, setUpdateProgress] = useState(0)
   
@@ -148,6 +149,29 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [feedbackDescription, setFeedbackDescription] = useState('')
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
   const [feedbackResult, setFeedbackResult] = useState<{ status: string; url?: string; message?: string } | null>(null)
+
+  // Cross-channel version notifications
+  const parseBaseVersion = (v: string): [number, number, number] => {
+    const parts = v.replace(/^v/, '').split('-')[0].split('.')
+    return [parseInt(parts[0] || '0'), parseInt(parts[1] || '0'), parseInt(parts[2] || '0')]
+  }
+
+  const currentVersion = versionInfo?.version || ''
+  const isOnBeta = currentVersion ? ['-beta', '-alpha', '-rc'].some(t => currentVersion.toLowerCase().includes(t)) : false
+
+  // Show "newer beta available" when on stable and a beta exists with a higher base version
+  const showBetaAvailable = !betaChannelEnabled && !isOnBeta && !!latestBetaVersion && !!currentVersion && currentVersion !== 'unknown' && (() => {
+    const [cMaj, cMin, cPat] = parseBaseVersion(currentVersion)
+    const [bMaj, bMin, bPat] = parseBaseVersion(latestBetaVersion)
+    return bMaj > cMaj || (bMaj === cMaj && (bMin > cMin || (bMin === cMin && bPat > cPat)))
+  })()
+
+  // Show "stable caught up" when on beta and stable base >= current base
+  const showStableCaughtUp = isOnBeta && !!latestStableVersion && !!currentVersion && currentVersion !== 'unknown' && (() => {
+    const [cMaj, cMin, cPat] = parseBaseVersion(currentVersion)
+    const [sMaj, sMin, sPat] = parseBaseVersion(latestStableVersion)
+    return sMaj > cMaj || (sMaj === cMaj && (sMin > cMin || (sMin === cMin && sPat >= cPat)))
+  })()
 
   useEffect(() => {
     setAiEnabledState(getAiEnabled())
@@ -1445,6 +1469,25 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               {t('settings.beta.currentChannel')}: <strong>{betaChannelEnabled ? 'Beta' : 'Stable'}</strong>
             </span>
           </div>
+
+          {/* Cross-channel notifications */}
+          {showBetaAvailable && (
+            <Alert className="bg-blue-500/10 border-blue-500/30">
+              <Info size={16} className="text-blue-500" />
+              <AlertDescription className="text-sm">
+                {t('settings.beta.betaAvailable', { version: latestBetaVersion })}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {showStableCaughtUp && (
+            <Alert className="bg-green-500/10 border-green-500/30">
+              <CheckCircle size={16} className="text-green-500" />
+              <AlertDescription className="text-sm">
+                {t('settings.beta.stableCaughtUp', { version: latestStableVersion })}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Feedback section - only visible in beta mode */}
           {betaChannelEnabled && (

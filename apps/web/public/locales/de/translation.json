@@ -263,7 +263,10 @@
       "shotFailed": "Bezug konnte nicht ausgeführt werden",
       "saveFailed": "Wiederkehrender Zeitplan konnte nicht gespeichert werden",
       "deleteFailed": "Wiederkehrender Zeitplan konnte nicht gelöscht werden",
-      "updateFailed": "Zeitplan konnte nicht aktualisiert werden"
+      "updateFailed": "Zeitplan konnte nicht aktualisiert werden",
+      "shotScheduled": "Shot geplant für {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Shot konnte nicht geplant werden",
+      "shotCancelled": "Geplanter Shot abgebrochen"
     },
     "changeProfile": "Ändern",
     "everyXDaysCount": "Alle {{count}} Tage",
@@ -461,7 +464,9 @@
         "feature": "Funktionswunsch",
         "question": "Frage",
         "general": "Allgemein"
-      }
+      },
+      "betaAvailable": "Beta v{{version}} ist mit neuen Funktionen verfügbar. Aktivieren Sie Beta-Updates, um sie auszuprobieren.",
+      "stableCaughtUp": "Stabile Version v{{version}} ist jetzt verfügbar. Sie können zum stabilen Kanal zurückwechseln."
     },
     "updateMethod": {
       "watchtower": "Automatische Updates über Watchtower",
@@ -885,6 +890,8 @@
     "runScheduleShot": "Shot starten / planen",
     "saveAsImage": "Ergebnisse als Bild speichern",
     "savedToDevice": "Profil auf Gerät gespeichert",
-    "savedToHistory": "Profil wurde auf Ihrem Meticulous-Gerät und im Verlauf gespeichert"
+    "savedToHistory": "Profil wurde auf Ihrem Meticulous-Gerät und im Verlauf gespeichert",
+    "noProfileJson": "Kein Profil-JSON verfügbar",
+    "profileJsonDownloaded": "Profil-JSON heruntergeladen!"
   }
 }

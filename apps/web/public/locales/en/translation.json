@@ -267,7 +267,10 @@
       "shotFailed": "Failed to run shot",
       "saveFailed": "Failed to save recurring schedule",
       "deleteFailed": "Failed to delete recurring schedule",
-      "updateFailed": "Failed to update schedule"
+      "updateFailed": "Failed to update schedule",
+      "shotScheduled": "Shot scheduled for {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Failed to schedule shot",
+      "shotCancelled": "Scheduled shot cancelled"
     }
   },
   "shotHistory": {
@@ -473,7 +476,9 @@
         "feature": "Feature Request",
         "question": "Question",
         "general": "General"
-      }
+      },
+      "betaAvailable": "Beta v{{version}} is available with new features. Enable beta updates to try it.",
+      "stableCaughtUp": "Stable v{{version}} is now available. You can switch back to the stable channel."
     },
     "updateMethod": {
       "watchtower": "Automatic updates via Watchtower",
@@ -897,6 +902,8 @@
     "exportAs": "Export as",
     "saveAsImage": "Save results as image",
     "image": "Image",
-    "json": "JSON"
+    "json": "JSON",
+    "noProfileJson": "No profile JSON available",
+    "profileJsonDownloaded": "Profile JSON downloaded!"
   }
 }

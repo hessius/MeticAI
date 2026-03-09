@@ -263,7 +263,10 @@
       "shotFailed": "Impossibile eseguire l'estrazione",
       "saveFailed": "Impossibile salvare programmazione ricorrente",
       "deleteFailed": "Impossibile eliminare programmazione ricorrente",
-      "updateFailed": "Impossibile aggiornare programmazione"
+      "updateFailed": "Impossibile aggiornare programmazione",
+      "shotScheduled": "Shot programmato per {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Impossibile programmare lo shot",
+      "shotCancelled": "Shot programmato annullato"
     },
     "changeProfile": "Cambia",
     "everyXDaysCount": "Ogni {{count}} giorni",
@@ -461,7 +464,9 @@
         "feature": "Richiesta funzionalità",
         "question": "Domanda",
         "general": "Generale"
-      }
+      },
+      "betaAvailable": "Beta v{{version}} è disponibile con nuove funzionalità. Attiva gli aggiornamenti beta per provarla.",
+      "stableCaughtUp": "La versione stabile v{{version}} è ora disponibile. Puoi tornare al canale stabile."
     },
     "updateMethod": {
       "watchtower": "Aggiornamenti automatici tramite Watchtower",
@@ -885,6 +890,8 @@
     "runScheduleShot": "Esegui / Programma shot",
     "saveAsImage": "Salva risultati come immagine",
     "savedToDevice": "Profilo salvato sul dispositivo",
-    "savedToHistory": "Il profilo è stato salvato sul dispositivo Meticulous e nella cronologia"
+    "savedToHistory": "Il profilo è stato salvato sul dispositivo Meticulous e nella cronologia",
+    "noProfileJson": "Nessun profilo JSON disponibile",
+    "profileJsonDownloaded": "Profilo JSON scaricato!"
   }
 }

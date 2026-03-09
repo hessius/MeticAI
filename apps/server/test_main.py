@@ -1577,7 +1577,7 @@ class TestStatusEndpoint:
         """Test that /api/status endpoint exists and is accessible."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1594,7 +1594,7 @@ class TestStatusEndpoint:
         """Test that /api/status returns expected JSON structure."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1614,7 +1614,7 @@ class TestStatusEndpoint:
         """Test that /api/status correctly identifies when updates are available."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1633,7 +1633,7 @@ class TestStatusEndpoint:
         """Test /api/status when already on latest version."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1668,7 +1668,7 @@ class TestStatusEndpoint:
         """Test that /api/status endpoint has CORS enabled for web app."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -3872,10 +3872,13 @@ class TestCheckUpdatesEndpoint:
         """Test successful update check with updates available."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "tag_name": "v2.1.0",
-            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.1.0"
-        }
+        mock_response.json.return_value = [
+            {
+                "tag_name": "v2.1.0",
+                "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.1.0",
+                "prerelease": False
+            }
+        ]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -3897,10 +3900,13 @@ class TestCheckUpdatesEndpoint:
         """Test update check when already on latest version."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "tag_name": "v2.0.0",
-            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0"
-        }
+        mock_response.json.return_value = [
+            {
+                "tag_name": "v2.0.0",
+                "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0",
+                "prerelease": False
+            }
+        ]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -3936,10 +3942,13 @@ class TestCheckUpdatesEndpoint:
         """Test that check-updates returns fresh_check=True."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "tag_name": "v2.0.0",
-            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0"
-        }
+        mock_response.json.return_value = [
+            {
+                "tag_name": "v2.0.0",
+                "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0",
+                "prerelease": False
+            }
+        ]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)

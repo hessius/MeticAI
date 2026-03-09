@@ -263,7 +263,10 @@
       "shotFailed": "Error al ejecutar disparo",
       "saveFailed": "Error al guardar programación recurrente",
       "deleteFailed": "Error al eliminar programación recurrente",
-      "updateFailed": "Error al actualizar programación"
+      "updateFailed": "Error al actualizar programación",
+      "shotScheduled": "Shot programado para {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Error al programar shot",
+      "shotCancelled": "Shot programado cancelado"
     },
     "changeProfile": "Cambiar",
     "everyXDaysCount": "Cada {{count}} días",
@@ -461,7 +464,9 @@
         "feature": "Solicitud de función",
         "question": "Pregunta",
         "general": "General"
-      }
+      },
+      "betaAvailable": "Beta v{{version}} está disponible con nuevas funciones. Activa las actualizaciones beta para probarla.",
+      "stableCaughtUp": "La versión estable v{{version}} ya está disponible. Puedes volver al canal estable."
     },
     "updateMethod": {
       "watchtower": "Actualizaciones automáticas vía Watchtower",
@@ -885,6 +890,8 @@
     "runScheduleShot": "Ejecutar / Programar shot",
     "saveAsImage": "Guardar resultados como imagen",
     "savedToDevice": "Perfil guardado en el dispositivo",
-    "savedToHistory": "El perfil se ha guardado en su dispositivo Meticulous y en el historial"
+    "savedToHistory": "El perfil se ha guardado en su dispositivo Meticulous y en el historial",
+    "noProfileJson": "No hay perfil JSON disponible",
+    "profileJsonDownloaded": "¡Perfil JSON descargado!"
   }
 }

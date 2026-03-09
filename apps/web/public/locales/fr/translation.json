@@ -263,7 +263,10 @@
       "shotFailed": "Échec de l'exécution de l'extraction",
       "saveFailed": "Échec de l'enregistrement de la programmation récurrente",
       "deleteFailed": "Échec de la suppression de la programmation récurrente",
-      "updateFailed": "Échec de la mise à jour de la programmation"
+      "updateFailed": "Échec de la mise à jour de la programmation",
+      "shotScheduled": "Shot programmé pour {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Échec de la programmation du shot",
+      "shotCancelled": "Shot programmé annulé"
     },
     "changeProfile": "Changer",
     "everyXDaysCount": "Tous les {{count}} jours",
@@ -461,7 +464,9 @@
         "feature": "Demande de fonctionnalité",
         "question": "Question",
         "general": "Général"
-      }
+      },
+      "betaAvailable": "La bêta v{{version}} est disponible avec de nouvelles fonctionnalités. Activez les mises à jour bêta pour l'essayer.",
+      "stableCaughtUp": "La version stable v{{version}} est maintenant disponible. Vous pouvez revenir au canal stable."
     },
     "updateMethod": {
       "watchtower": "Mises à jour automatiques via Watchtower",
@@ -885,6 +890,8 @@
     "runScheduleShot": "Lancer / Programmer un shot",
     "saveAsImage": "Sauvegarder les résultats en image",
     "savedToDevice": "Profil enregistré sur l'appareil",
-    "savedToHistory": "Le profil a été enregistré sur votre appareil Meticulous et dans l'historique"
+    "savedToHistory": "Le profil a été enregistré sur votre appareil Meticulous et dans l'historique",
+    "noProfileJson": "Aucun profil JSON disponible",
+    "profileJsonDownloaded": "Profil JSON téléchargé !"
   }
 }
