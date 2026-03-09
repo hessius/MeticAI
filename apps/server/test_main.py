@@ -173,6 +173,7 @@ class TestAnalyzeCoffeeEndpoint:
             assert "analysis" in response.json()
 
 
+@pytest.mark.usefixtures("mock_validate_profile")
 class TestAnalyzeAndProfileEndpoint:
     """Tests for the /analyze_and_profile endpoint (consolidated endpoint)."""
 
@@ -618,6 +619,7 @@ class TestEdgeCases:
         assert len(response.json()["analysis"]) == 10000
 
 
+@pytest.mark.usefixtures("mock_validate_profile")
 class TestEnhancedBaristaPersona:
     """Tests for enhanced barista persona and profile creation features."""
 
@@ -1187,6 +1189,7 @@ class TestUnicodeEscapeInReSubFix:
         assert mock_vision_model.return_value.async_generate_content.call_count == 2
 
 
+@pytest.mark.usefixtures("mock_validate_profile")
 class TestAdvancedCustomization:
     """Tests for advanced_customization parameter functionality."""
 

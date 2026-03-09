@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from config import DATA_DIR
-from services.pour_over_adapter import _load_template
+from services.pour_over_adapter import load_pour_over_template
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ def adapt_recipe_to_profile(recipe: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         A fully adapted profile dict ready for machine upload.
     """
-    template = _load_template()
+    template = load_pour_over_template()
     profile = copy.deepcopy(template)
 
     # ── Unique identity ──────────────────────────────────────────────────────

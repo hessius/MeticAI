@@ -65,14 +65,14 @@ def _reset_in_memory_caches():
     yield
 
 
-@pytest.fixture(autouse=True)
-def _mock_validate_profile():
-    """Auto-mock validate_profile to return valid for all tests.
+@pytest.fixture()
+def mock_validate_profile():
+    """Mock validate_profile to return valid for tests that need it.
 
-    This is autouse=True at *function* scope so every test gets a clean
-    mock.  Tests that specifically exercise validation retry logic should
-    override this by patching again inside the test body.  If autouse
-    becomes too broad, consider converting to an explicit fixture request.
+    Tests that trigger profile generation through /analyze_and_profile
+    should request this fixture explicitly.  Validation-specific tests
+    (e.g. TestValidationRetry) should NOT use this fixture so they
+    exercise the real validator or supply their own patch.
     """
     result = Mock()
     result.is_valid = True

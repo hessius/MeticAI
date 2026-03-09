@@ -14,5 +14,5 @@ export function useIsMobile() {
     [],
   )
 
-  return useSyncExternalStore(subscribe, getSnapshot)
+  return useSyncExternalStore(subscribe, getSnapshot, () => false)
 }

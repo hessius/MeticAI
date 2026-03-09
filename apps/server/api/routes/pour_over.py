@@ -187,11 +187,14 @@ class ModePreferences(BaseModel):
     autoStart: bool = True
     bloomEnabled: bool = True
     bloomSeconds: float = 30
+    bloomWeightMultiplier: float = 2
     machineIntegration: bool = False
 
 
 class RecipeModePreferences(BaseModel):
     machineIntegration: bool = False
+    autoStart: bool = True
+    progressionMode: str = "weight"
 
 
 class PreferencesPayload(BaseModel):

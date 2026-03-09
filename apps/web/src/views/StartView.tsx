@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -68,8 +68,8 @@ export function StartView({
   const { t } = useTranslation()
   const [firstName, setFirstName] = useState<string | undefined>(undefined)
 
-  // Pick greeting ONCE on mount — stable across re-renders
-  const [greeting_base] = useState(() => pickGreeting(t))
+  // Pick greeting once per language — stable across re-renders, updates on locale change
+  const greetingBase = useMemo(() => pickGreeting(t), [t])
 
   useEffect(() => {
     const fetchAuthorName = async () => {
@@ -90,7 +90,7 @@ export function StartView({
     fetchAuthorName()
   }, [])
 
-  const greeting = applyName(greeting_base, firstName)
+  const greeting = applyName(greetingBase, firstName)
 
   return (
     <motion.div
