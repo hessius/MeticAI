@@ -114,6 +114,7 @@ async def get_history_entry(request: Request, entry_id: str):
         )
 
 
+@router.delete("/history/{entry_id}")
 @router.delete("/api/history/{entry_id}")
 async def delete_history_entry(request: Request, entry_id: str):
     """Delete a specific history entry.
