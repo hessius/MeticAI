@@ -948,7 +948,25 @@
     "removeOrphanHint": "Permanently delete this entry from MeticAI history",
     "restoreToMachine": "Restore to machine",
     "restoreToMachineHint": "Re-upload this profile to your Meticulous machine",
-    "restoredToMachine": "'{{name}}' restored to machine"
+    "restoredToMachine": "'{{name}}' restored to machine",
+    "sync": {
+      "button": "Sync",
+      "title": "Profile Sync Report",
+      "description": "Differences found between your machine and MeticAI history.",
+      "allInSync": "All profiles are in sync — nothing to do!",
+      "newSection": "{{count}} new profile(s)",
+      "updatedSection": "{{count}} updated profile(s)",
+      "orphanedSection": "{{count}} orphaned profile(s)",
+      "newHint": "On machine but not in MeticAI history",
+      "updatedHint": "Changed on machine since last sync",
+      "orphanedHint": "In MeticAI history but no longer on machine",
+      "import": "Import",
+      "accept": "Accept",
+      "imported": "'{{name}}' imported to history",
+      "accepted": "'{{name}}' updated from machine",
+      "stale": "Updated on machine",
+      "aiDescriptionToggle": "Generate AI descriptions (uses tokens)"
+    }
   },
   "markdownEditor": {
     "edit": "Edit",

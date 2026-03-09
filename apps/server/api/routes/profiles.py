@@ -33,7 +33,7 @@ from services.meticulous_service import (
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
-from services.history_service import HISTORY_FILE, load_history, save_history
+from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
@@ -2427,6 +2427,288 @@ async def list_orphaned_history_entries(request: Request):
     except Exception as e:
         logger.error(
             f"Failed to check orphaned profiles: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+# ---------------------------------------------------------------------------
+# Profile Sync endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/profiles/sync")
+@router.post("/api/profiles/sync")
+async def sync_profiles(request: Request):
+    """Run a full sync between machine profiles and MeticAI history.
+
+    Computes a content hash for every machine profile and compares it against
+    the hash stored in the corresponding history entry.  Returns three lists:
+
+    - **new**: profiles on the machine that have no history entry at all.
+    - **updated**: profiles whose content hash differs from the stored hash.
+    - **orphaned**: history entries with no matching machine profile (reuses
+      the existing orphan-detection logic).
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            "Starting profile sync",
+            extra={"request_id": request_id},
+        )
+
+        # 1. Fetch machine profiles
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        # 2. Build a name→entry lookup from history
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        history_by_name: dict[str, dict] = {}
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in history_by_name:
+                history_by_name[pname] = entry
+
+        # 3. Walk machine profiles
+        new_profiles: list[dict] = []
+        updated_profiles: list[dict] = []
+        machine_names: set[str] = set()
+
+        for partial in profiles_result:
+            profile_name = getattr(partial, "name", "")
+            profile_id = getattr(partial, "id", "")
+            machine_names.add(profile_name)
+
+            # Fetch full profile to compute hash
+            try:
+                full = await async_get_profile(profile_id)
+                if hasattr(full, "error") and full.error:
+                    full = partial
+            except Exception:
+                full = partial
+
+            profile_dict = deep_convert_to_dict(full)
+            current_hash = compute_content_hash(profile_dict)
+
+            entry = history_by_name.get(profile_name)
+            if entry is None:
+                new_profiles.append({
+                    "profile_id": profile_id,
+                    "profile_name": profile_name,
+                    "content_hash": current_hash,
+                })
+            else:
+                stored_hash = entry.get("content_hash")
+                if stored_hash and stored_hash != current_hash:
+                    updated_profiles.append({
+                        "profile_id": profile_id,
+                        "profile_name": profile_name,
+                        "history_id": entry.get("id"),
+                        "stored_hash": stored_hash,
+                        "current_hash": current_hash,
+                    })
+
+        # 4. Orphaned entries (in history but not on machine)
+        orphaned: list[dict] = []
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in machine_names:
+                orphaned.append({
+                    "id": entry.get("id"),
+                    "profile_name": pname,
+                    "created_at": entry.get("created_at"),
+                    "has_profile_json": bool(entry.get("profile_json")),
+                })
+
+        logger.info(
+            f"Sync complete: {len(new_profiles)} new, {len(updated_profiles)} updated, {len(orphaned)} orphaned",
+            extra={"request_id": request_id},
+        )
+
+        return {
+            "status": "success",
+            "new": new_profiles,
+            "updated": updated_profiles,
+            "orphaned": orphaned,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Profile sync failed: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/profiles/sync/accept/{profile_id}")
+@router.post("/api/profiles/sync/accept/{profile_id}")
+async def accept_sync_update(profile_id: str, request: Request, ai_description: bool = False):
+    """Accept a machine profile update and refresh the history entry.
+
+    Re-fetches the profile from the machine, updates the stored
+    ``profile_json`` and ``content_hash``, and optionally regenerates the
+    AI description.
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            f"Accepting sync update for profile {profile_id}",
+            extra={"request_id": request_id, "profile_id": profile_id, "ai_description": ai_description},
+        )
+
+        # Fetch latest from machine
+        full_profile = await async_get_profile(profile_id)
+        if hasattr(full_profile, "error") and full_profile.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {full_profile.error}",
+            )
+
+        profile_dict = deep_convert_to_dict(full_profile)
+        profile_name = profile_dict.get("name", getattr(full_profile, "name", "Unknown"))
+        new_hash = compute_content_hash(profile_dict)
+
+        # Find the history entry by name
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        target_entry = None
+        for entry in entries:
+            if entry.get("profile_name") == profile_name:
+                target_entry = entry
+                break
+
+        if not target_entry:
+            raise HTTPException(status_code=404, detail="No history entry found for this profile")
+
+        # Optionally regenerate description
+        new_reply = None
+        if ai_description:
+            try:
+                new_reply = await _generate_profile_description(profile_dict, request_id)
+            except Exception as e:
+                logger.warning(
+                    f"AI description generation failed during sync accept: {e}",
+                    extra={"request_id": request_id},
+                )
+
+        updated = update_entry_sync_fields(
+            target_entry["id"],
+            content_hash=new_hash,
+            machine_updated_at=datetime.now(timezone.utc).isoformat(),
+            profile_json=profile_dict,
+            reply=new_reply,
+        )
+
+        if not updated:
+            raise HTTPException(status_code=404, detail="History entry not found")
+
+        logger.info(
+            f"Sync update accepted for '{profile_name}'",
+            extra={"request_id": request_id, "entry_id": target_entry["id"]},
+        )
+
+        return {
+            "status": "success",
+            "profile_name": profile_name,
+            "content_hash": new_hash,
+            "ai_description_generated": ai_description and new_reply is not None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to accept sync update: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.get("/profiles/sync/status")
+@router.get("/api/profiles/sync/status")
+async def sync_status(request: Request):
+    """Quick count of pending sync items for badge display.
+
+    This is a lightweight version of the full sync endpoint that avoids
+    fetching every full profile — it only checks existence by name and
+    compares stored hashes where available.
+    """
+    request_id = request.state.request_id
+
+    try:
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        history_by_name: dict[str, dict] = {}
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in history_by_name:
+                history_by_name[pname] = entry
+
+        machine_names: set[str] = set()
+        new_count = 0
+        updated_count = 0
+
+        for partial in profiles_result:
+            name = getattr(partial, "name", "")
+            machine_names.add(name)
+            entry = history_by_name.get(name)
+            if entry is None:
+                new_count += 1
+            else:
+                # For updated detection without a full fetch, we rely on
+                # stored hashes. If no hash stored yet, we can't tell.
+                stored_hash = entry.get("content_hash")
+                if stored_hash:
+                    # We need a full fetch to compare — but for status we
+                    # skip this to stay lightweight.  The full sync will
+                    # detect changes.
+                    pass
+
+        orphan_count = sum(
+            1 for entry in entries
+            if entry.get("profile_name", "") and entry.get("profile_name", "") not in machine_names
+        )
+
+        return {
+            "status": "success",
+            "new_count": new_count,
+            "updated_count": updated_count,
+            "orphaned_count": orphan_count,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get sync status: {str(e)}",
             exc_info=True,
             extra={"request_id": request_id, "error_type": type(e).__name__},
         )

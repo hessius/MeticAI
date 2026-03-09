@@ -12737,3 +12737,195 @@ class TestEditProfileEndpoint:
             json={"temperature": 88.0}
         )
         assert response.status_code == 200
+
+
+class TestProfileSync:
+    """Tests for profile sync endpoints."""
+
+    def _make_mock_profile(self, name="TestProfile", pid="prof-1"):
+        profile = Mock()
+        profile.id = pid
+        profile.name = name
+        profile.author = "Test Author"
+        profile.temperature = 93.0
+        profile.final_weight = 36.0
+        profile.error = None
+        profile.stages = []
+        profile.variables = []
+        profile.display = None
+        profile.isDefault = False
+        profile.source = None
+        profile.beverage_type = None
+        profile.tank_temperature = None
+        return profile
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_returns_new_profiles(self, mock_list, mock_get, mock_history, client):
+        """Profiles on machine but not in history are listed as 'new'."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_history.return_value = []
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 1
+        assert data["new"][0]["profile_name"] == "TestProfile"
+        assert len(data["updated"]) == 0
+        assert len(data["orphaned"]) == 0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_detects_updated_profiles(self, mock_list, mock_get, mock_history, client):
+        """Profiles with a different content hash are listed as 'updated'."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "content_hash": "stale_hash_value",
+            "reply": "test",
+        }]
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 0
+        assert len(data["updated"]) == 1
+        assert data["updated"][0]["profile_name"] == "TestProfile"
+        assert data["updated"][0]["stored_hash"] == "stale_hash_value"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_detects_orphaned_entries(self, mock_list, mock_get, mock_history, client):
+        """History entries with no matching machine profile are 'orphaned'."""
+        mock_list.return_value = []
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "DeletedProfile",
+            "reply": "desc",
+            "profile_json": {"name": "DeletedProfile"},
+        }]
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 0
+        assert len(data["updated"]) == 0
+        assert len(data["orphaned"]) == 1
+        assert data["orphaned"][0]["profile_name"] == "DeletedProfile"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_in_sync_returns_empty(self, mock_list, mock_get, mock_history, client):
+        """When hash matches, profile is neither new nor updated."""
+        from services.history_service import compute_content_hash
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        from utils.file_utils import deep_convert_to_dict
+        expected_hash = compute_content_hash(deep_convert_to_dict(profile))
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "content_hash": expected_hash,
+            "reply": "test",
+        }]
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 0
+        assert len(data["updated"]) == 0
+        assert len(data["orphaned"]) == 0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_status_counts(self, mock_list, mock_history, client):
+        """GET /api/profiles/sync/status returns correct counts."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_history.return_value = [{
+            "id": "orphan-1",
+            "profile_name": "GoneProfile",
+            "reply": "x",
+        }]
+
+        response = client.get("/api/profiles/sync/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["new_count"] == 1
+        assert data["orphaned_count"] == 1
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_status_dual_route(self, mock_list, mock_history, client):
+        """Both /profiles/sync/status and /api/profiles/sync/status work."""
+        mock_list.return_value = []
+        mock_history.return_value = []
+
+        for path in ["/profiles/sync/status", "/api/profiles/sync/status"]:
+            response = client.get(path)
+            assert response.status_code == 200
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.update_entry_sync_fields')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_accept_sync_update(self, mock_get, mock_history, mock_update, client):
+        """POST /api/profiles/sync/accept/{id} updates history entry."""
+        profile = self._make_mock_profile()
+        mock_get.return_value = profile
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "content_hash": "old_hash",
+            "reply": "old desc",
+        }]
+        mock_update.return_value = {"id": "entry-1", "profile_name": "TestProfile"}
+
+        response = client.post("/api/profiles/sync/accept/prof-1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile_name"] == "TestProfile"
+        mock_update.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_accept_sync_update_not_found(self, mock_get, mock_history, client):
+        """Accept returns 404 when no matching history entry exists."""
+        profile = self._make_mock_profile(name="Unknown")
+        mock_get.return_value = profile
+        mock_history.return_value = []
+
+        response = client.post("/api/profiles/sync/accept/prof-1")
+        assert response.status_code == 404
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_dual_route(self, mock_list, mock_get, mock_history, client):
+        """Both /profiles/sync and /api/profiles/sync work."""
+        mock_list.return_value = []
+        mock_get.return_value = None
+        mock_history.return_value = []
+
+        for path in ["/profiles/sync", "/api/profiles/sync"]:
+            response = client.post(path)
+            assert response.status_code == 200

@@ -22,6 +22,7 @@ import {
 import { getServerUrl } from '@/lib/config'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
+import { SyncReport, SyncResults } from './SyncReport'
 
 interface MachineProfile {
   id: string
@@ -117,6 +118,12 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const [orphanedEntries, setOrphanedEntries] = useState<OrphanedEntry[]>([])
   const [orphanTarget, setOrphanTarget] = useState<OrphanedEntry | null>(null)
 
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncResults, setSyncResults] = useState<SyncResults | null>(null)
+  const [syncBadgeCount, setSyncBadgeCount] = useState(0)
+  const [staleProfileNames, setStaleProfileNames] = useState<Set<string>>(new Set())
+
   // Detect coarse pointer (touch device)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   useEffect(() => {
@@ -162,11 +169,53 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       // Non-critical — silently ignore
     }
   }, [])
+
+  // Fetch sync status badge count
+  const fetchSyncStatus = useCallback(async () => {
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/profiles/sync/status`)
+      if (!response.ok) return
+      const data = await response.json()
+      setSyncBadgeCount(
+        (data.new_count || 0) + (data.updated_count || 0) + (data.orphaned_count || 0)
+      )
+    } catch {
+      // Non-critical
+    }
+  }, [])
+
+  // Run full sync
+  const handleSync = async () => {
+    setIsSyncing(true)
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/profiles/sync`, {
+        method: 'POST',
+      })
+      if (!response.ok) throw new Error('Sync failed')
+      const data: SyncResults = await response.json()
+      setSyncResults(data)
+
+      // Track stale profile names for badge display in the list
+      const stale = new Set<string>()
+      for (const u of data.updated) {
+        stale.add(u.profile_name)
+      }
+      setStaleProfileNames(stale)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sync failed'
+      toast.error(message)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
   
   useEffect(() => {
     fetchProfiles()
     fetchOrphaned()
-  }, [fetchProfiles, fetchOrphaned])
+    fetchSyncStatus()
+  }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
 
   // Find history ID for a profile by name
   const findHistoryId = useCallback(
@@ -296,15 +345,35 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
               {t('profileCatalogue.description', { count: profiles.length })}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { fetchProfiles(); fetchOrphaned() }}
-            disabled={isLoading}
-          >
-            <ArrowsClockwise className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            {t('profileCatalogue.refresh')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSync}
+              disabled={isSyncing || isLoading}
+              className="relative"
+            >
+              <ArrowsClockwise className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              {t('profileCatalogue.sync.button')}
+              {syncBadgeCount > 0 && !isSyncing && (
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-2 -right-2 h-5 min-w-[20px] px-1 text-xs"
+                >
+                  {syncBadgeCount}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { fetchProfiles(); fetchOrphaned(); fetchSyncStatus() }}
+              disabled={isLoading}
+            >
+              <ArrowsClockwise className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              {t('profileCatalogue.refresh')}
+            </Button>
+          </div>
         </div>
 
         {/* Orphan warning banner */}
@@ -407,6 +476,12 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                                 <Badge variant="outline" className="text-amber-600 border-amber-600 shrink-0">
                                   <Warning className="w-3 h-3 mr-1" />
                                   {t('profileCatalogue.orphaned')}
+                                </Badge>
+                              )}
+                              {staleProfileNames.has(profile.name) && !isOrphaned(profile.name) && (
+                                <Badge variant="outline" className="text-blue-600 border-blue-600 shrink-0">
+                                  <ArrowsClockwise className="w-3 h-3 mr-1" />
+                                  {t('profileCatalogue.sync.stale')}
                                 </Badge>
                               )}
                             </div>
@@ -529,6 +604,18 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
           setOrphanTarget(null)
           fetchProfiles()
           fetchOrphaned()
+        }}
+      />
+
+      <SyncReport
+        isOpen={!!syncResults}
+        results={syncResults}
+        onClose={() => setSyncResults(null)}
+        onResolved={() => {
+          setSyncResults(null)
+          fetchProfiles()
+          fetchOrphaned()
+          fetchSyncStatus()
         }}
       />
     </div>
