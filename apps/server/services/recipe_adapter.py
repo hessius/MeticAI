@@ -3,7 +3,8 @@
 Reads a recipe from the bundled recipe library and builds a Meticulous machine
 profile with one stage per OPOS protocol step:
 
-  - ``bloom`` / ``pour`` steps → weight exit trigger (cumulative water poured)
+  - ``bloom`` steps → time exit trigger (respects rest period)
+  - ``pour`` steps → weight exit trigger + 10-minute time backup
   - ``wait`` / ``swirl`` / ``stir`` steps → time exit trigger
 
 All stages use ``type: power`` with zero power (passive pour-over flow).
@@ -182,7 +183,14 @@ def adapt_recipe_to_profile(recipe: Dict[str, Any]) -> Dict[str, Any]:
                         "value": cumulative_water,
                         "relative": False,
                         "comparison": ">=",
-                    }
+                    },
+                    # 10-minute time backup to prevent indefinite runs
+                    {
+                        "type": "time",
+                        "value": 600,
+                        "relative": True,
+                        "comparison": ">=",
+                    },
                 ]
 
         elif action in ("wait", "swirl", "stir"):

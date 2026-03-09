@@ -638,6 +638,7 @@
       "descaling": "Détartrage",
       "unknown": "Inconnu",
       "ready": "Prêt",
+      "lancesStandard": "même selon le standard de Lance",
       "pourWater": "Ajouter de l'eau",
       "purging": "Purge",
       "clickToPurge": "Cliquez pour purger"
@@ -843,6 +844,7 @@
     "weight": "Poids",
     "weightLegend": "poids",
     "weightTrendLabel": "Tendance du poids",
+    "timeoutReached": "Minuterie d'infusion arrêtée — délai de sécurité de 10 minutes atteint.",
     "integration": {
       "toggle": "Intégration machine",
       "toggleDescription": "Suit votre pour-over sur l'écran Meticulous. Le minuteur démarre automatiquement — commencez à verser quand vous entendez le signal.",

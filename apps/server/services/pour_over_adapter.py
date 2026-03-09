@@ -5,6 +5,7 @@ Reads the ``PourOverBase.json`` template and adapts it for a specific brew:
   - Updates stage names (e.g. "Bloom (45s)", "Infusion (250g)")
   - Removes the Bloom stage if bloom is disabled
   - Sets the profile name to ``MeticAI Ratio Pour-Over``
+  - Adds a 10-minute time backup to weight-based stages to prevent indefinite runs
 """
 
 import copy
@@ -99,29 +100,62 @@ def adapt_pour_over_profile(
             if trigger.get("type") == "time":
                 trigger["value"] = bloom_seconds
 
-        # Stage 1: Infusion — update weight trigger
+        # Stage 1: Infusion — update weight trigger and add time backup
         infusion_stage = stages[1]
         infusion_stage["name"] = f"Infusion ({weight_label})"
+        has_time_backup = False
         for trigger in infusion_stage.get("exit_triggers", []):
             if trigger.get("type") == "weight":
                 trigger["value"] = target_weight
+            elif trigger.get("type") == "time":
+                has_time_backup = True
+        # Add 10-minute time backup if not present
+        if not has_time_backup:
+            infusion_stage.setdefault("exit_triggers", []).append({
+                "type": "time",
+                "value": 600,  # 10 minutes
+                "relative": True,
+                "comparison": ">=",
+            })
 
     elif not bloom_enabled and len(stages) >= 2:
         # Remove bloom stage, keep only infusion
         infusion_stage = stages[1]
         infusion_stage["name"] = f"Infusion ({weight_label})"
         infusion_stage["key"] = "power_1"  # Re-key since it's now first
+        has_time_backup = False
         for trigger in infusion_stage.get("exit_triggers", []):
             if trigger.get("type") == "weight":
                 trigger["value"] = target_weight
+            elif trigger.get("type") == "time":
+                has_time_backup = True
+        # Add 10-minute time backup if not present
+        if not has_time_backup:
+            infusion_stage.setdefault("exit_triggers", []).append({
+                "type": "time",
+                "value": 600,  # 10 minutes
+                "relative": True,
+                "comparison": ">=",
+            })
         profile["stages"] = [infusion_stage]
 
     elif len(stages) == 1:
         # Only one stage — treat as infusion
         infusion_stage = stages[0]
         infusion_stage["name"] = f"Infusion ({weight_label})"
+        has_time_backup = False
         for trigger in infusion_stage.get("exit_triggers", []):
             if trigger.get("type") == "weight":
                 trigger["value"] = target_weight
+            elif trigger.get("type") == "time":
+                has_time_backup = True
+        # Add 10-minute time backup if not present
+        if not has_time_backup:
+            infusion_stage.setdefault("exit_triggers", []).append({
+                "type": "time",
+                "value": 600,  # 10 minutes
+                "relative": True,
+                "comparison": ">=",
+            })
 
     return profile

@@ -638,6 +638,7 @@
       "descaling": "Descalcificando",
       "unknown": "Desconocido",
       "ready": "Listo",
+      "lancesStandard": "incluso por el estándar de Lance",
       "pourWater": "Añadir agua",
       "purging": "Purgando",
       "clickToPurge": "Pulsa para purgar"
@@ -843,6 +844,7 @@
     "weight": "Peso",
     "weightLegend": "peso",
     "weightTrendLabel": "Tendencia de peso",
+    "timeoutReached": "Temporizador de infusión detenido — tiempo de seguridad de 10 minutos alcanzado.",
     "integration": {
       "toggle": "Integración con máquina",
       "toggleDescription": "Rastrea tu pour-over en la pantalla Meticulous. El temporizador se inicia automáticamente — empieza a verter cuando escuches el sonido.",

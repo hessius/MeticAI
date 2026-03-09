@@ -360,26 +360,36 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
             return (
               <>
                 {/* Prominent READY banner */}
-                {isReady && (
-                  <Card className="p-4 border-emerald-500/50 bg-emerald-500/10">
+                {isReady && (() => {
+                  // "Lance's standard" easter egg: when temp is within 2.3°C of target, show enhanced display
+                  const isLancesStandard = temp != null && targetTemp != null && Math.abs(temp - targetTemp) <= 2.3
+                  return (
+                  <Card className={`p-4 ${isLancesStandard ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)] dark:shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="relative flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                        <span className={`relative flex ${isLancesStandard ? 'h-4 w-4' : 'h-3 w-3'}`}>
+                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLancesStandard ? 'bg-emerald-300' : 'bg-emerald-400'} opacity-75`} />
+                          <span className={`relative inline-flex rounded-full ${isLancesStandard ? 'h-4 w-4' : 'h-3 w-3'} bg-emerald-500`} />
                         </span>
-                        <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400">
+                        <span className={`font-bold ${isLancesStandard ? 'text-xl text-emerald-600 dark:text-emerald-300' : 'text-lg text-emerald-700 dark:text-emerald-400'}`}>
                           {t('controlCenter.states.ready')}
                         </span>
                       </div>
                       {temp != null && (
-                        <span className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        <span className={`font-bold tabular-nums ${isLancesStandard ? 'text-4xl text-emerald-600 dark:text-emerald-300 animate-pulse' : 'text-3xl text-emerald-700 dark:text-emerald-400'}`}>
                           {temp.toFixed(1)}°C
+                        </span>
+                      )}
+                      {/* Lance's standard subtitle */}
+                      {isLancesStandard && (
+                        <span className="text-xs font-medium text-emerald-600/80 dark:text-emerald-400/80 italic">
+                          {t('controlCenter.states.lancesStandard')}
                         </span>
                       )}
                     </div>
                   </Card>
-                )}
+                  )
+                })()}
 
                 {/* Prominent HEATING display */}
                 {isHeating && (
