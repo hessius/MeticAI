@@ -298,3 +298,71 @@ async def get_profile_json(request: Request, entry_id: str):
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "Failed to get profile JSON"}
         )
+
+
+@router.get("/api/history/{entry_id}/notes")
+async def get_history_notes(entry_id: str, request: Request):
+    """Get notes for a history entry.
+    
+    Args:
+        entry_id: The ID of the history entry.
+    
+    Returns:
+        notes: The notes content (or null if none).
+    """
+    from services.history_service import get_entry_by_id
+    
+    entry = get_entry_by_id(entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="History entry not found")
+    
+    return {
+        "status": "success",
+        "notes": entry.get("notes"),
+        "notes_updated_at": entry.get("notes_updated_at"),
+    }
+
+
+@router.patch("/api/history/{entry_id}/notes")
+async def update_history_notes(entry_id: str, request: Request):
+    """Update notes for a history entry.
+    
+    Args:
+        entry_id: The ID of the history entry.
+    
+    Body:
+        notes: The new notes content (Markdown). Empty to clear.
+    
+    Returns:
+        Updated notes information.
+    """
+    from services.history_service import update_entry_notes
+    
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        notes_text = body.get("notes", "")
+        
+        updated_entry = update_entry_notes(entry_id, notes_text)
+        
+        if not updated_entry:
+            raise HTTPException(status_code=404, detail="History entry not found")
+        
+        return {
+            "status": "success",
+            "notes": updated_entry.get("notes"),
+            "notes_updated_at": updated_entry.get("notes_updated_at"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update history notes: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "entry_id": entry_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )

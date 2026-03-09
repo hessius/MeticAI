@@ -37,6 +37,7 @@ import { ShotHistoryView } from '@/components/ShotHistoryView'
 import { ImageCropDialog } from '@/components/ImageCropDialog'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
+import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { getServerUrl } from '@/lib/config'
 import { 
   extractTagsFromPreferences, 
@@ -568,6 +569,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
   
   // Machine profile ID for run/schedule functionality
   const [machineProfileId, setMachineProfileId] = useState<string | null>(null)
+  
+  // Notes state
+  const [notes, setNotes] = useState<string>(entry.notes || '')
+  const [isSavingNotes, setIsSavingNotes] = useState(false)
 
   // Fetch machine profile ID by name
   useEffect(() => {
@@ -776,6 +781,33 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
   const handleDiscardPreview = () => {
     setShowPreviewDialog(false)
     setPreviewImage(null)
+  }
+
+  const handleSaveNotes = async (newNotes: string) => {
+    setIsSavingNotes(true)
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(
+        `${serverUrl}/api/history/${encodeURIComponent(entry.id)}/notes`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: newNotes })
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error('Failed to save notes')
+      }
+      
+      setNotes(newNotes)
+      toast.success(t('history.notesSaved'))
+    } catch (err) {
+      console.error('Failed to save notes:', err)
+      toast.error(t('history.notesSaveFailed'))
+    } finally {
+      setIsSavingNotes(false)
+    }
   }
 
   const handleDownload = async () => {
@@ -1079,6 +1111,26 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
             </div>
           )}
         </div>
+
+        {/* Personal Notes Section */}
+        {!isCapturing && (
+          <motion.div 
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="space-y-2"
+          >
+            <Label className="text-sm font-semibold tracking-wide text-muted-foreground">
+              {t('history.notes')}
+            </Label>
+            <MarkdownEditor
+              value={notes}
+              onChange={handleSaveNotes}
+              placeholder={t('history.notesPlaceholder')}
+              isSaving={isSavingNotes}
+            />
+          </motion.div>
+        )}
 
         </div>{/* end left column */}
 

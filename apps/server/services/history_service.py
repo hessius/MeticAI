@@ -186,3 +186,53 @@ def save_to_history(
     )
     
     return entry
+
+
+def update_entry_notes(entry_id: str, notes: str) -> Optional[dict]:
+    """Update the notes field for a history entry.
+    
+    Args:
+        entry_id: The ID of the entry to update.
+        notes: The new notes content (Markdown). Empty string clears notes.
+    
+    Returns:
+        The updated entry, or None if not found.
+    """
+    history = load_history()
+    
+    for entry in history:
+        if entry.get("id") == entry_id:
+            if notes and notes.strip():
+                entry["notes"] = notes.strip()
+                entry["notes_updated_at"] = datetime.now(timezone.utc).isoformat()
+            else:
+                # Clear notes if empty
+                entry.pop("notes", None)
+                entry.pop("notes_updated_at", None)
+            
+            save_history(history)
+            
+            logger.info(
+                f"Updated notes for history entry: {entry.get('profile_name', entry_id)}",
+                extra={"entry_id": entry_id, "has_notes": bool(notes)}
+            )
+            return entry
+    
+    logger.warning(f"History entry not found for notes update: {entry_id}")
+    return None
+
+
+def get_entry_by_id(entry_id: str) -> Optional[dict]:
+    """Get a history entry by its ID.
+    
+    Args:
+        entry_id: The ID of the entry to find.
+    
+    Returns:
+        The entry dict, or None if not found.
+    """
+    history = load_history()
+    for entry in history:
+        if entry.get("id") == entry_id:
+            return entry
+    return None
