@@ -611,12 +611,17 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
   // ── 10-minute safety timeout — auto-stop if brew exceeds 10 minutes ──
   const MAX_BREW_DURATION_MS = 10 * 60 * 1000 // 10 minutes
+  const shouldAutoStop = isRunning && elapsedMs >= MAX_BREW_DURATION_MS
+
   useEffect(() => {
-    if (!isRunning || elapsedMs < MAX_BREW_DURATION_MS) return
-    // Auto-stop the brew
-    pauseTimer()
-    toast.info(t('pourOver.timeoutReached'))
-  }, [isRunning, elapsedMs, pauseTimer, t])
+    if (!shouldAutoStop) return
+    // Use setTimeout(0) to defer setState out of the effect body
+    const timeoutId = setTimeout(() => {
+      pauseTimer()
+      toast.info(t('pourOver.timeoutReached'))
+    }, 0)
+    return () => clearTimeout(timeoutId)
+  }, [shouldAutoStop, pauseTimer, t])
 
   const startOrPause = () => {
     if (isRunning) {
