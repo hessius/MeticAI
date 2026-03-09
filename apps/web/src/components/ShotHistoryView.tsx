@@ -44,6 +44,7 @@ import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
+import { getAutoAnalyzeShots } from '@/lib/aiPreferences'
 import { format, formatDistanceToNow } from 'date-fns'
 import {
   STAGE_COLORS,
@@ -608,8 +609,11 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
     setLlmAnalysisResult(null)
     setLlmAnalysisError(null)
     
-    // Auto-trigger analysis when shot data is available
-    if (selectedShot && shotData && !isAnalyzing) {
+    // Check if auto-analyze is enabled in preferences
+    const autoAnalyzeEnabled = getAutoAnalyzeShots()
+    
+    // Auto-trigger analysis when shot data is available and auto-analyze is enabled
+    if (selectedShot && shotData && !isAnalyzing && autoAnalyzeEnabled) {
       // Small delay to avoid blocking UI during initial render
       const timer = setTimeout(() => {
         handleAnalyze()

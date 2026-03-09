@@ -32,7 +32,7 @@ import {
   Coffee
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
+import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable, getAutoAnalyzeShots, setAutoAnalyzeShots, getShowAiInHistory, setShowAiInHistory } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
@@ -150,6 +150,8 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
   const [tailscaleMessage, setTailscaleMessage] = useState('')
   const [aiEnabled, setAiEnabledState] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
+  const [autoAnalyzeShots, setAutoAnalyzeShotsState] = useState(true)
+  const [showAiInHistory, setShowAiInHistoryState] = useState(true)
   const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
 
   // Beta channel state
@@ -187,6 +189,8 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
   useEffect(() => {
     setAiEnabledState(getAiEnabled())
     setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
+    setAutoAnalyzeShotsState(getAutoAnalyzeShots())
+    setShowAiInHistoryState(getShowAiInHistory())
   }, [])
 
   // Load current settings on mount
@@ -850,6 +854,40 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
                     setHideAiWhenUnavailableState(next)
                     setHideAiWhenUnavailable(next)
                   }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-analyze-toggle" className="text-sm font-medium">{t('settings.autoAnalyzeShots')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.autoAnalyzeShotsDescription')}</p>
+                </div>
+                <Switch
+                  id="auto-analyze-toggle"
+                  checked={autoAnalyzeShots}
+                  onCheckedChange={(checked) => {
+                    const next = checked as boolean
+                    setAutoAnalyzeShotsState(next)
+                    setAutoAnalyzeShots(next)
+                  }}
+                  disabled={!hasGeminiKey || !aiEnabled}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="show-ai-history-toggle" className="text-sm font-medium">{t('settings.showAiInHistory')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.showAiInHistoryDescription')}</p>
+                </div>
+                <Switch
+                  id="show-ai-history-toggle"
+                  checked={showAiInHistory}
+                  onCheckedChange={(checked) => {
+                    const next = checked as boolean
+                    setShowAiInHistoryState(next)
+                    setShowAiInHistory(next)
+                  }}
+                  disabled={!hasGeminiKey || !aiEnabled}
                 />
               </div>
             </div>
