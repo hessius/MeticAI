@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { useMemo, type RefObject } from 'react'
+import { type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -91,11 +91,9 @@ export function ResultsView({
   onRunProfile
 }: ResultsViewProps) {
   const { t } = useTranslation()
-  const sections = useMemo(() => parseProfileSections(apiResponse?.reply), [apiResponse?.reply])
-  const profileName = useMemo(() => {
-    const profileNameMatch = apiResponse?.reply?.match(/Profile Created:\s*(.+?)(?:\n|$)/i)
-    return cleanProfileName(profileNameMatch?.[1]?.trim() || '')
-  }, [apiResponse?.reply])
+  const sections = parseProfileSections(apiResponse?.reply)
+  const profileNameMatch = apiResponse?.reply?.match(/Profile Created:\s*(.+?)(?:\n|$)/i)
+  const profileName = cleanProfileName(profileNameMatch?.[1]?.trim() || '')
 
   return (
     <motion.div

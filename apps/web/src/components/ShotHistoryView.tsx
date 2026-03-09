@@ -213,11 +213,11 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
   const [progress, setProgress] = useState(0)
   const [showQuote, setShowQuote] = useState(false)
   const [currentQuote] = useState(() => SHOT_QUOTES[Math.floor(Math.random() * SHOT_QUOTES.length)])
-  const startTimeRef = useRef(Date.now())
+  const [startTime] = useState(() => Date.now())
   
   useEffect(() => {
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - startTimeRef.current) / 1000
+      const elapsed = (Date.now() - startTime) / 1000
       // Use an easing function that slows down as it approaches 95%
       // Never reaches 100% until actually complete
       const newProgress = Math.min(95, (1 - Math.exp(-elapsed / (estimatedSeconds / 3))) * 100)

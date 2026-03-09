@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -75,7 +75,6 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
   // Track whether to show the progress message or a funny string
   const [showFunny, setShowFunny] = useState(false)
   const [funnyIndex, setFunnyIndex] = useState(0)
-  const lastPhaseRef = useRef<string | null>(null)
   
   // Pick a random funny message when switching to funny mode
   const pickRandomFunny = useCallback(() => {
@@ -83,12 +82,11 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
   }, [loadingMessages.length])
   
   // When progress phase changes, reset to show progress message
-  useEffect(() => {
-    if (hasProgress && progress.phase !== lastPhaseRef.current) {
-      lastPhaseRef.current = progress.phase
-      setShowFunny(false)
-    }
-  }, [hasProgress, progress?.phase])
+  const [prevPhase, setPrevPhase] = useState<string | null>(null)
+  if (hasProgress && progress.phase !== prevPhase) {
+    setPrevPhase(progress.phase)
+    setShowFunny(false)
+  }
   
   // Cycle between showing progress message and funny strings
   useEffect(() => {
@@ -112,7 +110,7 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
   }, [hasProgress, showFunny, pickRandomFunny])
   
   // Determine what message to display
-  const displayMessage = useMemo(() => {
+  const displayMessage = (() => {
     if (!hasProgress) {
       return loadingMessages[safeIndex]
     }
@@ -120,13 +118,13 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
       return loadingMessages[funnyIndex]
     }
     return progress.message
-  }, [hasProgress, showFunny, progress?.message, loadingMessages, safeIndex, funnyIndex])
+  })()
   
-  const messageKey = useMemo(() => {
+  const messageKey = (() => {
     if (!hasProgress) return `msg-${currentMessage}`
     if (showFunny) return `funny-${funnyIndex}`
     return `sse-${progress.phase}-${progress.attempt}`
-  }, [hasProgress, showFunny, currentMessage, funnyIndex, progress?.phase, progress?.attempt])
+  })()
 
   // Determine which segments are completed
   const currentPhaseIdx = hasProgress
