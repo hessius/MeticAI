@@ -912,6 +912,21 @@
     "deleted": "Profile deleted",
     "exported": "Profile exported"
   },
+  "markdownEditor": {
+    "edit": "Edit",
+    "preview": "Preview",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "placeholder": "Write your notes here... (Markdown supported)",
+    "emptyPreview": "Nothing to preview yet",
+    "addNote": "Add a note..."
+  },
+  "shotAnnotation": {
+    "title": "Your Notes",
+    "saved": "Note saved",
+    "saveFailed": "Failed to save note"
+  },
   "results": {
     "profileGenerated": "Profile Generated!",
     "savedToDevice": "Profile saved to device",
