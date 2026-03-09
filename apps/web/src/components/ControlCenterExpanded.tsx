@@ -45,21 +45,9 @@ import {
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
+import { useMachineService } from '@/hooks/useMachineService'
 import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
-import {
-  startShot,
-  stopShot,
-  abortShot,
-  continueShot,
-  preheat,
-  tareScale,
-  homePlunger,
-  purge,
-  setBrightness,
-  enableSounds,
-  loadProfile,
-} from '@/lib/mqttCommands'
 import { relativeTime } from '@/lib/timeUtils'
 
 // ---------------------------------------------------------------------------
@@ -90,6 +78,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     isIdle, isBrewing, isPreheating, isReady,
     canStart, canAbortWarmup, isConnected, cmd,
   } = useMachineActions(machineState)
+  const machine = useMachineService()
 
   // Build the profile image URL when active_profile changes
   // Suppress MeticAI-managed temp profiles — transient, deleted after pour-over cleanup.
@@ -140,14 +129,14 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     async (val: number[]) => {
       const v = val[0]
       setBrightnessValue(v)
-      await setBrightness(v)
+      await machine.setBrightness(v)
     },
-    [],
+    [machine],
   )
 
   const handleSoundsToggle = useCallback(
     async (enabled: boolean) => {
-      const res = await enableSounds(enabled)
+      const res = await machine.enableSounds(enabled)
       if (res.success) {
         toast.success(
           enabled
@@ -158,7 +147,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
         toast.error(res.message ?? t('controlCenter.toasts.error'))
       }
     },
-    [t],
+    [t, machine],
   )
 
   return (
@@ -219,7 +208,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
               <Select
                 value={activeProfile ?? ''}
                 onValueChange={async (name) => {
-                  const res = await loadProfile(name)
+                  const res = await machine.loadProfile(name)
                   if (res.success) {
                     toast.success(t('controlCenter.toasts.profileSelected', { name }))
                   } else {
@@ -315,7 +304,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             icon={<Play size={14} weight="fill" />}
             label={t('controlCenter.actions.start')}
             disabled={!canStart}
-            onClick={() => cmd(startShot, 'startingShot')}
+            onClick={() => cmd(() => machine.startShot(), 'startingShot')}
           />
 
           {/* Stop — destructive confirmation */}
@@ -325,7 +314,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             disabled={!isBrewing}
             title={t('controlCenter.confirm.stopTitle')}
             description={t('controlCenter.confirm.stopDesc')}
-            onConfirm={() => cmd(stopShot, 'stopping')}
+            onConfirm={() => cmd(() => machine.stopShot(), 'stopping')}
             t={t}
           />
 
@@ -335,7 +324,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
               icon={<XCircle size={14} weight="fill" />}
               label={t('controlCenter.actions.abortPreheat')}
               disabled={!isConnected}
-              onClick={() => cmd(abortShot, 'preheatCancelled')}
+              onClick={() => cmd(() => machine.abortShot(), 'preheatCancelled')}
             />
           )}
 
@@ -343,25 +332,25 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             icon={<ArrowRight size={14} weight="bold" />}
             label={t('controlCenter.actions.continue')}
             disabled={machineState.state?.toLowerCase() !== 'paused'}
-            onClick={() => cmd(continueShot, 'continuing')}
+            onClick={() => cmd(() => machine.continueShot(), 'continuing')}
           />
           <ActionButton
             icon={<Fire size={14} weight="fill" />}
             label={t('controlCenter.actions.preheat')}
             disabled={(!isIdle && !isReady) || !isConnected}
-            onClick={() => cmd(preheat, 'preheating')}
+            onClick={() => cmd(() => machine.preheat(), 'preheating')}
           />
           <ActionButton
             icon={<Scales size={14} weight="fill" />}
             label={t('controlCenter.actions.tare')}
             disabled={!isConnected}
-            onClick={() => cmd(tareScale, 'tared')}
+            onClick={() => cmd(() => machine.tareScale(), 'tared')}
           />
           <ActionButton
             icon={<House size={14} weight="fill" />}
             label={t('controlCenter.actions.home')}
             disabled={(!isIdle && !isReady) || !isConnected}
-            onClick={() => cmd(homePlunger, 'homed')}
+            onClick={() => cmd(() => machine.homePlunger(), 'homed')}
           />
 
           {/* Purge — destructive confirmation */}
@@ -371,7 +360,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             disabled={(!isIdle && !isReady) || !isConnected}
             title={t('controlCenter.confirm.purgeTitle')}
             description={t('controlCenter.confirm.purgeDesc')}
-            onConfirm={() => cmd(purge, 'purging')}
+            onConfirm={() => cmd(() => machine.purge(), 'purging')}
             t={t}
           />
         </div>
