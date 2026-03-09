@@ -39,6 +39,7 @@ apps/web/STORYBOOK.md
 data/
 !data/PourOverBase.json
 !data/recipes/
+!data/recipes/**
 logs/
 *.log
 
