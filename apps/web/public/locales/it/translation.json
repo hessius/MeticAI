@@ -868,7 +868,11 @@
         "done": "Estrazione completata!",
         "error": "Qualcosa è andato storto."
       }
-    }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Versare fino a {{weight}}g",
+    "recipeWait": "Attendere {{seconds}}s"
   },
   "results": {
     "backToForm": "Torna al modulo",

@@ -880,7 +880,11 @@
         "done": "Shot complete!",
         "error": "Something went wrong."
       }
-    }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Pour to {{weight}}g",
+    "recipeWait": "Wait {{seconds}}s"
   },
   "results": {
     "profileGenerated": "Profile Generated!",

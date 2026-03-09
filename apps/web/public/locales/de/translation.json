@@ -868,7 +868,11 @@
         "done": "Shot fertig!",
         "error": "Etwas ist schief gelaufen."
       }
-    }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Gießen bis {{weight}}g",
+    "recipeWait": "Warten {{seconds}}s"
   },
   "results": {
     "backToForm": "Zurück zum Formular",
