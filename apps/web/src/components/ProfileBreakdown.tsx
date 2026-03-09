@@ -412,7 +412,7 @@ function describeDynamics(dynamics: StageDynamics | undefined, stageType: string
   }
   
   // Build summary
-  let summary: string
+  let summary: string = ''
   if (startValue !== null && endValue !== null) {
     if (pattern === 'flat') {
       summary = `${patternEmoji} Holds at ${startValue.toFixed(1)} ${unit}`
