@@ -11,7 +11,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import confetti from 'canvas-confetti'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -161,7 +160,10 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     prevShotsRef.current = shots
     // Only fire when total_shots *crosses* a 100 boundary (not on initial load)
     if (prev != null && prev !== shots && shots > 0 && shots % 100 === 0) {
-      confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } })
+      // Lazy-load confetti to reduce initial bundle size (#188)
+      import('canvas-confetti').then(({ default: confetti }) => {
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } })
+      })
     }
   }, [machineState.total_shots])
 
