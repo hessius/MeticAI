@@ -329,6 +329,17 @@
     "getAiAnalysis": "Get AI Analysis",
     "runAnalysisForOverlay": "Run analysis to see graph overlay"
   },
+  "shotAnalysisView": {
+    "title": "Bezugsanalyse",
+    "recent": "Neueste",
+    "byProfile": "Nach Profil",
+    "noShots": "Noch keine Bezüge aufgezeichnet",
+    "noShotsDescription": "Bezüge werden hier angezeigt, nachdem Sie sie auf Ihrer Meticulous-Maschine durchgeführt haben.",
+    "annotated": "Kommentiert",
+    "shots_one": "{{count}} Bezug",
+    "shots_other": "{{count}} Bezüge",
+    "loading": "Bezüge werden geladen..."
+  },
   "shotComparison": {
     "title": "Bezugsvergleich",
     "shotA": "Bezug A",
@@ -879,6 +890,27 @@
     "recipePourTo": "Gießen bis {{weight}}g",
     "recipeWait": "Warten {{seconds}}s"
   },
+  "markdownEditor": {
+    "edit": "Bearbeiten",
+    "preview": "Vorschau",
+    "save": "Speichern",
+    "saving": "Speichern...",
+    "cancel": "Abbrechen",
+    "placeholder": "Notizen hier eingeben... (Markdown unterstützt)",
+    "emptyPreview": "Noch nichts zum Anzeigen",
+    "addNote": "Notiz hinzufügen..."
+  },
+  "shotAnnotation": {
+    "title": "Ihre Notizen",
+    "saved": "Notiz gespeichert",
+    "saveFailed": "Notiz konnte nicht gespeichert werden",
+    "ratingLabel": "Shot-Bewertung",
+    "ratingStar": "{{star}} Stern",
+    "ratingSaveFailed": "Bewertung konnte nicht gespeichert werden",
+    "deleted": "Anmerkung gelöscht",
+    "deleteFailed": "Anmerkung konnte nicht gelöscht werden",
+    "deleteConfirm": "Diese Anmerkung löschen?"
+  },
   "results": {
     "backToForm": "Zurück zum Formular",
     "coffeeAnalysis": "Kaffeeanalyse",
@@ -893,5 +925,22 @@
     "savedToHistory": "Profil wurde auf Ihrem Meticulous-Gerät und im Verlauf gespeichert",
     "noProfileJson": "Kein Profil-JSON verfügbar",
     "profileJsonDownloaded": "Profil-JSON heruntergeladen!"
+  },
+  "profileEdit": {
+    "title": "Profil bearbeiten",
+    "editProfile": "Profil bearbeiten",
+    "profileName": "Profilname",
+    "temperature": "Temperatur",
+    "finalWeight": "Zielgewicht",
+    "author": "Autor",
+    "variables": "Variablen",
+    "saving": "Speichern...",
+    "saved": "Profil erfolgreich aktualisiert",
+    "saveFailed": "Profil konnte nicht aktualisiert werden",
+    "nameRequired": "Der Profilname darf nicht leer sein",
+    "temperatureRange": "Die Temperatur muss zwischen 70 und 100 °C liegen",
+    "weightPositive": "Das Zielgewicht muss größer als 0 sein",
+    "unsavedChanges": "Es gibt ungespeicherte Änderungen. Verwerfen?",
+    "noChanges": "Keine Änderungen zum Speichern"
   }
 }

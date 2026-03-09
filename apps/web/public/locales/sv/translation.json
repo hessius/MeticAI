@@ -330,6 +330,17 @@
     "runAnalysisForOverlay": "Run analysis to see graph overlay",
     "aiUnavailable": "AI-analys är inte tillgänglig. Aktivera AI-funktioner i Inställningar och se till att en Gemini API-nyckel är konfigurerad."
   },
+  "shotAnalysisView": {
+    "title": "Körningsanalys",
+    "recent": "Senaste",
+    "byProfile": "Per profil",
+    "noShots": "Inga körningar registrerade ännu",
+    "noShotsDescription": "Körningar visas här efter att du har kört dem på din Meticulous-maskin.",
+    "annotated": "Annoterad",
+    "shots_one": "{{count}} körning",
+    "shots_other": "{{count}} körningar",
+    "loading": "Laddar körningar..."
+  },
   "shotComparison": {
     "title": "Körningsjämförelse",
     "shotA": "Körning A",
@@ -880,6 +891,27 @@
     "recipePourTo": "Häll till {{weight}}g",
     "recipeWait": "Vänta {{seconds}}s"
   },
+  "markdownEditor": {
+    "edit": "Redigera",
+    "preview": "Förhandsgranska",
+    "save": "Spara",
+    "saving": "Sparar...",
+    "cancel": "Avbryt",
+    "placeholder": "Skriv dina anteckningar här... (Markdown stöds)",
+    "emptyPreview": "Inget att förhandsgranska ännu",
+    "addNote": "Lägg till en anteckning..."
+  },
+  "shotAnnotation": {
+    "title": "Dina anteckningar",
+    "saved": "Anteckning sparad",
+    "saveFailed": "Kunde inte spara anteckning",
+    "ratingLabel": "Shotbetyg",
+    "ratingStar": "{{star}} stjärna",
+    "ratingSaveFailed": "Kunde inte spara betyg",
+    "deleted": "Anteckning borttagen",
+    "deleteFailed": "Kunde inte ta bort anteckning",
+    "deleteConfirm": "Ta bort denna anteckning?"
+  },
   "results": {
     "profileGenerated": "Profil skapad!",
     "savedToDevice": "Profil sparad på enheten",
@@ -894,5 +926,22 @@
     "json": "JSON",
     "noProfileJson": "Ingen profil-JSON tillgänglig",
     "profileJsonDownloaded": "Profil-JSON nedladdad!"
+  },
+  "profileEdit": {
+    "title": "Redigera profil",
+    "editProfile": "Redigera profil",
+    "profileName": "Profilnamn",
+    "temperature": "Temperatur",
+    "finalWeight": "Målvikt",
+    "author": "Författare",
+    "variables": "Variabler",
+    "saving": "Sparar...",
+    "saved": "Profil uppdaterad",
+    "saveFailed": "Kunde inte uppdatera profilen",
+    "nameRequired": "Profilnamnet får inte vara tomt",
+    "temperatureRange": "Temperaturen måste vara mellan 70 och 100 °C",
+    "weightPositive": "Målvikten måste vara större än 0",
+    "unsavedChanges": "Du har osparade ändringar. Kasta dem?",
+    "noChanges": "Inga ändringar att spara"
   }
 }

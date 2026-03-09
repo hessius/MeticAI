@@ -334,6 +334,17 @@
     "runAnalysisForOverlay": "Run analysis to see graph overlay",
     "aiUnavailable": "AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured."
   },
+  "shotAnalysisView": {
+    "title": "Shot Analysis",
+    "recent": "Recent",
+    "byProfile": "By Profile",
+    "noShots": "No shots recorded yet",
+    "noShotsDescription": "Shots will appear here after you pull them on your Meticulous machine.",
+    "annotated": "Annotated",
+    "shots_one": "{{count}} shot",
+    "shots_other": "{{count}} shots",
+    "loading": "Loading shots..."
+  },
   "shotComparison": {
     "title": "Shot Comparison",
     "shotA": "Shot A",
@@ -933,7 +944,13 @@
   "shotAnnotation": {
     "title": "Your Notes",
     "saved": "Note saved",
-    "saveFailed": "Failed to save note"
+    "saveFailed": "Failed to save note",
+    "ratingLabel": "Shot rating",
+    "ratingStar": "{{star}} star",
+    "ratingSaveFailed": "Failed to save rating",
+    "deleted": "Annotation deleted",
+    "deleteFailed": "Failed to delete annotation",
+    "deleteConfirm": "Delete this annotation?"
   },
   "results": {
     "profileGenerated": "Profile Generated!",
@@ -949,5 +966,22 @@
     "json": "JSON",
     "noProfileJson": "No profile JSON available",
     "profileJsonDownloaded": "Profile JSON downloaded!"
+  },
+  "profileEdit": {
+    "title": "Edit Profile",
+    "editProfile": "Edit Profile",
+    "profileName": "Profile Name",
+    "temperature": "Temperature",
+    "finalWeight": "Target Weight",
+    "author": "Author",
+    "variables": "Variables",
+    "saving": "Saving...",
+    "saved": "Profile updated successfully",
+    "saveFailed": "Failed to update profile",
+    "nameRequired": "Profile name cannot be empty",
+    "temperatureRange": "Temperature must be between 70 and 100 °C",
+    "weightPositive": "Target weight must be greater than 0",
+    "unsavedChanges": "You have unsaved changes. Discard them?",
+    "noChanges": "No changes to save"
   }
 }

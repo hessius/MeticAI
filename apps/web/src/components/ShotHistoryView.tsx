@@ -36,7 +36,9 @@ import {
   Equals,
   X,
   DownloadSimple,
-  Brain
+  Brain,
+  Star,
+  ChatText
 } from '@phosphor-icons/react'
 import { domToPng } from 'modern-screenshot'
 import { useShotHistory, ShotInfo, ShotData } from '@/hooks/useShotHistory'
@@ -315,6 +317,27 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
   const [llmAnalysisError, setLlmAnalysisError] = useState<string | null>(null)
   const [showLlmView, setShowLlmView] = useState(false)
   const [isLlmCached, setIsLlmCached] = useState(false)
+  
+  // Annotation summaries for shot list indicators
+  const [annotationSummaries, setAnnotationSummaries] = useState<Record<string, { has_annotation: boolean; rating: number | null }>>({})
+  
+  // Fetch annotation summaries when shots change
+  useEffect(() => {
+    if (shots.length === 0) return
+    const fetchAnnotations = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/shots/annotations`)
+        if (response.ok) {
+          const data = await response.json()
+          setAnnotationSummaries(data.annotations || {})
+        }
+      } catch {
+        // Non-critical — indicators just won't show
+      }
+    }
+    fetchAnnotations()
+  }, [shots])
   
   // Check server-side LLM analysis cache when shot changes
   useEffect(() => {
@@ -2244,6 +2267,24 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
                           date={selectedShot.date}
                           filename={selectedShot.filename}
                           className="pt-4 border-t border-border/30"
+                          onAnnotationChange={(hasAnnotation, rating) => {
+                            const key = `${selectedShot.date}/${selectedShot.filename}`
+                            setAnnotationSummaries(prev => ({
+                              ...prev,
+                              [key]: hasAnnotation || rating
+                                ? { has_annotation: hasAnnotation, rating }
+                                : undefined as never,
+                              ...(!hasAnnotation && !rating ? { [key]: undefined as never } : {}),
+                            }))
+                            // Clean up undefined entries
+                            if (!hasAnnotation && !rating) {
+                              setAnnotationSummaries(prev => {
+                                const next = { ...prev }
+                                delete next[key]
+                                return next
+                              })
+                            }
+                          }}
                         />
                       )}
                       
@@ -2521,11 +2562,27 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
                           )}
                         </div>
                       </div>
-                      <ChartLine 
-                        size={20} 
-                        weight="bold" 
-                        className="text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" 
-                      />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {(() => {
+                          const key = `${shot.date}/${shot.filename}`
+                          const summary = annotationSummaries[key]
+                          return summary ? (
+                            <>
+                              {summary.rating && (
+                                <Star size={14} weight="fill" className="text-amber-400/70" />
+                              )}
+                              {summary.has_annotation && (
+                                <ChatText size={14} weight="fill" className="text-muted-foreground/50" />
+                              )}
+                            </>
+                          ) : null
+                        })()}
+                        <ChartLine 
+                          size={20} 
+                          weight="bold" 
+                          className="text-muted-foreground/40 group-hover:text-primary transition-colors" 
+                        />
+                      </div>
                     </div>
                   </div>
                 </motion.div>

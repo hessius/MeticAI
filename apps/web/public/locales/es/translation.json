@@ -329,6 +329,17 @@
     "getAiAnalysis": "Get AI Analysis",
     "runAnalysisForOverlay": "Run analysis to see graph overlay"
   },
+  "shotAnalysisView": {
+    "title": "Análisis de extracciones",
+    "recent": "Recientes",
+    "byProfile": "Por perfil",
+    "noShots": "No hay extracciones registradas aún",
+    "noShotsDescription": "Las extracciones aparecerán aquí después de realizarlas en tu máquina Meticulous.",
+    "annotated": "Anotada",
+    "shots_one": "{{count}} extracción",
+    "shots_other": "{{count}} extracciones",
+    "loading": "Cargando extracciones..."
+  },
   "shotComparison": {
     "title": "Comparación de disparos",
     "shotA": "Disparo A",
@@ -879,6 +890,27 @@
     "recipePourTo": "Verter hasta {{weight}}g",
     "recipeWait": "Esperar {{seconds}}s"
   },
+  "markdownEditor": {
+    "edit": "Editar",
+    "preview": "Vista previa",
+    "save": "Guardar",
+    "saving": "Guardando...",
+    "cancel": "Cancelar",
+    "placeholder": "Escribe tus notas aquí... (Markdown compatible)",
+    "emptyPreview": "Nada que previsualizar aún",
+    "addNote": "Añadir una nota..."
+  },
+  "shotAnnotation": {
+    "title": "Tus notas",
+    "saved": "Nota guardada",
+    "saveFailed": "Error al guardar la nota",
+    "ratingLabel": "Valoración del shot",
+    "ratingStar": "{{star}} estrella",
+    "ratingSaveFailed": "Error al guardar la valoración",
+    "deleted": "Anotación eliminada",
+    "deleteFailed": "Error al eliminar la anotación",
+    "deleteConfirm": "¿Eliminar esta anotación?"
+  },
   "results": {
     "backToForm": "Volver al formulario",
     "coffeeAnalysis": "Análisis de café",
@@ -893,5 +925,22 @@
     "savedToHistory": "El perfil se ha guardado en su dispositivo Meticulous y en el historial",
     "noProfileJson": "No hay perfil JSON disponible",
     "profileJsonDownloaded": "¡Perfil JSON descargado!"
+  },
+  "profileEdit": {
+    "title": "Editar Perfil",
+    "editProfile": "Editar Perfil",
+    "profileName": "Nombre del perfil",
+    "temperature": "Temperatura",
+    "finalWeight": "Peso objetivo",
+    "author": "Autor",
+    "variables": "Variables",
+    "saving": "Guardando...",
+    "saved": "Perfil actualizado correctamente",
+    "saveFailed": "Error al actualizar el perfil",
+    "nameRequired": "El nombre del perfil no puede estar vacío",
+    "temperatureRange": "La temperatura debe estar entre 70 y 100 °C",
+    "weightPositive": "El peso objetivo debe ser mayor que 0",
+    "unsavedChanges": "Tienes cambios sin guardar. ¿Descartarlos?",
+    "noChanges": "No hay cambios para guardar"
   }
 }
