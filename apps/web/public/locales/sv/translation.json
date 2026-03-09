@@ -644,6 +644,7 @@
       "descaling": "Avkalkar",
       "unknown": "Okänd",
       "ready": "Redo",
+      "lancesStandard": "även enligt Lances standard",
       "pourWater": "Fyll på vatten",
       "purging": "Spolar",
       "clickToPurge": "Klicka för att spola"
@@ -844,6 +845,7 @@
     "weightLegend": "vikt",
     "flowLegend": "flöde",
     "weightTrendLabel": "Vikttrend",
+    "timeoutReached": "Brygningstimer stoppad — 10-minuters säkerhetstimeout nådd.",
     "integration": {
       "toggle": "Maskinintegration",
       "toggleDescription": "Följer ditt pour-over på Meticulous-skärmen. Timern startar automatiskt — börja hälla när du hör signalen.",

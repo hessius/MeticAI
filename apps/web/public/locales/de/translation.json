@@ -638,6 +638,7 @@
       "descaling": "Entkalkt",
       "unknown": "Unbekannt",
       "ready": "Bereit",
+      "lancesStandard": "sogar nach Lances Standard",
       "pourWater": "Wasser einfüllen",
       "purging": "Spülen",
       "clickToPurge": "Klicken zum Spülen"
@@ -843,6 +844,7 @@
     "weight": "Gewicht",
     "weightLegend": "Gewicht",
     "weightTrendLabel": "Gewichtstrend",
+    "timeoutReached": "Brühtimer gestoppt — 10-Minuten-Sicherheits-Timeout erreicht.",
     "integration": {
       "toggle": "Maschinenintegration",
       "toggleDescription": "Verfolgt dein Pour-Over auf dem Meticulous-Display. Der Timer startet automatisch — beginne mit dem Gießen, wenn du den Ton hörst.",

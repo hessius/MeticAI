@@ -644,6 +644,7 @@
       "descaling": "Descaling",
       "unknown": "Unknown",
       "ready": "Ready",
+      "lancesStandard": "even by Lance's standard",
       "pourWater": "Pour Water",
       "purging": "Purging",
       "clickToPurge": "Click to Purge"
@@ -855,6 +856,7 @@
     "weightLegend": "weight",
     "flowLegend": "flow",
     "weightTrendLabel": "Weight trend",
+    "timeoutReached": "Brew timer stopped — 10+minute safety timeout reached.",
     "integration": {
       "toggle": "Machine integration",
       "toggleDescription": "Tracks your pour-over on the Meticulous screen. The brew timer starts automatically — start pouring when you hear the chime.",

@@ -638,6 +638,7 @@
       "descaling": "Decalcificazione",
       "unknown": "Sconosciuto",
       "ready": "Pronto",
+      "lancesStandard": "anche secondo lo standard di Lance",
       "pourWater": "Aggiungere acqua",
       "purging": "Spurgo",
       "clickToPurge": "Clicca per purgare"
@@ -843,6 +844,7 @@
     "weight": "Peso",
     "weightLegend": "peso",
     "weightTrendLabel": "Andamento peso",
+    "timeoutReached": "Timer di infusione fermato — raggiunto il timeout di sicurezza di 10 minuti.",
     "integration": {
       "toggle": "Integrazione macchina",
       "toggleDescription": "Monitora il tuo pour-over sullo schermo Meticulous. Il timer si avvia automaticamente — inizia a versare quando senti il segnale.",
