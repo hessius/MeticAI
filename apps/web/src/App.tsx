@@ -44,6 +44,7 @@ import { BetaBanner } from '@/components/BetaBanner'
 import { LiveShotView } from '@/components/LiveShotView'
 import { PourOverView } from '@/components/PourOverView'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
+import { ProfileCatalogueView } from '@/components/ProfileCatalogueView'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
@@ -829,6 +830,7 @@ function App() {
               {viewState === 'settings' && (
                 <SettingsView
                   onBack={handleBackToStart}
+                  onViewProfileCatalogue={() => setViewState('profile-catalogue')}
                   showBlobs={showBlobs}
                   onToggleBlobs={toggleBlobs}
                   isDark={isDark}
@@ -871,6 +873,10 @@ function App() {
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
+              )}
+
+              {viewState === 'profile-catalogue' && (
+                <ProfileCatalogueView onBack={handleBackToStart} />
               )}
 
               {viewState === 'loading' && (

@@ -29,6 +29,7 @@ from services.meticulous_service import (
     async_create_profile,
     async_load_profile_by_id,
     async_execute_action,
+    async_delete_profile,
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
@@ -1632,6 +1633,149 @@ async def get_machine_profile_json(profile_id: str, request: Request):
     except Exception as e:
         logger.error(
             f"Failed to get profile JSON: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.delete("/api/machine/profile/{profile_id}")
+async def delete_machine_profile(profile_id: str, request: Request):
+    """Delete a profile from the Meticulous machine.
+    
+    Args:
+        profile_id: The profile ID to delete
+        
+    Returns:
+        Status of the deletion operation
+    """
+    request_id = request.state.request_id
+    
+    try:
+        # First get the profile to log its name
+        profile = await async_get_profile(profile_id)
+        profile_name = getattr(profile, 'name', profile_id) if profile else profile_id
+        
+        logger.info(
+            f"Deleting profile: {profile_name} ({profile_id})",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        result = await async_delete_profile(profile_id)
+        
+        logger.info(
+            f"Successfully deleted profile: {profile_name}",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Profile '{profile_name}' deleted successfully",
+            "profile_id": profile_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to delete profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.patch("/api/machine/profile/{profile_id}")
+async def update_machine_profile(profile_id: str, request: Request):
+    """Update a profile on the Meticulous machine.
+    
+    Currently supports:
+    - Renaming (via "name" field)
+    
+    Args:
+        profile_id: The profile ID to update
+        
+    Body:
+        name: New name for the profile (optional)
+        
+    Returns:
+        Updated profile information
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        new_name = body.get("name")
+        
+        if not new_name:
+            raise HTTPException(
+                status_code=400, 
+                detail="At least one field to update is required (e.g., 'name')"
+            )
+        
+        # Get the current profile
+        profile = await async_get_profile(profile_id)
+        if hasattr(profile, 'error') and profile.error:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile not found: {profile_id}"
+            )
+        
+        old_name = getattr(profile, 'name', profile_id)
+        
+        logger.info(
+            f"Renaming profile '{old_name}' to '{new_name}'",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        # Convert profile to dict for modification
+        profile_dict = {}
+        for attr in ['id', 'name', 'author', 'author_id', 'temperature', 'final_weight', 
+                     'stages', 'variables', 'display', 'isDefault', 'source', 
+                     'beverage_type', 'tank_temperature', 'previous_authors']:
+            if hasattr(profile, attr):
+                val = getattr(profile, attr)
+                if val is not None:
+                    if hasattr(val, '__dict__'):
+                        profile_dict[attr] = val.__dict__
+                    elif isinstance(val, list):
+                        profile_dict[attr] = [
+                            item.__dict__ if hasattr(item, '__dict__') else item 
+                            for item in val
+                        ]
+                    else:
+                        profile_dict[attr] = val
+        
+        # Update the name
+        profile_dict["name"] = new_name
+        
+        # Save the updated profile
+        await async_save_profile(profile_dict)
+        
+        logger.info(
+            f"Successfully renamed profile to '{new_name}'",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Profile renamed from '{old_name}' to '{new_name}'",
+            "profile_id": profile_id,
+            "old_name": old_name,
+            "new_name": new_name
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update profile: {str(e)}",
             exc_info=True,
             extra={"request_id": request_id, "error_type": type(e).__name__}
         )
