@@ -122,6 +122,7 @@ export type ViewState =
   | 'pour-over'
   | 'live-shot'
   | 'shot-history'
+  | 'shot-analysis'
   | 'profile-catalogue';
 
 // ============================================================================

@@ -203,7 +203,7 @@ export function useWebSocket(enabled: boolean): MachineState {
       )
       retriesRef.current++
       reconnectRef.current = setTimeout(() => {
-        void connect()
+        void connectRef.current?.()
       }, delay)
     }
   }, [resetStaleTimer])

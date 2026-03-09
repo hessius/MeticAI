@@ -67,6 +67,7 @@ export const NoProfiles: Story = {
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
+    onShotAnalysis: () => console.log('Shot analysis clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };
@@ -81,6 +82,7 @@ export const WithProfiles: Story = {
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
+    onShotAnalysis: () => console.log('Shot analysis clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };
@@ -95,6 +97,7 @@ export const SingleProfile: Story = {
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
+    onShotAnalysis: () => console.log('Shot analysis clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };
@@ -109,6 +112,7 @@ export const Loading: Story = {
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
+    onShotAnalysis: () => console.log('Shot analysis clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };

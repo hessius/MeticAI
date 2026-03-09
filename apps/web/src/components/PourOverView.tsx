@@ -822,7 +822,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       }
       setMachineLifecycle('idle')
     }
-  }, [meticulousIntegration, machineLifecycle, t, cmd, pauseTimer])
+  }, [meticulousIntegration, machineLifecycle, t, cmd, pauseTimer, machine])
 
   // ── Machine integration: handle start recipe on machine ──
   const handleMachineRecipeStart = useCallback(async () => {
@@ -843,7 +843,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setMachineLifecycle('error')
       toast.error(err instanceof Error ? err.message : t('pourOver.integration.prepareFailed'))
     }
-  }, [meticulousIntegration, machineLifecycle, selectedRecipe, t, cmd, waitForState])
+  }, [meticulousIntegration, machineLifecycle, selectedRecipe, t, cmd, waitForState, machine])
 
   // ── Machine integration: reset lifecycle when toggled off or mode changes ──
   const handleIntegrationToggle = useCallback((enabled: boolean) => {

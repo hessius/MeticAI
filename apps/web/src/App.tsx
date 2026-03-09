@@ -44,6 +44,7 @@ import { BetaBanner } from '@/components/BetaBanner'
 import { LiveShotView } from '@/components/LiveShotView'
 import { PourOverView } from '@/components/PourOverView'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
+import { ShotAnalysisView } from '@/components/ShotAnalysisView'
 import { ProfileCatalogueView } from '@/components/ProfileCatalogueView'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
@@ -533,6 +534,7 @@ function App() {
       case 'settings':
       case 'pour-over':
       case 'live-shot':
+      case 'shot-analysis':
         handleBackToStart()
         break
       // Don't navigate on start, loading, or error views - but still block browser gesture
@@ -761,6 +763,7 @@ function App() {
                     setViewState('run-shot')
                   }}
                   onPourOver={() => setViewState('pour-over')}
+                  onShotAnalysis={() => setViewState('shot-analysis')}
                   onSettings={() => setViewState('settings')}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
@@ -769,9 +772,14 @@ function App() {
                       <LastShotBanner
                         lastShot={lastShotHook}
                         onAnalyze={(date, filename) => {
-                          // Navigate to shot history for analysis
-                          // TODO: wire to specific shot detail once LiveShotView is built
-                          setViewState('history')
+                          // Navigate to shot analysis with the last shot's profile
+                          const profileName = lastShotHook.lastShot?.profile_name
+                          if (profileName) {
+                            setShotHistoryProfileName(profileName)
+                            setViewState('shot-history')
+                          } else {
+                            setViewState('shot-analysis')
+                          }
                           void date; void filename
                         }}
                       />
@@ -872,6 +880,16 @@ function App() {
                   onBack={handleBackToStart}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
+                />
+              )}
+
+              {viewState === 'shot-analysis' && (
+                <ShotAnalysisView
+                  onBack={handleBackToStart}
+                  onSelectShot={(profileName) => {
+                    setShotHistoryProfileName(profileName)
+                    setViewState('shot-history')
+                  }}
                 />
               )}
 

@@ -412,7 +412,7 @@ function describeDynamics(dynamics: StageDynamics | undefined, stageType: string
   }
   
   // Build summary
-  let summary: string = ''
+  let summary: string
   if (startValue !== null && endValue !== null) {
     if (pattern === 'flat') {
       summary = `${patternEmoji} Holds at ${startValue.toFixed(1)} ${unit}`
@@ -605,7 +605,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                 <div className="flex flex-wrap gap-2">
                   {infoVars.map((variable, idx) => {
                     // Format the display value based on the variable type and key
-                    let displayValue = ''
+                    let displayValue: string
                     if (variable.type === 'weight') {
                       // Weight type displays as grams
                       displayValue = `${variable.value}g`
