@@ -227,3 +227,45 @@ async def command_sounds(body: SoundsRequest):
     snapshot = _get_snapshot()
     _require_connected(snapshot)
     return _do_publish("enable_sounds", str(body.enabled).lower())
+
+
+# ---------------------------------------------------------------------------
+# Machine discovery
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/machine/detect")
+async def detect_machine():
+    """
+    Auto-detect Meticulous machine on the local network.
+    
+    Uses mDNS/Zeroconf and hostname resolution to find machines.
+    
+    Returns:
+        - found: bool
+        - ip: str (if found)
+        - hostname: str (if found)
+        - method: str (mdns | hostname)
+        - guidance: str (if not found)
+    """
+    from services.machine_discovery_service import discover_machine, verify_machine
+    
+    result = await discover_machine()
+    
+    response = {
+        "found": result.found,
+    }
+    
+    if result.found:
+        # Verify the machine is actually responding
+        verified = await verify_machine(result.ip)
+        response.update({
+            "ip": result.ip,
+            "hostname": result.hostname,
+            "method": result.method,
+            "verified": verified,
+        })
+    else:
+        response["guidance"] = result.guidance
+    
+    return response
