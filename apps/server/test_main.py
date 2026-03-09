@@ -12393,3 +12393,347 @@ class TestShotAnnotationEndpoints:
         response = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
         assert response.json()["annotation"] == md
 
+
+class TestRecentShotsEndpoint:
+    """Tests for GET /api/shots/recent and GET /api/shots/recent/by-profile."""
+
+    @pytest.fixture(autouse=True)
+    def clear_recent_cache(self):
+        """Clear the recent-shots in-memory cache between tests."""
+        from api.routes.shots import _recent_shots_cache
+        _recent_shots_cache.clear()
+        yield
+        _recent_shots_cache.clear()
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_success(self, mock_dates, mock_files, mock_fetch, client):
+        """Test fetching recent shots across all profiles."""
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_dates.return_value = [date1]
+
+        file1 = MagicMock()
+        file1.name = "shot_001.json"
+        file2 = MagicMock()
+        file2.name = "shot_002.json"
+        mock_files.return_value = [file2, file1]
+
+        mock_fetch.side_effect = [
+            {
+                "profile_name": "Profile B",
+                "profile": {"name": "Profile B", "id": "pb"},
+                "time": 1705320100,
+                "data": [{"time": 28000, "shot": {"weight": 38.0}}],
+            },
+            {
+                "profile_name": "Profile A",
+                "profile": {"name": "Profile A", "id": "pa"},
+                "time": 1705320000,
+                "data": [{"time": 25000, "shot": {"weight": 36.5}}],
+            },
+        ]
+
+        response = client.get("/api/shots/recent?limit=10&offset=0")
+        assert response.status_code == 200
+        data = response.json()
+        assert "shots" in data
+        assert len(data["shots"]) == 2
+        # Should be sorted by timestamp descending
+        assert data["shots"][0]["profile_name"] == "Profile B"
+        assert data["shots"][1]["profile_name"] == "Profile A"
+        assert data["shots"][0]["final_weight"] == 38.0
+        assert "has_annotation" in data["shots"][0]
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_empty(self, mock_dates, client):
+        """Test empty response when no dates exist."""
+        mock_dates.return_value = []
+
+        response = client.get("/api/shots/recent")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["shots"] == []
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_machine_error(self, mock_dates, client):
+        """Test 502 when machine returns error."""
+        result = MagicMock()
+        result.error = "Connection timeout"
+        mock_dates.return_value = result
+
+        response = client.get("/api/shots/recent")
+        assert response.status_code == 502
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_by_profile(self, mock_dates, mock_files, mock_fetch, client):
+        """Test fetching recent shots grouped by profile."""
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_dates.return_value = [date1]
+
+        file1 = MagicMock()
+        file1.name = "shot_001.json"
+        file2 = MagicMock()
+        file2.name = "shot_002.json"
+        mock_files.return_value = [file1, file2]
+
+        mock_fetch.side_effect = [
+            {
+                "profile_name": "Espresso Classic",
+                "profile": {"name": "Espresso Classic", "id": "ec"},
+                "time": 1705320000,
+                "data": [{"time": 25000, "shot": {"weight": 36.5}}],
+            },
+            {
+                "profile_name": "Espresso Classic",
+                "profile": {"name": "Espresso Classic", "id": "ec"},
+                "time": 1705320100,
+                "data": [{"time": 28000, "shot": {"weight": 38.0}}],
+            },
+        ]
+
+        response = client.get("/api/shots/recent/by-profile")
+        assert response.status_code == 200
+        data = response.json()
+        assert "profiles" in data
+        assert len(data["profiles"]) == 1
+        assert data["profiles"][0]["profile_name"] == "Espresso Classic"
+        assert data["profiles"][0]["shot_count"] == 2
+        assert len(data["profiles"][0]["shots"]) == 2
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_dual_routes(self, mock_dates, mock_files, mock_fetch, client):
+        """Test that dual routes (with and without /api prefix) both work."""
+        mock_dates.return_value = []
+
+        for path in ["/shots/recent", "/api/shots/recent"]:
+            response = client.get(path)
+            assert response.status_code == 200
+
+        for path in ["/shots/recent/by-profile", "/api/shots/recent/by-profile"]:
+            response = client.get(path)
+            assert response.status_code == 200
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_pagination(self, mock_dates, mock_files, mock_fetch, client):
+        """Test pagination with offset and limit."""
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_dates.return_value = [date1]
+
+        files = []
+        for i in range(5):
+            f = MagicMock()
+            f.name = f"shot_{i:03d}.json"
+            files.append(f)
+        mock_files.return_value = files
+
+        mock_fetch.side_effect = [
+            {
+                "profile_name": f"Profile {i}",
+                "profile": {"name": f"Profile {i}", "id": f"p{i}"},
+                "time": 1705320000 + i * 100,
+                "data": [{"time": 25000, "shot": {"weight": 36.0 + i}}],
+            }
+            for i in range(5)
+        ]
+
+        response = client.get("/api/shots/recent?limit=2&offset=0")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["shots"]) == 2
+
+
+
+class TestEditProfileEndpoint:
+    """Tests for the PUT /api/profile/{name}/edit endpoint."""
+
+    def _make_mock_profile(self, name="TestProfile", profile_id="abc-123",
+                           temperature=93.0, final_weight=36.0, author="MeticAI"):
+        """Helper to build a mock profile object."""
+        profile = Mock()
+        profile.id = profile_id
+        profile.name = name
+        profile.author = author
+        profile.author_id = None
+        profile.temperature = temperature
+        profile.final_weight = final_weight
+        profile.stages = []
+        var = MagicMock()
+        var.key = "flow_main"
+        var.name = "Main Flow"
+        var.value = 2.5
+        var.type = "flow"
+        var.__dict__ = {"key": "flow_main", "name": "Main Flow", "value": 2.5, "type": "flow"}
+        profile.variables = [var]
+        profile.display = None
+        profile.isDefault = False
+        profile.source = None
+        profile.beverage_type = None
+        profile.tank_temperature = None
+        profile.previous_authors = None
+        profile.error = None
+        return profile
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_success(self, mock_list, mock_get, mock_save, client):
+        """Successful profile edit updates temperature and returns success."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"temperature": 90.0}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile"]["temperature"] == 90.0
+        mock_save.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_temperature_too_low(self, client):
+        """Temperature below 70 returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"temperature": 50.0}
+        )
+        assert response.status_code == 400
+        assert "70" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_temperature_too_high(self, client):
+        """Temperature above 100 returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"temperature": 110.0}
+        )
+        assert response.status_code == 400
+        assert "100" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_weight_zero(self, client):
+        """Final weight of 0 returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"final_weight": 0}
+        )
+        assert response.status_code == 400
+        assert "greater than 0" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_empty_name(self, client):
+        """Empty name returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"name": ""}
+        )
+        assert response.status_code == 400
+        assert "non-empty" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_no_fields(self, client):
+        """No fields to update returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={}
+        )
+        assert response.status_code == 400
+        assert "At least one" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_not_found(self, mock_list, client):
+        """Profile not on machine returns 404."""
+        mock_list.return_value = []
+
+        response = client.put(
+            "/api/profile/MissingProfile/edit",
+            json={"temperature": 90.0}
+        )
+        assert response.status_code == 404
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_rename_cascades_to_history(
+        self, mock_list, mock_get, mock_save, mock_load_hist, mock_save_hist, client
+    ):
+        """Renaming a profile also updates matching history entries."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+        mock_load_hist.return_value = [
+            {"id": "h1", "profile_name": "TestProfile", "reply": "..."},
+            {"id": "h2", "profile_name": "OtherProfile", "reply": "..."},
+        ]
+
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"name": "RenamedProfile"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["profile"]["name"] == "RenamedProfile"
+
+        # History should have been saved with the renamed entry
+        mock_save_hist.assert_called_once()
+        saved = mock_save_hist.call_args[0][0]
+        assert saved[0]["profile_name"] == "RenamedProfile"
+        assert saved[1]["profile_name"] == "OtherProfile"  # unchanged
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_variables(self, mock_list, mock_get, mock_save, client):
+        """Updating variable values persists correctly."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"variables": [{"key": "flow_main", "value": 3.0}]}
+        )
+
+        assert response.status_code == 200
+        saved_dict = mock_save.call_args[0][0]
+        flow_var = next(v for v in saved_dict["variables"] if v["key"] == "flow_main")
+        assert flow_var["value"] == 3.0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_dual_route(self, mock_list, mock_get, mock_save, client):
+        """Both /profile/{name}/edit and /api/profile/{name}/edit work."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        response = client.put(
+            "/profile/TestProfile/edit",
+            json={"temperature": 88.0}
+        )
+        assert response.status_code == 200

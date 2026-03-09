@@ -91,17 +91,23 @@ export class ProfileService {
   }
 
   /**
-   * Update a profile
+   * Edit a profile on the machine (name, temperature, final_weight, variables, author)
    */
   async updateProfile(
-    profileId: string,
-    data: { name?: string; profile_json?: string; preferences?: string }
-  ): Promise<void> {
+    profileName: string,
+    data: {
+      name?: string;
+      temperature?: number;
+      final_weight?: number;
+      variables?: { key: string; value: number | string }[];
+      author?: string;
+    }
+  ): Promise<{ status: string; profile: { id: string; name: string; temperature?: number; final_weight?: number; author?: string } }> {
     const baseUrl = await this.getBaseUrl();
-    await apiFetch(
-      `${baseUrl}/profiles/${profileId}`,
+    return await apiFetch(
+      `${baseUrl}/profile/${encodeURIComponent(profileName)}/edit`,
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },

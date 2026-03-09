@@ -1033,6 +1033,166 @@ async def get_profile_info(
         )
 
 
+@router.put("/profile/{profile_name:path}/edit")
+@router.put("/api/profile/{profile_name:path}/edit")
+async def edit_profile(profile_name: str, request: Request):
+    """Edit an existing profile on the Meticulous machine.
+
+    Supports updating name, temperature, final_weight, variables, and author.
+    If the name changes, all matching history entries are updated too.
+
+    Body:
+        name?: str          – new profile name (non-empty)
+        temperature?: float – brew temperature (70-100 °C)
+        final_weight?: float – target weight (> 0)
+        variables?: list    – [{key: str, value: float|str}, ...]
+        author?: str        – profile author
+    """
+    request_id = request.state.request_id
+
+    try:
+        body = await request.json()
+
+        # --- validation -----------------------------------------------------------
+        new_name = body.get("name")
+        if new_name is not None:
+            if not isinstance(new_name, str) or not new_name.strip():
+                raise HTTPException(status_code=400, detail="Profile name must be a non-empty string")
+            new_name = new_name.strip()
+
+        temperature = body.get("temperature")
+        if temperature is not None:
+            try:
+                temperature = float(temperature)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Temperature must be a number")
+            if temperature < 70 or temperature > 100:
+                raise HTTPException(status_code=400, detail="Temperature must be between 70 and 100 °C")
+
+        final_weight = body.get("final_weight")
+        if final_weight is not None:
+            try:
+                final_weight = float(final_weight)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Final weight must be a number")
+            if final_weight <= 0:
+                raise HTTPException(status_code=400, detail="Final weight must be greater than 0")
+
+        variables = body.get("variables")
+        author = body.get("author")
+
+        if all(v is None for v in [new_name, temperature, final_weight, variables, author]):
+            raise HTTPException(status_code=400, detail="At least one field to update is required")
+
+        # --- find profile by name ------------------------------------------------
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(status_code=502, detail=f"Machine API error: {profiles_result.error}")
+
+        matching_profile = None
+        for p in profiles_result:
+            if p.name == profile_name:
+                matching_profile = p
+                break
+
+        if matching_profile is None:
+            raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found on machine")
+
+        full_profile = await async_get_profile(matching_profile.id)
+        if hasattr(full_profile, "error") and full_profile.error:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch profile: {full_profile.error}")
+
+        # --- convert to dict for mutation ----------------------------------------
+        profile_dict = {}
+        for attr in [
+            "id", "name", "author", "author_id", "temperature", "final_weight",
+            "stages", "variables", "display", "isDefault", "source",
+            "beverage_type", "tank_temperature", "previous_authors",
+        ]:
+            if hasattr(full_profile, attr):
+                val = getattr(full_profile, attr)
+                if val is not None:
+                    if hasattr(val, "__dict__"):
+                        profile_dict[attr] = val.__dict__
+                    elif isinstance(val, list):
+                        profile_dict[attr] = [
+                            item.__dict__ if hasattr(item, "__dict__") else item
+                            for item in val
+                        ]
+                    else:
+                        profile_dict[attr] = val
+
+        # --- apply changes -------------------------------------------------------
+        old_name = profile_dict.get("name", profile_name)
+
+        if new_name is not None:
+            profile_dict["name"] = new_name
+        if temperature is not None:
+            profile_dict["temperature"] = temperature
+        if final_weight is not None:
+            profile_dict["final_weight"] = final_weight
+        if author is not None:
+            profile_dict["author"] = author
+
+        if variables is not None and isinstance(profile_dict.get("variables"), list):
+            incoming = {v["key"]: v["value"] for v in variables if "key" in v and "value" in v}
+            for var in profile_dict["variables"]:
+                var_key = var.get("key") if isinstance(var, dict) else getattr(var, "key", None)
+                if var_key and var_key in incoming:
+                    if isinstance(var, dict):
+                        var["value"] = incoming[var_key]
+                    else:
+                        var.value = incoming[var_key]
+
+        # --- persist -------------------------------------------------------------
+        profile_dict = deep_convert_to_dict(profile_dict)
+        await async_save_profile(profile_dict)
+
+        logger.info(
+            f"Profile edited: '{old_name}' → '{profile_dict.get('name', old_name)}'",
+            extra={"request_id": request_id, "profile_name": profile_name},
+        )
+
+        # --- cascade rename into history -----------------------------------------
+        if new_name is not None and new_name != old_name:
+            history = load_history()
+            updated = 0
+            for entry in history:
+                if entry.get("profile_name") == old_name:
+                    entry["profile_name"] = new_name
+                    updated += 1
+            if updated:
+                save_history(history)
+                logger.info(
+                    f"Updated {updated} history entries from '{old_name}' to '{new_name}'",
+                    extra={"request_id": request_id},
+                )
+
+        return {
+            "status": "success",
+            "profile": {
+                "id": matching_profile.id,
+                "name": profile_dict.get("name", old_name),
+                "temperature": profile_dict.get("temperature"),
+                "final_weight": profile_dict.get("final_weight"),
+                "author": profile_dict.get("author"),
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to edit profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
 @router.post("/api/shots/analyze")
 async def analyze_shot(
     request: Request,
@@ -2207,6 +2367,137 @@ async def get_machine_profile_count(request: Request):
         raise HTTPException(
             status_code=500,
             detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.get("/machine/profiles/orphaned")
+@router.get("/api/machine/profiles/orphaned")
+async def list_orphaned_history_entries(request: Request):
+    """List history entries whose profiles no longer exist on the machine.
+
+    Cross-references history entries against the current machine profile list
+    and returns entries that have no matching machine profile.
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            "Checking for orphaned history entries",
+            extra={"request_id": request_id},
+        )
+
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        machine_names: set[str] = {
+            getattr(p, "name", "") for p in profiles_result
+        }
+
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+
+        orphaned = []
+        for entry in entries:
+            profile_name = entry.get("profile_name", "")
+            if profile_name and profile_name not in machine_names:
+                orphaned.append({
+                    "id": entry.get("id"),
+                    "profile_name": profile_name,
+                    "created_at": entry.get("created_at"),
+                    "has_profile_json": bool(entry.get("profile_json")),
+                })
+
+        logger.info(
+            f"Found {len(orphaned)} orphaned history entries",
+            extra={"request_id": request_id, "orphan_count": len(orphaned)},
+        )
+
+        return {
+            "status": "success",
+            "orphaned": orphaned,
+            "total": len(orphaned),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to check orphaned profiles: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/machine/profile/restore/{history_id}")
+@router.post("/api/machine/profile/restore/{history_id}")
+async def restore_profile_from_history(history_id: str, request: Request):
+    """Re-upload a profile from history to the Meticulous machine.
+
+    Loads the stored profile JSON from a history entry and saves it back to
+    the machine via async_save_profile().
+    """
+    request_id = request.state.request_id
+
+    try:
+        from services.history_service import get_entry_by_id
+
+        entry = get_entry_by_id(history_id)
+        if not entry:
+            raise HTTPException(status_code=404, detail="History entry not found")
+
+        profile_json = entry.get("profile_json")
+        if not profile_json:
+            raise HTTPException(
+                status_code=400,
+                detail="History entry does not contain profile JSON",
+            )
+
+        profile_name = entry.get("profile_name", "Restored Profile")
+
+        logger.info(
+            f"Restoring profile '{profile_name}' to machine from history",
+            extra={"request_id": request_id, "history_id": history_id},
+        )
+
+        result = await async_save_profile(profile_json)
+
+        if hasattr(result, "error") and result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {result.error}",
+            )
+
+        logger.info(
+            f"Successfully restored profile '{profile_name}' to machine",
+            extra={"request_id": request_id, "history_id": history_id},
+        )
+
+        return {
+            "status": "success",
+            "message": f"Profile '{profile_name}' restored to machine",
+            "profile_name": profile_name,
+            "history_id": history_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to restore profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
         )
 
 

@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { 
   Trash, 
@@ -25,7 +26,9 @@ import {
   Check,
   XCircle,
   Plus,
-  Play
+  Play,
+  PencilSimple,
+  FloppyDisk
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
@@ -39,6 +42,7 @@ import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { getServerUrl } from '@/lib/config'
+import { profileService } from '@/services/profileService'
 import { getShowAiInHistory } from '@/lib/aiPreferences'
 import { 
   extractTagsFromPreferences, 
@@ -575,6 +579,132 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
   const [notes, setNotes] = useState<string>(entry.notes || '')
   const [isSavingNotes, setIsSavingNotes] = useState(false)
 
+  // Profile edit state
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editName, setEditName] = useState(entry.profile_name)
+  const [editTemperature, setEditTemperature] = useState<string>(
+    entry.profile_json?.temperature?.toString() ?? ''
+  )
+  const [editFinalWeight, setEditFinalWeight] = useState<string>(
+    entry.profile_json?.final_weight?.toString() ?? ''
+  )
+  const [editVariables, setEditVariables] = useState<{ key: string; name: string; value: string; type: string }[]>(() => {
+    const vars = (entry.profile_json as ProfileData | null)?.variables ?? []
+    return vars
+      .filter((v: { key: string }) => !v.key.startsWith('info_'))
+      .map((v: { key: string; name: string; value: number; type: string }) => ({
+        key: v.key,
+        name: v.name,
+        value: String(v.value),
+        type: v.type,
+      }))
+  })
+
+  const hasEditChanges = useMemo(() => {
+    if (!isEditing) return false
+    const pj = entry.profile_json as ProfileData | null
+    if (editName !== entry.profile_name) return true
+    if (pj?.temperature !== undefined && editTemperature !== String(pj.temperature)) return true
+    if (pj?.final_weight !== undefined && editFinalWeight !== String(pj.final_weight)) return true
+    const origVars = (pj?.variables ?? []).filter((v: { key: string }) => !v.key.startsWith('info_'))
+    for (const ev of editVariables) {
+      const ov = origVars.find((v: { key: string }) => v.key === ev.key)
+      if (ov && String(ov.value) !== ev.value) return true
+    }
+    return false
+  }, [isEditing, editName, editTemperature, editFinalWeight, editVariables, entry])
+
+  // Unsaved changes guard
+  useEffect(() => {
+    if (!hasEditChanges) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasEditChanges])
+
+  const handleStartEdit = () => {
+    const pj = entry.profile_json as ProfileData | null
+    setEditName(entry.profile_name)
+    setEditTemperature(pj?.temperature?.toString() ?? '')
+    setEditFinalWeight(pj?.final_weight?.toString() ?? '')
+    setEditVariables(
+      (pj?.variables ?? [])
+        .filter((v: { key: string }) => !v.key.startsWith('info_'))
+        .map((v: { key: string; name: string; value: number; type: string }) => ({
+          key: v.key,
+          name: v.name,
+          value: String(v.value),
+          type: v.type,
+        }))
+    )
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    if (hasEditChanges && !window.confirm(t('profileEdit.unsavedChanges'))) return
+    setIsEditing(false)
+  }
+
+  const handleSaveEdit = async () => {
+    // Client-side validation
+    if (!editName.trim()) {
+      toast.error(t('profileEdit.nameRequired'))
+      return
+    }
+    const temp = editTemperature ? parseFloat(editTemperature) : undefined
+    if (temp !== undefined && (isNaN(temp) || temp < 70 || temp > 100)) {
+      toast.error(t('profileEdit.temperatureRange'))
+      return
+    }
+    const weight = editFinalWeight ? parseFloat(editFinalWeight) : undefined
+    if (weight !== undefined && (isNaN(weight) || weight <= 0)) {
+      toast.error(t('profileEdit.weightPositive'))
+      return
+    }
+
+    setIsSavingEdit(true)
+    try {
+      const payload: Record<string, unknown> = {}
+      if (editName.trim() !== entry.profile_name) payload.name = editName.trim()
+      if (temp !== undefined) payload.temperature = temp
+      if (weight !== undefined) payload.final_weight = weight
+
+      const changedVars = editVariables
+        .filter(ev => {
+          const pj = entry.profile_json as ProfileData | null
+          const origVars = (pj?.variables ?? []).filter((v: { key: string }) => !v.key.startsWith('info_'))
+          const ov = origVars.find((v: { key: string }) => v.key === ev.key)
+          return ov && String(ov.value) !== ev.value
+        })
+        .map(ev => ({ key: ev.key, value: parseFloat(ev.value) || ev.value }))
+      if (changedVars.length > 0) payload.variables = changedVars
+
+      if (Object.keys(payload).length === 0) {
+        toast.info(t('profileEdit.noChanges'))
+        setIsSavingEdit(false)
+        return
+      }
+
+      await profileService.updateProfile(
+        entry.profile_name,
+        payload as { name?: string; temperature?: number; final_weight?: number; variables?: { key: string; value: number | string }[] }
+      )
+
+      toast.success(t('profileEdit.saved'))
+      setIsEditing(false)
+      // Reload page to reflect changes (entry is read-only from parent)
+      window.location.reload()
+    } catch (err) {
+      console.error('Failed to save profile edit:', err)
+      toast.error(err instanceof Error ? err.message : t('profileEdit.saveFailed'))
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
   // Fetch machine profile ID by name
   useEffect(() => {
     const fetchMachineProfileId = async () => {
@@ -979,7 +1109,11 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onBack}
+                onClick={() => {
+                  if (hasEditChanges && !window.confirm(t('profileEdit.unsavedChanges'))) return
+                  if (isEditing) setIsEditing(false)
+                  onBack()
+                }}
                 className="shrink-0"
               >
                 <CaretLeft size={22} weight="bold" />
@@ -1022,6 +1156,18 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                   </div>
                 )}
               </div>
+              {/* Edit profile button */}
+              {entry.profile_json && !isEditing && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleStartEdit}
+                  className="shrink-0"
+                  title={t('profileEdit.editProfile')}
+                >
+                  <PencilSimple size={18} weight="bold" />
+                </Button>
+              )}
             </div>
           )}
           {isCapturing && (
@@ -1137,10 +1283,141 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
 
         {/* Right column: Profile Details */}
         <div className="desktop-panel-right">
-          {/* Profile Technical Breakdown */}
-          {entry.profile_json && (
-            <ProfileBreakdown profile={entry.profile_json as ProfileData} />
-          )}
+          <AnimatePresence mode="wait">
+            {isEditing ? (
+              <motion.div
+                key="edit-form"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-3"
+              >
+                <Label className="text-sm font-semibold tracking-wide text-primary">
+                  {t('profileEdit.title')}
+                </Label>
+                <div className="p-4 bg-secondary/60 rounded-xl border border-primary/20 space-y-4">
+                  {/* Profile Name */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t('profileEdit.profileName')}</Label>
+                    <Input
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      disabled={isSavingEdit}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+
+                  {/* Temperature */}
+                  {(entry.profile_json as ProfileData)?.temperature !== undefined && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">{t('profileEdit.temperature')} (°C)</Label>
+                      <Input
+                        type="number"
+                        min={70}
+                        max={100}
+                        step={0.5}
+                        value={editTemperature}
+                        onChange={e => setEditTemperature(e.target.value)}
+                        disabled={isSavingEdit}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* Final Weight */}
+                  {(entry.profile_json as ProfileData)?.final_weight !== undefined && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">{t('profileEdit.finalWeight')} (g)</Label>
+                      <Input
+                        type="number"
+                        min={0.1}
+                        step={0.1}
+                        value={editFinalWeight}
+                        onChange={e => setEditFinalWeight(e.target.value)}
+                        disabled={isSavingEdit}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* Adjustable Variables */}
+                  {editVariables.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">{t('profileEdit.variables')}</Label>
+                      <div className="space-y-2">
+                        {editVariables.map((v, idx) => (
+                          <div key={v.key} className="flex items-center gap-2">
+                            <span className="text-xs text-foreground/80 flex-1 min-w-0 truncate">{v.name}</span>
+                            <Input
+                              type="number"
+                              step={0.1}
+                              value={v.value}
+                              onChange={e => {
+                                const next = [...editVariables]
+                                next[idx] = { ...v, value: e.target.value }
+                                setEditVariables(next)
+                              }}
+                              disabled={isSavingEdit}
+                              className="h-8 w-24 text-sm text-right"
+                            />
+                            <span className="text-[10px] text-muted-foreground w-8">
+                              {v.type === 'pressure' && 'bar'}
+                              {v.type === 'flow' && 'ml/s'}
+                              {v.type === 'time' && 's'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Save / Cancel */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      className="flex-1 h-10 text-sm font-semibold"
+                      onClick={handleSaveEdit}
+                      disabled={isSavingEdit}
+                    >
+                      {isSavingEdit ? (
+                        <>
+                          <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
+                          {t('profileEdit.saving')}
+                        </>
+                      ) : (
+                        <>
+                          <FloppyDisk size={16} className="mr-1.5" weight="bold" />
+                          {t('common.save')}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-10 text-sm"
+                      onClick={handleCancelEdit}
+                      disabled={isSavingEdit}
+                    >
+                      {t('common.cancel')}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Still show breakdown below for reference */}
+                {entry.profile_json && (
+                  <div className="opacity-60">
+                    <ProfileBreakdown profile={entry.profile_json as ProfileData} />
+                  </div>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div key="breakdown" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                {/* Profile Technical Breakdown */}
+                {entry.profile_json && (
+                  <ProfileBreakdown profile={entry.profile_json as ProfileData} />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>{/* end right column */}
         </div>{/* end two-column wrapper */}
 
