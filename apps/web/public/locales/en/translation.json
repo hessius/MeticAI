@@ -201,7 +201,11 @@
       "modernDesc": "Contemporary art style",
       "vintage": "Vintage",
       "vintageDesc": "Retro aesthetic"
-    }
+    },
+    "notes": "Personal Notes",
+    "notesPlaceholder": "Add your tasting notes, grinder settings, or other observations...",
+    "notesSaved": "Notes saved",
+    "notesSaveFailed": "Failed to save notes"
   },
   "runShot": {
     "title": "Run / Schedule",
