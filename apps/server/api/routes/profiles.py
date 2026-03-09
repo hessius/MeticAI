@@ -247,19 +247,33 @@ async def upload_profile_image(
         
         # Find matching profile
         matching_profile = None
+        profile_fetch_error = None
         for partial_profile in profiles_result:
             if partial_profile.name == profile_name:
                 # Get full profile
                 full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
+                    # Non-UUID profile IDs cause 404 on machine API
+                    profile_fetch_error = f"Unable to fetch profile details. Profile ID '{partial_profile.id}' may be invalid (non-UUID). Consider deleting and recreating this profile."
+                    logger.warning(
+                        f"Profile found in list but fetch failed: {profile_name}",
+                        extra={
+                            "request_id": request_id,
+                            "profile_id": partial_profile.id,
+                            "error": full_profile.error
+                        }
+                    )
                     continue
                 matching_profile = full_profile
                 break
         
         if not matching_profile:
+            error_detail = f"Profile '{profile_name}' not found on machine"
+            if profile_fetch_error:
+                error_detail = profile_fetch_error
             raise HTTPException(
                 status_code=404,
-                detail=f"Profile '{profile_name}' not found on machine"
+                detail=error_detail
             )
         
         # Update the profile with the new image
@@ -1508,15 +1522,21 @@ async def list_machine_profiles(request: Request):
             try:
                 full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
-                    continue
+                    # Fall back to partial profile data (non-UUID IDs cause 404 on get)
+                    logger.warning(
+                        f"Could not fetch full profile {partial_profile.name}, using partial data",
+                        extra={"request_id": request_id, "profile_id": partial_profile.id}
+                    )
+                    full_profile = partial_profile
                 
                 # Check if this profile exists in our history
                 in_history = False
                 try:
                     history = load_history()
                     entries = history if isinstance(history, list) else history.get("entries", [])
+                    profile_name = getattr(full_profile, 'name', None) or getattr(partial_profile, 'name', None)
                     in_history = any(
-                        entry.get("profile_name") == full_profile.name 
+                        entry.get("profile_name") == profile_name 
                         for entry in entries
                     )
                 except Exception:
@@ -1524,11 +1544,11 @@ async def list_machine_profiles(request: Request):
                 
                 # Convert profile to dict
                 profile_dict = {
-                    "id": full_profile.id,
-                    "name": full_profile.name,
-                    "author": getattr(full_profile, 'author', None),
-                    "temperature": getattr(full_profile, 'temperature', None),
-                    "final_weight": getattr(full_profile, 'final_weight', None),
+                    "id": getattr(full_profile, 'id', partial_profile.id),
+                    "name": getattr(full_profile, 'name', partial_profile.name),
+                    "author": getattr(full_profile, 'author', getattr(partial_profile, 'author', None)),
+                    "temperature": getattr(full_profile, 'temperature', getattr(partial_profile, 'temperature', None)),
+                    "final_weight": getattr(full_profile, 'final_weight', getattr(partial_profile, 'final_weight', None)),
                     "in_history": in_history,
                     "has_description": False,
                     "description": None
@@ -1538,7 +1558,7 @@ async def list_machine_profiles(request: Request):
                 if in_history:
                     try:
                         for entry in entries:
-                            if entry.get("profile_name") == full_profile.name:
+                            if entry.get("profile_name") == profile_dict["name"]:
                                 if entry.get("reply"):
                                     profile_dict["has_description"] = True
                                 break
@@ -1547,10 +1567,23 @@ async def list_machine_profiles(request: Request):
                 
                 profiles.append(profile_dict)
             except Exception as e:
+                # Fall back to partial profile data on exception (e.g., 404 for non-UUID IDs)
                 logger.warning(
-                    f"Failed to fetch profile {partial_profile.name}: {e}",
+                    f"Failed to fetch profile {partial_profile.name}, using partial data: {e}",
                     extra={"request_id": request_id}
                 )
+                # Use partial profile data instead of skipping
+                profile_dict = {
+                    "id": partial_profile.id,
+                    "name": partial_profile.name,
+                    "author": getattr(partial_profile, 'author', None),
+                    "temperature": getattr(partial_profile, 'temperature', None),
+                    "final_weight": getattr(partial_profile, 'final_weight', None),
+                    "in_history": False,
+                    "has_description": False,
+                    "description": None
+                }
+                profiles.append(profile_dict)
         
         logger.info(
             f"Found {len(profiles)} profiles on machine",

@@ -4049,11 +4049,17 @@ class TestMachineProfilesEndpoint:
         mock_profile1.id = "profile-1"
         mock_profile1.name = "Good Profile"
         mock_profile1.error = None
+        mock_profile1.author = "Barista"
+        mock_profile1.temperature = 93
+        mock_profile1.final_weight = 40
         
         mock_profile2 = type('Profile', (), {})()
         mock_profile2.id = "profile-2"
         mock_profile2.name = "Bad Profile"
         mock_profile2.error = None
+        mock_profile2.author = None
+        mock_profile2.temperature = None
+        mock_profile2.final_weight = None
         
         mock_list_profiles.return_value = [mock_profile1, mock_profile2]
         
@@ -4063,7 +4069,7 @@ class TestMachineProfilesEndpoint:
         full_profile1.author = "Barista"
         full_profile1.error = None
         
-        # Second profile fetch fails
+        # Second profile fetch fails - should fall back to partial data
         mock_get_profile.side_effect = [full_profile1, Exception("Network error")]
         
         response = client.get("/api/machine/profiles")
@@ -4071,9 +4077,11 @@ class TestMachineProfilesEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["total"] == 1  # Only successful profile
-        assert len(data["profiles"]) == 1
+        # Now includes both profiles (using partial data for failed fetch)
+        assert data["total"] == 2
+        assert len(data["profiles"]) == 2
         assert data["profiles"][0]["name"] == "Good Profile"
+        assert data["profiles"][1]["name"] == "Bad Profile"  # Partial data fallback
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
@@ -9688,9 +9696,18 @@ class TestNormalizeProfileForMachine:
         result = self._normalize({"name": "X", "stages": []})
         assert "id" in result and len(result["id"]) == 36  # UUID format
 
-    def test_preserves_existing_id(self):
-        result = self._normalize({"name": "X", "id": "keep-me", "stages": []})
-        assert result["id"] == "keep-me"
+    def test_preserves_valid_uuid_id(self):
+        """Valid UUID IDs should be preserved."""
+        valid_uuid = "49cb0934-8b7c-4bb8-886d-624e5c5bf54f"
+        result = self._normalize({"name": "X", "id": valid_uuid, "stages": []})
+        assert result["id"] == valid_uuid
+
+    def test_replaces_non_uuid_id(self):
+        """Non-UUID IDs (e.g., slugs) should be replaced with a proper UUID."""
+        result = self._normalize({"name": "X", "id": "my-slug-id", "stages": []})
+        # Should be replaced with a valid UUID
+        assert result["id"] != "my-slug-id"
+        assert len(result["id"]) == 36  # UUID format
 
     def test_adds_author_and_author_id(self):
         result = self._normalize({"name": "X", "stages": []})

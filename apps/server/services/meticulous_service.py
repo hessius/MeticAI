@@ -307,7 +307,19 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
     data = dict(profile_json)  # shallow copy
 
     # ── Top-level identity & metadata ────────────────────────────────────
-    if "id" not in data or not data["id"]:
+    # Profile ID MUST be a valid UUID - the machine's /api/v1/profile/get/{id}
+    # endpoint returns 404 for non-UUID IDs (e.g. slug-style IDs like "my-profile")
+    existing_id = data.get("id", "")
+    if existing_id:
+        try:
+            uuid.UUID(existing_id)  # Validates UUID format
+        except (ValueError, AttributeError):
+            # Non-UUID ID - replace with a proper UUID to avoid 404 on fetch
+            logger.warning(
+                "Replacing non-UUID profile ID with UUID: %s", existing_id
+            )
+            existing_id = ""
+    if not existing_id:
         data["id"] = str(uuid.uuid4())
     data.setdefault("author", "MeticAI")
     if "author_id" not in data or not data["author_id"]:
