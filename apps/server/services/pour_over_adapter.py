@@ -31,7 +31,7 @@ _DOCKER_TEMPLATE_PATH = Path("/app/defaults/PourOverBase.json")
 _SEARCH_PATHS = (_TEMPLATE_PATH, _FALLBACK_TEMPLATE_PATH, _DOCKER_TEMPLATE_PATH)
 
 
-def _load_template() -> Dict[str, Any]:
+def load_pour_over_template() -> Dict[str, Any]:
     """Load the PourOverBase.json template, trying DATA_DIR first."""
     # Deduplicate while preserving order (in Docker, _FALLBACK_TEMPLATE_PATH
     # resolves to the same path as _TEMPLATE_PATH due to directory depth)
@@ -65,7 +65,7 @@ def adapt_pour_over_profile(
     Returns:
         A fully adapted profile dict ready for machine upload.
     """
-    template = _load_template()
+    template = load_pour_over_template()
     profile = copy.deepcopy(template)
 
     # ── Unique identity ──────────────────────────────────────────────────
