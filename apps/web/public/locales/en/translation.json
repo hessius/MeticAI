@@ -378,6 +378,9 @@
     "authorName": "Author Name",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"MeticAI\" if left empty.",
+    "profileManagement": "Profile Management",
+    "viewProfileCatalogue": "View Profile Catalogue",
+    "profileCatalogueDescription": "View, rename, export, and delete profiles on your Meticulous machine.",
     "mqttEnabled": "MQTT Bridge",
     "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
     "addToHomeAssistant": "Add to Home Assistant",
@@ -892,6 +895,22 @@
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Pour to {{weight}}g",
     "recipeWait": "Wait {{seconds}}s"
+  },
+  "profileCatalogue": {
+    "title": "Profile Catalogue",
+    "description": "{{count}} profiles on your machine",
+    "refresh": "Refresh",
+    "noProfiles": "No profiles found on the machine",
+    "inHistory": "In history",
+    "rename": "Rename",
+    "delete": "Delete",
+    "export": "Export JSON",
+    "confirmDelete": "Delete",
+    "cancel": "Cancel",
+    "nameRequired": "Profile name is required",
+    "renamed": "Profile renamed to '{{name}}'",
+    "deleted": "Profile deleted",
+    "exported": "Profile exported"
   },
   "results": {
     "profileGenerated": "Profile Generated!",

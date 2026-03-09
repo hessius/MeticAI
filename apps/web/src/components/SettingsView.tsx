@@ -28,7 +28,8 @@ import {
   Copy,
   Question,
   Code,
-  Info
+  Info,
+  Coffee
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
@@ -39,6 +40,7 @@ import { LanguageSelector } from '@/components/LanguageSelector'
 
 interface SettingsViewProps {
   onBack: () => void
+  onViewProfileCatalogue?: () => void
   showBlobs?: boolean
   onToggleBlobs?: () => void
   isDark?: boolean
@@ -95,7 +97,7 @@ const PROGRESS_UPDATE_INTERVAL = 500
 const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
 const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
-export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
+export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
   
   const [settings, setSettings] = useState<Settings>({
@@ -917,6 +919,26 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 {t('settings.authorNameDescription')}
               </p>
             </div>
+
+            {/* Profile Management */}
+            {onViewProfileCatalogue && (
+              <div className="space-y-3 pt-2 border-t border-border">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  {t('settings.profileManagement')}
+                </h3>
+                <Button
+                  variant="outline"
+                  onClick={onViewProfileCatalogue}
+                  className="w-full justify-start"
+                >
+                  <Coffee className="w-4 h-4 mr-2" />
+                  {t('settings.viewProfileCatalogue')}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.profileCatalogueDescription')}
+                </p>
+              </div>
+            )}
 
             {/* MQTT Bridge */}
             <div className="space-y-3 pt-2 border-t border-border">

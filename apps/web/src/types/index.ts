@@ -121,7 +121,8 @@ export type ViewState =
   | 'run-shot'
   | 'pour-over'
   | 'live-shot'
-  | 'shot-history';
+  | 'shot-history'
+  | 'profile-catalogue';
 
 // ============================================================================
 // Tag Types
