@@ -17,10 +17,10 @@
     "grind_setting": "Coarse"
   },
   "protocol": [
-    { "step": 1, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "First pour — controls sweetness" },
+    { "step": 1, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "First pour — controls sweetness" },
     { "step": 2, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Second pour — controls sweetness" },
+    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Second pour — controls sweetness" },
     { "step": 4, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 5, "action": "pour", "water_g": 180, "duration_s": 90, "notes": "Single combined strength pour to 300g total" }
+    { "step": 5, "action": "pour", "water_g": 180, "duration_s": 45, "notes": "Single combined strength pour to 300g total" }
   ]
 }

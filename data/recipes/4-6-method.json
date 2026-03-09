@@ -17,14 +17,14 @@
     "grind_setting": "Coarse"
   },
   "protocol": [
-    { "step": 1, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "First pour — controls sweetness" },
+    { "step": 1, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "First pour — controls sweetness" },
     { "step": 2, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Second pour — controls sweetness" },
+    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Second pour — controls sweetness" },
     { "step": 4, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 5, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Third pour — controls strength" },
+    { "step": 5, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Third pour — controls strength" },
     { "step": 6, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 7, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Fourth pour — controls strength" },
+    { "step": 7, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Fourth pour — controls strength" },
     { "step": 8, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
-    { "step": 9, "action": "pour", "water_g": 60, "duration_s": 45, "notes": "Fifth pour — controls strength" }
+    { "step": 9, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Fifth pour — controls strength" }
   ]
 }
