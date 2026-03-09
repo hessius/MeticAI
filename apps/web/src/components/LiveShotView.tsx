@@ -100,12 +100,19 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const chartDataRef = useRef<ChartDataPoint[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [shotComplete, setShotComplete] = useState(false)
-  const wasBrewingRef = useRef(machineState.brewing)
   const renderFrameRef = useRef<number | null>(null)
   const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
   const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+
+  // Summary stats (computed once when shot completes via brewing-detection cleanup)
+  const [summary, setSummary] = useState<{
+    totalTime: number
+    finalWeight: number
+    avgPressure: number
+    avgFlow: number
+  } | null>(null)
 
   // Use machine state from props directly
   const ms = machineState
@@ -150,17 +157,29 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     fetchData()
   }, [ms.active_profile])
 
+  // Detect shot completion: when ms.brewing transitions from true→false,
+  // the cleanup fires to mark the shot complete and compute summary stats.
+  useEffect(() => {
+    if (!ms.brewing) return
+    // Brewing is active — return cleanup that fires when it stops
+    return () => {
+      setShotComplete(true)
+      const data = chartDataRef.current
+      if (data.length > 0) {
+        const totalTime = data[data.length - 1].time
+        const finalWeight = data[data.length - 1].weight ?? 0
+        const avgPressure =
+          data.reduce((s, p) => s + (p.pressure ?? 0), 0) / data.length
+        const avgFlow =
+          data.reduce((s, p) => s + (p.flow ?? 0), 0) / data.length
+        setSummary({ totalTime, finalWeight, avgPressure, avgFlow })
+      }
+    }
+  }, [ms.brewing])
+
   // Accumulate data from WebSocket frames — push + rAF for O(1) per frame
   useEffect(() => {
-    if (!ms.brewing) {
-      // Shot just ended
-      if (wasBrewingRef.current) {
-        setShotComplete(true)
-      }
-      wasBrewingRef.current = false
-      return
-    }
-    wasBrewingRef.current = true
+    if (!ms.brewing) return
 
     const point: ChartDataPoint = {
       time: ms.shot_timer ?? 0,
@@ -304,19 +323,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 
   // Current stage name (from latest data point)
   const currentStageName = ms.state ?? null
-
-  // Summary stats (computed once when shot completes)
-  const summary = useMemo(() => {
-    if (!shotComplete || chartDataRef.current.length === 0) return null
-    const data = chartDataRef.current
-    const totalTime = data[data.length - 1].time
-    const finalWeight = data[data.length - 1].weight ?? 0
-    const avgPressure =
-      data.reduce((s, p) => s + (p.pressure ?? 0), 0) / data.length
-    const avgFlow =
-      data.reduce((s, p) => s + (p.flow ?? 0), 0) / data.length
-    return { totalTime, finalWeight, avgPressure, avgFlow }
-  }, [shotComplete])
 
   return (
     <motion.div

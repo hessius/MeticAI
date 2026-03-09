@@ -1,25 +1,25 @@
-import { useEffect, useState } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 
 const DESKTOP_BREAKPOINT = 1024
 
 /**
  * Hook to detect if the current device is a desktop
  * Returns true if the viewport width is >= 1024px (Tailwind `lg:` breakpoint)
- * @returns boolean True if on desktop, false if on mobile/tablet, undefined during initial render
+ * @returns boolean True if on desktop, false if on mobile/tablet, undefined during SSR
  */
 export function useIsDesktop(): boolean | undefined {
-  const [isDesktop, setIsDesktop] = useState<boolean | undefined>(undefined)
-
-  useEffect(() => {
+  const subscribe = useCallback((cb: () => void) => {
     const mql = window.matchMedia(`(min-width: ${DESKTOP_BREAKPOINT}px)`)
-    const onChange = () => {
-      setIsDesktop(mql.matches)
-    }
-    // Set initial value
-    setIsDesktop(mql.matches)
-    mql.addEventListener("change", onChange)
-    return () => mql.removeEventListener("change", onChange)
+    mql.addEventListener("change", cb)
+    return () => mql.removeEventListener("change", cb)
   }, [])
 
-  return isDesktop
+  const getSnapshot = useCallback(
+    () => window.matchMedia(`(min-width: ${DESKTOP_BREAKPOINT}px)`).matches,
+    [],
+  )
+
+  const getServerSnapshot = useCallback(() => undefined as boolean | undefined, [])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }

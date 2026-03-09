@@ -100,7 +100,10 @@ export function useWebSocket(enabled: boolean): MachineState {
   const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retriesRef = useRef(0)
   const enabledRef = useRef(enabled)
-  enabledRef.current = enabled
+  const connectRef = useRef<(() => Promise<void>) | null>(null)
+  useEffect(() => {
+    enabledRef.current = enabled
+  })
 
   const resetStaleTimer = useCallback(() => {
     if (staleTimerRef.current) clearTimeout(staleTimerRef.current)
@@ -199,9 +202,13 @@ export function useWebSocket(enabled: boolean): MachineState {
         RECONNECT_MAX_MS,
       )
       retriesRef.current++
-      reconnectRef.current = setTimeout(connect, delay)
+      reconnectRef.current = setTimeout(() => connectRef.current?.(), delay)
     }
   }, [resetStaleTimer])
+
+  useEffect(() => {
+    connectRef.current = connect
+  })
 
   useEffect(() => {
     if (enabled) {
@@ -212,6 +219,7 @@ export function useWebSocket(enabled: boolean): MachineState {
         wsRef.current.close()
         wsRef.current = null
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset state on WebSocket teardown
       setState(INITIAL_STATE)
     }
 

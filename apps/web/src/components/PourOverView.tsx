@@ -379,7 +379,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [baseElapsedMs, setBaseElapsedMs] = useState(0)
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
-  const [tick, setTick] = useState(0)
+  const [elapsedMs, setElapsedMs] = useState(baseElapsedMs)
   const [doseGrams, setDoseGrams] = useState('20')
   const [brewRatio, setBrewRatio] = useState('15')
   const [autoStartEnabled, setAutoStartEnabled] = useState(true)
@@ -397,6 +397,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [recipeShowBreakdown, setRecipeShowBreakdown] = useState(false)
   // 'weight': advance pour steps when scale reaches target; 'time': advance all steps by timer
   const [recipeProgressionMode, setRecipeProgressionMode] = useState<'weight' | 'time'>('weight')
+  // Cumulative time offset from manually skipped step durations
+  const [stepTimeOffsetMs, setStepTimeOffsetMs] = useState(0)
 
   // Machine integration state
   const [meticulousIntegration, setMeticulousIntegration] = useState(false)
@@ -579,28 +581,29 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     cmd(tareScale, 'tared')
   }, [cmd])
 
-  useEffect(() => {
-    if (!isRunning) return
-    const id = window.setInterval(() => setTick(prev => prev + 1), 50)
-    return () => window.clearInterval(id)
-  }, [isRunning])
+  // Sync elapsedMs with baseElapsedMs when timer is not running
+  if ((!isRunning || startedAtMs === null) && elapsedMs !== baseElapsedMs) {
+    setElapsedMs(baseElapsedMs)
+  }
 
-  const elapsedMs = useMemo(() => {
-    if (!isRunning || startedAtMs === null) {
-      return baseElapsedMs
-    }
-    return baseElapsedMs + (Date.now() - startedAtMs)
-  }, [baseElapsedMs, isRunning, startedAtMs, tick])
+  // While running, update elapsedMs every 50ms via interval callback
+  useEffect(() => {
+    if (!isRunning || startedAtMs === null) return
+    const id = window.setInterval(() => {
+      setElapsedMs(baseElapsedMs + (performance.now() - startedAtMs))
+    }, 50)
+    return () => window.clearInterval(id)
+  }, [isRunning, startedAtMs, baseElapsedMs])
 
   const startTimer = useCallback((backdateMs = 0) => {
     // backdateMs: how far back to set the timer (for auto-start confirmation delay)
-    setStartedAtMs(Date.now() - backdateMs)
+    setStartedAtMs(performance.now() - backdateMs)
     setIsRunning(true)
   }, [])
 
   const pauseTimer = useCallback(() => {
     if (startedAtMs !== null) {
-      setBaseElapsedMs(prev => prev + (Date.now() - startedAtMs))
+      setBaseElapsedMs(prev => prev + (performance.now() - startedAtMs))
     }
     setStartedAtMs(null)
     setIsRunning(false)
@@ -620,6 +623,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     setStartedAtMs(null)
     setBaseElapsedMs(0)
     setRecipeCurrentStep(0)
+    setStepTimeOffsetMs(0)
     // Reset graph data when timer is reset
     setWeightTrend([])
     trendStartTimestampRef.current = null
@@ -667,6 +671,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
     // Machine started brewing → transition to brewing phase
     if (!wasBrewing && isBrewing && machineLifecycle === 'ready') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to external machine state transition (WebSocket)
       setMachineLifecycle('brewing')
       // Auto-start the local timer when machine starts brewing
       startTimer()
@@ -678,7 +683,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       const endMs = startedAtMs !== null
         ? baseElapsedMs + (Date.now() - startedAtMs)
         : baseElapsedMs
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to external machine state transition (WebSocket)
       setMachineEndElapsedMs(endMs)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMachineLifecycle('drawdown')
       // Cleanup profile in background — timer continues for drawdown timing
       cleanupPourOver()
@@ -702,7 +709,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       const endMs = startedAtMs !== null
         ? baseElapsedMs + (Date.now() - startedAtMs)
         : baseElapsedMs
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to external machine state (click-to-purge detected via WebSocket)
       setMachineEndElapsedMs(endMs)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMachineLifecycle('drawdown')
       // Cleanup profile in background — timer continues for drawdown timing
       cleanupPourOver()
@@ -846,6 +855,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     setStartedAtMs(null)
     setBaseElapsedMs(0)
     setRecipeCurrentStep(0)
+    setStepTimeOffsetMs(0)
     // Clear graph
     setWeightTrend([])
     trendStartTimestampRef.current = null
@@ -953,6 +963,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // ── Load recipes when entering recipe mode ──
   useEffect(() => {
     if (mode !== 'recipe' || recipes.length > 0 || recipesLoading) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag before async fetch
     setRecipesLoading(true)
     getRecipes()
       .then(r => { setRecipes(r); setRecipesLoading(false) })
@@ -974,15 +985,18 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (timing.action === 'pour' && recipeProgressionMode === 'weight') {
       // Pour steps: advance on weight with ±5g tolerance
       if (weight >= timing.cumulativeWeight - 5 && timing.cumulativeWeight > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- timer/weight-driven step advance
         setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))
       }
     } else {
       // Bloom, wait, swirl, stir (and pour in time mode): advance on elapsed time
-      if (timeMs >= timing.endTimeSec * 1000) {
+      // stepTimeOffsetMs accounts for manually-skipped step durations
+      if (timeMs + stepTimeOffsetMs >= timing.endTimeSec * 1000) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- timer/weight-driven step advance
         setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))
       }
     }
-  }, [mode, recipeTimings, recipeCurrentStep, isRunning, weight, elapsedMs, recipeProgressionMode, meticulousIntegration, machineState.shot_timer])
+  }, [mode, recipeTimings, recipeCurrentStep, isRunning, weight, elapsedMs, recipeProgressionMode, meticulousIntegration, machineState.shot_timer, stepTimeOffsetMs])
 
   return (
     <motion.div
@@ -1167,8 +1181,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               const pourProgress = isPourStep && timing.cumulativeWeight > prevCw
                 ? Math.min(100, ((weight - prevCw) / (timing.cumulativeWeight - prevCw)) * 100)
                 : 0
+              const effectiveTimeMs = meticulousIntegration ? (machineState.shot_timer ?? 0) * 1000 : elapsedMs
               const stepEndMs = timing.endTimeSec * 1000
-              const remaining = Math.max(0, stepEndMs - elapsedMs)
+              const remaining = Math.max(0, stepEndMs - (effectiveTimeMs + stepTimeOffsetMs))
               const overallProgress = recipeCurrentStep / recipeTimings.length
 
               return (
@@ -1215,7 +1230,17 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     variant="outline"
                     size="sm"
                     className="w-full h-8 text-xs"
-                    onClick={() => setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))}
+                    onClick={() => {
+                      const t = recipeTimings[recipeCurrentStep]
+                      if (t) {
+                        const timeMs = meticulousIntegration
+                          ? (machineState.shot_timer ?? 0) * 1000
+                          : elapsedMs
+                        const skipMs = Math.max(0, t.endTimeSec * 1000 - (timeMs + stepTimeOffsetMs))
+                        setStepTimeOffsetMs(prev => prev + skipMs)
+                      }
+                      setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))
+                    }}
                     disabled={recipeCurrentStep >= recipeTimings.length - 1}
                   >
                     {t('pourOver.nextStep')}
@@ -1446,7 +1471,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     {recipes.map(recipe => (
                       <button
                         key={recipe.slug}
-                        onClick={() => { setSelectedRecipe(recipe); setRecipeCurrentStep(0); setRecipeShowBreakdown(false) }}
+                        onClick={() => { setSelectedRecipe(recipe); setRecipeCurrentStep(0); setStepTimeOffsetMs(0); setRecipeShowBreakdown(false) }}
                         className="w-full text-left p-3 rounded-xl border border-border/60 bg-secondary/40 hover:bg-secondary/60 transition-colors space-y-1.5"
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -1479,7 +1504,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                         variant="ghost"
                         size="sm"
                         className="h-8 text-xs shrink-0"
-                        onClick={() => { setSelectedRecipe(null); setRecipeCurrentStep(0); setRecipeShowBreakdown(false) }}
+                        onClick={() => { setSelectedRecipe(null); setRecipeCurrentStep(0); setStepTimeOffsetMs(0); setRecipeShowBreakdown(false) }}
                       >
                         {t('pourOver.changeRecipe')}
                       </Button>

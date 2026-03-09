@@ -91,11 +91,14 @@ function Carousel({
 
   useEffect(() => {
     if (!api || !setApi) return
-    setApi(api)
+    // Defer to avoid synchronous cascading setState (shadcn pattern)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- propagating embla API to parent via callback prop; no alternative without changing the public component API
+    queueMicrotask(() => setApi(api))
   }, [api, setApi])
 
   useEffect(() => {
     if (!api) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial carousel scroll-state sync (shadcn pattern)
     onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)

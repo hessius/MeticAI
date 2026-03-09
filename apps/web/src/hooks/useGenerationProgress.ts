@@ -76,8 +76,6 @@ export function useGenerationProgress(active: boolean): UseGenerationProgressRet
 
   useEffect(() => {
     if (!active) {
-      close()
-      setProgress(null)
       return
     }
 
@@ -128,6 +126,7 @@ export function useGenerationProgress(active: boolean): UseGenerationProgressRet
     return () => {
       cancelled = true
       close()
+      setProgress(null)
     }
   }, [active, close])
 
