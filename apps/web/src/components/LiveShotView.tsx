@@ -33,7 +33,7 @@ import {
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { continueShot, stopShot, abortShot, purge, tareScale } from '@/lib/mqttCommands'
+import { useMachineService } from '@/hooks/useMachineService'
 import { EspressoChart } from '@/components/charts'
 import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
 import { extractStageRanges, STAGE_COLORS, STAGE_BORDER_COLORS } from '@/components/charts/chartConstants'
@@ -226,6 +226,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 
   // Command helper from shared hook
   const { cmd } = useMachineActions(machineState)
+  const machine = useMachineService()
 
   // Compute stage ranges from data
   const stages = useMemo(
@@ -478,7 +479,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       value={ms.shot_weight?.toFixed(1) ?? '0.0'}
                       unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
                       label={t('controlCenter.metrics.weight')}
-                      onClick={() => cmd(tareScale, 'tared')}
+                      onClick={() => cmd(() => machine.tareScale(), 'tared')}
                     />
                     <MetricTile
                       icon={<Thermometer size={14} />}
@@ -509,7 +510,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       <Button
                         variant="default"
                         className="h-11 px-6"
-                        onClick={() => cmd(continueShot, 'startingShot')}
+                        onClick={() => cmd(() => machine.continueShot(), 'startingShot')}
                       >
                         <Play size={18} weight="fill" className="mr-2" />
                         {t('controlCenter.actions.start')}
@@ -528,7 +529,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => cmd(abortShot, 'warmupCancelled')}>{t('common.confirm')}</AlertDialogAction>
+                            <AlertDialogAction onClick={() => cmd(() => machine.abortShot(), 'warmupCancelled')}>{t('common.confirm')}</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -648,7 +649,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => cmd(stopShot, 'stopping')}>{t('common.confirm')}</AlertDialogAction>
+                    <AlertDialogAction onClick={() => cmd(() => machine.stopShot(), 'stopping')}>{t('common.confirm')}</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -694,7 +695,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 <Button
                   variant="outline"
                   className="h-11 px-6"
-                  onClick={() => cmd(purge, 'purging')}
+                  onClick={() => cmd(() => machine.purge(), 'purging')}
                 >
                   <Drop size={16} weight="fill" className="mr-2" />
                   {t('controlCenter.liveShot.purgeAfterShot')}

@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { tareScale, continueShot, stopShot } from '@/lib/mqttCommands'
+import { useMachineService } from '@/hooks/useMachineService'
 import { preparePourOver, cleanupPourOver, forceCleanupPourOver, getPourOverPreferences, savePourOverPreferences } from '@/lib/pourOverApi'
 import type { PourOverPreferences } from '@/lib/pourOverApi'
 import { getRecipes, prepareRecipe } from '@/lib/pourOverApi'
@@ -536,6 +536,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const FLOW_WEIGHT_ESCAPE_G = 3
 
   const { cmd, isBrewing, isConnected, canStart, isClickToPurge } = useMachineActions(machineState)
+  const machine = useMachineService()
 
   // Keep machineStateRef in sync with the latest prop value
   useEffect(() => {
@@ -578,8 +579,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     flowStartWeightRef.current = null
     setFlowRate(0)
     // Send tare command
-    cmd(tareScale, 'tared')
-  }, [cmd])
+    cmd(() => machine.tareScale(), 'tared')
+  }, [cmd, machine])
 
   // Sync elapsedMs with baseElapsedMs when timer is not running
   if ((!isRunning || startedAtMs === null) && elapsedMs !== baseElapsedMs) {
@@ -748,13 +749,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       // 1. First continue advances past the temperature control phase.
       // 2. Wait for machine to reach "Click to start" (press-to-start state).
       // 3. Second continue actually begins extraction.
-      await cmd(continueShot, 'started')
+      await cmd(() => machine.continueShot(), 'started')
       try {
         await waitForState('click to start')
       } catch {
         // Timeout — machine may already be past this state; try anyway
       }
-      await cmd(continueShot, 'started')
+      await cmd(() => machine.continueShot(), 'started')
     } catch (err) {
       setMachineLifecycle('error')
       toast.error(
@@ -763,7 +764,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           : t('pourOver.integration.prepareFailed'),
       )
     }
-  }, [meticulousIntegration, machineLifecycle, targetWeight, bloomEnabled, bloomSeconds, doseGrams, brewRatio, t, cmd, waitForState])
+  }, [meticulousIntegration, machineLifecycle, targetWeight, bloomEnabled, bloomSeconds, doseGrams, brewRatio, t, cmd, waitForState, machine])
 
   // ── Machine integration: handle abort / stop ──
   const handleMachineStop = useCallback(async () => {
@@ -772,7 +773,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (machineLifecycle === 'brewing') {
       // User manually aborted — stop shot, purge, delete
       try {
-        await cmd(stopShot, 'stopped')
+        await cmd(() => machine.stopShot(), 'stopped')
       } catch {
         // Machine stop may fail (e.g. already stopped) — continue with cleanup
       }
@@ -817,13 +818,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       await prepareRecipe(selectedRecipe.slug)
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
-      await cmd(continueShot, 'started')
+      await cmd(() => machine.continueShot(), 'started')
       try {
         await waitForState('click to start')
       } catch {
         // Timeout — machine may already be past this state; try anyway
       }
-      await cmd(continueShot, 'started')
+      await cmd(() => machine.continueShot(), 'started')
     } catch (err) {
       setMachineLifecycle('error')
       toast.error(err instanceof Error ? err.message : t('pourOver.integration.prepareFailed'))
@@ -866,8 +867,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     setFlowRate(0)
     // Tare the scale
     justTaredRef.current = true
-    cmd(tareScale, 'tared')
-  }, [cmd])
+    cmd(() => machine.tareScale(), 'tared')
+  }, [cmd, machine])
 
   useEffect(() => {
     const currentWeight = machineState.shot_weight

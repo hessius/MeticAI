@@ -94,6 +94,23 @@ vi.mock('@/hooks/useMachineActions', () => ({
   useMachineActions: () => mockMachineActions,
 }))
 
+vi.mock('@/hooks/useMachineService', () => ({
+  useMachineService: () => ({
+    name: 'MockMachineService',
+    startShot: vi.fn().mockResolvedValue({ success: true }),
+    stopShot: vi.fn().mockResolvedValue({ success: true }),
+    abortShot: vi.fn().mockResolvedValue({ success: true }),
+    continueShot: vi.fn().mockResolvedValue({ success: true }),
+    preheat: vi.fn().mockResolvedValue({ success: true }),
+    tareScale: vi.fn().mockResolvedValue({ success: true }),
+    homePlunger: vi.fn().mockResolvedValue({ success: true }),
+    purge: vi.fn().mockResolvedValue({ success: true }),
+    loadProfile: vi.fn().mockResolvedValue({ success: true }),
+    setBrightness: vi.fn().mockResolvedValue({ success: true }),
+    enableSounds: vi.fn().mockResolvedValue({ success: true }),
+  }),
+}))
+
 vi.mock('@/lib/mqttCommands', () => ({
   tareScale: 'tare_scale',
   startShot: vi.fn().mockResolvedValue({ success: true }),
