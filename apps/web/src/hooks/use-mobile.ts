@@ -14,5 +14,7 @@ export function useIsMobile() {
     [],
   )
 
-  return useSyncExternalStore(subscribe, getSnapshot, () => false)
+  const getServerSnapshot = useCallback(() => false, [])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }
