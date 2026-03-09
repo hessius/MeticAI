@@ -113,16 +113,14 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     !machineState.active_profile.startsWith('MeticAI '))
     ? machineState.active_profile : null
 
-  // Reset dependent state when active profile changes (adjusting state during render)
-  const [prevProfile, setPrevProfile] = useState(activeProfile)
-  if (prevProfile !== activeProfile) {
-    setPrevProfile(activeProfile)
+  // Reset dependent state when active profile is cleared
+  useEffect(() => {
     if (!activeProfile) {
       setProfileImgUrl(null)
       setProfileImgError(false)
       setProfileAuthor(null)
     }
-  }
+  }, [activeProfile])
 
   useEffect(() => {
     let cancelled = false

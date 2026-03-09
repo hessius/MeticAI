@@ -61,7 +61,7 @@ def _save_annotations(data: dict) -> None:
     """Save annotations to disk and update cache."""
     global _annotations_cache
     _ensure_file()
-    atomic_write_json(str(ANNOTATIONS_FILE), data)
+    atomic_write_json(ANNOTATIONS_FILE, data)
     _annotations_cache = data
 
 

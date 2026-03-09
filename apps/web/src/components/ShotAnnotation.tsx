@@ -25,8 +25,9 @@ export function ShotAnnotation({ date, filename, className = '' }: ShotAnnotatio
     const fetchAnnotation = async () => {
       setIsLoading(true)
       try {
+        const serverUrl = await getServerUrl()
         const response = await fetch(
-          `${getServerUrl()}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`
+          `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`
         )
         if (response.ok) {
           const data = await response.json()
@@ -49,8 +50,9 @@ export function ShotAnnotation({ date, filename, className = '' }: ShotAnnotatio
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
+      const serverUrl = await getServerUrl()
       const response = await fetch(
-        `${getServerUrl()}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`,
+        `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },

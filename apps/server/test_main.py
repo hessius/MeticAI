@@ -12254,3 +12254,142 @@ class TestPrepareRecipeEndpoint:
         )
         assert response.status_code == 422
 
+
+# ============================================================================
+# Shot Annotation Endpoint Tests
+# ============================================================================
+
+
+class TestShotAnnotationEndpoints:
+    """Tests for GET/PATCH /api/shots/{date}/{filename}/annotation."""
+
+    @pytest.fixture(autouse=True)
+    def isolate_annotations(self, tmp_path, monkeypatch):
+        """Redirect annotations storage to a temp dir and clear the cache."""
+        import services.shot_annotations_service as svc
+        annotations_file = tmp_path / "shot_annotations.json"
+        monkeypatch.setattr(svc, "ANNOTATIONS_FILE", annotations_file)
+        svc.invalidate_cache()
+        yield
+        svc.invalidate_cache()
+
+    def test_get_annotation_missing_returns_null(self, client):
+        """GET annotation for a shot with no saved annotation returns null."""
+        response = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["annotation"] is None
+
+    def test_create_annotation(self, client):
+        """PATCH creates a new annotation and returns it."""
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Great shot, nice crema."},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["annotation"] == "Great shot, nice crema."
+        assert data["updated_at"] is not None
+
+    def test_update_annotation(self, client):
+        """PATCH updates an existing annotation."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "First note."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Updated note."},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["annotation"] == "Updated note."
+
+    def test_get_annotation_after_create(self, client):
+        """GET returns the annotation after it has been created."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Tasty."},
+        )
+        response = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert response.status_code == 200
+        assert response.json()["annotation"] == "Tasty."
+
+    def test_clear_annotation_via_empty_string(self, client):
+        """PATCH with empty string clears the annotation (returns null)."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Remove me."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": ""},
+        )
+        assert response.status_code == 200
+        assert response.json()["annotation"] is None
+        # GET should also return null after clearing
+        get_resp = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert get_resp.json()["annotation"] is None
+
+    def test_clear_annotation_via_whitespace_only(self, client):
+        """PATCH with whitespace-only string clears the annotation."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Remove me."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "   "},
+        )
+        assert response.status_code == 200
+        assert response.json()["annotation"] is None
+
+    def test_patch_missing_annotation_field_defaults_to_clear(self, client):
+        """PATCH body with no annotation key defaults to clearing."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Something."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={},
+        )
+        assert response.status_code == 200
+        assert response.json()["annotation"] is None
+
+    def test_patch_invalid_json_body_returns_error(self, client):
+        """PATCH with invalid JSON body returns a 4xx error."""
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            content=b"not json at all",
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code in (400, 422, 500)
+
+    def test_annotations_are_isolated_per_shot(self, client):
+        """Annotations for different shots do not bleed into each other."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Shot one."},
+        )
+        client.patch(
+            "/api/shots/2024-01-15/shot_002.json/annotation",
+            json={"annotation": "Shot two."},
+        )
+        r1 = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        r2 = client.get("/api/shots/2024-01-15/shot_002.json/annotation")
+        assert r1.json()["annotation"] == "Shot one."
+        assert r2.json()["annotation"] == "Shot two."
+
+    def test_annotation_markdown_content_preserved(self, client):
+        """Annotation text with markdown is stored and returned verbatim."""
+        md = "## Notes\n\n- Bold flavour\n- **Nice** crema"
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": md},
+        )
+        response = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert response.json()["annotation"] == md
+
