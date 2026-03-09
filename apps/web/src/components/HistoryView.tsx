@@ -39,6 +39,7 @@ import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { getServerUrl } from '@/lib/config'
+import { getShowAiInHistory } from '@/lib/aiPreferences'
 import { 
   extractTagsFromPreferences, 
   getAllTagsFromEntries, 
@@ -1059,7 +1060,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
         {/* Left column: Content */}
         <div className="space-y-4 desktop-panel-left">
         <div className="space-y-4">
-          {entry.coffee_analysis && (
+          {entry.coffee_analysis && getShowAiInHistory() && (
             <motion.div 
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
