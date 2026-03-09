@@ -605,7 +605,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                 <div className="flex flex-wrap gap-2">
                   {infoVars.map((variable, idx) => {
                     // Format the display value based on the variable type and key
-                    let displayValue: string
+                    let displayValue = ''
                     if (variable.type === 'weight') {
                       // Weight type displays as grams
                       displayValue = `${variable.value}g`
