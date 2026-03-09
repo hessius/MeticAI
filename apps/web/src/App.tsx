@@ -653,8 +653,8 @@ function App() {
     }
   }
 
-  const canSubmit = !!(aiAvailable && (imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0))
   const aiAvailable = isAiConfigured && aiEnabled
+  const canSubmit = !!(aiAvailable && (imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0))
 
   // Phase 3 layout helpers
   const showControlCenter = mqttEnabled && machineState._wsConnected
