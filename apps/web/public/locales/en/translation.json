@@ -373,6 +373,8 @@
     "meticulousIp": "Meticulous Machine IP",
     "meticulousIpPlaceholder": "e.g., 192.168.1.100",
     "meticulousIpDescription": "The IP address of your Meticulous espresso machine on your local network",
+    "detect": "Detect",
+    "machineFound": "Found {{hostname}}",
     "authorName": "Author Name",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"MeticAI\" if left empty.",

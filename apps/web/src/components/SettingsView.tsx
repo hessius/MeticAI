@@ -111,6 +111,15 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [errorMessage, setErrorMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   
+  // Machine auto-detect
+  const [isDetecting, setIsDetecting] = useState(false)
+  const [detectResult, setDetectResult] = useState<{
+    found: boolean
+    ip?: string
+    hostname?: string
+    guidance?: string
+  } | null>(null)
+  
   // Version info
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
   
@@ -370,6 +379,33 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const handleChange = (field: keyof Settings, value: string) => {
     setSettings(prev => ({ ...prev, [field]: value }))
     setSaveStatus('idle')
+  }
+
+  const handleDetectMachine = async () => {
+    setIsDetecting(true)
+    setDetectResult(null)
+    
+    try {
+      const response = await fetch(`${getServerUrl()}/api/machine/detect`, {
+        method: 'POST',
+      })
+      
+      const result = await response.json()
+      setDetectResult(result)
+      
+      if (result.found && result.ip) {
+        // Auto-fill the IP field
+        handleChange('meticulousIp', result.ip)
+      }
+    } catch (error) {
+      console.error('Machine detection failed:', error)
+      setDetectResult({
+        found: false,
+        guidance: 'Detection failed. Please check your network connection and try again.',
+      })
+    } finally {
+      setIsDetecting(false)
+    }
   }
 
   const handleCopyText = async (value: string) => {
@@ -821,13 +857,45 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
                 {t('settings.meticulousIp')}
               </Label>
-              <Input
-                id="meticulousIp"
-                type="text"
-                value={settings.meticulousIp}
-                onChange={(e) => handleChange('meticulousIp', e.target.value)}
-                placeholder={t('settings.meticulousIpPlaceholder')}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="meticulousIp"
+                  type="text"
+                  value={settings.meticulousIp}
+                  onChange={(e) => handleChange('meticulousIp', e.target.value)}
+                  placeholder={t('settings.meticulousIpPlaceholder')}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  onClick={handleDetectMachine}
+                  disabled={isDetecting}
+                  className="shrink-0"
+                >
+                  {isDetecting ? (
+                    <ArrowsClockwise className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <WifiHigh className="w-4 h-4 mr-1" />
+                      {t('settings.detect')}
+                    </>
+                  )}
+                </Button>
+              </div>
+              {detectResult && (
+                <div className={`text-xs p-2 rounded ${detectResult.found ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200'}`}>
+                  {detectResult.found ? (
+                    <span>
+                      <CheckCircle className="w-3 h-3 inline mr-1" />
+                      {t('settings.machineFound', { hostname: detectResult.hostname || detectResult.ip })}
+                    </span>
+                  ) : (
+                    <span>{detectResult.guidance}</span>
+                  )}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {t('settings.meticulousIpDescription')}
               </p>
