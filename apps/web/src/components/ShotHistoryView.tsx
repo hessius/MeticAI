@@ -41,6 +41,7 @@ import {
 import { domToPng } from 'modern-screenshot'
 import { useShotHistory, ShotInfo, ShotData } from '@/hooks/useShotHistory'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
+import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
 import { format, formatDistanceToNow } from 'date-fns'
@@ -2232,6 +2233,15 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
                         </div>
                       </div>
                       </div>{/* End of analysisCardRef */}
+                      
+                      {/* Shot Annotation */}
+                      {selectedShot && (
+                        <ShotAnnotation
+                          date={selectedShot.date}
+                          filename={selectedShot.filename}
+                          className="pt-4 border-t border-border/30"
+                        />
+                      )}
                       
                       {/* Action buttons - stacked vertically for mobile */}
                       <div className="flex flex-col gap-2 pt-2">

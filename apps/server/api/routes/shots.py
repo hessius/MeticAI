@@ -900,3 +900,69 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "LLM shot analysis failed"}
         )
+
+
+# ============================================================================
+# Shot Annotations
+# ============================================================================
+
+
+@router.get("/api/shots/{date}/{filename}/annotation")
+async def get_shot_annotation(date: str, filename: str, request: Request):
+    """Get the user annotation for a specific shot.
+    
+    Args:
+        date: Shot date (e.g., "2024-01-15")
+        filename: Shot filename (e.g., "shot_001.json")
+    
+    Returns:
+        Annotation text if exists, null otherwise.
+    """
+    from services.shot_annotations_service import get_annotation
+    
+    annotation = get_annotation(date, filename)
+    return {
+        "status": "success",
+        "annotation": annotation,
+    }
+
+
+@router.patch("/api/shots/{date}/{filename}/annotation")
+async def update_shot_annotation(date: str, filename: str, request: Request):
+    """Update the user annotation for a specific shot.
+    
+    Args:
+        date: Shot date (e.g., "2024-01-15")
+        filename: Shot filename (e.g., "shot_001.json")
+        
+    Body:
+        annotation: Markdown text for the annotation (empty to clear)
+    
+    Returns:
+        Updated annotation entry.
+    """
+    from services.shot_annotations_service import set_annotation
+    
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        annotation_text = body.get("annotation", "")
+        
+        result = set_annotation(date, filename, annotation_text)
+        
+        return {
+            "status": "success",
+            "annotation": result.get("annotation"),
+            "updated_at": result.get("updated_at"),
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to update shot annotation: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
