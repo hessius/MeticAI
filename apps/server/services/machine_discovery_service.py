@@ -3,9 +3,9 @@
 Implements a multi-tier discovery strategy:
 1. mDNS/Zeroconf browse for _meticulous._tcp.local.
 2. Hostname resolution for meticulous.local
-3. Network scan fallback (ARP-based)
+3. If no machine is found, return guidance for manual configuration.
 
-Times out after 10 seconds total.
+Discovery typically completes within several seconds under normal conditions.
 """
 
 import asyncio
