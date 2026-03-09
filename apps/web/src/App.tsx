@@ -653,7 +653,7 @@ function App() {
     }
   }
 
-  const canSubmit = !!(imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0)
+  const canSubmit = !!(aiAvailable && (imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0))
   const aiAvailable = isAiConfigured && aiEnabled
 
   // Phase 3 layout helpers

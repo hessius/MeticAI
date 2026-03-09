@@ -664,9 +664,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       const end = t + step.duration_s
       if (step.action === 'bloom' || step.action === 'pour') cw += step.water_g ?? 0
       let label: string
-      if (step.action === 'bloom') label = step.water_g !== undefined ? `Bloom ${step.water_g}g` : 'Bloom'
-      else if (step.action === 'pour') label = `Pour to ${cw}g`
-      else if (step.action === 'wait') label = `Wait ${step.duration_s}s`
+      if (step.action === 'bloom') label = step.water_g !== undefined ? t('pourOver.recipeBloomWeight', { weight: step.water_g }) : t('pourOver.recipeBloom')
+      else if (step.action === 'pour') label = t('pourOver.recipePourTo', { weight: cw })
+      else if (step.action === 'wait') label = t('pourOver.recipeWait', { seconds: step.duration_s })
       else label = step.action.charAt(0).toUpperCase() + step.action.slice(1)
       t = end
       return { stepIndex: i, action: step.action, label, startTimeSec: start, endTimeSec: end, cumulativeWeight: cw, notes: step.notes }

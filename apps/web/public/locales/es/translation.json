@@ -868,7 +868,11 @@
         "done": "¡Extracción completa!",
         "error": "Algo salió mal."
       }
-    }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Verter hasta {{weight}}g",
+    "recipeWait": "Esperar {{seconds}}s"
   },
   "results": {
     "backToForm": "Volver al formulario",

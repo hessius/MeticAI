@@ -869,7 +869,11 @@
         "done": "Shot klar!",
         "error": "Något gick fel."
       }
-    }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Häll till {{weight}}g",
+    "recipeWait": "Vänta {{seconds}}s"
   },
   "results": {
     "profileGenerated": "Profil skapad!",

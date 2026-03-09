@@ -1448,7 +1448,17 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
 """
         
         # Call LLM (non-blocking)
-        model = get_vision_model()
+        try:
+            model = get_vision_model()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "message": str(e),
+                    "error": "AI features are unavailable until GEMINI_API_KEY is configured"
+                }
+            ) from e
         response = await model.async_generate_content(prompt)
         
         llm_analysis = response.text if response else "Analysis generation failed"

@@ -868,7 +868,11 @@
         "done": "Extraction terminée !",
         "error": "Quelque chose s'est mal passé."
       }
-    }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Verser jusqu'à {{weight}}g",
+    "recipeWait": "Attendre {{seconds}}s"
   },
   "results": {
     "backToForm": "Retour au formulaire",
