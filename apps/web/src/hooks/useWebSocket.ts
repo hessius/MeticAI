@@ -202,7 +202,9 @@ export function useWebSocket(enabled: boolean): MachineState {
         RECONNECT_MAX_MS,
       )
       retriesRef.current++
-      reconnectRef.current = setTimeout(() => connectRef.current?.(), delay)
+      reconnectRef.current = setTimeout(() => {
+        void connect()
+      }, delay)
     }
   }, [resetStaleTimer])
 
