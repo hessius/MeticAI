@@ -169,7 +169,7 @@ def adapt_recipe_to_profile(recipe: Dict[str, Any]) -> Dict[str, Any]:
                     {
                         "type": "time",
                         "value": duration_s,
-                        "relative": False,
+                        "relative": True,
                         "comparison": ">=",
                     }
                 ]
@@ -197,7 +197,7 @@ def adapt_recipe_to_profile(recipe: Dict[str, Any]) -> Dict[str, Any]:
                 {
                     "type": "time",
                     "value": duration_s,
-                    "relative": False,
+                    "relative": True,
                     "comparison": ">=",
                 }
             ]
