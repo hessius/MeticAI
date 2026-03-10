@@ -1170,13 +1170,7 @@ async def edit_profile(profile_name: str, request: Request):
 
         return {
             "status": "success",
-            "profile": {
-                "id": matching_profile.id,
-                "name": profile_dict.get("name", old_name),
-                "temperature": profile_dict.get("temperature"),
-                "final_weight": profile_dict.get("final_weight"),
-                "author": profile_dict.get("author"),
-            },
+            "profile": profile_dict,
         }
 
     except HTTPException:
@@ -1713,7 +1707,7 @@ async def list_machine_profiles(request: Request):
                 except Exception:
                     pass
                 
-                # Convert profile to dict
+                # Convert profile to dict with full parameter data
                 profile_dict = {
                     "id": getattr(full_profile, 'id', partial_profile.id),
                     "name": getattr(full_profile, 'name', partial_profile.name),
@@ -1724,6 +1718,12 @@ async def list_machine_profiles(request: Request):
                     "has_description": False,
                     "description": None
                 }
+                stages = getattr(full_profile, 'stages', None)
+                variables = getattr(full_profile, 'variables', None)
+                if stages:
+                    profile_dict["stages"] = deep_convert_to_dict(stages)
+                if variables:
+                    profile_dict["variables"] = deep_convert_to_dict(variables)
                 
                 # Check for existing description in history
                 if in_history:
