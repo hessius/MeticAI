@@ -12,7 +12,7 @@
 #     curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
 #
 # Environment variables (pre-set to skip prompts):
-#   GEMINI_API_KEY          - Google Gemini API key (required)
+#   GEMINI_API_KEY          - Google Gemini API key (optional)
 #   METICULOUS_IP           - Meticulous machine IP or hostname
 #   METICAI_NON_INTERACTIVE - Set to "true" to skip all prompts
 #   ENABLE_TAILSCALE        - Set to "y" to enable Tailscale
@@ -101,8 +101,7 @@ fi
 if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
     log_info "Running in non-interactive mode"
     if [[ -z "$GEMINI_API_KEY" ]]; then
-        log_error "GEMINI_API_KEY is required in non-interactive mode"
-        exit 1
+        log_warning "No GEMINI_API_KEY provided in non-interactive mode — AI features will be disabled"
     fi
     METICULOUS_IP="${METICULOUS_IP:-meticulous.local}"
 fi
@@ -463,19 +462,29 @@ elif [[ -f "$HAS_V2" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
         case "$CHOICE" in
             1)
                 log_info "Proceeding with reinstall..."
-                # Stop existing containers before reinstalling
-                if [[ -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
-                    log_info "Stopping existing containers..."
-                    cd "$INSTALL_DIR"
-                    docker compose down 2>/dev/null || true
-                    cd "$HOME"
-                fi
                 ;;
             *)
                 log_info "Cancelled"
                 exit 0
                 ;;
         esac
+    fi
+
+    # Always stop existing containers before reinstalling
+    log_info "Stopping existing containers..."
+    if [[ -f "${INSTALL_DIR}/docker-compose.yml" ]]; then
+        cd "$INSTALL_DIR"
+        docker compose down --remove-orphans 2>/dev/null || true
+        cd "$HOME"
+    fi
+    # Remove named containers directly in case compose project has changed
+    docker rm -f meticai 2>/dev/null || true
+    docker rm -f meticai-watchtower 2>/dev/null || true
+
+    # Clean up .git directory if present (leftover from old git-clone installs)
+    if [[ -d "${INSTALL_DIR}/.git" ]]; then
+        log_info "Removing leftover .git directory from previous installation..."
+        rm -rf "${INSTALL_DIR}/.git"
     fi
 fi
 
@@ -522,14 +531,20 @@ echo ""
 
 # --- Gemini API Key ---
 if [[ -z "$GEMINI_API_KEY" ]]; then
-    echo "Get your API key from: https://aistudio.google.com/app/apikey"
-    while [[ -z "$GEMINI_API_KEY" ]]; do
+    if [[ "${METICAI_NON_INTERACTIVE}" == "true" ]]; then
+        log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
+        log_info "You can add a key later in Settings within the MeticAI web UI"
+    else
+        echo "Get your API key from: https://aistudio.google.com/app/apikey"
+        echo "(Press Enter to skip — AI features will be disabled, but MeticAI will still work)"
         read -p "Gemini API Key: " GEMINI_API_KEY < /dev/tty
         if [[ -z "$GEMINI_API_KEY" ]]; then
-            log_error "API key is required. Get one from https://aistudio.google.com/app/apikey"
+            log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
+            log_info "You can add a key later in Settings within the MeticAI web UI"
+        else
+            log_success "API key configured"
         fi
-    done
-    log_success "API key configured"
+    fi
 fi
 
 # --- Meticulous Machine Discovery ---
@@ -829,6 +844,10 @@ if ! docker compose ${COMPOSE_FILES} pull 2>&1; then
 fi
 
 log_info "Starting MeticAI..."
+# Remove any leftover containers that could conflict
+docker rm -f meticai 2>/dev/null || true
+docker rm -f meticai-watchtower 2>/dev/null || true
+
 if ! docker compose ${COMPOSE_FILES} up -d 2>&1; then
     log_error "Failed to start MeticAI containers."
     echo ""

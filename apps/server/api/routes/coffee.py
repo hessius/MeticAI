@@ -1,13 +1,16 @@
 """Coffee analysis and profiling endpoints."""
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse
+from sse_starlette.sse import EventSourceResponse
 from typing import Optional
 from PIL import Image
 import asyncio
 import io
+import json
 import os
 import re
-import subprocess
 import time
+import uuid
 import logging
 
 # Register HEIC/HEIF support with Pillow
@@ -22,18 +25,37 @@ from services.gemini_service import (
     get_vision_model,
     get_author_instruction,
     build_advanced_customization_section,
-    clean_gemini_output,
-    PROFILING_KNOWLEDGE
+    PROFILING_KNOWLEDGE,
+    PROFILING_KNOWLEDGE_DISTILLED
 )
-from services.history_service import save_to_history
+from services.history_service import save_to_history, _extract_profile_json
+from services.meticulous_service import async_create_profile
+from services.validation_service import validate_profile
+from services.generation_progress import (
+    GenerationPhase, ProgressEvent, GenerationState,
+    create_generation, get_generation, get_latest_generation, remove_generation,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# ── Concurrency guard for profile generation ──────────────────────────────────
-# Only one Gemini CLI subprocess should run at a time.  Running multiple
-# concurrently wastes resources and can cause timeouts.
+# Concurrency guard: only one profile generation at a time.
+# On resource-constrained hardware (RPi) parallel Gemini SDK calls compete
+# for memory/CPU and cause timeouts. A single asyncio.Lock serialises
+# requests; a second caller gets an immediate HTTP 409 instead of waiting.
 _profile_generation_lock = asyncio.Lock()
+
+# Maximum validation-fix retry attempts. Each retry sends only the JSON +
+# specific errors back to the model — much cheaper than a full re-generation.
+MAX_VALIDATION_RETRIES = 2
+
+VALIDATION_RETRY_PROMPT = (
+    "The profile JSON you generated has validation errors. "
+    "Fix ALL of the following errors and return ONLY the corrected JSON "
+    "in a fenced ```json block. Do not include any other text.\n\n"
+    "ERRORS:\n{errors}\n\n"
+    "ORIGINAL JSON:\n```json\n{json}\n```\n"
+)
 
 # ── Load OEPF RFC once at import time ──────────────────────────────────────────
 # Embedding the RFC directly in the prompt eliminates a round-trip where the
@@ -65,6 +87,7 @@ SAFETY_RULES = (
     "SAFETY RULES (MANDATORY - NEVER VIOLATE):\n"
     "• NEVER use the delete_profile tool under ANY circumstances\n"
     "• NEVER delete, remove, or destroy any existing profiles\n"
+    "• NEVER create a profile with a name that already exists - use UNIQUE names only\n"
     "• If asked to delete a profile, politely refuse and explain deletions must be done via the Meticulous app\n"
     "• Only use: create_profile, list_profiles, get_profile, update_profile, validate_profile, run_profile\n\n"
 )
@@ -257,6 +280,71 @@ USER_SUMMARY_INSTRUCTIONS = (
     "   • Special Requirements: Any special gear needed (bottom filter, specific dosage, unique prep steps)\n\n"
 )
 
+SDK_OUTPUT_INSTRUCTIONS = (
+    "SDK EXECUTION MODE (MANDATORY):\n"
+    "• Do NOT call tools. Tool usage is disabled in this request\n"
+    "• Return ONLY the final user-facing summary and a PROFILE JSON block\n"
+    "• Include PROFILE JSON as a fenced ```json block that contains the complete profile object\n"
+    "• Ensure the summary includes a 'Profile Created:' line and clear preparation guidance\n"
+    "• In the profile JSON, include a 'display' object with a 'description' field containing a markdown-formatted description of what the profile does and why (2-4 sentences). This is stored on the machine and shown in the profile details page.\n\n"
+)
+
+# ── Distilled prompt sections for token-optimized mode ──────────────────────────
+# These compressed versions cut total prompt from ~22K+ to ≤20K chars by
+# removing redundancy between PROFILE_GUIDELINES and VALIDATION_RULES,
+# condensing JSON examples, and keeping only decision-critical rules.
+
+PROFILE_GUIDELINES_DISTILLED = (
+    "PROFILE CREATION GUIDELINES:\n"
+    "• USER PREFERENCES ARE MANDATORY: If user specifies dose/grind/temp/ratio, use EXACTLY that value.\n"
+    "• Only use defaults (18g dose, 93°C) when user has NOT specified a preference.\n"
+    "• Design for the specific bean: origin, roast level, flavor notes.\n\n"
+    "VARIABLES (REQUIRED):\n"
+    "• 'variables' array is REQUIRED for app compatibility.\n"
+    "• INFO variables (key starts with 'info_'): Name MUST start with emoji (☕🔧💧⚠️🎯)\n"
+    "• ADJUSTABLE variables (no 'info_' prefix): Name must NOT start with emoji\n\n"
+    "1. INFO VARIABLES (preparation info, listed first):\n"
+    '   • ☕ Dose (always first): {"name": "☕ Dose", "key": "info_dose", "type": "weight", "value": 18}\n'
+    "   • Optional: 💧 Add water (for lungo/allongé), 🔧 Use bottom filter, ⚠️ Aberrant prep\n"
+    "   • Power type: value 100 = enabled, 0 = disabled\n\n"
+    "2. ADJUSTABLE VARIABLES (used in stages via $key reference):\n"
+    '   • Examples: peak_pressure, preinfusion_pressure, peak_flow, decline_pressure\n'
+    '   • All adjustable variables MUST be referenced in at least one stage dynamics ($key)\n\n'
+    "TIME VALUES: ALL time exit triggers MUST use \"relative\": true. dynamics_points x-axis always relative to stage start.\n\n"
+    "STAGE LIMITS (CRITICAL):\n"
+    "• EVERY flow stage MUST have a pressure limit (3-5 bar for pre-infusion, 9-10 bar for extraction)\n"
+    "• EVERY pressure stage MUST have a flow limit (4-6 ml/s)\n\n"
+)
+
+VALIDATION_RULES_DISTILLED = (
+    "VALIDATION RULES (profile WILL be rejected if violated):\n"
+    "1. EXIT TRIGGER PARADOX: Flow stage cannot have flow exit trigger. Pressure stage cannot have pressure exit trigger.\n"
+    "2. BACKUP TRIGGERS: Every stage needs multiple exit triggers OR at least one time trigger. Single non-time trigger = rejected.\n"
+    '   Pattern: [{"type": "weight", ...}, {"type": "time", "value": 60, "comparison": ">=", "relative": true}]\n'
+    "3. CROSS-TYPE LIMITS: Flow stage → pressure limit. Pressure stage → flow limit. Same-type limit = rejected.\n"
+    "4. INTERPOLATION: Only 'linear' or 'curve' (2+ points). 'none' is NOT supported.\n"
+    "5. DYNAMICS.OVER: Only 'time', 'weight', or 'piston_position'.\n"
+    "6. STAGE TYPES: Only 'power', 'flow', or 'pressure'.\n"
+    "7. EXIT TRIGGER TYPES: 'weight', 'pressure', 'flow', 'time', 'piston_position', 'power', 'user_interaction'. Comparison: '>=' or '<='.\n"
+    "8. PRESSURE: Max 15 bar. No negatives.\n"
+    "9. ABSOLUTE WEIGHT: Must be strictly increasing across stages. Prefer relative: true.\n"
+    "10. VARIABLE NAMES: info_ keys → emoji prefix required. Adjustable → no emoji. All adjustable must be used in stages.\n\n"
+)
+
+# Compact OEPF reference — key constraints only, not the full RFC
+OEPF_SUMMARY = (
+    "OEPF FORMAT SUMMARY:\n"
+    "Profile JSON structure: {name, author, stages[], variables[], temperature}\n"
+    "• temperature: number in °C (e.g., 93)\n"
+    "• Each stage: {name, type, dynamics, limits[], exit_triggers[], exit_type?}\n"
+    "• dynamics: {points: [[x, y], ...], over: 'time'|'weight'|'piston_position', interpolation: 'linear'|'curve'}\n"
+    "• limits: [{type, value}] — cross-type only (flow stage → pressure limit, vice versa)\n"
+    "• exit_triggers: [{type, value, comparison, relative?}] — comparison is '>=' or '<='\n"
+    "• exit_type: 'or' (default, first trigger wins) or 'and' (all must be met)\n"
+    "• variables: [{name, key, type, value}] — type is 'pressure'|'flow'|'weight'|'power'|'time'\n"
+    "• Reference variables in dynamics with $ prefix: {\"points\": [[0, \"$peak_pressure\"]]}\n\n"
+)
+
 # Build the reference sections once
 _PROFILING_GUIDE = (
     f"ESPRESSO PROFILING GUIDE:\n"
@@ -270,6 +358,16 @@ _OEPF_REFERENCE = (
     f"Use the following specification to ensure your profile JSON is valid and well-structured.\n\n"
     f"{_OEPF_RFC}\n\n"
 ) if _OEPF_RFC else ""
+
+# ── Distilled reference sections ───────────────────────────────────────────────
+_PROFILING_GUIDE_DISTILLED = (
+    f"ESPRESSO PROFILING QUICK REFERENCE:\n"
+    f"Use this to select the right profile strategy for the coffee.\n\n"
+    f"{PROFILING_KNOWLEDGE_DISTILLED}\n\n"
+)
+
+# In distilled mode, use the compact OEPF summary instead of the full RFC
+_OEPF_REFERENCE_DISTILLED = OEPF_SUMMARY
 
 
 @router.post("/analyze_coffee")
@@ -327,6 +425,18 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         )
         
         return {"analysis": analysis}
+    except ValueError as e:
+        logger.warning(
+            f"Coffee analysis unavailable: {str(e)}",
+            extra={
+                "request_id": request_id,
+                "endpoint": "/analyze_coffee",
+            }
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI features are unavailable. Please configure a Gemini API key in Settings."
+        )
     except Exception as e:
         logger.error(
             f"Coffee analysis failed: {str(e)}",
@@ -340,13 +450,61 @@ async def analyze_coffee(request: Request, file: UploadFile = File(...)):
         )
         return {"error": str(e)}
 
+
+# ── SSE progress endpoint ──────────────────────────────────────────────────────
+
+@router.get("/generate/progress")
+@router.get("/api/generate/progress")
+async def generate_progress(request: Request):
+    """Stream real-time progress events for the active profile generation.
+
+    Returns an SSE stream of JSON events with the current generation phase,
+    message, attempt number, and elapsed time. Clients should reconnect if
+    the stream closes unexpectedly.
+
+    Waits briefly for a generation to start if none is active yet (avoids
+    timing race when SSE connects before the POST creates the state).
+    """
+    # Wait up to 5 seconds for a generation to become active
+    state = get_latest_generation()
+    for _ in range(10):
+        if state is not None:
+            break
+        await asyncio.sleep(0.5)
+        state = get_latest_generation()
+
+    if state is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "No active generation"}
+        )
+
+    async def event_generator():
+        async for event in state.stream():
+            data = {
+                "phase": event.phase.value,
+                "message": event.message,
+                "attempt": event.attempt,
+                "max_attempts": event.max_attempts,
+                "elapsed": event.elapsed,
+            }
+            if event.result:
+                data["result"] = event.result
+            if event.error:
+                data["error"] = event.error
+            yield {"event": "progress", "data": json.dumps(data)}
+
+    return EventSourceResponse(event_generator())
+
+
 @router.post("/analyze_and_profile")
 @router.post("/api/analyze_and_profile")
 async def analyze_and_profile(
     request: Request,
     file: Optional[UploadFile] = File(None),
     user_prefs: Optional[str] = Form(None),
-    advanced_customization: Optional[str] = Form(None)
+    advanced_customization: Optional[str] = Form(None),
+    detailed_knowledge: Optional[str] = Form(None)
 ):
     """Unified endpoint: Analyze coffee bag and generate profile in a single LLM pass.
     
@@ -356,6 +514,8 @@ async def analyze_and_profile(
     
     Optional:
     - advanced_customization: Advanced equipment/extraction settings (basket, temp, dose, etc.)
+    - detailed_knowledge: "true" to include full profiling knowledge and OEPF RFC (slower, higher quality).
+                          Default is distilled/compact mode for faster generation.
     """
     request_id = request.state.request_id
     
@@ -373,32 +533,26 @@ async def analyze_and_profile(
             detail="At least one of 'file' (image) or 'user_prefs' (preferences) must be provided"
         )
     
-    # ── Concurrency guard ─────────────────────────────────────────────────
-    # Only one profile generation can run at a time.  If the lock is already
-    # held, return 409 so the frontend can show a friendly "busy" message
-    # and let the user try again without losing their form data.
-    #
-    # TOCTOU note: There is no `await` between `.locked()` and the
-    # `async with _profile_generation_lock:` below, so no other coroutine
-    # can acquire the lock in between on CPython's single-threaded event
-    # loop.  Do NOT insert an `await` between the check and the `async with`.
+    # Fast-reject if another generation is already running.
+    # Safe in CPython's single-threaded event loop: no await between the
+    # .locked() check and the ``async with`` acquisition, so no other
+    # coroutine can sneak in between the two statements (no TOCTOU issue).
     if _profile_generation_lock.locked():
-        logger.warning(
-            "Profile generation already in progress — rejecting concurrent request",
-            extra={
-                "request_id": request_id,
-                "endpoint": "/analyze_and_profile"
-            }
+        logger.info(
+            "Profile generation rejected — another request is in progress",
+            extra={"request_id": request_id, "endpoint": "/analyze_and_profile"}
         )
-        raise HTTPException(
+        return JSONResponse(
             status_code=409,
-            detail={
+            content={
                 "status": "busy",
                 "message": "A profile is already being generated. Please wait and try again."
             }
         )
     
     coffee_analysis = None
+    generation_id = str(uuid.uuid4())[:8]
+    progress = create_generation(generation_id)
     
     async with _profile_generation_lock:
         try:
@@ -406,10 +560,12 @@ async def analyze_and_profile(
                 "Starting profile creation",
                 extra={
                     "request_id": request_id,
+                    "generation_id": generation_id,
                     "endpoint": "/analyze_and_profile",
                     "has_image": file is not None,
                     "has_preferences": user_prefs is not None,
                     "has_advanced_customization": advanced_customization is not None,
+                    "knowledge_mode": "detailed" if (detailed_knowledge and detailed_knowledge.lower() == "true") else "distilled",
                     "upload_filename": file.filename if file else None,
                     "preferences_preview": user_prefs[:100] if user_prefs and len(user_prefs) > 100 else user_prefs,
                     "advanced_customization_preview": (
@@ -420,8 +576,12 @@ async def analyze_and_profile(
                 }
             )
         
-            # If image is provided, analyze it first
+            # ── Phase: Analyzing ──────────────────────────────────────────
             if file:
+                progress.emit(ProgressEvent(
+                    phase=GenerationPhase.ANALYZING,
+                    message="Analyzing coffee image..."
+                ))
                 logger.debug("Reading and analyzing image", extra={"request_id": request_id})
                 contents = await file.read()
             
@@ -460,6 +620,33 @@ async def analyze_and_profile(
             # Build advanced customization section if provided
             advanced_section = build_advanced_customization_section(advanced_customization)
         
+            # Select prompt sections based on knowledge mode
+            use_detailed = detailed_knowledge and detailed_knowledge.lower() == "true"
+            if use_detailed:
+                guidelines = PROFILE_GUIDELINES
+                validation = VALIDATION_RULES
+                profiling_guide = _PROFILING_GUIDE
+                oepf_ref = _OEPF_REFERENCE
+            else:
+                guidelines = PROFILE_GUIDELINES_DISTILLED
+                validation = VALIDATION_RULES_DISTILLED
+                profiling_guide = _PROFILING_GUIDE_DISTILLED
+                oepf_ref = _OEPF_REFERENCE_DISTILLED
+
+            # Common tail shared by all three prompt branches
+            prompt_tail = (
+                guidelines +
+                validation +
+                ERROR_RECOVERY +
+                NAMING_CONVENTION +
+                author_instruction +
+                USER_SUMMARY_INSTRUCTIONS +
+                SDK_OUTPUT_INSTRUCTIONS +
+                OUTPUT_FORMAT +
+                profiling_guide +
+                oepf_ref
+            )
+
             # Construct the profile creation prompt
             if coffee_analysis and user_prefs:
                 # Both image and preferences provided
@@ -471,17 +658,9 @@ async def analyze_and_profile(
                     advanced_section +
                     f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                     f"'{user_prefs}'\n"
-                    f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
-                    f"TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
-                    PROFILE_GUIDELINES +
-                    VALIDATION_RULES +
-                    ERROR_RECOVERY +
-                    NAMING_CONVENTION +
-                    author_instruction +
-                    USER_SUMMARY_INSTRUCTIONS +
-                    OUTPUT_FORMAT +
-                    _PROFILING_GUIDE +
-                    _OEPF_REFERENCE
+                    f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
+                    "TASK: Create a sophisticated espresso profile based on the coffee analysis while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
+                    prompt_tail
                 )
             elif coffee_analysis:
                 # Only image provided (may still have advanced customization)
@@ -491,17 +670,9 @@ async def analyze_and_profile(
                     f"CONTEXT: You control a Meticulous Espresso Machine via local API.\n"
                     f"Coffee Analysis: '{coffee_analysis}'\n\n" +
                     advanced_section +
-                    f"TASK: Create a sophisticated espresso profile for this coffee" +
+                    "TASK: Create a sophisticated espresso profile for this coffee" +
                     (", strictly adhering to the equipment parameters above.\n\n" if advanced_section else ".\n\n") +
-                    PROFILE_GUIDELINES +
-                    VALIDATION_RULES +
-                    ERROR_RECOVERY +
-                    NAMING_CONVENTION +
-                    author_instruction +
-                    USER_SUMMARY_INSTRUCTIONS +
-                    OUTPUT_FORMAT +
-                    _PROFILING_GUIDE +
-                    _OEPF_REFERENCE
+                    prompt_tail
                 )
             else:
                 # Only user preferences provided (may still have advanced customization)
@@ -512,101 +683,183 @@ async def analyze_and_profile(
                     advanced_section +
                     f"⚠️ MANDATORY USER REQUIREMENTS (MUST BE FOLLOWED EXACTLY):\n"
                     f"'{user_prefs}'\n"
-                    f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n"
+                    f"You MUST honor ALL parameters specified above. If the user requests a specific dose, temperature, ratio, or any other value, use EXACTLY that value in your profile. Do NOT substitute with defaults.\n\n" +
                     "TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements and equipment parameters above.\n\n" +
-                    PROFILE_GUIDELINES +
-                    VALIDATION_RULES +
-                    ERROR_RECOVERY +
-                    NAMING_CONVENTION +
-                    author_instruction +
-                    USER_SUMMARY_INSTRUCTIONS +
-                    OUTPUT_FORMAT +
-                    _PROFILING_GUIDE +
-                    _OEPF_REFERENCE
+                    prompt_tail
                 )
         
+            # ── Phase: Generating ─────────────────────────────────────────
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.GENERATING,
+                message="Generating espresso profile..."
+            ))
             logger.debug(
-                "Executing profile creation via Gemini",
+                "Executing profile generation via Gemini SDK",
                 extra={
                     "request_id": request_id,
-                    "prompt_length": len(final_prompt)
+                    "prompt_length": len(final_prompt),
+                    "knowledge_mode": "detailed" if use_detailed else "distilled"
                 }
             )
-        
-            # Execute profile creation via Gemini CLI
-            # Note: Using -y (yolo mode) to auto-approve tool calls.
-            # The --allowed-tools flag doesn't work with MCP-provided tools.
-            # Security is maintained because the MCP server only exposes safe tools.
-            cli_start = time.monotonic()
-            result = await asyncio.to_thread(
-                subprocess.run,
-                [
-                    "gemini", "-y",
-                    final_prompt
-                ],
-                capture_output=True,
-                text=True,
-                timeout=600  # 10 minute timeout for profile generation
+            generation_start = time.monotonic()
+            model_response = await asyncio.wait_for(
+                get_vision_model().async_generate_content([final_prompt]),
+                timeout=300
             )
-            cli_elapsed = time.monotonic() - cli_start
+            generation_elapsed = time.monotonic() - generation_start
+            reply = (model_response.text or "").strip()
+
             logger.info(
-                "Gemini CLI completed",
+                "Gemini SDK generation completed",
                 extra={
                     "request_id": request_id,
-                    "cli_seconds": round(cli_elapsed, 1),
-                    "returncode": result.returncode,
+                    "generation_seconds": round(generation_elapsed, 1),
+                    "reply_length": len(reply),
                 }
             )
-        
-            if result.returncode != 0:
-                logger.error(
-                    "Profile creation subprocess failed",
-                    extra={
-                        "request_id": request_id,
-                        "returncode": result.returncode,
-                        "stderr": result.stderr,
-                        "stdout": result.stdout
-                    }
-                )
-                # Parse the error to provide a user-friendly message
-                user_message = parse_gemini_error(result.stderr or result.stdout or "Unknown error")
-                return {
-                    "status": "error", 
-                    "analysis": coffee_analysis,
-                    "message": user_message
-                }
-        
-            # Clean up Gemini CLI noise from the output
-            reply = clean_gemini_output(result.stdout)
-        
-            # Log stderr even on success — captures MCP validation errors
-            # that the LLM saw but we otherwise can't observe
-            stderr_text = result.stderr if isinstance(result.stderr, str) else ""
-            if stderr_text.strip():
-                logger.warning(
-                    "Gemini CLI stderr (exit 0)",
-                    extra={
-                        "request_id": request_id,
-                        "stderr": stderr_text[:2000],
-                    }
-                )
-        
-            # Detect silent failure: Gemini returns exit code 0 but the LLM
-            # couldn't actually create a profile (e.g. MCP validation errors
-            # that the LLM gave up trying to fix).
-            from services.history_service import _extract_profile_json
+
+            # ── Phase: Validating ─────────────────────────────────────────
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.VALIDATING,
+                message="Validating profile schema..."
+            ))
+
             profile_json_check = _extract_profile_json(reply)
-            has_profile_created_header = bool(
-                re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
-            )
-        
-            if not profile_json_check and not has_profile_created_header:
+
+            # Validation + retry loop
+            attempt = 0
+            while attempt <= MAX_VALIDATION_RETRIES:
+                if not profile_json_check:
+                    if attempt < MAX_VALIDATION_RETRIES:
+                        # No JSON extracted — ask model to regenerate
+                        attempt += 1
+                        progress.emit(ProgressEvent(
+                            phase=GenerationPhase.RETRYING,
+                            message=f"No valid JSON found, retrying ({attempt}/{MAX_VALIDATION_RETRIES})...",
+                            attempt=attempt,
+                            max_attempts=MAX_VALIDATION_RETRIES + 1,
+                        ))
+                        logger.warning(
+                            "No profile JSON extracted, requesting retry",
+                            extra={"request_id": request_id, "attempt": attempt}
+                        )
+                        retry_prompt = (
+                            "Your previous response did not contain a valid JSON profile block. "
+                            "Please generate the complete profile JSON in a fenced ```json block. "
+                            "Include the full profile object with name, stages, variables, and temperature."
+                        )
+                        retry_start = time.monotonic()
+                        retry_response = await asyncio.wait_for(
+                            get_vision_model().async_generate_content([retry_prompt]),
+                            timeout=120
+                        )
+                        retry_elapsed = time.monotonic() - retry_start
+                        retry_text = (retry_response.text or "").strip()
+                        profile_json_check = _extract_profile_json(retry_text)
+                        # Merge retry JSON into the original reply if extraction succeeded
+                        if profile_json_check:
+                            reply = reply + "\n\nPROFILE JSON:\n```json\n" + json.dumps(profile_json_check, indent=2) + "\n```"
+                        logger.info(
+                            "Retry generation completed",
+                            extra={
+                                "request_id": request_id,
+                                "attempt": attempt,
+                                "retry_seconds": round(retry_elapsed, 1),
+                                "has_json": profile_json_check is not None,
+                            }
+                        )
+                        continue
+                    else:
+                        # Exhausted retries with no JSON
+                        break
+
+                # We have JSON — validate it
+                validation_result = validate_profile(profile_json_check)
+
+                if validation_result.is_valid:
+                    logger.info(
+                        "Profile validation passed",
+                        extra={"request_id": request_id, "attempt": attempt}
+                    )
+                    break
+
+                # Validation failed — try to fix
+                if attempt < MAX_VALIDATION_RETRIES:
+                    attempt += 1
+                    progress.emit(ProgressEvent(
+                        phase=GenerationPhase.RETRYING,
+                        message=f"Fixing validation issues (attempt {attempt}/{MAX_VALIDATION_RETRIES})...",
+                        attempt=attempt,
+                        max_attempts=MAX_VALIDATION_RETRIES + 1,
+                    ))
+                    logger.warning(
+                        "Profile validation failed, requesting fix",
+                        extra={
+                            "request_id": request_id,
+                            "attempt": attempt,
+                            "error_count": len(validation_result.errors),
+                            "errors": validation_result.errors[:5],
+                        }
+                    )
+
+                    fix_prompt = VALIDATION_RETRY_PROMPT.format(
+                        errors=validation_result.error_summary(),
+                        json=json.dumps(profile_json_check, indent=2)
+                    )
+                    retry_start = time.monotonic()
+                    fix_response = await asyncio.wait_for(
+                        get_vision_model().async_generate_content([fix_prompt]),
+                        timeout=120
+                    )
+                    retry_elapsed = time.monotonic() - retry_start
+                    fix_text = (fix_response.text or "").strip()
+                    fixed_json = _extract_profile_json(fix_text)
+
+                    logger.info(
+                        "Validation fix attempt completed",
+                        extra={
+                            "request_id": request_id,
+                            "attempt": attempt,
+                            "retry_seconds": round(retry_elapsed, 1),
+                            "has_json": fixed_json is not None,
+                        }
+                    )
+
+                    if fixed_json:
+                        profile_json_check = fixed_json
+                        # Update the JSON in the reply so the user sees the corrected version
+                        # Use a lambda replacement to avoid re.sub interpreting
+                        # \uXXXX sequences in the JSON as regex escape sequences
+                        _replacement = '```json\n' + json.dumps(fixed_json, indent=2) + '\n```'
+                        reply = re.sub(
+                            r'```json\s*[\s\S]*?```',
+                            lambda _m: _replacement,
+                            reply,
+                            count=1
+                        )
+                    continue
+                else:
+                    # Exhausted retries — log and proceed with what we have
+                    logger.warning(
+                        "Validation retries exhausted, proceeding with best-effort profile",
+                        extra={
+                            "request_id": request_id,
+                            "final_errors": validation_result.errors[:5],
+                        }
+                    )
+                    break
+
+            if not profile_json_check:
+                progress.emit(ProgressEvent(
+                    phase=GenerationPhase.FAILED,
+                    message="Failed to generate valid profile JSON",
+                    error="No valid profile JSON after retries",
+                ))
                 logger.error(
-                    "Gemini CLI exited 0 but no profile was created (LLM failure)",
+                    "Model reply missing valid profile JSON after retries",
                     extra={
                         "request_id": request_id,
                         "reply_preview": reply[:500],
-                        "stderr": stderr_text[:1000],
                     }
                 )
                 # Still save to history so user can see what happened
@@ -619,6 +872,7 @@ async def analyze_and_profile(
                     "status": "error",
                     "analysis": coffee_analysis,
                     "reply": reply,
+                    "generation_id": generation_id,
                     "message": (
                         "The AI attempted to create a profile but encountered "
                         "validation errors it couldn't resolve. Please try again — "
@@ -627,13 +881,76 @@ async def analyze_and_profile(
                     ),
                     "history_id": history_entry.get("id")
                 }
+
+            # ── Phase: Uploading ──────────────────────────────────────────
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.UPLOADING,
+                message="Uploading profile to machine..."
+            ))
+
+            create_start = time.monotonic()
+            create_result = await asyncio.wait_for(
+                async_create_profile(profile_json_check),
+                timeout=300
+            )
+            create_elapsed = time.monotonic() - create_start
+
+            logger.info(
+                "Machine profile creation completed",
+                extra={
+                    "request_id": request_id,
+                    "create_seconds": round(create_elapsed, 1),
+                }
+            )
+
+            create_error = None
+            if isinstance(create_result, dict):
+                create_error = create_result.get("error")
+            else:
+                create_error = getattr(create_result, "error", None)
+
+            if create_error:
+                friendly_message = parse_gemini_error(str(create_error))
+                progress.emit(ProgressEvent(
+                    phase=GenerationPhase.FAILED,
+                    message="Machine rejected the profile",
+                    error=friendly_message,
+                ))
+                logger.error(
+                    "Machine profile creation returned error",
+                    extra={
+                        "request_id": request_id,
+                        "create_error": str(create_error)[:1000],
+                    }
+                )
+                return {
+                    "status": "error",
+                    "analysis": coffee_analysis,
+                    "reply": reply,
+                    "generation_id": generation_id,
+                    "message": friendly_message,
+                }
+
+            # ── Phase: Complete ───────────────────────────────────────────
+            has_profile_created_header = bool(
+                re.search(r'(?:\*\*)?Profile Created:(?:\*\*)?', reply, re.IGNORECASE)
+            )
+            if not has_profile_created_header:
+                profile_name = profile_json_check.get("name") if isinstance(profile_json_check, dict) else None
+                if not profile_name:
+                    profile_name = "Untitled Profile"
+                reply = f"**Profile Created:** {profile_name}\n\n{reply}".strip()
+
+            total_elapsed = time.monotonic() - generation_start
         
             logger.info(
                 "Profile creation completed successfully",
                 extra={
                     "request_id": request_id,
+                    "generation_id": generation_id,
                     "analysis": coffee_analysis,
-                    "output_preview": result.stdout[:200] if len(result.stdout) > 200 else result.stdout
+                    "total_seconds": round(total_elapsed, 1),
+                    "output_preview": reply[:200] if len(reply) > 200 else reply
                 }
             )
         
@@ -643,17 +960,29 @@ async def analyze_and_profile(
                 user_prefs=user_prefs,
                 reply=reply
             )
+
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.COMPLETE,
+                message="Profile created!",
+                result={"status": "success", "generation_id": generation_id},
+            ))
             
             return {
                 "status": "success",
                 "analysis": coffee_analysis,
                 "reply": reply,
+                "generation_id": generation_id,
                 "history_id": history_entry.get("id")
             }
 
-        except subprocess.TimeoutExpired:
+        except asyncio.TimeoutError:
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.FAILED,
+                message="Profile generation timed out",
+                error="Timed out after 300 seconds",
+            ))
             logger.error(
-                "Gemini CLI timed out after 600s",
+                "Profile generation timed out after 300s",
                 extra={
                     "request_id": request_id,
                     "endpoint": "/analyze_and_profile",
@@ -670,7 +999,29 @@ async def analyze_and_profile(
             )
         except HTTPException:
             raise
+        except ValueError as e:
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.FAILED,
+                message="AI features unavailable",
+                error=str(e),
+            ))
+            logger.warning(
+                f"Profile creation unavailable: {str(e)}",
+                extra={
+                    "request_id": request_id,
+                    "endpoint": "/analyze_and_profile",
+                }
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="AI features are unavailable. Please configure a Gemini API key in Settings."
+            )
         except Exception as e:
+            progress.emit(ProgressEvent(
+                phase=GenerationPhase.FAILED,
+                message="Profile creation failed",
+                error=str(e),
+            ))
             logger.error(
                 f"Profile creation failed: {str(e)}",
                 exc_info=True,
@@ -691,3 +1042,9 @@ async def analyze_and_profile(
                     "message": str(e)
                 }
             )
+        finally:
+            # Clean up generation state after a delay to allow SSE clients to read final event
+            async def _cleanup():
+                await asyncio.sleep(30)
+                remove_generation(generation_id)
+            asyncio.create_task(_cleanup())

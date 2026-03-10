@@ -16,7 +16,14 @@
     "or": "O",
     "and": "Y",
     "selected": "Seleccionado",
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "mon": "Lun",
+    "tue": "Mar",
+    "wed": "Mié",
+    "thu": "Jue",
+    "fri": "Vie",
+    "sat": "Sáb",
+    "sun": "Dom"
   },
   "greetings": {
     "morning": [
@@ -73,7 +80,16 @@
       "Cruzando referencias con los foros de Decent...",
       "Casi listo..."
     ],
-    "pleaseWait": "Esto puede tardar 120-180 segundos"
+    "pleaseWait": "Esto puede tardar 120-180 segundos",
+    "elapsed": "{{seconds}}s transcurridos",
+    "phases": {
+      "analyze": "Analizar",
+      "done": "Listo",
+      "generate": "Generar",
+      "upload": "Subir",
+      "validate": "Validar"
+    },
+    "retryAttempt": "intento {{attempt}}/{{max}}"
   },
   "app": {
     "title": "Perfilador AI de Meticulous Espresso",
@@ -86,12 +102,15 @@
       "provideInput": "Please provide at least a coffee bag photo or taste preferences",
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
+      "generateFailedNetwork": "Connection lost during profile generation. Check your network and try again.",
       "generateFailed404Route": "Error al generar perfil: La ruta del servidor no fue encontrada (404). Esto suele ser un problema de proxy inverso/ruta API — verifique que su proxy reenvía /api/* a MeticAI.",
       "generateFailedTimeout": "Error al generar perfil: La solicitud de AI agotó el tiempo de espera. Intente de nuevo; si esto se repite, reduzca la complejidad del prompt o pruebe un modelo Gemini más potente.",
       "generateFailedValidation": "Error al generar perfil: La AI generó un esquema de perfil no válido. Intente de nuevo — un segundo intento suele tener éxito.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
-      "saveFailed": "Failed to save results. Please try again."
+      "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "La generación de perfiles con IA está actualmente desactivada. Activa la IA en Ajustes y asegúrate de que haya una clave API configurada.",
+      "generateBusy": "Ya se está generando un perfil. Su formulario se ha conservado — inténtelo de nuevo en unos minutos."
     }
   },
   "navigation": {
@@ -99,13 +118,15 @@
     "profileCatalogue": "Catálogo de perfiles",
     "runSchedule": "Ejecutar / Programar",
     "settings": "Configuración",
-    "newProfile": "Nuevo perfil"
+    "newProfile": "Nuevo perfil",
+    "aiUnavailable": "La generación de perfiles con IA no está disponible. Habilita las funciones de IA en Configuración y asegúrate de que una clave de API de Gemini esté configurada."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Foto del paquete de café",
     "optional": "Opcional",
     "tastePreferences": "Preferencias de sabor",
     "tapToUpload": "Toca para subir o tomar foto",
+    "dropImage": "Suelta la imagen aquí",
     "imageFormats": "JPG, PNG u otros formatos de imagen",
     "selectPresetTags": "O selecciona etiquetas predefinidas:",
     "describeFlavor": "Describe tu perfil de sabor de espresso ideal usando texto, etiquetas o ambos",
@@ -132,7 +153,55 @@
     "profilePicture": "Imagen de perfil",
     "selectStyle": "Seleccionar estilo",
     "exportAs": "Exportar como",
-    "generatedImagePreview": "Vista previa de imagen generada"
+    "generatedImagePreview": "Vista previa de imagen generada",
+    "addedToMeticAI": "Añadido a MeticAI",
+    "aiImageUnavailable": "La generación de imágenes con IA no está disponible. Active las funciones de IA en Configuración y asegúrese de que hay una clave API de Gemini configurada.",
+    "apply": "Aplicar",
+    "applyImageFailed": "Error al aplicar la imagen",
+    "applying": "Aplicando...",
+    "byAuthor": "por {{author}}",
+    "captureSubtitle": "Generador de perfiles de espresso Meticulous",
+    "clearFilters": "Limpiar filtros",
+    "clickToEnlarge": "Clic para ampliar",
+    "discard": "Descartar",
+    "filterHintAnd": "Mostrando perfiles con todas las etiquetas seleccionadas",
+    "filterHintOr": "Mostrando perfiles con cualquiera de las etiquetas seleccionadas",
+    "generate": "Generar",
+    "generateStyleImage": "Generar imagen {{style}}",
+    "generatedPreviewAlt": "Vista previa generada",
+    "generating": "Generando...",
+    "generationFailed": "Error en la generación",
+    "imageApplied": "Imagen aplicada correctamente",
+    "imageGenerationFailed": "Error al generar la imagen",
+    "imageStyles": {
+      "abstract": "Abstracto",
+      "abstractDesc": "Interpretación artística abstracta",
+      "minimalist": "Minimalista",
+      "minimalistDesc": "Diseño limpio y minimal",
+      "modern": "Moderno",
+      "modernDesc": "Estilo artístico contemporáneo",
+      "pixelArt": "Pixel Art",
+      "pixelArtDesc": "Estilo retro de pixel art",
+      "vintage": "Vintage",
+      "vintageDesc": "Estética retro",
+      "watercolor": "Acuarela",
+      "watercolorDesc": "Pintura suave de acuarela"
+    },
+    "imageSyncNote": "La imagen se recortará en cuadrado y se sincronizará con su máquina",
+    "imageUploadFailed": "Error al subir la imagen",
+    "noImageData": "No se recibieron datos de imagen del servidor",
+    "noMatchingDescription": "Intente ajustar la configuración de filtros",
+    "noProfilesDescription": "Añada su primer perfil de espresso para verlo aquí",
+    "paidKeyRequired": "La generación de imágenes requiere una clave API de Gemini de pago. Configure GEMINI_API_KEY.",
+    "paidKeyWarning": "La generación de imágenes con IA requiere una clave API de Gemini de pago. Las claves gratuitas pueden no funcionar.",
+    "saveImageFailed": "Error al guardar la imagen. Inténtelo de nuevo.",
+    "selectImageFile": "Seleccione un archivo de imagen",
+    "shotHistoryAndAnalysis": "Historial de shots y análisis",
+    "upload": "Subir",
+    "uploadFailed": "Error al subir",
+    "uploaded": "¡Subido!",
+    "uploading": "Subiendo...",
+    "useImagePrompt": "¿Desea usar esta imagen para su perfil?"
   },
   "runShot": {
     "title": "Ejecutar / Programar",
@@ -194,8 +263,15 @@
       "shotFailed": "Error al ejecutar disparo",
       "saveFailed": "Error al guardar programación recurrente",
       "deleteFailed": "Error al eliminar programación recurrente",
-      "updateFailed": "Error al actualizar programación"
-    }
+      "updateFailed": "Error al actualizar programación",
+      "shotScheduled": "Shot programado para {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Error al programar shot",
+      "shotCancelled": "Shot programado cancelado"
+    },
+    "changeProfile": "Cambiar",
+    "everyXDaysCount": "Cada {{count}} días",
+    "noProfileSelected": "Ningún perfil seleccionado. Seleccione un perfil o use solo precalentamiento.",
+    "selectProfile": "Seleccionar perfil"
   },
   "shotHistory": {
     "duration": "Duración",
@@ -265,6 +341,11 @@
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare"
   },
+  "betaBanner": {
+    "runningBeta": "Estás usando MeticAI beta {{version}}",
+    "betaChannelEnabled": "Actualizaciones beta activadas — recibirás versiones previas",
+    "reportIssue": "Reportar problema"
+  },
   "settings": {
     "title": "Configuración",
     "aboutMeticAI": "Acerca de MeticAI",
@@ -278,6 +359,14 @@
     "apiKeyPlaceholder": "Ingresa tu clave API de Gemini",
     "apiKeyPlaceholderNew": "Ingresa nueva clave para cambiar",
     "apiKeyConfigured": "Clave API configurada. Haz clic en el campo para ingresar una nueva clave.",
+    "apiKeyConfiguredExtended": "Clave API configurada. Haz clic en el campo para ingresar una nueva clave. Puedes mantener la clave guardada y desactivar las funciones de IA a continuación.",
+    "aiAssistant": "Asistente de IA",
+    "aiAssistantDescription": "La clave API de Gemini es opcional. Agrega una solo si deseas funciones de perfil y análisis impulsadas por IA.",
+    "aiAssistantOptional": "Opcional.",
+    "enableAiFeatures": "Activar funciones de IA",
+    "enableAiFeaturesDescription": "Activa/desactiva las herramientas de IA sin eliminar tu clave API guardada.",
+    "hideAiWhenUnavailable": "Ocultar controles de IA cuando no estén disponibles",
+    "hideAiWhenUnavailableDescription": "Cuando está desactivado, los controles de IA permanecen visibles pero deshabilitados hasta que la IA esté disponible.",
     "getApiKey": "Obtén tu clave API de",
     "googleAIStudio": "Google AI Studio",
     "meticulousIp": "IP de máquina Meticulous",
@@ -357,11 +446,34 @@
       "guideStep3": "Abre esta URL desde cualquier dispositivo en tu red de Tailscale:",
       "setupGuide": "Guía de configuración"
     },
+    "beta": {
+      "title": "Pruebas beta",
+      "enableUpdates": "Activar actualizaciones beta",
+      "enableDescription": "Obtén acceso anticipado a nuevas funciones antes de que sean lanzadas.",
+      "warning": "Las versiones beta pueden contener errores y comportamiento inesperado. Puedes volver a la versión estable en cualquier momento.",
+      "currentChannel": "Canal actual",
+      "sendFeedback": "Enviar comentarios beta",
+      "feedbackTitle": "Título",
+      "feedbackTitlePlaceholder": "Breve resumen de tus comentarios",
+      "feedbackDescription": "Descripción",
+      "feedbackDescriptionPlaceholder": "Por favor describe tus comentarios en detalle...",
+      "submitFeedback": "Enviar comentarios",
+      "viewOnGitHub": "Ver en GitHub →",
+      "feedbackType": {
+        "bug": "Error",
+        "feature": "Solicitud de función",
+        "question": "Pregunta",
+        "general": "General"
+      },
+      "betaAvailable": "Beta v{{version}} está disponible con nuevas funciones. Activa las actualizaciones beta para probarla.",
+      "stableCaughtUp": "La versión estable v{{version}} ya está disponible. Puedes volver al canal estable."
+    },
     "updateMethod": {
       "watchtower": "Actualizaciones automáticas vía Watchtower",
       "manual": "Solo actualizaciones manuales",
       "watchtowerDescription": "Las actualizaciones se aplican automáticamente cuando hay nuevas versiones disponibles.",
-      "manualDescription": "No se detectó ningún mecanismo de actualización automática. Actualiza manualmente vía docker pull."
+      "manualDescription": "No se detectó ningún mecanismo de actualización automática. Actualiza manualmente vía docker pull.",
+      "watchtowerStatus": "Estado de Watchtower"
     },
     "version": "Versión",
     "footer": "MeticAI • Construido con ❤️ para amantes del café",
@@ -458,11 +570,16 @@
     "allProfilesImported": "Todos los perfiles de la máquina ya están en tu catálogo",
     "importAll": "Importar todos los {{count}} perfiles",
     "importingNote": "La importación genera descripciones AI para cada perfil y consumirá tokens de API.",
+    "generateAiDescriptions": "Generar descripciones de IA",
+    "generateAiDescriptionsHint": "Agrega resúmenes de perfil más detallados durante la importación",
+    "aiDescriptionsUnavailable": "Las descripciones de IA no están disponibles. Activa las funciones de IA en Configuración y asegúrate de que haya una clave API de Gemini configurada.",
     "startingImport": "Iniciando importación...",
     "importing": "Importando {{current}}/{{total}}",
     "preparing": "Preparando...",
     "percentComplete": "{{percent}}% completado",
     "generatingDescriptions": "Generando descripciones AI para cada perfil...",
+    "importingWithoutDescriptions": "Importando perfiles sin descripciones generadas por IA",
+    "importFileAriaLabel": "Importar archivo JSON de perfil",
     "readingFile": "Leyendo archivo...",
     "importingProfile": "Importando perfil...",
     "fetchingProfile": "Obteniendo perfil de la máquina...",
@@ -526,6 +643,7 @@
       "descaling": "Descalcificando",
       "unknown": "Desconocido",
       "ready": "Listo",
+      "lancesStandard": "incluso por el estándar de Lance",
       "pourWater": "Añadir agua",
       "purging": "Purgando",
       "clickToPurge": "Pulsa para purgar"
@@ -536,7 +654,9 @@
       "pressure": "Presión (bar)",
       "flow": "Flujo (ml/s)",
       "pressureLabel": "Presión",
-      "flowLabel": "Flujo"
+      "flowLabel": "Flujo",
+      "power": "Potencia",
+      "temp": "Temp"
     },
     "actions": {
       "start": "Iniciar",
@@ -683,5 +803,95 @@
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
     "animationsDescription": "Show animated background effects"
+  },
+  "advanced": {
+    "detailedKnowledge": "Conocimiento detallado de IA",
+    "detailedKnowledgeDescription": "Incluir guía completa de perfilado y especificación OEPF para perfiles de mayor calidad",
+    "detailedKnowledgeWarning": "Advertencia: El modo detallado usa aproximadamente 4× más tokens de entrada (~40K vs ~10K). Esto aumenta significativamente los costos de API y puede exceder los límites gratuitos. No recomendado con claves API de Gemini gratuitas."
+  },
+  "pourOver": {
+    "autoStartDescription": "Se inicia al detectar el vertido, pero ignora picos rápidos.",
+    "autoStartTimer": "Inicio automático del temporizador",
+    "bloomDescription": "Muestra una cuenta regresiva de bloom durante los primeros segundos de extracción.",
+    "bloomDone": "listo",
+    "bloomWeightMultiplier": "Peso objetivo del bloom",
+    "bloomWeightMultiplierDescription": "Peso objetivo del agua durante el bloom, como múltiplo de la dosis.",
+    "bloomDuration": "Duración del bloom (seg)",
+    "bloomIndicator": "Indicador de bloom",
+    "doseLabel": "Dosis (g)",
+    "flow": "Flujo",
+    "flowLegend": "flujo",
+    "freeMode": "Modo libre",
+    "offlineNotice": "La máquina está desconectada. Las acciones de la báscula están desactivadas hasta que se restablezca la conexión.",
+    "pause": "Pausa",
+    "progress": "Progreso",
+    "ratioLabel": "Ratio (1:x)",
+    "ratioMode": "Modo ratio",
+    "remaining": "Restante",
+    "targetReached": "¡Objetivo alcanzado!",
+    "reset": "Reiniciar",
+    "start": "Iniciar",
+    "tare": "Tarar",
+    "targetWater": "Agua objetivo",
+    "timer": "Temporizador",
+    "title": "Pour-over",
+    "unitFlowRate": "g/s",
+    "unitGrams": "g",
+    "unitTime": "mm:ss",
+    "waitingForWeight": "Esperando datos de peso…",
+    "weighFromScale": "Pesar en báscula",
+    "weighFromScaleTitle": "Capturar el peso actual de la báscula como dosis",
+    "weighFromScaleShort": "Dosis de báscula",
+    "weighFromScaleDescription": "Transfiere la lectura actual de la báscula como dosis de café",
+    "doseWarningTitle": "La dosis parece alta",
+    "doseWarningDescription": "Estás a punto de establecer {{weight}}g como dosis. ¿Olvidaste tarar la báscula?",
+    "doseWarningConfirm": "Usar {{weight}}g",
+    "weight": "Peso",
+    "weightLegend": "peso",
+    "weightTrendLabel": "Tendencia de peso",
+    "timeoutReached": "Temporizador de infusión detenido — tiempo de seguridad de 10 minutos alcanzado.",
+    "integration": {
+      "toggle": "Integración con máquina",
+      "toggleDescription": "Rastrea tu pour-over en la pantalla Meticulous. El temporizador se inicia automáticamente — empieza a verter cuando escuches el sonido.",
+      "startOnMachine": "Iniciar en máquina",
+      "stop": "Detener",
+      "newShot": "Nueva extracción",
+      "profileReady": "Perfil cargado — iniciando extracción en la máquina.",
+      "cleanupSuccess": "Perfil temporal eliminado.",
+      "forceCleanupUsed": "Perfil eliminado (purga omitida).",
+      "cleanupFailed": "No se pudo eliminar el perfil temporal.",
+      "abortCleanupSuccess": "Extracción detenida y perfil eliminado.",
+      "prepareFailed": "No se pudo preparar el perfil en la máquina.",
+      "invalidWeight": "Establece una dosis y ratio válidos para calcular el peso objetivo.",
+      "shotEndedAt": "Extracción terminada en",
+      "status": {
+        "preparing": "Preparando perfil…",
+        "ready": "Perfil cargado — esperando la máquina…",
+        "brewing": "Extrayendo en la máquina…",
+        "drawdown": "Objetivo alcanzado — midiendo tiempo de goteo…",
+        "purging": "Limpiando perfil…",
+        "done": "¡Extracción completa!",
+        "error": "Algo salió mal."
+      }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Verter hasta {{weight}}g",
+    "recipeWait": "Esperar {{seconds}}s"
+  },
+  "results": {
+    "backToForm": "Volver al formulario",
+    "coffeeAnalysis": "Análisis de café",
+    "exportAs": "Exportar como",
+    "image": "Imagen",
+    "json": "JSON",
+    "profileGenerated": "¡Perfil generado!",
+    "profileLabel": "Perfil",
+    "runScheduleShot": "Ejecutar / Programar shot",
+    "saveAsImage": "Guardar resultados como imagen",
+    "savedToDevice": "Perfil guardado en el dispositivo",
+    "savedToHistory": "El perfil se ha guardado en su dispositivo Meticulous y en el historial",
+    "noProfileJson": "No hay perfil JSON disponible",
+    "profileJsonDownloaded": "¡Perfil JSON descargado!"
   }
 }

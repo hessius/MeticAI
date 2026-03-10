@@ -26,6 +26,7 @@ from services.meticulous_service import (
     async_list_profiles,
     async_get_profile,
     async_save_profile,
+    async_create_profile,
     async_load_profile_by_id,
     async_execute_action,
 )
@@ -41,6 +42,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
+
+# Simple placeholder SVG for profiles without images (coffee bean icon)
+PLACEHOLDER_SVG = b'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256">
+<rect width="256" height="256" fill="#2d2d2d"/>
+<path fill="#6b5b47" d="M128 32c-53 0-96 43-96 96s43 96 96 96 96-43 96-96-43-96-96-96zm0 176c-44.2 0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z"/>
+<path fill="#8b7355" d="M128 56c-39.8 0-72 32.2-72 72s32.2 72 72 72 72-32.2 72-72-32.2-72-72-72zm0 128c-30.9 0-56-25.1-56-56s25.1-56 56-56 56 25.1 56 56-25.1 56-56 56z"/>
+<ellipse cx="128" cy="128" rx="32" ry="40" fill="#6b5b47"/>
+</svg>'''
 
 
 def _parse_data_image_uri(image_uri: str) -> tuple[str, bytes]:
@@ -238,19 +247,33 @@ async def upload_profile_image(
         
         # Find matching profile
         matching_profile = None
+        profile_fetch_error = None
         for partial_profile in profiles_result:
             if partial_profile.name == profile_name:
                 # Get full profile
                 full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
+                    # Non-UUID profile IDs cause 404 on machine API
+                    profile_fetch_error = f"Unable to fetch profile details. Profile ID '{partial_profile.id}' may be invalid (non-UUID). Consider deleting and recreating this profile."
+                    logger.warning(
+                        f"Profile found in list but fetch failed: {profile_name}",
+                        extra={
+                            "request_id": request_id,
+                            "profile_id": partial_profile.id,
+                            "error": full_profile.error
+                        }
+                    )
                     continue
                 matching_profile = full_profile
                 break
         
         if not matching_profile:
+            error_detail = f"Profile '{profile_name}' not found on machine"
+            if profile_fetch_error:
+                error_detail = profile_fetch_error
             raise HTTPException(
                 status_code=404,
-                detail=f"Profile '{profile_name}' not found on machine"
+                detail=error_detail
             )
         
         # Update the profile with the new image
@@ -398,8 +421,8 @@ async def generate_profile_image(
             client = get_gemini_client()
         except ValueError:
             raise HTTPException(
-                status_code=402,
-                detail="Image generation requires GEMINI_API_KEY to be set."
+                status_code=503,
+                detail="AI features are unavailable. Please configure a Gemini API key in Settings."
             )
         
         response = client.models.generate_images(
@@ -792,12 +815,24 @@ async def proxy_profile_image(
                         media_type=media_type
                     )
         
-        raise HTTPException(
-            status_code=404,
-            detail=f"Profile '{profile_name}' not found"
+        # Profile not found on machine - return placeholder instead of 404
+        # This prevents browser console errors for deleted/missing profiles
+        logger.debug(
+            f"Profile '{profile_name}' not found on machine, returning placeholder",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+        return Response(
+            content=PLACEHOLDER_SVG,
+            media_type="image/svg+xml"
         )
         
-    except HTTPException:
+    except HTTPException as he:
+        # If it's a "no image" case, return placeholder
+        if he.status_code == 404:
+            return Response(
+                content=PLACEHOLDER_SVG,
+                media_type="image/svg+xml"
+            )
         raise
     except httpx.TimeoutException as e:
         logger.warning(
@@ -971,10 +1006,17 @@ async def get_profile_info(
                 
                 return result
         
-        raise HTTPException(
-            status_code=404,
-            detail=f"Profile '{profile_name}' not found on machine"
+        # Profile not found - return graceful response instead of 404
+        # This prevents browser console errors when viewing history with deleted profiles
+        logger.info(
+            f"Profile not found on machine: {profile_name}",
+            extra={"request_id": request_id, "profile_name": profile_name}
         )
+        return {
+            "status": "not_found",
+            "profile": None,
+            "message": f"Profile '{profile_name}' not found on machine"
+        }
         
     except HTTPException:
         raise
@@ -1406,7 +1448,17 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
 """
         
         # Call LLM (non-blocking)
-        model = get_vision_model()
+        try:
+            model = get_vision_model()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "message": str(e),
+                    "error": "AI features are unavailable until GEMINI_API_KEY is configured"
+                }
+            ) from e
         response = await model.async_generate_content(prompt)
         
         llm_analysis = response.text if response else "Analysis generation failed"
@@ -1480,15 +1532,21 @@ async def list_machine_profiles(request: Request):
             try:
                 full_profile = await async_get_profile(partial_profile.id)
                 if hasattr(full_profile, 'error') and full_profile.error:
-                    continue
+                    # Fall back to partial profile data (non-UUID IDs cause 404 on get)
+                    logger.warning(
+                        f"Could not fetch full profile {partial_profile.name}, using partial data",
+                        extra={"request_id": request_id, "profile_id": partial_profile.id}
+                    )
+                    full_profile = partial_profile
                 
                 # Check if this profile exists in our history
                 in_history = False
                 try:
                     history = load_history()
                     entries = history if isinstance(history, list) else history.get("entries", [])
+                    profile_name = getattr(full_profile, 'name', None) or getattr(partial_profile, 'name', None)
                     in_history = any(
-                        entry.get("profile_name") == full_profile.name 
+                        entry.get("profile_name") == profile_name 
                         for entry in entries
                     )
                 except Exception:
@@ -1496,11 +1554,11 @@ async def list_machine_profiles(request: Request):
                 
                 # Convert profile to dict
                 profile_dict = {
-                    "id": full_profile.id,
-                    "name": full_profile.name,
-                    "author": getattr(full_profile, 'author', None),
-                    "temperature": getattr(full_profile, 'temperature', None),
-                    "final_weight": getattr(full_profile, 'final_weight', None),
+                    "id": getattr(full_profile, 'id', partial_profile.id),
+                    "name": getattr(full_profile, 'name', partial_profile.name),
+                    "author": getattr(full_profile, 'author', getattr(partial_profile, 'author', None)),
+                    "temperature": getattr(full_profile, 'temperature', getattr(partial_profile, 'temperature', None)),
+                    "final_weight": getattr(full_profile, 'final_weight', getattr(partial_profile, 'final_weight', None)),
                     "in_history": in_history,
                     "has_description": False,
                     "description": None
@@ -1510,7 +1568,7 @@ async def list_machine_profiles(request: Request):
                 if in_history:
                     try:
                         for entry in entries:
-                            if entry.get("profile_name") == full_profile.name:
+                            if entry.get("profile_name") == profile_dict["name"]:
                                 if entry.get("reply"):
                                     profile_dict["has_description"] = True
                                 break
@@ -1519,10 +1577,23 @@ async def list_machine_profiles(request: Request):
                 
                 profiles.append(profile_dict)
             except Exception as e:
+                # Fall back to partial profile data on exception (e.g., 404 for non-UUID IDs)
                 logger.warning(
-                    f"Failed to fetch profile {partial_profile.name}: {e}",
+                    f"Failed to fetch profile {partial_profile.name}, using partial data: {e}",
                     extra={"request_id": request_id}
                 )
+                # Use partial profile data instead of skipping
+                profile_dict = {
+                    "id": partial_profile.id,
+                    "name": partial_profile.name,
+                    "author": getattr(partial_profile, 'author', None),
+                    "temperature": getattr(partial_profile, 'temperature', None),
+                    "final_weight": getattr(partial_profile, 'final_weight', None),
+                    "in_history": False,
+                    "has_description": False,
+                    "description": None
+                }
+                profiles.append(profile_dict)
         
         logger.info(
             f"Found {len(profiles)} profiles on machine",
@@ -1672,9 +1743,11 @@ async def import_profile(request: Request):
                     f"Failed to generate description: {e}",
                     extra={"request_id": request_id}
                 )
-                reply = f"Profile imported from {source}. Description generation failed."
+                from services.analysis_service import _build_static_profile_description
+                reply = _build_static_profile_description(profile_json)
         else:
-            reply = f"Profile imported from {source}."
+            from services.analysis_service import _build_static_profile_description
+            reply = _build_static_profile_description(profile_json)
         
         # Create history entry
         entry_id = str(uuid.uuid4())
@@ -1700,6 +1773,23 @@ async def import_profile(request: Request):
         
         save_history(history)
         
+        # Upload profile to the Meticulous machine when imported from a file.
+        # Profiles imported from the machine (source="machine") already exist there.
+        machine_profile_id = None
+        if source == "file":
+            try:
+                result = await async_create_profile(profile_json)
+                machine_profile_id = result.get("id") if isinstance(result, dict) else None
+                logger.info(
+                    f"Profile uploaded to machine: {profile_name}",
+                    extra={"request_id": request_id, "machine_profile_id": machine_profile_id}
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"Profile saved to history but failed to upload to machine: {exc}",
+                    extra={"request_id": request_id, "error_type": type(exc).__name__}
+                )
+        
         logger.info(
             f"Profile imported successfully: {profile_name}",
             extra={"request_id": request_id, "entry_id": entry_id}
@@ -1709,7 +1799,8 @@ async def import_profile(request: Request):
             "status": "success",
             "entry_id": entry_id,
             "profile_name": profile_name,
-            "has_description": reply is not None and "Description generation failed" not in reply
+            "has_description": reply is not None and "Description generation failed" not in reply,
+            "uploaded_to_machine": machine_profile_id is not None
         }
         
     except HTTPException:
@@ -1740,6 +1831,14 @@ async def import_all_profiles(request: Request):
     from fastapi.responses import StreamingResponse
     
     request_id = request.state.request_id
+
+    generate_description = True
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            generate_description = bool(body.get("generate_description", True))
+    except Exception:
+        generate_description = True
     
     async def generate_import_stream():
         """Generator that yields progress updates as JSON lines."""
@@ -1818,12 +1917,16 @@ async def import_all_profiles(request: Request):
                     profile_json = deep_convert_to_dict(profile)
                     
                     # Generate description
-                    reply = None
-                    try:
-                        reply = await _generate_profile_description(profile_json, request_id)
-                    except Exception as e:
-                        logger.warning(f"Failed to generate description for {profile_name}: {e}")
-                        reply = "Profile imported from machine. Description generation failed."
+                    if generate_description:
+                        try:
+                            reply = await _generate_profile_description(profile_json, request_id)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate description for {profile_name}: {e}")
+                            from services.analysis_service import _build_static_profile_description
+                            reply = _build_static_profile_description(profile_json)
+                    else:
+                        from services.analysis_service import _build_static_profile_description
+                        reply = _build_static_profile_description(profile_json)
                     
                     # Create history entry
                     entry_id = str(uuid.uuid4())
@@ -2026,7 +2129,17 @@ Special Notes:
 
 Remember: NO information should be lost in this conversion!"""
 
-        model = get_vision_model()
+        try:
+            model = get_vision_model()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "error",
+                    "message": str(e),
+                    "error": "AI features are unavailable until GEMINI_API_KEY is configured"
+                }
+            ) from e
         response = await model.async_generate_content(prompt)
         converted_description = response.text.strip()
         

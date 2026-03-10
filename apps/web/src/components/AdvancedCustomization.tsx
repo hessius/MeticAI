@@ -1,11 +1,13 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
-import { CaretDown, X } from '@phosphor-icons/react'
+import { CaretDown, X, Warning } from '@phosphor-icons/react'
 
 export interface AdvancedCustomizationOptions {
   basketSize?: string
@@ -16,6 +18,7 @@ export interface AdvancedCustomizationOptions {
   shotVolume?: number
   dose?: number
   bottomFilter?: 'yes' | 'no'
+  detailedKnowledge?: boolean
 }
 
 interface AdvancedCustomizationProps {
@@ -24,6 +27,7 @@ interface AdvancedCustomizationProps {
 }
 
 export function AdvancedCustomization({ value, onChange }: AdvancedCustomizationProps) {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
 
   const handleChange = (key: keyof AdvancedCustomizationOptions, newValue: string | number | boolean | undefined) => {
@@ -319,6 +323,33 @@ export function AdvancedCustomization({ value, onChange }: AdvancedCustomization
                       </Button>
                     )}
                   </div>
+                </div>
+
+                {/* Detailed Knowledge Toggle */}
+                <div className="space-y-2 pt-2 border-t border-border/30">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="detailed-knowledge" className="text-sm font-medium text-foreground/90">
+                        {t('advanced.detailedKnowledge')}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t('advanced.detailedKnowledgeDescription')}
+                      </p>
+                    </div>
+                    <Switch
+                      id="detailed-knowledge"
+                      checked={value.detailedKnowledge || false}
+                      onCheckedChange={(checked) => handleChange('detailedKnowledge', checked)}
+                    />
+                  </div>
+                  {value.detailedKnowledge && (
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <Warning size={16} weight="fill" className="text-amber-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        {t('advanced.detailedKnowledgeWarning')}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

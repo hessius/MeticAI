@@ -19,6 +19,7 @@ import os
 import subprocess
 import json
 import time
+import asyncio
 import requests
 
 
@@ -172,30 +173,36 @@ class TestAnalyzeCoffeeEndpoint:
             assert "analysis" in response.json()
 
 
+@pytest.mark.usefixtures("mock_validate_profile")
 class TestAnalyzeAndProfileEndpoint:
     """Tests for the /analyze_and_profile endpoint (consolidated endpoint)."""
 
+    PROFILE_REPLY = (
+        "**Profile Created:** Test Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+        "```\n"
+    )
+
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
+    def test_analyze_and_profile_with_image_only(self, mock_vision_model, mock_create_profile, mock_save_history, client, sample_image):
         """Test profile creation with only an image (no user preferences)."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-123"}
+        mock_create_profile.return_value = {"id": "machine-123"}
         
-        # Mock the Gemini vision response
-        mock_response = Mock()
-        mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        # Mock successful subprocess execution
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        # Mock vision model with two calls: image analysis then profile generation
+        analysis_response = Mock()
+        analysis_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -205,36 +212,30 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "success"
         assert response.json()["analysis"] == "Ethiopian Yirgacheffe, Light Roast, Floral Notes"
-        assert "Profile uploaded" in response.json()["reply"]
+        assert "Profile Created" in response.json()["reply"]
         
         # Verify vision model was called
-        mock_vision_model.return_value.async_generate_content.assert_called_once()
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+        mock_create_profile.assert_awaited_once()
         
-        # Verify subprocess was called with correct arguments
-        mock_subprocess.assert_called_once()
-        call_args = mock_subprocess.call_args[0][0]
-        assert "gemini" in call_args
-        assert "-y" in call_args  # yolo mode for auto-approval
-        
-        # Verify the prompt contains the analysis
-        prompt = call_args[-1]
+        # Verify the final prompt contains the analysis
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         assert "Ethiopian Yirgacheffe, Light Roast, Floral Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_with_prefs_only(self, mock_subprocess, mock_save_history, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_with_prefs_only(self, mock_vision_model, mock_create_profile, mock_save_history, client):
         """Test profile creation with only user preferences (no image)."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-456"}
+        mock_create_profile.return_value = {"id": "machine-456"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
         
-        # Mock successful subprocess execution
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
-
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Strong and intense espresso"}
@@ -243,34 +244,32 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "success"
         assert response.json()["analysis"] is None  # No image, so no analysis
-        assert "Profile uploaded" in response.json()["reply"]
+        assert "Profile Created" in response.json()["reply"]
         
-        # Verify subprocess was called with user preferences
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        # Verify model prompt includes user preferences
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         assert "Strong and intense espresso" in prompt
+        mock_create_profile.assert_awaited_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_with_both(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
+    def test_analyze_and_profile_with_both(self, mock_vision_model, mock_create_profile, mock_save_history, client, sample_image):
         """Test profile creation with both image and user preferences."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-789"}
+        mock_create_profile.return_value = {"id": "machine-789"}
         
-        # Mock the Gemini vision response
-        mock_response = Mock()
-        mock_response.text = "Colombian Supremo, Medium Roast, Nutty"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        # Mock successful subprocess execution
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        # Mock two calls: image analysis then profile generation
+        analysis_response = Mock()
+        analysis_response.text = "Colombian Supremo, Medium Roast, Nutty"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -282,11 +281,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.json()["status"] == "success"
         assert response.json()["analysis"] == "Colombian Supremo, Medium Roast, Nutty"
         
-        # Verify subprocess was called with both coffee analysis and user preferences
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        # Verify prompt was built with both coffee analysis and user preferences
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         assert "Colombian Supremo, Medium Roast, Nutty" in prompt
         assert "Quick extraction" in prompt
+        mock_create_profile.assert_awaited_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_analyze_and_profile_missing_both(self, client):
@@ -305,22 +305,21 @@ class TestAnalyzeAndProfileEndpoint:
         assert "At least one of" in response.json()["detail"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_subprocess_error(self, mock_vision_model, mock_subprocess, client, sample_image):
-        """Test error handling when subprocess fails."""
+    def test_analyze_and_profile_profile_creation_error(self, mock_vision_model, mock_create_profile, client, sample_image):
+        """Test error handling when machine profile creation fails."""
         # Mock the Gemini vision response
-        mock_response = Mock()
-        mock_response.text = "Test Coffee"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
+        analysis_response = Mock()
+        analysis_response.text = "Test Coffee"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
         
-        # Mock subprocess failure
-        mock_result = Mock()
-        mock_result.returncode = 1
-        mock_result.stdout = ""
-        mock_result.stderr = "Docker container not found"
-        mock_subprocess.return_value = mock_result
+        # Mock machine API failure
+        mock_create_profile.return_value = {"error": "Docker container not found"}
 
         response = client.post(
             "/analyze_and_profile",
@@ -330,14 +329,17 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 200
         assert response.json()["status"] == "error"
         assert response.json()["analysis"] == "Test Coffee"
+        assert "reply" in response.json()
         assert "Docker container not found" in response.json()["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_exception(self, mock_subprocess, client):
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_exception(self, mock_vision_model, client):
         """Test handling of unexpected exceptions."""
-        # Mock an exception in subprocess
-        mock_subprocess.side_effect = Exception("Unexpected error occurred")
+        # Mock an exception in model generation
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=Exception("Unexpected error occurred")
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -347,11 +349,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert response.status_code == 500
         assert "Unexpected error" in response.json()["detail"]["message"]
 
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_timeout(self, mock_subprocess, client):
-        """Test handling of subprocess timeout."""
-        import subprocess as sp
-        mock_subprocess.side_effect = sp.TimeoutExpired(cmd="gemini", timeout=300)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_timeout(self, mock_vision_model, client):
+        """Test handling of SDK timeout."""
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=asyncio.TimeoutError()
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -381,23 +384,16 @@ class TestAnalyzeAndProfileEndpoint:
         assert "error" in response.json()["detail"]["status"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_llm_silent_failure(self, mock_subprocess, client):
-        """Test that LLM failure is detected even when Gemini CLI exits with code 0.
-        
-        When the LLM encounters MCP validation errors it can't resolve, it returns
-        exit code 0 but with a failure message (no profile JSON, no 'Profile Created:').
-        This should be detected and returned as an error, not success.
-        """
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = (
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_llm_silent_failure(self, mock_vision_model, client):
+        """Test that missing profile JSON in model output is treated as failure."""
+        profile_response = Mock()
+        profile_response.text = (
             "I've hit a roadblock trying to create this profile. "
             "The validation system returned conflicting errors that I couldn't resolve. "
             "Could you try again with slightly different parameters?"
         )
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -412,14 +408,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert "hit a roadblock" in data["reply"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_llm_silent_failure_empty_output(self, mock_subprocess, client):
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_llm_silent_failure_empty_output(self, mock_vision_model, client):
         """Test detection of empty LLM output as a failure."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = ""
-        mock_result.stderr = ""
-        mock_subprocess.return_value = mock_result
+        profile_response = Mock()
+        profile_response.text = ""
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -432,14 +426,12 @@ class TestAnalyzeAndProfileEndpoint:
         assert "validation errors" in data["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_llm_silent_failure_with_stderr(self, mock_subprocess, client):
-        """Test that stderr is logged when Gemini CLI exits 0 but fails."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "I couldn't create the profile due to errors."
-        mock_result.stderr = "MCP tool error: ProfileValidationError: pressure limit exceeded"
-        mock_subprocess.return_value = mock_result
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_llm_silent_failure_includes_history(self, mock_vision_model, client):
+        """Test failed attempts without profile JSON are still saved to history."""
+        profile_response = Mock()
+        profile_response.text = "I couldn't create the profile due to errors."
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -453,22 +445,21 @@ class TestAnalyzeAndProfileEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_subprocess, mock_save_history, client, sample_image):
+    def test_analyze_and_profile_various_preferences(self, mock_vision_model, mock_create_profile, mock_save_history, client, sample_image):
         """Test profile creation with different user preferences."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-multi"}
+        mock_create_profile.return_value = {"id": "machine-multi"}
         
-        mock_response = Mock()
-        mock_response.text = "Test Coffee"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile\n\nProfile uploaded successfully."
-        mock_subprocess.return_value = mock_result
+        analysis_response = Mock()
+        analysis_response.text = "Test Coffee"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response] * 4
+        )
 
         preferences = [
             "Strong and intense",
@@ -486,54 +477,44 @@ class TestAnalyzeAndProfileEndpoint:
             
             assert response.status_code == 200
             assert response.json()["status"] == "success"
+        assert mock_create_profile.await_count == 4
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_analyze_and_profile_yolo_mode(self, mock_vision_model, mock_subprocess, client, sample_image):
-        """Test that yolo mode is used for auto-approval of tool calls.
-        
-        Note: The --allowed-tools flag doesn't work with MCP-provided tools,
-        so we use -y (yolo mode) instead. Security is maintained because
-        the MCP server only exposes safe tools.
-        """
-        mock_response = Mock()
-        mock_response.text = "Test Coffee"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+    def test_analyze_and_profile_sdk_create_called(self, mock_vision_model, mock_create_profile, client, sample_image):
+        """Test SDK path calls machine create API instead of subprocess."""
+        mock_create_profile.return_value = {"id": "machine-sdk"}
+        analysis_response = Mock()
+        analysis_response.text = "Test Coffee"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
             files={"file": ("test.png", sample_image, "image/png")}
         )
 
-        call_args = mock_subprocess.call_args[0][0]
-        
-        # Verify that yolo mode flag is present for auto-approval
-        assert "-y" in call_args
-        
-        # Verify the command structure is correct (direct gemini CLI call)
-        assert call_args[0] == "gemini"
-        assert "-y" in call_args
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        mock_create_profile.assert_awaited_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.coffee.save_to_history')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_analyze_and_profile_special_characters(self, mock_subprocess, mock_save_history, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_analyze_and_profile_special_characters(self, mock_vision_model, mock_create_profile, mock_save_history, client):
         """Test handling of special characters in input."""
         # Mock history saving
         mock_save_history.return_value = {"id": "test-special"}
+        mock_create_profile.return_value = {"id": "machine-special"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
         
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
-
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Extra-strong <intense> & 'special' \"roast\""}
@@ -554,9 +535,9 @@ class TestAnalyzeAndProfileEndpoint:
             )
 
         assert response.status_code == 409
-        detail = response.json()["detail"]
-        assert detail["status"] == "busy"
-        assert "already being generated" in detail["message"]
+        body = response.json()
+        assert body["status"] == "busy"
+        assert "already being generated" in body["message"]
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_analyze_and_profile_409_with_api_prefix(self, client):
@@ -569,7 +550,7 @@ class TestAnalyzeAndProfileEndpoint:
             )
 
         assert response.status_code == 409
-        assert response.json()["detail"]["status"] == "busy"
+        assert response.json()["status"] == "busy"
 
 
 class TestHealthAndStartup:
@@ -638,23 +619,31 @@ class TestEdgeCases:
         assert len(response.json()["analysis"]) == 10000
 
 
+@pytest.mark.usefixtures("mock_validate_profile")
 class TestEnhancedBaristaPersona:
     """Tests for enhanced barista persona and profile creation features."""
 
+    PROFILE_REPLY = (
+        "**Profile Created:** Test Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+        "```\n"
+    )
+
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_prompt_includes_modern_barista_persona(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test that the prompt includes the modern experimental barista persona."""
-        mock_response = Mock()
-        mock_response.text = "Ethiopian Coffee, Light Roast"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-1"}
+        analysis_response = Mock()
+        analysis_response.text = "Ethiopian Coffee, Light Roast"
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -662,8 +651,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt contains persona elements
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         assert "PERSONA:" in prompt
         assert "modern, experimental barista" in prompt
@@ -671,13 +660,14 @@ class TestEnhancedBaristaPersona:
         assert "creative" in prompt or "puns" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_complex_profile_support(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_complex_profile_support(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes instructions for complex profile creation."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-2"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -685,8 +675,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes complex profile guidelines
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "PROFILE CREATION GUIDELINES:" in prompt
         assert "multi-stage extraction" in prompt
@@ -694,13 +684,14 @@ class TestEnhancedBaristaPersona:
         assert "blooming" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_naming_convention(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_naming_convention(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes witty naming convention instructions."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-3"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -708,21 +699,22 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes naming guidelines
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "NAMING CONVENTION:" in prompt
         assert "witty" in prompt or "pun" in prompt
         assert "Examples:" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_user_summary_instructions(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_user_summary_instructions(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes instructions for post-creation user summary."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-4"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -730,8 +722,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes user summary requirements
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "user summary" in prompt
         assert "Profile Name" in prompt or "Description" in prompt
@@ -740,13 +732,14 @@ class TestEnhancedBaristaPersona:
         assert "Special Requirements" in prompt or "Special Notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_output_format(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_output_format(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes the output format template."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-5"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -754,8 +747,8 @@ class TestEnhancedBaristaPersona:
         )
 
         # Verify the prompt includes output format
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "OUTPUT FORMAT (use this exact format):" in prompt
         assert "Profile Created:" in prompt
@@ -764,63 +757,116 @@ class TestEnhancedBaristaPersona:
         assert "Why This Works:" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_validation_rules(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_validation_rules(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes validation rules to prevent MCP rejections."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-6"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Test"}
         )
 
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
 
-        # Verify validation rules are present
+        # Verify validation rules are present (distilled mode is the default)
         assert "VALIDATION RULES" in prompt
         assert "PARADOX" in prompt
-        assert "BACKUP EXIT TRIGGERS" in prompt
-        assert "REQUIRED SAFETY LIMITS" in prompt
+        assert "BACKUP TRIGGER" in prompt
+        assert "CROSS-TYPE LIMITS" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_error_recovery(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_error_recovery(self, mock_vision_model, mock_create_profile, client):
         """Test that the prompt includes error recovery instructions."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-7"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
             data={"user_prefs": "Test"}
         )
 
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
 
         assert "ERROR RECOVERY" in prompt
         assert "Fix ALL errors in a SINGLE retry" in prompt
         assert "NEVER give up" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_distilled_mode_is_default(self, mock_vision_model, mock_create_profile, client):
+        """Test that distilled (compact) prompt mode is the default."""
+        mock_create_profile.return_value = {"id": "persona-d1"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test"}
+        )
+
+        prompt = mock_vision_model.return_value.async_generate_content.call_args[0][0][0]
+
+        # Distilled mode uses compact versions
+        assert "PROFILING QUICK REFERENCE" in prompt
+        assert "OEPF FORMAT SUMMARY" in prompt
+        # Should NOT contain the full verbose sections
+        assert "Understanding Puck Dynamics" not in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_detailed_knowledge_mode(self, mock_vision_model, mock_create_profile, client):
+        """Test that detailed_knowledge=true includes full profiling knowledge."""
+        mock_create_profile.return_value = {"id": "persona-d2"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test", "detailed_knowledge": "true"}
+        )
+
+        prompt = mock_vision_model.return_value.async_generate_content.call_args[0][0][0]
+
+        # Full mode uses verbose versions
+        assert "ESPRESSO PROFILING GUIDE" in prompt
+        assert "Understanding Puck Dynamics" in prompt
+        assert "BACKUP EXIT TRIGGERS" in prompt
+        # Should NOT contain the compact versions
+        assert "PROFILING QUICK REFERENCE" not in prompt
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_enhanced_prompt_with_both_inputs(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test enhanced prompt when both image and preferences are provided."""
-        mock_response = Mock()
-        mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: The Berry Express"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "persona-8"}
+        analysis_response = Mock()
+        analysis_response.text = "Kenyan AA, Medium Roast, Berry notes"
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: The Berry Express\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"The Berry Express\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         response = client.post(
             "/analyze_and_profile",
@@ -831,8 +877,8 @@ class TestEnhancedBaristaPersona:
         assert response.status_code == 200
         
         # Verify the prompt includes all elements for both inputs
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         # Should have coffee analysis
         assert "Kenyan AA, Medium Roast, Berry notes" in prompt
@@ -845,17 +891,325 @@ class TestEnhancedBaristaPersona:
         assert "OUTPUT FORMAT (use this exact format):" in prompt
 
 
+class TestValidationRetry:
+    """Tests for profile validation and retry logic (#229)."""
+
+    VALID_PROFILE_REPLY = (
+        "**Profile Created:** Retry Test\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Retry Test\",\"stages\":[{\"name\":\"Pre-infusion\","
+        "\"type\":\"flow\",\"dynamics\":{\"points\":[{\"value\":2}],\"over\":\"time\"},"
+        "\"exit_triggers\":[{\"type\":\"time\",\"value\":10}],"
+        "\"limits\":[{\"type\":\"pressure\",\"value\":3}]}],\"variables\":[]}\n"
+        "```\n"
+    )
+
+    INVALID_PROFILE_REPLY = (
+        "**Profile Created:** Bad Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Bad Profile\",\"stages\":[]}\n"
+        "```\n"
+    )
+
+    NO_JSON_REPLY = (
+        "I had trouble creating the profile. "
+        "Let me try a different approach next time."
+    )
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_validation_passes_first_try(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that validation passing on first attempt skips retry."""
+        mock_save_history.return_value = {"id": "test-v1"}
+        mock_create_profile.return_value = {"id": "machine-v1"}
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+        mock_validate.return_value = valid_result
+
+        profile_response = Mock()
+        profile_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Fruity and bright"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Vision model called once for generation, no retries
+        assert mock_vision_model.return_value.async_generate_content.call_count == 1
+        mock_validate.assert_called_once()
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_validation_fails_then_succeeds_on_retry(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that a validation failure triggers retry and succeeds."""
+        mock_save_history.return_value = {"id": "test-v2"}
+        mock_create_profile.return_value = {"id": "machine-v2"}
+
+        # First validation fails, second passes
+        invalid_result = Mock()
+        invalid_result.is_valid = False
+        invalid_result.errors = ["Stage 'Pre-infusion': pressure stage must have a flow limit"]
+        invalid_result.error_summary.return_value = "1. Stage 'Pre-infusion': pressure stage must have a flow limit"
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+
+        mock_validate.side_effect = [invalid_result, valid_result]
+
+        # First call: original generation, second call: fix response
+        gen_response = Mock()
+        gen_response.text = self.VALID_PROFILE_REPLY
+        fix_response = Mock()
+        fix_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[gen_response, fix_response]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Clean and balanced"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # Generation + fix retry = 2 calls
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+        assert mock_validate.call_count == 2
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_validation_exhausts_retries(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that exhausting retries still proceeds with best-effort profile."""
+        mock_save_history.return_value = {"id": "test-v3"}
+        mock_create_profile.return_value = {"id": "machine-v3"}
+
+        # All validation attempts fail
+        invalid_result = Mock()
+        invalid_result.is_valid = False
+        invalid_result.errors = ["Error that persists"]
+        invalid_result.error_summary.return_value = "1. Error that persists"
+        mock_validate.return_value = invalid_result
+
+        gen_response = Mock()
+        gen_response.text = self.VALID_PROFILE_REPLY
+        fix_response = Mock()
+        fix_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[gen_response, fix_response, fix_response]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Rich and bold"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        # Should still proceed with best-effort profile upload
+        assert data["status"] == "success"
+        # Generation + 2 fix retries = 3 calls
+        assert mock_vision_model.return_value.async_generate_content.call_count == 3
+        # 3 validations: initial + 2 retries
+        assert mock_validate.call_count == 3
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_no_json_retries_then_fails(self, mock_vision_model, mock_validate, mock_save_history, client):
+        """Test that missing JSON triggers retries and eventually fails."""
+        mock_save_history.return_value = {"id": "test-v4"}
+
+        # All responses lack JSON
+        no_json = Mock()
+        no_json.text = self.NO_JSON_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=no_json)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Something impossible"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "error"
+        assert "validation errors" in data["message"]
+        # Initial generation + 2 retries = 3 calls
+        assert mock_vision_model.return_value.async_generate_content.call_count == 3
+        # validate_profile should never be called since no JSON was extracted
+        mock_validate.assert_not_called()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_no_json_then_json_on_retry(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that missing JSON on first try but found on retry succeeds."""
+        mock_save_history.return_value = {"id": "test-v5"}
+        mock_create_profile.return_value = {"id": "machine-v5"}
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+        mock_validate.return_value = valid_result
+
+        no_json = Mock()
+        no_json.text = self.NO_JSON_REPLY
+        with_json = Mock()
+        with_json.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[no_json, with_json]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Light and delicate"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # 2 calls: initial (no JSON) + retry (with JSON)
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+        mock_validate.assert_called_once()
+        mock_create_profile.assert_awaited_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_response_includes_generation_id(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Test that the response includes a generation_id for SSE tracking."""
+        mock_save_history.return_value = {"id": "test-v6"}
+        mock_create_profile.return_value = {"id": "machine-v6"}
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+        mock_validate.return_value = valid_result
+
+        profile_response = Mock()
+        profile_response.text = self.VALID_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Bright acidity"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "generation_id" in data
+        assert len(data["generation_id"]) == 8
+
+
+class TestUnicodeEscapeInReSubFix:
+    """Test that re.sub replacement with Unicode JSON doesn't raise PatternError.
+
+    Regression test for a bug where json.dumps output containing \\uXXXX
+    sequences caused re.PatternError('bad escape \\u') when used directly
+    as the replacement string in re.sub().
+    """
+
+    # Profile with Unicode characters that produce \uXXXX in json.dumps
+    UNICODE_PROFILE_REPLY = (
+        "**Profile Created:** Café Résumé\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Caf\\u00e9 R\\u00e9sum\\u00e9\",\"stages\":[{\"name\":\"Pre-infusion\","
+        "\"type\":\"flow\",\"dynamics\":{\"points\":[{\"value\":2}],\"over\":\"time\"},"
+        "\"exit_triggers\":[{\"type\":\"time\",\"value\":10}],"
+        "\"limits\":[{\"type\":\"pressure\",\"value\":3}]}],\"variables\":[]}\n"
+        "```\n"
+    )
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.coffee.save_to_history')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.validate_profile')
+    @patch('api.routes.coffee.get_vision_model')
+    def test_unicode_in_fixed_json_does_not_raise(self, mock_vision_model, mock_validate, mock_create_profile, mock_save_history, client):
+        """Validation fix path replaces JSON with unicode chars without error."""
+        mock_save_history.return_value = {"id": "test-unicode"}
+        mock_create_profile.return_value = {"id": "machine-unicode"}
+
+        # First validation fails, second passes — forces the re.sub code path
+        invalid_result = Mock()
+        invalid_result.is_valid = False
+        invalid_result.errors = ["Stage missing limit"]
+        invalid_result.error_summary.return_value = "1. Stage missing limit"
+
+        valid_result = Mock()
+        valid_result.is_valid = True
+        valid_result.errors = []
+
+        mock_validate.side_effect = [invalid_result, valid_result]
+
+        gen_response = Mock()
+        gen_response.text = self.UNICODE_PROFILE_REPLY
+        fix_response = Mock()
+        fix_response.text = self.UNICODE_PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[gen_response, fix_response]
+        )
+
+        response = client.post(
+            "/analyze_and_profile",
+            data={"user_prefs": "Test unicode handling"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        # The re.sub path was exercised (2 model calls = generation + fix)
+        assert mock_vision_model.return_value.async_generate_content.call_count == 2
+
+
+@pytest.mark.usefixtures("mock_validate_profile")
 class TestAdvancedCustomization:
     """Tests for advanced_customization parameter functionality."""
 
+    PROFILE_REPLY = (
+        "**Profile Created:** Test Profile\n\n"
+        "PROFILE JSON:\n"
+        "```json\n"
+        "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+        "```\n"
+    )
+
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_parameter_parsed(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_parameter_parsed(self, mock_vision_model, mock_create_profile, client):
         """Test that advanced_customization parameter is correctly parsed."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-1"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
         
@@ -870,18 +1224,19 @@ class TestAdvancedCustomization:
         assert response.status_code == 200
         
         # Verify the parameter was parsed and included in the prompt
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_includes_advanced_customization_when_provided(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_includes_advanced_customization_when_provided(self, mock_vision_model, mock_create_profile, client):
         """Test that prompt includes advanced customization section when provided."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-2"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Temperature: 93°C, Dose: 18g, Max Pressure: 9 bar"
         
@@ -896,8 +1251,8 @@ class TestAdvancedCustomization:
         assert response.status_code == 200
         
         # Verify the prompt includes advanced customization section
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Check for section header
         assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
@@ -907,13 +1262,14 @@ class TestAdvancedCustomization:
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_prompt_omits_advanced_customization_when_not_provided(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_prompt_omits_advanced_customization_when_not_provided(self, mock_vision_model, mock_create_profile, client):
         """Test that prompt omits advanced customization section when not provided."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-3"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -923,20 +1279,21 @@ class TestAdvancedCustomization:
         assert response.status_code == 200
         
         # Verify the prompt does NOT include advanced customization section
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" not in prompt
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." not in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_section_formatting(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_section_formatting(self, mock_vision_model, mock_create_profile, client):
         """Test that advanced customization section has correct formatting."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-4"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Temperature: 93°C\nDose: 18g\nBasket: 18g VST"
         
@@ -950,8 +1307,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Verify all formatting elements are present
         assert "⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):" in prompt
@@ -961,13 +1318,14 @@ class TestAdvancedCustomization:
         assert "CRITICAL: You MUST configure the profile to use these EXACT values." in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_mandatory_instructions_included(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_mandatory_instructions_included(self, mock_vision_model, mock_create_profile, client):
         """Test that MANDATORY instructions are included in the advanced customization section."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-5"}
+        profile_response = Mock()
+        profile_response.text = self.PROFILE_REPLY
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -979,8 +1337,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Verify all mandatory instruction bullets are present
         assert "• If a temperature is specified, set the profile temperature to that EXACT value" in prompt
@@ -990,19 +1348,23 @@ class TestAdvancedCustomization:
         assert "• If bottom filter is specified, mention it in preparation notes" in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_advanced_customization_with_image(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_advanced_customization_with_image(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test advanced_customization with image input."""
-        mock_response = Mock()
-        mock_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Floral Fantasy"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-6"}
+        analysis_response = Mock()
+        analysis_response.text = "Ethiopian Yirgacheffe, Light Roast, Floral notes"
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: Floral Fantasy\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Floral Fantasy\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         advanced_params = "Temperature: 94°C, Dose: 20g"
         
@@ -1014,8 +1376,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         # Should have coffee analysis
         assert "Ethiopian Yirgacheffe, Light Roast, Floral notes" in prompt
@@ -1024,13 +1386,19 @@ class TestAdvancedCustomization:
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_advanced_customization_with_user_prefs(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_advanced_customization_with_user_prefs(self, mock_vision_model, mock_create_profile, client):
         """Test advanced_customization with user preferences."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Precise Pour"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-7"}
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: Precise Pour\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Precise Pour\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         advanced_params = "Max Flow: 4 ml/s, Bottom Filter: IMS Superfine"
         user_prefs = "Emphasize clarity and sweetness"
@@ -1045,8 +1413,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args[0][0]
+        prompt = prompt_payload[0]
         
         # Should have user preferences
         assert user_prefs in prompt
@@ -1055,19 +1423,23 @@ class TestAdvancedCustomization:
         assert advanced_params in prompt
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
     @patch('api.routes.coffee.get_vision_model')
-    def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_subprocess, client, sample_image):
+    def test_advanced_customization_with_image_and_user_prefs(self, mock_vision_model, mock_create_profile, client, sample_image):
         """Test advanced_customization with both image and user preferences."""
-        mock_response = Mock()
-        mock_response.text = "Kenyan AA, Medium Roast, Berry notes"
-        mock_vision_model.return_value.generate_content.return_value = mock_response
-        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=mock_response)
-        
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Profile Created: Berry Bomb"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "advanced-8"}
+        analysis_response = Mock()
+        analysis_response.text = "Kenyan AA, Medium Roast, Berry notes"
+        profile_response = Mock()
+        profile_response.text = (
+            "Profile Created: Berry Bomb\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Berry Bomb\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(
+            side_effect=[analysis_response, profile_response]
+        )
 
         advanced_params = "Temperature: 92°C, Dose: 18g, Max Pressure: 8 bar"
         user_prefs = "Highlight berry notes with gentle extraction"
@@ -1083,8 +1455,8 @@ class TestAdvancedCustomization:
 
         assert response.status_code == 200
         
-        call_args = mock_subprocess.call_args[0][0]
-        prompt = call_args[-1]
+        prompt_payload = mock_vision_model.return_value.async_generate_content.call_args_list[-1][0][0]
+        prompt = prompt_payload[0]
         
         # Should have coffee analysis
         assert "Kenyan AA, Medium Roast, Berry notes" in prompt
@@ -1121,13 +1493,19 @@ class TestCORS:
         assert response.headers["access-control-allow-origin"] == "*"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    @patch('api.routes.coffee.subprocess.run')
-    def test_cors_headers_on_analyze_and_profile(self, mock_subprocess, client):
+    @patch('api.routes.coffee.async_create_profile', new_callable=AsyncMock)
+    @patch('api.routes.coffee.get_vision_model')
+    def test_cors_headers_on_analyze_and_profile(self, mock_vision_model, mock_create_profile, client):
         """Test that CORS headers are present on /analyze_and_profile responses."""
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "**Profile Created:** Test Profile"
-        mock_subprocess.return_value = mock_result
+        mock_create_profile.return_value = {"id": "cors-1"}
+        profile_response = Mock()
+        profile_response.text = (
+            "**Profile Created:** Test Profile\n\n"
+            "PROFILE JSON:\n```json\n"
+            "{\"name\":\"Test Profile\",\"stages\":[],\"variables\":[]}\n"
+            "```\n"
+        )
+        mock_vision_model.return_value.async_generate_content = AsyncMock(return_value=profile_response)
 
         response = client.post(
             "/analyze_and_profile",
@@ -1199,7 +1577,7 @@ class TestStatusEndpoint:
         """Test that /api/status endpoint exists and is accessible."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1216,7 +1594,7 @@ class TestStatusEndpoint:
         """Test that /api/status returns expected JSON structure."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1236,7 +1614,7 @@ class TestStatusEndpoint:
         """Test that /api/status correctly identifies when updates are available."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1255,7 +1633,7 @@ class TestStatusEndpoint:
         """Test /api/status when already on latest version."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -1290,7 +1668,7 @@ class TestStatusEndpoint:
         """Test that /api/status endpoint has CORS enabled for web app."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"tag_name": "v2.0.0", "html_url": ""}
+        mock_response.json.return_value = [{"tag_name": "v2.0.0", "html_url": "", "prerelease": False}]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -3494,10 +3872,13 @@ class TestCheckUpdatesEndpoint:
         """Test successful update check with updates available."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "tag_name": "v2.1.0",
-            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.1.0"
-        }
+        mock_response.json.return_value = [
+            {
+                "tag_name": "v2.1.0",
+                "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.1.0",
+                "prerelease": False
+            }
+        ]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -3519,10 +3900,13 @@ class TestCheckUpdatesEndpoint:
         """Test update check when already on latest version."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "tag_name": "v2.0.0",
-            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0"
-        }
+        mock_response.json.return_value = [
+            {
+                "tag_name": "v2.0.0",
+                "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0",
+                "prerelease": False
+            }
+        ]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -3558,10 +3942,13 @@ class TestCheckUpdatesEndpoint:
         """Test that check-updates returns fresh_check=True."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "tag_name": "v2.0.0",
-            "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0"
-        }
+        mock_response.json.return_value = [
+            {
+                "tag_name": "v2.0.0",
+                "html_url": "https://github.com/hessius/MeticAI/releases/tag/v2.0.0",
+                "prerelease": False
+            }
+        ]
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -3674,11 +4061,17 @@ class TestMachineProfilesEndpoint:
         mock_profile1.id = "profile-1"
         mock_profile1.name = "Good Profile"
         mock_profile1.error = None
+        mock_profile1.author = "Barista"
+        mock_profile1.temperature = 93
+        mock_profile1.final_weight = 40
         
         mock_profile2 = type('Profile', (), {})()
         mock_profile2.id = "profile-2"
         mock_profile2.name = "Bad Profile"
         mock_profile2.error = None
+        mock_profile2.author = None
+        mock_profile2.temperature = None
+        mock_profile2.final_weight = None
         
         mock_list_profiles.return_value = [mock_profile1, mock_profile2]
         
@@ -3688,7 +4081,7 @@ class TestMachineProfilesEndpoint:
         full_profile1.author = "Barista"
         full_profile1.error = None
         
-        # Second profile fetch fails
+        # Second profile fetch fails - should fall back to partial data
         mock_get_profile.side_effect = [full_profile1, Exception("Network error")]
         
         response = client.get("/api/machine/profiles")
@@ -3696,9 +4089,11 @@ class TestMachineProfilesEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["total"] == 1  # Only successful profile
-        assert len(data["profiles"]) == 1
+        # Now includes both profiles (using partial data for failed fetch)
+        assert data["total"] == 2
+        assert len(data["profiles"]) == 2
         assert data["profiles"][0]["name"] == "Good Profile"
+        assert data["profiles"][1]["name"] == "Bad Profile"  # Partial data fallback
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
@@ -3934,7 +4329,7 @@ class TestProfileImportEndpoint:
     @patch('api.routes.profiles.load_history', return_value=[])
     @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock)
     def test_import_profile_description_generation_fails(self, mock_generate_desc, mock_load_history, mock_save_history, client):
-        """Test import continues when description generation fails."""
+        """Test import falls back to static description when AI generation fails."""
         mock_generate_desc.side_effect = Exception("AI service unavailable")
         
         profile_json = {
@@ -3954,8 +4349,8 @@ class TestProfileImportEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        # Should have fallback message
-        assert data["has_description"] is False
+        # Should have a static fallback description (not empty)
+        assert data["has_description"] is True
         mock_save_history.assert_called_once()
 
     @patch('api.routes.profiles.save_history')
@@ -4297,21 +4692,24 @@ class TestImageProxyEndpoint:
 
     @patch('api.routes.profiles._get_cached_image')
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_image_proxy_profile_not_found(self, mock_list_profiles, mock_get_cache, client):
-        """Test error when profile not found."""
+    def test_image_proxy_profile_not_found_returns_placeholder(self, mock_list_profiles, mock_get_cache, client):
+        """Test placeholder SVG returned when profile not found."""
         mock_get_cache.return_value = None
         
         mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/Nonexistent/image-proxy")
         
-        assert response.status_code == 404
+        # Returns placeholder SVG instead of 404
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert b"<svg" in response.content
 
     @patch('api.routes.profiles._get_cached_image')
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_image_proxy_no_image(self, mock_list_profiles, mock_get_profile, mock_get_cache, client):
-        """Test error when profile has no image."""
+    def test_image_proxy_no_image_returns_placeholder(self, mock_list_profiles, mock_get_profile, mock_get_cache, client):
+        """Test placeholder SVG returned when profile has no image."""
         mock_get_cache.return_value = None
         
         mock_profile = type('Profile', (), {})()
@@ -4328,7 +4726,10 @@ class TestImageProxyEndpoint:
         
         response = client.get("/api/profile/No%20Image/image-proxy")
         
-        assert response.status_code == 404
+        # Returns placeholder SVG instead of 404
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert b"<svg" in response.content
 
     @patch('httpx.AsyncClient')
     @patch('api.routes.profiles._set_cached_image')
@@ -4679,14 +5080,16 @@ class TestGetProfileInfoEndpoint:
         assert data["profile"]["accent_color"] == "#FF5733"
 
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_get_profile_info_not_found(self, mock_list_profiles, client):
-        """Test error when profile not found."""
+    def test_get_profile_info_not_found_returns_status(self, mock_list_profiles, client):
+        """Test graceful response when profile not found."""
         mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/Nonexistent")
         
-        assert response.status_code == 404
-        assert "not found" in response.json()["detail"]
+        # Returns 200 with status: not_found instead of 404
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "not_found"
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
@@ -5031,7 +5434,7 @@ class TestGenerateProfileImageEndpoint:
         with patch('services.gemini_service.get_gemini_client', side_effect=ValueError("GEMINI_API_KEY environment variable is required")):
             response = client.post("/api/profile/Test/generate-image")
         
-        assert response.status_code == 402
+        assert response.status_code == 503
 
     @patch('api.routes.profiles._set_cached_image')
     @patch('api.routes.profiles.process_image_for_profile')
@@ -5367,6 +5770,42 @@ class TestLLMShotAnalysisEndpoint:
         
         assert response.status_code == 404
 
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_list_profiles', new_callable=AsyncMock)
+    @patch('api.routes.shots.get_vision_model')
+    @patch('api.routes.shots._perform_local_shot_analysis')
+    def test_llm_analysis_ai_unavailable(self, mock_local_analysis, mock_get_model, mock_list_profiles, mock_get_profile, mock_fetch_shot, client):
+        """Test 503 when AI is unavailable."""
+        mock_fetch_shot.return_value = {"profile_name": "Test", "data": []}
+
+        partial = type('P', (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_list_profiles.return_value = [partial]
+
+        full = type('F', (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_get_profile.return_value = full
+
+        mock_local_analysis.return_value = {"summary": {}, "stages": []}
+        mock_get_model.side_effect = ValueError("GEMINI_API_KEY environment variable is required but not set")
+
+        response = client.post("/api/shots/analyze-llm", data={
+            "profile_name": "Test",
+            "shot_date": "2024-01-15",
+            "shot_filename": "shot.json",
+            "force_refresh": "true"
+        })
+
+        assert response.status_code == 503
+
 
 class TestConvertDescriptionEndpoint:
     """Tests for the POST /api/profile/convert-description endpoint."""
@@ -5489,6 +5928,18 @@ Adjust grind based on bean age."""
         call_args = mock_model.async_generate_content.call_args[0][0]
         assert "Detailed original description" in call_args
         assert "Complex Profile" in call_args
+
+    @patch('api.routes.profiles.get_vision_model')
+    def test_convert_description_ai_unavailable(self, mock_get_model, client):
+        """Test 503 when AI is unavailable."""
+        mock_get_model.side_effect = ValueError("GEMINI_API_KEY environment variable is required but not set")
+
+        response = client.post("/api/profile/convert-description", json={
+            "profile": {"name": "Test", "temperature": 93.0},
+            "description": "Original"
+        })
+
+        assert response.status_code == 503
 
 
 class TestErrorHandling:
@@ -5677,8 +6128,7 @@ class TestImagePromptErrorHandling:
     """Tests for image prompt generation error handling."""
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_generate_image_with_invalid_prompt_result_none(self, mock_subprocess, mock_get_api, client):
+    def test_generate_image_with_invalid_prompt_result_none(self, mock_get_api, client):
         """Test image generation when prompt builder returns None."""
         # Mock API to return profile exists
         mock_api = MagicMock()
@@ -5701,8 +6151,7 @@ class TestImagePromptErrorHandling:
             assert "Failed to build image generation prompt" in response.json()["detail"]
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_generate_image_with_invalid_prompt_result_not_dict(self, mock_subprocess, mock_get_api, client):
+    def test_generate_image_with_invalid_prompt_result_not_dict(self, mock_get_api, client):
         """Test image generation when prompt builder returns non-dict."""
         # Mock API to return profile exists
         mock_api = MagicMock()
@@ -5725,8 +6174,7 @@ class TestImagePromptErrorHandling:
             assert "Failed to build image generation prompt" in response.json()["detail"]
     
     @patch('services.meticulous_service.get_meticulous_api')
-    @patch('api.routes.coffee.subprocess.run')
-    def test_generate_image_with_valid_prompt_result(self, mock_subprocess, mock_get_api, client):
+    def test_generate_image_with_valid_prompt_result(self, mock_get_api, client):
         """Test image generation with valid prompt result doesn't fail at validation."""
         # Mock API to return profile exists
         mock_api = MagicMock()
@@ -5742,12 +6190,6 @@ class TestImagePromptErrorHandling:
             "prompt": "A beautiful coffee image",
             "metadata": {"influences_found": 2, "selected_colors": ["brown", "cream"]}
         }
-        
-        # Mock subprocess to return error (to stop execution after validation)
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_result.stderr = "gemini error"
-        mock_subprocess.return_value = mock_result
         
         with patch('prompt_builder.build_image_prompt_with_metadata', return_value=valid_prompt):
             response = client.post(
@@ -7185,6 +7627,33 @@ class TestGetMeticulousAPI:
         
         services.meticulous_service._meticulous_api = None
 
+    def test_get_meticulous_api_reinitializes_when_target_changes(self, monkeypatch):
+        """Test cached client is reinitialized when METICULOUS_IP changes."""
+        services.meticulous_service._meticulous_api = None
+
+        class MockApi:
+            def __init__(self, base_url):
+                self.base_url = base_url
+
+        from unittest.mock import MagicMock
+        mock_module = MagicMock()
+        mock_module.Api = MockApi
+
+        import sys
+        sys.modules['meticulous'] = mock_module
+        sys.modules['meticulous.api'] = mock_module
+
+        monkeypatch.setenv("METICULOUS_IP", "192.168.1.100")
+        api1 = services.meticulous_service.get_meticulous_api()
+        assert api1.base_url == "http://192.168.1.100"
+
+        monkeypatch.setenv("METICULOUS_IP", "192.168.1.101")
+        api2 = services.meticulous_service.get_meticulous_api()
+        assert api2.base_url == "http://192.168.1.101"
+        assert api1 is not api2
+
+        services.meticulous_service._meticulous_api = None
+
 
 class TestSettingsEndpoints:
     """Test settings management endpoints."""
@@ -7215,6 +7684,34 @@ class TestSettingsEndpoints:
         
         data = response.json()
         assert data["geminiApiKeyConfigured"] is False
+
+    def test_get_settings_with_stored_api_key_masks_and_marks_configured(self, client, monkeypatch):
+        """Stored API key should be masked and marked configured when env key is absent."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        import api.routes.system as system_module
+
+        def mock_load_settings():
+            return {
+                "geminiApiKey": "stored-key-1234567890",
+                "meticulousIp": "",
+                "serverIp": "",
+                "authorName": "",
+                "mqttEnabled": True,
+                "tailscaleEnabled": False,
+                "tailscaleAuthKey": "",
+            }
+
+        monkeypatch.setattr(system_module, "load_settings", mock_load_settings)
+
+        response = client.get("/api/settings")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["geminiApiKeyConfigured"] is True
+        assert data["geminiApiKeyMasked"] is True
+        assert data["geminiApiKey"]
+        assert "stored-key" not in data["geminiApiKey"]
     
     def test_get_settings_error_handling(self, client, monkeypatch):
         """Test get_settings handles errors."""
@@ -8403,7 +8900,9 @@ class TestMeticulousServiceDirect:
         
         with patch.dict(os.environ, {"METICULOUS_IP": "192.168.1.100"}):
             with patch('meticulous.api.Api') as mock_api_class:
-                mock_api_class.return_value = MagicMock()
+                mock_instance = MagicMock()
+                mock_instance.base_url = "http://192.168.1.100"
+                mock_api_class.return_value = mock_instance
                 
                 api = meticulous_service.get_meticulous_api()
                 
@@ -8869,13 +9368,16 @@ class TestProfileEndpointsCoverage:
     """Additional tests for profile endpoints coverage."""
 
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_get_profile_not_found(self, mock_list_profiles, client):
-        """Test get profile when profile doesn't exist."""
+    def test_get_profile_not_found_returns_status(self, mock_list_profiles, client):
+        """Test get profile returns graceful response when profile doesn't exist."""
         mock_list_profiles.return_value = []
         
         response = client.get("/api/profile/NonExistent")
         
-        assert response.status_code == 404
+        # Returns 200 with status: not_found instead of 404
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "not_found"
 
 
 class TestMachineControlEndpoints:
@@ -9193,6 +9695,248 @@ class TestMeticulousServiceCoverage:
         
         # Function should exist
         assert callable(get_meticulous_api)
+
+
+class TestNormalizeProfileForMachine:
+    """Tests for _normalize_profile_for_machine (profile upload enrichment)."""
+
+    def _normalize(self, data):
+        from services.meticulous_service import _normalize_profile_for_machine
+        return _normalize_profile_for_machine(data)
+
+    def test_adds_uuid_id(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert "id" in result and len(result["id"]) == 36  # UUID format
+
+    def test_preserves_valid_uuid_id(self):
+        """Valid UUID IDs should be preserved."""
+        valid_uuid = "49cb0934-8b7c-4bb8-886d-624e5c5bf54f"
+        result = self._normalize({"name": "X", "id": valid_uuid, "stages": []})
+        assert result["id"] == valid_uuid
+
+    def test_replaces_non_uuid_id(self):
+        """Non-UUID IDs (e.g., slugs) should be replaced with a proper UUID."""
+        result = self._normalize({"name": "X", "id": "my-slug-id", "stages": []})
+        # Should be replaced with a valid UUID
+        assert result["id"] != "my-slug-id"
+        assert len(result["id"]) == 36  # UUID format
+
+    def test_adds_author_and_author_id(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["author"] == "MeticAI"
+        assert len(result["author_id"]) == 36
+
+    def test_preserves_existing_author(self):
+        result = self._normalize({"name": "X", "author": "User", "stages": []})
+        assert result["author"] == "User"
+
+    def test_defaults_temperature_and_weight(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["temperature"] == 90.0
+        assert result["final_weight"] == 40.0
+
+    def test_preserves_explicit_temperature(self):
+        result = self._normalize({"name": "X", "temperature": 93.5, "stages": []})
+        assert result["temperature"] == 93.5
+
+    def test_variables_defaults_to_empty_list(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["variables"] == []
+
+    def test_variables_none_becomes_empty_list(self):
+        result = self._normalize({"name": "X", "variables": None, "stages": []})
+        assert result["variables"] == []
+
+    def test_variables_preserved_if_present(self):
+        v = [{"name": "P", "key": "p_1", "type": "pressure", "value": 8}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"] == v
+
+    def test_previous_authors_defaults_to_empty(self):
+        result = self._normalize({"name": "X", "stages": []})
+        assert result["previous_authors"] == []
+
+    def test_stage_key_auto_generated(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [[0, 2]], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["key"] == "flow_0"
+
+    def test_stage_key_preserved(self):
+        stage = {"name": "S1", "key": "my_key", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["key"] == "my_key"
+
+    def test_stage_limits_defaults_to_empty_list(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["limits"] == []
+
+    def test_stage_limits_none_becomes_empty(self):
+        stage = {"name": "S1", "type": "flow", "limits": None, "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["limits"] == []
+
+    def test_dynamics_interpolation_defaults_to_linear(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["interpolation"] == "linear"
+
+    def test_dynamics_interpolation_preserved(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time", "interpolation": "curve"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["interpolation"] == "curve"
+
+    def test_dynamics_dict_points_coerced_to_lists(self):
+        """Points like {"value": 2} are coerced to [0, 2]."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [{"value": 2}], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["points"] == [[0.0, 2]]
+
+    def test_dynamics_list_points_preserved(self):
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [[0, 1.5], [5, 3]], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["points"] == [[0, 1.5], [5, 3]]
+
+    def test_exit_trigger_relative_defaults_true_for_time(self):
+        trigger = {"type": "time", "value": 10}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["relative"] is True
+
+    def test_exit_trigger_relative_defaults_false_for_pressure(self):
+        trigger = {"type": "pressure", "value": 3}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["relative"] is False
+
+    def test_exit_trigger_relative_preserved_if_set(self):
+        trigger = {"type": "time", "value": 10, "relative": False}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["relative"] is False
+
+    def test_exit_trigger_comparison_defaults_to_gte(self):
+        trigger = {"type": "weight", "value": 30}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["comparison"] == ">="
+
+    def test_exit_trigger_comparison_preserved(self):
+        trigger = {"type": "weight", "value": 30, "comparison": "<="}
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": [trigger]}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"][0]["comparison"] == "<="
+
+    def test_multi_stage_keys_auto_numbered(self):
+        s1 = {"name": "A", "type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        s2 = {"name": "B", "type": "pressure", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [s1, s2]})
+        assert result["stages"][0]["key"] == "flow_0"
+        assert result["stages"][1]["key"] == "pressure_1"
+
+    def test_does_not_mutate_original(self):
+        """The original dict should not be modified."""
+        original = {"name": "X", "stages": []}
+        self._normalize(original)
+        assert "id" not in original  # shallow copy
+
+    def test_dynamics_over_defaults_to_time(self):
+        """Missing dynamics.over defaults to 'time'."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [[0, 1]]}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["over"] == "time"
+
+    def test_dynamics_points_defaults_to_empty(self):
+        """Missing dynamics.points defaults to []."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["dynamics"]["points"] == []
+
+    def test_dynamics_missing_entirely_gets_defaults(self):
+        """Missing dynamics entirely gets all defaults."""
+        stage = {"name": "S1", "type": "flow", "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        dyn = result["stages"][0]["dynamics"]
+        assert dyn["interpolation"] == "linear"
+        assert dyn["over"] == "time"
+        assert dyn["points"] == []
+
+    def test_exit_triggers_missing_defaults_to_empty(self):
+        """Missing exit_triggers defaults to []."""
+        stage = {"name": "S1", "type": "flow", "dynamics": {"points": [], "over": "time"}}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["exit_triggers"] == []
+
+    def test_stage_type_defaults_to_flow(self):
+        """Missing stage type defaults to 'flow'."""
+        stage = {"name": "S1", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["type"] == "flow"
+
+    def test_stage_name_defaults_to_numbered(self):
+        """Missing stage name gets auto-generated 'Stage N'."""
+        stage = {"type": "flow", "dynamics": {"points": [], "over": "time"}, "exit_triggers": []}
+        result = self._normalize({"name": "X", "stages": [stage]})
+        assert result["stages"][0]["name"] == "Stage 1"
+
+    def test_display_preserved_with_description(self):
+        """Existing display.description is preserved."""
+        data = {"name": "X", "stages": [],
+                "display": {"description": "A great profile", "accentColor": "#FF0000"}}
+        result = self._normalize(data)
+        assert result["display"]["description"] == "A great profile"
+        assert result["display"]["accentColor"] == "#FF0000"
+
+    def test_display_created_if_missing(self):
+        """display dict is created when absent."""
+        result = self._normalize({"name": "X", "stages": []})
+        assert isinstance(result["display"], dict)
+
+    def test_display_none_normalised_to_dict(self):
+        """display=None is normalised to {}."""
+        result = self._normalize({"name": "X", "stages": [], "display": None})
+        assert isinstance(result["display"], dict)
+
+    def test_display_non_dict_normalised(self):
+        """Non-dict display value is replaced with {}."""
+        result = self._normalize({"name": "X", "stages": [], "display": "bad"})
+        assert isinstance(result["display"], dict)
+
+    def test_info_variable_emoji_added_when_missing(self):
+        """Info variables (key starts with info_) get emoji prefix if missing."""
+        v = [{"name": "Dose", "key": "info_dose", "type": "numeric", "value": 18}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "ℹ️ Dose"
+
+    def test_info_variable_emoji_preserved(self):
+        """Info variables with existing emoji are not modified."""
+        v = [{"name": "☕ Dose", "key": "info_dose", "type": "numeric", "value": 18}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "☕ Dose"
+
+    def test_adjustable_variable_no_emoji_added(self):
+        """Adjustable variables (no info_ prefix) don't get emoji."""
+        v = [{"name": "Pressure", "key": "pressure_main", "type": "pressure", "value": 9}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "Pressure"
+
+    def test_info_variable_empty_name_gets_default(self):
+        """Info variable with empty name gets default emoji and text."""
+        v = [{"name": "", "key": "info_test", "type": "numeric", "value": 0}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "ℹ️ Info"
+
+    def test_adjustable_false_variable_gets_emoji(self):
+        """Variables with adjustable: false (without info_ prefix) also get emoji."""
+        v = [{"name": "Dose", "key": "dose", "type": "numeric", "value": 18, "adjustable": False}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "ℹ️ Dose"
+
+    def test_adjustable_true_variable_no_emoji(self):
+        """Variables with adjustable: true should NOT get emoji added."""
+        v = [{"name": "Dose", "key": "dose", "type": "numeric", "value": 18, "adjustable": True}]
+        result = self._normalize({"name": "X", "variables": v, "stages": []})
+        assert result["variables"][0]["name"] == "Dose"
 
 
 # ---------------------------------------------------------------------------
@@ -9698,6 +10442,17 @@ class TestLastShotEndpoint:
         mock_dates.side_effect = RuntimeError("disk full")
         response = client.get("/api/last-shot")
         assert response.status_code == 500
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_last_shot_machine_unreachable_connection_error(self, mock_dates, client):
+        """Returns 503 when machine is unreachable during history lookup."""
+        import requests
+        mock_dates.side_effect = requests.exceptions.ConnectionError("dns failed")
+
+        response = client.get("/api/last-shot")
+
+        assert response.status_code == 503
+        assert "unreachable" in response.json()["detail"].lower()
 
 
 # ============================================================================
@@ -10520,4 +11275,982 @@ class TestDataLoadingHardening:
             hs.HISTORY_FILE = old_file
             hs._history_cache = old_cache
 
+
+# ============================================================================
+# Pour-Over Profile Adaptation Tests
+# ============================================================================
+
+
+class TestAdaptPourOverProfile:
+    """Tests for services.pour_over_adapter.adapt_pour_over_profile()."""
+
+    def test_adapt_basic_with_bloom(self):
+        """Adaptation with bloom enabled produces correct profile structure."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=250.0,
+            bloom_enabled=True,
+            bloom_seconds=45.0,
+            dose_grams=18.0,
+            brew_ratio=13.9,
+        )
+
+        assert profile["final_weight"] == 250.0
+        assert profile["name"] == "MeticAI Ratio Pour-Over"
+        assert len(profile["stages"]) == 2
+
+        # Bloom stage
+        bloom = profile["stages"][0]
+        assert "Bloom" in bloom["name"]
+        assert "45s" in bloom["name"]
+        time_triggers = [t for t in bloom["exit_triggers"] if t["type"] == "time"]
+        assert len(time_triggers) == 1
+        assert time_triggers[0]["value"] == 45.0
+
+        # Infusion stage
+        infusion = profile["stages"][1]
+        assert "Infusion" in infusion["name"]
+        assert "250g" in infusion["name"]
+        weight_triggers = [t for t in infusion["exit_triggers"] if t["type"] == "weight"]
+        assert len(weight_triggers) == 1
+        assert weight_triggers[0]["value"] == 250.0
+
+    def test_adapt_without_bloom(self):
+        """Adaptation with bloom disabled removes bloom stage."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=300.0,
+            bloom_enabled=False,
+        )
+
+        assert profile["final_weight"] == 300.0
+        assert len(profile["stages"]) == 1
+        assert profile["name"] == "MeticAI Ratio Pour-Over"
+
+        stage = profile["stages"][0]
+        assert "Infusion" in stage["name"]
+        assert "300g" in stage["name"]
+        weight_triggers = [t for t in stage["exit_triggers"] if t["type"] == "weight"]
+        assert weight_triggers[0]["value"] == 300.0
+
+    def test_adapt_unique_id(self):
+        """Each adaptation generates a unique profile ID."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        p1 = adapt_pour_over_profile(target_weight=200.0)
+        p2 = adapt_pour_over_profile(target_weight=200.0)
+        assert p1["id"] != p2["id"]
+
+    def test_adapt_short_description(self):
+        """Short description includes target, dose, and ratio info."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=250.0,
+            dose_grams=18.0,
+            brew_ratio=13.9,
+        )
+        short_desc = profile.get("display", {}).get("shortDescription", "")
+        assert "250g" in short_desc
+        assert "18.0g" in short_desc
+        assert "13.9" in short_desc
+        assert len(short_desc) <= 99
+
+    def test_adapt_short_description_truncated(self):
+        """Short description is truncated to 99 chars."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(
+            target_weight=250.0,
+            dose_grams=18.0,
+            brew_ratio=13.9,
+        )
+        short_desc = profile.get("display", {}).get("shortDescription", "")
+        assert len(short_desc) <= 99
+
+    def test_adapt_does_not_mutate_template(self):
+        """Adaptation does not modify the loaded template."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        p1 = adapt_pour_over_profile(target_weight=100.0, bloom_enabled=False)
+        p2 = adapt_pour_over_profile(target_weight=500.0, bloom_enabled=True, bloom_seconds=60.0)
+
+        # p2 should still have 2 stages (bloom not removed from template)
+        assert len(p2["stages"]) == 2
+        assert p2["final_weight"] == 500.0
+
+    def test_adapt_default_bloom_seconds(self):
+        """Default bloom seconds is 30."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(target_weight=200.0, bloom_enabled=True)
+        bloom = profile["stages"][0]
+        time_triggers = [t for t in bloom["exit_triggers"] if t["type"] == "time"]
+        assert time_triggers[0]["value"] == 30.0
+
+    def test_adapt_preserves_template_structure(self):
+        """Adapted profile preserves variables, dynamics, etc."""
+        from services.pour_over_adapter import adapt_pour_over_profile
+
+        profile = adapt_pour_over_profile(target_weight=200.0)
+        assert "variables" in profile
+        assert profile["temperature"] == 0
+        for stage in profile["stages"]:
+            assert "dynamics" in stage
+            assert "exit_triggers" in stage
+
+
+# ============================================================================
+# TempProfileService Tests
+# ============================================================================
+
+
+class TestTempProfileService:
+    """Tests for services.temp_profile_service."""
+
+    def setup_method(self):
+        """Reset module state before each test."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+    def test_get_active_none(self):
+        """get_active returns None when no temp profile is active."""
+        import services.temp_profile_service as tps
+        assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_create_and_load_success(self):
+        """create_and_load creates a profile, loads it, and tracks it."""
+        import services.temp_profile_service as tps
+
+        mock_profile_json = {"name": "MeticAI Ratio Pour-Over", "id": "test-uuid-123"}
+
+        with patch("services.temp_profile_service.async_create_profile") as mock_create, \
+             patch("services.temp_profile_service.async_load_profile_by_id") as mock_load, \
+             patch("services.temp_profile_service.async_list_profiles", return_value=[]):
+            mock_create.return_value = {"id": "machine-uuid-456"}
+            mock_load.return_value = None
+
+            result = await tps.create_and_load(mock_profile_json, params={"target_weight": 250})
+
+            assert result["profile_id"] == "machine-uuid-456"
+            assert result["profile_name"] == "MeticAI Ratio Pour-Over"
+            mock_create.assert_called_once()
+            mock_load.assert_called_once_with("machine-uuid-456")
+
+            active = tps.get_active()
+            assert active is not None
+            assert active["profile_id"] == "machine-uuid-456"
+            assert active["original_params"]["target_weight"] == 250
+
+    @pytest.mark.asyncio
+    async def test_create_and_load_preserves_name(self):
+        """create_and_load preserves the profile name from caller."""
+        import services.temp_profile_service as tps
+
+        mock_profile = {"name": "MeticAI Ratio Pour-Over", "id": "test-id"}
+
+        with patch("services.temp_profile_service.async_create_profile") as mock_create, \
+             patch("services.temp_profile_service.async_load_profile_by_id"), \
+             patch("services.temp_profile_service.async_list_profiles", return_value=[]):
+            mock_create.return_value = {"id": "abc"}
+            await tps.create_and_load(mock_profile)
+
+            created_profile = mock_create.call_args[0][0]
+            assert created_profile["name"] == "MeticAI Ratio Pour-Over"
+
+    @pytest.mark.asyncio
+    async def test_create_and_load_replaces_existing(self):
+        """create_and_load force-cleans existing temp profile first."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="old-id", profile_name="Old Profile"
+        ))
+
+        with patch("services.temp_profile_service.async_create_profile") as mock_create, \
+             patch("services.temp_profile_service.async_load_profile_by_id"), \
+             patch("services.temp_profile_service.async_delete_profile") as mock_delete, \
+             patch("services.temp_profile_service.async_list_profiles", return_value=[]):
+            mock_create.return_value = {"id": "new-id"}
+            await tps.create_and_load({"name": "New", "id": "new-id"})
+
+            # Should have deleted old active + no pre-existing profiles found
+            mock_delete.assert_called_once_with("old-id")
+            active = tps.get_active()
+            assert active["profile_id"] == "new-id"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_success(self):
+        """cleanup purges and deletes the active temp profile."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="cleanup-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+
+        with patch("services.temp_profile_service.async_delete_profile") as mock_delete, \
+             patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
+             patch("api.routes.commands._do_publish"):
+            mock_delete.return_value = None
+            result = await tps.cleanup()
+
+            assert result["status"] == "cleaned_up"
+            assert result["deleted_profile"] == "MeticAI Ratio Pour-Over"
+            mock_delete.assert_called_once_with("cleanup-id")
+            assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_no_active(self):
+        """cleanup returns no_active_profile when nothing is active."""
+        import services.temp_profile_service as tps
+        result = await tps.cleanup()
+        assert result["status"] == "no_active_profile"
+
+    @pytest.mark.asyncio
+    async def test_force_cleanup_success(self):
+        """force_cleanup deletes without purging."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="force-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+
+        with patch("services.temp_profile_service.async_delete_profile") as mock_delete:
+            mock_delete.return_value = None
+            result = await tps.force_cleanup()
+
+            assert result["status"] == "force_cleaned_up"
+            assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_force_cleanup_no_active(self):
+        """force_cleanup returns no_active_profile when nothing is active."""
+        import services.temp_profile_service as tps
+        result = await tps.force_cleanup()
+        assert result["status"] == "no_active_profile"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_delete_fails_gracefully(self):
+        """cleanup reports delete_failed when delete raises."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="fail-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+
+        with patch("services.temp_profile_service.async_delete_profile") as mock_delete, \
+             patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
+             patch("api.routes.commands._do_publish"):
+            mock_delete.side_effect = Exception("Delete error")
+            result = await tps.cleanup()
+
+            assert result["status"] == "delete_failed"
+            assert "Delete error" in result["error"]
+            assert tps.get_active() is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_success(self):
+        """cleanup_stale removes orphaned [Temp] profiles."""
+        import services.temp_profile_service as tps
+
+        mock_profile1 = Mock()
+        mock_profile1.name = "MeticAI Ratio Pour-Over"
+        mock_profile1.id = "stale-1"
+
+        mock_profile2 = Mock()
+        mock_profile2.name = "Regular Profile"
+        mock_profile2.id = "regular-1"
+
+        mock_profile3 = Mock()
+        mock_profile3.name = "Some Other Profile"
+        mock_profile3.id = "other-1"
+
+        with patch("services.temp_profile_service.async_list_profiles") as mock_list, \
+             patch("services.temp_profile_service.async_delete_profile") as mock_delete:
+            mock_list.return_value = [mock_profile1, mock_profile2, mock_profile3]
+            mock_delete.return_value = None
+
+            result = await tps.cleanup_stale()
+
+            assert result["deleted"] == 1
+            assert mock_delete.call_count == 1
+            # Only the known temp profile name should be deleted
+            deleted_ids = [call[0][0] for call in mock_delete.call_args_list]
+            assert "stale-1" in deleted_ids
+            assert "regular-1" not in deleted_ids
+            assert "other-1" not in deleted_ids
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_machine_unreachable(self):
+        """cleanup_stale handles machine unreachable gracefully."""
+        import services.temp_profile_service as tps
+        from services.meticulous_service import MachineUnreachableError
+
+        with patch("services.temp_profile_service.async_list_profiles") as mock_list:
+            mock_list.side_effect = MachineUnreachableError()
+            result = await tps.cleanup_stale()
+
+            assert result["deleted"] == 0
+            assert result.get("skipped") == "machine_unreachable"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_stale_no_profiles(self):
+        """cleanup_stale handles empty profile list."""
+        import services.temp_profile_service as tps
+
+        with patch("services.temp_profile_service.async_list_profiles") as mock_list:
+            mock_list.return_value = []
+            result = await tps.cleanup_stale()
+            assert result["deleted"] == 0
+
+
+# ============================================================================
+# Pour-Over API Endpoint Tests
+# ============================================================================
+
+
+class TestPourOverEndpoints:
+    """Tests for /api/pour-over/* endpoints."""
+
+    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
+    @patch("services.temp_profile_service.async_create_profile")
+    @patch("services.temp_profile_service.async_load_profile_by_id")
+    def test_prepare_success(self, mock_load, mock_create, mock_list, client):
+        """POST /api/pour-over/prepare creates and loads a temp profile."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        mock_create.return_value = {"id": "prep-id-123"}
+        mock_load.return_value = None
+
+        response = client.post("/api/pour-over/prepare", json={
+            "target_weight": 250.0,
+            "bloom_enabled": True,
+            "bloom_seconds": 45.0,
+            "dose_grams": 18.0,
+            "brew_ratio": 13.9,
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_id"] == "prep-id-123"
+        assert data["profile_name"] == "MeticAI Ratio Pour-Over"
+
+    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
+    @patch("services.temp_profile_service.async_create_profile")
+    @patch("services.temp_profile_service.async_load_profile_by_id")
+    def test_prepare_without_bloom(self, mock_load, mock_create, mock_list, client):
+        """POST /api/pour-over/prepare works without bloom."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        mock_create.return_value = {"id": "no-bloom-id"}
+
+        response = client.post("/api/pour-over/prepare", json={
+            "target_weight": 300.0,
+            "bloom_enabled": False,
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_id"] == "no-bloom-id"
+
+    def test_prepare_invalid_weight(self, client):
+        """POST /api/pour-over/prepare rejects non-positive weight."""
+        response = client.post("/api/pour-over/prepare", json={
+            "target_weight": 0,
+        })
+        assert response.status_code == 422
+
+    def test_prepare_missing_weight(self, client):
+        """POST /api/pour-over/prepare requires target_weight."""
+        response = client.post("/api/pour-over/prepare", json={})
+        assert response.status_code == 422
+
+    @patch("services.temp_profile_service.async_delete_profile")
+    def test_cleanup_success(self, mock_delete, client):
+        """POST /api/pour-over/cleanup cleans up the active profile."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="cleanup-ep-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+        mock_delete.return_value = None
+
+        with patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
+             patch("api.routes.commands._do_publish"):
+            response = client.post("/api/pour-over/cleanup")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "cleaned_up"
+
+    def test_cleanup_no_active(self, client):
+        """POST /api/pour-over/cleanup returns no_active_profile."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        response = client.post("/api/pour-over/cleanup")
+        assert response.status_code == 200
+        assert response.json()["status"] == "no_active_profile"
+
+    @patch("services.temp_profile_service.async_delete_profile")
+    def test_force_cleanup_success(self, mock_delete, client):
+        """POST /api/pour-over/force-cleanup deletes without purge."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="force-ep-id", profile_name="MeticAI Ratio Pour-Over"
+        ))
+        mock_delete.return_value = None
+
+        response = client.post("/api/pour-over/force-cleanup")
+        assert response.status_code == 200
+        assert response.json()["status"] == "force_cleaned_up"
+
+    def test_force_cleanup_no_active(self, client):
+        """POST /api/pour-over/force-cleanup returns no_active_profile."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        response = client.post("/api/pour-over/force-cleanup")
+        assert response.status_code == 200
+        assert response.json()["status"] == "no_active_profile"
+
+    def test_get_active_none(self, client):
+        """GET /api/pour-over/active returns active=false when none."""
+        import services.temp_profile_service as tps
+        tps._set_active(None)
+
+        response = client.get("/api/pour-over/active")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["active"] is False
+        assert data["profile_id"] is None
+
+    def test_get_active_with_profile(self, client):
+        """GET /api/pour-over/active returns profile details when active."""
+        import services.temp_profile_service as tps
+        from services.temp_profile_service import ActiveTempProfile
+
+        tps._set_active(ActiveTempProfile(
+            profile_id="active-id", profile_name="MeticAI Ratio Pour-Over",
+            original_params={"target_weight": 250}
+        ))
+
+        response = client.get("/api/pour-over/active")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["active"] is True
+        assert data["profile_id"] == "active-id"
+        assert data["profile_name"] == "MeticAI Ratio Pour-Over"
+        assert data["original_params"]["target_weight"] == 250
+
+
+# ============================================================================
+# Pour-Over Preferences Tests
+# ============================================================================
+
+
+class TestPourOverPreferencesService:
+    """Unit tests for services.pour_over_preferences."""
+
+    def test_load_returns_defaults_when_no_file(self, tmp_path, monkeypatch):
+        """load_preferences returns defaults when no file exists."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        result = prefs.load_preferences()
+        assert result["free"]["autoStart"] is True
+        assert result["free"]["bloomEnabled"] is True
+        assert result["free"]["bloomSeconds"] == 30
+        assert result["free"]["machineIntegration"] is False
+        assert result["ratio"]["autoStart"] is True
+
+    def test_save_and_load_round_trip(self, tmp_path, monkeypatch):
+        """Preferences survive a save+clear+load cycle."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        prefs.save_preferences({
+            "free": {"autoStart": False, "bloomEnabled": False,
+                     "bloomSeconds": 45, "machineIntegration": True},
+            "ratio": {"autoStart": True, "bloomEnabled": True,
+                      "bloomSeconds": 20, "machineIntegration": True},
+        })
+
+        prefs.reset_cache()
+        result = prefs.load_preferences()
+        assert result["free"]["autoStart"] is False
+        assert result["free"]["bloomSeconds"] == 45
+        assert result["ratio"]["bloomSeconds"] == 20
+        assert result["ratio"]["machineIntegration"] is True
+
+    def test_save_drops_unknown_keys(self, tmp_path, monkeypatch):
+        """Unknown keys in the payload are silently dropped."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        prefs.save_preferences({
+            "free": {"autoStart": True, "extraKey": "nope"},
+            "ratio": {},
+        })
+
+        prefs.reset_cache()
+        result = prefs.load_preferences()
+        assert "extraKey" not in result["free"]
+        # defaults still present
+        assert result["free"]["bloomEnabled"] is True
+
+    def test_load_handles_corrupt_json(self, tmp_path, monkeypatch):
+        """Corrupt JSON on disk falls back to defaults."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        prefs_file = tmp_path / "prefs.json"
+        prefs_file.write_text("NOT-JSON!!!")
+        monkeypatch.setattr(prefs, "PREFS_FILE", prefs_file)
+
+        result = prefs.load_preferences()
+        assert result["free"]["autoStart"] is True
+        assert result["ratio"]["bloomSeconds"] == 30
+
+    def test_load_uses_cache(self, tmp_path, monkeypatch):
+        """Second call returns cached copy without re-reading disk."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        prefs_file = tmp_path / "prefs.json"
+        monkeypatch.setattr(prefs, "PREFS_FILE", prefs_file)
+
+        first = prefs.load_preferences()
+        # Overwrite file with garbage – cache should still work
+        prefs_file.write_text("GARBAGE")
+        second = prefs.load_preferences()
+        assert first is second
+
+    def test_save_partial_mode_fills_defaults(self, tmp_path, monkeypatch):
+        """If a mode dict is missing keys, defaults are used."""
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        result = prefs.save_preferences({"free": {"autoStart": False}, "ratio": {}})
+        assert result["free"]["autoStart"] is False
+        assert result["free"]["bloomEnabled"] is True  # default
+        assert result["ratio"]["autoStart"] is True    # default
+
+
+class TestPourOverPreferencesEndpoints:
+    """Integration tests for /api/pour-over/preferences endpoints."""
+
+    def setup_method(self):
+        import services.pour_over_preferences as prefs
+        prefs.reset_cache()
+
+    def test_get_preferences_defaults(self, client, tmp_path, monkeypatch):
+        """GET /api/pour-over/preferences returns defaults."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        response = client.get("/api/pour-over/preferences")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["free"]["autoStart"] is True
+        assert data["ratio"]["machineIntegration"] is False
+
+    def test_put_preferences(self, client, tmp_path, monkeypatch):
+        """PUT /api/pour-over/preferences saves and returns preferences."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        payload = {
+            "free": {"autoStart": False, "bloomEnabled": True,
+                     "bloomSeconds": 45, "machineIntegration": False},
+            "ratio": {"autoStart": True, "bloomEnabled": False,
+                      "bloomSeconds": 20, "machineIntegration": True},
+        }
+        response = client.put("/api/pour-over/preferences", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["free"]["autoStart"] is False
+        assert data["free"]["bloomSeconds"] == 45
+        assert data["ratio"]["bloomEnabled"] is False
+        assert data["ratio"]["machineIntegration"] is True
+
+    def test_put_then_get_round_trip(self, client, tmp_path, monkeypatch):
+        """PUT then GET returns the same preferences."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        payload = {
+            "free": {"autoStart": False, "bloomEnabled": False,
+                     "bloomSeconds": 60, "machineIntegration": True},
+            "ratio": {"autoStart": False, "bloomEnabled": True,
+                      "bloomSeconds": 15, "machineIntegration": False},
+        }
+        client.put("/api/pour-over/preferences", json=payload)
+
+        prefs.reset_cache()  # force re-read from disk
+        response = client.get("/api/pour-over/preferences")
+        data = response.json()
+        assert data["free"]["autoStart"] is False
+        assert data["free"]["bloomSeconds"] == 60
+        assert data["ratio"]["bloomSeconds"] == 15
+
+    def test_put_partial_payload_defaults(self, client, tmp_path, monkeypatch):
+        """PUT with partial data fills missing fields from defaults."""
+        import services.pour_over_preferences as prefs
+        monkeypatch.setattr(prefs, "PREFS_FILE", tmp_path / "prefs.json")
+
+        response = client.put("/api/pour-over/preferences", json={
+            "free": {"autoStart": False},
+            "ratio": {},
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["free"]["autoStart"] is False
+        assert data["free"]["bloomEnabled"] is True  # default
+        assert data["ratio"]["autoStart"] is True     # default
+
+
+# ============================================================================
+# Profile shortDescription Validation Tests
+# ============================================================================
+
+
+class TestShortDescriptionValidation:
+    """Tests for shortDescription truncation in _normalize_profile_for_machine."""
+
+    def test_short_desc_under_limit_unchanged(self):
+        """shortDescription under 99 chars is left unchanged."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        profile = {
+            "name": "Test",
+            "stages": [],
+            "display": {"shortDescription": "Short desc"},
+        }
+        result = _normalize_profile_for_machine(profile)
+        assert result["display"]["shortDescription"] == "Short desc"
+
+    def test_short_desc_over_limit_truncated(self):
+        """shortDescription over 99 chars is truncated."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        long_desc = "A" * 150
+        profile = {
+            "name": "Test",
+            "stages": [],
+            "display": {"shortDescription": long_desc},
+        }
+        result = _normalize_profile_for_machine(profile)
+        assert len(result["display"]["shortDescription"]) == 99
+
+    def test_short_desc_exactly_99_unchanged(self):
+        """shortDescription exactly 99 chars is left unchanged."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        desc = "A" * 99
+        profile = {
+            "name": "Test",
+            "stages": [],
+            "display": {"shortDescription": desc},
+        }
+        result = _normalize_profile_for_machine(profile)
+        assert result["display"]["shortDescription"] == desc
+        assert len(result["display"]["shortDescription"]) == 99
+
+    def test_short_desc_missing_no_error(self):
+        """Missing shortDescription doesn't cause an error."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        profile = {"name": "Test", "stages": [], "display": {}}
+        result = _normalize_profile_for_machine(profile)
+        assert "shortDescription" not in result["display"]
+
+    def test_short_desc_none_no_error(self):
+        """None shortDescription doesn't cause an error."""
+        from services.meticulous_service import _normalize_profile_for_machine
+
+        profile = {"name": "Test", "stages": [], "display": {"shortDescription": None}}
+        result = _normalize_profile_for_machine(profile)
+        # None is not a string, so it's not truncated
+        assert result["display"]["shortDescription"] is None
+
+
+# ============================================================================
+# Recipe Adapter Tests
+# ============================================================================
+
+
+class TestRecipeAdapter:
+    """Tests for services/recipe_adapter.py — OPOS → Meticulous profile."""
+
+    def test_list_recipe_slugs_returns_list(self):
+        """list_recipe_slugs returns a non-empty sorted list."""
+        from services.recipe_adapter import list_recipe_slugs
+        slugs = list_recipe_slugs()
+        assert isinstance(slugs, list)
+        assert len(slugs) >= 4
+
+    def test_list_recipe_slugs_contains_known_recipes(self):
+        """list_recipe_slugs includes the four confirmed bundled recipes."""
+        from services.recipe_adapter import list_recipe_slugs
+        slugs = list_recipe_slugs()
+        for expected in ("4-6-method", "hoffmann-v2", "lance-hedrick-single-pour"):
+            assert expected in slugs, f"Expected slug '{expected}' not found in {slugs}"
+
+    def test_load_recipe_success(self):
+        """load_recipe loads the 4:6 recipe and injects the slug key."""
+        from services.recipe_adapter import load_recipe
+        recipe = load_recipe("4-6-method")
+        assert recipe["slug"] == "4-6-method"
+        assert recipe["metadata"]["name"] == "Tetsu Kasuya 4:6 (Stronger)"
+        assert recipe["ingredients"]["coffee_g"] == 20.0
+        assert recipe["ingredients"]["water_g"] == 300.0
+        assert len(recipe["protocol"]) == 9
+
+    def test_load_recipe_not_found_raises(self):
+        """load_recipe raises FileNotFoundError for an unknown slug."""
+        from services.recipe_adapter import load_recipe
+        with pytest.raises(FileNotFoundError):
+            load_recipe("nonexistent-recipe-xyz-abc")
+
+    def test_list_recipes_returns_all_bundled(self):
+        """list_recipes returns at least the four confirmed recipes."""
+        from services.recipe_adapter import list_recipes
+        recipes = list_recipes()
+        assert isinstance(recipes, list)
+        assert len(recipes) >= 4
+        names = {r["metadata"]["name"] for r in recipes}
+        assert any("Tetsu Kasuya 4:6" in n for n in names)
+
+    def test_list_recipes_each_has_slug(self):
+        """Every recipe returned by list_recipes has a slug field."""
+        from services.recipe_adapter import list_recipes
+        for recipe in list_recipes():
+            assert "slug" in recipe, f"Recipe missing slug: {recipe.get('metadata', {}).get('name')}"
+
+    def test_adapt_recipe_46_method_stages(self):
+        """4:6 recipe produces 9 stages: 5 pours (weight exit) + 4 waits (time exit)."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("4-6-method")
+        profile = adapt_recipe_to_profile(recipe)
+
+        assert profile["name"] == "MeticAI Recipe: Tetsu Kasuya 4:6 (Stronger)"
+        assert profile["final_weight"] == 300.0
+        assert len(profile["stages"]) == 9
+
+        pour_stages = [s for s in profile["stages"] if "Pour" in s.get("name", "")]
+        wait_stages = [s for s in profile["stages"] if "Wait" in s.get("name", "")]
+        assert len(pour_stages) == 5
+        assert len(wait_stages) == 4
+
+        for s in pour_stages:
+            assert s["exit_triggers"][0]["type"] == "weight"
+        for s in wait_stages:
+            assert s["exit_triggers"][0]["type"] == "time"
+
+        # Cumulative weight of all 5 × 60g pours = 300g
+        assert pour_stages[-1]["exit_triggers"][0]["value"] == pytest.approx(300.0)
+
+    def test_adapt_recipe_hoffmann_has_bloom(self):
+        """Hoffmann V2 profile has a Bloom stage as first stage."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("hoffmann-v2")
+        profile = adapt_recipe_to_profile(recipe)
+
+        first_stage = profile["stages"][0]
+        assert "Bloom" in first_stage["name"]
+        assert first_stage["exit_triggers"][0]["type"] == "time"
+
+    def test_adapt_recipe_name_prefix(self):
+        """All adapted profiles have the 'MeticAI Recipe: ' prefix."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("hoffmann-v2")
+        profile = adapt_recipe_to_profile(recipe)
+        assert profile["name"].startswith("MeticAI Recipe: ")
+
+    def test_adapt_recipe_unique_ids(self):
+        """Two calls to adapt_recipe_to_profile produce different UUIDs."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("4-6-method")
+        p1 = adapt_recipe_to_profile(recipe)
+        p2 = adapt_recipe_to_profile(recipe)
+        assert p1["id"] != p2["id"]
+
+    def test_adapt_recipe_stages_use_power_type(self):
+        """All stages use type 'power' (pour-over has no heating/pressure)."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("4-6-method")
+        for stage in adapt_recipe_to_profile(recipe)["stages"]:
+            assert stage["type"] == "power"
+
+    def test_adapt_lance_hedrick_final_weight(self):
+        """Lance Hedrick profile's final_weight matches recipe water_g."""
+        from services.recipe_adapter import load_recipe, adapt_recipe_to_profile
+        recipe = load_recipe("lance-hedrick-single-pour")
+        profile = adapt_recipe_to_profile(recipe)
+        assert profile["final_weight"] == pytest.approx(recipe["ingredients"]["water_g"])
+
+    def test_adapt_recipe_missing_recipes_dir_returns_empty_list(self, tmp_path, monkeypatch):
+        """When recipes directory doesn't exist, list_recipe_slugs returns []."""
+        import services.recipe_adapter as ra
+        monkeypatch.setattr(ra, "_SEARCH_DIRS", (tmp_path / "nonexistent_dir",))
+        slugs = ra.list_recipe_slugs()
+        assert slugs == []
+
+    def test_adapt_recipe_from_custom_dir(self, tmp_path, monkeypatch):
+        """adapt_recipe_to_profile works with a custom recipe JSON."""
+        import services.recipe_adapter as ra
+
+        custom_recipe = {
+            "version": "1.1.0",
+            "metadata": {"name": "Test Custom Recipe"},
+            "equipment": {"dripper": {"model": "V60"}},
+            "ingredients": {"coffee_g": 15.0, "water_g": 250.0, "grind_setting": "Medium"},
+            "protocol": [
+                {"step": 1, "action": "bloom", "water_g": 45, "duration_s": 30},
+                {"step": 2, "action": "wait", "duration_s": 15},
+                {"step": 3, "action": "pour", "water_g": 205, "duration_s": 90},
+            ],
+        }
+
+        profile = ra.adapt_recipe_to_profile(custom_recipe)
+        assert profile["name"] == "MeticAI Recipe: Test Custom Recipe"
+        assert profile["final_weight"] == pytest.approx(250.0)
+        assert len(profile["stages"]) == 3
+
+        bloom = profile["stages"][0]
+        assert "Bloom" in bloom["name"]
+        assert bloom["exit_triggers"][0]["type"] == "time"
+        assert bloom["exit_triggers"][0]["value"] == pytest.approx(30.0)
+
+        wait = profile["stages"][1]
+        assert wait["exit_triggers"][0]["type"] == "time"
+        assert wait["exit_triggers"][0]["value"] == pytest.approx(15.0)
+
+        pour = profile["stages"][2]
+        assert pour["exit_triggers"][0]["type"] == "weight"
+        assert pour["exit_triggers"][0]["value"] == pytest.approx(250.0)  # cumulative
+
+
+# ============================================================================
+# Recipe Endpoint Tests
+# ============================================================================
+
+
+class TestRecipeEndpoints:
+    """Tests for GET /api/recipes and GET /api/recipes/{slug}."""
+
+    def test_list_recipes_returns_200(self, client):
+        """GET /api/recipes returns HTTP 200."""
+        response = client.get("/api/recipes")
+        assert response.status_code == 200
+
+    def test_list_recipes_returns_list(self, client):
+        """GET /api/recipes body is a JSON list."""
+        body = client.get("/api/recipes").json()
+        assert isinstance(body, list)
+        assert len(body) >= 4
+
+    def test_list_recipes_each_has_required_fields(self, client):
+        """Each item in GET /api/recipes has slug, metadata.name, ingredients, protocol."""
+        for recipe in client.get("/api/recipes").json():
+            assert "slug" in recipe
+            assert "metadata" in recipe
+            assert "name" in recipe["metadata"]
+            assert "ingredients" in recipe
+            assert "protocol" in recipe
+
+    def test_get_recipe_by_slug_returns_correct_data(self, client):
+        """GET /api/recipes/4-6-method returns Tetsu Kasuya 4:6 with 9 steps."""
+        response = client.get("/api/recipes/4-6-method")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["slug"] == "4-6-method"
+        assert data["metadata"]["name"] == "Tetsu Kasuya 4:6 (Stronger)"
+        assert data["ingredients"]["water_g"] == 300.0
+        assert len(data["protocol"]) == 9
+
+    def test_get_recipe_unknown_slug_returns_404(self, client):
+        """GET /api/recipes/<unknown> returns HTTP 404."""
+        response = client.get("/api/recipes/no-such-recipe-xyz")
+        assert response.status_code == 404
+
+    def test_get_all_bundled_recipes_individually(self, client):
+        """Each recipe that appears in the list can also be fetched by slug."""
+        slugs = [r["slug"] for r in client.get("/api/recipes").json()]
+        for slug in slugs:
+            resp = client.get(f"/api/recipes/{slug}")
+            assert resp.status_code == 200, f"Slug '{slug}' returned {resp.status_code}"
+
+    def test_recipe_slug_field_matches_url_slug(self, client):
+        """The slug field in each recipe matches the URL slug used to fetch it."""
+        for recipe in client.get("/api/recipes").json():
+            fetched = client.get(f"/api/recipes/{recipe['slug']}").json()
+            assert fetched["slug"] == recipe["slug"]
+
+
+# ============================================================================
+# Prepare Recipe Endpoint Tests
+# ============================================================================
+
+
+class TestPrepareRecipeEndpoint:
+    """Tests for POST /api/pour-over/prepare-recipe."""
+
+    @patch('api.routes.pour_over.temp_profile_service')
+    @patch('api.routes.pour_over.get_mqtt_subscriber')
+    def test_prepare_recipe_success(self, mock_mqtt_sub, mock_temp_svc, client):
+        """POST /api/pour-over/prepare-recipe with valid slug returns 200."""
+        mock_mqtt_sub.return_value.get_snapshot.return_value = {}
+
+        async def _fake_create_and_load(profile_json, params, previous_profile_name=None):
+            return {
+                "profile_id": "test-uuid-1234",
+                "profile_name": "MeticAI Recipe: Tetsu Kasuya 4:6",
+            }
+
+        mock_temp_svc.create_and_load = _fake_create_and_load
+
+        response = client.post(
+            "/api/pour-over/prepare-recipe",
+            json={"recipe_slug": "4-6-method"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "profile_id" in data
+        assert "profile_name" in data
+
+    def test_prepare_recipe_unknown_slug_returns_404(self, client):
+        """POST /api/pour-over/prepare-recipe with unknown slug returns 404."""
+        response = client.post(
+            "/api/pour-over/prepare-recipe",
+            json={"recipe_slug": "nonexistent-slug-xyz-abc"},
+        )
+        assert response.status_code == 404
+
+    def test_prepare_recipe_missing_recipe_slug_field_returns_422(self, client):
+        """POST /api/pour-over/prepare-recipe without recipe_slug returns 422."""
+        response = client.post("/api/pour-over/prepare-recipe", json={})
+        assert response.status_code == 422
+
+    def test_prepare_recipe_empty_slug_returns_422(self, client):
+        """POST /api/pour-over/prepare-recipe with empty string slug returns 422."""
+        response = client.post(
+            "/api/pour-over/prepare-recipe",
+            json={"recipe_slug": ""},
+        )
+        assert response.status_code == 422
 

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -48,6 +49,8 @@ interface BulkImportProgress {
 
 interface ProfileImportDialogProps {
   isOpen: boolean
+  aiConfigured?: boolean
+  hideAiWhenUnavailable?: boolean
   onClose: () => void
   onImported: () => void
   onGenerateNew: () => void
@@ -55,7 +58,7 @@ interface ProfileImportDialogProps {
 
 type ImportStep = 'choose' | 'file' | 'machine' | 'importing' | 'bulk-importing' | 'success' | 'bulk-success' | 'error'
 
-export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew }: ProfileImportDialogProps) {
+export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUnavailable = false, onClose, onImported, onGenerateNew }: ProfileImportDialogProps) {
   const { t } = useTranslation()
   const [step, setStep] = useState<ImportStep>('choose')
   const [machineProfiles, setMachineProfiles] = useState<MachineProfile[]>([])
@@ -66,6 +69,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
   const [importedProfileName, setImportedProfileName] = useState<string | null>(null)
   const [bulkProgress, setBulkProgress] = useState<BulkImportProgress | null>(null)
   const [bulkLogs, setBulkLogs] = useState<string[]>([])
+  const [generateDescriptions, setGenerateDescriptions] = useState(aiConfigured)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -79,6 +83,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
       setImportedProfileName(null)
       setBulkProgress(null)
       setBulkLogs([])
+      setGenerateDescriptions(aiConfigured)
     } else {
       // Cleanup abort controller when dialog closes
       if (abortControllerRef.current) {
@@ -86,7 +91,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
         abortControllerRef.current = null
       }
     }
-  }, [isOpen])
+  }, [isOpen, aiConfigured])
 
   const fetchMachineProfiles = async () => {
     setLoadingMachine(true)
@@ -126,6 +131,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
       const response = await fetch(`${serverUrl}/api/profile/import-all`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generate_description: generateDescriptions }),
         signal: abortControllerRef.current.signal
       })
       
@@ -203,7 +209,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           profile: profileJson,
-          generate_description: true,
+          generate_description: generateDescriptions,
           source: 'file'
         })
       })
@@ -262,7 +268,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           profile: profileData.profile,
-          generate_description: true,
+          generate_description: generateDescriptions,
           source: 'machine'
         })
       })
@@ -376,6 +382,25 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                     <span className="text-[10px] text-muted-foreground">{t('profileImport.meticulous')}</span>
                   </Button>
                 </div>
+
+                {(!hideAiWhenUnavailable || aiConfigured) && (
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between rounded-lg border border-border/30 p-2.5">
+                      <div>
+                        <p className="text-xs font-medium">{t('profileImport.generateAiDescriptions')}</p>
+                        <p className="text-[10px] text-muted-foreground">{t('profileImport.generateAiDescriptionsHint')}</p>
+                      </div>
+                      <Switch
+                        checked={generateDescriptions}
+                        disabled={!aiConfigured}
+                        onCheckedChange={(checked) => setGenerateDescriptions(checked as boolean)}
+                      />
+                    </div>
+                    {!aiConfigured && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5 text-center">{t('profileImport.aiDescriptionsUnavailable')}</p>
+                    )}
+                  </div>
+                )}
                 
                 <input
                   ref={fileInputRef}
@@ -383,6 +408,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                   accept=".json,application/json"
                   onChange={handleFileSelect}
                   className="hidden"
+                  aria-label={t('profileImport.importFileAriaLabel')}
                 />
               </motion.div>
             )}
@@ -520,7 +546,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImported, onGenerateNew
                 )}
                 
                 <p className="text-xs text-center text-muted-foreground/70">
-                  {t('profileImport.generatingDescriptions')}
+                  {generateDescriptions ? t('profileImport.generatingDescriptions') : t('profileImport.importingWithoutDescriptions')}
                 </p>
               </motion.div>
             )}

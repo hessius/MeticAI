@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Coffee, Play, Gear } from '@phosphor-icons/react'
+import { Plus, Coffee, Play, Gear, Drop } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
 const IGNORED_NAMES = ['meticai', 'metic ai', 'gemini', 'admin', 'user', 'default']
@@ -47,7 +47,10 @@ interface StartViewProps {
   onGenerateNew: () => void
   onViewHistory: () => void
   onRunShot: () => void
+  onPourOver: () => void
   onSettings: () => void
+  aiConfigured?: boolean
+  hideAiWhenUnavailable?: boolean
   lastShotBanner?: React.ReactNode
 }
 
@@ -56,17 +59,17 @@ export function StartView({
   onGenerateNew,
   onViewHistory,
   onRunShot,
+  onPourOver,
   onSettings,
+  aiConfigured = true,
+  hideAiWhenUnavailable = false,
   lastShotBanner,
 }: StartViewProps) {
   const { t } = useTranslation()
   const [firstName, setFirstName] = useState<string | undefined>(undefined)
 
-  // Pick greeting ONCE on mount — stored in a ref so it never changes on re-render
-  const greetingRef = useRef<string | null>(null)
-  if (greetingRef.current === null) {
-    greetingRef.current = pickGreeting(t)
-  }
+  // Pick greeting once per language — stable across re-renders, updates on locale change
+  const greetingBase = useMemo(() => pickGreeting(t), [t])
 
   useEffect(() => {
     const fetchAuthorName = async () => {
@@ -87,7 +90,7 @@ export function StartView({
     fetchAuthorName()
   }, [])
 
-  const greeting = applyName(greetingRef.current, firstName)
+  const greeting = applyName(greetingBase, firstName)
 
   return (
     <motion.div
@@ -114,14 +117,23 @@ export function StartView({
 
         <div className="space-y-3">
           {/* Dark Brew — deep brown, gold text */}
-          <Button
-            onClick={onGenerateNew}
-            variant="dark-brew"
-            className="w-full h-14 text-base"
-          >
-            <Plus size={20} className="mr-2" weight="bold" />
-            {t('navigation.generateNewProfile')}
-          </Button>
+          {(!hideAiWhenUnavailable || aiConfigured) && (
+            <Button
+              onClick={onGenerateNew}
+              disabled={!aiConfigured}
+              variant="dark-brew"
+              className="w-full h-14 text-base"
+            >
+              <Plus size={20} className="mr-2" weight="bold" />
+              {t('navigation.generateNewProfile')}
+            </Button>
+          )}
+
+          {!aiConfigured && !hideAiWhenUnavailable && (
+            <p className="text-xs text-muted-foreground text-center">
+              {t('navigation.aiUnavailable')}
+            </p>
+          )}
           
           {/* Style 2: Dark Brew — deep brown, gold text */}
           <Button
@@ -141,6 +153,15 @@ export function StartView({
           >
             <Play size={20} className="mr-2" weight="fill" />
             {t('navigation.runSchedule')}
+          </Button>
+
+          <Button
+            onClick={onPourOver}
+            variant="dark-brew"
+            className="w-full h-14 text-base"
+          >
+            <Drop size={20} className="mr-2" weight="fill" />
+            {t('pourOver.title')}
           </Button>
           
           {/* Style 4: Ember — warm orange inner glow + border */}

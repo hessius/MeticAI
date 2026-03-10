@@ -3,3 +3,6 @@ pytest>=8.0.0
 pytest-asyncio>=0.23.8
 pytest-cov>=5.0.0
 pytest-timeout>=2.3.1
+
+# Optional: for MQTT integration tests
+paho-mqtt>=2.0.0

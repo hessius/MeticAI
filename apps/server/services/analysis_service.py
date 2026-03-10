@@ -1303,7 +1303,131 @@ Special Notes:
 
 Be concise but informative. Focus on actionable barista guidance."""
 
-    model = get_vision_model()
-    response = await model.async_generate_content(prompt)
-    
-    return response.text.strip()
+    try:
+        model = get_vision_model()
+        response = await model.async_generate_content(prompt)
+        text = getattr(response, "text", "") if response else ""
+        if text and text.strip():
+            return text.strip()
+    except ValueError:
+        logger.info(
+            "Gemini API key not configured, using static profile description fallback",
+            extra={"request_id": request_id, "profile_name": profile_name}
+        )
+    except Exception:
+        logger.warning(
+            "AI profile description generation failed, using static fallback",
+            extra={"request_id": request_id, "profile_name": profile_name},
+            exc_info=True,
+        )
+
+    return _build_static_profile_description(profile_json)
+
+
+def _build_static_profile_description(profile_json: dict) -> str:
+    """Build a non-AI profile description for environments without Gemini.
+
+    Uses profile metadata and stage analysis to identify common extraction
+    techniques (pre-infusion, bloom, flat, ramp, etc.) so the description
+    reads more naturally than a plain parameter dump.
+    """
+    profile_name = profile_json.get("name", "Imported Profile")
+    temperature = profile_json.get("temperature")
+    final_weight = profile_json.get("final_weight")
+    stages = profile_json.get("stages") or []
+    existing_description = (
+        profile_json.get("description")
+        or profile_json.get("notes")
+        or profile_json.get("summary")
+    )
+
+    if existing_description:
+        description = str(existing_description).strip()
+    else:
+        # ── Identify common shot types from stage structure ──────────────
+        shot_traits: list[str] = []
+        for i, stage in enumerate(stages):
+            if not isinstance(stage, dict):
+                continue
+            sname = (stage.get("name") or "").lower()
+            dynamics = stage.get("dynamics", "")
+            sensor = stage.get("sensor", "")
+            points = stage.get("dynamics_points") if isinstance(stage, dict) else None
+
+            # Pre-infusion: first stage with low pressure or named so
+            if i == 0 and ("pre" in sname or "infus" in sname):
+                shot_traits.append("pre-infusion")
+            elif "bloom" in sname or "soak" in sname:
+                shot_traits.append("bloom")
+            elif "ramp" in sname or dynamics == "ramp":
+                shot_traits.append("ramp")
+            elif "flat" in sname or dynamics == "flat":
+                shot_traits.append("flat")
+            elif "decline" in sname or "taper" in sname:
+                shot_traits.append("decline")
+
+            # Detect flat pressure at ~9 bar (classic espresso)
+            if isinstance(points, list) and len(points) >= 2:
+                try:
+                    pressures = [float(p[1]) for p in points if isinstance(p, list) and len(p) >= 2]
+                    if pressures and all(abs(p - pressures[0]) < 0.3 for p in pressures):
+                        if 8.0 <= pressures[0] <= 10.0 and "flat" not in shot_traits:
+                            shot_traits.append("flat")
+                except (ValueError, TypeError):
+                    pass
+
+        # Build a natural-sounding description
+        description_parts = []
+        if stages:
+            stage_count_text = f"{len(stages)}-stage"
+            if shot_traits:
+                trait_str = ", ".join(dict.fromkeys(shot_traits))  # dedupe, preserve order
+                description_parts.append(f"A {stage_count_text} extraction featuring {trait_str}")
+            else:
+                description_parts.append(f"A {stage_count_text} extraction profile")
+        if temperature is not None:
+            description_parts.append(f"brewed at {temperature}°C")
+        if final_weight is not None:
+            description_parts.append(f"targeting ~{final_weight}g yield")
+        description = (
+            " ".join(description_parts) + "."
+            if description_parts
+            else "Profile imported successfully."
+        )
+
+    expected_time = "Not specified"
+    try:
+        total_stage_time = 0.0
+        for stage in stages:
+            points = stage.get("dynamics_points") if isinstance(stage, dict) else None
+            if isinstance(points, list) and points:
+                last = points[-1]
+                if isinstance(last, list) and last:
+                    total_stage_time += float(last[0])
+        if total_stage_time > 0:
+            expected_time = f"~{round(total_stage_time)}s"
+    except Exception:
+        pass
+
+    temp_text = f"{temperature}°C" if temperature is not None else "Use profile default"
+    yield_text = f"{final_weight}g" if final_weight is not None else "Use profile default"
+
+    return (
+        f"Profile Created: {profile_name}\n\n"
+        f"Description:\n"
+        f"{description}\n\n"
+        f"Preparation:\n"
+        f"• Dose: Use your standard recipe dose\n"
+        f"• Grind: Dial in to hit target flow and pressure\n"
+        f"• Temperature: {temp_text}\n"
+        f"• Target Yield: {yield_text}\n"
+        f"• Expected Time: {expected_time}\n\n"
+        f"Why This Works:\n"
+        f"This is a summary generated from the profile's stage structure and metadata. "
+        f"Enable AI features in Settings and configure a Gemini API key for a detailed "
+        f"barista-level analysis with expert brewing recommendations.\n\n"
+        f"Special Notes:\n"
+        f"This description was generated without AI assistance and may not capture "
+        f"all nuances of the extraction design. To generate a full AI summary, delete this "
+        f"profile from the MeticAI catalogue and re-import it after enabling AI features."
+    )

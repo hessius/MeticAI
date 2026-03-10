@@ -54,6 +54,8 @@ const SPEED_OPTIONS: number[] = [0.5, 1, 2, 3, 5]
 interface ShotHistoryViewProps {
   profileName: string
   onBack: () => void
+  aiConfigured?: boolean
+  hideAiWhenUnavailable?: boolean
 }
 
 // Analysis result types (local analysis)
@@ -211,11 +213,11 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
   const [progress, setProgress] = useState(0)
   const [showQuote, setShowQuote] = useState(false)
   const [currentQuote] = useState(() => SHOT_QUOTES[Math.floor(Math.random() * SHOT_QUOTES.length)])
-  const startTimeRef = useRef(Date.now())
+  const [startTime] = useState(() => Date.now())
   
   useEffect(() => {
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - startTimeRef.current) / 1000
+      const elapsed = (Date.now() - startTime) / 1000
       // Use an easing function that slows down as it approaches 95%
       // Never reaches 100% until actually complete
       const newProgress = Math.min(95, (1 - Math.exp(-elapsed / (estimatedSeconds / 3))) * 100)
@@ -271,7 +273,7 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
   )
 }
 
-export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
+export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hideAiWhenUnavailable = false }: ShotHistoryViewProps) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
@@ -1510,6 +1512,8 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         <button 
                           onClick={handleClearComparison}
                           className="p-1 hover:bg-destructive/20 rounded-full transition-colors"
+                          title={t('common.clear')}
+                          aria-label={t('common.clear')}
                         >
                           <X size={14} weight="bold" className="text-muted-foreground" />
                         </button>
@@ -2243,7 +2247,7 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                         </Button>
                         
                         {/* Show "View" if cached, otherwise "Get" */}
-                        {(llmAnalysisResult || isLlmCached) && !isLlmAnalyzing ? (
+                        {(!hideAiWhenUnavailable || aiConfigured) && ((llmAnalysisResult || isLlmCached) && !isLlmAnalyzing ? (
                           <Button
                             variant="default"
                             size="sm"
@@ -2258,12 +2262,16 @@ export function ShotHistoryView({ profileName, onBack }: ShotHistoryViewProps) {
                             variant="default"
                             size="sm"
                             onClick={handleLlmAnalysis}
-                            disabled={isLlmAnalyzing}
+                            disabled={isLlmAnalyzing || !aiConfigured}
                             className="gap-1.5 w-full ai-shimmer-button border-0"
                           >
                             <Brain size={14} weight="fill" />
                             {t('shotHistory.getAiAnalysis')}
                           </Button>
+                        ))}
+
+                        {!aiConfigured && !hideAiWhenUnavailable && (
+                          <p className="text-[11px] text-muted-foreground text-center">{t('shotHistory.aiUnavailable')}</p>
                         )}
                       </div>
                     </div>

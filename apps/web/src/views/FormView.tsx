@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
+import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -8,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Camera, Sparkle, Warning, Upload, X, Coffee, CaretLeft } from '@phosphor-icons/react'
 import { PRESET_TAGS, getTagColorClass } from '@/lib/tags'
 import { AdvancedCustomization, AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
-import type { RefObject, ChangeEvent } from 'react'
+import type { RefObject, ChangeEvent, DragEvent } from 'react'
 
 interface FormViewProps {
   imagePreview: string | null
@@ -20,6 +22,7 @@ interface FormViewProps {
   profileCount: number | null
   fileInputRef: RefObject<HTMLInputElement | null>
   onFileSelect: (e: ChangeEvent<HTMLInputElement>) => void
+  onFileDrop: (file: File) => void
   onRemoveImage: () => void
   onUserPrefsChange: (value: string) => void
   onToggleTag: (tag: string) => void
@@ -39,6 +42,7 @@ export function FormView({
   profileCount,
   fileInputRef,
   onFileSelect,
+  onFileDrop,
   onRemoveImage,
   onUserPrefsChange,
   onToggleTag,
@@ -47,6 +51,42 @@ export function FormView({
   onBack,
   onViewHistory
 }: FormViewProps) {
+  const { t } = useTranslation()
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleDragEnter = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set dragging to false if we're leaving the drop zone (not entering a child)
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setIsDragging(false)
+  }, [])
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      const file = files[0]
+      if (file.type.startsWith('image/')) {
+        onFileDrop(file)
+      }
+    }
+  }, [onFileDrop])
+
   return (
     <motion.div
       key="form"
@@ -63,16 +103,16 @@ export function FormView({
             size="icon"
             onClick={onBack}
             className="shrink-0"
-            aria-label="Back"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={22} weight="bold" />
           </Button>
-          <h2 className="text-lg font-bold tracking-tight">New Profile</h2>
+          <h2 className="text-lg font-bold tracking-tight">{t('navigation.newProfile')}</h2>
         </div>
 
         <div className="space-y-3">
           <Label className="text-sm font-semibold tracking-wide text-foreground/90">
-            Coffee Bag Photo <span className="text-muted-foreground font-normal">(Optional)</span>
+            {t('profileGeneration.coffeeBagPhoto')} <span className="text-muted-foreground font-normal">({t('profileGeneration.optional')})</span>
           </Label>
           <input
             ref={fileInputRef}
@@ -84,24 +124,39 @@ export function FormView({
           />
           
           {!imagePreview ? (
-            <label htmlFor="file-upload">
-              <motion.div 
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className="border-2 border-dashed border-border/50 hover:border-primary/50 rounded-2xl p-10 cursor-pointer transition-all duration-200 group bg-secondary/40 hover:bg-secondary/60"
-              >
-                <div className="flex flex-col items-center gap-4 text-muted-foreground group-hover:text-foreground transition-colors duration-200">
-                  <div className="flex gap-3">
-                    <Camera size={28} weight="duotone" className="group-hover:text-primary transition-colors" />
-                    <Upload size={28} weight="duotone" className="group-hover:text-primary transition-colors" />
+            <div
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
+              <label htmlFor="file-upload">
+                <motion.div 
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className={`border-2 border-dashed rounded-2xl p-10 cursor-pointer transition-all duration-200 group ${
+                    isDragging 
+                      ? 'border-primary bg-primary/10 scale-[1.02]' 
+                      : 'border-border/50 hover:border-primary/50 bg-secondary/40 hover:bg-secondary/60'
+                  }`}
+                >
+                  <div className={`flex flex-col items-center gap-4 transition-colors duration-200 ${
+                    isDragging ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                  }`}>
+                    <div className="flex gap-3">
+                      <Camera size={28} weight="duotone" className={isDragging ? 'text-primary' : 'group-hover:text-primary transition-colors'} />
+                      <Upload size={28} weight="duotone" className={isDragging ? 'text-primary' : 'group-hover:text-primary transition-colors'} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium">
+                        {isDragging ? t('profileGeneration.dropImage') : t('profileGeneration.tapToUpload')}
+                      </p>
+                      <p className="text-xs mt-1.5 text-muted-foreground">{t('profileGeneration.imageFormats')}</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium">Tap to upload or take photo</p>
-                    <p className="text-xs mt-1.5 text-muted-foreground">JPG, PNG, or other image formats</p>
-                  </div>
-                </div>
-              </motion.div>
-            </label>
+                </motion.div>
+              </label>
+            </div>
           ) : (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
@@ -127,7 +182,7 @@ export function FormView({
 
         <div className="space-y-3">
           <Label htmlFor="preferences" className="text-sm font-semibold tracking-wide text-foreground/90">
-            Taste Preferences <span className="text-muted-foreground font-normal">(Optional)</span>
+            {t('profileGeneration.tastePreferences')} <span className="text-muted-foreground font-normal">({t('profileGeneration.optional')})</span>
           </Label>
           
           <div className="space-y-4">
@@ -135,12 +190,12 @@ export function FormView({
               id="preferences"
               value={userPrefs}
               onChange={(e) => onUserPrefsChange(e.target.value)}
-              placeholder="e.g., Balanced extraction, nutty notes..."
+              placeholder={t('profileGeneration.placeholderText')}
               className="min-h-[90px] resize-none bg-secondary/50 border-border/50 focus:border-primary/60 focus:bg-secondary/80 transition-all duration-200 rounded-xl text-sm placeholder:text-muted-foreground/60"
             />
             
             <div className="space-y-2.5">
-              <p className="text-xs text-muted-foreground font-medium">Or select preset tags:</p>
+              <p className="text-xs text-muted-foreground font-medium">{t('profileGeneration.selectPresetTags')}</p>
               <div className="flex flex-wrap gap-2">
                 {PRESET_TAGS.map((tag) => {
                   const isSelected = selectedTags.includes(tag.label)
@@ -169,7 +224,7 @@ export function FormView({
           </div>
           
           <p className="text-xs text-muted-foreground/80 mt-3">
-            Describe your ideal espresso flavor profile using text, tags, or both
+            {t('profileGeneration.describeFlavor')}
           </p>
         </div>
 
@@ -198,7 +253,7 @@ export function FormView({
             className="w-full h-13 text-base transition-all duration-200"
           >
             <Sparkle size={18} weight="fill" className="mr-1" />
-            Generate Profile
+            {t('profileGeneration.generateProfile')}
           </Button>
           
           {/* Only show catalogue button when no profiles exist (no back button visible) */}
@@ -209,7 +264,7 @@ export function FormView({
               className="w-full h-11 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               <Coffee size={18} className="mr-2" weight="fill" />
-              Profile Catalogue
+              {t('history.title')}
             </Button>
           )}
         </div>

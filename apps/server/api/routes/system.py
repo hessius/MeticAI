@@ -47,6 +47,7 @@ _update_cache_time: Optional[datetime] = None
 UPDATE_CACHE_DURATION = timedelta(minutes=15)
 
 GITHUB_RELEASES_URL = "https://api.github.com/repos/hessius/MeticAI/releases/latest"
+GITHUB_ALL_RELEASES_URL = "https://api.github.com/repos/hessius/MeticAI/releases"
 WATCHTOWER_API_ENDPOINTS = (
     "http://watchtower:8080/v1/update",
     "http://meticai-watchtower:8080/v1/update",
@@ -158,8 +159,18 @@ def _version_tuple(v: str):
         return (0, 0, 0)
 
 
+def _is_prerelease_version(v: str) -> bool:
+    """Check if a version string has a pre-release tag (beta, alpha, rc)."""
+    v = v.lstrip("v")
+    return any(tag in v.lower() for tag in ["-beta", "-alpha", "-rc"])
+
+
 async def _fetch_latest_release() -> dict:
-    """Query GitHub Releases API for the latest published version."""
+    """Query GitHub Releases API for the latest published version.
+
+    Fetches all recent releases to determine the latest stable and beta
+    versions separately, enabling cross-channel notifications.
+    """
     global _update_cache, _update_cache_time
     
     now = datetime.now(timezone.utc)
@@ -172,25 +183,52 @@ async def _fetch_latest_release() -> dict:
         import httpx
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                GITHUB_RELEASES_URL,
+                GITHUB_ALL_RELEASES_URL,
+                params={"per_page": 30},
                 headers={"Accept": "application/vnd.github+json"},
                 timeout=10.0,
             )
             if resp.status_code == 200:
-                data = resp.json()
-                latest_version = data.get("tag_name", "").lstrip("v")
+                releases = resp.json()
                 running_version = _get_running_version()
+
+                # Find the latest stable and beta releases
+                latest_stable_version = None
+                latest_beta_version = None
+                latest_release_url = None
+
+                for release in releases:
+                    tag = release.get("tag_name", "").lstrip("v")
+                    if not tag:
+                        continue
+                    is_pre = release.get("prerelease", False) or _is_prerelease_version(tag)
+                    if is_pre:
+                        if latest_beta_version is None:
+                            latest_beta_version = tag
+                    else:
+                        if latest_stable_version is None:
+                            latest_stable_version = tag
+                            latest_release_url = release.get("html_url")
+                    if latest_stable_version and latest_beta_version:
+                        break
+
+                # Primary update_available uses the latest stable release
+                # (matches the previous /releases/latest behaviour)
+                latest_version = latest_stable_version or ""
                 update_available = (
-                    latest_version != "unknown"
+                    latest_version != ""
                     and running_version != "unknown"
                     and _version_tuple(latest_version) > _version_tuple(running_version)
                 )
+
                 result = {
                     "update_available": update_available,
                     "latest_version": latest_version,
                     "current_version": running_version,
                     "last_check": now.isoformat(),
-                    "release_url": data.get("html_url"),
+                    "release_url": latest_release_url,
+                    "latest_stable_version": latest_stable_version,
+                    "latest_beta_version": latest_beta_version,
                 }
                 _update_cache = result
                 _update_cache_time = now
@@ -206,6 +244,8 @@ async def _fetch_latest_release() -> dict:
         "current_version": _get_running_version(),
         "latest_version": None,
         "last_check": None,
+        "latest_stable_version": None,
+        "latest_beta_version": None,
         "error": "Could not reach GitHub API",
     }
 
@@ -376,7 +416,8 @@ async def get_tailscale_status(request: Request):
     try:
         # Load user config from settings
         from services.settings_service import load_settings
-        settings = load_settings()
+        stored_settings = load_settings()
+        settings = dict(stored_settings)
         ts_enabled = settings.get("tailscaleEnabled", False)
         ts_auth_key = settings.get("tailscaleAuthKey", "")
         # Also check env var fallback
@@ -898,6 +939,7 @@ async def get_version_info(request: Request):
     """Get unified version information for MeticAI.
     
     In v2 all components run in a single container, so there is one version.
+    Includes beta channel status from settings.
     """
     request_id = request.state.request_id
     
@@ -923,10 +965,20 @@ async def get_version_info(request: Request):
         except Exception:
             pass
         
+        # Determine if this is a beta version (contains -beta, -alpha, or -rc)
+        is_beta_version = any(suffix in version.lower() for suffix in ['-beta', '-alpha', '-rc'])
+        
+        # Get beta channel preference from settings
+        settings = load_settings()
+        beta_channel = settings.get("betaChannel", False)
+        
         return {
             "version": version,
             "commit": commit,
-            "repo_url": "https://github.com/hessius/MeticAI"
+            "repo_url": "https://github.com/hessius/MeticAI",
+            "is_beta_version": is_beta_version,
+            "beta_channel_enabled": beta_channel,
+            "channel": "beta" if beta_channel else "stable"
         }
     except Exception as e:
         logger.error(
@@ -937,7 +989,10 @@ async def get_version_info(request: Request):
         return {
             "version": "unknown",
             "commit": None,
-            "repo_url": "https://github.com/hessius/MeticAI"
+            "repo_url": "https://github.com/hessius/MeticAI",
+            "is_beta_version": False,
+            "beta_channel_enabled": False,
+            "channel": "stable"
         }
 
 
@@ -1101,20 +1156,25 @@ async def get_settings(request: Request):
             extra={"request_id": request_id, "endpoint": "/api/settings"}
         )
         
-        settings = load_settings()
+        stored_settings = load_settings()
+        settings = dict(stored_settings)
         
         # Read current values from environment
         env_api_key = os.environ.get("GEMINI_API_KEY", "")
         env_meticulous_ip = os.environ.get("METICULOUS_IP", "")
         env_server_ip = os.environ.get("PI_IP", "")
         
+        stored_api_key = str(stored_settings.get("geminiApiKey", "") or "").strip()
+        effective_api_key = env_api_key.strip() or stored_api_key
+
         # Always show API key as stars if set (never expose the actual key)
-        if env_api_key:
-            # Show stars to indicate a key is configured
-            settings["geminiApiKey"] = "*" * min(len(env_api_key), 20)
+        if effective_api_key:
+            settings["geminiApiKey"] = "*" * min(len(effective_api_key), 20)
             settings["geminiApiKeyMasked"] = True
             settings["geminiApiKeyConfigured"] = True
         else:
+            settings["geminiApiKey"] = ""
+            settings["geminiApiKeyMasked"] = False
             settings["geminiApiKeyConfigured"] = False
         
         # Always show current IP values from environment (env takes precedence)
@@ -1376,4 +1436,249 @@ async def save_settings_endpoint(request: Request):
         raise HTTPException(
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "Failed to save settings"}
+        )
+
+
+@router.post("/api/beta-channel")
+async def switch_beta_channel(request: Request):
+    """Switch between beta and stable update channels.
+    
+    Updates the betaChannel setting and optionally creates a docker-compose override
+    to pull from the beta tag instead of latest.
+    
+    Request body:
+        enabled (bool): Whether to enable beta channel
+    
+    Returns:
+        status: success/error
+        channel: Current channel after switch ("beta" or "stable")
+        message: Informational message
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        enabled = body.get("enabled", False)
+        
+        logger.info(
+            f"Switching beta channel: enabled={enabled}",
+            extra={"request_id": request_id}
+        )
+        
+        # Update settings
+        current_settings = load_settings()
+        current_settings["betaChannel"] = enabled
+        save_settings(current_settings)
+        
+        # Create or update docker-compose override for image tag
+        override_path = Path("/app/docker-compose.channel.yml")
+        compose_updated = False
+        
+        try:
+            if enabled:
+                # Create override to use beta tag
+                override_content = """# Auto-generated by MeticAI beta channel switch
+# DO NOT EDIT - this file is managed automatically
+version: '3.8'
+services:
+  meticai:
+    image: ghcr.io/hessius/meticai:beta
+"""
+                override_path.write_text(override_content)
+                compose_updated = True
+                logger.info("Created docker-compose.channel.yml for beta tag",
+                           extra={"request_id": request_id})
+            else:
+                # Remove override to use latest (default)
+                if override_path.exists():
+                    override_path.unlink()
+                    compose_updated = True
+                    logger.info("Removed docker-compose.channel.yml, reverting to latest",
+                               extra={"request_id": request_id})
+        except PermissionError:
+            logger.warning(
+                "Cannot modify docker-compose override - filesystem may be read-only",
+                extra={"request_id": request_id}
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to update docker-compose override: {e}",
+                extra={"request_id": request_id}
+            )
+        
+        channel = "beta" if enabled else "stable"
+        
+        return {
+            "status": "success",
+            "channel": channel,
+            "compose_updated": compose_updated,
+            "message": f"Switched to {channel} channel. " + (
+                "Watchtower will pull the next beta update automatically." if enabled
+                else "Watchtower will pull from the stable channel."
+            ) + (" Container restart may be required for changes to take effect." if compose_updated else "")
+        }
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to switch beta channel: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.post("/api/feedback")
+async def send_feedback(request: Request):
+    """Submit beta feedback to create a GitHub issue.
+    
+    Request body:
+        type (str): Feedback type - "bug", "feature", "question", or "general"
+        title (str): Short summary of the feedback
+        description (str): Detailed description
+        include_logs (bool, optional): Whether to include recent server logs
+    
+    Returns:
+        status: success/error
+        issue_url: URL to the created GitHub issue (if successful)
+        message: Informational message
+    
+    Note: This creates an issue via the GitHub API. Requires the GITHUB_TOKEN
+    environment variable to be set, or falls back to returning a pre-filled
+    issue URL that the user can open manually.
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        feedback_type = body.get("type", "general")
+        title = body.get("title", "").strip()
+        description = body.get("description", "").strip()
+        include_logs = body.get("include_logs", False)
+        
+        if not title or not description:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "Title and description are required"}
+            )
+        
+        # Get version info for context
+        version = "unknown"
+        version_file = Path(__file__).parent.parent.parent / "VERSION"
+        if version_file.exists():
+            version = version_file.read_text().strip()
+        
+        # Check if running beta
+        settings = load_settings()
+        is_beta = settings.get("betaChannel", False)
+        
+        # Build issue body
+        issue_body_parts = [
+            f"## Feedback Type\n{feedback_type.capitalize()}",
+            f"\n## Description\n{description}",
+            f"\n## Environment",
+            f"- **Version**: {version}",
+            f"- **Channel**: {'Beta' if is_beta else 'Stable'}",
+        ]
+        
+        # Include recent logs if requested
+        if include_logs:
+            try:
+                # Get last 50 lines of logs
+                import subprocess
+                result = subprocess.run(
+                    ["journalctl", "-u", "meticai", "-n", "50", "--no-pager"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    issue_body_parts.append(
+                        f"\n## Recent Logs\n```\n{result.stdout[:2000]}\n```"
+                    )
+            except Exception:
+                pass  # Skip logs if unavailable
+        
+        issue_body = "\n".join(issue_body_parts)
+        
+        # Add labels based on type
+        labels = ["beta-feedback"]
+        if feedback_type == "bug":
+            labels.append("bug")
+        elif feedback_type == "feature":
+            labels.append("enhancement")
+        
+        # Try to create issue via GitHub API
+        github_token = os.environ.get("GITHUB_TOKEN")
+        
+        if github_token:
+            import httpx
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "https://api.github.com/repos/hessius/MeticAI/issues",
+                        headers={
+                            "Authorization": f"Bearer {github_token}",
+                            "Accept": "application/vnd.github+json",
+                            "X-GitHub-Api-Version": "2022-11-28"
+                        },
+                        json={
+                            "title": f"[{feedback_type.upper()}] {title}",
+                            "body": issue_body,
+                            "labels": labels
+                        },
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 201:
+                        issue_data = response.json()
+                        logger.info(
+                            f"Created GitHub issue #{issue_data.get('number')}",
+                            extra={"request_id": request_id}
+                        )
+                        return {
+                            "status": "success",
+                            "issue_url": issue_data.get("html_url"),
+                            "issue_number": issue_data.get("number"),
+                            "message": "Feedback submitted successfully!"
+                        }
+                    else:
+                        logger.warning(
+                            f"GitHub API returned {response.status_code}: {response.text}",
+                            extra={"request_id": request_id}
+                        )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to create GitHub issue: {e}",
+                    extra={"request_id": request_id}
+                )
+        
+        # Fallback: return a URL for manual issue creation
+        import urllib.parse
+        params = urllib.parse.urlencode({
+            "title": f"[{feedback_type.upper()}] {title}",
+            "body": issue_body,
+            "labels": ",".join(labels)
+        })
+        manual_url = f"https://github.com/hessius/MeticAI/issues/new?{params}"
+        
+        return {
+            "status": "manual",
+            "issue_url": manual_url,
+            "message": "Please click the link to submit your feedback on GitHub."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to submit feedback: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
         )

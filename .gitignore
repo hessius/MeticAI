@@ -37,6 +37,8 @@ htmlcov/
 
 # Data files (runtime generated)
 data/
+!data/PourOverBase.json
+!data/recipes/
 
 # Update tracking
 .versions.json
@@ -45,6 +47,10 @@ data/
 .rebuild-needed
 .restart-requested
 .update-requested
+
+# Benchmark artifacts
+benchmark_results.jsonl
+*.jsonl
 
 # Development safety marker (prevents uninstaller from deleting dev folder)
 .meticai-dev
@@ -58,3 +64,14 @@ macos-installer/build/
 *.app
 .vscode/
 apps/server/data/
+
+# Continuity
+SESSION_HANDOFF.md
+.continuity/
+
+# Backup/temp files
+*.old
+*.Super.md
+.superpowers
+
+tasks.old.md

@@ -344,6 +344,24 @@ jobs:
           sudo apt-get install -y shellcheck
           shellcheck scripts/*.sh || true
 
+      - name: Check for hard-coded UI strings
+        continue-on-error: true
+        run: |
+          echo "::warning::Checking for hard-coded user-facing strings..."
+          FOUND=$(grep -rn --include='*.tsx' --include='*.ts' \
+            -E 'toast\.(success|error|info|warning)\s*\(\s*['"'"'"`]' \
+            apps/web/src/ \
+            | grep -v '\.test\.' | grep -v '\.spec\.' \
+            | grep -v 't(' || true)
+          if [ -n "$FOUND" ]; then
+            echo "::warning::Found potential hard-coded toast strings:"
+            echo "$FOUND"
+            echo ""
+            echo "Consider using i18n t() for these strings."
+          else
+            echo "✅ No hard-coded toast strings detected"
+          fi
+
   # ============================================================================
   # Windows Installer Tests (PowerShell/Pester)
   # ============================================================================

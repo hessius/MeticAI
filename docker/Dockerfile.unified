@@ -5,7 +5,7 @@
 # - Server (FastAPI backend)
 # - Web Frontend (React, served via nginx)
 # - MCP Server (Meticulous machine communication)
-# - Gemini CLI (AI integration)
+# - Gemini SDK-based AI integration
 # - Mosquitto MQTT Broker (real-time telemetry bus)
 # - Meticulous Bridge (Socket.IO → MQTT relay via @nickwilsonr/meticulous-addon)
 #
@@ -68,8 +68,6 @@ FROM python:3.13-slim
 # Install runtime dependencies (xz-utils needed for s6-overlay extraction)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
-    nodejs \
-    npm \
     curl \
     xz-utils \
     git \
@@ -91,11 +89,6 @@ RUN case "${TARGETARCH}" in \
     && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
     && tar -C / -Jxpf /tmp/s6-overlay-arch.tar.xz \
     && rm /tmp/s6-overlay-*.tar.xz
-
-# Install Gemini CLI globally
-RUN npm install -g @google/gemini-cli \
-    && echo "Gemini CLI installed successfully" \
-    || { echo "WARNING: Gemini CLI install failed — profile creation will not work" >&2; true; }
 
 # Copy Python virtual environment from builder
 COPY --from=python-builder /opt/venv /opt/venv
@@ -150,10 +143,6 @@ COPY docker/mosquitto.conf /etc/mosquitto/mosquitto.conf
 # Copy nginx configuration
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-# Copy Gemini CLI configuration (MCP server connection)
-RUN mkdir -p /root/.gemini
-COPY docker/gemini-settings.json /root/.gemini/settings.json
-
 # Copy s6 service definitions
 COPY docker/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 
@@ -163,6 +152,11 @@ RUN chmod +x /etc/s6-overlay/scripts/data-migrate
 
 # Create data directory for persistent storage
 VOLUME ["/data"]
+
+# Copy default data files (templates, etc.)
+# These are placed in /app/defaults and copied to /data at startup if missing
+COPY data/PourOverBase.json /app/defaults/PourOverBase.json
+COPY data/recipes/ /app/defaults/recipes/
 
 # Environment variables
 ENV DATA_DIR=/data

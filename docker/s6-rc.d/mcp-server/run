@@ -1,4 +1,9 @@
 #!/command/with-contenv sh
+
+# MCP server provides Meticulous machine tools for external MCP clients (Claude Desktop, etc.)
+# External clients may use their own LLM/API key — MeticAI's GEMINI_API_KEY is not required.
+# Core profile creation uses the Python Gemini SDK directly (#214).
+
 cd /app/mcp-server
 export PYTHONPATH=/app/mcp-server/meticulous-mcp/src
 export FASTMCP_HOST=0.0.0.0

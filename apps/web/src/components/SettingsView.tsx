@@ -27,9 +27,11 @@ import {
   Link as LinkIcon,
   Copy,
   Question,
-  Code
+  Code,
+  Info
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
@@ -90,6 +92,8 @@ interface TailscaleStatus {
 // Maximum expected update duration (3 minutes)
 const MAX_UPDATE_DURATION = 180000
 const PROGRESS_UPDATE_INTERVAL = 500
+const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
+const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
 export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
@@ -119,7 +123,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [aboutExpanded, setAboutExpanded] = useState(false)
   
   // Update functionality
-  const { updateAvailable, checkForUpdates, isChecking } = useUpdateStatus()
+  const { updateAvailable, checkForUpdates, isChecking, latestStableVersion, latestBetaVersion } = useUpdateStatus()
   const { triggerUpdate, isUpdating, updateError } = useUpdateTrigger()
   const [updateProgress, setUpdateProgress] = useState(0)
   
@@ -133,6 +137,46 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const [tailscaleSaving, setTailscaleSaving] = useState(false)
   const [tailscaleSaveStatus, setTailscaleSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [tailscaleMessage, setTailscaleMessage] = useState('')
+  const [aiEnabled, setAiEnabledState] = useState(true)
+  const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
+  const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
+
+  // Beta channel state
+  const [betaChannelEnabled, setBetaChannelEnabled] = useState(false)
+  const [betaSwitching, setBetaSwitching] = useState(false)
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'question' | 'general'>('general')
+  const [feedbackTitle, setFeedbackTitle] = useState('')
+  const [feedbackDescription, setFeedbackDescription] = useState('')
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
+  const [feedbackResult, setFeedbackResult] = useState<{ status: string; url?: string; message?: string } | null>(null)
+
+  // Cross-channel version notifications
+  const parseBaseVersion = (v: string): [number, number, number] => {
+    const parts = v.replace(/^v/, '').split('-')[0].split('.')
+    return [parseInt(parts[0] || '0'), parseInt(parts[1] || '0'), parseInt(parts[2] || '0')]
+  }
+
+  const currentVersion = versionInfo?.version || ''
+  const isOnBeta = currentVersion ? ['-beta', '-alpha', '-rc'].some(t => currentVersion.toLowerCase().includes(t)) : false
+
+  // Show "newer beta available" when on stable and a beta exists with a higher base version
+  const showBetaAvailable = !betaChannelEnabled && !isOnBeta && !!latestBetaVersion && !!currentVersion && currentVersion !== 'unknown' && (() => {
+    const [cMaj, cMin, cPat] = parseBaseVersion(currentVersion)
+    const [bMaj, bMin, bPat] = parseBaseVersion(latestBetaVersion)
+    return bMaj > cMaj || (bMaj === cMaj && (bMin > cMin || (bMin === cMin && bPat > cPat)))
+  })()
+
+  // Show "stable caught up" when on beta and stable base >= current base
+  const showStableCaughtUp = isOnBeta && !!latestStableVersion && !!currentVersion && currentVersion !== 'unknown' && (() => {
+    const [cMaj, cMin, cPat] = parseBaseVersion(currentVersion)
+    const [sMaj, sMin, sPat] = parseBaseVersion(latestStableVersion)
+    return sMaj > cMaj || (sMaj === cMaj && (sMin > cMin || (sMin === cMin && sPat >= cPat)))
+  })()
+
+  useEffect(() => {
+    setAiEnabledState(getAiEnabled())
+    setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
+  }, [])
 
   // Load current settings on mount
   useEffect(() => {
@@ -202,6 +246,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             commit: data.commit || undefined,
             repoUrl: data.repo_url || 'https://github.com/hessius/MeticAI'
           })
+          // Also set beta channel status from version endpoint
+          setBetaChannelEnabled(data.beta_channel_enabled || false)
         }
       } catch (err) {
         console.error('Failed to load version info:', err)
@@ -324,6 +370,14 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   const handleChange = (field: keyof Settings, value: string) => {
     setSettings(prev => ({ ...prev, [field]: value }))
     setSaveStatus('idle')
+  }
+
+  const handleCopyText = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch (err) {
+      console.error('Failed to copy snippet:', err)
+    }
   }
 
   const handleUpdate = async () => {
@@ -489,6 +543,75 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
     }
   }
 
+  const handleBetaChannelToggle = async (enabled: boolean) => {
+    setBetaSwitching(true)
+    
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/beta-channel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      })
+      
+      if (response.ok) {
+        setBetaChannelEnabled(enabled)
+      } else {
+        throw new Error('Failed to switch beta channel')
+      }
+    } catch (err) {
+      console.error('Beta channel toggle failed:', err)
+      // Revert the toggle state
+      setBetaChannelEnabled(!enabled)
+    } finally {
+      setBetaSwitching(false)
+    }
+  }
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackTitle.trim() || !feedbackDescription.trim()) return
+    
+    setFeedbackSubmitting(true)
+    setFeedbackResult(null)
+    
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: feedbackType,
+          title: feedbackTitle,
+          description: feedbackDescription,
+          include_logs: false
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setFeedbackResult({
+          status: data.status,
+          url: data.issue_url,
+          message: data.message
+        })
+        // Clear form on success
+        if (data.status === 'success') {
+          setFeedbackTitle('')
+          setFeedbackDescription('')
+        }
+      } else {
+        throw new Error('Failed to submit feedback')
+      }
+    } catch (err) {
+      setFeedbackResult({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Failed to submit feedback'
+      })
+    } finally {
+      setFeedbackSubmitting(false)
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -609,50 +732,88 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               <LanguageSelector variant="outline" showLabel={true} />
             </div>
 
-            {/* Gemini API Key */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="apiKey" className="text-sm font-medium">
-                  {t('settings.geminiApiKey')}
-                </Label>
-                {settings.geminiApiKeyConfigured && (
-                  <span className="text-xs text-success flex items-center gap-1">
-                    <CheckCircle size={12} weight="fill" />
-                    {t('settings.configured')}
-                  </span>
-                )}
+            {/* AI Assistant */}
+            <div className="space-y-3 pt-2 border-t border-border">
+              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{t('settings.aiAssistant')}</h3>
+              <p className="text-xs text-muted-foreground">{t('settings.aiAssistantDescription')}</p>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="apiKey" className="text-sm font-medium">
+                    {t('settings.geminiApiKey')}
+                  </Label>
+                  {hasGeminiKey && (
+                    <span className="text-xs text-success flex items-center gap-1">
+                      <CheckCircle size={12} weight="fill" />
+                      {t('settings.configured')}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    value={settings.geminiApiKey}
+                    onChange={(e) => handleChange('geminiApiKey', e.target.value)}
+                    placeholder={hasGeminiKey ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
+                    className="pr-10"
+                    readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
+                    onClick={() => {
+                      if (settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')) {
+                        handleChange('geminiApiKey', '')
+                      }
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {hasGeminiKey
+                    ? t('settings.apiKeyConfiguredExtended')
+                    : <>{t('settings.aiAssistantOptional')} {t('settings.getApiKey')}{' '}
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {t('settings.googleAIStudio')}
+                      </a>
+                    </>
+                  }
+                </p>
               </div>
-              <div className="relative">
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={settings.geminiApiKey}
-                  onChange={(e) => handleChange('geminiApiKey', e.target.value)}
-                  placeholder={settings.geminiApiKeyConfigured ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
-                  className="pr-10"
-                  readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
-                  onClick={() => {
-                    if (settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')) {
-                      handleChange('geminiApiKey', '')
-                    }
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="ai-enabled-toggle" className="text-sm font-medium">{t('settings.enableAiFeatures')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.enableAiFeaturesDescription')}</p>
+                </div>
+                <Switch
+                  id="ai-enabled-toggle"
+                  checked={aiEnabled}
+                  onCheckedChange={(checked) => {
+                    const next = checked as boolean
+                    setAiEnabledState(next)
+                    setAiEnabled(next)
+                  }}
+                  disabled={!hasGeminiKey}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="hide-ai-toggle" className="text-sm font-medium">{t('settings.hideAiWhenUnavailable')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.hideAiWhenUnavailableDescription')}</p>
+                </div>
+                <Switch
+                  id="hide-ai-toggle"
+                  checked={hideAiWhenUnavailable}
+                  onCheckedChange={(checked) => {
+                    const next = checked as boolean
+                    setHideAiWhenUnavailableState(next)
+                    setHideAiWhenUnavailable(next)
                   }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {settings.geminiApiKeyConfigured 
-                  ? t('settings.apiKeyConfigured')
-                  : <>{t('settings.getApiKey')}{' '}
-                    <a 
-                      href="https://aistudio.google.com/app/apikey" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      {t('settings.googleAIStudio')}
-                    </a>
-                  </>
-                }
-              </p>
             </div>
 
             {/* Meticulous IP */}
@@ -736,6 +897,49 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   </p>
                 </div>
               )}
+
+              <div className="space-y-2 pt-1 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium">Meticulous Add-on</h4>
+                  <a
+                    href="https://github.com/nickwilsonr/meticulous-addon"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    GitHub
+                  </a>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Copy these snippets to install or update the addon manually in the running container.
+                </p>
+                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
+                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
+                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_INSTALL_SNIPPET}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => handleCopyText(METICULOUS_ADDON_INSTALL_SNIPPET)}
+                    title="Copy install command"
+                  >
+                    <Copy size={13} />
+                  </Button>
+                </div>
+                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
+                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
+                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_UPDATE_SNIPPET}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => handleCopyText(METICULOUS_ADDON_UPDATE_SNIPPET)}
+                    title="Copy update command"
+                  >
+                    <Copy size={13} />
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Appearance */}
@@ -789,6 +993,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                     />
                   </div>
                 )}
+
               </div>
             )}
 
@@ -1224,6 +1429,143 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           >
             <ArrowClockwise size={18} className={isChecking ? 'animate-spin' : ''} />
           </Button>
+        </div>
+      </Card>
+
+      {/* Beta Testing Section */}
+      <Card className="p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-primary">{t('settings.beta.title')}</h3>
+        
+        <div className="space-y-4">
+          {/* Beta channel toggle */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <label htmlFor="beta-channel-switch" className="font-medium cursor-pointer">{t('settings.beta.enableUpdates')}</label>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.beta.enableDescription')}
+              </p>
+            </div>
+            <Switch
+              id="beta-channel-switch"
+              checked={betaChannelEnabled}
+              onCheckedChange={handleBetaChannelToggle}
+              disabled={betaSwitching}
+              aria-label={t('settings.beta.enableUpdates')}
+            />
+          </div>
+
+          {/* Warning about beta versions */}
+          <Alert className="bg-yellow-500/10 border-yellow-500/30">
+            <Warning size={16} className="text-yellow-500" />
+            <AlertDescription className="text-sm">
+              {t('settings.beta.warning')}
+            </AlertDescription>
+          </Alert>
+
+          {/* Current channel indicator */}
+          <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/50">
+            <div className={`w-2 h-2 rounded-full ${betaChannelEnabled ? 'bg-yellow-500' : 'bg-green-500'}`} />
+            <span className="text-sm">
+              {t('settings.beta.currentChannel')}: <strong>{betaChannelEnabled ? 'Beta' : 'Stable'}</strong>
+            </span>
+          </div>
+
+          {/* Cross-channel notifications */}
+          {showBetaAvailable && (
+            <Alert className="bg-blue-500/10 border-blue-500/30">
+              <Info size={16} className="text-blue-500" />
+              <AlertDescription className="text-sm">
+                {t('settings.beta.betaAvailable', { version: latestBetaVersion })}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {showStableCaughtUp && (
+            <Alert className="bg-green-500/10 border-green-500/30">
+              <CheckCircle size={16} className="text-green-500" />
+              <AlertDescription className="text-sm">
+                {t('settings.beta.stableCaughtUp', { version: latestStableVersion })}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Feedback section - only visible in beta mode */}
+          {betaChannelEnabled && (
+            <div className="space-y-3 pt-2 border-t border-border/40">
+              <h4 className="font-medium">{t('settings.beta.sendFeedback')}</h4>
+              
+              {/* Feedback type selector */}
+              <div className="flex gap-2 flex-wrap">
+                {(['bug', 'feature', 'question', 'general'] as const).map((type) => (
+                  <Button
+                    key={type}
+                    variant={feedbackType === type ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFeedbackType(type)}
+                  >
+                    {t(`settings.beta.feedbackType.${type}`)}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Feedback form */}
+              <div className="space-y-2">
+                <Label htmlFor="feedback-title">{t('settings.beta.feedbackTitle')}</Label>
+                <Input
+                  id="feedback-title"
+                  value={feedbackTitle}
+                  onChange={(e) => setFeedbackTitle(e.target.value)}
+                  placeholder={t('settings.beta.feedbackTitlePlaceholder')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="feedback-description">{t('settings.beta.feedbackDescription')}</Label>
+                <textarea
+                  id="feedback-description"
+                  value={feedbackDescription}
+                  onChange={(e) => setFeedbackDescription(e.target.value)}
+                  placeholder={t('settings.beta.feedbackDescriptionPlaceholder')}
+                  className="w-full h-24 px-3 py-2 rounded-md border border-input bg-background text-sm resize-none"
+                />
+              </div>
+
+              <Button
+                onClick={handleFeedbackSubmit}
+                disabled={feedbackSubmitting || !feedbackTitle.trim() || !feedbackDescription.trim()}
+                className="w-full"
+              >
+                {feedbackSubmitting ? (
+                  <ArrowClockwise size={18} className="animate-spin mr-2" />
+                ) : null}
+                {t('settings.beta.submitFeedback')}
+              </Button>
+
+              {/* Feedback result */}
+              {feedbackResult && (
+                <Alert className={feedbackResult.status === 'success' ? 'bg-green-500/10 border-green-500/30' : feedbackResult.status === 'error' ? 'bg-red-500/10 border-red-500/30' : 'bg-blue-500/10 border-blue-500/30'}>
+                  {feedbackResult.status === 'success' ? (
+                    <CheckCircle size={16} className="text-green-500" />
+                  ) : feedbackResult.status === 'error' ? (
+                    <Warning size={16} className="text-red-500" />
+                  ) : null}
+                  <AlertDescription className="text-sm">
+                    {feedbackResult.message}
+                    {feedbackResult.url && (
+                      <a
+                        href={feedbackResult.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block mt-1 text-primary hover:underline"
+                      >
+                        {t('settings.beta.viewOnGitHub')}
+                      </a>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 

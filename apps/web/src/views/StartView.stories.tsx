@@ -66,6 +66,7 @@ export const NoProfiles: Story = {
     onGenerateNew: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
+    onPourOver: () => console.log('Pour over clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };
@@ -79,6 +80,7 @@ export const WithProfiles: Story = {
     onGenerateNew: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
+    onPourOver: () => console.log('Pour over clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };
@@ -92,6 +94,7 @@ export const SingleProfile: Story = {
     onGenerateNew: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
+    onPourOver: () => console.log('Pour over clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };
@@ -105,6 +108,7 @@ export const Loading: Story = {
     onGenerateNew: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
+    onPourOver: () => console.log('Pour over clicked'),
     onSettings: () => console.log('Settings clicked'),
   },
 };

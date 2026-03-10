@@ -19,6 +19,12 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // react-hooks v7 strict rules — all violations fixed or intentionally suppressed
+      'react-hooks/refs': 'error',
+      'react-hooks/set-state-in-effect': 'error',
+      'react-hooks/purity': 'error',
+      'react-hooks/preserve-manual-memoization': 'error',
+      'react-hooks/immutability': 'error',
       'react-refresh/only-export-components': [
         'warn',
         { 

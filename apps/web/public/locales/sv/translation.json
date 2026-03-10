@@ -16,7 +16,14 @@
     "or": "ELLER",
     "and": "OCH",
     "selected": "Vald",
-    "tryAgain": "Try Again"
+    "mon": "Mån",
+    "tue": "Tis",
+    "wed": "Ons",
+    "thu": "Tor",
+    "fri": "Fre",
+    "sat": "Lör",
+    "sun": "Sön",
+    "tryAgain": "Försök igen"
   },
   "greetings": {
     "morning": [
@@ -73,7 +80,16 @@
       "Korskontrollerar med Decent-forumet...",
       "Nästan klar..."
     ],
-    "pleaseWait": "Detta kan ta flera minuter"
+    "pleaseWait": "Detta kan ta flera minuter",
+    "phases": {
+      "analyze": "Analysera",
+      "generate": "Generera",
+      "validate": "Validera",
+      "upload": "Ladda upp",
+      "done": "Klar"
+    },
+    "elapsed": "{{seconds}}s förflutit",
+    "retryAttempt": "försök {{attempt}}/{{max}}"
   },
   "app": {
     "title": "Meticulous Espresso AI-profilerare",
@@ -86,13 +102,15 @@
       "provideInput": "Please provide at least a coffee bag photo or taste preferences",
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
+      "generateFailedNetwork": "Connection lost during profile generation. Check your network and try again.",
       "generateFailed404Route": "Kunde inte generera profil: Server-routen hittades inte (404). Detta beror ofta på fel i reverse-proxy/API-path — kontrollera att proxyn skickar /api/* till MeticAI.",
       "generateFailedTimeout": "Kunde inte generera profil: AI-förfrågan fick timeout. Försök igen; om det fortsätter, minska promptens komplexitet eller prova en starkare Gemini-modell.",
       "generateFailedValidation": "Kunde inte generera profil: AI:n skapade en ogiltig profilschema. Försök igen — ett andra försök lyckas ofta.",
       "generateBusy": "En profil genereras redan. Ditt formulär har sparats — försök igen om några minuter.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
-      "saveFailed": "Failed to save results. Please try again."
+      "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "AI-profilgenerering är för närvarande inaktiverad. Aktivera AI i Inställningar och se till att en API-nyckel är konfigurerad."
     }
   },
   "navigation": {
@@ -100,13 +118,15 @@
     "profileCatalogue": "Profilkatalog",
     "runSchedule": "Kör / Schemalägg",
     "settings": "Inställningar",
-    "newProfile": "Ny profil"
+    "newProfile": "Ny profil",
+    "aiUnavailable": "AI-profilgenerering är inte tillgänglig. Aktivera AI-funktioner i Inställningar och säkerställ att en Gemini API-nyckel är konfigurerad."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Kaffepaket-foto",
     "optional": "Valfritt",
     "tastePreferences": "Smakpreferenser",
     "tapToUpload": "Tryck för att ladda upp eller ta foto",
+    "dropImage": "Släpp bild här",
     "imageFormats": "JPG, PNG eller andra bildformat",
     "selectPresetTags": "Eller välj förinställda taggar:",
     "describeFlavor": "Beskriv din ideala espressossmakprofil med text, taggar eller både och",
@@ -133,7 +153,55 @@
     "profilePicture": "Profilbild",
     "selectStyle": "Välj stil",
     "exportAs": "Exportera som",
-    "generatedImagePreview": "Genererad bildförhandsvisning"
+    "generatedImagePreview": "Genererad bildförhandsvisning",
+    "filterHintOr": "Visar profiler med någon av de valda taggarna",
+    "filterHintAnd": "Visar profiler med alla valda taggar",
+    "noProfilesDescription": "Lägg till din första espressoprofil för att se den här",
+    "noMatchingDescription": "Prova att justera dina filterinställningar",
+    "clearFilters": "Rensa filter",
+    "byAuthor": "av {{author}}",
+    "uploadFailed": "Uppladdning misslyckades",
+    "imageUploadFailed": "Misslyckades att ladda upp bild",
+    "selectImageFile": "Välj en bildfil",
+    "paidKeyRequired": "Bildgenerering kräver en betald Gemini API-nyckel. Konfigurera GEMINI_API_KEY.",
+    "generationFailed": "Generering misslyckades",
+    "imageGenerationFailed": "Misslyckades att generera bild",
+    "noImageData": "Ingen bilddata mottagen från servern",
+    "applyImageFailed": "Misslyckades att använda bild",
+    "imageApplied": "Bild applicerad",
+    "saveImageFailed": "Misslyckades att spara bild. Försök igen.",
+    "captureSubtitle": "Meticulous Espresso-profilgenerator",
+    "addedToMeticAI": "Tillagd i MeticAI",
+    "clickToEnlarge": "Klicka för att förstora",
+    "shotHistoryAndAnalysis": "Körhistorik & analys",
+    "uploading": "Laddar upp...",
+    "uploaded": "Uppladdat!",
+    "upload": "Ladda upp",
+    "generating": "Genererar...",
+    "generate": "Generera",
+    "aiImageUnavailable": "AI-bildgenerering är inte tillgänglig. Aktivera AI-funktioner i Inställningar och se till att en Gemini API-nyckel är konfigurerad.",
+    "imageSyncNote": "Bilden beskärs till kvadrat och synkroniseras till din maskin",
+    "generateStyleImage": "Generera {{style}}-bild",
+    "paidKeyWarning": "AI-bildgenerering kräver en betald Gemini API-nyckel. Gratis nycklar kanske inte fungerar.",
+    "useImagePrompt": "Vill du använda den här bilden för din profil?",
+    "discard": "Kassera",
+    "applying": "Applicerar...",
+    "apply": "Applicera",
+    "generatedPreviewAlt": "Genererad förhandsvisning",
+    "imageStyles": {
+      "abstract": "Abstrakt",
+      "abstractDesc": "Konstnärlig abstrakt tolkning",
+      "minimalist": "Minimalistisk",
+      "minimalistDesc": "Ren, minimal design",
+      "pixelArt": "Pixelkonst",
+      "pixelArtDesc": "Retro pixelkonststil",
+      "watercolor": "Akvarell",
+      "watercolorDesc": "Mjuk akvarellmålning",
+      "modern": "Modern",
+      "modernDesc": "Samtida konststil",
+      "vintage": "Vintage",
+      "vintageDesc": "Retroestetik"
+    }
   },
   "runShot": {
     "title": "Kör / Schemalägg",
@@ -173,6 +241,10 @@
     "pauseSchedule": "Pausa schema",
     "enableSchedule": "Aktivera schema",
     "preheatOnly": "Endast förvärmning",
+    "changeProfile": "Ändra",
+    "selectProfile": "Välj profil",
+    "noProfileSelected": "Ingen profil vald. Välj en profil eller använd bara förvärmning.",
+    "everyXDaysCount": "Var {{count}}:e dag",
     "everyDay": "Varje dag",
     "weekdays": "Vardagar (Mån-Fre)",
     "weekends": "Helger (Lör-Sön)",
@@ -195,7 +267,10 @@
       "shotFailed": "Misslyckades köra körning",
       "saveFailed": "Misslyckades spara återkommande schema",
       "deleteFailed": "Misslyckades ta bort återkommande schema",
-      "updateFailed": "Misslyckades uppdatera schema"
+      "updateFailed": "Misslyckades uppdatera schema",
+      "shotScheduled": "Shot schemalagd till {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Misslyckades schemalägg shot",
+      "shotCancelled": "Schemalagd shot avbruten"
     }
   },
   "shotHistory": {
@@ -252,7 +327,8 @@
     "exportAsImage": "Export as Image",
     "viewAiAnalysis": "View AI Analysis",
     "getAiAnalysis": "Get AI Analysis",
-    "runAnalysisForOverlay": "Run analysis to see graph overlay"
+    "runAnalysisForOverlay": "Run analysis to see graph overlay",
+    "aiUnavailable": "AI-analys är inte tillgänglig. Aktivera AI-funktioner i Inställningar och se till att en Gemini API-nyckel är konfigurerad."
   },
   "shotComparison": {
     "title": "Körningsjämförelse",
@@ -265,6 +341,11 @@
     "selectShotDesktop": "Select a shot to compare",
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare"
+  },
+  "betaBanner": {
+    "runningBeta": "Du kör MeticAI beta {{version}}",
+    "betaChannelEnabled": "Beta-uppdateringar aktiverade — du tar emot förhandsversioner",
+    "reportIssue": "Rapportera problem"
   },
   "settings": {
     "title": "Inställningar",
@@ -279,6 +360,14 @@
     "apiKeyPlaceholder": "Ange din Gemini API-nyckel",
     "apiKeyPlaceholderNew": "Ange ny nyckel för att ändra",
     "apiKeyConfigured": "API-nyckel är konfigurerad. Klicka på fältet för att ange en ny nyckel.",
+    "apiKeyConfiguredExtended": "API-nyckel är konfigurerad. Klicka på fältet för att ange en ny nyckel. Du kan behålla nyckeln sparad och inaktivera AI-funktioner nedan.",
+    "aiAssistant": "AI-assistent",
+    "aiAssistantDescription": "Gemini API-nyckel är valfri. Lägg bara till en om du vill ha AI-drivna profil- och analysfunktioner.",
+    "aiAssistantOptional": "Valfritt.",
+    "enableAiFeatures": "Aktivera AI-funktioner",
+    "enableAiFeaturesDescription": "Slår på/av AI-verktyg utan att ta bort din sparade API-nyckel.",
+    "hideAiWhenUnavailable": "Dölj AI-kontroller när de inte är tillgängliga",
+    "hideAiWhenUnavailableDescription": "När det är inaktiverat förblir AI-kontrollerna synliga men inaktiverade tills AI är tillgängligt.",
     "getApiKey": "Hämta din API-nyckel från",
     "googleAIStudio": "Google AI Studio",
     "meticulousIp": "Meticulous maskin-IP",
@@ -357,6 +446,28 @@
       "guideStep2": "Logga in med samma konto som användes vid konfigurering av MeticAI",
       "guideStep3": "Öppna denna URL från valfri enhet på ditt Tailscale-nätverk:",
       "setupGuide": "Installationsguide"
+    },
+    "beta": {
+      "title": "Beta-testning",
+      "enableUpdates": "Aktivera beta-uppdateringar",
+      "enableDescription": "Få tidig tillgång till nya funktioner innan de lanseras.",
+      "warning": "Beta-versioner kan innehålla buggar och oväntat beteende. Du kan när som helst byta tillbaka till stabil version.",
+      "currentChannel": "Nuvarande kanal",
+      "sendFeedback": "Skicka beta-feedback",
+      "feedbackTitle": "Titel",
+      "feedbackTitlePlaceholder": "Kort sammanfattning av din feedback",
+      "feedbackDescription": "Beskrivning",
+      "feedbackDescriptionPlaceholder": "Beskriv din feedback i detalj...",
+      "submitFeedback": "Skicka feedback",
+      "viewOnGitHub": "Visa på GitHub →",
+      "feedbackType": {
+        "bug": "Bugg",
+        "feature": "Funktionsförfrågan",
+        "question": "Fråga",
+        "general": "Allmänt"
+      },
+      "betaAvailable": "Beta v{{version}} finns tillgänglig med nya funktioner. Aktivera beta-uppdateringar för att prova.",
+      "stableCaughtUp": "Stabil v{{version}} finns nu tillgänglig. Du kan byta tillbaka till den stabila kanalen."
     },
     "updateMethod": {
       "watchtower": "Automatiska uppdateringar via Watchtower",
@@ -440,6 +551,11 @@
     "yes": "Ja",
     "no": "Nej"
   },
+  "advanced": {
+    "detailedKnowledge": "Detaljerad AI-kunskap",
+    "detailedKnowledgeDescription": "Inkludera fullständig profilguide och OEPF-specifikation för profiler av högre kvalitet",
+    "detailedKnowledgeWarning": "Varning: Detaljerat läge använder ca 4× fler input-tokens (~40K vs ~10K). Detta ökar API-kostnader betydligt och kan överskrida gratisplaner. Rekommenderas inte med gratis Gemini API-nycklar."
+  },
   "qrCode": {
     "title": "Öppna på mobil",
     "description": "Skanna denna QR-kod med din telefons kamera för att öppna denna sida på din mobila enhet",
@@ -460,11 +576,16 @@
     "allProfilesImported": "Alla maskinprofiler finns redan i din katalog",
     "importAll": "Importera alla {{count}} profiler",
     "importingNote": "Import genererar AI-beskrivningar för varje profil och kommer att förbruka API-tokens.",
+    "generateAiDescriptions": "Generera AI-beskrivningar",
+    "generateAiDescriptionsHint": "Lägger till rikare profilsammanfattningar under import",
+    "aiDescriptionsUnavailable": "AI-beskrivningar är inte tillgängliga. Aktivera AI-funktioner i Inställningar och se till att en Gemini API-nyckel är konfigurerad.",
     "startingImport": "Startar import...",
     "importing": "Importerar {{current}}/{{total}}",
     "preparing": "Förbereder...",
     "percentComplete": "{{percent}}% klart",
     "generatingDescriptions": "Genererar AI-beskrivningar för varje profil...",
+    "importingWithoutDescriptions": "Importerar profiler utan AI-genererade beskrivningar",
+    "importFileAriaLabel": "Importera profil-JSON-fil",
     "readingFile": "Läser fil...",
     "importingProfile": "Importerar profil...",
     "fetchingProfile": "Hämtar profil från maskin...",
@@ -528,6 +649,7 @@
       "descaling": "Avkalkar",
       "unknown": "Okänd",
       "ready": "Redo",
+      "lancesStandard": "även enligt Lances standard",
       "pourWater": "Fyll på vatten",
       "purging": "Spolar",
       "clickToPurge": "Klicka för att spola"
@@ -538,7 +660,9 @@
       "pressure": "Tryck (bar)",
       "flow": "Flöde (ml/s)",
       "pressureLabel": "Tryck",
-      "flowLabel": "Flöde"
+      "flowLabel": "Flöde",
+      "power": "Effekt",
+      "temp": "Temp"
     },
     "actions": {
       "start": "Starta",
@@ -667,23 +791,108 @@
     "cached": "Cached",
     "disclaimer": "This analysis is generated by AI and may not always be accurate. Use it as a starting point for your own experimentation.",
     "analyzing": "Analyzing Shot Data",
-    "analyzingDescription": "Our AI barista is reviewing your extraction data and comparing it against the profile targets...",
-    "noAnalysis": "No analysis available",
-    "reAnalyze": "Re-Analyze",
-    "forFreshInsights": "for Fresh Insights",
-    "shotPerformance": "Shot Performance",
-    "extractionQuality": "Extraction Quality",
-    "profileAdherence": "Profile Adherence",
-    "recommendations": "Recommendations",
-    "overallScore": "Overall Score"
+    "analyzingDescription": "Vår AI-barista granskar dina extraktionsdata och jämför med profilmålen...",
+    "noAnalysis": "Ingen analys tillgänglig",
+    "reAnalyze": "Analysera igen",
+    "forFreshInsights": "för nya insikter",
+    "shotPerformance": "Shot-prestation",
+    "extractionQuality": "Extraktionskvalitet",
+    "profileAdherence": "Profilföljsamhet",
+    "recommendations": "Rekommendationer",
+    "overallScore": "Totalbetyg"
   },
   "appearance": {
-    "title": "Appearance",
-    "useLightMode": "Use light mode",
-    "lightModeDescription": "Switch between dark and light mode",
-    "followSystemTheme": "Follow system theme",
-    "followSystemDescription": "Automatically match your system's dark/light mode preference",
-    "backgroundAnimations": "Background animations",
-    "animationsDescription": "Show animated background effects"
+    "title": "Utseende",
+    "useLightMode": "Använd ljust läge",
+    "lightModeDescription": "Växla mellan mörkt och ljust läge",
+    "followSystemTheme": "Följ systemtema",
+    "followSystemDescription": "Matcha automatiskt ditt systems mörkt-/ljust-läge",
+    "backgroundAnimations": "Bakgrundsanimationer",
+    "animationsDescription": "Visa animerade bakgrundseffekter"
+  },
+  "pourOver": {
+    "title": "Pour Over",
+    "weight": "Vikt",
+    "timer": "Timer",
+    "flow": "Flöde",
+    "unitGrams": "g",
+    "unitTime": "mm:ss",
+    "unitFlowRate": "g/s",
+    "targetWater": "Målvatten",
+    "remaining": "Kvar",
+    "targetReached": "Mål nått!",
+    "progress": "Förlopp",
+    "start": "Starta",
+    "pause": "Pausa",
+    "reset": "Nollställ",
+    "tare": "Tarera",
+    "doseLabel": "Dos (g)",
+    "ratioLabel": "Ratio (1:x)",
+    "weighFromScale": "Väg från våg",
+    "weighFromScaleTitle": "Använd aktuell vågvikt som dos",
+    "weighFromScaleShort": "Dos från våg",
+    "weighFromScaleDescription": "Överför aktuell vågavläsning som kaffedos",
+    "doseWarningTitle": "Dosen verkar hög",
+    "doseWarningDescription": "Du håller på att ange {{weight}}g som dos. Har du glömt att tarera vågen?",
+    "doseWarningConfirm": "Använd {{weight}}g",
+    "autoStartTimer": "Starta timer automatiskt",
+    "autoStartDescription": "Startar vid hällning men ignorerar snabba spikar.",
+    "bloomIndicator": "Bloom-indikator",
+    "bloomDescription": "Visar en bloom-nedräkning de första sekunderna av bryggningen.",
+    "bloomDuration": "Bloom-tid (sek)",
+    "bloomDone": "klar",
+    "bloomWeightMultiplier": "Bloom-viktmål",
+    "bloomWeightMultiplierDescription": "Målvikt för vatten under bloom, som en multipel av dosen.",
+    "offlineNotice": "Maskinen är offline. Vågfunktioner är inaktiverade tills anslutningen återställs.",
+    "freeMode": "Fritt läge",
+    "ratioMode": "Ratio-läge",
+    "waitingForWeight": "Väntar på viktuppdateringar…",
+    "weightLegend": "vikt",
+    "flowLegend": "flöde",
+    "weightTrendLabel": "Vikttrend",
+    "timeoutReached": "Brygningstimer stoppad — 10-minuters säkerhetstimeout nådd.",
+    "integration": {
+      "toggle": "Maskinintegration",
+      "toggleDescription": "Följer ditt pour-over på Meticulous-skärmen. Timern startar automatiskt — börja hälla när du hör signalen.",
+      "startOnMachine": "Starta på maskin",
+      "stop": "Stopp",
+      "newShot": "Ny shot",
+      "profileReady": "Profil laddad — startar shot på maskinen.",
+      "cleanupSuccess": "Temporär profil städad.",
+      "forceCleanupUsed": "Profil städad (rensning överhoppad).",
+      "cleanupFailed": "Kunde inte städa temporär profil.",
+      "abortCleanupSuccess": "Shot stoppad och profil borttagen.",
+      "prepareFailed": "Kunde inte förbereda profil på maskinen.",
+      "invalidWeight": "Ange en giltig dos och ratio för att beräkna målvikt.",
+      "shotEndedAt": "Shot avslutad vid",
+      "status": {
+        "preparing": "Förbereder profil…",
+        "ready": "Profil laddad — väntar på maskinen…",
+        "brewing": "Brygger på maskinen…",
+        "drawdown": "Mål nått — mäter avrinningstid…",
+        "purging": "Städar profil…",
+        "done": "Shot klar!",
+        "error": "Något gick fel."
+      }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Häll till {{weight}}g",
+    "recipeWait": "Vänta {{seconds}}s"
+  },
+  "results": {
+    "profileGenerated": "Profil skapad!",
+    "savedToDevice": "Profil sparad på enheten",
+    "coffeeAnalysis": "Kaffeanalys",
+    "profileLabel": "Profil",
+    "backToForm": "Tillbaka till formuläret",
+    "savedToHistory": "Profilen har sparats på din Meticulous och i historiken",
+    "runScheduleShot": "Kör / Schemalägg shot",
+    "exportAs": "Exportera som",
+    "saveAsImage": "Spara resultat som bild",
+    "image": "Bild",
+    "json": "JSON",
+    "noProfileJson": "Ingen profil-JSON tillgänglig",
+    "profileJsonDownloaded": "Profil-JSON nedladdad!"
   }
 }

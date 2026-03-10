@@ -23,6 +23,7 @@ import { FormView } from '@/views/FormView'
 import { LoadingView, LOADING_MESSAGE_COUNT } from '@/views/LoadingView'
 import { ResultsView } from '@/views/ResultsView'
 import { ErrorView } from '@/views/ErrorView'
+import { useGenerationProgress } from '@/hooks/useGenerationProgress'
 
 import { AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
 import type { APIResponse, ViewState } from '@/types'
@@ -31,6 +32,7 @@ import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon } from '@phosphor-icons/react'
+import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -38,7 +40,9 @@ import { useLastShot } from '@/hooks/useLastShot'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
+import { BetaBanner } from '@/components/BetaBanner'
 import { LiveShotView } from '@/components/LiveShotView'
+import { PourOverView } from '@/components/PourOverView'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
@@ -55,6 +59,9 @@ function App() {
   const [advancedOptions, setAdvancedOptions] = useState<AdvancedCustomizationOptions>({})
   const [currentMessage, setCurrentMessage] = useState(0)
   const [apiResponse, setApiResponse] = useState<APIResponse | null>(null)
+
+  // SSE progress for real-time generation updates
+  const { progress: generationProgress } = useGenerationProgress(viewState === 'loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [isCapturing, setIsCapturing] = useState(false)
   const [qrDialogOpen, setQrDialogOpen] = useState(false)
@@ -78,6 +85,9 @@ function App() {
 
   // Phase 3 — MQTT / WebSocket telemetry
   const [mqttEnabled, setMqttEnabled] = useState(false)
+  const [isAiConfigured, setIsAiConfigured] = useState(false)
+  const [aiEnabled, setAiEnabled] = useState(true)
+  const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useWebSocket(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
@@ -116,7 +126,8 @@ function App() {
     })()
   }, [viewState, machineState.active_profile])
 
-  // Fetch mqttEnabled from settings on mount
+  // Fetch mqttEnabled from settings on mount and when returning from Settings view
+  const prevViewStateRef = useRef<ViewState | null>(null)
   useEffect(() => {
     const fetchMqttSetting = async () => {
       try {
@@ -125,12 +136,31 @@ function App() {
         if (res.ok) {
           const data = await res.json()
           setMqttEnabled(data.mqttEnabled !== false)
+          const hasGeminiKey = Boolean((data.geminiApiKey || '').trim())
+          setIsAiConfigured(data.geminiApiKeyConfigured === true || hasGeminiKey)
         }
       } catch {
         // default false if unreachable
       }
     }
-    fetchMqttSetting()
+    // Fetch on mount or when leaving the settings view
+    if (prevViewStateRef.current === null || (prevViewStateRef.current === 'settings' && viewState !== 'settings')) {
+      fetchMqttSetting()
+    }
+    prevViewStateRef.current = viewState
+  }, [viewState])
+
+  useEffect(() => {
+    setAiEnabled(getAiEnabled())
+    setHideAiWhenUnavailable(getHideAiWhenUnavailable())
+
+    const handler = () => {
+      setAiEnabled(getAiEnabled())
+      setHideAiWhenUnavailable(getHideAiWhenUnavailable())
+    }
+
+    window.addEventListener(AI_PREFS_CHANGED_EVENT, handler)
+    return () => window.removeEventListener(AI_PREFS_CHANGED_EVENT, handler)
   }, [])
 
   // Reset shot banner dismissed state when brewing ends
@@ -197,6 +227,19 @@ function App() {
     }
   }
 
+  const handleFileDrop = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage(t('app.errors.uploadImage'))
+      return
+    }
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }, [t])
+
   const handleRemoveImage = () => {
     setImageFile(null)
     setImagePreview(null)
@@ -214,6 +257,11 @@ function App() {
   }
 
   const handleSubmit = async () => {
+    if (!(isAiConfigured && aiEnabled)) {
+      setErrorMessage(t('app.errors.aiDisabled'))
+      return
+    }
+
     if (!imageFile && !userPrefs.trim() && selectedTags.length === 0) {
       setErrorMessage(t('app.errors.provideInput'))
       return
@@ -273,6 +321,11 @@ function App() {
         
         if (advancedParams.length > 0) {
           formData.append('advanced_customization', advancedParams.join(', '))
+        }
+        
+        // Pass detailed knowledge mode flag
+        if (advancedOptions.detailedKnowledge) {
+          formData.append('detailed_knowledge', 'true')
         }
       }
 
@@ -377,6 +430,11 @@ function App() {
       const buildFriendlyGenerateError = (err: Error): string => {
         const message = err.message || ''
 
+        // Network-level failure — fetch never got an HTTP response (no connection, CORS, etc.)
+        if (/NetworkError|Failed to fetch|network request failed|fetch failed/i.test(message) && !message.includes('HTTP error')) {
+          return t('app.errors.generateFailedNetwork')
+        }
+
         if (message.includes('HTTP error! status: 404')) {
           return t('app.errors.generateFailed404Route')
         }
@@ -389,7 +447,25 @@ function App() {
           return t('app.errors.generateFailedValidation')
         }
 
-        return t('app.errors.generateFailed', { message })
+        // Extract the detail string from JSON error bodies returned by the server
+        // e.g. body: {"detail": "quota exhausted..."} or {"detail": {"message": "..."}}
+        let friendlyDetail = message
+        const bodyMatch = message.match(/body:\s*(\{[\s\S]+\})$/)
+        if (bodyMatch) {
+          try {
+            const parsed = JSON.parse(bodyMatch[1])
+            const detail = parsed.detail
+            if (typeof detail === 'string') {
+              friendlyDetail = detail
+            } else if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+              friendlyDetail = detail.message
+            }
+          } catch {
+            // keep friendlyDetail as the raw message
+          }
+        }
+
+        return t('app.errors.generateFailed', { message: friendlyDetail })
       }
 
       setErrorMessage(
@@ -454,6 +530,7 @@ function App() {
         break
       case 'history':
       case 'settings':
+      case 'pour-over':
       case 'live-shot':
         handleBackToStart()
         break
@@ -478,7 +555,7 @@ function App() {
   const handleDownloadJson = () => {
     const jsonData = selectedHistoryEntry?.profile_json || currentProfileJson
     if (!jsonData) {
-      toast.error('No profile JSON available')
+      toast.error(t('results.noProfileJson'))
       return
     }
 
@@ -502,7 +579,7 @@ function App() {
     link.click()
     URL.revokeObjectURL(url)
     
-    toast.success('Profile JSON downloaded!')
+    toast.success(t('results.profileJsonDownloaded'))
   }
 
   const handleSaveResults = async () => {
@@ -576,7 +653,8 @@ function App() {
     }
   }
 
-  const canSubmit = !!(imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0)
+  const aiAvailable = isAiConfigured && aiEnabled
+  const canSubmit = !!(aiAvailable && (imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0))
 
   // Phase 3 layout helpers
   const showControlCenter = mqttEnabled && machineState._wsConnected
@@ -585,11 +663,15 @@ function App() {
     mqttEnabled &&
     machineState.brewing &&
     viewState !== 'live-shot' &&
+    viewState !== 'pour-over' &&
     !shotBannerDismissed
 
   return (
     <>
       {showBlobs && <AmbientBackground />}
+
+      {/* Beta version banner — fixed at top */}
+      <BetaBanner />
 
       {/* Shot detection banner — fixed at top, across all views */}
       <ShotDetectionBanner
@@ -677,7 +759,10 @@ function App() {
                     setRunShotProfileName(undefined)
                     setViewState('run-shot')
                   }}
+                  onPourOver={() => setViewState('pour-over')}
                   onSettings={() => setViewState('settings')}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                   lastShotBanner={
                     mqttEnabled ? (
                       <LastShotBanner
@@ -705,6 +790,7 @@ function App() {
                   profileCount={profileCount}
                   fileInputRef={fileInputRef}
                   onFileSelect={handleFileSelect}
+                  onFileDrop={handleFileDrop}
                   onRemoveImage={handleRemoveImage}
                   onUserPrefsChange={setUserPrefs}
                   onToggleTag={toggleTag}
@@ -720,6 +806,8 @@ function App() {
                   onBack={handleBackToStart}
                   onViewProfile={handleViewHistoryEntry}
                   onGenerateNew={() => setViewState('form')}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
               )}
 
@@ -728,6 +816,8 @@ function App() {
                   entry={selectedHistoryEntry}
                   onBack={() => setViewState('history')}
                   cachedImageUrl={selectedHistoryImageUrl}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                   onRunProfile={(profileId, profileName) => {
                     setRunShotProfileId(profileId)
                     setRunShotProfileName(profileName)
@@ -767,15 +857,24 @@ function App() {
                 />
               )}
 
-              {viewState === 'shot-history' && shotHistoryProfileName && (
-                <ShotHistoryView
-                  profileName={shotHistoryProfileName}
+              {viewState === 'pour-over' && (
+                <PourOverView
+                  machineState={machineState}
                   onBack={handleBackToStart}
                 />
               )}
 
+              {viewState === 'shot-history' && shotHistoryProfileName && (
+                <ShotHistoryView
+                  profileName={shotHistoryProfileName}
+                  onBack={handleBackToStart}
+                  aiConfigured={aiAvailable}
+                  hideAiWhenUnavailable={hideAiWhenUnavailable}
+                />
+              )}
+
               {viewState === 'loading' && (
-                <LoadingView currentMessage={currentMessage} />
+                <LoadingView currentMessage={currentMessage} progress={generationProgress} />
               )}
 
               {viewState === 'results' && apiResponse && (
