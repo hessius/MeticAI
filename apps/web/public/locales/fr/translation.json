@@ -117,6 +117,8 @@
     "generateNewProfile": "Générer nouveau profil",
     "profileCatalogue": "Catalogue de profils",
     "runSchedule": "Exécuter / Programmer",
+    "pourOver": "Pour-over",
+    "shotAnalysis": "Analyse d'extraction",
     "settings": "Paramètres",
     "newProfile": "Nouveau profil",
     "aiUnavailable": "La génération de profils par IA n'est pas disponible. Activez les fonctionnalités IA dans les Paramètres et assurez-vous qu'une clé API Gemini est configurée."

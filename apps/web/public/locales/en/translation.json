@@ -117,6 +117,8 @@
     "generateNewProfile": "Generate New Profile",
     "profileCatalogue": "Profile Catalogue",
     "runSchedule": "Run / Schedule",
+    "pourOver": "Pour-over",
+    "shotAnalysis": "Shot Analysis",
     "settings": "Settings",
     "newProfile": "New Profile",
     "aiUnavailable": "AI profile generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured."

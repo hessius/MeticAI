@@ -117,6 +117,8 @@
     "generateNewProfile": "Neues Profil generieren",
     "profileCatalogue": "Profilkatalog",
     "runSchedule": "Ausführen / Planen",
+    "pourOver": "Pour-over",
+    "shotAnalysis": "Bezugs-Analyse",
     "settings": "Einstellungen",
     "newProfile": "Neues Profil",
     "aiUnavailable": "KI-Profilgenerierung ist nicht verfügbar. Aktivieren Sie die KI-Funktionen in den Einstellungen und stellen Sie sicher, dass ein Gemini API-Schlüssel konfiguriert ist."
