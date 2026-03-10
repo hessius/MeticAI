@@ -914,7 +914,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     setPreviewImage(null)
   }
 
-  const handleSaveNotes = async (newNotes: string) => {
+  const handleSaveNotes = async () => {
     setIsSavingNotes(true)
     try {
       const serverUrl = await getServerUrl()
@@ -923,7 +923,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: newNotes })
+          body: JSON.stringify({ notes })
         }
       )
       
@@ -931,7 +931,6 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
         throw new Error('Failed to save notes')
       }
       
-      setNotes(newNotes)
       toast.success(t('history.notesSaved'))
     } catch (err) {
       console.error('Failed to save notes:', err)
@@ -1272,9 +1271,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
             </Label>
             <MarkdownEditor
               value={notes}
-              onChange={handleSaveNotes}
+              onChange={setNotes}
+              onSave={handleSaveNotes}
               placeholder={t('history.notesPlaceholder')}
-              isSaving={isSavingNotes}
+              saving={isSavingNotes}
             />
           </motion.div>
         )}
