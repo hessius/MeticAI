@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { 
   CaretLeft, 
@@ -20,6 +22,7 @@ import {
   X
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { getAutoSync, setAutoSync } from '@/lib/aiPreferences'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
 import { SyncReport, SyncResults } from './SyncReport'
@@ -124,6 +127,10 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const [syncBadgeCount, setSyncBadgeCount] = useState(0)
   const [staleProfileNames, setStaleProfileNames] = useState<Set<string>>(new Set())
 
+  // Auto-sync state
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => getAutoSync())
+  const autoSyncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // Detect coarse pointer (touch device)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   useEffect(() => {
@@ -216,6 +223,53 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     fetchOrphaned()
     fetchSyncStatus()
   }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
+
+  // Auto-sync polling: every 5 minutes when enabled
+  useEffect(() => {
+    if (autoSyncIntervalRef.current) {
+      clearInterval(autoSyncIntervalRef.current)
+      autoSyncIntervalRef.current = null
+    }
+
+    if (!autoSyncEnabled) return
+
+    const runAutoSync = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/profiles/auto-sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ai_description: false }),
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        const total = (data.imported_count || 0) + (data.updated_count || 0)
+        if (total > 0) {
+          toast.success(
+            t('profileCatalogue.sync.autoSyncComplete', {
+              imported: data.imported_count || 0,
+              updated: data.updated_count || 0,
+            })
+          )
+          fetchProfiles()
+          fetchOrphaned()
+          fetchSyncStatus()
+        }
+      } catch {
+        // Silent — auto-sync is best-effort
+      }
+    }
+
+    // Run once immediately then every 5 minutes
+    runAutoSync()
+    autoSyncIntervalRef.current = setInterval(runAutoSync, 5 * 60 * 1000)
+
+    return () => {
+      if (autoSyncIntervalRef.current) {
+        clearInterval(autoSyncIntervalRef.current)
+      }
+    }
+  }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchSyncStatus, t])
 
   // Find history ID for a profile by name
   const findHistoryId = useCallback(
@@ -374,6 +428,21 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
               {t('profileCatalogue.refresh')}
             </Button>
           </div>
+        </div>
+
+        {/* Auto-sync toggle */}
+        <div className="flex items-center gap-2 px-1">
+          <Switch
+            id="auto-sync-toggle"
+            checked={autoSyncEnabled}
+            onCheckedChange={(checked) => {
+              setAutoSyncEnabled(checked as boolean)
+              setAutoSync(checked as boolean)
+            }}
+          />
+          <Label htmlFor="auto-sync-toggle" className="text-sm cursor-pointer">
+            {t('profileCatalogue.sync.autoSync')}
+          </Label>
         </div>
 
         {/* Orphan warning banner */}

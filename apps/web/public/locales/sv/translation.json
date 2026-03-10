@@ -204,7 +204,11 @@
       "modernDesc": "Samtida konststil",
       "vintage": "Vintage",
       "vintageDesc": "Retroestetik"
-    }
+    },
+    "generateAiDescription": "Generera AI-förklaring",
+    "generatingAiDescription": "Genererar AI-förklaring...",
+    "aiDescriptionGenerated": "AI-förklaring genererad",
+    "aiDescriptionFailed": "Kunde inte generera AI-förklaring"
   },
   "runShot": {
     "title": "Kör / Schemalägg",
@@ -985,7 +989,9 @@
       "imported": "'{{name}}' importerad till historiken",
       "accepted": "'{{name}}' uppdaterad från maskinen",
       "stale": "Uppdaterad på maskinen",
-      "aiDescriptionToggle": "Generera AI-beskrivningar (använder tokens)"
+      "aiDescriptionToggle": "Generera AI-beskrivningar (använder tokens)",
+      "autoSync": "Synka profiler automatiskt från maskinen",
+      "autoSyncComplete": "Autosynk: {{imported}} importerade, {{updated}} uppdaterade"
     },
     "title": "Profilkatalog",
     "description": "{{count}} profiler på din maskin",

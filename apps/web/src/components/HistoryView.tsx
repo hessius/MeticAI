@@ -29,8 +29,7 @@ import {
   Play,
   PencilSimple,
   FloppyDisk,
-  GearSix,
-  ArrowsClockwise
+  GearSix
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
@@ -619,6 +618,9 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
   // Profile edit state
   const [isEditing, setIsEditing] = useState(false)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
+  // AI description regeneration state
+  const [isRegeneratingDescription, setIsRegeneratingDescription] = useState(false)
+  const [currentReply, setCurrentReply] = useState(entry.reply)
   const [editName, setEditName] = useState(entry.profile_name)
   const [editTemperature, setEditTemperature] = useState<string>(
     entry.profile_json?.temperature?.toString() ?? ''
@@ -977,6 +979,29 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     }
   }
 
+  const handleRegenerateDescription = async () => {
+    setIsRegeneratingDescription(true)
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(
+        `${serverUrl}/api/profile/${encodeURIComponent(entry.id)}/regenerate-description`,
+        { method: 'POST' }
+      )
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to generate AI description')
+      }
+      const data = await response.json()
+      setCurrentReply(data.description)
+      toast.success(t('history.aiDescriptionGenerated'))
+    } catch (err) {
+      console.error('Failed to regenerate description:', err)
+      toast.error(err instanceof Error ? err.message : t('history.aiDescriptionFailed'))
+    } finally {
+      setIsRegeneratingDescription(false)
+    }
+  }
+
   const handleDownload = async () => {
     try {
       setIsDownloading(true)
@@ -1105,7 +1130,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     return sections
   }
 
-  const sections = parseProfileSections(entry.reply)
+  const sections = parseProfileSections(currentReply)
 
   // If showing shot history, render that component instead
   if (showShotHistory) {
@@ -1288,12 +1313,37 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               </Label>
               <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">
                 <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-                  <MarkdownText>{entry.reply}</MarkdownText>
+                  <MarkdownText>{currentReply}</MarkdownText>
                 </p>
               </div>
             </div>
           )}
         </div>
+
+        {/* Generate AI Explanation button — shown for static summaries when AI is available */}
+        {!isCapturing && aiConfigured && currentReply?.includes('generated without AI assistance') && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Button
+              variant="outline"
+              className="w-full h-10 text-sm font-medium"
+              onClick={handleRegenerateDescription}
+              disabled={isRegeneratingDescription}
+            >
+              {isRegeneratingDescription ? (
+                <SpinnerGap size={16} className="mr-2 animate-spin" />
+              ) : (
+                <MagicWand size={16} className="mr-2" weight="bold" />
+              )}
+              {isRegeneratingDescription
+                ? t('history.generatingAiDescription')
+                : t('history.generateAiDescription')}
+            </Button>
+          </motion.div>
+        )}
 
         {/* Personal Notes Section */}
         {!isCapturing && (

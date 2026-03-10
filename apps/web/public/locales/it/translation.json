@@ -204,7 +204,11 @@
     "uploadFailed": "Caricamento fallito",
     "uploaded": "Caricato!",
     "uploading": "Caricamento...",
-    "useImagePrompt": "Vuoi usare questa immagine per il tuo profilo?"
+    "useImagePrompt": "Vuoi usare questa immagine per il tuo profilo?",
+    "generateAiDescription": "Genera spiegazione AI",
+    "generatingAiDescription": "Generazione spiegazione AI...",
+    "aiDescriptionGenerated": "Spiegazione AI generata con successo",
+    "aiDescriptionFailed": "Impossibile generare la spiegazione AI"
   },
   "runShot": {
     "title": "Esegui / Programma",
@@ -984,7 +988,9 @@
       "imported": "'{{name}}' importato nella cronologia",
       "accepted": "'{{name}}' aggiornato dalla macchina",
       "stale": "Aggiornato sulla macchina",
-      "aiDescriptionToggle": "Genera descrizioni AI (utilizza token)"
+      "aiDescriptionToggle": "Genera descrizioni AI (utilizza token)",
+      "autoSync": "Sincronizza automaticamente i profili dalla macchina",
+      "autoSyncComplete": "Sync automatica: {{imported}} importati, {{updated}} aggiornati"
     },
     "title": "Catalogo profili",
     "description": "{{count}} profili sulla tua macchina",

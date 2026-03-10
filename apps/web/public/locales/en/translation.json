@@ -208,7 +208,11 @@
     "notes": "Personal Notes",
     "notesPlaceholder": "Add your tasting notes, grinder settings, or other observations...",
     "notesSaved": "Notes saved",
-    "notesSaveFailed": "Failed to save notes"
+    "notesSaveFailed": "Failed to save notes",
+    "generateAiDescription": "Generate AI Explanation",
+    "generatingAiDescription": "Generating AI explanation...",
+    "aiDescriptionGenerated": "AI explanation generated successfully",
+    "aiDescriptionFailed": "Failed to generate AI explanation"
   },
   "runShot": {
     "title": "Run / Schedule",
@@ -961,7 +965,9 @@
       "imported": "'{{name}}' imported to history",
       "accepted": "'{{name}}' updated from machine",
       "stale": "Updated on machine",
-      "aiDescriptionToggle": "Generate AI descriptions (uses tokens)"
+      "aiDescriptionToggle": "Generate AI descriptions (uses tokens)",
+      "autoSync": "Auto-sync profiles from machine",
+      "autoSyncComplete": "Auto-sync: {{imported}} imported, {{updated}} updated"
     }
   },
   "markdownEditor": {

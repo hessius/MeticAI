@@ -204,7 +204,11 @@
     "uploadFailed": "Error al subir",
     "uploaded": "¡Subido!",
     "uploading": "Subiendo...",
-    "useImagePrompt": "¿Desea usar esta imagen para su perfil?"
+    "useImagePrompt": "¿Desea usar esta imagen para su perfil?",
+    "generateAiDescription": "Generar explicación IA",
+    "generatingAiDescription": "Generando explicación IA...",
+    "aiDescriptionGenerated": "Explicación IA generada correctamente",
+    "aiDescriptionFailed": "Error al generar la explicación IA"
   },
   "runShot": {
     "title": "Ejecutar / Programar",
@@ -984,7 +988,9 @@
       "imported": "'{{name}}' importado al historial",
       "accepted": "'{{name}}' actualizado desde la máquina",
       "stale": "Actualizado en máquina",
-      "aiDescriptionToggle": "Generar descripciones con IA (usa tokens)"
+      "aiDescriptionToggle": "Generar descripciones con IA (usa tokens)",
+      "autoSync": "Sincronizar perfiles automáticamente desde la máquina",
+      "autoSyncComplete": "Auto-sync: {{imported}} importados, {{updated}} actualizados"
     },
     "title": "Catálogo de perfiles",
     "description": "{{count}} perfiles en su máquina",

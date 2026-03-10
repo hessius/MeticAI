@@ -204,7 +204,11 @@
     "uploadFailed": "Échec du téléversement",
     "uploaded": "Téléversé !",
     "uploading": "Téléversement...",
-    "useImagePrompt": "Souhaitez-vous utiliser cette image pour votre profil ?"
+    "useImagePrompt": "Souhaitez-vous utiliser cette image pour votre profil ?",
+    "generateAiDescription": "Générer une explication IA",
+    "generatingAiDescription": "Génération de l'explication IA...",
+    "aiDescriptionGenerated": "Explication IA générée avec succès",
+    "aiDescriptionFailed": "Échec de la génération de l'explication IA"
   },
   "runShot": {
     "title": "Exécuter / Programmer",
@@ -984,7 +988,9 @@
       "imported": "'{{name}}' importé dans l'historique",
       "accepted": "'{{name}}' mis à jour depuis la machine",
       "stale": "Mis à jour sur la machine",
-      "aiDescriptionToggle": "Générer des descriptions IA (utilise des tokens)"
+      "aiDescriptionToggle": "Générer des descriptions IA (utilise des tokens)",
+      "autoSync": "Synchroniser automatiquement les profils depuis la machine",
+      "autoSyncComplete": "Sync auto : {{imported}} importé(s), {{updated}} mis à jour"
     },
     "title": "Catalogue de profils",
     "description": "{{count}} profils sur votre machine",

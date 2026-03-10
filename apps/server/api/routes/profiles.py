@@ -2718,6 +2718,145 @@ async def sync_status(request: Request):
         )
 
 
+@router.post("/profiles/auto-sync")
+@router.post("/api/profiles/auto-sync")
+async def auto_sync_profiles(request: Request):
+    """Automatically sync all new and updated profiles from the machine.
+
+    Imports new profiles and accepts updates without user intervention.
+    Orphaned profiles are reported but not automatically removed.
+    """
+    request_id = request.state.request_id
+
+    try:
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        ai_description = body.get("ai_description", False)
+
+        # Run full sync detection
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        history_by_name: dict[str, dict] = {}
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in history_by_name:
+                history_by_name[pname] = entry
+
+        imported = []
+        updated = []
+
+        for partial in profiles_result:
+            profile_name = getattr(partial, "name", "")
+            profile_id = getattr(partial, "id", "")
+
+            if profile_name not in history_by_name:
+                # New profile — import it
+                try:
+                    full_profile = await async_get_profile(profile_id)
+                    if hasattr(full_profile, "error") and full_profile.error:
+                        continue
+                    profile_dict = deep_convert_to_dict(full_profile)
+
+                    if ai_description:
+                        try:
+                            reply = await _generate_profile_description(profile_dict, request_id)
+                        except Exception:
+                            from services.analysis_service import _build_static_profile_description
+                            reply = _build_static_profile_description(profile_dict)
+                    else:
+                        from services.analysis_service import _build_static_profile_description
+                        reply = _build_static_profile_description(profile_dict)
+
+                    entry_id = str(uuid.uuid4())
+                    new_entry = {
+                        "id": entry_id,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "profile_name": profile_name,
+                        "user_preferences": "Imported from machine (auto-sync)",
+                        "reply": reply,
+                        "profile_json": profile_dict,
+                        "content_hash": compute_content_hash(profile_dict),
+                        "imported": True,
+                        "import_source": "machine",
+                    }
+                    # Reload history to avoid stale writes
+                    history = load_history()
+                    if not isinstance(history, list):
+                        history = history.get("entries", [])
+                    history.insert(0, new_entry)
+                    save_history(history)
+                    imported.append(profile_name)
+                except Exception as exc:
+                    logger.warning(
+                        f"Auto-sync: failed to import '{profile_name}': {exc}",
+                        extra={"request_id": request_id},
+                    )
+            else:
+                # Existing profile — check for updates
+                existing = history_by_name[profile_name]
+                stored_hash = existing.get("content_hash")
+                if not stored_hash:
+                    continue  # No hash to compare — skip
+                try:
+                    full_profile = await async_get_profile(profile_id)
+                    if hasattr(full_profile, "error") and full_profile.error:
+                        continue
+                    profile_dict = deep_convert_to_dict(full_profile)
+                    current_hash = compute_content_hash(profile_dict)
+                    if current_hash != stored_hash:
+                        new_reply = None
+                        if ai_description:
+                            try:
+                                new_reply = await _generate_profile_description(profile_dict, request_id)
+                            except Exception:
+                                pass
+                        update_entry_sync_fields(
+                            existing["id"],
+                            content_hash=current_hash,
+                            machine_updated_at=datetime.now(timezone.utc).isoformat(),
+                            profile_json=profile_dict,
+                            reply=new_reply,
+                        )
+                        updated.append(profile_name)
+                except Exception as exc:
+                    logger.warning(
+                        f"Auto-sync: failed to update '{profile_name}': {exc}",
+                        extra={"request_id": request_id},
+                    )
+
+        logger.info(
+            f"Auto-sync complete: {len(imported)} imported, {len(updated)} updated",
+            extra={"request_id": request_id},
+        )
+
+        return {
+            "status": "success",
+            "imported": imported,
+            "updated": updated,
+            "imported_count": len(imported),
+            "updated_count": len(updated),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Auto-sync failed: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
 @router.post("/machine/profile/restore/{history_id}")
 @router.post("/api/machine/profile/restore/{history_id}")
 async def restore_profile_from_history(history_id: str, request: Request):
@@ -2893,6 +3032,71 @@ Remember: NO information should be lost in this conversion!"""
         raise HTTPException(
             status_code=500,
             detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.post("/profile/{entry_id}/regenerate-description")
+@router.post("/api/profile/{entry_id}/regenerate-description")
+async def regenerate_profile_description(entry_id: str, request: Request):
+    """Regenerate the AI description for an existing profile in history.
+
+    Replaces a static (non-AI) description with a full AI-generated one.
+    Requires a configured Gemini API key.
+    """
+    request_id = request.state.request_id
+
+    try:
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        target_entry = None
+        for entry in entries:
+            if entry.get("id") == entry_id:
+                target_entry = entry
+                break
+
+        if not target_entry:
+            raise HTTPException(status_code=404, detail="History entry not found")
+
+        profile_json = target_entry.get("profile_json")
+        if not profile_json:
+            raise HTTPException(status_code=400, detail="No profile JSON data available for this entry")
+
+        profile_name = target_entry.get("profile_name", "Unknown Profile")
+        logger.info(
+            f"Regenerating AI description for: {profile_name}",
+            extra={"request_id": request_id, "entry_id": entry_id},
+        )
+
+        new_description = await _generate_profile_description(profile_json, request_id)
+
+        # Check it actually used AI (not the static fallback)
+        if "generated without AI assistance" in new_description:
+            raise HTTPException(
+                status_code=503,
+                detail="AI description generation failed — check that your Gemini API key is configured",
+            )
+
+        target_entry["reply"] = new_description
+        save_history(history)
+
+        logger.info(
+            f"AI description regenerated for: {profile_name}",
+            extra={"request_id": request_id, "entry_id": entry_id},
+        )
+
+        return {"status": "success", "description": new_description}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to regenerate description: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
         )
 
 

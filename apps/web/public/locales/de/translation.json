@@ -204,7 +204,11 @@
     "uploadFailed": "Upload fehlgeschlagen",
     "uploaded": "Hochgeladen!",
     "uploading": "Wird hochgeladen...",
-    "useImagePrompt": "Möchten Sie dieses Bild für Ihr Profil verwenden?"
+    "useImagePrompt": "Möchten Sie dieses Bild für Ihr Profil verwenden?",
+    "generateAiDescription": "KI-Erklärung generieren",
+    "generatingAiDescription": "KI-Erklärung wird generiert...",
+    "aiDescriptionGenerated": "KI-Erklärung erfolgreich generiert",
+    "aiDescriptionFailed": "KI-Erklärung konnte nicht generiert werden"
   },
   "runShot": {
     "title": "Ausführen / Planen",
@@ -984,7 +988,9 @@
       "imported": "'{{name}}' in die Historie importiert",
       "accepted": "'{{name}}' von der Maschine aktualisiert",
       "stale": "Auf Maschine aktualisiert",
-      "aiDescriptionToggle": "KI-Beschreibungen generieren (verbraucht Tokens)"
+      "aiDescriptionToggle": "KI-Beschreibungen generieren (verbraucht Tokens)",
+      "autoSync": "Profile automatisch von der Maschine synchronisieren",
+      "autoSyncComplete": "Auto-Sync: {{imported}} importiert, {{updated}} aktualisiert"
     },
     "title": "Profilkatalog",
     "description": "{{count}} Profile auf Ihrer Maschine",
