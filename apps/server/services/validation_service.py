@@ -183,6 +183,40 @@ def _basic_validate(profile: Dict[str, Any]) -> Tuple[bool, List[str]]:
             if interp and interp not in ("linear", "curve"):
                 errors.append(f"Stage '{sname}': interpolation must be 'linear' or 'curve'")
 
+    # Unused adjustable variables check
+    variables = profile.get("variables", [])
+    if variables and isinstance(variables, list):
+        # Build a set of all $key references across all stages (recursive)
+        used_keys: set = set()
+
+        def _collect_refs(obj: Any) -> None:
+            if isinstance(obj, str):
+                if obj.startswith("$"):
+                    used_keys.add(obj[1:])
+            elif isinstance(obj, list):
+                for item in obj:
+                    _collect_refs(item)
+            elif isinstance(obj, dict):
+                for val in obj.values():
+                    _collect_refs(val)
+
+        for stage in profile.get("stages", []):
+            if isinstance(stage, dict):
+                _collect_refs(stage)
+
+        for var in variables:
+            if not isinstance(var, dict):
+                continue
+            key = var.get("key")
+            name = var.get("name", "")
+            is_info = not var.get("adjustable", True)
+            if key and not is_info and key not in used_keys:
+                errors.append(
+                    f"Adjustable variable '{key}' ({name}) is defined but never used "
+                    f"in any stage. Use ${key} in a dynamics point, mark it as info-only "
+                    f"(adjustable: false), or remove it."
+                )
+
     return len(errors) == 0, errors
 
 
@@ -204,7 +238,8 @@ def validate_profile(profile: Dict[str, Any]) -> ValidationResult:
         is_valid, errors = _basic_validate(profile)
     else:
         try:
-            is_valid, errors = validator.validate(profile)
+            from meticulous_mcp.profile_validator import ValidationLevel  # type: ignore[import-untyped]
+            is_valid, errors = validator.validate(profile, level=ValidationLevel.STRICT)
         except Exception as e:
             logger.warning("Full validation failed, falling back to basic: %s", e)
             is_valid, errors = _basic_validate(profile)
