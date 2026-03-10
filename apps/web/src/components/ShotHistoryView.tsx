@@ -2602,7 +2602,7 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
           <div className="pt-3 border-t border-border/20 space-y-2">
             {lastFetched && (
               <p className="text-xs text-muted-foreground/60 text-center">
-                Last updated: {formatDistanceToNow(lastFetched, { addSuffix: true })}
+                {t('shotHistory.lastUpdated', { time: formatDistanceToNow(lastFetched, { addSuffix: true }) })}
               </p>
             )}
             <Button

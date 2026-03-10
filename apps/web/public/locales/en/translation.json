@@ -339,7 +339,8 @@
     "viewAiAnalysis": "View AI Analysis",
     "getAiAnalysis": "Get AI Analysis",
     "runAnalysisForOverlay": "Run analysis to see graph overlay",
-    "aiUnavailable": "AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured."
+    "aiUnavailable": "AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.",
+    "lastUpdated": "Last updated: {{time}}"
   },
   "shotAnalysisView": {
     "title": "Shot Analysis",
