@@ -133,7 +133,7 @@ async def _try_hostname_resolution() -> DiscoveryResult:
     This works when mDNS responder is available on the system.
     """
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         
         # Try to resolve meticulous.local
         hostname = "meticulous.local"

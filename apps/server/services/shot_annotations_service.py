@@ -14,6 +14,7 @@ Storage format: JSON object mapping shot keys to annotation objects:
 """
 
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -28,6 +29,9 @@ ANNOTATIONS_FILE = DATA_DIR / "shot_annotations.json"
 
 # In-memory cache
 _annotations_cache: Optional[dict] = None
+
+# Lock to prevent concurrent read/modify/write races
+_annotations_lock = threading.Lock()
 
 
 def _ensure_file():
@@ -122,30 +126,31 @@ def set_annotation(date: str, filename: str, annotation: str, rating=None) -> di
         Updated annotation entry.
     """
     validated_rating = _validate_rating(rating)
-    annotations = _load_annotations()
-    key = make_shot_key(date, filename)
-    
-    has_text = annotation and annotation.strip()
-    existing = annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
+    with _annotations_lock:
+        annotations = _load_annotations()
+        key = make_shot_key(date, filename)
+        
+        has_text = annotation and annotation.strip()
+        existing = annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
 
-    # Merge: keep existing rating if caller didn't provide one
-    new_annotation = annotation.strip() if has_text else None
-    new_rating = validated_rating if rating is not None else existing.get("rating")
+        # Merge: keep existing rating if caller didn't provide one
+        new_annotation = annotation.strip() if has_text else None
+        new_rating = validated_rating if rating is not None else existing.get("rating")
 
-    if not new_annotation and not new_rating:
-        # Nothing left — remove entry entirely
-        if key in annotations:
-            del annotations[key]
-            _save_annotations(annotations)
-        return {"annotation": None, "rating": None}
-    
-    entry = {
-        "annotation": new_annotation,
-        "rating": new_rating,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    annotations[key] = entry
-    _save_annotations(annotations)
+        if not new_annotation and not new_rating:
+            # Nothing left — remove entry entirely
+            if key in annotations:
+                del annotations[key]
+                _save_annotations(annotations)
+            return {"annotation": None, "rating": None}
+        
+        entry = {
+            "annotation": new_annotation,
+            "rating": new_rating,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        annotations[key] = entry
+        _save_annotations(annotations)
     
     logger.info(f"Saved annotation for shot {key}")
     return entry
@@ -163,26 +168,27 @@ def set_rating(date: str, filename: str, rating) -> dict:
         Updated annotation entry.
     """
     validated_rating = _validate_rating(rating)
-    annotations = _load_annotations()
-    key = make_shot_key(date, filename)
-    existing = annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
+    with _annotations_lock:
+        annotations = _load_annotations()
+        key = make_shot_key(date, filename)
+        existing = annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
 
-    existing_text = existing.get("annotation")
+        existing_text = existing.get("annotation")
 
-    if not existing_text and not validated_rating:
-        # Nothing left — remove entry entirely
-        if key in annotations:
-            del annotations[key]
-            _save_annotations(annotations)
-        return {"annotation": None, "rating": None}
+        if not existing_text and not validated_rating:
+            # Nothing left — remove entry entirely
+            if key in annotations:
+                del annotations[key]
+                _save_annotations(annotations)
+            return {"annotation": None, "rating": None}
 
-    entry = {
-        "annotation": existing_text,
-        "rating": validated_rating,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    annotations[key] = entry
-    _save_annotations(annotations)
+        entry = {
+            "annotation": existing_text,
+            "rating": validated_rating,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        annotations[key] = entry
+        _save_annotations(annotations)
 
     logger.info(f"Saved rating for shot {key}")
     return entry
@@ -198,13 +204,14 @@ def delete_annotation(date: str, filename: str) -> bool:
     Returns:
         True if an annotation was deleted, False if none existed.
     """
-    annotations = _load_annotations()
-    key = make_shot_key(date, filename)
-    if key in annotations:
-        del annotations[key]
-        _save_annotations(annotations)
-        logger.info(f"Deleted annotation for shot {key}")
-        return True
+    with _annotations_lock:
+        annotations = _load_annotations()
+        key = make_shot_key(date, filename)
+        if key in annotations:
+            del annotations[key]
+            _save_annotations(annotations)
+            logger.info(f"Deleted annotation for shot {key}")
+            return True
     return False
 
 
