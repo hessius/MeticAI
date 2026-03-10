@@ -392,7 +392,7 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
     setDetectResult(null)
     
     try {
-      const response = await fetch(`${getServerUrl()}/api/machine/detect`, {
+      const response = await fetch(`${await getServerUrl()}/api/machine/detect`, {
         method: 'POST',
       })
       
