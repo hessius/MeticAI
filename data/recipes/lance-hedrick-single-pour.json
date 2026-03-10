@@ -1,0 +1,25 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "Lance Hedrick Single Pour",
+    "author": "Lance Hedrick",
+    "description": "Long bloom with wet WDT to fully saturate grounds, then one continuous pour. High extraction with minimal fines migration.",
+    "compatibility": ["V60"],
+    "visualizer_hint": "linear_ramp"
+  },
+  "equipment": {
+    "dripper": { "model": "V60", "material": "Plastic" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 20.0,
+    "water_g": 340.0,
+    "grind_setting": "Medium-Coarse"
+  },
+  "protocol": [
+    { "step": 1, "action": "bloom", "water_g": 60, "duration_s": 10, "notes": "Pour 60g (3× dose) to saturate all grounds evenly" },
+    { "step": 2, "action": "stir", "duration_s": 10, "notes": "Wet WDT — stir through the grounds with a WDT tool or chopstick to break all dry pockets" },
+    { "step": 3, "action": "wait", "duration_s": 80, "notes": "Wait — total bloom ~1:40" },
+    { "step": 4, "action": "pour", "water_g": 280, "duration_s": 120, "flow_rate": "steady", "notes": "Single continuous centre pour to 340g — maintain height for turbulence. After draining, swirl if slow / wet WDT if somewhat quick / turn bed with spoon if draining fast." }
+  ]
+}

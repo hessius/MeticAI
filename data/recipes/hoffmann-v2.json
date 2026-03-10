@@ -1,0 +1,33 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "James Hoffmann V2",
+    "author": "James Hoffmann",
+    "description": "Better 1-Cup V60 technique. 50g bloom with a mid-bloom swirl, then four measured pours of 50g each with 10-second pauses, finished with a gentle swirl.",
+    "compatibility": ["V60"],
+    "visualizer_hint": "pulse_block"
+  },
+  "equipment": {
+    "dripper": { "model": "V60", "material": "Plastic" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 15.0,
+    "water_g": 250.0,
+    "grind_setting": "Medium-Fine"
+  },
+  "protocol": [
+    { "step": 1, "action": "bloom", "water_g": 50, "duration_s": 10, "notes": "Pour 50g to bloom" },
+    { "step": 2, "action": "swirl", "duration_s": 5, "notes": "Gently swirl at 10–15s" },
+    { "step": 3, "action": "wait", "duration_s": 30, "notes": "Finish bloom — wait until 0:45" },
+    { "step": 4, "action": "pour", "water_g": 50, "duration_s": 15, "notes": "Pour to 100g total (40% weight)" },
+    { "step": 5, "action": "wait", "duration_s": 10 },
+    { "step": 6, "action": "pour", "water_g": 50, "duration_s": 10, "notes": "Pour to 150g total (60% weight)" },
+    { "step": 7, "action": "wait", "duration_s": 10 },
+    { "step": 8, "action": "pour", "water_g": 50, "duration_s": 10, "notes": "Pour to 200g total (80% weight)" },
+    { "step": 9, "action": "wait", "duration_s": 10 },
+    { "step": 10, "action": "pour", "water_g": 50, "duration_s": 10, "notes": "Pour to 250g total (100% weight)" },
+    { "step": 11, "action": "swirl", "duration_s": 5, "notes": "Gently swirl to flatten the bed" },
+    { "step": 12, "action": "wait", "duration_s": 60, "notes": "Allow to drain completely" }
+  ]
+}

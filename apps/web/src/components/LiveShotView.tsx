@@ -33,7 +33,7 @@ import {
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { continueShot, stopShot, abortShot, purge } from '@/lib/mqttCommands'
+import { continueShot, stopShot, abortShot, purge, tareScale } from '@/lib/mqttCommands'
 import { EspressoChart } from '@/components/charts'
 import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
 import { extractStageRanges, STAGE_COLORS, STAGE_BORDER_COLORS } from '@/components/charts/chartConstants'
@@ -100,12 +100,19 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const chartDataRef = useRef<ChartDataPoint[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [shotComplete, setShotComplete] = useState(false)
-  const wasBrewingRef = useRef(machineState.brewing)
   const renderFrameRef = useRef<number | null>(null)
   const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
   const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+
+  // Summary stats (computed once when shot completes via brewing-detection cleanup)
+  const [summary, setSummary] = useState<{
+    totalTime: number
+    finalWeight: number
+    avgPressure: number
+    avgFlow: number
+  } | null>(null)
 
   // Use machine state from props directly
   const ms = machineState
@@ -150,17 +157,29 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     fetchData()
   }, [ms.active_profile])
 
+  // Detect shot completion: when ms.brewing transitions from true→false,
+  // the cleanup fires to mark the shot complete and compute summary stats.
+  useEffect(() => {
+    if (!ms.brewing) return
+    // Brewing is active — return cleanup that fires when it stops
+    return () => {
+      setShotComplete(true)
+      const data = chartDataRef.current
+      if (data.length > 0) {
+        const totalTime = data[data.length - 1].time
+        const finalWeight = data[data.length - 1].weight ?? 0
+        const avgPressure =
+          data.reduce((s, p) => s + (p.pressure ?? 0), 0) / data.length
+        const avgFlow =
+          data.reduce((s, p) => s + (p.flow ?? 0), 0) / data.length
+        setSummary({ totalTime, finalWeight, avgPressure, avgFlow })
+      }
+    }
+  }, [ms.brewing])
+
   // Accumulate data from WebSocket frames — push + rAF for O(1) per frame
   useEffect(() => {
-    if (!ms.brewing) {
-      // Shot just ended
-      if (wasBrewingRef.current) {
-        setShotComplete(true)
-      }
-      wasBrewingRef.current = false
-      return
-    }
-    wasBrewingRef.current = true
+    if (!ms.brewing) return
 
     const point: ChartDataPoint = {
       time: ms.shot_timer ?? 0,
@@ -305,19 +324,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   // Current stage name (from latest data point)
   const currentStageName = ms.state ?? null
 
-  // Summary stats (computed once when shot completes)
-  const summary = useMemo(() => {
-    if (!shotComplete || chartDataRef.current.length === 0) return null
-    const data = chartDataRef.current
-    const totalTime = data[data.length - 1].time
-    const finalWeight = data[data.length - 1].weight ?? 0
-    const avgPressure =
-      data.reduce((s, p) => s + (p.pressure ?? 0), 0) / data.length
-    const avgFlow =
-      data.reduce((s, p) => s + (p.flow ?? 0), 0) / data.length
-    return { totalTime, finalWeight, avgPressure, avgFlow }
-  }, [shotComplete])
-
   return (
     <motion.div
       key="live-shot"
@@ -354,26 +360,36 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
             return (
               <>
                 {/* Prominent READY banner */}
-                {isReady && (
-                  <Card className="p-4 border-emerald-500/50 bg-emerald-500/10">
+                {isReady && (() => {
+                  // "Lance's standard" easter egg: when temp is within 2.3°C of target, show enhanced display
+                  const isLancesStandard = temp != null && targetTemp != null && Math.abs(temp - targetTemp) <= 2.3
+                  return (
+                  <Card className={`p-4 ${isLancesStandard ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)] dark:shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="relative flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                        <span className={`relative flex ${isLancesStandard ? 'h-4 w-4' : 'h-3 w-3'}`}>
+                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLancesStandard ? 'bg-emerald-300' : 'bg-emerald-400'} opacity-75`} />
+                          <span className={`relative inline-flex rounded-full ${isLancesStandard ? 'h-4 w-4' : 'h-3 w-3'} bg-emerald-500`} />
                         </span>
-                        <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400">
+                        <span className={`font-bold ${isLancesStandard ? 'text-xl text-emerald-600 dark:text-emerald-300' : 'text-lg text-emerald-700 dark:text-emerald-400'}`}>
                           {t('controlCenter.states.ready')}
                         </span>
                       </div>
                       {temp != null && (
-                        <span className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        <span className={`font-bold tabular-nums ${isLancesStandard ? 'text-4xl text-emerald-600 dark:text-emerald-300 animate-pulse' : 'text-3xl text-emerald-700 dark:text-emerald-400'}`}>
                           {temp.toFixed(1)}°C
+                        </span>
+                      )}
+                      {/* Lance's standard subtitle */}
+                      {isLancesStandard && (
+                        <span className="text-xs font-medium text-emerald-600/80 dark:text-emerald-400/80 italic">
+                          {t('controlCenter.states.lancesStandard')}
                         </span>
                       )}
                     </div>
                   </Card>
-                )}
+                  )
+                })()}
 
                 {/* Prominent HEATING display */}
                 {isHeating && (
@@ -472,6 +488,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       value={ms.shot_weight?.toFixed(1) ?? '0.0'}
                       unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
                       label={t('controlCenter.metrics.weight')}
+                      onClick={() => cmd(tareScale, 'tared')}
                     />
                     <MetricTile
                       icon={<Thermometer size={14} />}
@@ -718,15 +735,22 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricTile({ icon, value, unit, label, progress }: {
+function MetricTile({ icon, value, unit, label, progress, onClick }: {
   icon?: React.ReactNode
   value: string
   unit: string
   label: string
   progress?: number
+  onClick?: () => void
 }) {
   return (
-    <div className="bg-muted/50 rounded-lg px-3 py-2 text-center">
+    <div
+      className={`bg-muted/50 rounded-lg px-3 py-2 text-center ${onClick ? 'cursor-pointer hover:bg-muted/75 active:bg-muted transition-colors select-none' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
+    >
       <div className="text-lg font-bold tabular-nums text-foreground flex items-center justify-center gap-1">
         {icon}
         {value}

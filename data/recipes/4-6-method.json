@@ -1,0 +1,30 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "Tetsu Kasuya 4:6 (Stronger)",
+    "author": "Tetsu Kasuya",
+    "description": "Adjust sweetness with the first 40% of water (pours 1–2) and strength with the final 60% (pours 3–5). Use a coarse grind for clarity.",
+    "compatibility": ["V60", "April", "Origami"],
+    "visualizer_hint": "pulse_block"
+  },
+  "equipment": {
+    "dripper": { "model": "V60", "material": "Ceramic" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 20.0,
+    "water_g": 300.0,
+    "grind_setting": "Coarse"
+  },
+  "protocol": [
+    { "step": 1, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "First pour — controls sweetness" },
+    { "step": 2, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
+    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Second pour — controls sweetness" },
+    { "step": 4, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
+    { "step": 5, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Third pour — controls strength" },
+    { "step": 6, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
+    { "step": 7, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Fourth pour — controls strength" },
+    { "step": 8, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
+    { "step": 9, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Fifth pour — controls strength" }
+  ]
+}

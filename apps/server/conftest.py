@@ -8,6 +8,7 @@ import os
 import tempfile
 import shutil
 import pytest
+from unittest.mock import Mock, patch
 
 # Set test environment variables BEFORE main.py is imported
 # This runs at import time, ensuring environment is set up early
@@ -42,6 +43,8 @@ def _reset_in_memory_caches():
     import services.settings_service as _ss
     import services.history_service as _hs
     import services.meticulous_service as _ms
+    import services.temp_profile_service as _tps
+    import services.pour_over_preferences as _pop
 
     _cs._llm_cache = None
     _cs._shot_cache = None
@@ -49,6 +52,9 @@ def _reset_in_memory_caches():
     _hs._history_cache = None
     _ms._profile_list_cache = None
     _ms._profile_list_cache_time = 0.0
+    _tps._set_active(None)
+    _tps._reset_lock()
+    _pop._cache = None
 
     # Also reset settings file on disk to defaults to prevent cross-test leaks
     from config import DATA_DIR
@@ -57,4 +63,29 @@ def _reset_in_memory_caches():
         settings_file.unlink()
 
     yield
+
+
+@pytest.fixture()
+def mock_validate_profile():
+    """Mock validate_profile to return valid for tests that need it.
+
+    Tests that trigger profile generation through /analyze_and_profile
+    should request this fixture explicitly.  Validation-specific tests
+    (e.g. TestValidationRetry) should NOT use this fixture so they
+    exercise the real validator or supply their own patch.
+    """
+    result = Mock()
+    result.is_valid = True
+    result.errors = []
+    with patch("api.routes.coffee.validate_profile", return_value=result):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_generation_progress():
+    """Clear in-memory generation state between tests."""
+    from services.generation_progress import _active_generations
+    _active_generations.clear()
+    yield
+    _active_generations.clear()
 

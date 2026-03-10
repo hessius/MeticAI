@@ -16,7 +16,14 @@
     "tryAgain": "Try Again",
     "or": "OR",
     "and": "AND",
-    "selected": "Selected"
+    "selected": "Selected",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat",
+    "sun": "Sun"
   },
   "greetings": {
     "morning": [
@@ -73,7 +80,16 @@
       "Cross-referencing with the Decent forums...",
       "Almost there..."
     ],
-    "pleaseWait": "This may take several minutes"
+    "pleaseWait": "This may take several minutes",
+    "phases": {
+      "analyze": "Analyze",
+      "generate": "Generate",
+      "validate": "Validate",
+      "upload": "Upload",
+      "done": "Done"
+    },
+    "elapsed": "{{seconds}}s elapsed",
+    "retryAttempt": "retry {{attempt}}/{{max}}"
   },
   "app": {
     "title": "Meticulous Espresso AI Profiler",
@@ -86,13 +102,15 @@
       "provideInput": "Please provide at least a coffee bag photo or taste preferences",
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
+      "generateFailedNetwork": "Connection lost during profile generation. Check your network and try again.",
       "generateFailed404Route": "Failed to generate profile: The server route was not found (404). This is often a reverse-proxy/API path mismatch — verify your proxy forwards /api/* to MeticAI.",
       "generateFailedTimeout": "Failed to generate profile: The AI request timed out. Please retry; if this repeats, reduce prompt complexity or try a stronger Gemini model.",
       "generateFailedValidation": "Failed to generate profile: The AI generated an invalid profile schema. Please retry — a second attempt often succeeds.",
       "generateBusy": "A profile is already being generated. Your form has been preserved — please try again in a few minutes.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
-      "saveFailed": "Failed to save results. Please try again."
+      "saveFailed": "Failed to save results. Please try again.",
+      "aiDisabled": "AI profile generation is currently disabled. Enable AI in Settings and ensure an API key is configured."
     }
   },
   "navigation": {
@@ -100,13 +118,15 @@
     "profileCatalogue": "Profile Catalogue",
     "runSchedule": "Run / Schedule",
     "settings": "Settings",
-    "newProfile": "New Profile"
+    "newProfile": "New Profile",
+    "aiUnavailable": "AI profile generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured."
   },
   "profileGeneration": {
     "coffeeBagPhoto": "Coffee Bag Photo",
     "optional": "Optional",
     "tastePreferences": "Taste Preferences",
     "tapToUpload": "Tap to upload or take photo",
+    "dropImage": "Drop image here",
     "imageFormats": "JPG, PNG, or other image formats",
     "selectPresetTags": "Or select preset tags:",
     "describeFlavor": "Describe your ideal espresso flavor profile using text, tags, or both",
@@ -133,7 +153,55 @@
     "profilePicture": "Profile Picture",
     "selectStyle": "Select Style",
     "exportAs": "Export as",
-    "generatedImagePreview": "Generated Image Preview"
+    "generatedImagePreview": "Generated Image Preview",
+    "filterHintOr": "Showing profiles with any of the selected tags",
+    "filterHintAnd": "Showing profiles with all selected tags",
+    "noProfilesDescription": "Add your first espresso profile to see it here",
+    "noMatchingDescription": "Try adjusting your filter settings",
+    "clearFilters": "Clear Filters",
+    "byAuthor": "by {{author}}",
+    "uploadFailed": "Upload failed",
+    "imageUploadFailed": "Failed to upload image",
+    "selectImageFile": "Please select an image file",
+    "paidKeyRequired": "Image generation requires a paid Gemini API key. Please configure GEMINI_API_KEY.",
+    "generationFailed": "Generation failed",
+    "imageGenerationFailed": "Failed to generate image",
+    "noImageData": "No image data received from server",
+    "applyImageFailed": "Failed to apply image",
+    "imageApplied": "Image applied successfully",
+    "saveImageFailed": "Failed to save image. Please try again.",
+    "captureSubtitle": "Meticulous Espresso Profile Generator",
+    "addedToMeticAI": "Added to MeticAI",
+    "clickToEnlarge": "Click to enlarge",
+    "shotHistoryAndAnalysis": "Shot History & Analysis",
+    "uploading": "Uploading...",
+    "uploaded": "Uploaded!",
+    "upload": "Upload",
+    "generating": "Generating...",
+    "generate": "Generate",
+    "aiImageUnavailable": "AI image generation is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.",
+    "imageSyncNote": "Image will be cropped to square and synced to your machine",
+    "generateStyleImage": "Generate {{style}} Image",
+    "paidKeyWarning": "AI image generation requires a paid Gemini API key. Free tier keys may not work.",
+    "useImagePrompt": "Would you like to use this image for your profile?",
+    "discard": "Discard",
+    "applying": "Applying...",
+    "apply": "Apply",
+    "generatedPreviewAlt": "Generated preview",
+    "imageStyles": {
+      "abstract": "Abstract",
+      "abstractDesc": "Artistic abstract interpretation",
+      "minimalist": "Minimalist",
+      "minimalistDesc": "Clean, minimal design",
+      "pixelArt": "Pixel Art",
+      "pixelArtDesc": "Retro pixel art style",
+      "watercolor": "Watercolor",
+      "watercolorDesc": "Soft watercolor painting",
+      "modern": "Modern",
+      "modernDesc": "Contemporary art style",
+      "vintage": "Vintage",
+      "vintageDesc": "Retro aesthetic"
+    }
   },
   "runShot": {
     "title": "Run / Schedule",
@@ -173,6 +241,10 @@
     "pauseSchedule": "Pause schedule",
     "enableSchedule": "Enable schedule",
     "preheatOnly": "Preheat only",
+    "changeProfile": "Change",
+    "selectProfile": "Select Profile",
+    "noProfileSelected": "No profile selected. Select a profile or use preheat only.",
+    "everyXDaysCount": "Every {{count}} days",
     "everyDay": "Every day",
     "weekdays": "Weekdays (Mon-Fri)",
     "weekends": "Weekends (Sat-Sun)",
@@ -195,7 +267,10 @@
       "shotFailed": "Failed to run shot",
       "saveFailed": "Failed to save recurring schedule",
       "deleteFailed": "Failed to delete recurring schedule",
-      "updateFailed": "Failed to update schedule"
+      "updateFailed": "Failed to update schedule",
+      "shotScheduled": "Shot scheduled for {{time}}{{preheatInfo}}",
+      "shotScheduleFailed": "Failed to schedule shot",
+      "shotCancelled": "Scheduled shot cancelled"
     }
   },
   "shotHistory": {
@@ -252,7 +327,8 @@
     "exportAsImage": "Export as Image",
     "viewAiAnalysis": "View AI Analysis",
     "getAiAnalysis": "Get AI Analysis",
-    "runAnalysisForOverlay": "Run analysis to see graph overlay"
+    "runAnalysisForOverlay": "Run analysis to see graph overlay",
+    "aiUnavailable": "AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured."
   },
   "shotComparison": {
     "title": "Shot Comparison",
@@ -265,6 +341,11 @@
     "compareWith": "Compare with:",
     "noOtherShots": "No other shots available to compare",
     "timeTooltip": "Time: {{value}}s"
+  },
+  "betaBanner": {
+    "runningBeta": "You're running MeticAI beta {{version}}",
+    "betaChannelEnabled": "Beta updates enabled — you'll receive pre-release versions",
+    "reportIssue": "Report Issue"
   },
   "settings": {
     "title": "Settings",
@@ -279,6 +360,14 @@
     "apiKeyPlaceholder": "Enter your Gemini API key",
     "apiKeyPlaceholderNew": "Enter new key to change",
     "apiKeyConfigured": "API key is configured. Click the field to enter a new key.",
+    "apiKeyConfiguredExtended": "API key is configured. Click the field to enter a new key. You can keep the key saved and disable AI features below.",
+    "aiAssistant": "AI Assistant",
+    "aiAssistantDescription": "Gemini API key is optional. Add one only if you want AI-powered profile and analysis features.",
+    "aiAssistantOptional": "Optional.",
+    "enableAiFeatures": "Enable AI features",
+    "enableAiFeaturesDescription": "Turns AI tools on/off without removing your saved API key.",
+    "hideAiWhenUnavailable": "Hide AI controls when unavailable",
+    "hideAiWhenUnavailableDescription": "When disabled, AI controls stay visible but disabled until AI is available.",
     "getApiKey": "Get your API key from",
     "googleAIStudio": "Google AI Studio",
     "meticulousIp": "Meticulous Machine IP",
@@ -369,6 +458,28 @@
       "guideStep3": "Open this URL from any device on your Tailscale network:",
       "setupGuide": "Setup Guide"
     },
+    "beta": {
+      "title": "Beta Testing",
+      "enableUpdates": "Enable beta updates",
+      "enableDescription": "Get early access to new features before they're released.",
+      "warning": "Beta versions may contain bugs and unexpected behavior. You can switch back to stable anytime.",
+      "currentChannel": "Current channel",
+      "sendFeedback": "Send Beta Feedback",
+      "feedbackTitle": "Title",
+      "feedbackTitlePlaceholder": "Brief summary of your feedback",
+      "feedbackDescription": "Description",
+      "feedbackDescriptionPlaceholder": "Please describe your feedback in detail...",
+      "submitFeedback": "Submit Feedback",
+      "viewOnGitHub": "View on GitHub →",
+      "feedbackType": {
+        "bug": "Bug",
+        "feature": "Feature Request",
+        "question": "Question",
+        "general": "General"
+      },
+      "betaAvailable": "Beta v{{version}} is available with new features. Enable beta updates to try it.",
+      "stableCaughtUp": "Stable v{{version}} is now available. You can switch back to the stable channel."
+    },
     "updateMethod": {
       "watchtower": "Automatic updates via Watchtower",
       "manual": "Manual updates only",
@@ -440,6 +551,11 @@
     "yes": "Yes",
     "no": "No"
   },
+  "advanced": {
+    "detailedKnowledge": "Detailed AI Knowledge",
+    "detailedKnowledgeDescription": "Include full profiling guide and OEPF specification for higher quality profiles",
+    "detailedKnowledgeWarning": "Warning: Detailed mode uses approximately 4× more input tokens (~40K vs ~10K). This significantly increases API costs and may exceed free-tier limits. Not recommended with free Gemini API keys."
+  },
   "qrCode": {
     "title": "Open on Mobile",
     "description": "Scan this QR code with your phone's camera to open this page on your mobile device",
@@ -460,11 +576,16 @@
     "allProfilesImported": "All machine profiles are already in your catalogue",
     "importAll": "Import All {{count}} Profiles",
     "importingNote": "Importing generates AI descriptions for each profile and will consume API tokens.",
+    "generateAiDescriptions": "Generate AI descriptions",
+    "generateAiDescriptionsHint": "Adds richer profile summaries during import",
+    "aiDescriptionsUnavailable": "AI descriptions are unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.",
     "startingImport": "Starting import...",
     "importing": "Importing {{current}}/{{total}}",
     "preparing": "Preparing...",
     "percentComplete": "{{percent}}% complete",
     "generatingDescriptions": "Generating AI descriptions for each profile...",
+    "importingWithoutDescriptions": "Importing profiles without AI-generated descriptions",
+    "importFileAriaLabel": "Import profile JSON file",
     "readingFile": "Reading file...",
     "importingProfile": "Importing profile...",
     "fetchingProfile": "Fetching profile from machine...",
@@ -528,6 +649,7 @@
       "descaling": "Descaling",
       "unknown": "Unknown",
       "ready": "Ready",
+      "lancesStandard": "even by Lance's standard",
       "pourWater": "Pour Water",
       "purging": "Purging",
       "clickToPurge": "Click to Purge"
@@ -556,6 +678,7 @@
     },
     "toasts": {
       "startingShot": "Starting shot...",
+      "started": "Shot started!",
       "stopping": "Stopping shot...",
       "aborting": "Aborting shot...",
       "continuing": "Continuing shot...",
@@ -687,5 +810,100 @@
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
     "animationsDescription": "Show animated background effects"
+  },
+  "pourOver": {
+    "title": "Pour-over",
+    "weight": "Weight",
+    "timer": "Timer",
+    "flow": "Flow",
+    "unitGrams": "g",
+    "unitTime": "mm:ss",
+    "unitFlowRate": "g/s",
+    "targetWater": "Target water",
+    "remaining": "Remaining",
+    "targetReached": "Target reached!",
+    "progress": "Progress",
+    "start": "Start",
+    "pause": "Pause",
+    "reset": "Reset",
+    "tare": "Tare",
+    "doseLabel": "Dose (g)",
+    "ratioLabel": "Ratio (1:x)",
+    "weighFromScale": "Weigh from scale",
+    "weighFromScaleTitle": "Capture current scale weight as dose",
+    "weighFromScaleShort": "Set dose from scale",
+    "weighFromScaleDescription": "Transfers the current scale reading as your coffee dose",
+    "doseWarningTitle": "Dose seems high",
+    "doseWarningDescription": "You're about to set {{weight}}g as your dose. Did you forget to tare the scale?",
+    "doseWarningConfirm": "Use {{weight}}g",
+    "autoStartTimer": "Auto-start timer",
+    "autoStartDescription": "Starts when pour is detected, but ignores fast grounds-style spikes.",
+    "bloomIndicator": "Bloom indicator",
+    "bloomDescription": "Shows a bloom countdown during the first seconds of brewing.",
+    "bloomDuration": "Bloom duration (sec)",
+    "bloomDone": "done",
+    "bloomWeightMultiplier": "Bloom weight target",
+    "bloomWeightMultiplierDescription": "Target water weight during bloom, as a multiple of your dose.",
+    "recipeMode": "Recipes",
+    "selectRecipe": "Select a recipe",
+    "noRecipes": "No recipes found",
+    "changeRecipe": "Change",
+    "viewRecipeDetails": "View recipe details",
+    "hideRecipeDetails": "Hide details",
+    "nextStep": "Next step →",
+    "offlineNotice": "Machine is offline. Scale actions are disabled until connection is restored.",
+    "freeMode": "Free",
+    "ratioMode": "Ratio",
+    "mode": "Mode",
+    "followWeight": "Follow scale weight",
+    "followWeightDescription": "Advance pour steps when scale reaches target. Disable to advance all steps by timer.",
+    "waitingForWeight": "Waiting for weight updates…",
+    "weightLegend": "weight",
+    "flowLegend": "flow",
+    "weightTrendLabel": "Weight trend",
+    "timeoutReached": "Brew timer stopped — 10+minute safety timeout reached.",
+    "integration": {
+      "toggle": "Machine integration",
+      "toggleDescription": "Tracks your pour-over on the Meticulous screen. The brew timer starts automatically — start pouring when you hear the chime.",
+      "startOnMachine": "Start on machine",
+      "stop": "Stop",
+      "newShot": "New Shot",
+      "profileReady": "Profile loaded — starting shot on machine.",
+      "cleanupSuccess": "Temporary profile cleaned up.",
+      "forceCleanupUsed": "Profile cleaned up (purge skipped).",
+      "cleanupFailed": "Failed to clean up temporary profile.",
+      "abortCleanupSuccess": "Shot stopped and profile removed.",
+      "prepareFailed": "Failed to prepare profile on machine.",
+      "invalidWeight": "Set a valid dose and ratio to calculate target weight.",
+      "shotEndedAt": "Shot ended at",
+      "status": {
+        "preparing": "Preparing profile…",
+        "ready": "Profile loaded — waiting for machine…",
+        "brewing": "Brewing on machine…",
+        "drawdown": "Target reached — timing drawdown…",
+        "purging": "Cleaning up profile…",
+        "done": "Shot complete!",
+        "error": "Something went wrong."
+      }
+    },
+    "recipeBloom": "Bloom",
+    "recipeBloomWeight": "Bloom {{weight}}g",
+    "recipePourTo": "Pour to {{weight}}g",
+    "recipeWait": "Wait {{seconds}}s"
+  },
+  "results": {
+    "profileGenerated": "Profile Generated!",
+    "savedToDevice": "Profile saved to device",
+    "coffeeAnalysis": "Coffee Analysis",
+    "profileLabel": "Profile",
+    "backToForm": "Back to form",
+    "savedToHistory": "Profile has been saved to your Meticulous device and history",
+    "runScheduleShot": "Run / Schedule Shot",
+    "exportAs": "Export as",
+    "saveAsImage": "Save results as image",
+    "image": "Image",
+    "json": "JSON",
+    "noProfileJson": "No profile JSON available",
+    "profileJsonDownloaded": "Profile JSON downloaded!"
   }
 }

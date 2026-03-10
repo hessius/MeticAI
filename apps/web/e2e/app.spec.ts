@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test'
 
+/**
+ * E2E Tests for MeticAI Web Application
+ *
+ * Note: Tests that require the "Generate New Profile" button will be skipped
+ * when AI features are unavailable (no API key configured in CI).
+ */
+
 test.describe('MeticAI Web Application E2E Tests', () => {
   test('should load the homepage successfully', async ({ page }) => {
     await page.goto('/')
@@ -16,7 +23,15 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Wait for the app to load and click "Generate New Profile" to access the form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     // Now check for form elements
     // Check for file upload area
@@ -40,7 +55,15 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     const textarea = page.getByPlaceholder(/Balanced extraction/)
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
@@ -60,7 +83,15 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
     
@@ -79,7 +110,15 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     // Select multiple tags
     await page.getByText('Light Body').first().click()
@@ -97,7 +136,15 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     const lightBodyTag = page.locator('[data-slot="badge"]:has-text("Light Body")')
     
@@ -119,7 +166,15 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     // Test mobile view
     await page.setViewportSize({ width: 375, height: 667 })
@@ -132,7 +187,15 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
     
@@ -155,7 +218,15 @@ test.describe('User Flows', () => {
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
-    await page.getByRole('button', { name: /Generate New Profile/i }).click()
+    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    
+    // Skip test if button is disabled (AI unavailable in CI)
+    if (await generateButton.isDisabled()) {
+      test.skip()
+      return
+    }
+    
+    await generateButton.click()
     
     // Fill in preferences
     await page.getByPlaceholder(/Balanced extraction/).fill('I prefer fruity and bright espresso with floral notes')

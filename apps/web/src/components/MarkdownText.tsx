@@ -220,7 +220,6 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
 
   const processInlineMarkdown = (text: string, lineIndex: number): React.ReactNode[] => {
     const parts: React.ReactNode[] = []
-    let key = 0
 
     // Combined regex for links, bold, italic, and code
     const inlineRegex = /(\[([^\]]+)\]\(([^)]+)\)|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g
@@ -230,7 +229,7 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
     while ((match = inlineRegex.exec(text)) !== null) {
       // Add text before the match
       if (match.index > lastIndex) {
-        parts.push(<span key={`t-${lineIndex}-${key++}`}>{text.substring(lastIndex, match.index)}</span>)
+        parts.push(<span key={`t-${lineIndex}-${parts.length}`}>{text.substring(lastIndex, match.index)}</span>)
       }
 
       if (match[2] && match[3]) {
@@ -238,7 +237,7 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
         const sanitizedUrl = sanitizeUrl(match[3])
         parts.push(
           <a 
-            key={`a-${lineIndex}-${key++}`} 
+            key={`a-${lineIndex}-${parts.length}`} 
             href={sanitizedUrl} 
             target="_blank" 
             rel="noopener noreferrer"
@@ -250,28 +249,28 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
       } else if (match[4]) {
         // ***bold italic***
         parts.push(
-          <strong key={`bi-${lineIndex}-${key++}`} className="font-semibold italic">
+          <strong key={`bi-${lineIndex}-${parts.length}`} className="font-semibold italic">
             {match[4]}
           </strong>
         )
       } else if (match[5]) {
         // **bold**
         parts.push(
-          <strong key={`b-${lineIndex}-${key++}`} className="font-semibold">
+          <strong key={`b-${lineIndex}-${parts.length}`} className="font-semibold">
             {match[5]}
           </strong>
         )
       } else if (match[6]) {
         // *italic*
         parts.push(
-          <em key={`i-${lineIndex}-${key++}`} className="italic">
+          <em key={`i-${lineIndex}-${parts.length}`} className="italic">
             {match[6]}
           </em>
         )
       } else if (match[7]) {
         // `code`
         parts.push(
-          <code key={`c-${lineIndex}-${key++}`} className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
+          <code key={`c-${lineIndex}-${parts.length}`} className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
             {match[7]}
           </code>
         )
@@ -282,7 +281,7 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
 
     // Add remaining text
     if (lastIndex < text.length) {
-      parts.push(<span key={`t-${lineIndex}-${key++}`}>{text.substring(lastIndex)}</span>)
+      parts.push(<span key={`t-${lineIndex}-${parts.length}`}>{text.substring(lastIndex)}</span>)
     }
 
     // If no matches found, return original text

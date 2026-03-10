@@ -1,14 +1,16 @@
 """Meticulous service for espresso machine API and shot data management."""
 
 import json
+import re
 import time
+import uuid
 import zstandard
 import httpx
 import asyncio
 import os
 import functools
 import requests.exceptions
-from typing import Optional
+from typing import Any, Dict, Optional
 from fastapi import HTTPException
 from logging_config import get_logger
 from services.settings_service import load_settings
@@ -66,6 +68,26 @@ _profile_list_cache: Optional[list] = None
 _profile_list_cache_time: float = 0.0
 
 
+def _resolve_meticulous_base_url() -> str:
+    """Resolve the machine base URL from environment/settings with safe defaults."""
+    meticulous_ip = os.environ.get("METICULOUS_IP", "").strip()
+
+    if not meticulous_ip:
+        try:
+            settings = load_settings()
+            meticulous_ip = (settings.get("meticulousIp") or "").strip()
+        except Exception:
+            meticulous_ip = ""
+
+    if not meticulous_ip:
+        meticulous_ip = "meticulous.local"
+
+    if not meticulous_ip.startswith("http"):
+        meticulous_ip = f"http://{meticulous_ip}"
+
+    return meticulous_ip.rstrip("/")
+
+
 def _get_http_client() -> httpx.AsyncClient:
     """Return the singleton httpx.AsyncClient, creating it if needed."""
     global _http_client
@@ -85,24 +107,25 @@ async def close_http_client():
 def get_meticulous_api():
     """Lazily initialize and return the Meticulous API client."""
     global _meticulous_api
+    desired_base_url = _resolve_meticulous_base_url()
+
     if _meticulous_api is None:
         from meticulous.api import Api
+        _meticulous_api = Api(base_url=desired_base_url)
+        return _meticulous_api
 
-        meticulous_ip = os.environ.get("METICULOUS_IP", "").strip()
-        if not meticulous_ip:
-            try:
-                settings = load_settings()
-                meticulous_ip = (settings.get("meticulousIp") or "").strip()
-            except Exception:
-                meticulous_ip = ""
+    current_base_url = str(getattr(_meticulous_api, "base_url", "")).rstrip("/")
+    if current_base_url != desired_base_url:
+        from meticulous.api import Api
+        logger.info(
+            "Meticulous API target changed, reinitializing client",
+            extra={
+                "from_base_url": current_base_url,
+                "to_base_url": desired_base_url,
+            },
+        )
+        _meticulous_api = Api(base_url=desired_base_url)
 
-        if not meticulous_ip:
-            meticulous_ip = "meticulous.local"
-
-        # Ensure we use http:// prefix
-        if not meticulous_ip.startswith("http"):
-            meticulous_ip = f"http://{meticulous_ip}"
-        _meticulous_api = Api(base_url=meticulous_ip)
     return _meticulous_api
 
 
@@ -257,14 +280,197 @@ async def async_load_profile_by_id(profile_id: str):
     return await loop.run_in_executor(None, api.load_profile_by_id, profile_id)
 
 
+def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, Any]:
+    """Enrich and normalize espresso-profile-schema JSON for the machine REST API.
+
+    The AI model produces JSON conforming to the OEPF espresso-profile-schema,
+    but the Meticulous machine's ``/api/v1/profile/save`` endpoint requires
+    several additional fields.  This function — borrowing the same conventions
+    used by the MCP server's ``create_profile`` tool — fills in the gaps so the
+    profile can be saved directly.
+
+    Added / defaulted fields:
+        - ``id`` — random UUID if missing
+        - ``author`` / ``author_id`` — ``"MeticAI"`` + random UUID
+        - ``temperature`` — defaults to 90.0 °C
+        - ``final_weight`` — defaults to 40.0 g
+        - ``variables`` — always present (empty list if missing)
+        - ``previous_authors`` — always present (empty list if missing)
+        - Per-stage ``key`` — auto-generated from type + index if missing
+        - Per-stage ``limits`` — always an array (never None / absent)
+        - ``dynamics.interpolation`` — defaults to ``"linear"``
+        - ``dynamics.points`` — each point coerced to ``[x, y]`` list form
+        - Exit-trigger ``relative`` — defaults to ``True`` for time, ``False``
+          otherwise (matches MCP profile_builder behaviour)
+        - Exit-trigger ``comparison`` — defaults to ``">="``
+    """
+    data = dict(profile_json)  # shallow copy
+
+    # ── Top-level identity & metadata ────────────────────────────────────
+    # Profile ID MUST be a valid UUID - the machine's /api/v1/profile/get/{id}
+    # endpoint returns 404 for non-UUID IDs (e.g. slug-style IDs like "my-profile")
+    existing_id = data.get("id", "")
+    if existing_id:
+        try:
+            uuid.UUID(existing_id)  # Validates UUID format
+        except (ValueError, AttributeError):
+            # Non-UUID ID - replace with a proper UUID to avoid 404 on fetch
+            logger.warning(
+                "Replacing non-UUID profile ID with UUID: %s", existing_id
+            )
+            existing_id = ""
+    if not existing_id:
+        data["id"] = str(uuid.uuid4())
+    data.setdefault("author", "MeticAI")
+    if "author_id" not in data or not data["author_id"]:
+        data["author_id"] = str(uuid.uuid4())
+    data.setdefault("temperature", 90.0)
+    data.setdefault("final_weight", 40.0)
+    # The Meticulous app crashes if variables array is absent
+    if "variables" not in data or data.get("variables") is None:
+        data["variables"] = []
+    data.setdefault("previous_authors", [])
+
+    # ── Info variable emoji normalization ────────────────────────────────
+    # Info variables (key starts with "info_") MUST have an emoji prefix in name.
+    # This distinguishes them from adjustable variables (no emoji, used in stages).
+    emoji_pattern = re.compile(
+        r'^[\U0001F300-\U0001F9FF'   # Supplemental Symbols and Pictographs
+        r'\U0001F600-\U0001F64F'      # Emoticons
+        r'\U0001F680-\U0001F6FF'      # Transport and Map Symbols  
+        r'\U00002600-\U000026FF'      # Misc symbols
+        r'\U00002700-\U000027BF]'     # Dingbats
+    )
+    for var in data.get("variables") or []:
+        key = var.get("key", "")
+        name = var.get("name", "")
+        is_info = key.startswith("info_") or var.get("adjustable") is False
+        # If it's an info variable and name doesn't start with emoji, add default ℹ️
+        if is_info and not emoji_pattern.match(name):
+            var["name"] = f"ℹ️ {name}" if name else "ℹ️ Info"
+
+    # ── Display metadata ─────────────────────────────────────────────────
+    # The OEPF schema supports display.description / display.shortDescription
+    # which the Meticulous app stores alongside the profile.
+    display = data.get("display") or {}
+    if not isinstance(display, dict):
+        display = {}
+    # Truncate shortDescription to 99 chars — the Meticulous app rejects
+    # longer values and may display garbled text.
+    short_desc = display.get("shortDescription")
+    if isinstance(short_desc, str) and len(short_desc) > 99:
+        display["shortDescription"] = short_desc[:99]
+    # Preserve any existing description; normalise structure
+    data["display"] = display
+
+    # ── Per-stage normalisation ──────────────────────────────────────────
+    for idx, stage in enumerate(data.get("stages") or []):
+        # type — default to "flow" if missing
+        stage.setdefault("type", "flow")
+        stage_type = stage["type"]
+
+        # name — required, default to "Stage N" if missing
+        stage.setdefault("name", f"Stage {idx + 1}")
+
+        # key — unique string identifier
+        if "key" not in stage or not stage["key"]:
+            stage["key"] = f"{stage_type}_{idx}"
+
+        # exit_triggers — required, must be a list
+        if "exit_triggers" not in stage or stage.get("exit_triggers") is None:
+            stage["exit_triggers"] = []
+
+        # limits — must always be a list
+        if "limits" not in stage or stage.get("limits") is None:
+            stage["limits"] = []
+
+        # dynamics — required; ensure it exists with all required sub-fields
+        dynamics = stage.get("dynamics") or {}
+        dynamics.setdefault("interpolation", "linear")
+        dynamics.setdefault("over", "time")
+        dynamics.setdefault("points", [])
+
+        # dynamics.points — coerce dicts like {"value": 2} to [0, 2]
+        raw_points = dynamics.get("points") or []
+        normalised_points = []
+        for pt in raw_points:
+            if isinstance(pt, dict):
+                # Single-value shorthand {"value": v} → [0, v]
+                normalised_points.append([0.0, pt.get("value", 0)])
+            elif isinstance(pt, (list, tuple)):
+                normalised_points.append(list(pt))
+            else:
+                normalised_points.append([0.0, float(pt)])
+        dynamics["points"] = normalised_points
+        stage["dynamics"] = dynamics
+
+        # exit_triggers — ensure relative & comparison are present
+        for trigger in stage.get("exit_triggers") or []:
+            if "relative" not in trigger or trigger.get("relative") is None:
+                trigger["relative"] = trigger.get("type") == "time"
+            trigger.setdefault("comparison", ">=")
+
+    return data
+
+
+class DuplicateProfileNameError(ValueError):
+    """Raised when attempting to create a profile with a name that already exists."""
+    pass
+
+
 @_wrap_machine_call
 async def async_create_profile(profile_json):
-    """create_profile() offloaded to a thread."""
-    api = get_meticulous_api()
-    loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, api.create_profile, profile_json)
+    """Upload a profile to the machine via its REST API.
+
+    Normalises the espresso-profile-schema JSON (as produced by the AI model)
+    into the machine-compatible format and POSTs it to ``/api/v1/profile/save``,
+    following the same approach used by the MCP server's ``create_profile`` tool.
+    
+    Raises:
+        DuplicateProfileNameError: If a profile with the same name already exists.
+    """
+    # Check for duplicate profile names (uses cached list, ~0ms if warm)
+    profile_name = profile_json.get("name") if isinstance(profile_json, dict) else None
+    if profile_name:
+        try:
+            existing_profiles = await async_list_profiles()
+            if existing_profiles and not isinstance(existing_profiles, dict):
+                existing_names = [getattr(p, "name", None) for p in existing_profiles]
+                if profile_name in existing_names:
+                    raise DuplicateProfileNameError(
+                        f"A profile named '{profile_name}' already exists. "
+                        f"Please choose a unique name."
+                    )
+        except DuplicateProfileNameError:
+            raise
+        except Exception as e:
+            # Don't block creation if we can't check duplicates
+            logger.warning("Could not check for duplicate profile names: %s", e)
+    
+    normalised = _normalize_profile_for_machine(profile_json)
+    base_url = _resolve_meticulous_base_url()
+    client = _get_http_client()
+    response = await client.post(
+        f"{base_url}/api/v1/profile/save",
+        json=normalised,
+        timeout=30.0,
+    )
+    if response.status_code != 200:
+        body = response.text
+        logger.error(
+            "Machine rejected profile save: %s",
+            body[:1000],
+            extra={
+                "status": response.status_code,
+                "profile_name": normalised.get("name"),
+                "profile_keys": list(normalised.keys()),
+                "stage_count": len(normalised.get("stages", [])),
+                "stage_keys": [s.get("key") for s in normalised.get("stages", [])],
+            }
+        )
+    response.raise_for_status()
     invalidate_profile_list_cache()
-    return result
+    return response.json()
 
 
 @_wrap_machine_call

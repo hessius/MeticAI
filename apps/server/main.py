@@ -88,14 +88,53 @@ def _write_s6_env(var_name: str, value: str) -> None:
     update_s6_env(var_name, value)
 
 
+def _sync_defaults() -> None:
+    """Sync bundled defaults from /app/defaults into DATA_DIR.
+
+    - PourOverBase.json: always overwritten (read-only template)
+    - Recipes: always overwritten — bundled recipes are read-only managed defaults
+    """
+    import shutil
+    from config import DATA_DIR
+
+    defaults_base = Path("/app/defaults")
+    if not defaults_base.exists():
+        return  # Not running in Docker — nothing to sync
+
+    # PourOverBase.json — always overwrite from bundled defaults so template
+    # updates are applied on container restart (this is a read-only template,
+    # not user-editable data)
+    src_template = defaults_base / "PourOverBase.json"
+    dst_template = DATA_DIR / "PourOverBase.json"
+    if src_template.exists():
+        dst_template.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_template, dst_template)
+        logger.info("Synced PourOverBase.json to %s", dst_template)
+
+    # Recipes — always overwrite so new/updated bundled recipes appear on upgrade
+    src_recipes = defaults_base / "recipes"
+    dst_recipes = DATA_DIR / "recipes"
+    if src_recipes.exists():
+        dst_recipes.mkdir(parents=True, exist_ok=True)
+        synced = 0
+        for recipe_file in src_recipes.glob("*.json"):
+            shutil.copy2(recipe_file, dst_recipes / recipe_file.name)
+            synced += 1
+        if synced:
+            logger.info("Synced %d default recipe(s) to %s", synced, dst_recipes)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - start background tasks on startup."""
+    # ── Sync bundled defaults into the data volume ───────────────────────
+    _sync_defaults()
+
     # ── Hydrate os.environ from persisted settings ──────────────────────
     # When the container starts, GEMINI_API_KEY / METICULOUS_IP may be
     # empty in the environment (user configured them via the Settings UI,
     # which writes to /data/settings.json but the Docker env stays blank).
-    # Load them now so that subprocess calls (Gemini CLI) inherit them.
+    # Load them now so that all services see them.
     try:
         from services.settings_service import load_settings
         stored = load_settings()
@@ -143,6 +182,18 @@ async def lifespan(app: FastAPI):
     from services.mqtt_service import get_mqtt_subscriber
     mqtt_sub = get_mqtt_subscriber()
     mqtt_sub.start(asyncio.get_running_loop())
+    
+    # Clean up any orphaned temp profiles from previous sessions
+    try:
+        from services.temp_profile_service import cleanup_stale
+        stale_result = await cleanup_stale()
+        if stale_result.get("deleted", 0) > 0:
+            logger.info(
+                "Cleaned %d stale temp profile(s) at startup",
+                stale_result["deleted"],
+            )
+    except Exception as e:
+        logger.warning("Failed to clean stale temp profiles at startup: %s", e)
     
     yield
     
@@ -212,7 +263,7 @@ async def _httpx_connect_timeout(_request: Request, exc: httpx.ConnectTimeout):
 
 
 # Import route modules
-from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands
+from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands, pour_over, recipes
 
 # Middleware for request logging and tracking
 @app.middleware("http")
@@ -304,6 +355,8 @@ app.include_router(scheduling.router)
 app.include_router(bridge.router)
 app.include_router(websocket.router)
 app.include_router(commands.router)
+app.include_router(pour_over.router)
+app.include_router(recipes.router)
 
 
 # ============================================================================

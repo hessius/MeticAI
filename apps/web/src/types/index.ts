@@ -119,6 +119,7 @@ export type ViewState =
   | 'history-detail' 
   | 'settings' 
   | 'run-shot'
+  | 'pour-over'
   | 'live-shot'
   | 'shot-history';
 
@@ -212,8 +213,53 @@ export class ValidationError extends Error {
 }
 
 // ============================================================================
-// Utility Types
+// Recipe Types (OPOS v1.1)
 // ============================================================================
+
+export interface RecipeStep {
+  step: number
+  action: 'bloom' | 'pour' | 'wait' | 'swirl' | 'stir'
+  water_g?: number
+  duration_s: number
+  flow_rate?: 'slow' | 'steady' | 'fast'
+  valve_state?: 'open' | 'closed'
+  notes?: string
+}
+
+export interface Recipe {
+  slug: string
+  version: string
+  metadata: {
+    name: string
+    author?: string
+    description?: string
+    compatibility?: string[]
+    visualizer_hint?: 'pulse_block' | 'linear_ramp'
+  }
+  equipment: {
+    dripper: { model: string; material?: string }
+    filter_type?: string
+  }
+  ingredients: {
+    coffee_g: number
+    water_g: number
+    grind_setting: string
+    grind_microns?: number
+  }
+  protocol: RecipeStep[]
+}
+
+/** Precomputed per-step timing used by the graph and step tracker. */
+export interface RecipeStepTiming {
+  stepIndex: number
+  action: RecipeStep['action']
+  label: string
+  startTimeSec: number
+  endTimeSec: number
+  /** Cumulative water poured at the end of this step (0 for non-pour steps). */
+  cumulativeWeight: number
+  notes?: string
+}
 
 export type Nullable<T> = T | null;
 export type Optional<T> = T | undefined;

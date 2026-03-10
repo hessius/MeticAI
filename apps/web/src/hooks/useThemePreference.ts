@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
 
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 const STORAGE_KEY = 'meticai-theme-preference'
+
+const subscribe = () => () => {}
+const getSnapshot = () => true
+const getServerSnapshot = () => false
 
 /**
  * Extended theme hook that wraps next-themes and adds a
@@ -11,11 +15,7 @@ const STORAGE_KEY = 'meticai-theme-preference'
  */
 export function useThemePreference() {
   const { theme, setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   const preference: ThemePreference =
     theme === 'system' ? 'system' : theme === 'light' ? 'light' : 'dark'

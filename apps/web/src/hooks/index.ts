@@ -16,6 +16,10 @@ export { useUpdateStatus } from './useUpdateStatus';
 
 export { useUpdateTrigger } from './useUpdateTrigger';
 
+export { useGenerationProgress } from './useGenerationProgress';
+export type { GenerationPhase, ProgressEvent, UseGenerationProgressReturn } from './useGenerationProgress';
+export { PHASE_ORDER, phaseProgress } from './useGenerationProgress';
+
 // UI Hooks
 export { useIsDesktop } from './use-desktop';
 

@@ -1,0 +1,28 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "Tetsu Kasuya 4:6 (Standard)",
+    "author": "Tetsu Kasuya",
+    "description": "Classic 4:6 with two equal strength pours. First 40% (two pours of 60g) controls sweetness; final 60% (two pours of 90g) controls strength. Use a coarse grind for clarity.",
+    "compatibility": ["V60", "April", "Origami"],
+    "visualizer_hint": "pulse_block"
+  },
+  "equipment": {
+    "dripper": { "model": "V60", "material": "Ceramic" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 20.0,
+    "water_g": 300.0,
+    "grind_setting": "Coarse"
+  },
+  "protocol": [
+    { "step": 1, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "First pour — controls sweetness" },
+    { "step": 2, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
+    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Second pour — controls sweetness" },
+    { "step": 4, "action": "wait", "duration_s": 45, "notes": "Wait for the bed to drain" },
+    { "step": 5, "action": "pour", "water_g": 90, "duration_s": 20, "notes": "Third pour — controls strength" },
+    { "step": 6, "action": "wait", "duration_s": 60, "notes": "Wait for the bed to drain" },
+    { "step": 7, "action": "pour", "water_g": 90, "duration_s": 20, "notes": "Fourth pour — controls strength" }
+  ]
+}
