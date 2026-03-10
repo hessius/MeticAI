@@ -46,7 +46,7 @@ import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
-import { getAutoAnalyzeShots } from '@/lib/aiPreferences'
+
 import { format, formatDistanceToNow } from 'date-fns'
 import {
   STAGE_COLORS,
@@ -645,17 +645,6 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
     setLlmAnalysisResult(null)
     setLlmAnalysisError(null)
     
-    // Check if auto-analyze is enabled in preferences
-    const autoAnalyzeEnabled = getAutoAnalyzeShots()
-    
-    // Auto-trigger analysis when shot data is available and auto-analyze is enabled
-    if (selectedShot && shotData && !isAnalyzing && autoAnalyzeEnabled) {
-      // Small delay to avoid blocking UI during initial render
-      const timer = setTimeout(() => {
-        handleAnalyze()
-      }, 100)
-      return () => clearTimeout(timer)
-    }
     return undefined
   }, [selectedShot, shotData]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2582,7 +2571,11 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
                           return summary ? (
                             <>
                               {summary.rating && (
-                                <Star size={14} weight="fill" className="text-amber-400/70" />
+                                <span className="flex items-center gap-px">
+                                  {Array.from({ length: 5 }, (_, i) => (
+                                    <Star key={i} size={12} weight={i < summary.rating! ? "fill" : "regular"} className={i < summary.rating! ? "text-amber-400" : "text-muted-foreground/30"} />
+                                  ))}
+                                </span>
                               )}
                               {summary.has_annotation && (
                                 <ChatText size={14} weight="fill" className="text-muted-foreground/50" />

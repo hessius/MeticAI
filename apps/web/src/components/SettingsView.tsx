@@ -28,11 +28,10 @@ import {
   Copy,
   Question,
   Code,
-  Info,
-  Coffee
+  Info
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable, getAutoAnalyzeShots, setAutoAnalyzeShots, getShowAiInHistory, setShowAiInHistory } from '@/lib/aiPreferences'
+import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
@@ -40,7 +39,6 @@ import { LanguageSelector } from '@/components/LanguageSelector'
 
 interface SettingsViewProps {
   onBack: () => void
-  onViewProfileCatalogue?: () => void
   showBlobs?: boolean
   onToggleBlobs?: () => void
   isDark?: boolean
@@ -97,7 +95,7 @@ const PROGRESS_UPDATE_INTERVAL = 500
 const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
 const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
-export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
+export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
   
   const [settings, setSettings] = useState<Settings>({
@@ -150,8 +148,6 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
   const [tailscaleMessage, setTailscaleMessage] = useState('')
   const [aiEnabled, setAiEnabledState] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
-  const [autoAnalyzeShots, setAutoAnalyzeShotsState] = useState(true)
-  const [showAiInHistory, setShowAiInHistoryState] = useState(true)
   const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
 
   // Beta channel state
@@ -189,8 +185,6 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
   useEffect(() => {
     setAiEnabledState(getAiEnabled())
     setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
-    setAutoAnalyzeShotsState(getAutoAnalyzeShots())
-    setShowAiInHistoryState(getShowAiInHistory())
   }, [])
 
   // Load current settings on mount
@@ -857,39 +851,7 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="auto-analyze-toggle" className="text-sm font-medium">{t('settings.autoAnalyzeShots')}</Label>
-                  <p className="text-xs text-muted-foreground">{t('settings.autoAnalyzeShotsDescription')}</p>
-                </div>
-                <Switch
-                  id="auto-analyze-toggle"
-                  checked={autoAnalyzeShots}
-                  onCheckedChange={(checked) => {
-                    const next = checked as boolean
-                    setAutoAnalyzeShotsState(next)
-                    setAutoAnalyzeShots(next)
-                  }}
-                  disabled={!hasGeminiKey || !aiEnabled}
-                />
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="show-ai-history-toggle" className="text-sm font-medium">{t('settings.showAiInHistory')}</Label>
-                  <p className="text-xs text-muted-foreground">{t('settings.showAiInHistoryDescription')}</p>
-                </div>
-                <Switch
-                  id="show-ai-history-toggle"
-                  checked={showAiInHistory}
-                  onCheckedChange={(checked) => {
-                    const next = checked as boolean
-                    setShowAiInHistoryState(next)
-                    setShowAiInHistory(next)
-                  }}
-                  disabled={!hasGeminiKey || !aiEnabled}
-                />
-              </div>
             </div>
 
             {/* Meticulous IP */}
@@ -957,26 +919,6 @@ export function SettingsView({ onBack, onViewProfileCatalogue, showBlobs, onTogg
                 {t('settings.authorNameDescription')}
               </p>
             </div>
-
-            {/* Profile Management */}
-            {onViewProfileCatalogue && (
-              <div className="space-y-3 pt-2 border-t border-border">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                  {t('settings.profileManagement')}
-                </h3>
-                <Button
-                  variant="outline"
-                  onClick={onViewProfileCatalogue}
-                  className="w-full justify-start"
-                >
-                  <Coffee className="w-4 h-4 mr-2" />
-                  {t('settings.viewProfileCatalogue')}
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.profileCatalogueDescription')}
-                </p>
-              </div>
-            )}
 
             {/* MQTT Bridge */}
             <div className="space-y-3 pt-2 border-t border-border">

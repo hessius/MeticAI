@@ -28,7 +28,9 @@ import {
   Plus,
   Play,
   PencilSimple,
-  FloppyDisk
+  FloppyDisk,
+  GearSix,
+  ArrowsClockwise
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
@@ -43,7 +45,7 @@ import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { getServerUrl } from '@/lib/config'
 import { profileService } from '@/services/profileService'
-import { getShowAiInHistory } from '@/lib/aiPreferences'
+
 import { 
   extractTagsFromPreferences, 
   getAllTagsFromEntries, 
@@ -104,11 +106,12 @@ interface HistoryViewProps {
   onBack: () => void
   onViewProfile: (entry: HistoryEntry, cachedImageUrl?: string) => void
   onGenerateNew: () => void
+  onManageMachine?: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
 }
 
-export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
+export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMachine, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
   const { t } = useTranslation()
   const { 
     entries, 
@@ -126,6 +129,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
   const [showFilters, setShowFilters] = useState(false)
   const [profileImages, setProfileImages] = useState<Record<string, string>>({})
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [syncBadgeCount, setSyncBadgeCount] = useState(0)
   
   // Use cached profile images
   const { fetchImagesForProfiles } = useProfileImageCache()
@@ -133,6 +137,23 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
   useEffect(() => {
     fetchHistory()
   }, [fetchHistory])
+
+  // Fetch sync badge count
+  useEffect(() => {
+    if (!onManageMachine) return
+    const loadSyncStatus = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/profiles/sync/status`)
+        if (!response.ok) return
+        const data = await response.json()
+        setSyncBadgeCount((data.new_count || 0) + (data.updated_count || 0) + (data.orphaned_count || 0))
+      } catch {
+        // Non-critical
+      }
+    }
+    loadSyncStatus()
+  }, [onManageMachine])
 
   // Fetch profile images for all entries (using cache)
   useEffect(() => {
@@ -250,6 +271,22 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
             >
               <Plus size={18} weight="bold" />
             </Button>
+            {onManageMachine && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onManageMachine}
+                className="relative shrink-0 h-9 w-9"
+                title={t('history.manageMachine')}
+              >
+                <GearSix size={18} weight="fill" />
+                {syncBadgeCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-bold leading-4 text-white bg-destructive rounded-full">
+                    {syncBadgeCount}
+                  </span>
+                )}
+              </Button>
+            )}
             <Button
               variant={showFilters ? "secondary" : "ghost"}
               size="icon"
@@ -1205,7 +1242,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
         {/* Left column: Content */}
         <div className="space-y-4 desktop-panel-left">
         <div className="space-y-4">
-          {entry.coffee_analysis && getShowAiInHistory() && (
+          {entry.coffee_analysis && (
             <motion.div 
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}

@@ -818,6 +818,7 @@ function App() {
                   onBack={handleBackToStart}
                   onViewProfile={handleViewHistoryEntry}
                   onGenerateNew={() => setViewState('form')}
+                  onManageMachine={() => setViewState('profile-catalogue')}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
@@ -841,7 +842,6 @@ function App() {
               {viewState === 'settings' && (
                 <SettingsView
                   onBack={handleBackToStart}
-                  onViewProfileCatalogue={() => setViewState('profile-catalogue')}
                   showBlobs={showBlobs}
                   onToggleBlobs={toggleBlobs}
                   isDark={isDark}
@@ -903,7 +903,7 @@ function App() {
               )}
 
               {viewState === 'profile-catalogue' && (
-                <ProfileCatalogueView onBack={handleBackToStart} />
+                <ProfileCatalogueView onBack={() => setViewState('history')} />
               )}
 
               {viewState === 'loading' && (
