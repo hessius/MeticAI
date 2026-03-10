@@ -14,6 +14,7 @@ import {
   CaretDown,
   CaretRight,
   SpinnerGap,
+  ArrowsCounterClockwise,
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { format } from 'date-fns'
@@ -74,48 +75,76 @@ function formatShotTimestamp(shot: RecentShot): string {
   }
 }
 
+// Module-level cache for recent shots (persists across mounts, 5 min TTL)
+const CACHE_TTL_MS = 5 * 60 * 1000
+interface ShotAnalysisCache {
+  recent: { shots: RecentShot[]; fetchedAt: number } | null
+  byProfile: { profiles: ProfileGroup[]; fetchedAt: number } | null
+}
+const shotAnalysisCache: ShotAnalysisCache = { recent: null, byProfile: null }
+
 export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<'recent' | 'by-profile'>('recent')
-  const [recentShots, setRecentShots] = useState<RecentShot[]>([])
-  const [profileGroups, setProfileGroups] = useState<ProfileGroup[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [recentShots, setRecentShots] = useState<RecentShot[]>(shotAnalysisCache.recent?.shots ?? [])
+  const [profileGroups, setProfileGroups] = useState<ProfileGroup[]>(shotAnalysisCache.byProfile?.profiles ?? [])
+  const [isLoading, setIsLoading] = useState(!shotAnalysisCache.recent)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set())
 
-  const fetchRecentShots = useCallback(async () => {
-    setIsLoading(true)
+  const fetchRecentShots = useCallback(async (force = false) => {
+    // Serve from cache if still fresh
+    if (!force && shotAnalysisCache.recent && Date.now() - shotAnalysisCache.recent.fetchedAt < CACHE_TTL_MS) {
+      setRecentShots(shotAnalysisCache.recent.shots)
+      setIsLoading(false)
+      return
+    }
+    if (force) setIsRefreshing(true); else setIsLoading(true)
     setError(null)
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/shots/recent?limit=50&offset=0`)
       if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`)
       const data = await response.json()
-      setRecentShots(data.shots || [])
+      const shots = data.shots || []
+      shotAnalysisCache.recent = { shots, fetchedAt: Date.now() }
+      setRecentShots(shots)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch shots')
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
   }, [])
 
-  const fetchByProfile = useCallback(async () => {
-    setIsLoading(true)
+  const fetchByProfile = useCallback(async (force = false) => {
+    if (!force && shotAnalysisCache.byProfile && Date.now() - shotAnalysisCache.byProfile.fetchedAt < CACHE_TTL_MS) {
+      setProfileGroups(shotAnalysisCache.byProfile.profiles)
+      if (shotAnalysisCache.byProfile.profiles.length > 0) {
+        setExpandedProfiles(new Set([shotAnalysisCache.byProfile.profiles[0].profile_name]))
+      }
+      setIsLoading(false)
+      return
+    }
+    if (force) setIsRefreshing(true); else setIsLoading(true)
     setError(null)
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/shots/recent/by-profile?limit=50&offset=0`)
       if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`)
       const data = await response.json()
-      setProfileGroups(data.profiles || [])
-      // Auto-expand the first profile
-      if (data.profiles?.length > 0) {
-        setExpandedProfiles(new Set([data.profiles[0].profile_name]))
+      const profiles = data.profiles || []
+      shotAnalysisCache.byProfile = { profiles, fetchedAt: Date.now() }
+      setProfileGroups(profiles)
+      if (profiles.length > 0) {
+        setExpandedProfiles(new Set([profiles[0].profile_name]))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch shots')
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
   }, [])
 
@@ -126,6 +155,14 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
       fetchByProfile()
     }
   }, [activeTab, fetchRecentShots, fetchByProfile])
+
+  const handleRefresh = () => {
+    if (activeTab === 'recent') {
+      fetchRecentShots(true)
+    } else {
+      fetchByProfile(true)
+    }
+  }
 
   const toggleProfile = (name: string) => {
     setExpandedProfiles(prev => {
@@ -213,6 +250,16 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
               {t('shotAnalysisView.title')}
             </h2>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="shrink-0"
+            title={t('shotAnalysisView.refresh', 'Refresh')}
+          >
+            <ArrowsCounterClockwise size={18} weight="bold" className={isRefreshing ? 'animate-spin' : ''} />
+          </Button>
         </div>
 
         {/* Tab bar */}

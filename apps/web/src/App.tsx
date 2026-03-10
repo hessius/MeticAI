@@ -74,6 +74,8 @@ function App() {
   const [runShotProfileId, setRunShotProfileId] = useState<string | undefined>(undefined)
   const [runShotProfileName, setRunShotProfileName] = useState<string | undefined>(undefined)
   const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
+  const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
+  const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -776,11 +778,12 @@ function App() {
                           const profileName = lastShotHook.lastShot?.profile_name
                           if (profileName) {
                             setShotHistoryProfileName(profileName)
+                            setShotHistoryInitialDate(date)
+                            setShotHistoryInitialFilename(filename)
                             setViewState('shot-history')
                           } else {
                             setViewState('shot-analysis')
                           }
-                          void date; void filename
                         }}
                       />
                     ) : undefined
@@ -862,6 +865,8 @@ function App() {
                   onBack={handleBackToStart}
                   onAnalyzeShot={(profileName) => {
                     setShotHistoryProfileName(profileName)
+                    setShotHistoryInitialDate(undefined)
+                    setShotHistoryInitialFilename(undefined)
                     setViewState('shot-history')
                   }}
                 />
@@ -877,6 +882,8 @@ function App() {
               {viewState === 'shot-history' && shotHistoryProfileName && (
                 <ShotHistoryView
                   profileName={shotHistoryProfileName}
+                  initialShotDate={shotHistoryInitialDate}
+                  initialShotFilename={shotHistoryInitialFilename}
                   onBack={handleBackToStart}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
@@ -886,8 +893,10 @@ function App() {
               {viewState === 'shot-analysis' && (
                 <ShotAnalysisView
                   onBack={handleBackToStart}
-                  onSelectShot={(profileName) => {
+                  onSelectShot={(profileName, date, filename) => {
                     setShotHistoryProfileName(profileName)
+                    setShotHistoryInitialDate(date)
+                    setShotHistoryInitialFilename(filename)
                     setViewState('shot-history')
                   }}
                 />

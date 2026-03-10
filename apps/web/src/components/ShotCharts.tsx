@@ -13,7 +13,8 @@ import {
   ResponsiveContainer,
   ReferenceArea,
   ReferenceLine,
-  Customized
+  useXAxisScale,
+  useYAxisScale,
 } from 'recharts'
 import {
   CHART_COLORS,
@@ -237,6 +238,42 @@ export function CompareChart({
   )
 }
 
+// Renders target profile curves as SVG overlays using recharts v3 scale hooks
+function TargetCurvesSvg({ curves, maxLeftAxis }: { curves: ProfileTargetPoint[]; maxLeftAxis: number }) {
+  const xScale = useXAxisScale()
+  const yScale = useYAxisScale('left')
+  if (!xScale || !yScale) return null
+
+  const pressurePoints = curves.filter(p => p.target_pressure !== undefined).sort((a, b) => a.time - b.time)
+  const flowPoints = curves.filter(p => p.target_flow !== undefined).sort((a, b) => a.time - b.time)
+  const powerPoints = curves.filter(p => p.target_power !== undefined).sort((a, b) => a.time - b.time)
+  const pwScale = maxLeftAxis / 100
+
+  const buildPath = (pts: ProfileTargetPoint[], getValue: (p: ProfileTargetPoint) => number) =>
+    pts.length >= 2 ? pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.time)} ${yScale(getValue(p))}`).join(' ') : ''
+
+  const pressurePath = buildPath(pressurePoints, p => p.target_pressure!)
+  const flowPath = buildPath(flowPoints, p => p.target_flow!)
+  const powerPath = buildPath(powerPoints, p => p.target_power! * pwScale)
+
+  return (
+    <g className="target-curves">
+      {pressurePath && <>
+        <path d={pressurePath} fill="none" stroke={CHART_COLORS.targetPressure} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+        {pressurePoints.map((p, i) => <circle key={`tp-${i}`} cx={xScale(p.time)} cy={yScale(p.target_pressure!)} r={4} fill={CHART_COLORS.targetPressure} />)}
+      </>}
+      {flowPath && <>
+        <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+        {flowPoints.map((p, i) => <circle key={`tf-${i}`} cx={xScale(p.time)} cy={yScale(p.target_flow!)} r={4} fill={CHART_COLORS.targetFlow} />)}
+      </>}
+      {powerPath && <>
+        <path d={powerPath} fill="none" stroke={CHART_COLORS.targetPower} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+        {powerPoints.map((p, i) => <circle key={`tpw-${i}`} cx={xScale(p.time)} cy={yScale(p.target_power! * pwScale)} r={4} fill={CHART_COLORS.targetPower} />)}
+      </>}
+    </g>
+  )
+}
+
 interface AnalyzeChartProps {
   chartData: ChartDataPoint[]
   stageRanges: StageRange[]
@@ -292,42 +329,7 @@ export function AnalyzeChart({
               <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
               <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
               {hasTargetCurves && profileTargetCurves && (
-                <Customized
-                  component={({ xAxisMap, yAxisMap }: { xAxisMap?: Record<string, { scale: (v: number) => number }>; yAxisMap?: Record<string, { scale: (v: number) => number }> }) => {
-                    if (!xAxisMap || !yAxisMap) return null
-                    const xAxis = Object.values(xAxisMap)[0]
-                    const yAxis = yAxisMap['left']
-                    if (!xAxis?.scale || !yAxis?.scale) return null
-                    const curves = profileTargetCurves!
-                    const pressurePoints = curves.filter(p => p.target_pressure !== undefined).sort((a, b) => a.time - b.time)
-                    const flowPoints = curves.filter(p => p.target_flow !== undefined).sort((a, b) => a.time - b.time)
-                    const powerPoints = curves.filter(p => p.target_power !== undefined).sort((a, b) => a.time - b.time)
-                    // Normalize power (0–100%) to the left axis range so it doesn't compress pressure/flow
-                    const pwScale = maxLeftAxis / 100
-                    let pressurePath = ''
-                    if (pressurePoints.length >= 2) pressurePath = pressurePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_pressure!)}`).join(' ')
-                    let flowPath = ''
-                    if (flowPoints.length >= 2) flowPath = flowPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_flow!)}`).join(' ')
-                    let powerPath = ''
-                    if (powerPoints.length >= 2) powerPath = powerPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAxis.scale(p.time)} ${yAxis.scale(p.target_power! * pwScale)}`).join(' ')
-                    return (
-                      <g className="target-curves">
-                        {pressurePath && <>
-                          <path d={pressurePath} fill="none" stroke={CHART_COLORS.targetPressure} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
-                          {pressurePoints.map((p, i) => <circle key={`tp-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_pressure!)} r={4} fill={CHART_COLORS.targetPressure} />)}
-                        </>}
-                        {flowPath && <>
-                          <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
-                          {flowPoints.map((p, i) => <circle key={`tf-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_flow!)} r={4} fill={CHART_COLORS.targetFlow} />)}
-                        </>}
-                        {powerPath && <>
-                          <path d={powerPath} fill="none" stroke={CHART_COLORS.targetPower} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
-                          {powerPoints.map((p, i) => <circle key={`tpw-${i}`} cx={xAxis.scale(p.time)} cy={yAxis.scale(p.target_power! * pwScale)} r={4} fill={CHART_COLORS.targetPower} />)}
-                        </>}
-                      </g>
-                    )
-                  }}
-                />
+                <TargetCurvesSvg curves={profileTargetCurves} maxLeftAxis={maxLeftAxis} />
               )}
             </LineChart>
           </ResponsiveContainer>

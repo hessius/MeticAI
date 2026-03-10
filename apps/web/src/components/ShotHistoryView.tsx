@@ -57,6 +57,8 @@ const SPEED_OPTIONS: number[] = [0.5, 1, 2, 3, 5]
 
 interface ShotHistoryViewProps {
   profileName: string
+  initialShotDate?: string
+  initialShotFilename?: string
   onBack: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
@@ -277,7 +279,7 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
   )
 }
 
-export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hideAiWhenUnavailable = false }: ShotHistoryViewProps) {
+export function ShotHistoryView({ profileName, initialShotDate, initialShotFilename, onBack, aiConfigured = true, hideAiWhenUnavailable = false }: ShotHistoryViewProps) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
@@ -537,12 +539,23 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
         if (result.is_stale) {
           backgroundRefresh(profileName, { limit: 20 })
         }
+        
+        // Auto-select a specific shot if navigated from ShotAnalysisView
+        if (initialShotDate && initialShotFilename && result.shots?.length > 0) {
+          const target = result.shots.find(
+            s => s.date === initialShotDate && s.filename === initialShotFilename
+          )
+          if (target) {
+            handleSelectShot(target)
+          }
+        }
       } catch (err) {
         console.error('Failed to fetch shots:', err)
       }
     }
     
     loadShots()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileName, fetchShotsByProfile, backgroundRefresh])
 
   const handleSelectShot = async (shot: ShotInfo) => {
