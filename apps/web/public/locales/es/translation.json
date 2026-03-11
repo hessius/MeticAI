@@ -1007,6 +1007,13 @@
     "nameRequired": "Se requiere nombre de perfil",
     "renamed": "Perfil renombrado a '{{name}}'",
     "deleted": "Perfil eliminado",
-    "exported": "Perfil exportado"
+    "exported": "Perfil exportado",
+    "errors": {
+      "removeFromHistoryFailed": "Error al eliminar del historial",
+      "restoreToMachineFailed": "Error al restaurar en la máquina",
+      "restoreProfileFailed": "Error al restaurar el perfil",
+      "deleteFromMachineFailed": "Error al eliminar de la máquina",
+      "deleteProfileFailed": "Error al eliminar el perfil"
+    }
   }
 }

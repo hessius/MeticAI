@@ -1007,6 +1007,13 @@
     "nameRequired": "Nome profilo richiesto",
     "renamed": "Profilo rinominato in '{{name}}'",
     "deleted": "Profilo eliminato",
-    "exported": "Profilo esportato"
+    "exported": "Profilo esportato",
+    "errors": {
+      "removeFromHistoryFailed": "Impossibile rimuovere dalla cronologia",
+      "restoreToMachineFailed": "Impossibile ripristinare sulla macchina",
+      "restoreProfileFailed": "Impossibile ripristinare il profilo",
+      "deleteFromMachineFailed": "Impossibile eliminare dalla macchina",
+      "deleteProfileFailed": "Impossibile eliminare il profilo"
+    }
   }
 }

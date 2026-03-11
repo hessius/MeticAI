@@ -1007,6 +1007,13 @@
     "nameRequired": "Profilnamn krävs",
     "renamed": "Profil omdöpt till '{{name}}'",
     "deleted": "Profil borttagen",
-    "exported": "Profil exporterad"
+    "exported": "Profil exporterad",
+    "errors": {
+      "removeFromHistoryFailed": "Kunde inte ta bort från historiken",
+      "restoreToMachineFailed": "Kunde inte återställa till maskinen",
+      "restoreProfileFailed": "Kunde inte återställa profilen",
+      "deleteFromMachineFailed": "Kunde inte ta bort från maskinen",
+      "deleteProfileFailed": "Kunde inte ta bort profilen"
+    }
   }
 }

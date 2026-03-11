@@ -11,6 +11,7 @@ import base64
 import binascii
 import ipaddress
 import socket
+import threading
 import httpx
 from urllib.parse import urlparse
 
@@ -41,6 +42,8 @@ from utils.file_utils import atomic_write_json, deep_convert_to_dict
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_history_lock = threading.Lock()
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
@@ -1155,14 +1158,16 @@ async def edit_profile(profile_name: str, request: Request):
 
         # --- cascade rename into history -----------------------------------------
         if new_name is not None and new_name != old_name:
-            history = load_history()
-            updated = 0
-            for entry in history:
-                if entry.get("profile_name") == old_name:
-                    entry["profile_name"] = new_name
-                    updated += 1
+            with _history_lock:
+                history = load_history()
+                updated = 0
+                for entry in history:
+                    if entry.get("profile_name") == old_name:
+                        entry["profile_name"] = new_name
+                        updated += 1
+                if updated:
+                    save_history(history)
             if updated:
-                save_history(history)
                 logger.info(
                     f"Updated {updated} history entries from '{old_name}' to '{new_name}'",
                     extra={"request_id": request_id},
@@ -2069,13 +2074,14 @@ async def import_profile(request: Request):
         }
         
         # Save to history using cache-aware save to keep in-memory cache in sync
-        history = load_history()
-        if not isinstance(history, list):
-            history = history.get("entries", [])
-        
-        history.insert(0, new_entry)
-        
-        save_history(history)
+        with _history_lock:
+            history = load_history()
+            if not isinstance(history, list):
+                history = history.get("entries", [])
+            
+            history.insert(0, new_entry)
+            
+            save_history(history)
         
         # Upload profile to the Meticulous machine when imported from a file.
         # Profiles imported from the machine (source="machine") already exist there.
@@ -2248,13 +2254,14 @@ async def import_all_profiles(request: Request):
                     }
                     
                     # Save to history using cache-aware save
-                    history = load_history()
-                    if not isinstance(history, list):
-                        history = history.get("entries", [])
-                    
-                    history.insert(0, new_entry)
-                    
-                    save_history(history)
+                    with _history_lock:
+                        history = load_history()
+                        if not isinstance(history, list):
+                            history = history.get("entries", [])
+                        
+                        history.insert(0, new_entry)
+                        
+                        save_history(history)
                     
                     imported.append(profile_name)
                     
@@ -3002,14 +3009,15 @@ Remember: NO information should be lost in this conversion!"""
         # Update the history entry if it exists
         entry_id = body.get("entry_id")
         if entry_id:
-            history = load_history()
-            entries = history if isinstance(history, list) else history.get("entries", [])
-            for entry in entries:
-                if entry.get("id") == entry_id:
-                    entry["reply"] = converted_description
-                    entry["description_converted"] = True
-                    break
-            save_history(history)
+            with _history_lock:
+                history = load_history()
+                entries = history if isinstance(history, list) else history.get("entries", [])
+                for entry in entries:
+                    if entry.get("id") == entry_id:
+                        entry["reply"] = converted_description
+                        entry["description_converted"] = True
+                        break
+                save_history(history)
         
         logger.info(
             f"Description converted successfully for: {profile_name}",

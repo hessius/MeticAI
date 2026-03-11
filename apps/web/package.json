@@ -1,7 +1,7 @@
 {
     "name": "meticai-espresso-pro",
     "private": true,
-    "version": "2.2.0-beta.1",
+    "version": "2.2.0-beta.2",
     "type": "module",
     "scripts": {
         "dev": "vite",
@@ -111,12 +111,12 @@
         "@vitest/coverage-v8": "^4.0.18",
         "@vitest/ui": "^4.0.18",
         "axe-core": "^4.11.1",
-        "eslint": "^10.0.2",
+        "eslint": "^10.0.3",
         "eslint-plugin-react-hooks": "^7.0.1",
         "eslint-plugin-react-refresh": "^0.5.2",
         "globals": "^17.4.0",
         "happy-dom": "^20.1.0",
-        "storybook": "^10.2.7",
+        "storybook": "^10.2.17",
         "tailwindcss": "^4.1.11",
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.56.1",

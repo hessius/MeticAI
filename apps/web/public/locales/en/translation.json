@@ -969,6 +969,13 @@
       "aiDescriptionToggle": "Generate AI descriptions (uses tokens)",
       "autoSync": "Auto-sync profiles from machine",
       "autoSyncComplete": "Auto-sync: {{imported}} imported, {{updated}} updated"
+    },
+    "errors": {
+      "removeFromHistoryFailed": "Failed to remove from history",
+      "restoreToMachineFailed": "Failed to restore to machine",
+      "restoreProfileFailed": "Failed to restore profile",
+      "deleteFromMachineFailed": "Failed to delete from machine",
+      "deleteProfileFailed": "Failed to delete profile"
     }
   },
   "markdownEditor": {

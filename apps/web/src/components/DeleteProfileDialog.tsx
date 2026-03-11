@@ -43,13 +43,13 @@ export function DeleteProfileDialog({
         method: 'DELETE',
       })
 
-      if (!response.ok) throw new Error('Failed to remove from history')
+      if (!response.ok) throw new Error(t('profileCatalogue.errors.removeFromHistoryFailed'))
 
       toast.success(t('profileCatalogue.removedFromHistory'))
       onDeleted()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Failed to remove from history'
+        err instanceof Error ? err.message : t('profileCatalogue.errors.removeFromHistoryFailed')
       toast.error(message)
     } finally {
       setIsDeleting(false)
@@ -66,13 +66,13 @@ export function DeleteProfileDialog({
         { method: 'DELETE' }
       )
 
-      if (!response.ok) throw new Error('Failed to delete from machine')
+      if (!response.ok) throw new Error(t('profileCatalogue.errors.deleteFromMachineFailed'))
 
       toast.success(t('profileCatalogue.deleted'))
       onDeleted()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Failed to delete profile'
+        err instanceof Error ? err.message : t('profileCatalogue.errors.deleteProfileFailed')
       toast.error(message)
     } finally {
       setIsDeleting(false)

@@ -909,6 +909,19 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
 # In-memory cache for recent shots
 _recent_shots_cache: dict = {}
 _RECENT_SHOTS_TTL = 30  # seconds
+_RECENT_SHOTS_MAX_ENTRIES = 50
+
+
+def _cache_recent_shots(key: str, data: dict) -> None:
+    """Insert into the recent-shots cache with bounded size."""
+    if len(_recent_shots_cache) > _RECENT_SHOTS_MAX_ENTRIES:
+        now = time.time()
+        expired = [k for k, v in _recent_shots_cache.items() if now - v["ts"] >= _RECENT_SHOTS_TTL]
+        for k in expired:
+            del _recent_shots_cache[k]
+        if len(_recent_shots_cache) > _RECENT_SHOTS_MAX_ENTRIES:
+            _recent_shots_cache.clear()
+    _recent_shots_cache[key] = {"data": data, "ts": time.time()}
 
 
 @router.get("/shots/recent")
@@ -921,7 +934,7 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
         offset: pagination offset (default 0)
     """
     request_id = request.state.request_id
-    cache_key = f"recent:{limit}:{offset}"
+    cache_key = f"recent:{min(limit, 100)}:{min(offset, 10000)}"
     now = time.time()
 
     # Check cache
@@ -1007,7 +1020,7 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
         page = all_shots[offset : offset + limit]
 
         response_data = {"shots": page}
-        _recent_shots_cache[cache_key] = {"data": response_data, "ts": now}
+        _cache_recent_shots(cache_key, response_data)
         return response_data
 
     except HTTPException:
@@ -1029,7 +1042,7 @@ async def get_recent_shots_by_profile(request: Request, limit: int = 50, offset:
     Response: { profiles: [{ profile_name, profile_id, shots: [...], shot_count }] }
     """
     request_id = request.state.request_id
-    cache_key = f"recent_by_profile:{limit}:{offset}"
+    cache_key = f"recent_by_profile:{min(limit, 100)}:{min(offset, 10000)}"
     now = time.time()
 
     cached = _recent_shots_cache.get(cache_key)
@@ -1058,7 +1071,7 @@ async def get_recent_shots_by_profile(request: Request, limit: int = 50, offset:
         profiles = sorted(grouped.values(), key=lambda g: g["shot_count"], reverse=True)
 
         response_data = {"profiles": profiles}
-        _recent_shots_cache[cache_key] = {"data": response_data, "ts": now}
+        _cache_recent_shots(cache_key, response_data)
         return response_data
 
     except HTTPException:

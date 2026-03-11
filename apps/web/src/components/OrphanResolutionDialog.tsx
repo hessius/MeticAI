@@ -51,13 +51,13 @@ export function OrphanResolutionDialog({
         method: 'DELETE',
       })
 
-      if (!response.ok) throw new Error('Failed to remove from history')
+      if (!response.ok) throw new Error(t('profileCatalogue.errors.removeFromHistoryFailed'))
 
       toast.success(t('profileCatalogue.removedFromHistory'))
       onResolved()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Failed to remove from history'
+        err instanceof Error ? err.message : t('profileCatalogue.errors.removeFromHistoryFailed')
       toast.error(message)
     } finally {
       setIsProcessing(false)
@@ -74,7 +74,7 @@ export function OrphanResolutionDialog({
         { method: 'POST' }
       )
 
-      if (!response.ok) throw new Error('Failed to restore to machine')
+      if (!response.ok) throw new Error(t('profileCatalogue.errors.restoreToMachineFailed'))
 
       toast.success(
         t('profileCatalogue.restoredToMachine', {
@@ -84,7 +84,7 @@ export function OrphanResolutionDialog({
       onResolved()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Failed to restore profile'
+        err instanceof Error ? err.message : t('profileCatalogue.errors.restoreProfileFailed')
       toast.error(message)
     } finally {
       setIsProcessing(false)
