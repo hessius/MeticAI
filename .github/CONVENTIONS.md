@@ -41,7 +41,7 @@ These are **non-negotiable**. Every PR, every push, every completion claim:
 
 ### Backend (Python)
 ```bash
-cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -q
+cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -x -q
 ```
 - Currently 750+ tests. New code must include tests in `test_main.py`.
 - Test both success and failure/edge-case paths.

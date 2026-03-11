@@ -66,7 +66,7 @@ function getConventionsSummary() {
 
 function getVerificationChecklist() {
     return `VERIFICATION CHECKLIST — Complete ALL before marking task done:
-1. Backend tests pass: cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -q
+1. Backend tests pass: cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -x -q
 2. Frontend tests pass: cd apps/web && bun run test:run
 3. Lint is clean: cd apps/web && bun run lint
 4. Build succeeds: cd apps/web && bun run build
@@ -129,7 +129,7 @@ const session = await joinSession({
             handler: async (args) => {
                 const scope = args.scope || "all";
                 const commands = {
-                    backend: "cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -q 2>&1",
+                    backend: "cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -x -q 2>&1",
                     frontend: "cd apps/web && bun run test:run 2>&1",
                     lint: "cd apps/web && bun run lint 2>&1",
                     build: "cd apps/web && bun run build 2>&1",

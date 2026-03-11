@@ -47,7 +47,7 @@ Edit `.github/CONVENTIONS.md` directly, adding the rule under the appropriate se
 | Testing | Test commands, coverage expectations |
 | Commits | Message format, trailers |
 | Pull Requests | PR structure requirements |
-| i18n | Translation rules |
+| Internationalization (i18n) | Translation rules |
 | Dependencies | Package management rules |
 | Code Style | Language-specific style rules |
 | Architecture Patterns | Design patterns and conventions |
