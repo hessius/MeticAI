@@ -12,7 +12,7 @@ This is the **single source of truth**. When in doubt, read it.
 
 - **CI green** before any completion claim or merge
 - **No tech debt** — fix everything now, defer nothing
-- **VERSION + package.json** always bumped together
+- **VERSION + apps/web/package.json** always bumped together
 - **Conventional Commits** with `Co-authored-by: Copilot` trailer
 - **i18n** all user-facing strings via `t()`, all 6 locales
 - **Tests** before pushing: backend pytest + frontend bun + lint + build
@@ -24,8 +24,8 @@ When you discover a new rule or the user corrects a behavior:
 **Option A — Extension tool:**
 Use the `learn_convention` tool (provided by the `self-improve` extension):
 - Specify the section and rule
-- It's automatically appended to CONVENTIONS.md
-- Committed with the next git commit
+- It's automatically appended to `.github/CONVENTIONS.md`
+- Remember to commit `.github/CONVENTIONS.md` after learning a rule
 
 **Option B — Manual edit:**
 Edit `.github/CONVENTIONS.md` directly, adding the rule under the appropriate section.

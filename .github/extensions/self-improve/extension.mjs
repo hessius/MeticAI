@@ -82,15 +82,15 @@ const session = await joinSession({
                 if (match) {
                     const sectionStart = match.index + match[0].length;
                     const nextSection = content.indexOf("\n## ", sectionStart + 1);
-                    const insertAt = nextSection === -1 ? content.length : nextSection;
+                    const lastFooter = content.lastIndexOf("\n---\n");
+                    const insertAt =
+                        nextSection !== -1
+                            ? nextSection
+                            : lastFooter !== -1 && lastFooter > sectionStart
+                                ? lastFooter
+                                : content.length;
 
-                    const existingSection = content.substring(sectionStart, insertAt);
                     const newRule = `\n- ${args.rule}`;
-
-                    const lastBullet = existingSection.lastIndexOf("\n-");
-                    const lastLine = existingSection.lastIndexOf("\n");
-                    const insertPos = lastBullet !== -1 ? sectionStart + lastBullet + existingSection.substring(lastBullet + 1).indexOf("\n") + 1 : insertAt;
-
                     content = content.substring(0, insertAt) + newRule + "\n" + content.substring(insertAt);
                 } else {
                     const lastUpdated = content.lastIndexOf("\n---\n");

@@ -5,7 +5,7 @@ This skill defines the release process for MeticAI versions.
 ## 1. Pre-Release Checklist
 
 Before bumping to a release version:
-- All tests pass (backend: `cd apps/server && .venv/bin/python -m pytest test_main.py -q`, frontend: `cd apps/web && bun run test:run`)
+- All tests pass (backend: `cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -q`, frontend: `cd apps/web && bun run test:run`)
 - Lint clean: `cd apps/web && bun run lint`
 - Build succeeds: `cd apps/web && bun run build`
 - CI is green on the version branch
@@ -26,7 +26,7 @@ Version progression:
 ## 3. Release Steps
 
 1. Ensure `version/X.Y.Z` branch is up to date and CI is green.
-2. Bump both `VERSION` and `package.json` to final version.
+2. Bump both `VERSION` and `apps/web/package.json` to final version.
 3. Commit: `chore(release): bump version to X.Y.Z`
 4. Push and wait for CI green.
 5. Create PR from `version/X.Y.Z` → `main`.
@@ -46,7 +46,7 @@ For critical fixes after release:
 1. Branch from `main`: `fix/<issue-name>`
 2. Fix, test, push, CI green.
 3. PR into `main`.
-4. Bump patch version in both VERSION and package.json.
+4. Bump patch version in both VERSION and `apps/web/package.json`.
 
 ## References
 

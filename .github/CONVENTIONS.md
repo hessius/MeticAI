@@ -35,16 +35,16 @@ These are **non-negotiable**. Every PR, every push, every completion claim:
 3. **No deferred tasks.** If a task is in scope, it gets done now — not added to a backlog.
 4. **All code review comments addressed.** Including suppressed/collapsed threads. Don't dismiss without clear justification.
 5. **Tests pass locally before pushing.** Don't rely on CI as your first test run.
+6. **Wide review on bug discovery.** When discovering a bug or potential issue, always do a wide review to look for the same or similar issues across the codebase. Bugs are often part of a pattern — fix the pattern, not just the instance.
 
 ## Testing
 
 ### Backend (Python)
 ```bash
-cd apps/server && .venv/bin/python -m pytest test_main.py -q
+cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -q
 ```
 - Currently 750+ tests. New code must include tests in `test_main.py`.
 - Test both success and failure/edge-case paths.
-- Use `TEST_MODE=true` environment variable.
 
 ### Frontend (TypeScript/React)
 ```bash
@@ -56,7 +56,7 @@ cd apps/web && bun run test:run
 
 ### Full Local Gate (run before pushing)
 ```bash
-cd apps/server && .venv/bin/python -m pytest test_main.py -x -q && \
+cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -x -q && \
 cd ../web && bun run lint && bun run test:run && bun run build
 ```
 

@@ -15,22 +15,44 @@ function loadConventions() {
 }
 
 function getConventionsSummary() {
-    return `PROJECT CONVENTIONS (auto-injected by meticai-guardrails):
-- CI must be completely green before claiming work is done
-- Zero tech debt — address all issues immediately, never defer
-- All code review comments must be addressed (including suppressed threads)
-- VERSION and apps/web/package.json must be bumped together on releases
-- Branch naming: version/X.Y.Z for milestones, feat/<name> for features
-- All user-facing strings must use i18n t() function (6 locales: en, sv, de, es, fr, it)
-- Conventional Commits format with Co-authored-by: Copilot trailer
-- Run full test suite before pushing: backend pytest + frontend bun test + lint + build
-- Dual route registration (/path + /api/path) is intentional — not a defect
-- Read .github/CONVENTIONS.md for the complete set of project rules`;
+    const content = loadConventions();
+    if (!content) {
+        return "PROJECT CONVENTIONS: Read .github/CONVENTIONS.md for all project rules.";
+    }
+
+    const lines = content.split("\n");
+    const keySections = ["Quality Gates", "Branch Naming", "Testing", "Commits", "Internationalization"];
+    const summary = ["PROJECT CONVENTIONS (auto-injected from .github/CONVENTIONS.md):"];
+
+    let inKeySection = false;
+    let bulletCount = 0;
+    const maxBullets = 3;
+
+    for (const line of lines) {
+        if (line.startsWith("## ")) {
+            const sectionName = line.replace("## ", "").trim();
+            inKeySection = keySections.some(s => sectionName.includes(s));
+            bulletCount = 0;
+            if (inKeySection) {
+                summary.push("");
+                summary.push(line);
+            }
+        } else if (inKeySection && line.startsWith("- ") && bulletCount < maxBullets) {
+            summary.push(line);
+            bulletCount++;
+        } else if (inKeySection && line.startsWith("```")) {
+            inKeySection = false; // skip code blocks
+        }
+    }
+
+    summary.push("");
+    summary.push("Full conventions: .github/CONVENTIONS.md");
+    return summary.join("\n");
 }
 
 function getVerificationChecklist() {
     return `VERIFICATION CHECKLIST — Complete ALL before marking task done:
-1. Backend tests pass: cd apps/server && .venv/bin/python -m pytest test_main.py -q
+1. Backend tests pass: cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -q
 2. Frontend tests pass: cd apps/web && bun run test:run
 3. Lint is clean: cd apps/web && bun run lint
 4. Build succeeds: cd apps/web && bun run build
@@ -93,7 +115,7 @@ const session = await joinSession({
             handler: async (args) => {
                 const scope = args.scope || "all";
                 const commands = {
-                    backend: "cd apps/server && .venv/bin/python -m pytest test_main.py -q 2>&1",
+                    backend: "cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -q 2>&1",
                     frontend: "cd apps/web && bun run test:run 2>&1",
                     lint: "cd apps/web && bun run lint 2>&1",
                     build: "cd apps/web && bun run build 2>&1",
