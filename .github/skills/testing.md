@@ -1,5 +1,7 @@
 Agent Skill: Testing, Build & Debugging
 
+> **Full conventions:** See `.github/CONVENTIONS.md` for all project rules.
+
 This skill defines the commands and workflows required to verify code changes, run tests, and manage the local Docker environment.
 
 # 1. Complete Local Test Workflow (The Gate)
@@ -10,6 +12,8 @@ Run this sequence before pushing any code to trigger CI:
 
 cd apps/server && TEST_MODE=true .venv/bin/pytest test_main.py -x -q
 
+Expected: 750+ tests passing.
+
 2. Python logging tests
 
 TEST_MODE=true .venv/bin/pytest test_logging.py -x -q
@@ -17,6 +21,8 @@ TEST_MODE=true .venv/bin/pytest test_logging.py -x -q
 3. Web unit tests + linter (0 errors required; warnings are OK)
 
 cd ../web && bun run lint && bun run test:run
+
+Expected: 277+ tests passing. 0 lint errors (warnings OK per issue #256).
 
 4. Build container from local source and start
 
@@ -61,3 +67,6 @@ docker exec meticai s6-svc -r /run/service/server
 
 - MCP server logs
 docker exec meticai cat /var/log/mcp-server.log
+
+# 5. Quick Full Gate (Extension Tool)
+If the `meticai-guardrails` extension is loaded, you can run `meticai_run_tests` with scope "all" to execute the full gate in one command.
