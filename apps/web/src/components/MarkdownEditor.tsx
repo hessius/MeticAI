@@ -14,7 +14,7 @@ import { MarkdownText } from '@/components/MarkdownText'
 interface MarkdownEditorProps {
   value: string
   onChange: (value: string) => void
-  onSave?: () => void
+  onSave?: () => void | Promise<void>
   onCancel?: () => void
   placeholder?: string
   saving?: boolean
@@ -47,10 +47,15 @@ export function MarkdownEditor({
     onCancel?.()
   }, [onCancel])
 
-  const handleSave = useCallback(() => {
-    onSave?.()
-    setIsEditing(false)
-    setShowPreview(false)
+  const handleSave = useCallback(async () => {
+    if (!onSave) return
+    try {
+      await onSave()
+      setIsEditing(false)
+      setShowPreview(false)
+    } catch {
+      // Keep editor open on save failure; parent handles error display
+    }
   }, [onSave])
 
   // Read-only mode: just show the content

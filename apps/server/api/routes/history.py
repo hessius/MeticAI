@@ -1,6 +1,7 @@
 """Profile history management endpoints."""
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
+import json
 import logging
 
 from services.history_service import load_history, save_history
@@ -342,7 +343,10 @@ async def update_history_notes(entry_id: str, request: Request):
     request_id = request.state.request_id
     
     try:
-        body = await request.json()
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            raise HTTPException(status_code=400, detail={"status": "error", "error": "Invalid JSON body"})
         notes_text = body.get("notes", "")
         
         updated_entry = update_entry_notes(entry_id, notes_text)

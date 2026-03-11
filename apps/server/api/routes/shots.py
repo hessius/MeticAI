@@ -26,6 +26,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _safe_float(val, default=0.0):
+    """Convert a value to float safely, returning default on failure."""
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
 @router.get("/api/last-shot")
 async def get_last_shot(request: Request):
     """Return metadata for the most recent shot without loading full telemetry.
@@ -1005,7 +1013,8 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
             if not files:
                 continue
 
-            tasks = [_fetch_shot_info(date, fn) for fn in files]
+            remaining = needed - len(all_shots)
+            tasks = [_fetch_shot_info(date, fn) for fn in files[:remaining]]
             results = await asyncio.gather(*tasks)
             for r in results:
                 if r is not None:
@@ -1013,7 +1022,7 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
 
         # Sort by timestamp descending (handle None timestamps)
         all_shots.sort(
-            key=lambda s: float(s["timestamp"]) if s["timestamp"] else 0,
+            key=lambda s: _safe_float(s["timestamp"]),
             reverse=True,
         )
 
@@ -1052,7 +1061,7 @@ async def get_recent_shots_by_profile(request: Request, limit: int = 50, offset:
     try:
         # Reuse the flat recent-shots logic
         flat_response = await get_recent_shots(request, limit=limit + offset, offset=0)
-        flat_shots = flat_response["shots"]
+        flat_shots = flat_response["shots"][offset:offset + limit]
 
         # Group by profile_name
         grouped: dict[str, dict] = {}
@@ -1132,7 +1141,10 @@ async def update_shot_annotation(date: str, filename: str, request: Request):
     request_id = request.state.request_id
     
     try:
-        body = await request.json()
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            raise HTTPException(status_code=400, detail={"status": "error", "error": "Invalid JSON body"})
 
         # If only rating is provided (no annotation key), update just the rating
         if "rating" in body and "annotation" not in body:
