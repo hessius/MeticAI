@@ -1,5 +1,7 @@
 # Agent Skill: Workflow & Execution
 
+> **Full conventions:** See `.github/CONVENTIONS.md` for all project rules.
+
 This skill defines the autonomous loop for executing items in `tasks.md`. Follow these phases strictly.
 
 ## 1. Safety Rules (Non-Negotiable)
@@ -39,8 +41,10 @@ Before pushing, ensure:
 
 ### Phase 6 — Retrospective (End of Session)
 Review the session for friction. Propose workflow updates or update `tasks.md` directly. 
-Finally, notify the user that the session is done by executing this terminal command on their Mac:
-`osascript -e 'display notification "All tasks complete" with title "Copilot Agent"'`
+Finally, notify the user that the session is done.
 
 ## 3. Pull Requests
 Open PRs with a Summary, How to test, and Assumptions/Open Questions. Post a PR comment summarizing changes for substantial multi-file updates.
+
+## 4. Fleet Dispatch
+When facing 2+ independent tasks, use parallel agent dispatch. See the `dispatch-agents` prompt for the pattern. Group tasks by independence — each agent gets one clear scope with no shared state.
