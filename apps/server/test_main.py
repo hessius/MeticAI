@@ -12929,3 +12929,172 @@ class TestProfileSync:
         for path in ["/profiles/sync", "/api/profiles/sync"]:
             response = client.post(path)
             assert response.status_code == 200
+
+
+class TestHistoryNotesEndpoints:
+    """Tests for the history notes GET/PATCH endpoints."""
+
+    @pytest.fixture
+    def sample_entry_with_notes(self):
+        """Create a sample history entry that has notes."""
+        return {
+            "id": "note-entry-1",
+            "profile_name": "Test Profile",
+            "notes": "These are my tasting notes.",
+            "notes_updated_at": "2026-03-01T12:00:00+00:00",
+        }
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.get_entry_by_id')
+    def test_get_notes_success(self, mock_get_entry, client, sample_entry_with_notes):
+        """GET notes for a valid entry returns notes and timestamp."""
+        mock_get_entry.return_value = sample_entry_with_notes
+
+        response = client.get("/api/history/note-entry-1/notes")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["notes"] == "These are my tasting notes."
+        assert data["notes_updated_at"] == "2026-03-01T12:00:00+00:00"
+        mock_get_entry.assert_called_once_with("note-entry-1")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.get_entry_by_id')
+    def test_get_notes_entry_not_found(self, mock_get_entry, client):
+        """GET notes for a missing entry returns 404."""
+        mock_get_entry.return_value = None
+
+        response = client.get("/api/history/nonexistent-id/notes")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.update_entry_notes')
+    def test_patch_notes_success(self, mock_update, client):
+        """PATCH notes with valid text returns updated notes."""
+        mock_update.return_value = {
+            "id": "note-entry-1",
+            "notes": "Updated tasting notes.",
+            "notes_updated_at": "2026-03-02T08:00:00+00:00",
+        }
+
+        response = client.patch(
+            "/api/history/note-entry-1/notes",
+            json={"notes": "Updated tasting notes."},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["notes"] == "Updated tasting notes."
+        assert data["notes_updated_at"] == "2026-03-02T08:00:00+00:00"
+        mock_update.assert_called_once_with("note-entry-1", "Updated tasting notes.")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.update_entry_notes')
+    def test_patch_notes_empty_clears(self, mock_update, client):
+        """PATCH notes with empty string clears notes."""
+        mock_update.return_value = {
+            "id": "note-entry-1",
+            "notes": "",
+            "notes_updated_at": "2026-03-02T09:00:00+00:00",
+        }
+
+        response = client.patch(
+            "/api/history/note-entry-1/notes",
+            json={"notes": ""},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["notes"] == ""
+        mock_update.assert_called_once_with("note-entry-1", "")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.update_entry_notes')
+    def test_patch_notes_entry_not_found(self, mock_update, client):
+        """PATCH notes for a missing entry returns 404."""
+        mock_update.return_value = None
+
+        response = client.patch(
+            "/api/history/nonexistent-id/notes",
+            json={"notes": "text"},
+        )
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+
+class TestMachineDetectEndpoint:
+    """Tests for POST /api/machine/detect auto-discovery."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.verify_machine', new_callable=AsyncMock)
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_found_and_verified(self, mock_discover, mock_verify, client):
+        """Machine found and verified returns full details with verified=True."""
+        from services.machine_discovery_service import DiscoveryResult
+        mock_discover.return_value = DiscoveryResult(
+            found=True, ip="192.168.1.42", hostname="meticulous.local", method="mdns",
+        )
+        mock_verify.return_value = True
+
+        response = client.post("/api/machine/detect")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is True
+        assert data["ip"] == "192.168.1.42"
+        assert data["hostname"] == "meticulous.local"
+        assert data["method"] == "mdns"
+        assert data["verified"] is True
+        mock_verify.assert_called_once_with("192.168.1.42")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.verify_machine', new_callable=AsyncMock)
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_found_not_verified(self, mock_discover, mock_verify, client):
+        """Machine found but not responding returns verified=False."""
+        from services.machine_discovery_service import DiscoveryResult
+        mock_discover.return_value = DiscoveryResult(
+            found=True, ip="10.0.0.5", hostname="meticulous.local", method="hostname",
+        )
+        mock_verify.return_value = False
+
+        response = client.post("/api/machine/detect")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is True
+        assert data["ip"] == "10.0.0.5"
+        assert data["verified"] is False
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_not_found(self, mock_discover, client):
+        """No machine found returns guidance text."""
+        from services.machine_discovery_service import DiscoveryResult
+        mock_discover.return_value = DiscoveryResult(
+            found=False, guidance="Could not automatically detect your Meticulous machine.",
+        )
+
+        response = client.post("/api/machine/detect")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is False
+        assert "guidance" in data
+        assert len(data["guidance"]) > 0
+        assert "ip" not in data
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_discovery_raises_exception(self, mock_discover, client):
+        """Discovery raising an exception propagates as a server error."""
+        mock_discover.side_effect = Exception("Network timeout")
+
+        with pytest.raises(Exception, match="Network timeout"):
+            client.post("/api/machine/detect")
