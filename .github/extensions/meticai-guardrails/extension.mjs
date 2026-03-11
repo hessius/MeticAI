@@ -14,7 +14,16 @@ function loadConventions() {
     return null;
 }
 
+let _conventionsSummaryCache = null;
+let _conventionsCacheTime = 0;
+const CACHE_TTL_MS = 60000; // 60 seconds
+
 function getConventionsSummary() {
+    const now = Date.now();
+    if (_conventionsSummaryCache && (now - _conventionsCacheTime) < CACHE_TTL_MS) {
+        return _conventionsSummaryCache;
+    }
+
     const content = loadConventions();
     if (!content) {
         return "PROJECT CONVENTIONS: Read .github/CONVENTIONS.md for all project rules.";
@@ -25,29 +34,34 @@ function getConventionsSummary() {
     const summary = ["PROJECT CONVENTIONS (auto-injected from .github/CONVENTIONS.md):"];
 
     let inKeySection = false;
+    let inCodeBlock = false;
     let bulletCount = 0;
     const maxBullets = 3;
 
     for (const line of lines) {
-        if (line.startsWith("## ")) {
-            const sectionName = line.replace("## ", "").trim();
+        const trimmed = line.trim();
+
+        if (trimmed.startsWith("```")) {
+            inCodeBlock = !inCodeBlock;
+        } else if (!inCodeBlock && trimmed.startsWith("## ")) {
+            const sectionName = trimmed.replace("## ", "").trim();
             inKeySection = keySections.some(s => sectionName.includes(s));
             bulletCount = 0;
             if (inKeySection) {
                 summary.push("");
-                summary.push(line);
+                summary.push(trimmed);
             }
-        } else if (inKeySection && line.startsWith("- ") && bulletCount < maxBullets) {
+        } else if (inKeySection && !inCodeBlock && line.startsWith("- ") && bulletCount < maxBullets) {
             summary.push(line);
             bulletCount++;
-        } else if (inKeySection && line.startsWith("```")) {
-            inKeySection = false; // skip code blocks
         }
     }
 
     summary.push("");
     summary.push("Full conventions: .github/CONVENTIONS.md");
-    return summary.join("\n");
+    _conventionsSummaryCache = summary.join("\n");
+    _conventionsCacheTime = now;
+    return _conventionsSummaryCache;
 }
 
 function getVerificationChecklist() {
@@ -73,7 +87,7 @@ const session = await joinSession({
         },
         onUserPromptSubmitted: async (input) => {
             return {
-                additionalContext: getConventionsSummary(),
+                additionalContext: "Follow all rules in .github/CONVENTIONS.md. Key: CI green, no tech debt, no deferred tasks, wide review on bugs, i18n all strings, TEST_MODE=true for pytest.",
             };
         },
         onPreToolUse: async (input) => {

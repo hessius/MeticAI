@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { approveAll } from "@github/copilot-sdk";
 import { joinSession } from "@github/copilot-sdk/extension";
@@ -76,12 +76,26 @@ const session = await joinSession({
                 }
 
                 let content = readFileSync(CONVENTIONS_PATH, "utf-8");
-                const sectionPattern = new RegExp(`^## ${args.section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m");
-                const match = content.match(sectionPattern);
 
-                if (match) {
-                    const sectionStart = match.index + match[0].length;
-                    const nextSection = content.indexOf("\n## ", sectionStart + 1);
+                // Find all existing section headers
+                const headerRegex = /^## .+$/gm;
+                const headers = [];
+                let headerMatch;
+                while ((headerMatch = headerRegex.exec(content)) !== null) {
+                    headers.push({ text: headerMatch[0], index: headerMatch.index });
+                }
+
+                // Case-insensitive fuzzy match: find best matching header
+                const inputLower = args.section.toLowerCase();
+                const matchedHeader = headers.find(h =>
+                    h.text.replace("## ", "").toLowerCase().includes(inputLower) ||
+                    inputLower.includes(h.text.replace("## ", "").toLowerCase())
+                );
+
+                if (matchedHeader) {
+                    const sectionStart = matchedHeader.index + matchedHeader.text.length;
+                    const nextHeader = headers.find(h => h.index > matchedHeader.index);
+                    const nextSection = nextHeader ? nextHeader.index : -1;
                     const lastFooter = content.lastIndexOf("\n---\n");
                     const insertAt =
                         nextSection !== -1
@@ -90,7 +104,19 @@ const session = await joinSession({
                                 ? lastFooter
                                 : content.length;
 
-                    const newRule = `\n- ${args.rule}`;
+                    const sectionContent = content.substring(sectionStart, insertAt);
+
+                    // Detect list style: numbered (1. 2. 3.) vs bullet (- )
+                    const numberedPattern = /\n\s*(\d+)\.\s/g;
+                    const numberedMatches = [...sectionContent.matchAll(numberedPattern)];
+                    let newRule;
+                    if (numberedMatches.length > 0) {
+                        const lastNum = Math.max(...numberedMatches.map(m => parseInt(m[1], 10)));
+                        newRule = `\n${lastNum + 1}. ${args.rule}`;
+                    } else {
+                        newRule = `\n- ${args.rule}`;
+                    }
+
                     content = content.substring(0, insertAt) + newRule + "\n" + content.substring(insertAt);
                 } else {
                     const lastUpdated = content.lastIndexOf("\n---\n");
@@ -98,7 +124,9 @@ const session = await joinSession({
                     content = content.substring(0, insertAt) + `\n\n## ${args.section}\n\n- ${args.rule}\n` + content.substring(insertAt);
                 }
 
-                writeFileSync(CONVENTIONS_PATH, content, "utf-8");
+                const tmpPath = CONVENTIONS_PATH + ".tmp";
+                writeFileSync(tmpPath, content, "utf-8");
+                renameSync(tmpPath, CONVENTIONS_PATH);
                 await session.log(`Learned new convention in "${args.section}": ${args.rule}`);
                 return `Added to "${args.section}": ${args.rule}`;
             },
