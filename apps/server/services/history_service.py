@@ -1,5 +1,6 @@
 """History service for managing profile creation history."""
 
+import hashlib
 import json
 import re
 import uuid
@@ -186,3 +187,103 @@ def save_to_history(
     )
     
     return entry
+
+
+def update_entry_notes(entry_id: str, notes: str) -> Optional[dict]:
+    """Update the notes field for a history entry.
+    
+    Args:
+        entry_id: The ID of the entry to update.
+        notes: The new notes content (Markdown). Empty string clears notes.
+    
+    Returns:
+        The updated entry, or None if not found.
+    """
+    history = load_history()
+    
+    for entry in history:
+        if entry.get("id") == entry_id:
+            if notes and notes.strip():
+                entry["notes"] = notes.strip()
+                entry["notes_updated_at"] = datetime.now(timezone.utc).isoformat()
+            else:
+                # Clear notes if empty
+                entry.pop("notes", None)
+                entry.pop("notes_updated_at", None)
+            
+            save_history(history)
+            
+            logger.info(
+                f"Updated notes for history entry: {entry.get('profile_name', entry_id)}",
+                extra={"entry_id": entry_id, "has_notes": bool(notes)}
+            )
+            return entry
+    
+    logger.warning(f"History entry not found for notes update: {entry_id}")
+    return None
+
+
+def get_entry_by_id(entry_id: str) -> Optional[dict]:
+    """Get a history entry by its ID.
+    
+    Args:
+        entry_id: The ID of the entry to find.
+    
+    Returns:
+        The entry dict, or None if not found.
+    """
+    history = load_history()
+    for entry in history:
+        if entry.get("id") == entry_id:
+            return entry
+    return None
+
+
+def compute_content_hash(profile_dict: dict) -> str:
+    """Compute a SHA-256 hash of a profile's JSON content for change detection.
+
+    Produces a stable hash by sorting keys before serialisation so that
+    semantically identical profiles always yield the same digest.
+    """
+    canonical = json.dumps(profile_dict, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def update_entry_sync_fields(
+    entry_id: str,
+    *,
+    content_hash: Optional[str] = None,
+    machine_updated_at: Optional[str] = None,
+    profile_json: Optional[dict] = None,
+    reply: Optional[str] = None,
+) -> Optional[dict]:
+    """Update sync-related fields on a history entry.
+
+    Any keyword argument that is not ``None`` will be written to the entry.
+
+    Returns:
+        The updated entry, or ``None`` if not found.
+    """
+    history = load_history()
+
+    for entry in history:
+        if entry.get("id") == entry_id:
+            if content_hash is not None:
+                entry["content_hash"] = content_hash
+            if machine_updated_at is not None:
+                entry["machine_updated_at"] = machine_updated_at
+            if profile_json is not None:
+                entry["profile_json"] = profile_json
+            if reply is not None:
+                entry["reply"] = reply
+
+            save_history(history)
+
+            logger.info(
+                f"Updated sync fields for history entry: {entry.get('profile_name', entry_id)}",
+                extra={"entry_id": entry_id, "has_hash": content_hash is not None},
+            )
+            return entry
+
+    logger.warning(f"History entry not found for sync update: {entry_id}")
+    return None

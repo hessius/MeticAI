@@ -26,6 +26,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _safe_float(val, default=0.0):
+    """Convert a value to float safely, returning default on failure."""
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
 @router.get("/api/last-shot")
 async def get_last_shot(request: Request):
     """Return metadata for the most recent shot without loading full telemetry.
@@ -900,3 +908,324 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
             status_code=500,
             detail={"status": "error", "error": str(e), "message": "LLM shot analysis failed"}
         )
+
+
+# ============================================================================
+# Recent Shots (cross-profile)
+# ============================================================================
+
+# In-memory cache for recent shots
+_recent_shots_cache: dict = {}
+_RECENT_SHOTS_TTL = 30  # seconds
+_RECENT_SHOTS_MAX_ENTRIES = 50
+
+
+def _cache_recent_shots(key: str, data: dict) -> None:
+    """Insert into the recent-shots cache with bounded size."""
+    if len(_recent_shots_cache) > _RECENT_SHOTS_MAX_ENTRIES:
+        now = time.time()
+        expired = [k for k, v in _recent_shots_cache.items() if now - v["ts"] >= _RECENT_SHOTS_TTL]
+        for k in expired:
+            del _recent_shots_cache[k]
+        if len(_recent_shots_cache) > _RECENT_SHOTS_MAX_ENTRIES:
+            _recent_shots_cache.clear()
+    _recent_shots_cache[key] = {"data": data, "ts": time.time()}
+
+
+@router.get("/shots/recent")
+@router.get("/api/shots/recent")
+async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
+    """Return recent shots across ALL profiles, sorted chronologically (latest first).
+
+    Query params:
+        limit:  max items to return (default 50)
+        offset: pagination offset (default 0)
+    """
+    request_id = request.state.request_id
+    cache_key = f"recent:{min(limit, 100)}:{min(offset, 10000)}"
+    now = time.time()
+
+    # Check cache
+    cached = _recent_shots_cache.get(cache_key)
+    if cached and (now - cached["ts"]) < _RECENT_SHOTS_TTL:
+        return cached["data"]
+
+    try:
+        from services.shot_annotations_service import get_annotation
+
+        dates_result = await async_get_history_dates()
+        if hasattr(dates_result, "error") and dates_result.error:
+            raise HTTPException(status_code=502, detail=f"Machine API error: {dates_result.error}")
+
+        dates = sorted([d.name for d in dates_result], reverse=True) if dates_result else []
+
+        all_shots: list[dict] = []
+        sem = asyncio.Semaphore(6)
+
+        async def _fetch_shot_info(date: str, filename: str):
+            async with sem:
+                try:
+                    shot_data = await fetch_shot_data(date, filename)
+                except Exception:
+                    return None
+
+                profile_name = shot_data.get("profile_name", "")
+                if not profile_name and isinstance(shot_data.get("profile"), dict):
+                    profile_name = shot_data["profile"].get("name", "")
+
+                profile_id = ""
+                if isinstance(shot_data.get("profile"), dict):
+                    profile_id = shot_data["profile"].get("id", "")
+
+                data_entries = shot_data.get("data", [])
+                final_weight = None
+                total_time_ms = None
+                if data_entries:
+                    last_entry = data_entries[-1]
+                    if isinstance(last_entry.get("shot"), dict):
+                        final_weight = last_entry["shot"].get("weight")
+                    total_time_ms = last_entry.get("time")
+
+                timestamp = shot_data.get("time")
+                annotation = get_annotation(date, filename)
+
+                return {
+                    "profile_name": profile_name,
+                    "profile_id": profile_id,
+                    "date": date,
+                    "filename": filename,
+                    "timestamp": timestamp,
+                    "final_weight": final_weight,
+                    "total_time": total_time_ms / 1000 if total_time_ms else None,
+                    "has_annotation": annotation is not None,
+                }
+
+        # We need enough shots for offset + limit; collect greedily
+        needed = offset + limit
+        for date in dates:
+            if len(all_shots) >= needed:
+                break
+
+            files_result = await async_get_shot_files(date)
+            if hasattr(files_result, "error") and files_result.error:
+                continue
+            files = sorted([f.name for f in files_result], reverse=True) if files_result else []
+            if not files:
+                continue
+
+            remaining = needed - len(all_shots)
+            tasks = [_fetch_shot_info(date, fn) for fn in files[:remaining]]
+            results = await asyncio.gather(*tasks)
+            for r in results:
+                if r is not None:
+                    all_shots.append(r)
+
+        # Sort by timestamp descending (handle None timestamps)
+        all_shots.sort(
+            key=lambda s: _safe_float(s["timestamp"]),
+            reverse=True,
+        )
+
+        page = all_shots[offset : offset + limit]
+
+        response_data = {"shots": page}
+        _cache_recent_shots(cache_key, response_data)
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch recent shots: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/shots/recent/by-profile")
+@router.get("/api/shots/recent/by-profile")
+async def get_recent_shots_by_profile(request: Request, limit: int = 50, offset: int = 0):
+    """Same data as /shots/recent but grouped by profile.
+
+    Response: { profiles: [{ profile_name, profile_id, shots: [...], shot_count }] }
+    """
+    request_id = request.state.request_id
+    cache_key = f"recent_by_profile:{min(limit, 100)}:{min(offset, 10000)}"
+    now = time.time()
+
+    cached = _recent_shots_cache.get(cache_key)
+    if cached and (now - cached["ts"]) < _RECENT_SHOTS_TTL:
+        return cached["data"]
+
+    try:
+        # Reuse the flat recent-shots logic
+        flat_response = await get_recent_shots(request, limit=limit + offset, offset=0)
+        flat_shots = flat_response["shots"][offset:offset + limit]
+
+        # Group by profile_name
+        grouped: dict[str, dict] = {}
+        for shot in flat_shots:
+            pname = shot.get("profile_name") or "Unknown"
+            if pname not in grouped:
+                grouped[pname] = {
+                    "profile_name": pname,
+                    "profile_id": shot.get("profile_id", ""),
+                    "shots": [],
+                    "shot_count": 0,
+                }
+            grouped[pname]["shots"].append(shot)
+            grouped[pname]["shot_count"] += 1
+
+        profiles = sorted(grouped.values(), key=lambda g: g["shot_count"], reverse=True)
+
+        response_data = {"profiles": profiles}
+        _cache_recent_shots(cache_key, response_data)
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch recent shots by profile: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Shot Annotations
+# ============================================================================
+
+
+@router.get("/api/shots/{date}/{filename}/annotation")
+async def get_shot_annotation(date: str, filename: str, request: Request):
+    """Get the user annotation for a specific shot.
+    
+    Args:
+        date: Shot date (e.g., "2024-01-15")
+        filename: Shot filename (e.g., "shot_001.json")
+    
+    Returns:
+        Annotation text, rating, and updated_at if exists, null otherwise.
+    """
+    from services.shot_annotations_service import get_annotation
+    
+    entry = get_annotation(date, filename)
+    return {
+        "status": "success",
+        "annotation": entry.get("annotation") if entry else None,
+        "rating": entry.get("rating") if entry else None,
+        "updated_at": entry.get("updated_at") if entry else None,
+    }
+
+
+@router.patch("/api/shots/{date}/{filename}/annotation")
+async def update_shot_annotation(date: str, filename: str, request: Request):
+    """Update the user annotation for a specific shot.
+    
+    Args:
+        date: Shot date (e.g., "2024-01-15")
+        filename: Shot filename (e.g., "shot_001.json")
+        
+    Body:
+        annotation: Markdown text for the annotation (empty to clear)
+        rating: Star rating 1-5 (null to leave unchanged, explicit null/0 to clear)
+    
+    Returns:
+        Updated annotation entry.
+    """
+    from services.shot_annotations_service import set_annotation, set_rating
+    
+    request_id = request.state.request_id
+    
+    try:
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            raise HTTPException(status_code=400, detail={"status": "error", "error": "Invalid JSON body"})
+
+        # If only rating is provided (no annotation key), update just the rating
+        if "rating" in body and "annotation" not in body:
+            result = set_rating(date, filename, body.get("rating"))
+        else:
+            annotation_text = body.get("annotation", "")
+            rating = body.get("rating")
+            result = set_annotation(date, filename, annotation_text, rating)
+        
+        return {
+            "status": "success",
+            "annotation": result.get("annotation"),
+            "rating": result.get("rating"),
+            "updated_at": result.get("updated_at"),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail={"status": "error", "error": str(e)})
+    except Exception as e:
+        logger.error(
+            f"Failed to update shot annotation: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.delete("/api/shots/{date}/{filename}/annotation")
+async def delete_shot_annotation(date: str, filename: str, request: Request):
+    """Delete the annotation for a specific shot.
+    
+    Args:
+        date: Shot date (e.g., "2024-01-15")
+        filename: Shot filename (e.g., "shot_001.json")
+    
+    Returns:
+        Success status.
+    """
+    from services.shot_annotations_service import delete_annotation
+    
+    request_id = request.state.request_id
+    
+    try:
+        deleted = delete_annotation(date, filename)
+        return {
+            "status": "success",
+            "deleted": deleted,
+        }
+    except Exception as e:
+        logger.error(
+            f"Failed to delete shot annotation: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.get("/api/shots/annotations")
+async def get_all_shot_annotations(request: Request):
+    """Get all shot annotations (for shot list indicators).
+    
+    Returns:
+        Dict mapping shot keys to annotation summaries.
+    """
+    from services.shot_annotations_service import get_all_annotations
+    
+    annotations = get_all_annotations()
+    # Return lightweight summaries for the shot list
+    summaries = {}
+    for key, entry in annotations.items():
+        if isinstance(entry, dict):
+            summaries[key] = {
+                "has_annotation": bool(entry.get("annotation")),
+                "rating": entry.get("rating"),
+            }
+    return {
+        "status": "success",
+        "annotations": summaries,
+    }

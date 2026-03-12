@@ -9,6 +9,8 @@ export interface HistoryEntry {
   user_preferences: string | null
   reply: string
   profile_json: Record<string, unknown> | null
+  notes?: string | null
+  notes_updated_at?: string | null
 }
 
 export interface HistoryResponse {

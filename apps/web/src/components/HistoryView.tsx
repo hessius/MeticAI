@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { 
   Trash, 
@@ -25,7 +26,10 @@ import {
   Check,
   XCircle,
   Plus,
-  Play
+  Play,
+  PencilSimple,
+  FloppyDisk,
+  GearSix
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
@@ -37,7 +41,10 @@ import { ShotHistoryView } from '@/components/ShotHistoryView'
 import { ImageCropDialog } from '@/components/ImageCropDialog'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
+import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { getServerUrl } from '@/lib/config'
+import { profileService } from '@/services/profileService'
+
 import { 
   extractTagsFromPreferences, 
   getAllTagsFromEntries, 
@@ -98,11 +105,12 @@ interface HistoryViewProps {
   onBack: () => void
   onViewProfile: (entry: HistoryEntry, cachedImageUrl?: string) => void
   onGenerateNew: () => void
+  onManageMachine?: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
 }
 
-export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
+export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMachine, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
   const { t } = useTranslation()
   const { 
     entries, 
@@ -120,6 +128,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
   const [showFilters, setShowFilters] = useState(false)
   const [profileImages, setProfileImages] = useState<Record<string, string>>({})
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [syncBadgeCount, setSyncBadgeCount] = useState(0)
   
   // Use cached profile images
   const { fetchImagesForProfiles } = useProfileImageCache()
@@ -127,6 +136,23 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
   useEffect(() => {
     fetchHistory()
   }, [fetchHistory])
+
+  // Fetch sync badge count
+  useEffect(() => {
+    if (!onManageMachine) return
+    const loadSyncStatus = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/profiles/sync/status`)
+        if (!response.ok) return
+        const data = await response.json()
+        setSyncBadgeCount((data.new_count || 0) + (data.updated_count || 0) + (data.orphaned_count || 0))
+      } catch {
+        // Non-critical
+      }
+    }
+    loadSyncStatus()
+  }, [onManageMachine])
 
   // Fetch profile images for all entries (using cache)
   useEffect(() => {
@@ -244,6 +270,22 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, aiConfigured
             >
               <Plus size={18} weight="bold" />
             </Button>
+            {onManageMachine && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onManageMachine}
+                className="relative shrink-0 h-9 w-9"
+                title={t('history.manageMachine')}
+              >
+                <GearSix size={18} weight="fill" />
+                {syncBadgeCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-bold leading-4 text-white bg-destructive rounded-full">
+                    {syncBadgeCount}
+                  </span>
+                )}
+              </Button>
+            )}
             <Button
               variant={showFilters ? "secondary" : "ghost"}
               size="icon"
@@ -532,12 +574,13 @@ interface ProfileDetailViewProps {
   entry: HistoryEntry
   onBack: () => void
   onRunProfile?: (profileId: string, profileName: string) => void
+  onEntryUpdated?: (entry: HistoryEntry) => void
   cachedImageUrl?: string
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
 }
 
-export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
+export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
   const { t } = useTranslation()
   const { downloadJson } = useHistory()
   const { invalidate: invalidateImageCache } = useProfileImageCache()
@@ -568,6 +611,180 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
   
   // Machine profile ID for run/schedule functionality
   const [machineProfileId, setMachineProfileId] = useState<string | null>(null)
+  
+  // Notes state
+  const [notes, setNotes] = useState<string>(entry.notes || '')
+  const [isSavingNotes, setIsSavingNotes] = useState(false)
+
+  // Profile edit state — separate modes for title vs details
+  const [editingSection, setEditingSection] = useState<'title' | 'details' | null>(null)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  // AI description regeneration state
+  const [isRegeneratingDescription, setIsRegeneratingDescription] = useState(false)
+  const [currentReply, setCurrentReply] = useState(entry.reply)
+  const [editName, setEditName] = useState(entry.profile_name)
+  const [editTemperature, setEditTemperature] = useState<string>(
+    entry.profile_json?.temperature?.toString() ?? ''
+  )
+  const [editFinalWeight, setEditFinalWeight] = useState<string>(
+    entry.profile_json?.final_weight?.toString() ?? ''
+  )
+  const [editVariables, setEditVariables] = useState<{ key: string; name: string; value: string; type: string }[]>(() => {
+    const vars = (entry.profile_json as ProfileData | null)?.variables ?? []
+    return vars
+      .filter((v: { key: string }) => !v.key.startsWith('info_'))
+      .map((v: { key: string; name: string; value: number; type: string }) => ({
+        key: v.key,
+        name: v.name,
+        value: String(v.value),
+        type: v.type,
+      }))
+  })
+
+  // Sync local state when entry prop updates (e.g. after edit save)
+  useEffect(() => {
+    setNotes(entry.notes || '')
+    setCurrentReply(entry.reply)
+    setEditName(entry.profile_name)
+    setEditTemperature(entry.profile_json?.temperature?.toString() ?? '')
+    setEditFinalWeight(entry.profile_json?.final_weight?.toString() ?? '')
+    const vars = (entry.profile_json as ProfileData | null)?.variables ?? []
+    setEditVariables(
+      vars
+        .filter((v: { key: string }) => !v.key.startsWith('info_'))
+        .map((v: { key: string; name: string; value: number; type: string }) => ({
+          key: v.key, name: v.name, value: String(v.value), type: v.type,
+        }))
+    )
+  }, [entry])
+
+  const hasEditChanges = useMemo(() => {
+    if (!editingSection) return false
+    const pj = entry.profile_json as ProfileData | null
+    if (editingSection === 'title') {
+      return editName !== entry.profile_name
+    }
+    // details
+    if (pj?.temperature !== undefined && editTemperature !== String(pj.temperature)) return true
+    if (pj?.final_weight !== undefined && editFinalWeight !== String(pj.final_weight)) return true
+    const origVars = (pj?.variables ?? []).filter((v: { key: string }) => !v.key.startsWith('info_'))
+    for (const ev of editVariables) {
+      const ov = origVars.find((v: { key: string }) => v.key === ev.key)
+      if (ov && String(ov.value) !== ev.value) return true
+    }
+    return false
+  }, [editingSection, editName, editTemperature, editFinalWeight, editVariables, entry])
+
+  // Unsaved changes guard
+  useEffect(() => {
+    if (!hasEditChanges) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasEditChanges])
+
+  const handleStartEdit = (section: 'title' | 'details') => {
+    const pj = entry.profile_json as ProfileData | null
+    setEditName(entry.profile_name)
+    setEditTemperature(pj?.temperature?.toString() ?? '')
+    setEditFinalWeight(pj?.final_weight?.toString() ?? '')
+    setEditVariables(
+      (pj?.variables ?? [])
+        .filter((v: { key: string }) => !v.key.startsWith('info_'))
+        .map((v: { key: string; name: string; value: number; type: string }) => ({
+          key: v.key,
+          name: v.name,
+          value: String(v.value),
+          type: v.type,
+        }))
+    )
+    setEditingSection(section)
+  }
+
+  const handleCancelEdit = () => {
+    if (hasEditChanges && !window.confirm(t('profileEdit.unsavedChanges'))) return
+    setEditingSection(null)
+  }
+
+  const handleSaveEdit = async () => {
+    const payload: Record<string, unknown> = {}
+
+    if (editingSection === 'title') {
+      if (!editName.trim()) {
+        toast.error(t('profileEdit.nameRequired'))
+        return
+      }
+      if (editName.trim() !== entry.profile_name) {
+        payload.name = editName.trim()
+      }
+    } else {
+      // details section
+      const temp = editTemperature ? parseFloat(editTemperature) : undefined
+      if (temp !== undefined && (isNaN(temp) || temp > 100)) {
+        toast.error(t('profileEdit.temperatureMax'))
+        return
+      }
+      if (temp !== undefined && temp < 70) {
+        toast.warning(t('profileEdit.temperatureLow'))
+      }
+      const weight = editFinalWeight ? parseFloat(editFinalWeight) : undefined
+      if (weight !== undefined && (isNaN(weight) || weight <= 0)) {
+        toast.error(t('profileEdit.weightPositive'))
+        return
+      }
+
+      if (temp !== undefined) payload.temperature = temp
+      if (weight !== undefined) payload.final_weight = weight
+
+      const changedVars = editVariables
+        .filter(ev => {
+          const pj = entry.profile_json as ProfileData | null
+          const origVars = (pj?.variables ?? []).filter((v: { key: string }) => !v.key.startsWith('info_'))
+          const ov = origVars.find((v: { key: string }) => v.key === ev.key)
+          return ov && String(ov.value) !== ev.value
+        })
+        .map(ev => {
+          const num = parseFloat(ev.value)
+          return { key: ev.key, value: isNaN(num) ? ev.value : num }
+        })
+      if (changedVars.length > 0) payload.variables = changedVars
+    }
+
+    if (Object.keys(payload).length === 0) {
+      toast.info(t('profileEdit.noChanges'))
+      return
+    }
+
+    setIsSavingEdit(true)
+    try {
+      await profileService.updateProfile(
+        entry.profile_name,
+        payload as { name?: string; temperature?: number; final_weight?: number; variables?: { key: string; value: number | string }[] }
+      )
+
+      toast.success(t('profileEdit.saved'))
+      setEditingSection(null)
+
+      // Stay on page: re-fetch the updated history entry
+      try {
+        const serverUrl = await getServerUrl()
+        const res = await fetch(`${serverUrl}/api/history/${entry.id}`)
+        if (res.ok) {
+          const updated = await res.json()
+          onEntryUpdated?.(updated)
+        }
+      } catch {
+        // Non-critical — entry still shows previous data
+      }
+    } catch (err) {
+      console.error('Failed to save profile edit:', err)
+      toast.error(err instanceof Error ? err.message : t('profileEdit.saveFailed'))
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
 
   // Fetch machine profile ID by name
   useEffect(() => {
@@ -778,6 +995,55 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     setPreviewImage(null)
   }
 
+  const handleSaveNotes = async () => {
+    setIsSavingNotes(true)
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(
+        `${serverUrl}/api/history/${encodeURIComponent(entry.id)}/notes`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes })
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error('Failed to save notes')
+      }
+      
+      toast.success(t('history.notesSaved'))
+    } catch (err) {
+      console.error('Failed to save notes:', err)
+      toast.error(t('history.notesSaveFailed'))
+    } finally {
+      setIsSavingNotes(false)
+    }
+  }
+
+  const handleRegenerateDescription = async () => {
+    setIsRegeneratingDescription(true)
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(
+        `${serverUrl}/api/profile/${encodeURIComponent(entry.id)}/regenerate-description`,
+        { method: 'POST' }
+      )
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to generate AI description')
+      }
+      const data = await response.json()
+      setCurrentReply(data.description)
+      toast.success(t('history.aiDescriptionGenerated'))
+    } catch (err) {
+      console.error('Failed to regenerate description:', err)
+      toast.error(err instanceof Error ? err.message : t('history.aiDescriptionFailed'))
+    } finally {
+      setIsRegeneratingDescription(false)
+    }
+  }
+
   const handleDownload = async () => {
     try {
       setIsDownloading(true)
@@ -906,7 +1172,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     return sections
   }
 
-  const sections = parseProfileSections(entry.reply)
+  const sections = parseProfileSections(currentReply)
 
   // If showing shot history, render that component instead
   if (showShotHistory) {
@@ -946,15 +1212,63 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onBack}
+                onClick={() => {
+                  if (hasEditChanges && !window.confirm(t('profileEdit.unsavedChanges'))) return
+                  if (editingSection) setEditingSection(null)
+                  onBack()
+                }}
                 className="shrink-0"
               >
                 <CaretLeft size={22} weight="bold" />
               </Button>
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-foreground truncate">
-                  {cleanProfileName(entry.profile_name)}
-                </h2>
+                {editingSection === 'title' ? (
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      disabled={isSavingEdit}
+                      className="h-8 text-lg font-bold"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') handleCancelEdit() }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-8 w-8 text-green-600 hover:text-green-700"
+                      onClick={handleSaveEdit}
+                      disabled={isSavingEdit}
+                    >
+                      {isSavingEdit ? <SpinnerGap size={16} className="animate-spin" weight="bold" /> : <Check size={16} weight="bold" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={handleCancelEdit}
+                      disabled={isSavingEdit}
+                    >
+                      <X size={16} weight="bold" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <h2 className="text-lg font-bold text-foreground truncate">
+                      {cleanProfileName(entry.profile_name)}
+                    </h2>
+                    {entry.profile_json && !editingSection && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 h-7 w-7 text-muted-foreground/60 hover:text-foreground"
+                        onClick={() => handleStartEdit('title')}
+                        title={t('profileEdit.editProfile')}
+                      >
+                        <PencilSimple size={14} weight="bold" />
+                      </Button>
+                    )}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground/70">
                   {(() => {
                     if (!entry.created_at) return t('history.addedToMeticAI')
@@ -970,24 +1284,33 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                   })()}
                 </p>
               </div>
-              {/* Profile Image - fixed size to prevent layout shift */}
-              <div 
-                className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30 shrink-0 cursor-pointer hover:border-primary/50 transition-colors bg-secondary/60"
-                onClick={profileImage ? () => setShowLightbox(true) : undefined}
-                title={profileImage ? t('history.clickToEnlarge') : undefined}
-              >
-                {profileImage ? (
-                  <img 
-                    src={profileImage} 
-                    alt={entry.profile_name}
-                    className="w-full h-full object-cover animate-in fade-in duration-300"
-                    onError={() => setProfileImage(null)}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Coffee size={20} className="text-muted-foreground/40" weight="fill" />
-                  </div>
-                )}
+              {/* Profile Image with edit overlay */}
+              <div className="relative shrink-0 group">
+                <div 
+                  className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30 cursor-pointer hover:border-primary/50 transition-colors bg-secondary/60"
+                  onClick={() => setShowLightbox(true)}
+                  title={t('history.clickToEnlarge')}
+                >
+                  {profileImage ? (
+                    <img 
+                      src={profileImage} 
+                      alt={entry.profile_name}
+                      className="w-full h-full object-cover animate-in fade-in duration-300"
+                      onError={() => setProfileImage(null)}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Coffee size={20} className="text-muted-foreground/40" weight="fill" />
+                    </div>
+                  )}
+                </div>
+                {/* Camera overlay */}
+                <div
+                  className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  onClick={() => setShowLightbox(true)}
+                >
+                  <Camera size={16} className="text-white" weight="fill" />
+                </div>
               </div>
             </div>
           )}
@@ -1073,20 +1396,127 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               </Label>
               <div className="p-4 bg-secondary/50 dark:bg-secondary/60 rounded-xl border border-border/50">
                 <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-                  <MarkdownText>{entry.reply}</MarkdownText>
+                  <MarkdownText>{currentReply}</MarkdownText>
                 </p>
               </div>
             </div>
           )}
         </div>
 
+        {/* Generate AI Explanation button — shown for static summaries when AI is available */}
+        {!isCapturing && aiConfigured && currentReply?.includes('generated without AI assistance') && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Button
+              variant="outline"
+              className="w-full h-10 text-sm font-medium"
+              onClick={handleRegenerateDescription}
+              disabled={isRegeneratingDescription}
+            >
+              {isRegeneratingDescription ? (
+                <SpinnerGap size={16} className="mr-2 animate-spin" />
+              ) : (
+                <MagicWand size={16} className="mr-2" weight="bold" />
+              )}
+              {isRegeneratingDescription
+                ? t('history.generatingAiDescription')
+                : t('history.generateAiDescription')}
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Personal Notes Section */}
+        {!isCapturing && (
+          <motion.div 
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="space-y-2"
+          >
+            <Label className={`text-sm font-semibold tracking-wide ${notes ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+              {t('history.notes')}
+            </Label>
+            <MarkdownEditor
+              value={notes}
+              onChange={setNotes}
+              onSave={handleSaveNotes}
+              placeholder={t('history.notesPlaceholder')}
+              saving={isSavingNotes}
+            />
+          </motion.div>
+        )}
+
         </div>{/* end left column */}
 
         {/* Right column: Profile Details */}
         <div className="desktop-panel-right">
-          {/* Profile Technical Breakdown */}
+          {/* Save / Cancel bar when editing details */}
+          {editingSection === 'details' && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-2 mb-3"
+            >
+              <Button
+                className="flex-1 h-9 text-sm font-semibold"
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+              >
+                {isSavingEdit ? (
+                  <>
+                    <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
+                    {t('profileEdit.saving')}
+                  </>
+                ) : (
+                  <>
+                    <FloppyDisk size={16} className="mr-1.5" weight="bold" />
+                    {t('common.save')}
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 h-9 text-sm"
+                onClick={handleCancelEdit}
+                disabled={isSavingEdit}
+              >
+                {t('common.cancel')}
+              </Button>
+            </motion.div>
+          )}
+          {/* Edit details button */}
+          {entry.profile_json && !editingSection && (
+            <div className="flex justify-end mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
+                onClick={() => handleStartEdit('details')}
+                title={t('profileEdit.editProfile')}
+              >
+                <PencilSimple size={14} weight="bold" />
+                {t('profileEdit.editProfile')}
+              </Button>
+            </div>
+          )}
+          {/* Profile Technical Breakdown (inline editing when editing details) */}
           {entry.profile_json && (
-            <ProfileBreakdown profile={entry.profile_json as ProfileData} />
+            <ProfileBreakdown
+              profile={entry.profile_json as ProfileData}
+              editMode={editingSection === 'details'}
+              editTemperature={editTemperature}
+              onTemperatureChange={setEditTemperature}
+              editFinalWeight={editFinalWeight}
+              onFinalWeightChange={setEditFinalWeight}
+              editVariables={editVariables}
+              onVariableChange={(key, value) => {
+                setEditVariables(prev => prev.map(v => v.key === key ? { ...v, value } : v))
+              }}
+              disabled={isSavingEdit}
+            />
           )}
         </div>{/* end right column */}
         </div>{/* end two-column wrapper */}
@@ -1268,7 +1698,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
 
       {/* Lightbox for Profile Image */}
       <AnimatePresence>
-        {showLightbox && profileImage && (
+        {showLightbox && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1291,18 +1721,60 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               >
                 <XCircle size={28} weight="bold" />
               </Button>
-              <div className="rounded-2xl overflow-hidden border-4 border-primary/30 shadow-2xl">
-                <img 
-                  src={profileImage} 
-                  alt={entry.profile_name}
-                  className="w-full h-auto object-contain"
-                  onError={() => {
-                    setProfileImage(null)
-                    setShowLightbox(false)
-                  }}
-                />
-              </div>
+              {profileImage ? (
+                <div className="rounded-2xl overflow-hidden border-4 border-primary/30 shadow-2xl">
+                  <img 
+                    src={profileImage} 
+                    alt={entry.profile_name}
+                    className="w-full h-auto object-contain"
+                    onError={() => {
+                      setProfileImage(null)
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border-4 border-primary/30 shadow-2xl bg-secondary/80 flex items-center justify-center h-64">
+                  <Coffee size={64} className="text-muted-foreground/30" weight="fill" />
+                </div>
+              )}
               <p className="text-center text-white/80 mt-4 text-sm font-medium">{cleanProfileName(entry.profile_name)}</p>
+              {/* Image actions in lightbox */}
+              <div className="flex gap-2 mt-4 justify-center">
+                <Button
+                  variant="outline"
+                  className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  disabled={isUploadingImage}
+                  onClick={() => {
+                    setShowLightbox(false)
+                    imageInputRef.current?.click()
+                  }}
+                >
+                  {isUploadingImage ? (
+                    <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
+                  ) : (
+                    <Camera size={16} className="mr-1.5" weight="bold" />
+                  )}
+                  {t('history.upload')}
+                </Button>
+                {(!hideAiWhenUnavailable || aiConfigured) && (
+                  <Button
+                    variant="outline"
+                    className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20 border-dashed"
+                    disabled={isGeneratingImage || !aiConfigured}
+                    onClick={() => {
+                      setShowLightbox(false)
+                      setShowStylePicker(true)
+                    }}
+                  >
+                    {isGeneratingImage ? (
+                      <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
+                    ) : (
+                      <MagicWand size={16} className="mr-1.5" weight="bold" />
+                    )}
+                    {t('history.generate')}
+                  </Button>
+                )}
+              </div>
             </motion.div>
           </motion.div>
         )}

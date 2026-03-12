@@ -36,13 +36,17 @@ import {
   Equals,
   X,
   DownloadSimple,
-  Brain
+  Brain,
+  Star,
+  ChatText
 } from '@phosphor-icons/react'
 import { domToPng } from 'modern-screenshot'
 import { useShotHistory, ShotInfo, ShotData } from '@/hooks/useShotHistory'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
+import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
+
 import { format, formatDistanceToNow } from 'date-fns'
 import {
   STAGE_COLORS,
@@ -53,6 +57,8 @@ const SPEED_OPTIONS: number[] = [0.5, 1, 2, 3, 5]
 
 interface ShotHistoryViewProps {
   profileName: string
+  initialShotDate?: string
+  initialShotFilename?: string
   onBack: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
@@ -273,7 +279,7 @@ function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: number 
   )
 }
 
-export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hideAiWhenUnavailable = false }: ShotHistoryViewProps) {
+export function ShotHistoryView({ profileName, initialShotDate, initialShotFilename, onBack, aiConfigured = true, hideAiWhenUnavailable = false }: ShotHistoryViewProps) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
@@ -313,6 +319,27 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
   const [llmAnalysisError, setLlmAnalysisError] = useState<string | null>(null)
   const [showLlmView, setShowLlmView] = useState(false)
   const [isLlmCached, setIsLlmCached] = useState(false)
+  
+  // Annotation summaries for shot list indicators
+  const [annotationSummaries, setAnnotationSummaries] = useState<Record<string, { has_annotation: boolean; rating: number | null }>>({})
+  
+  // Fetch annotation summaries when shots change
+  useEffect(() => {
+    if (shots.length === 0) return
+    const fetchAnnotations = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/shots/annotations`)
+        if (response.ok) {
+          const data = await response.json()
+          setAnnotationSummaries(data.annotations || {})
+        }
+      } catch {
+        // Non-critical — indicators just won't show
+      }
+    }
+    fetchAnnotations()
+  }, [shots])
   
   // Check server-side LLM analysis cache when shot changes
   useEffect(() => {
@@ -512,12 +539,23 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
         if (result.is_stale) {
           backgroundRefresh(profileName, { limit: 20 })
         }
+        
+        // Auto-select a specific shot if navigated from ShotAnalysisView
+        if (initialShotDate && initialShotFilename && result.shots?.length > 0) {
+          const target = result.shots.find(
+            s => s.date === initialShotDate && s.filename === initialShotFilename
+          )
+          if (target) {
+            handleSelectShot(target)
+          }
+        }
       } catch (err) {
         console.error('Failed to fetch shots:', err)
       }
     }
     
     loadShots()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileName, fetchShotsByProfile, backgroundRefresh])
 
   const handleSelectShot = async (shot: ShotInfo) => {
@@ -536,12 +574,17 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
     }
   }
 
+  // Track whether the component was opened with a specific shot pre-selected
+  const enteredWithShot = useRef(!!(initialShotDate && initialShotFilename))
+
   const handleBack = () => {
-    if (selectedShot) {
+    if (selectedShot && !enteredWithShot.current) {
+      // Deselect shot to show the shot list
       setSelectedShot(null)
       setShotData(null)
       setDataError(null)
     } else {
+      // Go back to previous view (ShotAnalysisView, history-detail, etc.)
       onBack()
     }
   }
@@ -607,14 +650,11 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
     setLlmAnalysisResult(null)
     setLlmAnalysisError(null)
     
-    // Auto-trigger analysis when shot data is available
-    if (selectedShot && shotData && !isAnalyzing) {
-      // Small delay to avoid blocking UI during initial render
-      const timer = setTimeout(() => {
-        handleAnalyze()
-      }, 100)
-      return () => clearTimeout(timer)
+    // Auto-run static analysis when shot data is available
+    if (selectedShot && shotData) {
+      handleAnalyze()
     }
+    
     return undefined
   }, [selectedShot, shotData]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2280,6 +2320,35 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
                   </motion.div>
                 </TabsContent>
                 </Card>{/* end Card wrapping entire left column */}
+                
+                {/* Shot Annotation — own card below the main tabs card */}
+                {selectedShot && (
+                  <Card className="p-4 border-border/40">
+                    <ShotAnnotation
+                      date={selectedShot.date}
+                      filename={selectedShot.filename}
+                      onAnnotationChange={(hasAnnotation, rating) => {
+                        const key = `${selectedShot.date}/${selectedShot.filename}`
+                        setAnnotationSummaries(prev => ({
+                          ...prev,
+                          [key]: hasAnnotation || rating
+                            ? { has_annotation: hasAnnotation, rating }
+                            : undefined as never,
+                          ...(!hasAnnotation && !rating ? { [key]: undefined as never } : {}),
+                        }))
+                        // Clean up undefined entries
+                        if (!hasAnnotation && !rating) {
+                          setAnnotationSummaries(prev => {
+                            const next = { ...prev }
+                            delete next[key]
+                            return next
+                          })
+                        }
+                      }}
+                    />
+                  </Card>
+                )}
+
                 </div>{/* end left column */}
 
                 {/* Right column on desktop: Graph area (maximized) — hidden on mobile */}
@@ -2507,11 +2576,31 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
                           )}
                         </div>
                       </div>
-                      <ChartLine 
-                        size={20} 
-                        weight="bold" 
-                        className="text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" 
-                      />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {(() => {
+                          const key = `${shot.date}/${shot.filename}`
+                          const summary = annotationSummaries[key]
+                          return summary ? (
+                            <>
+                              {summary.rating && (
+                                <span className="flex items-center gap-px">
+                                  {Array.from({ length: 5 }, (_, i) => (
+                                    <Star key={i} size={12} weight={i < summary.rating! ? "fill" : "regular"} className={i < summary.rating! ? "text-amber-400" : "text-muted-foreground/30"} />
+                                  ))}
+                                </span>
+                              )}
+                              {summary.has_annotation && (
+                                <ChatText size={14} weight="fill" className="text-muted-foreground/50" />
+                              )}
+                            </>
+                          ) : null
+                        })()}
+                        <ChartLine 
+                          size={20} 
+                          weight="bold" 
+                          className="text-muted-foreground/40 group-hover:text-primary transition-colors" 
+                        />
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -2525,7 +2614,7 @@ export function ShotHistoryView({ profileName, onBack, aiConfigured = true, hide
           <div className="pt-3 border-t border-border/20 space-y-2">
             {lastFetched && (
               <p className="text-xs text-muted-foreground/60 text-center">
-                Last updated: {formatDistanceToNow(lastFetched, { addSuffix: true })}
+                {t('shotHistory.lastUpdated', { time: formatDistanceToNow(lastFetched, { addSuffix: true }) })}
               </p>
             )}
             <Button

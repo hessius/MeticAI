@@ -44,7 +44,7 @@ export class ProfileService {
     try {
       const baseUrl = await this.getBaseUrl();
       const response = await apiFetch<ProfileCountResponse>(
-        `${baseUrl}/profile-count`
+        `${baseUrl}/api/profile-count`
       );
       return response.count;
     } catch (error) {
@@ -66,7 +66,7 @@ export class ProfileService {
     });
 
     const response = await apiFetch<unknown>(
-      `${baseUrl}/analyze`,
+      `${baseUrl}/api/analyze`,
       {
         method: 'POST',
         body: formData,
@@ -83,7 +83,7 @@ export class ProfileService {
   async deleteProfile(profileId: string): Promise<void> {
     const baseUrl = await this.getBaseUrl();
     await apiFetch(
-      `${baseUrl}/profiles/${profileId}`,
+      `${baseUrl}/api/profiles/${profileId}`,
       {
         method: 'DELETE',
       }
@@ -91,17 +91,23 @@ export class ProfileService {
   }
 
   /**
-   * Update a profile
+   * Edit a profile on the machine (name, temperature, final_weight, variables, author)
    */
   async updateProfile(
-    profileId: string,
-    data: { name?: string; profile_json?: string; preferences?: string }
-  ): Promise<void> {
+    profileName: string,
+    data: {
+      name?: string;
+      temperature?: number;
+      final_weight?: number;
+      variables?: { key: string; value: number | string }[];
+      author?: string;
+    }
+  ): Promise<{ status: string; profile: { id: string; name: string; temperature?: number; final_weight?: number; author?: string } }> {
     const baseUrl = await this.getBaseUrl();
-    await apiFetch(
-      `${baseUrl}/profiles/${profileId}`,
+    return await apiFetch(
+      `${baseUrl}/api/profile/${encodeURIComponent(profileName)}/edit`,
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -116,7 +122,7 @@ export class ProfileService {
   async exportProfile(profileId: string): Promise<Blob> {
     const baseUrl = await this.getBaseUrl();
     return await apiFetch<Blob>(
-      `${baseUrl}/profiles/${profileId}/export`,
+      `${baseUrl}/api/profiles/${profileId}/export`,
       { responseType: 'blob' }
     );
   }

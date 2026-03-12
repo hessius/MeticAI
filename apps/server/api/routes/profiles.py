@@ -11,6 +11,7 @@ import base64
 import binascii
 import ipaddress
 import socket
+import threading
 import httpx
 from urllib.parse import urlparse
 
@@ -29,17 +30,21 @@ from services.meticulous_service import (
     async_create_profile,
     async_load_profile_by_id,
     async_execute_action,
+    async_delete_profile,
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
-from services.history_service import HISTORY_FILE, load_history, save_history
+from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
 from utils.file_utils import atomic_write_json, deep_convert_to_dict
+from services.temp_profile_service import is_temp_profile
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_history_lock = threading.Lock()
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
@@ -1032,6 +1037,138 @@ async def get_profile_info(
         )
 
 
+@router.put("/profile/{profile_name:path}/edit")
+@router.put("/api/profile/{profile_name:path}/edit")
+async def edit_profile(profile_name: str, request: Request):
+    """Edit an existing profile on the Meticulous machine.
+
+    Supports updating name, temperature, final_weight, variables, and author.
+    If the name changes, all matching history entries are updated too.
+
+    Body:
+        name?: str          – new profile name (non-empty)
+        temperature?: float – brew temperature (70-100 °C)
+        final_weight?: float – target weight (> 0)
+        variables?: list    – [{key: str, value: float|str}, ...]
+        author?: str        – profile author
+    """
+    request_id = request.state.request_id
+
+    try:
+        body = await request.json()
+
+        # --- validation -----------------------------------------------------------
+        new_name = body.get("name")
+        if new_name is not None:
+            if not isinstance(new_name, str) or not new_name.strip():
+                raise HTTPException(status_code=400, detail="Profile name must be a non-empty string")
+            new_name = new_name.strip()
+
+        temperature = body.get("temperature")
+        if temperature is not None:
+            try:
+                temperature = float(temperature)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Temperature must be a number")
+            if temperature > 100:
+                raise HTTPException(status_code=400, detail="Temperature must not exceed 100 °C")
+
+        final_weight = body.get("final_weight")
+        if final_weight is not None:
+            try:
+                final_weight = float(final_weight)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Final weight must be a number")
+            if final_weight <= 0:
+                raise HTTPException(status_code=400, detail="Final weight must be greater than 0")
+
+        variables = body.get("variables")
+        author = body.get("author")
+
+        if all(v is None for v in [new_name, temperature, final_weight, variables, author]):
+            raise HTTPException(status_code=400, detail="At least one field to update is required")
+
+        # --- find profile by name ------------------------------------------------
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(status_code=502, detail=f"Machine API error: {profiles_result.error}")
+
+        matching_profile = None
+        for p in profiles_result:
+            if p.name == profile_name:
+                matching_profile = p
+                break
+
+        if matching_profile is None:
+            raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found on machine")
+
+        full_profile = await async_get_profile(matching_profile.id)
+        if hasattr(full_profile, "error") and full_profile.error:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch profile: {full_profile.error}")
+
+        # --- apply changes directly on profile object ---------------------------
+        old_name = full_profile.name
+
+        if new_name is not None:
+            full_profile.name = new_name
+        if temperature is not None:
+            full_profile.temperature = temperature
+        if final_weight is not None:
+            full_profile.final_weight = final_weight
+        if author is not None:
+            full_profile.author = author
+
+        if variables is not None and hasattr(full_profile, "variables") and full_profile.variables:
+            incoming = {v["key"]: v["value"] for v in variables if "key" in v and "value" in v}
+            for var in full_profile.variables:
+                var_key = getattr(var, "key", None)
+                if var_key and var_key in incoming:
+                    var.value = incoming[var_key]
+
+        # --- persist -------------------------------------------------------------
+        await async_save_profile(full_profile)
+
+        logger.info(
+            f"Profile edited: '{old_name}' → '{full_profile.name}'",
+            extra={"request_id": request_id, "profile_name": profile_name},
+        )
+
+        # --- cascade rename into history -----------------------------------------
+        if new_name is not None and new_name != old_name:
+            with _history_lock:
+                history = load_history()
+                updated = 0
+                for entry in history:
+                    if entry.get("profile_name") == old_name:
+                        entry["profile_name"] = new_name
+                        updated += 1
+                if updated:
+                    save_history(history)
+            if updated:
+                logger.info(
+                    f"Updated {updated} history entries from '{old_name}' to '{new_name}'",
+                    extra={"request_id": request_id},
+                )
+
+        return {
+            "status": "success",
+            "profile": deep_convert_to_dict(full_profile),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to edit profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
 @router.post("/api/shots/analyze")
 async def analyze_shot(
     request: Request,
@@ -1552,7 +1689,7 @@ async def list_machine_profiles(request: Request):
                 except Exception:
                     pass
                 
-                # Convert profile to dict
+                # Convert profile to dict with full parameter data
                 profile_dict = {
                     "id": getattr(full_profile, 'id', partial_profile.id),
                     "name": getattr(full_profile, 'name', partial_profile.name),
@@ -1563,6 +1700,12 @@ async def list_machine_profiles(request: Request):
                     "has_description": False,
                     "description": None
                 }
+                stages = getattr(full_profile, 'stages', None)
+                variables = getattr(full_profile, 'variables', None)
+                if stages:
+                    profile_dict["stages"] = deep_convert_to_dict(stages)
+                if variables:
+                    profile_dict["variables"] = deep_convert_to_dict(variables)
                 
                 # Check for existing description in history
                 if in_history:
@@ -1684,6 +1827,149 @@ async def get_machine_profile_json(profile_id: str, request: Request):
         )
 
 
+@router.delete("/api/machine/profile/{profile_id}")
+async def delete_machine_profile(profile_id: str, request: Request):
+    """Delete a profile from the Meticulous machine.
+    
+    Args:
+        profile_id: The profile ID to delete
+        
+    Returns:
+        Status of the deletion operation
+    """
+    request_id = request.state.request_id
+    
+    try:
+        # First get the profile to log its name
+        profile = await async_get_profile(profile_id)
+        profile_name = getattr(profile, 'name', profile_id) if profile else profile_id
+        
+        logger.info(
+            f"Deleting profile: {profile_name} ({profile_id})",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        result = await async_delete_profile(profile_id)
+        
+        logger.info(
+            f"Successfully deleted profile: {profile_name}",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Profile '{profile_name}' deleted successfully",
+            "profile_id": profile_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to delete profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.patch("/api/machine/profile/{profile_id}")
+async def update_machine_profile(profile_id: str, request: Request):
+    """Update a profile on the Meticulous machine.
+    
+    Currently supports:
+    - Renaming (via "name" field)
+    
+    Args:
+        profile_id: The profile ID to update
+        
+    Body:
+        name: New name for the profile (optional)
+        
+    Returns:
+        Updated profile information
+    """
+    request_id = request.state.request_id
+    
+    try:
+        body = await request.json()
+        new_name = body.get("name")
+        
+        if not new_name:
+            raise HTTPException(
+                status_code=400, 
+                detail="At least one field to update is required (e.g., 'name')"
+            )
+        
+        # Get the current profile
+        profile = await async_get_profile(profile_id)
+        if hasattr(profile, 'error') and profile.error:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile not found: {profile_id}"
+            )
+        
+        old_name = getattr(profile, 'name', profile_id)
+        
+        logger.info(
+            f"Renaming profile '{old_name}' to '{new_name}'",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        # Convert profile to dict for modification
+        profile_dict = {}
+        for attr in ['id', 'name', 'author', 'author_id', 'temperature', 'final_weight', 
+                     'stages', 'variables', 'display', 'isDefault', 'source', 
+                     'beverage_type', 'tank_temperature', 'previous_authors']:
+            if hasattr(profile, attr):
+                val = getattr(profile, attr)
+                if val is not None:
+                    if hasattr(val, '__dict__'):
+                        profile_dict[attr] = val.__dict__
+                    elif isinstance(val, list):
+                        profile_dict[attr] = [
+                            item.__dict__ if hasattr(item, '__dict__') else item 
+                            for item in val
+                        ]
+                    else:
+                        profile_dict[attr] = val
+        
+        # Update the name
+        profile_dict["name"] = new_name
+        
+        # Save the updated profile
+        await async_save_profile(profile_dict)
+        
+        logger.info(
+            f"Successfully renamed profile to '{new_name}'",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Profile renamed from '{old_name}' to '{new_name}'",
+            "profile_id": profile_id,
+            "old_name": old_name,
+            "new_name": new_name
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
 @router.post("/api/profile/import")
 async def import_profile(request: Request):
     """Import a profile into the MeticAI history.
@@ -1765,13 +2051,14 @@ async def import_profile(request: Request):
         }
         
         # Save to history using cache-aware save to keep in-memory cache in sync
-        history = load_history()
-        if not isinstance(history, list):
-            history = history.get("entries", [])
-        
-        history.insert(0, new_entry)
-        
-        save_history(history)
+        with _history_lock:
+            history = load_history()
+            if not isinstance(history, list):
+                history = history.get("entries", [])
+            
+            history.insert(0, new_entry)
+            
+            save_history(history)
         
         # Upload profile to the Meticulous machine when imported from a file.
         # Profiles imported from the machine (source="machine") already exist there.
@@ -1944,13 +2231,14 @@ async def import_all_profiles(request: Request):
                     }
                     
                     # Save to history using cache-aware save
-                    history = load_history()
-                    if not isinstance(history, list):
-                        history = history.get("entries", [])
-                    
-                    history.insert(0, new_entry)
-                    
-                    save_history(history)
+                    with _history_lock:
+                        history = load_history()
+                        if not isinstance(history, list):
+                            history = history.get("entries", [])
+                        
+                        history.insert(0, new_entry)
+                        
+                        save_history(history)
                     
                     imported.append(profile_name)
                     
@@ -2066,6 +2354,558 @@ async def get_machine_profile_count(request: Request):
         )
 
 
+@router.get("/machine/profiles/orphaned")
+@router.get("/api/machine/profiles/orphaned")
+async def list_orphaned_history_entries(request: Request):
+    """List history entries whose profiles no longer exist on the machine.
+
+    Cross-references history entries against the current machine profile list
+    and returns entries that have no matching machine profile.
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            "Checking for orphaned history entries",
+            extra={"request_id": request_id},
+        )
+
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        machine_names: set[str] = {
+            getattr(p, "name", "") for p in profiles_result
+        }
+
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+
+        orphaned = []
+        for entry in entries:
+            profile_name = entry.get("profile_name", "")
+            if profile_name and profile_name not in machine_names and not is_temp_profile(profile_name):
+                orphaned.append({
+                    "id": entry.get("id"),
+                    "profile_name": profile_name,
+                    "created_at": entry.get("created_at"),
+                    "has_profile_json": bool(entry.get("profile_json")),
+                })
+
+        logger.info(
+            f"Found {len(orphaned)} orphaned history entries",
+            extra={"request_id": request_id, "orphan_count": len(orphaned)},
+        )
+
+        return {
+            "status": "success",
+            "orphaned": orphaned,
+            "total": len(orphaned),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to check orphaned profiles: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+# ---------------------------------------------------------------------------
+# Profile Sync endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/profiles/sync")
+@router.post("/api/profiles/sync")
+async def sync_profiles(request: Request):
+    """Run a full sync between machine profiles and MeticAI history.
+
+    Computes a content hash for every machine profile and compares it against
+    the hash stored in the corresponding history entry.  Returns three lists:
+
+    - **new**: profiles on the machine that have no history entry at all.
+    - **updated**: profiles whose content hash differs from the stored hash.
+    - **orphaned**: history entries with no matching machine profile (reuses
+      the existing orphan-detection logic).
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            "Starting profile sync",
+            extra={"request_id": request_id},
+        )
+
+        # 1. Fetch machine profiles
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        # 2. Build a name→entry lookup from history
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        history_by_name: dict[str, dict] = {}
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in history_by_name:
+                history_by_name[pname] = entry
+
+        # 3. Walk machine profiles
+        new_profiles: list[dict] = []
+        updated_profiles: list[dict] = []
+        machine_names: set[str] = set()
+
+        for partial in profiles_result:
+            profile_name = getattr(partial, "name", "")
+            profile_id = getattr(partial, "id", "")
+            machine_names.add(profile_name)
+
+            # Fetch full profile to compute hash
+            try:
+                full = await async_get_profile(profile_id)
+                if hasattr(full, "error") and full.error:
+                    full = partial
+            except Exception:
+                full = partial
+
+            profile_dict = deep_convert_to_dict(full)
+            current_hash = compute_content_hash(profile_dict)
+
+            entry = history_by_name.get(profile_name)
+            if entry is None:
+                new_profiles.append({
+                    "profile_id": profile_id,
+                    "profile_name": profile_name,
+                    "content_hash": current_hash,
+                })
+            else:
+                stored_hash = entry.get("content_hash")
+                if stored_hash and stored_hash != current_hash:
+                    updated_profiles.append({
+                        "profile_id": profile_id,
+                        "profile_name": profile_name,
+                        "history_id": entry.get("id"),
+                        "stored_hash": stored_hash,
+                        "current_hash": current_hash,
+                    })
+
+        # 4. Orphaned entries (in history but not on machine)
+        orphaned: list[dict] = []
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in machine_names:
+                orphaned.append({
+                    "id": entry.get("id"),
+                    "profile_name": pname,
+                    "created_at": entry.get("created_at"),
+                    "has_profile_json": bool(entry.get("profile_json")),
+                })
+
+        logger.info(
+            f"Sync complete: {len(new_profiles)} new, {len(updated_profiles)} updated, {len(orphaned)} orphaned",
+            extra={"request_id": request_id},
+        )
+
+        return {
+            "status": "success",
+            "new": new_profiles,
+            "updated": updated_profiles,
+            "orphaned": orphaned,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Profile sync failed: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/profiles/sync/accept/{profile_id}")
+@router.post("/api/profiles/sync/accept/{profile_id}")
+async def accept_sync_update(profile_id: str, request: Request, ai_description: bool = False):
+    """Accept a machine profile update and refresh the history entry.
+
+    Re-fetches the profile from the machine, updates the stored
+    ``profile_json`` and ``content_hash``, and optionally regenerates the
+    AI description.
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            f"Accepting sync update for profile {profile_id}",
+            extra={"request_id": request_id, "profile_id": profile_id, "ai_description": ai_description},
+        )
+
+        # Fetch latest from machine
+        full_profile = await async_get_profile(profile_id)
+        if hasattr(full_profile, "error") and full_profile.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {full_profile.error}",
+            )
+
+        profile_dict = deep_convert_to_dict(full_profile)
+        profile_name = profile_dict.get("name", getattr(full_profile, "name", "Unknown"))
+        new_hash = compute_content_hash(profile_dict)
+
+        # Find the history entry by name
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        target_entry = None
+        for entry in entries:
+            if entry.get("profile_name") == profile_name:
+                target_entry = entry
+                break
+
+        if not target_entry:
+            raise HTTPException(status_code=404, detail="No history entry found for this profile")
+
+        # Optionally regenerate description
+        new_reply = None
+        if ai_description:
+            try:
+                new_reply = await _generate_profile_description(profile_dict, request_id)
+            except Exception as e:
+                logger.warning(
+                    f"AI description generation failed during sync accept: {e}",
+                    extra={"request_id": request_id},
+                )
+
+        updated = update_entry_sync_fields(
+            target_entry["id"],
+            content_hash=new_hash,
+            machine_updated_at=datetime.now(timezone.utc).isoformat(),
+            profile_json=profile_dict,
+            reply=new_reply,
+        )
+
+        if not updated:
+            raise HTTPException(status_code=404, detail="History entry not found")
+
+        logger.info(
+            f"Sync update accepted for '{profile_name}'",
+            extra={"request_id": request_id, "entry_id": target_entry["id"]},
+        )
+
+        return {
+            "status": "success",
+            "profile_name": profile_name,
+            "content_hash": new_hash,
+            "ai_description_generated": ai_description and new_reply is not None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to accept sync update: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.get("/profiles/sync/status")
+@router.get("/api/profiles/sync/status")
+async def sync_status(request: Request):
+    """Quick count of pending sync items for badge display.
+
+    This is a lightweight version of the full sync endpoint that avoids
+    fetching every full profile — it only checks existence by name and
+    compares stored hashes where available.
+    """
+    request_id = request.state.request_id
+
+    try:
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        history_by_name: dict[str, dict] = {}
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in history_by_name:
+                history_by_name[pname] = entry
+
+        machine_names: set[str] = set()
+        new_count = 0
+        updated_count = 0
+
+        for partial in profiles_result:
+            name = getattr(partial, "name", "")
+            machine_names.add(name)
+            entry = history_by_name.get(name)
+            if entry is None:
+                new_count += 1
+            else:
+                # For updated detection without a full fetch, we rely on
+                # stored hashes. If no hash stored yet, we can't tell.
+                stored_hash = entry.get("content_hash")
+                if stored_hash:
+                    # We need a full fetch to compare — but for status we
+                    # skip this to stay lightweight.  The full sync will
+                    # detect changes.
+                    pass
+
+        orphan_count = sum(
+            1 for entry in entries
+            if entry.get("profile_name", "") and entry.get("profile_name", "") not in machine_names
+        )
+
+        return {
+            "status": "success",
+            "new_count": new_count,
+            "updated_count": updated_count,
+            "orphaned_count": orphan_count,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get sync status: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/profiles/auto-sync")
+@router.post("/api/profiles/auto-sync")
+async def auto_sync_profiles(request: Request):
+    """Automatically sync all new and updated profiles from the machine.
+
+    Imports new profiles and accepts updates without user intervention.
+    Orphaned profiles are reported but not automatically removed.
+    """
+    request_id = request.state.request_id
+
+    try:
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        ai_description = body.get("ai_description", False)
+
+        # Run full sync detection
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profiles_result.error}",
+            )
+
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        history_by_name: dict[str, dict] = {}
+        for entry in entries:
+            pname = entry.get("profile_name", "")
+            if pname and pname not in history_by_name:
+                history_by_name[pname] = entry
+
+        imported = []
+        updated = []
+
+        for partial in profiles_result:
+            profile_name = getattr(partial, "name", "")
+            profile_id = getattr(partial, "id", "")
+
+            if profile_name not in history_by_name:
+                # New profile — import it
+                try:
+                    full_profile = await async_get_profile(profile_id)
+                    if hasattr(full_profile, "error") and full_profile.error:
+                        continue
+                    profile_dict = deep_convert_to_dict(full_profile)
+
+                    if ai_description:
+                        try:
+                            reply = await _generate_profile_description(profile_dict, request_id)
+                        except Exception:
+                            from services.analysis_service import _build_static_profile_description
+                            reply = _build_static_profile_description(profile_dict)
+                    else:
+                        from services.analysis_service import _build_static_profile_description
+                        reply = _build_static_profile_description(profile_dict)
+
+                    entry_id = str(uuid.uuid4())
+                    new_entry = {
+                        "id": entry_id,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "profile_name": profile_name,
+                        "user_preferences": "Imported from machine (auto-sync)",
+                        "reply": reply,
+                        "profile_json": profile_dict,
+                        "content_hash": compute_content_hash(profile_dict),
+                        "imported": True,
+                        "import_source": "machine",
+                    }
+                    # Reload history to avoid stale writes
+                    history = load_history()
+                    if not isinstance(history, list):
+                        history = history.get("entries", [])
+                    history.insert(0, new_entry)
+                    save_history(history)
+                    imported.append(profile_name)
+                except Exception as exc:
+                    logger.warning(
+                        f"Auto-sync: failed to import '{profile_name}': {exc}",
+                        extra={"request_id": request_id},
+                    )
+            else:
+                # Existing profile — check for updates
+                existing = history_by_name[profile_name]
+                stored_hash = existing.get("content_hash")
+                if not stored_hash:
+                    continue  # No hash to compare — skip
+                try:
+                    full_profile = await async_get_profile(profile_id)
+                    if hasattr(full_profile, "error") and full_profile.error:
+                        continue
+                    profile_dict = deep_convert_to_dict(full_profile)
+                    current_hash = compute_content_hash(profile_dict)
+                    if current_hash != stored_hash:
+                        new_reply = None
+                        if ai_description:
+                            try:
+                                new_reply = await _generate_profile_description(profile_dict, request_id)
+                            except Exception:
+                                pass
+                        update_entry_sync_fields(
+                            existing["id"],
+                            content_hash=current_hash,
+                            machine_updated_at=datetime.now(timezone.utc).isoformat(),
+                            profile_json=profile_dict,
+                            reply=new_reply,
+                        )
+                        updated.append(profile_name)
+                except Exception as exc:
+                    logger.warning(
+                        f"Auto-sync: failed to update '{profile_name}': {exc}",
+                        extra={"request_id": request_id},
+                    )
+
+        logger.info(
+            f"Auto-sync complete: {len(imported)} imported, {len(updated)} updated",
+            extra={"request_id": request_id},
+        )
+
+        return {
+            "status": "success",
+            "imported": imported,
+            "updated": updated,
+            "imported_count": len(imported),
+            "updated_count": len(updated),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Auto-sync failed: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/machine/profile/restore/{history_id}")
+@router.post("/api/machine/profile/restore/{history_id}")
+async def restore_profile_from_history(history_id: str, request: Request):
+    """Re-upload a profile from history to the Meticulous machine.
+
+    Loads the stored profile JSON from a history entry and saves it back to
+    the machine via async_save_profile().
+    """
+    request_id = request.state.request_id
+
+    try:
+        from services.history_service import get_entry_by_id
+
+        entry = get_entry_by_id(history_id)
+        if not entry:
+            raise HTTPException(status_code=404, detail="History entry not found")
+
+        profile_json = entry.get("profile_json")
+        if not profile_json:
+            raise HTTPException(
+                status_code=400,
+                detail="History entry does not contain profile JSON",
+            )
+
+        profile_name = entry.get("profile_name", "Restored Profile")
+
+        logger.info(
+            f"Restoring profile '{profile_name}' to machine from history",
+            extra={"request_id": request_id, "history_id": history_id},
+        )
+
+        result = await async_save_profile(profile_json)
+
+        if hasattr(result, "error") and result.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {result.error}",
+            )
+
+        logger.info(
+            f"Successfully restored profile '{profile_name}' to machine",
+            extra={"request_id": request_id, "history_id": history_id},
+        )
+
+        return {
+            "status": "success",
+            "message": f"Profile '{profile_name}' restored to machine",
+            "profile_name": profile_name,
+            "history_id": history_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to restore profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
 @router.post("/api/profile/convert-description")
 async def convert_profile_description(request: Request):
     """Convert an existing profile description to the standard MeticAI format.
@@ -2146,14 +2986,15 @@ Remember: NO information should be lost in this conversion!"""
         # Update the history entry if it exists
         entry_id = body.get("entry_id")
         if entry_id:
-            history = load_history()
-            entries = history if isinstance(history, list) else history.get("entries", [])
-            for entry in entries:
-                if entry.get("id") == entry_id:
-                    entry["reply"] = converted_description
-                    entry["description_converted"] = True
-                    break
-            save_history(history)
+            with _history_lock:
+                history = load_history()
+                entries = history if isinstance(history, list) else history.get("entries", [])
+                for entry in entries:
+                    if entry.get("id") == entry_id:
+                        entry["reply"] = converted_description
+                        entry["description_converted"] = True
+                        break
+                save_history(history)
         
         logger.info(
             f"Description converted successfully for: {profile_name}",
@@ -2176,6 +3017,71 @@ Remember: NO information should be lost in this conversion!"""
         raise HTTPException(
             status_code=500,
             detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.post("/profile/{entry_id}/regenerate-description")
+@router.post("/api/profile/{entry_id}/regenerate-description")
+async def regenerate_profile_description(entry_id: str, request: Request):
+    """Regenerate the AI description for an existing profile in history.
+
+    Replaces a static (non-AI) description with a full AI-generated one.
+    Requires a configured Gemini API key.
+    """
+    request_id = request.state.request_id
+
+    try:
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+        target_entry = None
+        for entry in entries:
+            if entry.get("id") == entry_id:
+                target_entry = entry
+                break
+
+        if not target_entry:
+            raise HTTPException(status_code=404, detail="History entry not found")
+
+        profile_json = target_entry.get("profile_json")
+        if not profile_json:
+            raise HTTPException(status_code=400, detail="No profile JSON data available for this entry")
+
+        profile_name = target_entry.get("profile_name", "Unknown Profile")
+        logger.info(
+            f"Regenerating AI description for: {profile_name}",
+            extra={"request_id": request_id, "entry_id": entry_id},
+        )
+
+        new_description = await _generate_profile_description(profile_json, request_id)
+
+        # Check it actually used AI (not the static fallback)
+        if "generated without AI assistance" in new_description:
+            raise HTTPException(
+                status_code=503,
+                detail="AI description generation failed — check that your Gemini API key is configured",
+            )
+
+        target_entry["reply"] = new_description
+        save_history(history)
+
+        logger.info(
+            f"AI description regenerated for: {profile_name}",
+            extra={"request_id": request_id, "entry_id": entry_id},
+        )
+
+        return {"status": "success", "description": new_description}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to regenerate description: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
         )
 
 

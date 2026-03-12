@@ -20,7 +20,9 @@ _DEFAULT_SETTINGS = {
     "mqttEnabled": True,
     "tailscaleEnabled": False,
     "tailscaleAuthKey": "",
-    "betaChannel": False
+    "betaChannel": False,
+    "autoSync": False,
+    "autoSyncAiDescription": False
 }
 
 

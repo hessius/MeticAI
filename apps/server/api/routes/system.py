@@ -1244,6 +1244,11 @@ async def save_settings_endpoint(request: Request):
         # Update only provided fields
         if "authorName" in body:
             current_settings["authorName"] = body["authorName"].strip()
+
+        # Boolean preference fields
+        for bool_key in ("autoSync", "autoSyncAiDescription"):
+            if bool_key in body:
+                current_settings[bool_key] = bool(body[bool_key])
         
         # For IP and API key changes, also update .env file
         env_updated = False

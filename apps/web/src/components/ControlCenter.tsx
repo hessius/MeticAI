@@ -11,7 +11,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import confetti from 'canvas-confetti'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +30,7 @@ import {
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
-import { startShot, continueShot, stopShot, abortShot, preheat, tareScale } from '@/lib/mqttCommands'
+import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
@@ -106,6 +105,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     isIdle, isBrewing, isPreheating, isHeating, isReady, isPourWater,
     canStart, canAbortWarmup, cmd,
   } = useMachineActions(machineState)
+  const machine = useMachineService()
 
   // Build the profile image URL when active_profile changes
   // Suppress MeticAI-managed temp profiles — they're transient and deleted after cleanup.
@@ -113,16 +113,14 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     !machineState.active_profile.startsWith('MeticAI '))
     ? machineState.active_profile : null
 
-  // Reset dependent state when active profile changes (adjusting state during render)
-  const [prevProfile, setPrevProfile] = useState(activeProfile)
-  if (prevProfile !== activeProfile) {
-    setPrevProfile(activeProfile)
+  // Reset dependent state when active profile is cleared
+  useEffect(() => {
     if (!activeProfile) {
       setProfileImgUrl(null)
       setProfileImgError(false)
       setProfileAuthor(null)
     }
-  }
+  }, [activeProfile])
 
   useEffect(() => {
     let cancelled = false
@@ -160,7 +158,10 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     prevShotsRef.current = shots
     // Only fire when total_shots *crosses* a 100 boundary (not on initial load)
     if (prev != null && prev !== shots && shots > 0 && shots % 100 === 0) {
-      confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } })
+      // Lazy-load confetti to reduce initial bundle size (#188)
+      import('canvas-confetti').then(({ default: confetti }) => {
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } })
+      })
     }
   }, [machineState.total_shots])
 
@@ -316,7 +317,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!canStart}
-              onClick={() => cmd(isReady ? continueShot : startShot, 'startingShot')}
+              onClick={() => cmd(() => isReady ? machine.continueShot() : machine.startShot(), 'startingShot')}
             >
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
@@ -328,7 +329,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!machineState.connected}
-                onClick={() => cmd(abortShot, isPreheating ? 'preheatCancelled' : 'warmupCancelled')}
+                onClick={() => cmd(() => machine.abortShot(), isPreheating ? 'preheatCancelled' : 'warmupCancelled')}
               >
                 <XCircle size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.abortPreheat')}
@@ -339,7 +340,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!isIdle || !machineState.connected}
-                onClick={() => cmd(preheat, 'preheating')}
+                onClick={() => cmd(() => machine.preheat(), 'preheating')}
               >
                 <Fire size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.preheat')}
@@ -350,7 +351,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!machineState.connected}
-              onClick={() => cmd(tareScale, 'tared')}
+              onClick={() => cmd(() => machine.tareScale(), 'tared')}
             >
               <Scales size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.tare')}
@@ -426,7 +427,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               variant="destructive"
               size="sm"
               className="h-9 text-xs"
-              onClick={() => cmd(stopShot, 'stopping')}
+              onClick={() => cmd(() => machine.stopShot(), 'stopping')}
             >
               <Stop size={14} weight="fill" className="mr-1" />
               {t('controlCenter.actions.stop')}

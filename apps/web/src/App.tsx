@@ -32,7 +32,7 @@ import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon } from '@phosphor-icons/react'
-import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable } from '@/lib/aiPreferences'
+import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -44,6 +44,8 @@ import { BetaBanner } from '@/components/BetaBanner'
 import { LiveShotView } from '@/components/LiveShotView'
 import { PourOverView } from '@/components/PourOverView'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
+import { ShotAnalysisView } from '@/components/ShotAnalysisView'
+import { ProfileCatalogueView } from '@/components/ProfileCatalogueView'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
@@ -51,6 +53,7 @@ function App() {
   const { t } = useTranslation()
   const [isInitializing, setIsInitializing] = useState(true)
   const [viewState, setViewState] = useState<ViewState>('start')
+  const previousViewStateRef = useRef<ViewState>('start')
   const [profileCount, setProfileCount] = useState<number | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -72,6 +75,8 @@ function App() {
   const [runShotProfileId, setRunShotProfileId] = useState<string | undefined>(undefined)
   const [runShotProfileName, setRunShotProfileName] = useState<string | undefined>(undefined)
   const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
+  const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
+  const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -138,6 +143,7 @@ function App() {
           setMqttEnabled(data.mqttEnabled !== false)
           const hasGeminiKey = Boolean((data.geminiApiKey || '').trim())
           setIsAiConfigured(data.geminiApiKeyConfigured === true || hasGeminiKey)
+          syncAutoSyncFromServer(data)
         }
       } catch {
         // default false if unreachable
@@ -162,6 +168,53 @@ function App() {
     window.addEventListener(AI_PREFS_CHANGED_EVENT, handler)
     return () => window.removeEventListener(AI_PREFS_CHANGED_EVENT, handler)
   }, [])
+
+  // Global auto-sync polling: every 5 minutes when enabled
+  const autoSyncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    if (autoSyncIntervalRef.current) {
+      clearInterval(autoSyncIntervalRef.current)
+      autoSyncIntervalRef.current = null
+    }
+
+    // Re-read prefs on every AI_PREFS_CHANGED_EVENT via aiEnabled dep
+    const autoSyncEnabled = getAutoSync()
+    if (!autoSyncEnabled) return
+
+    const runAutoSync = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const aiDescription = getAutoSyncAiDescription()
+        const response = await fetch(`${serverUrl}/api/profiles/auto-sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ai_description: aiDescription }),
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        const total = (data.imported_count || 0) + (data.updated_count || 0)
+        if (total > 0) {
+          toast.success(
+            t('profileCatalogue.sync.autoSyncComplete', {
+              imported: data.imported_count || 0,
+              updated: data.updated_count || 0,
+            })
+          )
+        }
+      } catch {
+        // Silent — auto-sync is best-effort
+      }
+    }
+
+    runAutoSync()
+    autoSyncIntervalRef.current = setInterval(runAutoSync, 5 * 60 * 1000)
+
+    return () => {
+      if (autoSyncIntervalRef.current) {
+        clearInterval(autoSyncIntervalRef.current)
+      }
+    }
+  }, [aiEnabled, t]) // aiEnabled changes on AI_PREFS_CHANGED_EVENT, retriggering this
 
   // Reset shot banner dismissed state when brewing ends
   useEffect(() => {
@@ -532,8 +585,18 @@ function App() {
       case 'settings':
       case 'pour-over':
       case 'live-shot':
+      case 'shot-analysis':
         handleBackToStart()
         break
+      case 'shot-history': {
+        const prev = previousViewStateRef.current
+        if (prev === 'shot-analysis' || prev === 'history-detail') {
+          setViewState(prev)
+        } else {
+          handleBackToStart()
+        }
+        break
+      }
       // Don't navigate on start, loading, or error views - but still block browser gesture
       default:
         break
@@ -760,6 +823,7 @@ function App() {
                     setViewState('run-shot')
                   }}
                   onPourOver={() => setViewState('pour-over')}
+                  onShotAnalysis={() => setViewState('shot-analysis')}
                   onSettings={() => setViewState('settings')}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
@@ -768,10 +832,17 @@ function App() {
                       <LastShotBanner
                         lastShot={lastShotHook}
                         onAnalyze={(date, filename) => {
-                          // Navigate to shot history for analysis
-                          // TODO: wire to specific shot detail once LiveShotView is built
-                          setViewState('history')
-                          void date; void filename
+                          // Navigate to shot analysis with the last shot's profile
+                          const profileName = lastShotHook.lastShot?.profile_name
+                          if (profileName) {
+                            setShotHistoryProfileName(profileName)
+                            setShotHistoryInitialDate(date)
+                            setShotHistoryInitialFilename(filename)
+                            previousViewStateRef.current = 'start'
+                            setViewState('shot-history')
+                          } else {
+                            setViewState('shot-analysis')
+                          }
                         }}
                       />
                     ) : undefined
@@ -806,6 +877,7 @@ function App() {
                   onBack={handleBackToStart}
                   onViewProfile={handleViewHistoryEntry}
                   onGenerateNew={() => setViewState('form')}
+                  onManageMachine={() => setViewState('profile-catalogue')}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
@@ -818,6 +890,7 @@ function App() {
                   cachedImageUrl={selectedHistoryImageUrl}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
+                  onEntryUpdated={(updated) => setSelectedHistoryEntry(updated)}
                   onRunProfile={(profileId, profileName) => {
                     setRunShotProfileId(profileId)
                     setRunShotProfileName(profileName)
@@ -852,6 +925,9 @@ function App() {
                   onBack={handleBackToStart}
                   onAnalyzeShot={(profileName) => {
                     setShotHistoryProfileName(profileName)
+                    setShotHistoryInitialDate(undefined)
+                    setShotHistoryInitialFilename(undefined)
+                    previousViewStateRef.current = 'live-shot'
                     setViewState('shot-history')
                   }}
                 />
@@ -867,10 +943,36 @@ function App() {
               {viewState === 'shot-history' && shotHistoryProfileName && (
                 <ShotHistoryView
                   profileName={shotHistoryProfileName}
-                  onBack={handleBackToStart}
+                  initialShotDate={shotHistoryInitialDate}
+                  initialShotFilename={shotHistoryInitialFilename}
+                  onBack={() => {
+                    const prev = previousViewStateRef.current
+                    if (prev === 'shot-analysis' || prev === 'history-detail') {
+                      setViewState(prev)
+                    } else {
+                      handleBackToStart()
+                    }
+                  }}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
+              )}
+
+              {viewState === 'shot-analysis' && (
+                <ShotAnalysisView
+                  onBack={handleBackToStart}
+                  onSelectShot={(profileName, date, filename) => {
+                    setShotHistoryProfileName(profileName)
+                    setShotHistoryInitialDate(date)
+                    setShotHistoryInitialFilename(filename)
+                    previousViewStateRef.current = 'shot-analysis'
+                    setViewState('shot-history')
+                  }}
+                />
+              )}
+
+              {viewState === 'profile-catalogue' && (
+                <ProfileCatalogueView onBack={() => setViewState('history')} />
               )}
 
               {viewState === 'loading' && (

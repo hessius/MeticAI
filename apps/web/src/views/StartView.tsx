@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Coffee, Play, Gear, Drop } from '@phosphor-icons/react'
+import { Plus, Coffee, Play, Gear, Drop, ChartLine } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
 const IGNORED_NAMES = ['meticai', 'metic ai', 'gemini', 'admin', 'user', 'default']
@@ -48,6 +48,7 @@ interface StartViewProps {
   onViewHistory: () => void
   onRunShot: () => void
   onPourOver: () => void
+  onShotAnalysis: () => void
   onSettings: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
@@ -60,6 +61,7 @@ export function StartView({
   onViewHistory,
   onRunShot,
   onPourOver,
+  onShotAnalysis,
   onSettings,
   aiConfigured = true,
   hideAiWhenUnavailable = false,
@@ -162,6 +164,15 @@ export function StartView({
           >
             <Drop size={20} className="mr-2" weight="fill" />
             {t('pourOver.title')}
+          </Button>
+
+          <Button
+            onClick={onShotAnalysis}
+            variant="dark-brew"
+            className="w-full h-14 text-base"
+          >
+            <ChartLine size={20} className="mr-2" weight="bold" />
+            {t('navigation.shotAnalysis')}
           </Button>
           
           {/* Style 4: Ember — warm orange inner glow + border */}

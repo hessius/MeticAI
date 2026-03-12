@@ -18,6 +18,7 @@ from pathlib import Path
 import os
 import subprocess
 import json
+from types import SimpleNamespace
 import time
 import asyncio
 import requests
@@ -12254,3 +12255,845 @@ class TestPrepareRecipeEndpoint:
         )
         assert response.status_code == 422
 
+
+# ============================================================================
+# Shot Annotation Endpoint Tests
+# ============================================================================
+
+
+class TestShotAnnotationEndpoints:
+    """Tests for GET/PATCH /api/shots/{date}/{filename}/annotation."""
+
+    @pytest.fixture(autouse=True)
+    def isolate_annotations(self, tmp_path, monkeypatch):
+        """Redirect annotations storage to a temp dir and clear the cache."""
+        import services.shot_annotations_service as svc
+        annotations_file = tmp_path / "shot_annotations.json"
+        monkeypatch.setattr(svc, "ANNOTATIONS_FILE", annotations_file)
+        svc.invalidate_cache()
+        yield
+        svc.invalidate_cache()
+
+    def test_get_annotation_missing_returns_null(self, client):
+        """GET annotation for a shot with no saved annotation returns null."""
+        response = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["annotation"] is None
+
+    def test_create_annotation(self, client):
+        """PATCH creates a new annotation and returns it."""
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Great shot, nice crema."},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["annotation"] == "Great shot, nice crema."
+        assert data["updated_at"] is not None
+
+    def test_update_annotation(self, client):
+        """PATCH updates an existing annotation."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "First note."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Updated note."},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["annotation"] == "Updated note."
+
+    def test_get_annotation_after_create(self, client):
+        """GET returns the annotation after it has been created."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Tasty."},
+        )
+        response = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert response.status_code == 200
+        assert response.json()["annotation"] == "Tasty."
+
+    def test_clear_annotation_via_empty_string(self, client):
+        """PATCH with empty string clears the annotation (returns null)."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Remove me."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": ""},
+        )
+        assert response.status_code == 200
+        assert response.json()["annotation"] is None
+        # GET should also return null after clearing
+        get_resp = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert get_resp.json()["annotation"] is None
+
+    def test_clear_annotation_via_whitespace_only(self, client):
+        """PATCH with whitespace-only string clears the annotation."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Remove me."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "   "},
+        )
+        assert response.status_code == 200
+        assert response.json()["annotation"] is None
+
+    def test_patch_missing_annotation_field_defaults_to_clear(self, client):
+        """PATCH body with no annotation key defaults to clearing."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Something."},
+        )
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={},
+        )
+        assert response.status_code == 200
+        assert response.json()["annotation"] is None
+
+    def test_patch_invalid_json_body_returns_error(self, client):
+        """PATCH with invalid JSON body returns a 4xx error."""
+        response = client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            content=b"not json at all",
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code in (400, 422, 500)
+
+    def test_annotations_are_isolated_per_shot(self, client):
+        """Annotations for different shots do not bleed into each other."""
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": "Shot one."},
+        )
+        client.patch(
+            "/api/shots/2024-01-15/shot_002.json/annotation",
+            json={"annotation": "Shot two."},
+        )
+        r1 = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        r2 = client.get("/api/shots/2024-01-15/shot_002.json/annotation")
+        assert r1.json()["annotation"] == "Shot one."
+        assert r2.json()["annotation"] == "Shot two."
+
+    def test_annotation_markdown_content_preserved(self, client):
+        """Annotation text with markdown is stored and returned verbatim."""
+        md = "## Notes\n\n- Bold flavour\n- **Nice** crema"
+        client.patch(
+            "/api/shots/2024-01-15/shot_001.json/annotation",
+            json={"annotation": md},
+        )
+        response = client.get("/api/shots/2024-01-15/shot_001.json/annotation")
+        assert response.json()["annotation"] == md
+
+
+class TestRecentShotsEndpoint:
+    """Tests for GET /api/shots/recent and GET /api/shots/recent/by-profile."""
+
+    @pytest.fixture(autouse=True)
+    def clear_recent_cache(self):
+        """Clear the recent-shots in-memory cache between tests."""
+        from api.routes.shots import _recent_shots_cache
+        _recent_shots_cache.clear()
+        yield
+        _recent_shots_cache.clear()
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_success(self, mock_dates, mock_files, mock_fetch, client):
+        """Test fetching recent shots across all profiles."""
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_dates.return_value = [date1]
+
+        file1 = MagicMock()
+        file1.name = "shot_001.json"
+        file2 = MagicMock()
+        file2.name = "shot_002.json"
+        mock_files.return_value = [file2, file1]
+
+        mock_fetch.side_effect = [
+            {
+                "profile_name": "Profile B",
+                "profile": {"name": "Profile B", "id": "pb"},
+                "time": 1705320100,
+                "data": [{"time": 28000, "shot": {"weight": 38.0}}],
+            },
+            {
+                "profile_name": "Profile A",
+                "profile": {"name": "Profile A", "id": "pa"},
+                "time": 1705320000,
+                "data": [{"time": 25000, "shot": {"weight": 36.5}}],
+            },
+        ]
+
+        response = client.get("/api/shots/recent?limit=10&offset=0")
+        assert response.status_code == 200
+        data = response.json()
+        assert "shots" in data
+        assert len(data["shots"]) == 2
+        # Should be sorted by timestamp descending
+        assert data["shots"][0]["profile_name"] == "Profile B"
+        assert data["shots"][1]["profile_name"] == "Profile A"
+        assert data["shots"][0]["final_weight"] == 38.0
+        assert "has_annotation" in data["shots"][0]
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_empty(self, mock_dates, client):
+        """Test empty response when no dates exist."""
+        mock_dates.return_value = []
+
+        response = client.get("/api/shots/recent")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["shots"] == []
+
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_machine_error(self, mock_dates, client):
+        """Test 502 when machine returns error."""
+        result = MagicMock()
+        result.error = "Connection timeout"
+        mock_dates.return_value = result
+
+        response = client.get("/api/shots/recent")
+        assert response.status_code == 502
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_by_profile(self, mock_dates, mock_files, mock_fetch, client):
+        """Test fetching recent shots grouped by profile."""
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_dates.return_value = [date1]
+
+        file1 = MagicMock()
+        file1.name = "shot_001.json"
+        file2 = MagicMock()
+        file2.name = "shot_002.json"
+        mock_files.return_value = [file1, file2]
+
+        mock_fetch.side_effect = [
+            {
+                "profile_name": "Espresso Classic",
+                "profile": {"name": "Espresso Classic", "id": "ec"},
+                "time": 1705320000,
+                "data": [{"time": 25000, "shot": {"weight": 36.5}}],
+            },
+            {
+                "profile_name": "Espresso Classic",
+                "profile": {"name": "Espresso Classic", "id": "ec"},
+                "time": 1705320100,
+                "data": [{"time": 28000, "shot": {"weight": 38.0}}],
+            },
+        ]
+
+        response = client.get("/api/shots/recent/by-profile")
+        assert response.status_code == 200
+        data = response.json()
+        assert "profiles" in data
+        assert len(data["profiles"]) == 1
+        assert data["profiles"][0]["profile_name"] == "Espresso Classic"
+        assert data["profiles"][0]["shot_count"] == 2
+        assert len(data["profiles"][0]["shots"]) == 2
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_dual_routes(self, mock_dates, mock_files, mock_fetch, client):
+        """Test that dual routes (with and without /api prefix) both work."""
+        mock_dates.return_value = []
+
+        for path in ["/shots/recent", "/api/shots/recent"]:
+            response = client.get(path)
+            assert response.status_code == 200
+
+        for path in ["/shots/recent/by-profile", "/api/shots/recent/by-profile"]:
+            response = client.get(path)
+            assert response.status_code == 200
+
+    @patch('api.routes.shots.fetch_shot_data', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_shot_files', new_callable=AsyncMock)
+    @patch('api.routes.shots.async_get_history_dates', new_callable=AsyncMock)
+    def test_recent_shots_pagination(self, mock_dates, mock_files, mock_fetch, client):
+        """Test pagination with offset and limit."""
+        date1 = MagicMock()
+        date1.name = "2024-01-15"
+        mock_dates.return_value = [date1]
+
+        files = []
+        for i in range(5):
+            f = MagicMock()
+            f.name = f"shot_{i:03d}.json"
+            files.append(f)
+        mock_files.return_value = files
+
+        mock_fetch.side_effect = [
+            {
+                "profile_name": f"Profile {i}",
+                "profile": {"name": f"Profile {i}", "id": f"p{i}"},
+                "time": 1705320000 + i * 100,
+                "data": [{"time": 25000, "shot": {"weight": 36.0 + i}}],
+            }
+            for i in range(5)
+        ]
+
+        response = client.get("/api/shots/recent?limit=2&offset=0")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["shots"]) == 2
+
+
+
+class TestEditProfileEndpoint:
+    """Tests for the PUT /api/profile/{name}/edit endpoint."""
+
+    def _make_mock_profile(self, name="TestProfile", profile_id="abc-123",
+                           temperature=93.0, final_weight=36.0, author="MeticAI"):
+        """Helper to build a mock profile object."""
+        profile = Mock()
+        profile.id = profile_id
+        profile.name = name
+        profile.author = author
+        profile.author_id = None
+        profile.temperature = temperature
+        profile.final_weight = final_weight
+        profile.stages = []
+        var = SimpleNamespace(key="flow_main", name="Main Flow", value=2.5, type="flow")
+        profile.variables = [var]
+        profile.display = None
+        profile.isDefault = False
+        profile.source = None
+        profile.beverage_type = None
+        profile.tank_temperature = None
+        profile.previous_authors = None
+        profile.error = None
+        return profile
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_success(self, mock_list, mock_get, mock_save, client):
+        """Successful profile edit updates temperature and returns success."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"temperature": 90.0}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile"]["temperature"] == 90.0
+        mock_save.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_temperature_below_70_accepted(self, client):
+        """Temperature below 70 is accepted (warning only, not an error)."""
+        # The endpoint no longer rejects temperatures below 70 —
+        # it only blocks temperatures above 100.
+        # Without a real machine, this will fail at the list_profiles step (500),
+        # but the key assertion is that we do NOT get a 400 validation error.
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"temperature": 50.0}
+        )
+        assert response.status_code != 400
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_temperature_too_high(self, client):
+        """Temperature above 100 returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"temperature": 110.0}
+        )
+        assert response.status_code == 400
+        assert "100" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_weight_zero(self, client):
+        """Final weight of 0 returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"final_weight": 0}
+        )
+        assert response.status_code == 400
+        assert "greater than 0" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_empty_name(self, client):
+        """Empty name returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"name": ""}
+        )
+        assert response.status_code == 400
+        assert "non-empty" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_edit_profile_no_fields(self, client):
+        """No fields to update returns 400."""
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={}
+        )
+        assert response.status_code == 400
+        assert "At least one" in response.json()["detail"]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_not_found(self, mock_list, client):
+        """Profile not on machine returns 404."""
+        mock_list.return_value = []
+
+        response = client.put(
+            "/api/profile/MissingProfile/edit",
+            json={"temperature": 90.0}
+        )
+        assert response.status_code == 404
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_rename_cascades_to_history(
+        self, mock_list, mock_get, mock_save, mock_load_hist, mock_save_hist, client
+    ):
+        """Renaming a profile also updates matching history entries."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+        mock_load_hist.return_value = [
+            {"id": "h1", "profile_name": "TestProfile", "reply": "..."},
+            {"id": "h2", "profile_name": "OtherProfile", "reply": "..."},
+        ]
+
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"name": "RenamedProfile"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["profile"]["name"] == "RenamedProfile"
+
+        # History should have been saved with the renamed entry
+        mock_save_hist.assert_called_once()
+        saved = mock_save_hist.call_args[0][0]
+        assert saved[0]["profile_name"] == "RenamedProfile"
+        assert saved[1]["profile_name"] == "OtherProfile"  # unchanged
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_variables(self, mock_list, mock_get, mock_save, client):
+        """Updating variable values persists correctly."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        response = client.put(
+            "/api/profile/TestProfile/edit",
+            json={"variables": [{"key": "flow_main", "value": 3.0}]}
+        )
+
+        assert response.status_code == 200
+        saved_profile = mock_save.call_args[0][0]
+        flow_var = next(v for v in saved_profile.variables if v.key == "flow_main")
+        assert flow_var.value == 3.0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_edit_profile_dual_route(self, mock_list, mock_get, mock_save, client):
+        """Both /profile/{name}/edit and /api/profile/{name}/edit work."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        response = client.put(
+            "/profile/TestProfile/edit",
+            json={"temperature": 88.0}
+        )
+        assert response.status_code == 200
+
+
+class TestProfileSync:
+    """Tests for profile sync endpoints."""
+
+    def _make_mock_profile(self, name="TestProfile", pid="prof-1"):
+        profile = Mock()
+        profile.id = pid
+        profile.name = name
+        profile.author = "Test Author"
+        profile.temperature = 93.0
+        profile.final_weight = 36.0
+        profile.error = None
+        profile.stages = []
+        profile.variables = []
+        profile.display = None
+        profile.isDefault = False
+        profile.source = None
+        profile.beverage_type = None
+        profile.tank_temperature = None
+        return profile
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_returns_new_profiles(self, mock_list, mock_get, mock_history, client):
+        """Profiles on machine but not in history are listed as 'new'."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_history.return_value = []
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 1
+        assert data["new"][0]["profile_name"] == "TestProfile"
+        assert len(data["updated"]) == 0
+        assert len(data["orphaned"]) == 0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_detects_updated_profiles(self, mock_list, mock_get, mock_history, client):
+        """Profiles with a different content hash are listed as 'updated'."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "content_hash": "stale_hash_value",
+            "reply": "test",
+        }]
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 0
+        assert len(data["updated"]) == 1
+        assert data["updated"][0]["profile_name"] == "TestProfile"
+        assert data["updated"][0]["stored_hash"] == "stale_hash_value"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_detects_orphaned_entries(self, mock_list, mock_get, mock_history, client):
+        """History entries with no matching machine profile are 'orphaned'."""
+        mock_list.return_value = []
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "DeletedProfile",
+            "reply": "desc",
+            "profile_json": {"name": "DeletedProfile"},
+        }]
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 0
+        assert len(data["updated"]) == 0
+        assert len(data["orphaned"]) == 1
+        assert data["orphaned"][0]["profile_name"] == "DeletedProfile"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_in_sync_returns_empty(self, mock_list, mock_get, mock_history, client):
+        """When hash matches, profile is neither new nor updated."""
+        from services.history_service import compute_content_hash
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        from utils.file_utils import deep_convert_to_dict
+        expected_hash = compute_content_hash(deep_convert_to_dict(profile))
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "content_hash": expected_hash,
+            "reply": "test",
+        }]
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["new"]) == 0
+        assert len(data["updated"]) == 0
+        assert len(data["orphaned"]) == 0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_status_counts(self, mock_list, mock_history, client):
+        """GET /api/profiles/sync/status returns correct counts."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_history.return_value = [{
+            "id": "orphan-1",
+            "profile_name": "GoneProfile",
+            "reply": "x",
+        }]
+
+        response = client.get("/api/profiles/sync/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["new_count"] == 1
+        assert data["orphaned_count"] == 1
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_status_dual_route(self, mock_list, mock_history, client):
+        """Both /profiles/sync/status and /api/profiles/sync/status work."""
+        mock_list.return_value = []
+        mock_history.return_value = []
+
+        for path in ["/profiles/sync/status", "/api/profiles/sync/status"]:
+            response = client.get(path)
+            assert response.status_code == 200
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.update_entry_sync_fields')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_accept_sync_update(self, mock_get, mock_history, mock_update, client):
+        """POST /api/profiles/sync/accept/{id} updates history entry."""
+        profile = self._make_mock_profile()
+        mock_get.return_value = profile
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "content_hash": "old_hash",
+            "reply": "old desc",
+        }]
+        mock_update.return_value = {"id": "entry-1", "profile_name": "TestProfile"}
+
+        response = client.post("/api/profiles/sync/accept/prof-1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["profile_name"] == "TestProfile"
+        mock_update.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_accept_sync_update_not_found(self, mock_get, mock_history, client):
+        """Accept returns 404 when no matching history entry exists."""
+        profile = self._make_mock_profile(name="Unknown")
+        mock_get.return_value = profile
+        mock_history.return_value = []
+
+        response = client.post("/api/profiles/sync/accept/prof-1")
+        assert response.status_code == 404
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_dual_route(self, mock_list, mock_get, mock_history, client):
+        """Both /profiles/sync and /api/profiles/sync work."""
+        mock_list.return_value = []
+        mock_get.return_value = None
+        mock_history.return_value = []
+
+        for path in ["/profiles/sync", "/api/profiles/sync"]:
+            response = client.post(path)
+            assert response.status_code == 200
+
+
+class TestHistoryNotesEndpoints:
+    """Tests for the history notes GET/PATCH endpoints."""
+
+    @pytest.fixture
+    def sample_entry_with_notes(self):
+        """Create a sample history entry that has notes."""
+        return {
+            "id": "note-entry-1",
+            "profile_name": "Test Profile",
+            "notes": "These are my tasting notes.",
+            "notes_updated_at": "2026-03-01T12:00:00+00:00",
+        }
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.get_entry_by_id')
+    def test_get_notes_success(self, mock_get_entry, client, sample_entry_with_notes):
+        """GET notes for a valid entry returns notes and timestamp."""
+        mock_get_entry.return_value = sample_entry_with_notes
+
+        response = client.get("/api/history/note-entry-1/notes")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["notes"] == "These are my tasting notes."
+        assert data["notes_updated_at"] == "2026-03-01T12:00:00+00:00"
+        mock_get_entry.assert_called_once_with("note-entry-1")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.get_entry_by_id')
+    def test_get_notes_entry_not_found(self, mock_get_entry, client):
+        """GET notes for a missing entry returns 404."""
+        mock_get_entry.return_value = None
+
+        response = client.get("/api/history/nonexistent-id/notes")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.update_entry_notes')
+    def test_patch_notes_success(self, mock_update, client):
+        """PATCH notes with valid text returns updated notes."""
+        mock_update.return_value = {
+            "id": "note-entry-1",
+            "notes": "Updated tasting notes.",
+            "notes_updated_at": "2026-03-02T08:00:00+00:00",
+        }
+
+        response = client.patch(
+            "/api/history/note-entry-1/notes",
+            json={"notes": "Updated tasting notes."},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["notes"] == "Updated tasting notes."
+        assert data["notes_updated_at"] == "2026-03-02T08:00:00+00:00"
+        mock_update.assert_called_once_with("note-entry-1", "Updated tasting notes.")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.update_entry_notes')
+    def test_patch_notes_empty_clears(self, mock_update, client):
+        """PATCH notes with empty string clears notes."""
+        mock_update.return_value = {
+            "id": "note-entry-1",
+            "notes": "",
+            "notes_updated_at": "2026-03-02T09:00:00+00:00",
+        }
+
+        response = client.patch(
+            "/api/history/note-entry-1/notes",
+            json={"notes": ""},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["notes"] == ""
+        mock_update.assert_called_once_with("note-entry-1", "")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.history_service.update_entry_notes')
+    def test_patch_notes_entry_not_found(self, mock_update, client):
+        """PATCH notes for a missing entry returns 404."""
+        mock_update.return_value = None
+
+        response = client.patch(
+            "/api/history/nonexistent-id/notes",
+            json={"notes": "text"},
+        )
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+
+class TestMachineDetectEndpoint:
+    """Tests for POST /api/machine/detect auto-discovery."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.verify_machine', new_callable=AsyncMock)
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_found_and_verified(self, mock_discover, mock_verify, client):
+        """Machine found and verified returns full details with verified=True."""
+        from services.machine_discovery_service import DiscoveryResult
+        mock_discover.return_value = DiscoveryResult(
+            found=True, ip="192.168.1.42", hostname="meticulous.local", method="mdns",
+        )
+        mock_verify.return_value = True
+
+        response = client.post("/api/machine/detect")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is True
+        assert data["ip"] == "192.168.1.42"
+        assert data["hostname"] == "meticulous.local"
+        assert data["method"] == "mdns"
+        assert data["verified"] is True
+        mock_verify.assert_called_once_with("192.168.1.42")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.verify_machine', new_callable=AsyncMock)
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_found_not_verified(self, mock_discover, mock_verify, client):
+        """Machine found but not responding returns verified=False."""
+        from services.machine_discovery_service import DiscoveryResult
+        mock_discover.return_value = DiscoveryResult(
+            found=True, ip="10.0.0.5", hostname="meticulous.local", method="hostname",
+        )
+        mock_verify.return_value = False
+
+        response = client.post("/api/machine/detect")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is True
+        assert data["ip"] == "10.0.0.5"
+        assert data["verified"] is False
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_not_found(self, mock_discover, client):
+        """No machine found returns guidance text."""
+        from services.machine_discovery_service import DiscoveryResult
+        mock_discover.return_value = DiscoveryResult(
+            found=False, guidance="Could not automatically detect your Meticulous machine.",
+        )
+
+        response = client.post("/api/machine/detect")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["found"] is False
+        assert "guidance" in data
+        assert len(data["guidance"]) > 0
+        assert "ip" not in data
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('services.machine_discovery_service.discover_machine', new_callable=AsyncMock)
+    def test_detect_discovery_raises_exception(self, mock_discover, client):
+        """Discovery raising an exception propagates as a server error."""
+        mock_discover.side_effect = Exception("Network timeout")
+
+        with pytest.raises(Exception, match="Network timeout"):
+            client.post("/api/machine/detect")
