@@ -1003,7 +1003,8 @@
       "stale": "Auf Maschine aktualisiert",
       "aiDescriptionToggle": "KI-Beschreibungen generieren (verbraucht Tokens)",
       "autoSync": "Profile automatisch von der Maschine synchronisieren",
-      "autoSyncComplete": "Auto-Sync: {{imported}} importiert, {{updated}} aktualisiert"
+      "autoSyncComplete": "Auto-Sync: {{imported}} importiert, {{updated}} aktualisiert",
+      "autoSyncAiDescription": "KI-Beschreibungen automatisch generieren"
     },
     "title": "Profilkatalog",
     "description": "{{count}} Profile auf Ihrer Maschine",

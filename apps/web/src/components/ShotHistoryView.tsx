@@ -574,12 +574,17 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
     }
   }
 
+  // Track whether the component was opened with a specific shot pre-selected
+  const enteredWithShot = useRef(!!(initialShotDate && initialShotFilename))
+
   const handleBack = () => {
-    if (selectedShot) {
+    if (selectedShot && !enteredWithShot.current) {
+      // Deselect shot to show the shot list
       setSelectedShot(null)
       setShotData(null)
       setDataError(null)
     } else {
+      // Go back to previous view (ShotAnalysisView, history-detail, etc.)
       onBack()
     }
   }

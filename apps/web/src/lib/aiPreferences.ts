@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'meticai-hide-ai-when-unavailable'
 const AI_ENABLED_STORAGE_KEY = 'meticai-ai-enabled'
 const AUTO_SYNC_STORAGE_KEY = 'meticai-auto-sync'
+const AUTO_SYNC_AI_DESC_STORAGE_KEY = 'meticai-auto-sync-ai-description'
 export const AI_PREFS_CHANGED_EVENT = 'meticai-ai-prefs-changed'
 
 export function getHideAiWhenUnavailable(): boolean {
@@ -49,6 +50,23 @@ export function getAutoSync(): boolean {
 export function setAutoSync(value: boolean): void {
   try {
     localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(value))
+    window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { value } }))
+  } catch {
+    // no-op
+  }
+}
+
+export function getAutoSyncAiDescription(): boolean {
+  try {
+    return localStorage.getItem(AUTO_SYNC_AI_DESC_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+export function setAutoSyncAiDescription(value: boolean): void {
+  try {
+    localStorage.setItem(AUTO_SYNC_AI_DESC_STORAGE_KEY, String(value))
     window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { value } }))
   } catch {
     // no-op

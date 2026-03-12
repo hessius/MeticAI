@@ -1003,7 +1003,8 @@
       "stale": "Uppdaterad på maskinen",
       "aiDescriptionToggle": "Generera AI-beskrivningar (använder tokens)",
       "autoSync": "Synka profiler automatiskt från maskinen",
-      "autoSyncComplete": "Autosynk: {{imported}} importerade, {{updated}} uppdaterade"
+      "autoSyncComplete": "Autosynk: {{imported}} importerade, {{updated}} uppdaterade",
+      "autoSyncAiDescription": "Generera AI-beskrivningar automatiskt"
     },
     "title": "Profilkatalog",
     "description": "{{count}} profiler på din maskin",

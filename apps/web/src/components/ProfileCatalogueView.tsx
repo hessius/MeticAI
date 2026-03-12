@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import {
   X
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { getAutoSync, setAutoSync } from '@/lib/aiPreferences'
+import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
 import { SyncReport, SyncResults } from './SyncReport'
@@ -129,7 +129,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
 
   // Auto-sync state
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => getAutoSync())
-  const autoSyncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [autoSyncAiDesc, setAutoSyncAiDesc] = useState(() => getAutoSyncAiDescription())
 
   // Detect coarse pointer (touch device)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
@@ -224,52 +224,17 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     fetchSyncStatus()
   }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
 
-  // Auto-sync polling: every 5 minutes when enabled
+  // Auto-sync is now handled globally in App.tsx — just refresh data periodically
+  // when the catalogue view is visible
   useEffect(() => {
-    if (autoSyncIntervalRef.current) {
-      clearInterval(autoSyncIntervalRef.current)
-      autoSyncIntervalRef.current = null
-    }
-
     if (!autoSyncEnabled) return
-
-    const runAutoSync = async () => {
-      try {
-        const serverUrl = await getServerUrl()
-        const response = await fetch(`${serverUrl}/api/profiles/auto-sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ai_description: false }),
-        })
-        if (!response.ok) return
-        const data = await response.json()
-        const total = (data.imported_count || 0) + (data.updated_count || 0)
-        if (total > 0) {
-          toast.success(
-            t('profileCatalogue.sync.autoSyncComplete', {
-              imported: data.imported_count || 0,
-              updated: data.updated_count || 0,
-            })
-          )
-          fetchProfiles()
-          fetchOrphaned()
-          fetchSyncStatus()
-        }
-      } catch {
-        // Silent — auto-sync is best-effort
-      }
-    }
-
-    // Run once immediately then every 5 minutes
-    runAutoSync()
-    autoSyncIntervalRef.current = setInterval(runAutoSync, 5 * 60 * 1000)
-
-    return () => {
-      if (autoSyncIntervalRef.current) {
-        clearInterval(autoSyncIntervalRef.current)
-      }
-    }
-  }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchSyncStatus, t])
+    const refreshInterval = setInterval(() => {
+      fetchProfiles()
+      fetchOrphaned()
+      fetchSyncStatus()
+    }, 5 * 60 * 1000)
+    return () => clearInterval(refreshInterval)
+  }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchSyncStatus])
 
   // Find history ID for a profile by name
   const findHistoryId = useCallback(
@@ -444,6 +409,23 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
             {t('profileCatalogue.sync.autoSync')}
           </Label>
         </div>
+
+        {/* AI description during auto-sync toggle */}
+        {autoSyncEnabled && (
+          <div className="flex items-center gap-2 px-1 pl-6">
+            <Switch
+              id="auto-sync-ai-desc-toggle"
+              checked={autoSyncAiDesc}
+              onCheckedChange={(checked) => {
+                setAutoSyncAiDesc(checked as boolean)
+                setAutoSyncAiDescription(checked as boolean)
+              }}
+            />
+            <Label htmlFor="auto-sync-ai-desc-toggle" className="text-xs cursor-pointer text-muted-foreground">
+              {t('profileCatalogue.sync.autoSyncAiDescription')}
+            </Label>
+          </div>
+        )}
 
         {/* Orphan warning banner */}
         {orphanedEntries.length > 0 && (

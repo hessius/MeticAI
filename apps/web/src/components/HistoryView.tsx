@@ -615,8 +615,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
   const [notes, setNotes] = useState<string>(entry.notes || '')
   const [isSavingNotes, setIsSavingNotes] = useState(false)
 
-  // Profile edit state
-  const [isEditing, setIsEditing] = useState(false)
+  // Profile edit state — separate modes for title vs details
+  const [editingSection, setEditingSection] = useState<'title' | 'details' | null>(null)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   // AI description regeneration state
   const [isRegeneratingDescription, setIsRegeneratingDescription] = useState(false)
@@ -641,9 +641,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
   })
 
   const hasEditChanges = useMemo(() => {
-    if (!isEditing) return false
+    if (!editingSection) return false
     const pj = entry.profile_json as ProfileData | null
-    if (editName !== entry.profile_name) return true
+    if (editingSection === 'title') {
+      return editName !== entry.profile_name
+    }
+    // details
     if (pj?.temperature !== undefined && editTemperature !== String(pj.temperature)) return true
     if (pj?.final_weight !== undefined && editFinalWeight !== String(pj.final_weight)) return true
     const origVars = (pj?.variables ?? []).filter((v: { key: string }) => !v.key.startsWith('info_'))
@@ -652,7 +655,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       if (ov && String(ov.value) !== ev.value) return true
     }
     return false
-  }, [isEditing, editName, editTemperature, editFinalWeight, editVariables, entry])
+  }, [editingSection, editName, editTemperature, editFinalWeight, editVariables, entry])
 
   // Unsaved changes guard
   useEffect(() => {
@@ -664,7 +667,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
     return () => window.removeEventListener('beforeunload', handler)
   }, [hasEditChanges])
 
-  const handleStartEdit = () => {
+  const handleStartEdit = (section: 'title' | 'details') => {
     const pj = entry.profile_json as ProfileData | null
     setEditName(entry.profile_name)
     setEditTemperature(pj?.temperature?.toString() ?? '')
@@ -679,38 +682,41 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
           type: v.type,
         }))
     )
-    setIsEditing(true)
+    setEditingSection(section)
   }
 
   const handleCancelEdit = () => {
     if (hasEditChanges && !window.confirm(t('profileEdit.unsavedChanges'))) return
-    setIsEditing(false)
+    setEditingSection(null)
   }
 
   const handleSaveEdit = async () => {
-    // Client-side validation
-    if (!editName.trim()) {
-      toast.error(t('profileEdit.nameRequired'))
-      return
-    }
-    const temp = editTemperature ? parseFloat(editTemperature) : undefined
-    if (temp !== undefined && (isNaN(temp) || temp > 100)) {
-      toast.error(t('profileEdit.temperatureMax'))
-      return
-    }
-    if (temp !== undefined && temp < 70) {
-      toast.warning(t('profileEdit.temperatureLow'))
-    }
-    const weight = editFinalWeight ? parseFloat(editFinalWeight) : undefined
-    if (weight !== undefined && (isNaN(weight) || weight <= 0)) {
-      toast.error(t('profileEdit.weightPositive'))
-      return
-    }
+    const payload: Record<string, unknown> = {}
 
-    setIsSavingEdit(true)
-    try {
-      const payload: Record<string, unknown> = {}
-      if (editName.trim() !== entry.profile_name) payload.name = editName.trim()
+    if (editingSection === 'title') {
+      if (!editName.trim()) {
+        toast.error(t('profileEdit.nameRequired'))
+        return
+      }
+      if (editName.trim() !== entry.profile_name) {
+        payload.name = editName.trim()
+      }
+    } else {
+      // details section
+      const temp = editTemperature ? parseFloat(editTemperature) : undefined
+      if (temp !== undefined && (isNaN(temp) || temp > 100)) {
+        toast.error(t('profileEdit.temperatureMax'))
+        return
+      }
+      if (temp !== undefined && temp < 70) {
+        toast.warning(t('profileEdit.temperatureLow'))
+      }
+      const weight = editFinalWeight ? parseFloat(editFinalWeight) : undefined
+      if (weight !== undefined && (isNaN(weight) || weight <= 0)) {
+        toast.error(t('profileEdit.weightPositive'))
+        return
+      }
+
       if (temp !== undefined) payload.temperature = temp
       if (weight !== undefined) payload.final_weight = weight
 
@@ -721,23 +727,27 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
           const ov = origVars.find((v: { key: string }) => v.key === ev.key)
           return ov && String(ov.value) !== ev.value
         })
-        .map(ev => ({ key: ev.key, value: parseFloat(ev.value) || ev.value }))
+        .map(ev => {
+          const num = parseFloat(ev.value)
+          return { key: ev.key, value: isNaN(num) ? ev.value : num }
+        })
       if (changedVars.length > 0) payload.variables = changedVars
+    }
 
-      if (Object.keys(payload).length === 0) {
-        toast.info(t('profileEdit.noChanges'))
-        setIsSavingEdit(false)
-        return
-      }
+    if (Object.keys(payload).length === 0) {
+      toast.info(t('profileEdit.noChanges'))
+      return
+    }
 
+    setIsSavingEdit(true)
+    try {
       await profileService.updateProfile(
         entry.profile_name,
         payload as { name?: string; temperature?: number; final_weight?: number; variables?: { key: string; value: number | string }[] }
       )
 
       toast.success(t('profileEdit.saved'))
-      setIsEditing(false)
-      // Reload page to reflect changes (entry is read-only from parent)
+      setEditingSection(null)
       window.location.reload()
     } catch (err) {
       console.error('Failed to save profile edit:', err)
@@ -1175,7 +1185,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 size="icon"
                 onClick={() => {
                   if (hasEditChanges && !window.confirm(t('profileEdit.unsavedChanges'))) return
-                  if (isEditing) setIsEditing(false)
+                  if (editingSection) setEditingSection(null)
                   onBack()
                 }}
                 className="shrink-0"
@@ -1183,7 +1193,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 <CaretLeft size={22} weight="bold" />
               </Button>
               <div className="flex-1 min-w-0">
-                {isEditing ? (
+                {editingSection === 'title' ? (
                   <div className="flex items-center gap-1.5">
                     <Input
                       value={editName}
@@ -1191,12 +1201,44 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                       disabled={isSavingEdit}
                       className="h-8 text-lg font-bold"
                       autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') handleCancelEdit() }}
                     />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-8 w-8 text-green-600 hover:text-green-700"
+                      onClick={handleSaveEdit}
+                      disabled={isSavingEdit}
+                    >
+                      {isSavingEdit ? <SpinnerGap size={16} className="animate-spin" weight="bold" /> : <Check size={16} weight="bold" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={handleCancelEdit}
+                      disabled={isSavingEdit}
+                    >
+                      <X size={16} weight="bold" />
+                    </Button>
                   </div>
                 ) : (
-                  <h2 className="text-lg font-bold text-foreground truncate">
-                    {cleanProfileName(entry.profile_name)}
-                  </h2>
+                  <div className="flex items-center gap-1">
+                    <h2 className="text-lg font-bold text-foreground truncate">
+                      {cleanProfileName(entry.profile_name)}
+                    </h2>
+                    {entry.profile_json && !editingSection && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 h-7 w-7 text-muted-foreground/60 hover:text-foreground"
+                        onClick={() => handleStartEdit('title')}
+                        title={t('profileEdit.editProfile')}
+                      >
+                        <PencilSimple size={14} weight="bold" />
+                      </Button>
+                    )}
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground/70">
                   {(() => {
@@ -1213,8 +1255,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                   })()}
                 </p>
               </div>
-              {/* Profile Image - fixed size to prevent layout shift */}
-              <div className="relative shrink-0">
+              {/* Profile Image with edit overlay */}
+              <div className="relative shrink-0 group">
                 <div 
                   className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30 cursor-pointer hover:border-primary/50 transition-colors bg-secondary/60"
                   onClick={() => setShowLightbox(true)}
@@ -1233,19 +1275,14 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                     </div>
                   )}
                 </div>
-              </div>
-              {/* Edit profile button */}
-              {entry.profile_json && !isEditing && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleStartEdit}
-                  className="shrink-0"
-                  title={t('profileEdit.editProfile')}
+                {/* Camera overlay */}
+                <div
+                  className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  onClick={() => setShowLightbox(true)}
                 >
-                  <PencilSimple size={18} weight="bold" />
-                </Button>
-              )}
+                  <Camera size={16} className="text-white" weight="fill" />
+                </div>
+              </div>
             </div>
           )}
           {isCapturing && (
@@ -1387,8 +1424,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
 
         {/* Right column: Profile Details */}
         <div className="desktop-panel-right">
-          {/* Save / Cancel bar when editing */}
-          {isEditing && (
+          {/* Save / Cancel bar when editing details */}
+          {editingSection === 'details' && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1421,11 +1458,26 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               </Button>
             </motion.div>
           )}
-          {/* Profile Technical Breakdown (inline editing when isEditing) */}
+          {/* Edit details button */}
+          {entry.profile_json && !editingSection && (
+            <div className="flex justify-end mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
+                onClick={() => handleStartEdit('details')}
+                title={t('profileEdit.editProfile')}
+              >
+                <PencilSimple size={14} weight="bold" />
+                {t('profileEdit.editProfile')}
+              </Button>
+            </div>
+          )}
+          {/* Profile Technical Breakdown (inline editing when editing details) */}
           {entry.profile_json && (
             <ProfileBreakdown
               profile={entry.profile_json as ProfileData}
-              editMode={isEditing}
+              editMode={editingSection === 'details'}
               editTemperature={editTemperature}
               onTemperatureChange={setEditTemperature}
               editFinalWeight={editFinalWeight}

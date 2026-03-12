@@ -978,7 +978,8 @@
       "stale": "Updated on machine",
       "aiDescriptionToggle": "Generate AI descriptions (uses tokens)",
       "autoSync": "Auto-sync profiles from machine",
-      "autoSyncComplete": "Auto-sync: {{imported}} imported, {{updated}} updated"
+      "autoSyncComplete": "Auto-sync: {{imported}} imported, {{updated}} updated",
+      "autoSyncAiDescription": "Auto-generate AI descriptions"
     },
     "errors": {
       "removeFromHistoryFailed": "Failed to remove from catalogue",

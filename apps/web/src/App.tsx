@@ -32,7 +32,7 @@ import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon } from '@phosphor-icons/react'
-import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable } from '@/lib/aiPreferences'
+import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -167,6 +167,53 @@ function App() {
     window.addEventListener(AI_PREFS_CHANGED_EVENT, handler)
     return () => window.removeEventListener(AI_PREFS_CHANGED_EVENT, handler)
   }, [])
+
+  // Global auto-sync polling: every 5 minutes when enabled
+  const autoSyncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    if (autoSyncIntervalRef.current) {
+      clearInterval(autoSyncIntervalRef.current)
+      autoSyncIntervalRef.current = null
+    }
+
+    // Re-read prefs on every AI_PREFS_CHANGED_EVENT via aiEnabled dep
+    const autoSyncEnabled = getAutoSync()
+    if (!autoSyncEnabled) return
+
+    const runAutoSync = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const aiDescription = getAutoSyncAiDescription()
+        const response = await fetch(`${serverUrl}/api/profiles/auto-sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ai_description: aiDescription }),
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        const total = (data.imported_count || 0) + (data.updated_count || 0)
+        if (total > 0) {
+          toast.success(
+            t('profileCatalogue.sync.autoSyncComplete', {
+              imported: data.imported_count || 0,
+              updated: data.updated_count || 0,
+            })
+          )
+        }
+      } catch {
+        // Silent — auto-sync is best-effort
+      }
+    }
+
+    runAutoSync()
+    autoSyncIntervalRef.current = setInterval(runAutoSync, 5 * 60 * 1000)
+
+    return () => {
+      if (autoSyncIntervalRef.current) {
+        clearInterval(autoSyncIntervalRef.current)
+      }
+    }
+  }, [aiEnabled, t]) // aiEnabled changes on AI_PREFS_CHANGED_EVENT, retriggering this
 
   // Reset shot banner dismissed state when brewing ends
   useEffect(() => {

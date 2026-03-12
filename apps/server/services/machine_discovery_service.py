@@ -3,12 +3,14 @@
 Implements a multi-tier discovery strategy:
 1. mDNS/Zeroconf browse for _meticulous._tcp.local.
 2. Hostname resolution for meticulous.local
-3. If no machine is found, return guidance for manual configuration.
+3. METICULOUS_IP environment variable (verified)
+4. If no machine is found, return guidance for manual configuration.
 
 Discovery typically completes within several seconds under normal conditions.
 """
 
 import asyncio
+import os
 import socket
 from dataclasses import dataclass
 from typing import Optional
@@ -58,7 +60,12 @@ async def discover_machine() -> DiscoveryResult:
     result = await _try_hostname_resolution()
     if result.found:
         return result
-    
+
+    # Fallback to configured METICULOUS_IP env var
+    result = await _try_env_ip()
+    if result.found:
+        return result
+
     # No machine found - provide guidance
     logger.info("Machine discovery: no machine found via mDNS or hostname")
     return DiscoveryResult(
@@ -167,6 +174,28 @@ async def _try_hostname_resolution() -> DiscoveryResult:
     except Exception as e:
         logger.warning(f"Hostname resolution failed: {e}")
     
+    return DiscoveryResult(found=False)
+
+
+async def _try_env_ip() -> DiscoveryResult:
+    """
+    Check the METICULOUS_IP environment variable and verify the machine is reachable.
+    """
+    ip = os.environ.get("METICULOUS_IP", "").strip()
+    if not ip:
+        return DiscoveryResult(found=False)
+
+    logger.info(f"Trying configured METICULOUS_IP: {ip}")
+    if await verify_machine(ip):
+        logger.info(f"Verified machine at configured IP: {ip}")
+        return DiscoveryResult(
+            found=True,
+            ip=ip,
+            hostname=None,
+            method="env"
+        )
+
+    logger.debug(f"Machine at configured METICULOUS_IP {ip} did not respond")
     return DiscoveryResult(found=False)
 
 

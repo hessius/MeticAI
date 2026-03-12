@@ -18,6 +18,7 @@ from pathlib import Path
 import os
 import subprocess
 import json
+from types import SimpleNamespace
 import time
 import asyncio
 import requests
@@ -12567,12 +12568,7 @@ class TestEditProfileEndpoint:
         profile.temperature = temperature
         profile.final_weight = final_weight
         profile.stages = []
-        var = MagicMock()
-        var.key = "flow_main"
-        var.name = "Main Flow"
-        var.value = 2.5
-        var.type = "flow"
-        var.__dict__ = {"key": "flow_main", "name": "Main Flow", "value": 2.5, "type": "flow"}
+        var = SimpleNamespace(key="flow_main", name="Main Flow", value=2.5, type="flow")
         profile.variables = [var]
         profile.display = None
         profile.isDefault = False
@@ -12720,9 +12716,9 @@ class TestEditProfileEndpoint:
         )
 
         assert response.status_code == 200
-        saved_dict = mock_save.call_args[0][0]
-        flow_var = next(v for v in saved_dict["variables"] if v["key"] == "flow_main")
-        assert flow_var["value"] == 3.0
+        saved_profile = mock_save.call_args[0][0]
+        flow_var = next(v for v in saved_profile.variables if v.key == "flow_main")
+        assert flow_var.value == 3.0
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)

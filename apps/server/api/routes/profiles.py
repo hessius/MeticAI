@@ -1106,54 +1106,30 @@ async def edit_profile(profile_name: str, request: Request):
         if hasattr(full_profile, "error") and full_profile.error:
             raise HTTPException(status_code=502, detail=f"Failed to fetch profile: {full_profile.error}")
 
-        # --- convert to dict for mutation ----------------------------------------
-        profile_dict = {}
-        for attr in [
-            "id", "name", "author", "author_id", "temperature", "final_weight",
-            "stages", "variables", "display", "isDefault", "source",
-            "beverage_type", "tank_temperature", "previous_authors",
-        ]:
-            if hasattr(full_profile, attr):
-                val = getattr(full_profile, attr)
-                if val is not None:
-                    if hasattr(val, "__dict__"):
-                        profile_dict[attr] = val.__dict__
-                    elif isinstance(val, list):
-                        profile_dict[attr] = [
-                            item.__dict__ if hasattr(item, "__dict__") else item
-                            for item in val
-                        ]
-                    else:
-                        profile_dict[attr] = val
-
-        # --- apply changes -------------------------------------------------------
-        old_name = profile_dict.get("name", profile_name)
+        # --- apply changes directly on profile object ---------------------------
+        old_name = full_profile.name
 
         if new_name is not None:
-            profile_dict["name"] = new_name
+            full_profile.name = new_name
         if temperature is not None:
-            profile_dict["temperature"] = temperature
+            full_profile.temperature = temperature
         if final_weight is not None:
-            profile_dict["final_weight"] = final_weight
+            full_profile.final_weight = final_weight
         if author is not None:
-            profile_dict["author"] = author
+            full_profile.author = author
 
-        if variables is not None and isinstance(profile_dict.get("variables"), list):
+        if variables is not None and hasattr(full_profile, "variables") and full_profile.variables:
             incoming = {v["key"]: v["value"] for v in variables if "key" in v and "value" in v}
-            for var in profile_dict["variables"]:
-                var_key = var.get("key") if isinstance(var, dict) else getattr(var, "key", None)
+            for var in full_profile.variables:
+                var_key = getattr(var, "key", None)
                 if var_key and var_key in incoming:
-                    if isinstance(var, dict):
-                        var["value"] = incoming[var_key]
-                    else:
-                        var.value = incoming[var_key]
+                    var.value = incoming[var_key]
 
         # --- persist -------------------------------------------------------------
-        profile_dict = deep_convert_to_dict(profile_dict)
-        await async_save_profile(profile_dict)
+        await async_save_profile(full_profile)
 
         logger.info(
-            f"Profile edited: '{old_name}' → '{profile_dict.get('name', old_name)}'",
+            f"Profile edited: '{old_name}' → '{full_profile.name}'",
             extra={"request_id": request_id, "profile_name": profile_name},
         )
 
@@ -1176,7 +1152,7 @@ async def edit_profile(profile_name: str, request: Request):
 
         return {
             "status": "success",
-            "profile": profile_dict,
+            "profile": deep_convert_to_dict(full_profile),
         }
 
     except HTTPException:

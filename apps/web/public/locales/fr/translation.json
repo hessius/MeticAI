@@ -1003,7 +1003,8 @@
       "stale": "Mis à jour sur la machine",
       "aiDescriptionToggle": "Générer des descriptions IA (utilise des tokens)",
       "autoSync": "Synchroniser automatiquement les profils depuis la machine",
-      "autoSyncComplete": "Sync auto : {{imported}} importé(s), {{updated}} mis à jour"
+      "autoSyncComplete": "Sync auto : {{imported}} importé(s), {{updated}} mis à jour",
+      "autoSyncAiDescription": "Générer automatiquement les descriptions IA"
     },
     "title": "Catalogue de profils",
     "description": "{{count}} profils sur votre machine",

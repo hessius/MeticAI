@@ -1003,7 +1003,8 @@
       "stale": "Aggiornato sulla macchina",
       "aiDescriptionToggle": "Genera descrizioni AI (utilizza token)",
       "autoSync": "Sincronizza automaticamente i profili dalla macchina",
-      "autoSyncComplete": "Sync automatica: {{imported}} importati, {{updated}} aggiornati"
+      "autoSyncComplete": "Sync automatica: {{imported}} importati, {{updated}} aggiornati",
+      "autoSyncAiDescription": "Generazione automatica descrizioni IA"
     },
     "title": "Catalogo profili",
     "description": "{{count}} profili sulla tua macchina",
