@@ -403,6 +403,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
             onCheckedChange={(checked) => {
               setAutoSyncEnabled(checked as boolean)
               setAutoSync(checked as boolean)
+              getServerUrl().then(url => fetch(`${url}/api/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ autoSync: checked }),
+              })).catch(() => {/* best-effort */})
             }}
           />
           <Label htmlFor="auto-sync-toggle" className="text-sm cursor-pointer">
@@ -419,6 +424,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
               onCheckedChange={(checked) => {
                 setAutoSyncAiDesc(checked as boolean)
                 setAutoSyncAiDescription(checked as boolean)
+                getServerUrl().then(url => fetch(`${url}/api/settings`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ autoSyncAiDescription: checked }),
+                })).catch(() => {/* best-effort */})
               }}
             />
             <Label htmlFor="auto-sync-ai-desc-toggle" className="text-xs cursor-pointer text-muted-foreground">

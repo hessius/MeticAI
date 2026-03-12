@@ -72,3 +72,24 @@ export function setAutoSyncAiDescription(value: boolean): void {
     // no-op
   }
 }
+
+/**
+ * Sync auto-sync settings from server response data into localStorage.
+ * Call after fetching /api/settings to keep local cache in sync.
+ */
+export function syncAutoSyncFromServer(settings: { autoSync?: boolean; autoSyncAiDescription?: boolean }): void {
+  try {
+    if (typeof settings.autoSync === 'boolean') {
+      const prev = getAutoSync()
+      localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(settings.autoSync))
+      if (prev !== settings.autoSync) {
+        window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { autoSync: settings.autoSync } }))
+      }
+    }
+    if (typeof settings.autoSyncAiDescription === 'boolean') {
+      localStorage.setItem(AUTO_SYNC_AI_DESC_STORAGE_KEY, String(settings.autoSyncAiDescription))
+    }
+  } catch {
+    // no-op
+  }
+}

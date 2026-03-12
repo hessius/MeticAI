@@ -32,7 +32,7 @@ import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon } from '@phosphor-icons/react'
-import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription } from '@/lib/aiPreferences'
+import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -143,6 +143,7 @@ function App() {
           setMqttEnabled(data.mqttEnabled !== false)
           const hasGeminiKey = Boolean((data.geminiApiKey || '').trim())
           setIsAiConfigured(data.geminiApiKeyConfigured === true || hasGeminiKey)
+          syncAutoSyncFromServer(data)
         }
       } catch {
         // default false if unreachable
@@ -889,6 +890,7 @@ function App() {
                   cachedImageUrl={selectedHistoryImageUrl}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
+                  onEntryUpdated={(updated) => setSelectedHistoryEntry(updated)}
                   onRunProfile={(profileId, profileName) => {
                     setRunShotProfileId(profileId)
                     setRunShotProfileName(profileName)

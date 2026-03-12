@@ -574,12 +574,13 @@ interface ProfileDetailViewProps {
   entry: HistoryEntry
   onBack: () => void
   onRunProfile?: (profileId: string, profileName: string) => void
+  onEntryUpdated?: (entry: HistoryEntry) => void
   cachedImageUrl?: string
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
 }
 
-export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
+export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
   const { t } = useTranslation()
   const { downloadJson } = useHistory()
   const { invalidate: invalidateImageCache } = useProfileImageCache()
@@ -639,6 +640,23 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
         type: v.type,
       }))
   })
+
+  // Sync local state when entry prop updates (e.g. after edit save)
+  useEffect(() => {
+    setNotes(entry.notes || '')
+    setCurrentReply(entry.reply)
+    setEditName(entry.profile_name)
+    setEditTemperature(entry.profile_json?.temperature?.toString() ?? '')
+    setEditFinalWeight(entry.profile_json?.final_weight?.toString() ?? '')
+    const vars = (entry.profile_json as ProfileData | null)?.variables ?? []
+    setEditVariables(
+      vars
+        .filter((v: { key: string }) => !v.key.startsWith('info_'))
+        .map((v: { key: string; name: string; value: number; type: string }) => ({
+          key: v.key, name: v.name, value: String(v.value), type: v.type,
+        }))
+    )
+  }, [entry])
 
   const hasEditChanges = useMemo(() => {
     if (!editingSection) return false
@@ -748,7 +766,18 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
 
       toast.success(t('profileEdit.saved'))
       setEditingSection(null)
-      window.location.reload()
+
+      // Stay on page: re-fetch the updated history entry
+      try {
+        const serverUrl = await getServerUrl()
+        const res = await fetch(`${serverUrl}/api/history/${entry.id}`)
+        if (res.ok) {
+          const updated = await res.json()
+          onEntryUpdated?.(updated)
+        }
+      } catch {
+        // Non-critical — entry still shows previous data
+      }
     } catch (err) {
       console.error('Failed to save profile edit:', err)
       toast.error(err instanceof Error ? err.message : t('profileEdit.saveFailed'))
