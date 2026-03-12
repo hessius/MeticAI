@@ -267,5 +267,7 @@ async def detect_machine():
         })
     else:
         response["guidance"] = result.guidance
+        response["guidance_key"] = result.guidance_key
+        response["guidance_hints"] = result.guidance_hints
     
     return response

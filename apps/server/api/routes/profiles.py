@@ -39,6 +39,7 @@ from services.analysis_service import _perform_local_shot_analysis, _generate_pr
 from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
 from utils.file_utils import atomic_write_json, deep_convert_to_dict
+from services.temp_profile_service import is_temp_profile
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1069,8 +1070,8 @@ async def edit_profile(profile_name: str, request: Request):
                 temperature = float(temperature)
             except (TypeError, ValueError):
                 raise HTTPException(status_code=400, detail="Temperature must be a number")
-            if temperature < 70 or temperature > 100:
-                raise HTTPException(status_code=400, detail="Temperature must be between 70 and 100 °C")
+            if temperature > 100:
+                raise HTTPException(status_code=400, detail="Temperature must not exceed 100 °C")
 
         final_weight = body.get("final_weight")
         if final_weight is not None:
@@ -2410,7 +2411,7 @@ async def list_orphaned_history_entries(request: Request):
         orphaned = []
         for entry in entries:
             profile_name = entry.get("profile_name", "")
-            if profile_name and profile_name not in machine_names:
+            if profile_name and profile_name not in machine_names and not is_temp_profile(profile_name):
                 orphaned.append({
                     "id": entry.get("id"),
                     "profile_name": profile_name,

@@ -119,7 +119,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   
   // Orphan state
   const [orphanedEntries, setOrphanedEntries] = useState<OrphanedEntry[]>([])
-  const [orphanTarget, setOrphanTarget] = useState<OrphanedEntry | null>(null)
+  const [orphanDialogOpen, setOrphanDialogOpen] = useState(false)
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
@@ -447,7 +447,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
 
         {/* Orphan warning banner */}
         {orphanedEntries.length > 0 && (
-          <Alert>
+          <Alert className="cursor-pointer" onClick={() => setOrphanDialogOpen(true)}>
             <Warning className="w-4 h-4" />
             <AlertDescription>
               {t('profileCatalogue.orphanBanner', { count: orphanedEntries.length })}
@@ -629,7 +629,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                 >
                   <Card
                     className="p-4 opacity-60 border-dashed cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => setOrphanTarget(entry)}
+                    onClick={() => setOrphanDialogOpen(true)}
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
@@ -666,11 +666,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       />
 
       <OrphanResolutionDialog
-        isOpen={!!orphanTarget}
-        entry={orphanTarget}
-        onClose={() => setOrphanTarget(null)}
+        isOpen={orphanDialogOpen}
+        entries={orphanedEntries}
+        onClose={() => setOrphanDialogOpen(false)}
         onResolved={() => {
-          setOrphanTarget(null)
+          setOrphanDialogOpen(false)
           fetchProfiles()
           fetchOrphaned()
         }}

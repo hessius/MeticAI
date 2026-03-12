@@ -645,6 +645,11 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
     setLlmAnalysisResult(null)
     setLlmAnalysisError(null)
     
+    // Auto-run static analysis when shot data is available
+    if (selectedShot && shotData) {
+      handleAnalyze()
+    }
+    
     return undefined
   }, [selectedShot, shotData]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2263,33 +2268,6 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
                       </div>
                       </div>{/* End of analysisCardRef */}
                       
-                      {/* Shot Annotation */}
-                      {selectedShot && (
-                        <ShotAnnotation
-                          date={selectedShot.date}
-                          filename={selectedShot.filename}
-                          className="pt-4 border-t border-border/30"
-                          onAnnotationChange={(hasAnnotation, rating) => {
-                            const key = `${selectedShot.date}/${selectedShot.filename}`
-                            setAnnotationSummaries(prev => ({
-                              ...prev,
-                              [key]: hasAnnotation || rating
-                                ? { has_annotation: hasAnnotation, rating }
-                                : undefined as never,
-                              ...(!hasAnnotation && !rating ? { [key]: undefined as never } : {}),
-                            }))
-                            // Clean up undefined entries
-                            if (!hasAnnotation && !rating) {
-                              setAnnotationSummaries(prev => {
-                                const next = { ...prev }
-                                delete next[key]
-                                return next
-                              })
-                            }
-                          }}
-                        />
-                      )}
-                      
                       {/* Action buttons - stacked vertically for mobile */}
                       <div className="flex flex-col gap-2 pt-2">
                         <Button
@@ -2337,6 +2315,35 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
                   </motion.div>
                 </TabsContent>
                 </Card>{/* end Card wrapping entire left column */}
+                
+                {/* Shot Annotation — own card below the main tabs card */}
+                {selectedShot && (
+                  <Card className="p-4 border-border/40">
+                    <ShotAnnotation
+                      date={selectedShot.date}
+                      filename={selectedShot.filename}
+                      onAnnotationChange={(hasAnnotation, rating) => {
+                        const key = `${selectedShot.date}/${selectedShot.filename}`
+                        setAnnotationSummaries(prev => ({
+                          ...prev,
+                          [key]: hasAnnotation || rating
+                            ? { has_annotation: hasAnnotation, rating }
+                            : undefined as never,
+                          ...(!hasAnnotation && !rating ? { [key]: undefined as never } : {}),
+                        }))
+                        // Clean up undefined entries
+                        if (!hasAnnotation && !rating) {
+                          setAnnotationSummaries(prev => {
+                            const next = { ...prev }
+                            delete next[key]
+                            return next
+                          })
+                        }
+                      }}
+                    />
+                  </Card>
+                )}
+
                 </div>{/* end left column */}
 
                 {/* Right column on desktop: Graph area (maximized) — hidden on mobile */}

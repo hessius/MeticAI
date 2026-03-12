@@ -12606,14 +12606,17 @@ class TestEditProfileEndpoint:
         mock_save.assert_called_once()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
-    def test_edit_profile_temperature_too_low(self, client):
-        """Temperature below 70 returns 400."""
+    def test_edit_profile_temperature_below_70_accepted(self, client):
+        """Temperature below 70 is accepted (warning only, not an error)."""
+        # The endpoint no longer rejects temperatures below 70 —
+        # it only blocks temperatures above 100.
+        # Without a real machine, this will fail at the list_profiles step (500),
+        # but the key assertion is that we do NOT get a 400 validation error.
         response = client.put(
             "/api/profile/TestProfile/edit",
             json={"temperature": 50.0}
         )
-        assert response.status_code == 400
-        assert "70" in response.json()["detail"]
+        assert response.status_code != 400
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     def test_edit_profile_temperature_too_high(self, client):

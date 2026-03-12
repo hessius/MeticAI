@@ -22,152 +22,168 @@ interface OrphanedEntry {
 
 interface OrphanResolutionDialogProps {
   isOpen: boolean
-  entry: OrphanedEntry | null
+  entries: OrphanedEntry[]
   onClose: () => void
   onResolved: () => void
 }
 
 export function OrphanResolutionDialog({
   isOpen,
-  entry,
+  entries,
   onClose,
   onResolved,
 }: OrphanResolutionDialogProps) {
   const { t } = useTranslation()
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
 
-  if (!entry) return null
+  const remainingEntries = entries.filter(e => !resolvedIds.has(e.id))
+  const canRestoreAll = remainingEntries.some(e => e.has_profile_json)
 
-  const handleKeep = () => {
+  const handleClose = () => {
+    if (resolvedIds.size > 0) onResolved()
+    setResolvedIds(new Set())
     onClose()
   }
 
-  const handleRemoveFromHistory = async () => {
-    setIsProcessing(true)
-
+  const removeEntry = async (entry: OrphanedEntry) => {
+    setProcessingIds(prev => new Set(prev).add(entry.id))
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/api/history/${entry.id}`, {
-        method: 'DELETE',
-      })
-
+      const response = await fetch(`${serverUrl}/api/history/${entry.id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error(t('profileCatalogue.errors.removeFromHistoryFailed'))
-
       toast.success(t('profileCatalogue.removedFromHistory'))
-      onResolved()
+      setResolvedIds(prev => new Set(prev).add(entry.id))
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : t('profileCatalogue.errors.removeFromHistoryFailed')
-      toast.error(message)
+      toast.error(err instanceof Error ? err.message : t('profileCatalogue.errors.removeFromHistoryFailed'))
     } finally {
-      setIsProcessing(false)
+      setProcessingIds(prev => { const n = new Set(prev); n.delete(entry.id); return n })
     }
   }
 
-  const handleRestoreToMachine = async () => {
-    setIsProcessing(true)
-
+  const restoreEntry = async (entry: OrphanedEntry) => {
+    setProcessingIds(prev => new Set(prev).add(entry.id))
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(
-        `${serverUrl}/api/machine/profile/restore/${entry.id}`,
-        { method: 'POST' }
-      )
-
+      const response = await fetch(`${serverUrl}/api/machine/profile/restore/${entry.id}`, { method: 'POST' })
       if (!response.ok) throw new Error(t('profileCatalogue.errors.restoreToMachineFailed'))
-
-      toast.success(
-        t('profileCatalogue.restoredToMachine', {
-          name: entry.profile_name,
-        })
-      )
-      onResolved()
+      toast.success(t('profileCatalogue.restoredToMachine', { name: entry.profile_name }))
+      setResolvedIds(prev => new Set(prev).add(entry.id))
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : t('profileCatalogue.errors.restoreProfileFailed')
-      toast.error(message)
+      toast.error(err instanceof Error ? err.message : t('profileCatalogue.errors.restoreProfileFailed'))
     } finally {
-      setIsProcessing(false)
+      setProcessingIds(prev => { const n = new Set(prev); n.delete(entry.id); return n })
     }
+  }
+
+  const handleRemoveAll = async () => {
+    setIsBatchProcessing(true)
+    for (const entry of remainingEntries) {
+      await removeEntry(entry)
+    }
+    setIsBatchProcessing(false)
+  }
+
+  const handleRestoreAll = async () => {
+    setIsBatchProcessing(true)
+    for (const entry of remainingEntries.filter(e => e.has_profile_json)) {
+      await restoreEntry(entry)
+    }
+    setIsBatchProcessing(false)
+  }
+
+  if (remainingEntries.length === 0 && resolvedIds.size > 0) {
+    // All resolved — auto-close after a short delay to show final toast
+    setTimeout(handleClose, 300)
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{t('profileCatalogue.orphanTitle')}</DialogTitle>
+          <DialogTitle>{t('profileCatalogue.orphanedSection')}</DialogTitle>
           <DialogDescription>
-            {t('profileCatalogue.orphanDescription', {
-              name: entry.profile_name,
-            })}
+            {t('profileCatalogue.orphanBanner', { count: remainingEntries.length })}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3 py-2">
-          <Button
-            variant="outline"
-            className="justify-start gap-2 h-auto py-3 px-4"
-            onClick={handleKeep}
-            disabled={isProcessing}
-          >
-            <CheckCircle className="w-5 h-5 shrink-0" />
-            <div className="text-left">
-              <div className="font-medium">
-                {t('profileCatalogue.keepInHistory')}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {t('profileCatalogue.keepInHistoryHint')}
-              </div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="justify-start gap-2 h-auto py-3 px-4"
-            onClick={handleRemoveFromHistory}
-            disabled={isProcessing}
-          >
-            {isProcessing ? (
-              <SpinnerGap className="w-5 h-5 animate-spin shrink-0" />
-            ) : (
-              <Trash className="w-5 h-5 shrink-0" />
-            )}
-            <div className="text-left">
-              <div className="font-medium">
-                {t('profileCatalogue.removeFromHistoryOnly')}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {t('profileCatalogue.removeOrphanHint')}
-              </div>
-            </div>
-          </Button>
-
-          {entry.has_profile_json && (
+        {/* Batch actions */}
+        {remainingEntries.length > 1 && (
+          <div className="flex gap-2 pb-2 border-b border-border/40">
             <Button
-              variant="default"
-              className="justify-start gap-2 h-auto py-3 px-4"
-              onClick={handleRestoreToMachine}
-              disabled={isProcessing}
+              variant="outline"
+              size="sm"
+              onClick={handleRemoveAll}
+              disabled={isBatchProcessing}
+              className="gap-1.5"
             >
-              {isProcessing ? (
-                <SpinnerGap className="w-5 h-5 animate-spin shrink-0" />
-              ) : (
-                <ArrowsClockwise className="w-5 h-5 shrink-0" />
-              )}
-              <div className="text-left">
-                <div className="font-medium">
-                  {t('profileCatalogue.restoreToMachine')}
+              {isBatchProcessing ? <SpinnerGap className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}
+              {t('profileCatalogue.removeFromHistoryOnly')} ({remainingEntries.length})
+            </Button>
+            {canRestoreAll && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleRestoreAll}
+                disabled={isBatchProcessing}
+                className="gap-1.5"
+              >
+                {isBatchProcessing ? <SpinnerGap className="w-4 h-4 animate-spin" /> : <ArrowsClockwise className="w-4 h-4" />}
+                {t('profileCatalogue.restoreToMachine')} ({remainingEntries.filter(e => e.has_profile_json).length})
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Individual entries */}
+        <div className="flex flex-col gap-3 py-2 overflow-y-auto">
+          {remainingEntries.map((entry) => {
+            const isProcessing = processingIds.has(entry.id)
+            return (
+              <div key={entry.id} className="flex items-center gap-3 p-3 bg-secondary/40 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm truncate">{entry.profile_name}</h4>
+                  <p className="text-xs text-muted-foreground">{t('profileCatalogue.orphanHint')}</p>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {t('profileCatalogue.restoreToMachineHint')}
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeEntry(entry)}
+                    disabled={isProcessing || isBatchProcessing}
+                    title={t('profileCatalogue.removeFromHistoryOnly')}
+                  >
+                    {isProcessing ? <SpinnerGap className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}
+                  </Button>
+                  {entry.has_profile_json && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => restoreEntry(entry)}
+                      disabled={isProcessing || isBatchProcessing}
+                      title={t('profileCatalogue.restoreToMachine')}
+                    >
+                      {isProcessing ? <SpinnerGap className="w-4 h-4 animate-spin" /> : <ArrowsClockwise className="w-4 h-4" />}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setResolvedIds(prev => new Set(prev).add(entry.id))}
+                    disabled={isProcessing || isBatchProcessing}
+                    title={t('profileCatalogue.keepInHistory')}
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
-            </Button>
-          )}
+            )
+          })}
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={isProcessing}>
+          <Button variant="ghost" onClick={handleClose} disabled={isBatchProcessing}>
             {t('common.close')}
           </Button>
         </DialogFooter>

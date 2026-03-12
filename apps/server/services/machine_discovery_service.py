@@ -32,6 +32,8 @@ class DiscoveryResult:
     hostname: Optional[str] = None
     method: Optional[str] = None
     guidance: Optional[str] = None
+    guidance_key: Optional[str] = None
+    guidance_hints: Optional[list[str]] = None
 
 
 async def discover_machine() -> DiscoveryResult:
@@ -61,6 +63,8 @@ async def discover_machine() -> DiscoveryResult:
     logger.info("Machine discovery: no machine found via mDNS or hostname")
     return DiscoveryResult(
         found=False,
+        guidance_key="notFound",
+        guidance_hints=["machinePoweredOn", "sameNetwork", "manualIp"],
         guidance=(
             "Could not automatically detect your Meticulous machine. "
             "Please ensure:\n"

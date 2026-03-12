@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { 
   Thermometer, 
   Scales, 
@@ -144,7 +145,7 @@ function startsWithEmoji(str: string): boolean {
 interface ValidationWarning {
   type: 'info-missing-emoji' | 'adjustable-has-emoji' | 'adjustable-unused'
   variableName: string
-  message: string
+  messageKey: string
 }
 
 function validateVariables(
@@ -161,7 +162,7 @@ function validateVariables(
       warnings.push({
         type: 'info-missing-emoji',
         variableName: v.name,
-        message: `Info variable "${v.name}" should start with an emoji`
+        messageKey: 'profileBreakdown.warningInfoMissingEmoji',
       })
     }
     
@@ -169,7 +170,7 @@ function validateVariables(
       warnings.push({
         type: 'adjustable-has-emoji',
         variableName: v.name,
-        message: `Adjustable variable "${v.name}" should not start with an emoji`
+        messageKey: 'profileBreakdown.warningAdjustableHasEmoji',
       })
     }
     
@@ -179,7 +180,7 @@ function validateVariables(
         warnings.push({
           type: 'adjustable-unused',
           variableName: v.name,
-          message: `Variable "${v.name}" is defined but not used in any stage`
+          messageKey: 'profileBreakdown.warningUnused',
         })
       }
     }
@@ -218,6 +219,15 @@ interface ProfileBreakdownProps {
   className?: string
   /** When set, highlights the named stage and auto-scrolls to it */
   currentStage?: string | null
+  /** Inline editing support */
+  editMode?: boolean
+  editTemperature?: string
+  onTemperatureChange?: (value: string) => void
+  editFinalWeight?: string
+  onFinalWeightChange?: (value: string) => void
+  editVariables?: { key: string; name: string; value: string; type: string }[]
+  onVariableChange?: (key: string, value: string) => void
+  disabled?: boolean
 }
 
 function getTypeIcon(type: string) {
@@ -474,7 +484,7 @@ function formatLimits(limits?: StageLimit[], variables?: ProfileVariable[]): str
   }).join(', ')
 }
 
-export function ProfileBreakdown({ profile, className = '', currentStage }: ProfileBreakdownProps) {
+export function ProfileBreakdown({ profile, className = '', currentStage, editMode, editTemperature, onTemperatureChange, editFinalWeight, onFinalWeightChange, editVariables, onVariableChange, disabled }: ProfileBreakdownProps) {
   const { t } = useTranslation()
   const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -487,9 +497,34 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
     }
   }, [currentStage])
 
+  // Build a preview profile with edited values for live stage rendering
+  const displayProfile = useMemo(() => {
+    if (!profile || !editMode) return profile
+    const updated = { ...profile }
+    if (editTemperature !== undefined) {
+      const temp = parseFloat(editTemperature)
+      if (!isNaN(temp)) updated.temperature = temp
+    }
+    if (editFinalWeight !== undefined) {
+      const weight = parseFloat(editFinalWeight)
+      if (!isNaN(weight)) updated.final_weight = weight
+    }
+    if (editVariables && profile.variables) {
+      updated.variables = profile.variables.map(v => {
+        const edited = editVariables.find(ev => ev.key === v.key)
+        if (edited) {
+          const numVal = parseFloat(edited.value)
+          return { ...v, value: isNaN(numVal) ? v.value : numVal }
+        }
+        return v
+      })
+    }
+    return updated
+  }, [profile, editMode, editTemperature, editFinalWeight, editVariables])
+
   // Memoize expensive variable calculations
   const { adjustableVars, infoVars, variableColorMap, variableUsage, warnings } = useMemo(() => {
-    if (!profile) {
+    if (!displayProfile) {
       return {
         adjustableVars: [] as ProfileVariable[],
         infoVars: [] as ProfileVariable[],
@@ -499,11 +534,11 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
       }
     }
     
-    const hasVars = profile.variables && profile.variables.length > 0
-    const hasStg = profile.stages && profile.stages.length > 0
+    const hasVars = displayProfile.variables && displayProfile.variables.length > 0
+    const hasStg = displayProfile.stages && displayProfile.stages.length > 0
     
-    const adjustable = hasVars ? profile.variables!.filter(v => !v.key.startsWith('info_')) : []
-    const info = hasVars ? profile.variables!.filter(v => v.key.startsWith('info_')) : []
+    const adjustable = hasVars ? displayProfile.variables!.filter(v => !v.key.startsWith('info_')) : []
+    const info = hasVars ? displayProfile.variables!.filter(v => v.key.startsWith('info_')) : []
     
     // Build color map
     const colorMap = new Map<string, typeof VARIABLE_COLORS[0]>()
@@ -512,10 +547,10 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
     })
     
     // Find variable usage
-    const usage = hasStg && hasVars ? findVariableUsage(profile.stages!, adjustable) : new Map<string, string[]>()
+    const usage = hasStg && hasVars ? findVariableUsage(displayProfile.stages!, adjustable) : new Map<string, string[]>()
     
     // Validate variables
-    const warns = hasVars ? validateVariables(profile.variables!, usage) : []
+    const warns = hasVars ? validateVariables(displayProfile.variables!, usage) : []
     
     return {
       adjustableVars: adjustable,
@@ -524,13 +559,13 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
       variableUsage: usage,
       warnings: warns
     }
-  }, [profile])
+  }, [displayProfile])
   
-  if (!profile) return null
+  if (!displayProfile) return null
   
-  const hasBasicInfo = profile.temperature !== undefined || profile.final_weight !== undefined
-  const hasVariables = profile.variables && profile.variables.length > 0
-  const hasStages = profile.stages && profile.stages.length > 0
+  const hasBasicInfo = displayProfile.temperature !== undefined || displayProfile.final_weight !== undefined
+  const hasVariables = displayProfile.variables && displayProfile.variables.length > 0
+  const hasStages = displayProfile.stages && displayProfile.stages.length > 0
   
   if (!hasBasicInfo && !hasVariables && !hasStages) return null
   
@@ -549,26 +584,51 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
         {/* Temperature and Target Weight */}
         {hasBasicInfo && (
           <div className="flex flex-wrap gap-4">
-            {profile.temperature !== undefined && (
+            {displayProfile.temperature !== undefined && (
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-red-500/15">
                   <Thermometer size={16} weight="bold" className="text-red-600 dark:text-red-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">{t('profileBreakdown.temperature')}</p>
-                  <p className="text-sm font-semibold">{profile.temperature}°C</p>
+                  {editMode && onTemperatureChange ? (
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={editTemperature ?? ''}
+                      onChange={e => onTemperatureChange(e.target.value)}
+                      disabled={disabled}
+                      className="h-7 w-20 text-sm font-semibold"
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold">{displayProfile.temperature}°C</p>
+                  )}
                 </div>
               </div>
             )}
             
-            {profile.final_weight !== undefined && (
+            {displayProfile.final_weight !== undefined && (
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-green-500/15">
                   <Scales size={16} weight="bold" className="text-green-600 dark:text-green-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">{t('profileBreakdown.targetWeight')}</p>
-                  <p className="text-sm font-semibold">{profile.final_weight}g</p>
+                  {editMode && onFinalWeightChange ? (
+                    <Input
+                      type="number"
+                      min={0.1}
+                      step={0.1}
+                      value={editFinalWeight ?? ''}
+                      onChange={e => onFinalWeightChange(e.target.value)}
+                      disabled={disabled}
+                      className="h-7 w-20 text-sm font-semibold"
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold">{displayProfile.final_weight}g</p>
+                  )}
                 </div>
               </div>
             )}
@@ -588,7 +648,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                 <div className="space-y-1">
                   {warnings.map((warning, idx) => (
                     <p key={idx} className="text-[11px] text-amber-700/80 dark:text-amber-300/80">
-                      • {warning.message}
+                      • {t(warning.messageKey, { name: warning.variableName })}
                     </p>
                   ))}
                 </div>
@@ -659,22 +719,34 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                   {adjustableVars.map((variable, idx) => {
                     const color = variableColorMap.get(variable.key) || VARIABLE_COLORS[0]
                     const usedInStages = variableUsage.get(variable.key) || []
+                    const editVar = editMode && editVariables?.find(ev => ev.key === variable.key)
                     
                     return (
                       <div 
                         key={idx}
-                        className={`px-2.5 py-1.5 rounded-lg border text-xs whitespace-nowrap ${color.bg} ${color.text} ${color.border}`}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs whitespace-nowrap ${color.bg} ${color.text} ${color.border} ${editMode ? 'flex items-center gap-1.5' : ''}`}
                         title={usedInStages.length > 0 ? `Used in: ${usedInStages.join(', ')}` : 'Not used in any stage'}
                       >
                         {/* Color dot indicator */}
                         <span className={`inline-block w-2 h-2 rounded-full ${color.dot} mr-1.5`} />
                         <span className="font-medium">{variable.name}</span>
-                        <span className="opacity-70 ml-1.5">
-                          {variable.value}
-                          {variable.type === 'pressure' && ' bar'}
-                          {variable.type === 'flow' && ' ml/s'}
-                          {variable.type === 'time' && 's'}
-                        </span>
+                        {editVar && onVariableChange ? (
+                          <Input
+                            type="number"
+                            step={0.1}
+                            value={editVar.value}
+                            onChange={e => onVariableChange(variable.key, e.target.value)}
+                            disabled={disabled}
+                            className="h-6 w-16 text-xs text-right ml-1 inline-block"
+                          />
+                        ) : (
+                          <span className="opacity-70 ml-1.5">
+                            {variable.value}
+                            {variable.type === 'pressure' && ' bar'}
+                            {variable.type === 'flow' && ' ml/s'}
+                            {variable.type === 'time' && 's'}
+                          </span>
+                        )}
                         {usedInStages.length > 0 && (
                           <span className="ml-1.5 opacity-60 text-[10px]">
                             → {usedInStages.length} stage{usedInStages.length > 1 ? 's' : ''}
@@ -695,16 +767,16 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
             <div className="flex items-center gap-2">
               <ListNumbers size={14} weight="bold" className="text-muted-foreground shrink-0" />
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                {t('profileBreakdown.stages')} ({profile.stages!.length})
+                {t('profileBreakdown.stages')} ({displayProfile.stages!.length})
               </p>
             </div>
             <div className="space-y-2">
-              {profile.stages!.map((stage, idx) => {
+              {displayProfile.stages!.map((stage, idx) => {
                 const exitInfo = formatExitTriggers(stage.exit_triggers)
-                const limitsInfo = formatLimits(stage.limits, profile.variables)
+                const limitsInfo = formatLimits(stage.limits, displayProfile.variables)
                 // Normalize dynamics - handles both nested and flattened formats
                 const normalizedDynamics = getNormalizedDynamics(stage)
-                const dynamicsDesc = describeDynamics(normalizedDynamics, stage.type, profile.variables)
+                const dynamicsDesc = describeDynamics(normalizedDynamics, stage.type, displayProfile.variables)
                 
                 // Find which variables are used in this stage using variableUsage map
                 const usedVars = adjustableVars.filter(v => {
@@ -713,9 +785,9 @@ export function ProfileBreakdown({ profile, className = '', currentStage }: Prof
                 })
                 
                 const isActive = currentStage === stage.name
-                const stageIdx = profile.stages!.indexOf(stage)
+                const stageIdx = displayProfile.stages!.indexOf(stage)
                 const currentIdx = currentStage
-                  ? profile.stages!.findIndex(s => s.name === currentStage)
+                  ? displayProfile.stages!.findIndex(s => s.name === currentStage)
                   : -1
                 const isDone = currentIdx >= 0 && stageIdx < currentIdx
 

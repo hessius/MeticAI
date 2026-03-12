@@ -53,6 +53,7 @@ function App() {
   const { t } = useTranslation()
   const [isInitializing, setIsInitializing] = useState(true)
   const [viewState, setViewState] = useState<ViewState>('start')
+  const previousViewStateRef = useRef<ViewState>('start')
   const [profileCount, setProfileCount] = useState<number | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -539,6 +540,15 @@ function App() {
       case 'shot-analysis':
         handleBackToStart()
         break
+      case 'shot-history': {
+        const prev = previousViewStateRef.current
+        if (prev === 'shot-analysis' || prev === 'history-detail') {
+          setViewState(prev)
+        } else {
+          handleBackToStart()
+        }
+        break
+      }
       // Don't navigate on start, loading, or error views - but still block browser gesture
       default:
         break
@@ -780,6 +790,7 @@ function App() {
                             setShotHistoryProfileName(profileName)
                             setShotHistoryInitialDate(date)
                             setShotHistoryInitialFilename(filename)
+                            previousViewStateRef.current = 'start'
                             setViewState('shot-history')
                           } else {
                             setViewState('shot-analysis')
@@ -867,6 +878,7 @@ function App() {
                     setShotHistoryProfileName(profileName)
                     setShotHistoryInitialDate(undefined)
                     setShotHistoryInitialFilename(undefined)
+                    previousViewStateRef.current = 'live-shot'
                     setViewState('shot-history')
                   }}
                 />
@@ -884,7 +896,14 @@ function App() {
                   profileName={shotHistoryProfileName}
                   initialShotDate={shotHistoryInitialDate}
                   initialShotFilename={shotHistoryInitialFilename}
-                  onBack={handleBackToStart}
+                  onBack={() => {
+                    const prev = previousViewStateRef.current
+                    if (prev === 'shot-analysis' || prev === 'history-detail') {
+                      setViewState(prev)
+                    } else {
+                      handleBackToStart()
+                    }
+                  }}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
                 />
@@ -897,6 +916,7 @@ function App() {
                     setShotHistoryProfileName(profileName)
                     setShotHistoryInitialDate(date)
                     setShotHistoryInitialFilename(filename)
+                    previousViewStateRef.current = 'shot-analysis'
                     setViewState('shot-history')
                   }}
                 />

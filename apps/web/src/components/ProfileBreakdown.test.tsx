@@ -14,7 +14,7 @@ vi.mock('framer-motion', () => ({
 // Mock react-i18next to return English translations
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, params?: Record<string, string>) => {
       const translations: Record<string, string> = {
         'profileBreakdown.title': 'Profile Details',
         'profileBreakdown.temperature': 'Temperature',
@@ -26,8 +26,17 @@ vi.mock('react-i18next', () => ({
         'profileBreakdown.max': 'Max',
         'profileBreakdown.exit': 'Exit',
         'profileBreakdown.alsoVisible': 'Also visible in the Meticulous app under Profile Settings → Variables',
+        'profileBreakdown.warningInfoMissingEmoji': 'Info variable "{{name}}" should start with an emoji so it displays correctly in the Meticulous app',
+        'profileBreakdown.warningAdjustableHasEmoji': 'Adjustable variable "{{name}}" starts with an emoji — this may cause issues in the Meticulous app',
+        'profileBreakdown.warningUnused': 'Adjustable variable "{{name}}" is not used in any stage',
       }
-      return translations[key] || key
+      let result = translations[key] || key
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          result = result.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v)
+        }
+      }
+      return result
     },
     i18n: { language: 'en' },
   }),
@@ -423,7 +432,7 @@ describe('ProfileBreakdown', () => {
       }
       render(<ProfileBreakdown profile={profile} />)
       
-      expect(screen.getByText(/Info variable "Dose" should start with an emoji/)).toBeInTheDocument()
+      expect(screen.getByText(/Info variable "Dose" should start with an emoji so it displays correctly/)).toBeInTheDocument()
     })
 
     it('should show warning when adjustable variable has emoji', () => {
@@ -438,7 +447,7 @@ describe('ProfileBreakdown', () => {
       }
       render(<ProfileBreakdown profile={profile} />)
       
-      expect(screen.getByText(/Adjustable variable "☕ Peak Pressure" should not start with an emoji/)).toBeInTheDocument()
+      expect(screen.getByText(/Adjustable variable "☕ Peak Pressure" starts with an emoji/)).toBeInTheDocument()
     })
 
     it('should show warning when adjustable variable is unused', () => {
@@ -453,7 +462,7 @@ describe('ProfileBreakdown', () => {
       }
       render(<ProfileBreakdown profile={profile} />)
       
-      expect(screen.getByText(/Variable "Peak Pressure" is defined but not used/)).toBeInTheDocument()
+      expect(screen.getByText(/Adjustable variable "Peak Pressure" is not used in any stage/)).toBeInTheDocument()
     })
 
     it('should not show warnings when variables are valid', () => {

@@ -694,9 +694,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
       return
     }
     const temp = editTemperature ? parseFloat(editTemperature) : undefined
-    if (temp !== undefined && (isNaN(temp) || temp < 70 || temp > 100)) {
-      toast.error(t('profileEdit.temperatureRange'))
+    if (temp !== undefined && (isNaN(temp) || temp > 100)) {
+      toast.error(t('profileEdit.temperatureMax'))
       return
+    }
+    if (temp !== undefined && temp < 70) {
+      toast.warning(t('profileEdit.temperatureLow'))
     }
     const weight = editFinalWeight ? parseFloat(editFinalWeight) : undefined
     if (weight !== undefined && (isNaN(weight) || weight <= 0)) {
@@ -1180,9 +1183,21 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 <CaretLeft size={22} weight="bold" />
               </Button>
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-foreground truncate">
-                  {cleanProfileName(entry.profile_name)}
-                </h2>
+                {isEditing ? (
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      disabled={isSavingEdit}
+                      className="h-8 text-lg font-bold"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <h2 className="text-lg font-bold text-foreground truncate">
+                    {cleanProfileName(entry.profile_name)}
+                  </h2>
+                )}
                 <p className="text-xs text-muted-foreground/70">
                   {(() => {
                     if (!entry.created_at) return t('history.addedToMeticAI')
@@ -1199,23 +1214,25 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
                 </p>
               </div>
               {/* Profile Image - fixed size to prevent layout shift */}
-              <div 
-                className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30 shrink-0 cursor-pointer hover:border-primary/50 transition-colors bg-secondary/60"
-                onClick={profileImage ? () => setShowLightbox(true) : undefined}
-                title={profileImage ? t('history.clickToEnlarge') : undefined}
-              >
-                {profileImage ? (
-                  <img 
-                    src={profileImage} 
-                    alt={entry.profile_name}
-                    className="w-full h-full object-cover animate-in fade-in duration-300"
-                    onError={() => setProfileImage(null)}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Coffee size={20} className="text-muted-foreground/40" weight="fill" />
-                  </div>
-                )}
+              <div className="relative shrink-0">
+                <div 
+                  className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30 cursor-pointer hover:border-primary/50 transition-colors bg-secondary/60"
+                  onClick={() => setShowLightbox(true)}
+                  title={t('history.clickToEnlarge')}
+                >
+                  {profileImage ? (
+                    <img 
+                      src={profileImage} 
+                      alt={entry.profile_name}
+                      className="w-full h-full object-cover animate-in fade-in duration-300"
+                      onError={() => setProfileImage(null)}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Coffee size={20} className="text-muted-foreground/40" weight="fill" />
+                    </div>
+                  )}
+                </div>
               </div>
               {/* Edit profile button */}
               {entry.profile_json && !isEditing && (
@@ -1353,7 +1370,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
             transition={{ delay: 0.3 }}
             className="space-y-2"
           >
-            <Label className="text-sm font-semibold tracking-wide text-muted-foreground">
+            <Label className={`text-sm font-semibold tracking-wide ${notes ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
               {t('history.notes')}
             </Label>
             <MarkdownEditor
@@ -1370,141 +1387,56 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
 
         {/* Right column: Profile Details */}
         <div className="desktop-panel-right">
-          <AnimatePresence mode="wait">
-            {isEditing ? (
-              <motion.div
-                key="edit-form"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-3"
+          {/* Save / Cancel bar when editing */}
+          {isEditing && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-2 mb-3"
+            >
+              <Button
+                className="flex-1 h-9 text-sm font-semibold"
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
               >
-                <Label className="text-sm font-semibold tracking-wide text-primary">
-                  {t('profileEdit.title')}
-                </Label>
-                <div className="p-4 bg-secondary/60 rounded-xl border border-primary/20 space-y-4">
-                  {/* Profile Name */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">{t('profileEdit.profileName')}</Label>
-                    <Input
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      disabled={isSavingEdit}
-                      className="h-9 text-sm"
-                    />
-                  </div>
-
-                  {/* Temperature */}
-                  {(entry.profile_json as ProfileData)?.temperature !== undefined && (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t('profileEdit.temperature')} (°C)</Label>
-                      <Input
-                        type="number"
-                        min={70}
-                        max={100}
-                        step={0.5}
-                        value={editTemperature}
-                        onChange={e => setEditTemperature(e.target.value)}
-                        disabled={isSavingEdit}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                  )}
-
-                  {/* Final Weight */}
-                  {(entry.profile_json as ProfileData)?.final_weight !== undefined && (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t('profileEdit.finalWeight')} (g)</Label>
-                      <Input
-                        type="number"
-                        min={0.1}
-                        step={0.1}
-                        value={editFinalWeight}
-                        onChange={e => setEditFinalWeight(e.target.value)}
-                        disabled={isSavingEdit}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                  )}
-
-                  {/* Adjustable Variables */}
-                  {editVariables.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">{t('profileEdit.variables')}</Label>
-                      <div className="space-y-2">
-                        {editVariables.map((v, idx) => (
-                          <div key={v.key} className="flex items-center gap-2">
-                            <span className="text-xs text-foreground/80 flex-1 min-w-0 truncate">{v.name}</span>
-                            <Input
-                              type="number"
-                              step={0.1}
-                              value={v.value}
-                              onChange={e => {
-                                const next = [...editVariables]
-                                next[idx] = { ...v, value: e.target.value }
-                                setEditVariables(next)
-                              }}
-                              disabled={isSavingEdit}
-                              className="h-8 w-24 text-sm text-right"
-                            />
-                            <span className="text-[10px] text-muted-foreground w-8">
-                              {v.type === 'pressure' && 'bar'}
-                              {v.type === 'flow' && 'ml/s'}
-                              {v.type === 'time' && 's'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Save / Cancel */}
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      className="flex-1 h-10 text-sm font-semibold"
-                      onClick={handleSaveEdit}
-                      disabled={isSavingEdit}
-                    >
-                      {isSavingEdit ? (
-                        <>
-                          <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
-                          {t('profileEdit.saving')}
-                        </>
-                      ) : (
-                        <>
-                          <FloppyDisk size={16} className="mr-1.5" weight="bold" />
-                          {t('common.save')}
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 h-10 text-sm"
-                      onClick={handleCancelEdit}
-                      disabled={isSavingEdit}
-                    >
-                      {t('common.cancel')}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Still show breakdown below for reference */}
-                {entry.profile_json && (
-                  <div className="opacity-60">
-                    <ProfileBreakdown profile={entry.profile_json as ProfileData} />
-                  </div>
+                {isSavingEdit ? (
+                  <>
+                    <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
+                    {t('profileEdit.saving')}
+                  </>
+                ) : (
+                  <>
+                    <FloppyDisk size={16} className="mr-1.5" weight="bold" />
+                    {t('common.save')}
+                  </>
                 )}
-              </motion.div>
-            ) : (
-              <motion.div key="breakdown" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                {/* Profile Technical Breakdown */}
-                {entry.profile_json && (
-                  <ProfileBreakdown profile={entry.profile_json as ProfileData} />
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 h-9 text-sm"
+                onClick={handleCancelEdit}
+                disabled={isSavingEdit}
+              >
+                {t('common.cancel')}
+              </Button>
+            </motion.div>
+          )}
+          {/* Profile Technical Breakdown (inline editing when isEditing) */}
+          {entry.profile_json && (
+            <ProfileBreakdown
+              profile={entry.profile_json as ProfileData}
+              editMode={isEditing}
+              editTemperature={editTemperature}
+              onTemperatureChange={setEditTemperature}
+              editFinalWeight={editFinalWeight}
+              onFinalWeightChange={setEditFinalWeight}
+              editVariables={editVariables}
+              onVariableChange={(key, value) => {
+                setEditVariables(prev => prev.map(v => v.key === key ? { ...v, value } : v))
+              }}
+              disabled={isSavingEdit}
+            />
+          )}
         </div>{/* end right column */}
         </div>{/* end two-column wrapper */}
 
@@ -1685,7 +1617,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
 
       {/* Lightbox for Profile Image */}
       <AnimatePresence>
-        {showLightbox && profileImage && (
+        {showLightbox && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1708,18 +1640,60 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, cachedImageUrl,
               >
                 <XCircle size={28} weight="bold" />
               </Button>
-              <div className="rounded-2xl overflow-hidden border-4 border-primary/30 shadow-2xl">
-                <img 
-                  src={profileImage} 
-                  alt={entry.profile_name}
-                  className="w-full h-auto object-contain"
-                  onError={() => {
-                    setProfileImage(null)
-                    setShowLightbox(false)
-                  }}
-                />
-              </div>
+              {profileImage ? (
+                <div className="rounded-2xl overflow-hidden border-4 border-primary/30 shadow-2xl">
+                  <img 
+                    src={profileImage} 
+                    alt={entry.profile_name}
+                    className="w-full h-auto object-contain"
+                    onError={() => {
+                      setProfileImage(null)
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border-4 border-primary/30 shadow-2xl bg-secondary/80 flex items-center justify-center h-64">
+                  <Coffee size={64} className="text-muted-foreground/30" weight="fill" />
+                </div>
+              )}
               <p className="text-center text-white/80 mt-4 text-sm font-medium">{cleanProfileName(entry.profile_name)}</p>
+              {/* Image actions in lightbox */}
+              <div className="flex gap-2 mt-4 justify-center">
+                <Button
+                  variant="outline"
+                  className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  disabled={isUploadingImage}
+                  onClick={() => {
+                    setShowLightbox(false)
+                    imageInputRef.current?.click()
+                  }}
+                >
+                  {isUploadingImage ? (
+                    <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
+                  ) : (
+                    <Camera size={16} className="mr-1.5" weight="bold" />
+                  )}
+                  {t('history.upload')}
+                </Button>
+                {(!hideAiWhenUnavailable || aiConfigured) && (
+                  <Button
+                    variant="outline"
+                    className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20 border-dashed"
+                    disabled={isGeneratingImage || !aiConfigured}
+                    onClick={() => {
+                      setShowLightbox(false)
+                      setShowStylePicker(true)
+                    }}
+                  >
+                    {isGeneratingImage ? (
+                      <SpinnerGap size={16} className="mr-1.5 animate-spin" weight="bold" />
+                    ) : (
+                      <MagicWand size={16} className="mr-1.5" weight="bold" />
+                    )}
+                    {t('history.generate')}
+                  </Button>
+                )}
+              </div>
             </motion.div>
           </motion.div>
         )}

@@ -118,6 +118,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
     ip?: string
     hostname?: string
     guidance?: string
+    guidance_key?: string
+    guidance_hints?: string[]
   } | null>(null)
   
   // Version info
@@ -401,7 +403,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       console.error('Machine detection failed:', error)
       setDetectResult({
         found: false,
-        guidance: 'Detection failed. Please check your network connection and try again.',
+        guidance_key: 'networkError',
       })
     } finally {
       setIsDetecting(false)
@@ -894,7 +896,16 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                       {t('settings.machineFound', { hostname: detectResult.hostname || detectResult.ip })}
                     </span>
                   ) : (
-                    <span>{detectResult.guidance}</span>
+                    <div className="space-y-1">
+                      <span className="font-medium">{t(`settings.discovery.${detectResult.guidance_key || 'notFound'}`)}</span>
+                      {detectResult.guidance_hints && detectResult.guidance_hints.length > 0 && (
+                        <ul className="list-disc list-inside text-[11px] space-y-0.5 ml-1">
+                          {detectResult.guidance_hints.map((hint) => (
+                            <li key={hint}>{t(`settings.discovery.${hint}`)}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

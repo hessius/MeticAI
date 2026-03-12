@@ -94,13 +94,18 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set())
 
   const fetchRecentShots = useCallback(async (force = false) => {
-    // Serve from cache if still fresh
-    if (!force && shotAnalysisCache.recent && Date.now() - shotAnalysisCache.recent.fetchedAt < CACHE_TTL_MS) {
-      setRecentShots(shotAnalysisCache.recent.shots)
+    // Serve from cache immediately (stale-while-revalidate)
+    const cached = shotAnalysisCache.recent
+    if (cached) {
+      setRecentShots(cached.shots)
       setIsLoading(false)
-      return
+      // If still fresh and not forced, skip revalidation
+      if (!force && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return
+      // Revalidate in background
+      setIsRefreshing(true)
+    } else {
+      setIsLoading(true)
     }
-    if (force) setIsRefreshing(true); else setIsLoading(true)
     setError(null)
     try {
       const serverUrl = await getServerUrl()
@@ -111,7 +116,10 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
       shotAnalysisCache.recent = { shots, fetchedAt: Date.now() }
       setRecentShots(shots)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+      // Only set error if we have no cached data to show
+      if (!shotAnalysisCache.recent) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+      }
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
@@ -119,15 +127,21 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
   }, [])
 
   const fetchByProfile = useCallback(async (force = false) => {
-    if (!force && shotAnalysisCache.byProfile && Date.now() - shotAnalysisCache.byProfile.fetchedAt < CACHE_TTL_MS) {
-      setProfileGroups(shotAnalysisCache.byProfile.profiles)
-      if (shotAnalysisCache.byProfile.profiles.length > 0) {
-        setExpandedProfiles(new Set([shotAnalysisCache.byProfile.profiles[0].profile_name]))
+    // Serve from cache immediately (stale-while-revalidate)
+    const cached = shotAnalysisCache.byProfile
+    if (cached) {
+      setProfileGroups(cached.profiles)
+      if (cached.profiles.length > 0) {
+        setExpandedProfiles(prev => prev.size > 0 ? prev : new Set([cached.profiles[0].profile_name]))
       }
       setIsLoading(false)
-      return
+      // If still fresh and not forced, skip revalidation
+      if (!force && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return
+      // Revalidate in background
+      setIsRefreshing(true)
+    } else {
+      setIsLoading(true)
     }
-    if (force) setIsRefreshing(true); else setIsLoading(true)
     setError(null)
     try {
       const serverUrl = await getServerUrl()
@@ -138,10 +152,12 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
       shotAnalysisCache.byProfile = { profiles, fetchedAt: Date.now() }
       setProfileGroups(profiles)
       if (profiles.length > 0) {
-        setExpandedProfiles(new Set([profiles[0].profile_name]))
+        setExpandedProfiles(prev => prev.size > 0 ? prev : new Set([profiles[0].profile_name]))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+      if (!shotAnalysisCache.byProfile) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+      }
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
