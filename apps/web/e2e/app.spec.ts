@@ -15,7 +15,7 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     await expect(page).toHaveTitle('MeticAI - Espresso Profile Generator')
     
     // Check for the application title
-    await expect(page.getByText(/MeticAI/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /MeticAI/ })).toBeVisible()
   })
 
   test('should display form elements', async ({ page }) => {
@@ -162,7 +162,7 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Test desktop view
     await page.setViewportSize({ width: 1920, height: 1080 })
-    await expect(page.getByText(/MeticAI/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /MeticAI/ })).toBeVisible()
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
@@ -178,7 +178,7 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Test mobile view
     await page.setViewportSize({ width: 375, height: 667 })
-    await expect(page.getByText(/MeticAI/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /MeticAI/ })).toBeVisible()
     await expect(page.getByPlaceholder(/Balanced extraction/)).toBeVisible()
   })
 

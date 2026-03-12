@@ -51,11 +51,11 @@ test.describe('History View', () => {
 
     await historyButton.click()
     
-    // Click logo to go back
-    await page.locator('text=MeticAI').first().click()
+    // Click logo/heading to go back
+    await page.getByRole('heading', { name: /MeticAI/ }).click()
 
-    // Should be back on start view
-    await expect(page.getByRole('button', { name: /Generate New Profile/i })).toBeVisible({ timeout: 5000 })
+    // Should be back on start view (Profile Catalogue button is always visible on start)
+    await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })
   })
 })
 
