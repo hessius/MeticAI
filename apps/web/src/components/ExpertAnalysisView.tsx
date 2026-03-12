@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CaretLeft } from "@phosphor-icons/react";
-import { Loader2, Sparkles, RefreshCw, XCircle, Info } from "lucide-react";
-import { parseStructuredAnalysis } from "@/lib/parseAnalysis";
+import { Loader2, Sparkles, RefreshCw, XCircle, Info, Wand2 } from "lucide-react";
+import { parseStructuredAnalysis, parseRecommendationsJSON, hasRecommendations } from "@/lib/parseAnalysis";
+import type { Recommendation } from "@/lib/parseAnalysis";
 import { SectionCard } from "@/components/SectionCard";
+import { RecommendationSelectionDialog } from "@/components/RecommendationSelectionDialog";
 
 interface ExpertAnalysisViewProps {
   isLoading: boolean;
@@ -36,6 +38,35 @@ export function ExpertAnalysisView({
     if (!analysisResult) return [];
     return parseStructuredAnalysis(analysisResult);
   }, [analysisResult]);
+
+  const showRecommendations = useMemo(
+    () => !!analysisResult && hasRecommendations(analysisResult),
+    [analysisResult],
+  );
+
+  const recommendations: Recommendation[] = useMemo(() => {
+    if (!analysisResult) return [];
+    return parseRecommendationsJSON(analysisResult);
+  }, [analysisResult]);
+
+  const [recDialogOpen, setRecDialogOpen] = useState(false);
+
+  const handleApplyRecommendations = useCallback(
+    async (selected: Recommendation[]) => {
+      if (!profileName) return;
+      const form = new FormData();
+      form.append("recommendations", JSON.stringify(selected));
+      const res = await fetch(
+        `/api/profile/${encodeURIComponent(profileName)}/apply-recommendations`,
+        { method: "POST", body: form },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail?.message || body.detail || "Failed to apply recommendations");
+      }
+    },
+    [profileName],
+  );
   
   return (
     <motion.div
@@ -133,6 +164,32 @@ export function ExpertAnalysisView({
           </div>
         )}
         
+        {/* Apply Recommendations button */}
+        {!isLoading && !error && showRecommendations && profileName && (
+          <div className="flex items-center justify-center pt-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setRecDialogOpen(true)}
+              className="gap-2"
+            >
+              <Wand2 className="h-4 w-4" />
+              {t("recommendations.apply")}
+            </Button>
+          </div>
+        )}
+
+        {/* Recommendation Selection Dialog */}
+        {showRecommendations && profileName && (
+          <RecommendationSelectionDialog
+            open={recDialogOpen}
+            onOpenChange={setRecDialogOpen}
+            recommendations={recommendations}
+            profileName={profileName}
+            onApply={handleApplyRecommendations}
+          />
+        )}
+
         {/* Re-Analyze button */}
         {!isLoading && analysisResult && onReAnalyze && (
           <div className="flex items-center justify-center pt-2">

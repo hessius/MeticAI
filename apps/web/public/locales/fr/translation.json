@@ -1027,5 +1027,66 @@
       "deleteFromMachineFailed": "Échec de la suppression de la machine",
       "deleteProfileFailed": "Échec de la suppression du profil"
     }
+  },
+  "recommendations": {
+    "apply": "Appliquer les recommandations",
+    "selectChanges": "Sélectionner les modifications à appliquer",
+    "confidence": {
+      "high": "Confiance élevée",
+      "medium": "Confiance moyenne",
+      "low": "Confiance faible"
+    },
+    "infoOnly": "Information uniquement (non modifiable)",
+    "applying": "Application des modifications...",
+    "applied": "Recommandations appliquées avec succès",
+    "noRecommendations": "Aucune recommandation applicable trouvée",
+    "currentValue": "Actuel",
+    "recommendedValue": "Recommandé",
+    "selectAll": "Tout sélectionner",
+    "deselectAll": "Tout désélectionner"
+  },
+  "taste": {
+    "compass": {
+      "title": "Boussole de Goût",
+      "sour": "Acide",
+      "bitter": "Amer",
+      "weak": "Faible",
+      "strong": "Fort",
+      "balanced": "Équilibré",
+      "reset": "Réinitialiser le Goût",
+      "descriptors": "Descripteurs de Goût",
+      "positive": "Positif",
+      "negative": "Négatif",
+      "hint": "Faites glisser le point pour décrire votre expérience gustative"
+    },
+    "section": {
+      "title": "Recommandations Basées sur le Goût"
+    }
+  },
+  "variables": {
+    "panelTitle": "Ajustements des Variables",
+    "resetAll": "Tout réinitialiser",
+    "reset": "Réinitialiser",
+    "adjusted": "ajusté",
+    "noVariables": "Aucune variable ajustable dans ce profil",
+    "saveDialogTitle": "Sauvegarder les modifications ?",
+    "saveDialogDescription": "Votre shot a utilisé des variables ajustées. Souhaitez-vous conserver ces modifications ?",
+    "discardChanges": "Abandonner les modifications",
+    "saveToOriginal": "Sauvegarder dans le profil original",
+    "saveAsNew": "Sauvegarder comme nouveau profil",
+    "newProfileName": "Nom du nouveau profil...",
+    "savedToOriginal": "Modifications sauvegardées dans le profil original",
+    "savedAsNew": "Sauvegardé comme nouveau profil",
+    "saveFailed": "Échec de la sauvegarde des modifications"
+  },
+  "profileRecommendations": {
+    "title": "Profils recommandés",
+    "loading": "Recherche de profils correspondants…",
+    "empty": "Aucun profil correspondant trouvé. Essayez d'autres tags.",
+    "basedOn": "Basé sur vos tags et préférences sélectionnés",
+    "useProfile": "Utiliser",
+    "findSimilar": "Trouver similaires",
+    "similarTo": "Profils similaires à \"{{name}}\"",
+    "noSimilar": "Aucun profil similaire trouvé."
   }
 }

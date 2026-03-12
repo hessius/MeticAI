@@ -1027,5 +1027,66 @@
       "deleteFromMachineFailed": "Error al eliminar de la máquina",
       "deleteProfileFailed": "Error al eliminar el perfil"
     }
+  },
+  "recommendations": {
+    "apply": "Aplicar recomendaciones",
+    "selectChanges": "Seleccionar cambios a aplicar",
+    "confidence": {
+      "high": "Alta confianza",
+      "medium": "Confianza media",
+      "low": "Baja confianza"
+    },
+    "infoOnly": "Solo información (no se puede cambiar)",
+    "applying": "Aplicando cambios...",
+    "applied": "Recomendaciones aplicadas con éxito",
+    "noRecommendations": "No se encontraron recomendaciones aplicables",
+    "currentValue": "Actual",
+    "recommendedValue": "Recomendado",
+    "selectAll": "Seleccionar todos los aplicables",
+    "deselectAll": "Deseleccionar todos"
+  },
+  "taste": {
+    "compass": {
+      "title": "Brújula de Sabor",
+      "sour": "Ácido",
+      "bitter": "Amargo",
+      "weak": "Débil",
+      "strong": "Fuerte",
+      "balanced": "Equilibrado",
+      "reset": "Restablecer Sabor",
+      "descriptors": "Descriptores de Sabor",
+      "positive": "Positivo",
+      "negative": "Negativo",
+      "hint": "Arrastra el punto para describir tu experiencia de sabor"
+    },
+    "section": {
+      "title": "Recomendaciones Basadas en Sabor"
+    }
+  },
+  "variables": {
+    "panelTitle": "Ajustes de Variables",
+    "resetAll": "Restablecer todo",
+    "reset": "Restablecer",
+    "adjusted": "ajustado",
+    "noVariables": "No hay variables ajustables en este perfil",
+    "saveDialogTitle": "¿Guardar cambios de variables?",
+    "saveDialogDescription": "Tu shot usó variables ajustadas. ¿Te gustaría conservar estos cambios?",
+    "discardChanges": "Descartar cambios",
+    "saveToOriginal": "Guardar en perfil original",
+    "saveAsNew": "Guardar como nuevo perfil",
+    "newProfileName": "Nombre del nuevo perfil...",
+    "savedToOriginal": "Cambios guardados en el perfil original",
+    "savedAsNew": "Guardado como nuevo perfil",
+    "saveFailed": "No se pudieron guardar los cambios del perfil"
+  },
+  "profileRecommendations": {
+    "title": "Perfiles recomendados",
+    "loading": "Buscando perfiles coincidentes…",
+    "empty": "No se encontraron perfiles coincidentes. Prueba con otras etiquetas.",
+    "basedOn": "Basado en tus etiquetas y preferencias seleccionadas",
+    "useProfile": "Usar",
+    "findSimilar": "Buscar similares",
+    "similarTo": "Perfiles similares a \"{{name}}\"",
+    "noSimilar": "No se encontraron perfiles similares."
   }
 }

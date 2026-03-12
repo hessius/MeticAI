@@ -13097,3 +13097,242 @@ class TestMachineDetectEndpoint:
 
         with pytest.raises(Exception, match="Network timeout"):
             client.post("/api/machine/detect")
+
+
+# ============================================================================
+# Recommendation Pipeline Tests (#258)
+# ============================================================================
+
+class TestRecommendationParsing:
+    """Tests for _parse_recommendations_json and _classify_recommendation_patchable."""
+
+    def test_parse_valid_recommendations_json(self):
+        """Valid RECOMMENDATIONS_JSON block is parsed correctly."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """## 1. Shot Performance
+**What Happened:**
+- Test
+
+RECOMMENDATIONS_JSON:
+[
+  {
+    "variable": "pressure",
+    "current_value": 6.0,
+    "recommended_value": 7.0,
+    "stage": "extraction",
+    "confidence": "high",
+    "reason": "Under-extraction detected"
+  },
+  {
+    "variable": "temperature",
+    "current_value": 92,
+    "recommended_value": 94,
+    "stage": "global",
+    "confidence": "medium",
+    "reason": "Higher temp for dark roast"
+  }
+]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 2
+        assert recs[0]["variable"] == "pressure"
+        assert recs[0]["recommended_value"] == 7.0
+        assert recs[1]["confidence"] == "medium"
+
+    def test_parse_empty_recommendations(self):
+        """Empty array block is parsed as empty list."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """Some analysis text
+RECOMMENDATIONS_JSON:
+[]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert recs == []
+
+    def test_parse_missing_block(self):
+        """Missing RECOMMENDATIONS_JSON block returns empty list."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = "## 1. Shot Performance\nJust regular analysis text"
+        recs = _parse_recommendations_json(text)
+        assert recs == []
+
+    def test_parse_malformed_json(self):
+        """Malformed JSON in block returns empty list."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{broken json
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert recs == []
+
+    def test_classify_adjustable_variable(self):
+        """Adjustable variable (no info_ prefix) is patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "flow_main", "stage": "extraction"}
+        variables = [{"key": "flow_main", "name": "Main Flow", "type": "flow", "value": 2.5}]
+        assert _classify_recommendation_patchable(rec, variables) is True
+
+    def test_classify_info_variable(self):
+        """Info variable (info_ prefix) is not patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "info_dose", "stage": "extraction"}
+        variables = [{"key": "info_dose", "name": "☕ Dose", "type": "weight", "value": 18}]
+        assert _classify_recommendation_patchable(rec, variables) is False
+
+    def test_classify_adjustable_false_variable(self):
+        """Variable with adjustable=false is not patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "grind_info", "stage": "extraction"}
+        variables = [{"key": "grind_info", "name": "Grind", "type": "power", "value": 100, "adjustable": False}]
+        assert _classify_recommendation_patchable(rec, variables) is False
+
+    def test_classify_global_temperature(self):
+        """Global temperature setting is always patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "temperature", "stage": "global"}
+        assert _classify_recommendation_patchable(rec, []) is True
+
+    def test_classify_global_final_weight(self):
+        """Global final_weight setting is always patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "final_weight", "stage": "global"}
+        assert _classify_recommendation_patchable(rec, []) is True
+
+    def test_classify_unknown_variable(self):
+        """Unknown variable not in profile is not patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "unknown_var", "stage": "extraction"}
+        variables = [{"key": "flow_main", "name": "Main Flow", "type": "flow", "value": 2.5}]
+        assert _classify_recommendation_patchable(rec, variables) is False
+
+
+class TestApplyRecommendationsEndpoint:
+    """Tests for POST /api/profile/{name}/apply-recommendations."""
+
+    def _make_mock_profile(self, name="TestProfile", profile_id="abc-123",
+                           temperature=93.0, final_weight=36.0):
+        profile = Mock()
+        profile.id = profile_id
+        profile.name = name
+        profile.temperature = temperature
+        profile.final_weight = final_weight
+        profile.stages = []
+        var = SimpleNamespace(key="flow_main", name="Main Flow", value=2.5, type="flow")
+        info_var = SimpleNamespace(key="info_dose", name="☕ Dose", value=18.0, type="weight")
+        profile.variables = [var, info_var]
+        profile.error = None
+        profile.author = "MeticAI"
+        profile.author_id = None
+        profile.display = None
+        profile.isDefault = False
+        profile.source = None
+        profile.beverage_type = None
+        profile.tank_temperature = None
+        profile.previous_authors = None
+        return profile
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_valid_recommendations(self, mock_list, mock_get, mock_save, client):
+        """Applying valid adjustable recommendations succeeds."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps([
+            {"variable": "flow_main", "recommended_value": 3.0, "stage": "extraction"},
+        ])
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert len(data["applied"]) == 1
+        assert data["applied"][0]["variable"] == "flow_main"
+        mock_save.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_info_only_skipped(self, mock_list, mock_get, mock_save, client):
+        """Info-only variables are skipped when applying recommendations."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps([
+            {"variable": "info_dose", "recommended_value": 20.0, "stage": "extraction"},
+        ])
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "no_changes"
+        assert len(data["skipped"]) == 1
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_global_temperature(self, mock_list, mock_get, mock_save, client):
+        """Global temperature recommendation is applied correctly."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps([
+            {"variable": "temperature", "recommended_value": 95.0, "stage": "global"},
+        ])
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["applied"][0]["variable"] == "temperature"
+        assert profile.temperature == 95.0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_apply_invalid_json(self, client):
+        """Invalid JSON in recommendations returns 400."""
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": "not json"},
+        )
+        assert response.status_code == 400
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_profile_not_found(self, mock_list, client):
+        """Applying to non-existent profile returns 404."""
+        mock_list.return_value = []
+        recs = json.dumps([{"variable": "flow_main", "recommended_value": 3.0, "stage": "extraction"}])
+        response = client.post(
+            "/api/profile/NonExistent/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 404

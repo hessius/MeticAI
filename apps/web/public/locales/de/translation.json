@@ -1027,5 +1027,66 @@
       "deleteFromMachineFailed": "Löschen von der Maschine fehlgeschlagen",
       "deleteProfileFailed": "Profil konnte nicht gelöscht werden"
     }
+  },
+  "recommendations": {
+    "apply": "Empfehlungen anwenden",
+    "selectChanges": "Änderungen zum Anwenden auswählen",
+    "confidence": {
+      "high": "Hohe Zuversicht",
+      "medium": "Mittlere Zuversicht",
+      "low": "Geringe Zuversicht"
+    },
+    "infoOnly": "Nur Information (kann nicht geändert werden)",
+    "applying": "Änderungen werden angewendet...",
+    "applied": "Empfehlungen erfolgreich angewendet",
+    "noRecommendations": "Keine umsetzbaren Empfehlungen gefunden",
+    "currentValue": "Aktuell",
+    "recommendedValue": "Empfohlen",
+    "selectAll": "Alle anwendbaren auswählen",
+    "deselectAll": "Alle abwählen"
+  },
+  "taste": {
+    "compass": {
+      "title": "Geschmackskompass",
+      "sour": "Sauer",
+      "bitter": "Bitter",
+      "weak": "Schwach",
+      "strong": "Stark",
+      "balanced": "Ausgewogen",
+      "reset": "Geschmack zurücksetzen",
+      "descriptors": "Geschmacksbeschreibungen",
+      "positive": "Positiv",
+      "negative": "Negativ",
+      "hint": "Ziehen Sie den Punkt, um Ihr Geschmackserlebnis zu beschreiben"
+    },
+    "section": {
+      "title": "Geschmacksbasierte Empfehlungen"
+    }
+  },
+  "variables": {
+    "panelTitle": "Variablen-Anpassungen",
+    "resetAll": "Alle zurücksetzen",
+    "reset": "Zurücksetzen",
+    "adjusted": "angepasst",
+    "noVariables": "Keine anpassbaren Variablen in diesem Profil",
+    "saveDialogTitle": "Variablenänderungen speichern?",
+    "saveDialogDescription": "Ihr Shot verwendete angepasste Variablen. Möchten Sie diese Änderungen beibehalten?",
+    "discardChanges": "Änderungen verwerfen",
+    "saveToOriginal": "Im Originalprofil speichern",
+    "saveAsNew": "Als neues Profil speichern",
+    "newProfileName": "Neuer Profilname...",
+    "savedToOriginal": "Änderungen im Originalprofil gespeichert",
+    "savedAsNew": "Als neues Profil gespeichert",
+    "saveFailed": "Profiländerungen konnten nicht gespeichert werden"
+  },
+  "profileRecommendations": {
+    "title": "Empfohlene Profile",
+    "loading": "Passende Profile werden gesucht…",
+    "empty": "Keine passenden Profile gefunden. Versuche andere Tags.",
+    "basedOn": "Basierend auf deinen ausgewählten Tags und Vorlieben",
+    "useProfile": "Verwenden",
+    "findSimilar": "Ähnliche finden",
+    "similarTo": "Profile ähnlich zu \"{{name}}\"",
+    "noSimilar": "Keine ähnlichen Profile gefunden."
   }
 }

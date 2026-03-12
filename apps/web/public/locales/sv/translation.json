@@ -1027,5 +1027,66 @@
       "deleteFromMachineFailed": "Kunde inte ta bort från maskinen",
       "deleteProfileFailed": "Kunde inte ta bort profilen"
     }
+  },
+  "recommendations": {
+    "apply": "Tillämpa rekommendationer",
+    "selectChanges": "Välj ändringar att tillämpa",
+    "confidence": {
+      "high": "Hög tillförlitlighet",
+      "medium": "Medelhög tillförlitlighet",
+      "low": "Låg tillförlitlighet"
+    },
+    "infoOnly": "Endast information (kan inte ändras)",
+    "applying": "Tillämpar ändringar...",
+    "applied": "Rekommendationer tillämpade framgångsrikt",
+    "noRecommendations": "Inga tillämpbara rekommendationer hittades",
+    "currentValue": "Nuvarande",
+    "recommendedValue": "Rekommenderat",
+    "selectAll": "Välj alla tillämpbara",
+    "deselectAll": "Avmarkera alla"
+  },
+  "taste": {
+    "compass": {
+      "title": "Smakkompass",
+      "sour": "Surt",
+      "bitter": "Bittert",
+      "weak": "Svagt",
+      "strong": "Starkt",
+      "balanced": "Balanserat",
+      "reset": "Återställ Smak",
+      "descriptors": "Smakbeskrivningar",
+      "positive": "Positiv",
+      "negative": "Negativ",
+      "hint": "Dra punkten för att beskriva din smakupplevelse"
+    },
+    "section": {
+      "title": "Smakbaserade Rekommendationer"
+    }
+  },
+  "variables": {
+    "panelTitle": "Variabeljusteringar",
+    "resetAll": "Återställ alla",
+    "reset": "Återställ",
+    "adjusted": "justerad",
+    "noVariables": "Inga justerbara variabler i denna profil",
+    "saveDialogTitle": "Spara variabeländringar?",
+    "saveDialogDescription": "Ditt shot använde justerade variabler. Vill du behålla dessa ändringar?",
+    "discardChanges": "Förkasta ändringar",
+    "saveToOriginal": "Spara i originalprofilen",
+    "saveAsNew": "Spara som ny profil",
+    "newProfileName": "Nytt profilnamn...",
+    "savedToOriginal": "Ändringar sparade i originalprofilen",
+    "savedAsNew": "Sparad som ny profil",
+    "saveFailed": "Kunde inte spara profiländringar"
+  },
+  "profileRecommendations": {
+    "title": "Rekommenderade profiler",
+    "loading": "Söker matchande profiler…",
+    "empty": "Inga matchande profiler hittades. Prova andra taggar.",
+    "basedOn": "Baserat på dina valda taggar och preferenser",
+    "useProfile": "Använd",
+    "findSimilar": "Hitta liknande",
+    "similarTo": "Profiler liknande \"{{name}}\"",
+    "noSimilar": "Inga liknande profiler hittades."
   }
 }

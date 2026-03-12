@@ -196,3 +196,63 @@ export function parseStructuredAnalysis(text: string): ParsedSection[] {
 
   return sections;
 }
+
+// ---- Recommendation Types & Parser ----
+
+export interface Recommendation {
+  variable: string;
+  current_value: number;
+  recommended_value: number;
+  stage: string;
+  confidence: "high" | "medium" | "low";
+  reason: string;
+  is_patchable: boolean;
+}
+
+/**
+ * Parse the RECOMMENDATIONS_JSON block from an analysis string.
+ *
+ * Expected format:
+ *   RECOMMENDATIONS_JSON:
+ *   [ ... ]
+ *   END_RECOMMENDATIONS_JSON
+ */
+export function parseRecommendationsJSON(text: string): Recommendation[] {
+  const match = text.match(
+    /RECOMMENDATIONS_JSON:\s*\n\s*(\[[\s\S]*?\])\s*\n\s*END_RECOMMENDATIONS_JSON/,
+  );
+  if (!match) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(match[1]);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === "object" && item !== null,
+      )
+      .map((item) => ({
+        variable: String(item.variable ?? ""),
+        current_value: Number(item.current_value ?? 0),
+        recommended_value: Number(item.recommended_value ?? 0),
+        stage: String(item.stage ?? ""),
+        confidence: (["high", "medium", "low"].includes(
+          String(item.confidence),
+        )
+          ? String(item.confidence)
+          : "low") as "high" | "medium" | "low",
+        reason: String(item.reason ?? ""),
+        is_patchable: Boolean(item.is_patchable),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Check if an analysis string contains a RECOMMENDATIONS_JSON block.
+ */
+export function hasRecommendations(text: string): boolean {
+  return /RECOMMENDATIONS_JSON:\s*\n/.test(text);
+}

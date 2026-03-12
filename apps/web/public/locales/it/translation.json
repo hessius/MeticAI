@@ -1027,5 +1027,66 @@
       "deleteFromMachineFailed": "Impossibile eliminare dalla macchina",
       "deleteProfileFailed": "Impossibile eliminare il profilo"
     }
+  },
+  "recommendations": {
+    "apply": "Applica raccomandazioni",
+    "selectChanges": "Seleziona le modifiche da applicare",
+    "confidence": {
+      "high": "Alta affidabilità",
+      "medium": "Media affidabilità",
+      "low": "Bassa affidabilità"
+    },
+    "infoOnly": "Solo informazione (non modificabile)",
+    "applying": "Applicazione modifiche...",
+    "applied": "Raccomandazioni applicate con successo",
+    "noRecommendations": "Nessuna raccomandazione applicabile trovata",
+    "currentValue": "Attuale",
+    "recommendedValue": "Raccomandato",
+    "selectAll": "Seleziona tutti applicabili",
+    "deselectAll": "Deseleziona tutti"
+  },
+  "taste": {
+    "compass": {
+      "title": "Bussola del Gusto",
+      "sour": "Acido",
+      "bitter": "Amaro",
+      "weak": "Debole",
+      "strong": "Forte",
+      "balanced": "Equilibrato",
+      "reset": "Reimposta Gusto",
+      "descriptors": "Descrittori di Gusto",
+      "positive": "Positivo",
+      "negative": "Negativo",
+      "hint": "Trascina il punto per descrivere la tua esperienza di gusto"
+    },
+    "section": {
+      "title": "Raccomandazioni Basate sul Gusto"
+    }
+  },
+  "variables": {
+    "panelTitle": "Regolazioni Variabili",
+    "resetAll": "Ripristina tutto",
+    "reset": "Ripristina",
+    "adjusted": "regolato",
+    "noVariables": "Nessuna variabile regolabile in questo profilo",
+    "saveDialogTitle": "Salvare le modifiche alle variabili?",
+    "saveDialogDescription": "Il tuo shot ha utilizzato variabili regolate. Vuoi mantenere queste modifiche?",
+    "discardChanges": "Scarta le modifiche",
+    "saveToOriginal": "Salva nel profilo originale",
+    "saveAsNew": "Salva come nuovo profilo",
+    "newProfileName": "Nome del nuovo profilo...",
+    "savedToOriginal": "Modifiche salvate nel profilo originale",
+    "savedAsNew": "Salvato come nuovo profilo",
+    "saveFailed": "Impossibile salvare le modifiche al profilo"
+  },
+  "profileRecommendations": {
+    "title": "Profili consigliati",
+    "loading": "Ricerca profili corrispondenti…",
+    "empty": "Nessun profilo corrispondente trovato. Prova con altri tag.",
+    "basedOn": "In base ai tag e alle preferenze selezionati",
+    "useProfile": "Usa",
+    "findSimilar": "Trova simili",
+    "similarTo": "Profili simili a \"{{name}}\"",
+    "noSimilar": "Nessun profilo simile trovato."
   }
 }

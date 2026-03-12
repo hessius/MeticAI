@@ -1042,5 +1042,66 @@
     "weightPositive": "Target weight must be greater than 0",
     "unsavedChanges": "You have unsaved changes. Discard them?",
     "noChanges": "No changes to save"
+  },
+  "recommendations": {
+    "apply": "Apply Recommendations",
+    "selectChanges": "Select changes to apply",
+    "confidence": {
+      "high": "High confidence",
+      "medium": "Medium confidence",
+      "low": "Low confidence"
+    },
+    "infoOnly": "Information only (cannot be changed)",
+    "applying": "Applying changes...",
+    "applied": "Recommendations applied successfully",
+    "noRecommendations": "No actionable recommendations found",
+    "currentValue": "Current",
+    "recommendedValue": "Recommended",
+    "selectAll": "Select all patchable",
+    "deselectAll": "Deselect all"
+  },
+  "taste": {
+    "compass": {
+      "title": "Taste Compass",
+      "sour": "Sour",
+      "bitter": "Bitter",
+      "weak": "Weak",
+      "strong": "Strong",
+      "balanced": "Balanced",
+      "reset": "Reset Taste",
+      "descriptors": "Taste Descriptors",
+      "positive": "Positive",
+      "negative": "Negative",
+      "hint": "Drag the point to describe your taste experience"
+    },
+    "section": {
+      "title": "Taste-Based Recommendations"
+    }
+  },
+  "variables": {
+    "panelTitle": "Variable Adjustments",
+    "resetAll": "Reset All",
+    "reset": "Reset",
+    "adjusted": "adjusted",
+    "noVariables": "No adjustable variables in this profile",
+    "saveDialogTitle": "Save Variable Changes?",
+    "saveDialogDescription": "Your shot used adjusted variables. Would you like to keep these changes?",
+    "discardChanges": "Discard changes",
+    "saveToOriginal": "Save to original profile",
+    "saveAsNew": "Save as new profile",
+    "newProfileName": "New profile name...",
+    "savedToOriginal": "Changes saved to original profile",
+    "savedAsNew": "Saved as new profile",
+    "saveFailed": "Failed to save profile changes"
+  },
+  "profileRecommendations": {
+    "title": "Recommended Profiles",
+    "loading": "Finding matching profiles…",
+    "empty": "No matching profiles found. Try selecting different tags.",
+    "basedOn": "Based on your selected tags and preferences",
+    "useProfile": "Use",
+    "findSimilar": "Find Similar",
+    "similarTo": "Profiles similar to \"{{name}}\"",
+    "noSimilar": "No similar profiles found."
   }
 }

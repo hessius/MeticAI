@@ -34,6 +34,7 @@ from services.meticulous_service import (
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
+from services.profile_recommendation_service import recommendation_service
 from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
@@ -1127,6 +1128,7 @@ async def edit_profile(profile_name: str, request: Request):
 
         # --- persist -------------------------------------------------------------
         await async_save_profile(full_profile)
+        recommendation_service.invalidate_cache()
 
         logger.info(
             f"Profile edited: '{old_name}' → '{full_profile.name}'",
@@ -1850,6 +1852,7 @@ async def delete_machine_profile(profile_id: str, request: Request):
         )
         
         result = await async_delete_profile(profile_id)
+        recommendation_service.invalidate_cache()
         
         logger.info(
             f"Successfully deleted profile: {profile_name}",
@@ -1942,6 +1945,7 @@ async def update_machine_profile(profile_id: str, request: Request):
         
         # Save the updated profile
         await async_save_profile(profile_dict)
+        recommendation_service.invalidate_cache()
         
         logger.info(
             f"Successfully renamed profile to '{new_name}'",
@@ -3335,3 +3339,239 @@ async def _restore_scheduled_shots():
     if restored_count > 0:
         logger.info(f"Restored {restored_count} scheduled shot(s) from persistence")
 
+
+# ============================================================================
+# Apply AI Recommendations
+# ============================================================================
+
+@router.post("/profile/{name:path}/apply-recommendations")
+@router.post("/api/profile/{name:path}/apply-recommendations")
+async def apply_recommendations(
+    name: str,
+    request: Request,
+    recommendations: str = Form(...),
+):
+    """Apply selected AI recommendations to a profile.
+
+    Only applies patchable (adjustable) variables. Info-only variables
+    and unknown keys are silently skipped.
+
+    Args:
+        name: Profile name on the machine.
+        recommendations: JSON string — list of recommendation objects with
+            at least ``variable``, ``recommended_value``, ``stage``.
+
+    Returns:
+        Updated profile dict.
+    """
+    request_id = request.state.request_id
+
+    try:
+        recs = json.loads(recommendations)
+        if not isinstance(recs, list):
+            raise HTTPException(status_code=400, detail="recommendations must be a JSON array")
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid recommendations JSON: {exc}")
+
+    try:
+        # --- find profile by name ------------------------------------------------
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(status_code=502, detail=f"Machine API error: {profiles_result.error}")
+
+        matching_profile = None
+        for p in profiles_result:
+            if p.name == name:
+                matching_profile = p
+                break
+
+        if matching_profile is None:
+            raise HTTPException(status_code=404, detail=f"Profile '{name}' not found on machine")
+
+        full_profile = await async_get_profile(matching_profile.id)
+        if hasattr(full_profile, "error") and full_profile.error:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch profile: {full_profile.error}")
+
+        applied: list[dict] = []
+        skipped: list[dict] = []
+
+        for rec in recs:
+            variable = rec.get("variable", "")
+            recommended_value = rec.get("recommended_value")
+            stage = rec.get("stage", "")
+
+            if recommended_value is None:
+                skipped.append({"variable": variable, "reason": "no recommended_value"})
+                continue
+
+            # --- global settings (temperature, final_weight) ---
+            if stage == "global":
+                if variable == "temperature" and hasattr(full_profile, "temperature"):
+                    try:
+                        val = float(recommended_value)
+                    except (TypeError, ValueError):
+                        skipped.append({"variable": variable, "reason": "invalid value"})
+                        continue
+                    if val > 100:
+                        skipped.append({"variable": variable, "reason": "exceeds 100 °C"})
+                        continue
+                    full_profile.temperature = val
+                    applied.append({"variable": variable, "stage": stage, "value": val})
+                    continue
+                elif variable == "final_weight" and hasattr(full_profile, "final_weight"):
+                    try:
+                        val = float(recommended_value)
+                    except (TypeError, ValueError):
+                        skipped.append({"variable": variable, "reason": "invalid value"})
+                        continue
+                    if val <= 0:
+                        skipped.append({"variable": variable, "reason": "must be > 0"})
+                        continue
+                    full_profile.final_weight = val
+                    applied.append({"variable": variable, "stage": stage, "value": val})
+                    continue
+
+            # --- profile variables ---
+            if hasattr(full_profile, "variables") and full_profile.variables:
+                matched_var = False
+                for var in full_profile.variables:
+                    var_key = getattr(var, "key", "")
+                    if var_key == variable:
+                        # Skip info-only variables
+                        if var_key.startswith("info_") or getattr(var, "adjustable", None) is False:
+                            skipped.append({"variable": variable, "reason": "info-only / not adjustable"})
+                            matched_var = True
+                            break
+                        try:
+                            var.value = float(recommended_value)
+                        except (TypeError, ValueError):
+                            skipped.append({"variable": variable, "reason": "invalid value"})
+                            matched_var = True
+                            break
+                        applied.append({"variable": variable, "stage": stage, "value": var.value})
+                        matched_var = True
+                        break
+                if matched_var:
+                    continue
+
+            skipped.append({"variable": variable, "reason": "variable not found in profile"})
+
+        if not applied:
+            return {
+                "status": "no_changes",
+                "message": "No applicable recommendations to apply",
+                "applied": [],
+                "skipped": skipped,
+            }
+
+        # --- persist -------------------------------------------------------------
+        await async_save_profile(full_profile)
+
+        logger.info(
+            f"Applied {len(applied)} recommendation(s) to profile '{name}'",
+            extra={"request_id": request_id, "applied_count": len(applied), "skipped_count": len(skipped)},
+        )
+
+        return {
+            "status": "success",
+            "profile": deep_convert_to_dict(full_profile),
+            "applied": applied,
+            "skipped": skipped,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to apply recommendations: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": name},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+# ============================================================================
+# Profile recommendations
+# ============================================================================
+
+
+@router.post("/profiles/recommend")
+@router.post("/api/profiles/recommend")
+async def recommend_profiles(
+    request: Request,
+    tags: list[str] = Form(default=[]),
+    roast_level: Optional[str] = Form(default=None),
+    beverage_type: Optional[str] = Form(default=None),
+    description: Optional[str] = Form(default=None),
+    limit: int = Form(default=5),
+):
+    """Return profile recommendations based on user preferences.
+
+    Uses a two-tier scoring system:
+    1. Local tag/roast/beverage matching (always available)
+    2. LLM semantic ranking via Gemini (when available)
+    """
+    request_id = request.state.request_id
+
+    try:
+        results = await recommendation_service.get_recommendations(
+            tags=tags,
+            roast_level=roast_level,
+            beverage_type=beverage_type,
+            description=description,
+            limit=limit,
+        )
+
+        return {
+            "status": "success",
+            "recommendations": results,
+            "count": len(results),
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get recommendations: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/profiles/find-similar")
+@router.post("/api/profiles/find-similar")
+async def find_similar_profiles(
+    request: Request,
+    profile_name: str = Form(...),
+    limit: int = Form(default=10),
+):
+    """Find profiles similar to a given source profile."""
+    request_id = request.state.request_id
+
+    try:
+        results = await recommendation_service.find_similar(
+            source_profile_name=profile_name,
+            limit=limit,
+        )
+
+        return {
+            "status": "success",
+            "recommendations": results,
+            "count": len(results),
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Failed to find similar profiles: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
