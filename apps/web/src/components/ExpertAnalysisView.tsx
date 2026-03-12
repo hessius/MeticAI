@@ -1,24 +1,14 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { CaretLeft } from "@phosphor-icons/react";
-import { 
-  Loader2, 
-  Sparkles, 
-  Info, 
-  RefreshCw,
-  Target,
-  Wrench,
-  Lightbulb,
-  TrendingUp,
-  XCircle,
-  AlertCircle
-} from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, XCircle, Info } from "lucide-react";
+import { parseStructuredAnalysis } from "@/lib/parseAnalysis";
+import { SectionCard } from "@/components/SectionCard";
 
 interface ExpertAnalysisViewProps {
   isLoading: boolean;
@@ -29,156 +19,6 @@ interface ExpertAnalysisViewProps {
   profileName?: string;
   shotDate?: string;
   isCached?: boolean;
-}
-
-// Section configuration with colors and icons
-const SECTION_CONFIG: Record<string, { icon: React.ReactNode; color: string; borderColor: string }> = {
-  "1. Shot Performance": {
-    icon: <Target className="h-5 w-5" />,
-    color: "text-blue-600 dark:text-blue-400",
-    borderColor: "border-blue-500/30"
-  },
-  "2. Root Cause Analysis": {
-    icon: <AlertCircle className="h-5 w-5" />,
-    color: "text-amber-600 dark:text-amber-400",
-    borderColor: "border-amber-500/30"
-  },
-  "3. Setup Recommendations": {
-    icon: <Wrench className="h-5 w-5" />,
-    color: "text-green-600 dark:text-green-400",
-    borderColor: "border-green-500/30"
-  },
-  "4. Profile Recommendations": {
-    icon: <TrendingUp className="h-5 w-5" />,
-    color: "text-purple-600 dark:text-purple-400",
-    borderColor: "border-purple-500/30"
-  },
-  "5. Profile Design Observations": {
-    icon: <Lightbulb className="h-5 w-5" />,
-    color: "text-cyan-600 dark:text-cyan-400",
-    borderColor: "border-cyan-500/30"
-  }
-};
-
-interface ParsedSection {
-  title: string;
-  number: string;
-  content: string;
-  subsections: { title: string; items: string[] }[];
-  assessment?: { status: string; color: string };
-}
-
-function parseStructuredAnalysis(text: string): ParsedSection[] {
-  const sections: ParsedSection[] = [];
-  
-  const sectionRegex = /^## (\d+)\.\s+(.+)$/gm;
-  const matches = [...text.matchAll(sectionRegex)];
-  
-  for (let i = 0; i < matches.length; i++) {
-    const match = matches[i];
-    const number = match[1];
-    const title = `${number}. ${match[2].trim()}`;
-    const startIndex = match.index! + match[0].length;
-    const endIndex = i < matches.length - 1 ? matches[i + 1].index! : text.length;
-    const sectionContent = text.slice(startIndex, endIndex).trim();
-    
-    const subsections: { title: string; items: string[] }[] = [];
-    const subsectionRegex = /\*\*([^*]+):\*\*/g;
-    const subsectionMatches = [...sectionContent.matchAll(subsectionRegex)];
-    
-    for (let j = 0; j < subsectionMatches.length; j++) {
-      const subMatch = subsectionMatches[j];
-      const subTitle = subMatch[1].trim();
-      const subStart = subMatch.index! + subMatch[0].length;
-      const subEnd = j < subsectionMatches.length - 1 ? subsectionMatches[j + 1].index! : sectionContent.length;
-      const subContent = sectionContent.slice(subStart, subEnd).trim();
-      
-      const items = subContent
-        .split('\n')
-        .map(line => line.replace(/^[-•]\s*/, '').trim())
-        .filter(line => line.length > 0 && !line.startsWith('**'));
-      
-      if (items.length > 0) {
-        subsections.push({ title: subTitle, items });
-      }
-    }
-    
-    let assessment: { status: string; color: string } | undefined;
-    const assessmentMatch = sectionContent.match(/\*\*Assessment:\*\*\s*\[?([^\]\n]+)\]?/i);
-    if (assessmentMatch) {
-      const status = assessmentMatch[1].trim();
-      let color = "bg-gray-600 dark:bg-gray-500";
-      if (status.toLowerCase().includes("good")) color = "bg-green-700 dark:bg-green-500";
-      else if (status.toLowerCase().includes("acceptable")) color = "bg-yellow-600 dark:bg-yellow-500";
-      else if (status.toLowerCase().includes("needs improvement")) color = "bg-orange-700 dark:bg-orange-500";
-      else if (status.toLowerCase().includes("problematic")) color = "bg-red-700 dark:bg-red-500";
-      assessment = { status, color };
-    }
-    
-    sections.push({
-      title,
-      number,
-      content: sectionContent,
-      subsections,
-      assessment
-    });
-  }
-  
-  return sections;
-}
-
-// Circled number characters for section numbering
-const CIRCLED_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳'];
-
-function SectionCard({ section }: { section: ParsedSection }) {
-  const config = SECTION_CONFIG[section.title] || {
-    icon: <Info className="h-5 w-5" />,
-    color: "text-gray-600 dark:text-gray-400",
-    borderColor: "border-gray-500/30"
-  };
-  
-  return (
-    <Card className={`${config.borderColor} border-2 overflow-hidden`}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-          <span className={`shrink-0 ${config.color}`}>{config.icon}</span>
-          <span className="text-foreground font-semibold">{section.title}</span>
-          {section.assessment && (
-            <Badge className={`${section.assessment.color} text-white shrink-0`}>
-              {section.assessment.status}
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-4">
-        {section.subsections.map((subsection, idx) => (
-          <div key={idx} className="space-y-2">
-            <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
-              <span className={`text-base shrink-0 ${config.color}`}>{CIRCLED_NUMBERS[idx] || `${idx + 1}.`}</span>
-              <span className="break-words">{subsection.title}</span>
-            </h4>
-            <ul className="space-y-1.5 pl-6">
-              {subsection.items.map((item, itemIdx) => (
-                <li key={itemIdx} className="text-sm text-muted-foreground flex items-start gap-2">
-                  <span className="text-primary shrink-0 leading-relaxed">•</span>
-                  <span className="leading-relaxed">{item}</span>
-                </li>
-              ))}
-            </ul>
-            {idx < section.subsections.length - 1 && (
-              <Separator className="mt-3" />
-            )}
-          </div>
-        ))}
-        
-        {section.subsections.length === 0 && (
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-            {section.content}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
 }
 
 export function ExpertAnalysisView({
