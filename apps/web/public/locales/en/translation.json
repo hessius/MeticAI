@@ -1092,7 +1092,11 @@
     "newProfileName": "New profile name...",
     "savedToOriginal": "Changes saved to original profile",
     "savedAsNew": "Saved as new profile",
-    "saveFailed": "Failed to save profile changes"
+    "saveFailed": "Failed to save profile changes",
+    "adjust": "Adjust Variables",
+    "overridesApplied": "{{count}} adjusted",
+    "original": "Original: {{value}}",
+    "noAdjustable": "No adjustable variables in this profile"
   },
   "profileRecommendations": {
     "title": "Recommended Profiles",

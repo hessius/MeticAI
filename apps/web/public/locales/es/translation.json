@@ -1077,7 +1077,11 @@
     "newProfileName": "Nombre del nuevo perfil...",
     "savedToOriginal": "Cambios guardados en el perfil original",
     "savedAsNew": "Guardado como nuevo perfil",
-    "saveFailed": "No se pudieron guardar los cambios del perfil"
+    "saveFailed": "No se pudieron guardar los cambios del perfil",
+    "adjust": "Ajustar variables",
+    "overridesApplied": "{{count}} ajustadas",
+    "original": "Original: {{value}}",
+    "noAdjustable": "No hay variables ajustables en este perfil"
   },
   "profileRecommendations": {
     "title": "Perfiles recomendados",

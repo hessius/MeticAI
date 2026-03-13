@@ -1077,7 +1077,11 @@
     "newProfileName": "Nytt profilnamn...",
     "savedToOriginal": "Ändringar sparade i originalprofilen",
     "savedAsNew": "Sparad som ny profil",
-    "saveFailed": "Kunde inte spara profiländringar"
+    "saveFailed": "Kunde inte spara profiländringar",
+    "adjust": "Justera variabler",
+    "overridesApplied": "{{count}} justerade",
+    "original": "Original: {{value}}",
+    "noAdjustable": "Inga justerbara variabler i denna profil"
   },
   "profileRecommendations": {
     "title": "Rekommenderade profiler",

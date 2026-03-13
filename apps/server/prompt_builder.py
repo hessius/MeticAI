@@ -576,3 +576,77 @@ def build_image_prompt_with_metadata(profile_name: str, style: str, tags: List[s
     """
     builder = PromptBuilder(profile_name, style, tags)
     return builder.build_with_metadata()
+
+
+# =============================================================================
+# TASTE COMPASS — Espresso Compass prompt context
+# =============================================================================
+
+def _describe_axis_value(value: float, negative_label: str, positive_label: str) -> str:
+    """Convert a -1..1 axis value to a human-readable description."""
+    abs_val = abs(value)
+    if abs_val < 0.15:
+        return "Balanced"
+    if abs_val < 0.4:
+        intensity = "Slightly"
+    elif abs_val < 0.7:
+        intensity = "Moderately"
+    else:
+        intensity = "Very"
+    direction = positive_label if value > 0 else negative_label
+    return f"{intensity} {direction}"
+
+
+def build_taste_context(
+    taste_x: float | None,
+    taste_y: float | None,
+    taste_descriptors: list[str] | None,
+) -> str:
+    """Build taste feedback context for the analysis prompt.
+
+    Args:
+        taste_x: -1 (sour) to 1 (bitter), or None
+        taste_y: -1 (weak/thin) to 1 (strong/heavy), or None
+        taste_descriptors: optional list of taste descriptor strings
+
+    Returns:
+        A prompt section string, or empty string when no data is present.
+    """
+    has_coords = taste_x is not None and taste_y is not None
+    has_descriptors = bool(taste_descriptors)
+
+    if not has_coords and not has_descriptors:
+        return ""
+
+    lines: List[str] = [
+        "",
+        "## User Taste Feedback (Espresso Compass)",
+        "The user reports this shot tasted:",
+    ]
+
+    if has_coords:
+        balance_desc = _describe_axis_value(taste_x, "Sour", "Bitter")
+        body_desc = _describe_axis_value(taste_y, "Weak/Thin", "Strong/Heavy")
+        lines.append(f"- Balance: {balance_desc} (X: {taste_x:.2f})")
+        lines.append(f"- Body: {body_desc} (Y: {taste_y:.2f})")
+
+    if has_descriptors:
+        lines.append(f"- Descriptors: {', '.join(taste_descriptors)}")
+
+    lines.append("")
+    lines.append("### Espresso Compass Domain Knowledge")
+    lines.append("- Sour (negative X) typically indicates under-extraction → increase temperature, pressure, or contact time")
+    lines.append("- Bitter (positive X) typically indicates over-extraction → decrease temperature, pressure, or contact time")
+    lines.append("- Weak/Thin (negative Y) → increase dose or decrease water volume (lower ratio)")
+    lines.append("- Strong/Heavy (positive Y) → decrease dose or increase water volume (higher ratio)")
+    lines.append("- Quadrant: Sour + Weak = severely under-extracted, needs major grind/temp adjustment")
+    lines.append("- Quadrant: Sour + Strong = high-dose under-extraction, grind finer or increase temp")
+    lines.append("- Quadrant: Bitter + Weak = channeling likely, improve puck prep and lower temp")
+    lines.append("- Quadrant: Bitter + Strong = over-extracted and over-dosed, coarsen grind and reduce dose")
+    lines.append("")
+    lines.append("Based on this taste feedback, include a '## 6. Taste-Based Recommendations' section in your analysis that:")
+    lines.append("1. Correlates the taste perception with the extraction data")
+    lines.append("2. Suggests specific variable adjustments to address taste issues")
+    lines.append("3. Explains the coffee science behind the recommendations")
+
+    return "\n".join(lines)

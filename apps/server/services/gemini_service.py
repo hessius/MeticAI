@@ -2,6 +2,7 @@
 
 from google import genai
 import asyncio
+import hashlib
 import os
 import re
 from typing import Optional
@@ -547,3 +548,32 @@ def build_advanced_customization_section(advanced_customization: Optional[str]) 
         f"• If basket size/type is specified, account for it in your dose and extraction design\n"
         f"• If bottom filter is specified, mention it in preparation notes\n\n"
     )
+
+
+# =============================================================================
+# Taste Compass — cache key helpers
+# =============================================================================
+
+def compute_taste_hash(
+    taste_x: float | None,
+    taste_y: float | None,
+    taste_descriptors: list[str] | None,
+) -> str | None:
+    """Return a short hash for taste data, or None when no taste input is present.
+
+    Used to differentiate cached analyses: same shot *without* taste data keeps
+    its original cache entry, while taste-aware analyses get a separate one.
+    """
+    has_coords = taste_x is not None and taste_y is not None
+    has_desc = bool(taste_descriptors)
+    if not has_coords and not has_desc:
+        return None
+
+    parts: list[str] = []
+    if has_coords:
+        parts.append(f"{taste_x:.4f},{taste_y:.4f}")
+    if has_desc:
+        parts.append(",".join(sorted(taste_descriptors)))
+
+    raw = "|".join(parts)
+    return hashlib.sha256(raw.encode()).hexdigest()[:12]

@@ -1077,7 +1077,11 @@
     "newProfileName": "Nom du nouveau profil...",
     "savedToOriginal": "Modifications sauvegardées dans le profil original",
     "savedAsNew": "Sauvegardé comme nouveau profil",
-    "saveFailed": "Échec de la sauvegarde des modifications"
+    "saveFailed": "Échec de la sauvegarde des modifications",
+    "adjust": "Ajuster les variables",
+    "overridesApplied": "{{count}} ajustées",
+    "original": "Original : {{value}}",
+    "noAdjustable": "Aucune variable ajustable dans ce profil"
   },
   "profileRecommendations": {
     "title": "Profils recommandés",

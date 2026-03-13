@@ -1077,7 +1077,11 @@
     "newProfileName": "Neuer Profilname...",
     "savedToOriginal": "Änderungen im Originalprofil gespeichert",
     "savedAsNew": "Als neues Profil gespeichert",
-    "saveFailed": "Profiländerungen konnten nicht gespeichert werden"
+    "saveFailed": "Profiländerungen konnten nicht gespeichert werden",
+    "adjust": "Variablen anpassen",
+    "overridesApplied": "{{count}} angepasst",
+    "original": "Original: {{value}}",
+    "noAdjustable": "Keine anpassbaren Variablen in diesem Profil"
   },
   "profileRecommendations": {
     "title": "Empfohlene Profile",
