@@ -208,7 +208,11 @@
     "generateAiDescription": "KI-Erklärung generieren",
     "generatingAiDescription": "KI-Erklärung wird generiert...",
     "aiDescriptionGenerated": "KI-Erklärung erfolgreich generiert",
-    "aiDescriptionFailed": "KI-Erklärung konnte nicht generiert werden"
+    "aiDescriptionFailed": "KI-Erklärung konnte nicht generiert werden",
+    "notes": "Notizen",
+    "notesPlaceholder": "Notizen zu diesem Profil hinzufügen…",
+    "notesSaveFailed": "Notizen konnten nicht gespeichert werden",
+    "notesSaved": "Notizen gespeichert"
   },
   "runShot": {
     "title": "Ausführen / Planen",
@@ -716,7 +720,8 @@
       "soundsOn": "Töne aktiviert",
       "soundsOff": "Töne deaktiviert",
       "error": "Befehl fehlgeschlagen",
-      "profileSelected": "Profil ausgewählt: {{name}}"
+      "profileSelected": "Profil ausgewählt: {{name}}",
+      "started": "Gestartet"
     },
     "profileSelector": {
       "placeholder": "Profil wechseln…"
@@ -909,7 +914,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Gießen bis {{weight}}g",
-    "recipeWait": "Warten {{seconds}}s"
+    "recipeWait": "Warten {{seconds}}s",
+    "changeRecipe": "Rezept ändern",
+    "followWeight": "Gewicht folgen",
+    "followWeightDescription": "Schritte automatisch nach Gewicht weiterschalten",
+    "hideRecipeDetails": "Rezeptdetails ausblenden",
+    "mode": "Modus",
+    "nextStep": "Nächster Schritt",
+    "noRecipes": "Keine Rezepte verfügbar",
+    "recipeMode": "Rezeptmodus",
+    "selectRecipe": "Rezept auswählen",
+    "viewRecipeDetails": "Rezeptdetails anzeigen"
   },
   "markdownEditor": {
     "edit": "Bearbeiten",

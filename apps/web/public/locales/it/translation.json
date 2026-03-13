@@ -208,7 +208,11 @@
     "generateAiDescription": "Genera spiegazione AI",
     "generatingAiDescription": "Generazione spiegazione AI...",
     "aiDescriptionGenerated": "Spiegazione AI generata con successo",
-    "aiDescriptionFailed": "Impossibile generare la spiegazione AI"
+    "aiDescriptionFailed": "Impossibile generare la spiegazione AI",
+    "notes": "Note",
+    "notesPlaceholder": "Aggiungi note su questo profilo…",
+    "notesSaveFailed": "Impossibile salvare le note",
+    "notesSaved": "Note salvate"
   },
   "runShot": {
     "title": "Esegui / Programma",
@@ -716,7 +720,8 @@
       "soundsOn": "Suoni attivati",
       "soundsOff": "Suoni disattivati",
       "error": "Comando fallito",
-      "profileSelected": "Profilo selezionato: {{name}}"
+      "profileSelected": "Profilo selezionato: {{name}}",
+      "started": "Avviato"
     },
     "profileSelector": {
       "placeholder": "Cambia profilo…"
@@ -909,7 +914,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Versare fino a {{weight}}g",
-    "recipeWait": "Attendere {{seconds}}s"
+    "recipeWait": "Attendere {{seconds}}s",
+    "changeRecipe": "Cambia ricetta",
+    "followWeight": "Segui peso",
+    "followWeightDescription": "Avanza automaticamente i passaggi in base al peso",
+    "hideRecipeDetails": "Nascondi dettagli ricetta",
+    "mode": "Modalità",
+    "nextStep": "Prossimo passaggio",
+    "noRecipes": "Nessuna ricetta disponibile",
+    "recipeMode": "Modalità ricetta",
+    "selectRecipe": "Seleziona ricetta",
+    "viewRecipeDetails": "Vedi dettagli ricetta"
   },
   "markdownEditor": {
     "edit": "Modifica",

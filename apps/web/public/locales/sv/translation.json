@@ -208,7 +208,11 @@
     "generateAiDescription": "Generera AI-förklaring",
     "generatingAiDescription": "Genererar AI-förklaring...",
     "aiDescriptionGenerated": "AI-förklaring genererad",
-    "aiDescriptionFailed": "Kunde inte generera AI-förklaring"
+    "aiDescriptionFailed": "Kunde inte generera AI-förklaring",
+    "notes": "Anteckningar",
+    "notesPlaceholder": "Lägg till anteckningar om denna profil…",
+    "notesSaveFailed": "Kunde inte spara anteckningar",
+    "notesSaved": "Anteckningar sparade"
   },
   "runShot": {
     "title": "Kör / Schemalägg",
@@ -721,7 +725,8 @@
       "soundsOn": "Ljud aktiverat",
       "soundsOff": "Ljud inaktiverat",
       "error": "Kommandot misslyckades",
-      "profileSelected": "Profil vald: {{name}}"
+      "profileSelected": "Profil vald: {{name}}",
+      "started": "Startad"
     },
     "profileSelector": {
       "placeholder": "Byt profil…"
@@ -909,7 +914,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Häll till {{weight}}g",
-    "recipeWait": "Vänta {{seconds}}s"
+    "recipeWait": "Vänta {{seconds}}s",
+    "changeRecipe": "Byt recept",
+    "followWeight": "Följ vikt",
+    "followWeightDescription": "Gå automatiskt vidare baserat på vikt",
+    "hideRecipeDetails": "Dölj receptdetaljer",
+    "mode": "Läge",
+    "nextStep": "Nästa steg",
+    "noRecipes": "Inga recept tillgängliga",
+    "recipeMode": "Receptläge",
+    "selectRecipe": "Välj recept",
+    "viewRecipeDetails": "Visa receptdetaljer"
   },
   "markdownEditor": {
     "edit": "Redigera",

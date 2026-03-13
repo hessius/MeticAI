@@ -208,7 +208,11 @@
     "generateAiDescription": "Generar explicación IA",
     "generatingAiDescription": "Generando explicación IA...",
     "aiDescriptionGenerated": "Explicación IA generada correctamente",
-    "aiDescriptionFailed": "Error al generar la explicación IA"
+    "aiDescriptionFailed": "Error al generar la explicación IA",
+    "notes": "Notas",
+    "notesPlaceholder": "Agregar notas sobre este perfil…",
+    "notesSaveFailed": "Error al guardar notas",
+    "notesSaved": "Notas guardadas"
   },
   "runShot": {
     "title": "Ejecutar / Programar",
@@ -716,7 +720,8 @@
       "soundsOn": "Sonidos activados",
       "soundsOff": "Sonidos desactivados",
       "error": "El comando falló",
-      "profileSelected": "Perfil seleccionado: {{name}}"
+      "profileSelected": "Perfil seleccionado: {{name}}",
+      "started": "Iniciado"
     },
     "profileSelector": {
       "placeholder": "Cambiar perfil…"
@@ -909,7 +914,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Verter hasta {{weight}}g",
-    "recipeWait": "Esperar {{seconds}}s"
+    "recipeWait": "Esperar {{seconds}}s",
+    "changeRecipe": "Cambiar receta",
+    "followWeight": "Seguir peso",
+    "followWeightDescription": "Avanzar pasos automáticamente según el peso",
+    "hideRecipeDetails": "Ocultar detalles de receta",
+    "mode": "Modo",
+    "nextStep": "Siguiente paso",
+    "noRecipes": "No hay recetas disponibles",
+    "recipeMode": "Modo receta",
+    "selectRecipe": "Seleccionar receta",
+    "viewRecipeDetails": "Ver detalles de receta"
   },
   "markdownEditor": {
     "edit": "Editar",
