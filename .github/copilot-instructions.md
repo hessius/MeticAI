@@ -14,7 +14,7 @@ MeticAI is an AI-powered controller for the Meticulous Espresso Machine. Stack: 
 
 ## Skills
 
-Detailed domain instructions are in `.github/skills/`: `workflow.md`, `testing.md`, `frontend.md`, `backend.md`, `release.md`, `conventions.md`.
+Detailed domain instructions are in `.github/skills/`: `workflow.md`, `testing.md`, `frontend.md`, `backend.md`, `release.md`, `conventions.md`, `browser-testing.md`.
 
 ## Barista Persona (Profile Generation)
 

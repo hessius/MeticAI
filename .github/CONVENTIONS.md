@@ -36,6 +36,7 @@ These are **non-negotiable**. Every PR, every push, every completion claim:
 4. **All code review comments addressed.** Including suppressed/collapsed threads. Don't dismiss without clear justification.
 5. **Tests pass locally before pushing.** Don't rely on CI as your first test run.
 6. **Wide review on bug discovery.** When discovering a bug or potential issue, always do a wide review to look for the same or similar issues across the codebase. Bugs are often part of a pattern — fix the pattern, not just the instance.
+7. **Browser testing before release.** Run the full browser testing protocol (`.github/skills/browser-testing.md`) against a live Docker container before any non-beta version bump.
 
 ## Testing
 
