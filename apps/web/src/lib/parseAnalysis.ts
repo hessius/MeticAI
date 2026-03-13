@@ -243,7 +243,7 @@ export function parseRecommendationsJSON(text: string): Recommendation[] {
           ? String(item.confidence)
           : "low") as "high" | "medium" | "low",
         reason: String(item.reason ?? ""),
-        is_patchable: Boolean(item.is_patchable),
+        is_patchable: item.is_patchable !== undefined ? Boolean(item.is_patchable) : true,
       }));
   } catch {
     return [];

@@ -1377,13 +1377,20 @@ async def analyze_recommendations(
 
         cached_analysis = get_cached_llm_analysis(profile_name, shot_date, shot_filename)
 
-        if not cached_analysis or force_refresh:
+        if not cached_analysis:
             raise HTTPException(
                 status_code=404,
                 detail={
                     "status": "no_analysis",
                     "message": "No cached analysis found. Run a full analysis first.",
                 },
+            )
+
+        if force_refresh:
+            # Re-parse the cached text to get fresh structured data
+            logger.info(
+                "Force refresh requested, re-parsing cached analysis",
+                extra={"request_id": request_id},
             )
 
         # Parse recommendations from analysis text

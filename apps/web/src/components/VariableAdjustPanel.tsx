@@ -41,13 +41,13 @@ const VARIABLE_CONFIG: Record<string, VariableConfig> = {
   piston_position: { min: 0, max: 100, step: 1, unit: '%' },
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  pressure: 'Pressure',
-  flow: 'Flow',
-  weight: 'Weight',
-  power: 'Power',
-  time: 'Time',
-  piston_position: 'Piston',
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  pressure: 'variables.type.pressure',
+  flow: 'variables.type.flow',
+  weight: 'variables.type.weight',
+  power: 'variables.type.power',
+  time: 'variables.type.time',
+  piston_position: 'variables.type.piston',
 }
 
 export function VariableAdjustPanel({
@@ -154,7 +154,7 @@ export function VariableAdjustPanel({
               {Object.entries(grouped).map(([type, vars]) => (
                 <div key={type} className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {TYPE_LABELS[type] ?? type}
+                    {t(TYPE_LABEL_KEYS[type] ?? type, type)}
                   </p>
 
                   {vars.map((variable) => {

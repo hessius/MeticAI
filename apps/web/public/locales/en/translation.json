@@ -1058,7 +1058,8 @@
     "currentValue": "Current",
     "recommendedValue": "Recommended",
     "selectAll": "Select all patchable",
-    "deselectAll": "Deselect all"
+    "deselectAll": "Deselect all",
+    "globalSettings": "Global Settings"
   },
   "taste": {
     "compass": {
@@ -1096,7 +1097,15 @@
     "adjust": "Adjust Variables",
     "overridesApplied": "{{count}} adjusted",
     "original": "Original: {{value}}",
-    "noAdjustable": "No adjustable variables in this profile"
+    "noAdjustable": "No adjustable variables in this profile",
+    "type": {
+      "pressure": "Pressure",
+      "flow": "Flow",
+      "weight": "Weight",
+      "power": "Power",
+      "time": "Time",
+      "piston": "Piston"
+    }
   },
   "profileRecommendations": {
     "title": "Recommended Profiles",
@@ -1231,7 +1240,8 @@
     "recommendations": {
       "loading": "Loading recommendations",
       "loaded": "{{count}} recommendations loaded",
-      "group": "{{stage}} recommendations"
+      "group": "{{stage}} recommendations",
+      "selectVariable": "Select {{variable}}"
     },
     "shotList": {
       "viewShot": "View shot from {{time}}",
@@ -1241,6 +1251,9 @@
     "variableSlider": "{{name}}: {{value}}{{unit}}, range {{min}} to {{max}}",
     "searchProgress": "Search progress: {{percent}}%",
     "similarProfile": "Select profile {{name}}, {{score}}% match",
-    "useProfile": "Use profile {{name}}"
+    "useProfile": "Use profile {{name}}",
+    "dialIn": {
+      "submitProfileName": "Use entered profile name"
+    }
   }
 }

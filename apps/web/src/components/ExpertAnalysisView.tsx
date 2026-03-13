@@ -11,6 +11,7 @@ import { parseStructuredAnalysis, parseRecommendationsJSON, hasRecommendations }
 import type { Recommendation } from "@/lib/parseAnalysis";
 import { SectionCard } from "@/components/SectionCard";
 import { RecommendationSelectionDialog } from "@/components/RecommendationSelectionDialog";
+import { getServerUrl } from "@/lib/config";
 
 interface ExpertAnalysisViewProps {
   isLoading: boolean;
@@ -54,10 +55,11 @@ export function ExpertAnalysisView({
   const handleApplyRecommendations = useCallback(
     async (selected: Recommendation[]) => {
       if (!profileName) return;
+      const serverUrl = await getServerUrl();
       const form = new FormData();
       form.append("recommendations", JSON.stringify(selected));
       const res = await fetch(
-        `/api/profile/${encodeURIComponent(profileName)}/apply-recommendations`,
+        `${serverUrl}/api/profile/${encodeURIComponent(profileName)}/apply-recommendations`,
         { method: "POST", body: form },
       );
       if (!res.ok) {

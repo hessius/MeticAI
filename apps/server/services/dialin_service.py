@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
-from datetime import datetime, timezone
+from logging_config import get_logger
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
@@ -19,10 +19,14 @@ from models.dialin import (
     TasteFeedback,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # In-memory session store keyed by session id
 _sessions: dict[str, DialInSession] = {}
+
+# Bounds: max sessions in memory and TTL for completed sessions
+MAX_SESSIONS = 200
+COMPLETED_SESSION_TTL = timedelta(days=7)
 
 # Module-level asyncio lock with lazy creation.
 # Recreated when the running event loop changes so that tests using a new
@@ -111,6 +115,26 @@ async def _load() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _prune_expired_sessions() -> int:
+    """Remove completed sessions older than COMPLETED_SESSION_TTL.
+
+    Must be called while holding _get_state_lock().
+    Returns number of sessions removed.
+    """
+    now = datetime.now(timezone.utc)
+    expired = [
+        sid
+        for sid, s in _sessions.items()
+        if s.status in (SessionStatus.COMPLETED, SessionStatus.ABANDONED)
+        and (now - s.updated_at) > COMPLETED_SESSION_TTL
+    ]
+    for sid in expired:
+        del _sessions[sid]
+    if expired:
+        logger.info("Pruned %d expired dial-in session(s)", len(expired))
+    return len(expired)
+
+
 async def create_session(
     coffee: CoffeeDetails,
     profile_name: Optional[str] = None,
@@ -128,6 +152,19 @@ async def create_session(
     )
 
     async with _get_state_lock():
+        # Prune expired sessions and enforce bounds
+        _prune_expired_sessions()
+        if len(_sessions) >= MAX_SESSIONS:
+            # Drop oldest completed sessions first, then oldest abandoned
+            oldest = sorted(
+                ((sid, s) for sid, s in _sessions.items()
+                 if s.status != SessionStatus.ACTIVE),
+                key=lambda x: x[1].updated_at,
+            )
+            if oldest:
+                del _sessions[oldest[0][0]]
+                logger.warning("Evicted oldest non-active session to stay within bounds")
+
         _sessions[session.id] = session
         await _persist()
 

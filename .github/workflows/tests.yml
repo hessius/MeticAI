@@ -41,7 +41,7 @@ jobs:
         env:
           GEMINI_API_KEY: test_key_for_ci
         run: |
-          pytest test_main.py test_logging.py -v \
+          pytest test_main.py test_logging.py test_taste_compass.py test_recommendations.py -v \
             --cov=main --cov=logging_config --cov=config \
             --cov=prompt_builder --cov=api --cov=services \
             --cov=utils --cov=models \

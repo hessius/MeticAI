@@ -94,6 +94,7 @@ export function DialInProfileStep({ coffee, onSelect }: DialInProfileStepProps) 
             size="icon"
             onClick={() => onSelect(manualName || t('dialIn.profile.defaultName'))}
             className="shrink-0"
+            aria-label={t('a11y.dialIn.submitProfileName')}
           >
             <ArrowRight size={18} />
           </Button>

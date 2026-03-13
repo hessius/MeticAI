@@ -576,6 +576,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => setSimilarTarget(profile.name)}
                             title={t('profileRecommendations.findSimilar')}
+                            aria-label={t('profileRecommendations.findSimilar')}
                           >
                             <MagnifyingGlass className="w-4 h-4" />
                           </Button>
@@ -584,6 +585,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => handleExport(profile)}
                             title={t('profileCatalogue.export')}
+                            aria-label={t('profileCatalogue.export')}
                           >
                             <FileJs className="w-4 h-4" />
                           </Button>
@@ -592,6 +594,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => startRename(profile)}
                             title={t('profileCatalogue.rename')}
+                            aria-label={t('profileCatalogue.rename')}
                           >
                             <PencilSimple className="w-4 h-4" />
                           </Button>
@@ -600,6 +603,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => openDeleteDialog(profile)}
                             title={t('profileCatalogue.delete')}
+                            aria-label={t('profileCatalogue.delete')}
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash className="w-4 h-4" />

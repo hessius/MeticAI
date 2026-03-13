@@ -194,6 +194,13 @@ async def lifespan(app: FastAPI):
             )
     except Exception as e:
         logger.warning("Failed to clean stale temp profiles at startup: %s", e)
+
+    # Restore dial-in sessions from persistence
+    try:
+        from services.dialin_service import _load as load_dialin_sessions
+        await load_dialin_sessions()
+    except Exception as e:
+        logger.warning("Failed to restore dial-in sessions at startup: %s", e)
     
     yield
     

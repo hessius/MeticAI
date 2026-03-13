@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -109,10 +110,14 @@ export function RecommendationSelectionDialog({
         setApplied(false);
         setSelected(new Set());
       }, 1500);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : t("recommendations.applying") + " failed",
+      );
     } finally {
       setIsApplying(false);
     }
-  }, [recommendations, selected, onApply, onOpenChange]);
+  }, [recommendations, selected, onApply, onOpenChange, t]);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -164,7 +169,7 @@ export function RecommendationSelectionDialog({
             {Object.entries(grouped).map(([stage, items]) => (
               <div key={stage} className="space-y-2" role="group" aria-labelledby={`stage-${stage}`}>
                 <h4 id={`stage-${stage}`} className="text-sm font-semibold capitalize text-muted-foreground">
-                  {stage === "global" ? "Global Settings" : stage}
+                  {stage === "global" ? t("recommendations.globalSettings", "Global Settings") : stage}
                 </h4>
                 <AnimatePresence>
                   {items.map(({ rec, index }) => {
@@ -194,7 +199,7 @@ export function RecommendationSelectionDialog({
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleSelection(index)}
-                              aria-label={`Select ${rec.variable}`}
+                              aria-label={t('a11y.recommendations.selectVariable', { variable: rec.variable })}
                             />
                           ) : (
                             <Info className="h-4 w-4 text-muted-foreground" />

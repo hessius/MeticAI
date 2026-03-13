@@ -29,6 +29,7 @@ from services.scheduling_state import (
     PREHEAT_DURATION_MINUTES,
 )
 from services import temp_profile_service
+from utils.file_utils import deep_convert_to_dict
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -330,9 +331,7 @@ async def run_profile_with_overrides(
 
         # Normalise to dict
         if hasattr(original_profile, "__dict__"):
-            profile_data: dict = {
-                k: v for k, v in vars(original_profile).items() if not k.startswith("_")
-            }
+            profile_data: dict = deep_convert_to_dict(original_profile)
         elif isinstance(original_profile, dict):
             profile_data = original_profile
         else:

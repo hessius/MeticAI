@@ -1043,7 +1043,8 @@
     "currentValue": "Nuvarande",
     "recommendedValue": "Rekommenderat",
     "selectAll": "Välj alla tillämpbara",
-    "deselectAll": "Avmarkera alla"
+    "deselectAll": "Avmarkera alla",
+    "globalSettings": "Globala inställningar"
   },
   "taste": {
     "compass": {
@@ -1081,7 +1082,15 @@
     "adjust": "Justera variabler",
     "overridesApplied": "{{count}} justerade",
     "original": "Original: {{value}}",
-    "noAdjustable": "Inga justerbara variabler i denna profil"
+    "noAdjustable": "Inga justerbara variabler i denna profil",
+    "type": {
+      "pressure": "Tryck",
+      "flow": "Flöde",
+      "weight": "Vikt",
+      "power": "Effekt",
+      "time": "Tid",
+      "piston": "Kolv"
+    }
   },
   "profileRecommendations": {
     "title": "Rekommenderade profiler",
@@ -1216,7 +1225,8 @@
     "recommendations": {
       "loading": "Laddar rekommendationer",
       "loaded": "{{count}} rekommendationer laddade",
-      "group": "{{stage}}-rekommendationer"
+      "group": "{{stage}}-rekommendationer",
+      "selectVariable": "Välj {{variable}}"
     },
     "shotList": {
       "viewShot": "Visa shot från {{time}}",
@@ -1226,6 +1236,9 @@
     "variableSlider": "{{name}}: {{value}}{{unit}}, intervall {{min}} till {{max}}",
     "searchProgress": "Sökframsteg: {{percent}}%",
     "similarProfile": "Välj profil {{name}}, {{score}}% matchning",
-    "useProfile": "Använd profil {{name}}"
+    "useProfile": "Använd profil {{name}}",
+    "dialIn": {
+      "submitProfileName": "Använd angivet profilnamn"
+    }
   }
 }

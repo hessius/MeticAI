@@ -41,7 +41,7 @@ export function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: 
         <Progress
           value={progress}
           className="h-2"
-          aria-label={t('a11y.searchProgress')}
+          aria-label={t('a11y.searchProgress', { percent: Math.round(progress) })}
           aria-valuenow={Math.round(progress)}
           aria-valuemin={0}
           aria-valuemax={100}

@@ -1043,7 +1043,8 @@
     "currentValue": "Attuale",
     "recommendedValue": "Raccomandato",
     "selectAll": "Seleziona tutti applicabili",
-    "deselectAll": "Deseleziona tutti"
+    "deselectAll": "Deseleziona tutti",
+    "globalSettings": "Impostazioni globali"
   },
   "taste": {
     "compass": {
@@ -1081,7 +1082,15 @@
     "adjust": "Regola variabili",
     "overridesApplied": "{{count}} regolate",
     "original": "Originale: {{value}}",
-    "noAdjustable": "Nessuna variabile regolabile in questo profilo"
+    "noAdjustable": "Nessuna variabile regolabile in questo profilo",
+    "type": {
+      "pressure": "Pressione",
+      "flow": "Flusso",
+      "weight": "Peso",
+      "power": "Potenza",
+      "time": "Tempo",
+      "piston": "Pistone"
+    }
   },
   "profileRecommendations": {
     "title": "Profili consigliati",
@@ -1216,7 +1225,8 @@
     "recommendations": {
       "loading": "Caricamento raccomandazioni",
       "loaded": "{{count}} raccomandazioni caricate",
-      "group": "Raccomandazioni {{stage}}"
+      "group": "Raccomandazioni {{stage}}",
+      "selectVariable": "Seleziona {{variable}}"
     },
     "shotList": {
       "viewShot": "Visualizza shot del {{time}}",
@@ -1226,6 +1236,9 @@
     "variableSlider": "{{name}}: {{value}}{{unit}}, intervallo da {{min}} a {{max}}",
     "searchProgress": "Progresso della ricerca: {{percent}}%",
     "similarProfile": "Seleziona profilo {{name}}, {{score}}% di corrispondenza",
-    "useProfile": "Usa profilo {{name}}"
+    "useProfile": "Usa profilo {{name}}",
+    "dialIn": {
+      "submitProfileName": "Usa il nome profilo inserito"
+    }
   }
 }

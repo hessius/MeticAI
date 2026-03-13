@@ -1043,7 +1043,8 @@
     "currentValue": "Actual",
     "recommendedValue": "Recomendado",
     "selectAll": "Seleccionar todos los aplicables",
-    "deselectAll": "Deseleccionar todos"
+    "deselectAll": "Deseleccionar todos",
+    "globalSettings": "Configuración global"
   },
   "taste": {
     "compass": {
@@ -1081,7 +1082,15 @@
     "adjust": "Ajustar variables",
     "overridesApplied": "{{count}} ajustadas",
     "original": "Original: {{value}}",
-    "noAdjustable": "No hay variables ajustables en este perfil"
+    "noAdjustable": "No hay variables ajustables en este perfil",
+    "type": {
+      "pressure": "Presión",
+      "flow": "Flujo",
+      "weight": "Peso",
+      "power": "Potencia",
+      "time": "Tiempo",
+      "piston": "Pistón"
+    }
   },
   "profileRecommendations": {
     "title": "Perfiles recomendados",
@@ -1216,7 +1225,8 @@
     "recommendations": {
       "loading": "Cargando recomendaciones",
       "loaded": "{{count}} recomendaciones cargadas",
-      "group": "Recomendaciones de {{stage}}"
+      "group": "Recomendaciones de {{stage}}",
+      "selectVariable": "Seleccionar {{variable}}"
     },
     "shotList": {
       "viewShot": "Ver shot de {{time}}",
@@ -1226,6 +1236,9 @@
     "variableSlider": "{{name}}: {{value}}{{unit}}, rango de {{min}} a {{max}}",
     "searchProgress": "Progreso de búsqueda: {{percent}}%",
     "similarProfile": "Seleccionar perfil {{name}}, {{score}}% de coincidencia",
-    "useProfile": "Usar perfil {{name}}"
+    "useProfile": "Usar perfil {{name}}",
+    "dialIn": {
+      "submitProfileName": "Usar nombre de perfil ingresado"
+    }
   }
 }

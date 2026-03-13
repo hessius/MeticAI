@@ -68,10 +68,10 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
 
   const stepIndex = STEPS.indexOf(step)
   const progress = ((stepIndex + 1) / STEPS.length) * 100
-  const { announce } = useScreenReaderAnnouncement()
+  const announce = useScreenReaderAnnouncement()
 
   useEffect(() => {
-    announce(t('a11y.stepProgress', { current: stepIndex + 1, total: STEPS.length }))
+    announce(t('a11y.stepProgress', { current: stepIndex + 1, total: STEPS.length, step: t(`dialIn.steps.${step}`) }))
   }, [step, stepIndex, announce, t])
 
   // API helpers
@@ -205,7 +205,7 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
         <Progress
           value={progress}
           className="h-1.5"
-          aria-label={t('a11y.progressBar')}
+          aria-label={t('a11y.progressBar', { percent: Math.round(progress) })}
           aria-valuenow={Math.round(progress)}
           aria-valuemin={0}
           aria-valuemax={100}
