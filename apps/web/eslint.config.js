@@ -54,6 +54,9 @@ export default tseslint.config(
         },
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
+      // Prevent variable shadowing — caught the `let t = 0` crash in PourOverView
+      'no-shadow': 'off',
+      '@typescript-eslint/no-shadow': 'error',
     },
   },
   // Disable react-refresh for shadcn/ui components (library code with intentional patterns)

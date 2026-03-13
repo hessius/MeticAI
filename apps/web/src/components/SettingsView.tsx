@@ -168,7 +168,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   }
 
   const currentVersion = versionInfo?.version || ''
-  const isOnBeta = currentVersion ? ['-beta', '-alpha', '-rc'].some(t => currentVersion.toLowerCase().includes(t)) : false
+  const isOnBeta = currentVersion ? ['-beta', '-alpha', '-rc'].some(suffix => currentVersion.toLowerCase().includes(suffix)) : false
 
   // Show "newer beta available" when on stable and a beta exists with a higher base version
   const showBetaAvailable = !betaChannelEnabled && !isOnBeta && !!latestBetaVersion && !!currentVersion && currentVersion !== 'unknown' && (() => {

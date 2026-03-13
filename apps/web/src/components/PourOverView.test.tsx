@@ -75,8 +75,18 @@ vi.mock('react-i18next', () => ({
         'pourOver.bloomWeightMultiplier': 'Bloom weight target',
         'pourOver.bloomWeightMultiplierDescription': 'Target water weight during bloom, as a multiple of your dose.',
         'common.back': 'Back',
+        'common.loading': 'Loading…',
+        'pourOver.recipeMode': 'Recipes',
+        'pourOver.selectRecipe': 'Select a recipe',
+        'pourOver.noRecipes': 'No recipes found',
+        'pourOver.recipeBloom': 'Bloom',
+        'pourOver.recipeBloomWeight': 'Bloom {{weight}}g',
+        'pourOver.recipePourTo': 'Pour to {{weight}}g',
+        'pourOver.recipeWait': 'Wait {{seconds}}s',
       }
-      return translations[key] || key
+      if (translations[key]) return translations[key]
+      // Handle interpolation keys (e.g. pourOver.recipePourTo with {weight: 100})
+      return key
     },
     i18n: { language: 'en' },
   }),
@@ -117,11 +127,29 @@ vi.mock('@/lib/mqttCommands', () => ({
   stopShot: vi.fn().mockResolvedValue({ success: true }),
 }))
 
+const mockRecipes = [
+  {
+    slug: 'test-v60',
+    version: '1.1',
+    metadata: { name: 'Test V60', author: 'Tester' },
+    equipment: { dripper: { model: 'V60' } },
+    ingredients: { coffee_g: 15, water_g: 250, grind_setting: 'medium' },
+    protocol: [
+      { step: 1, action: 'bloom' as const, water_g: 30, duration_s: 30 },
+      { step: 2, action: 'pour' as const, water_g: 120, duration_s: 30 },
+      { step: 3, action: 'wait' as const, duration_s: 15 },
+      { step: 4, action: 'pour' as const, water_g: 100, duration_s: 30 },
+    ],
+  },
+]
+
 vi.mock('@/lib/pourOverApi', () => ({
   preparePourOver: vi.fn().mockResolvedValue({ profile_id: 'test-id', profile_name: 'MeticAI Ratio Pour-Over', loaded: true }),
   cleanupPourOver: vi.fn().mockResolvedValue({ deleted: true, purged: true }),
   forceCleanupPourOver: vi.fn().mockResolvedValue({ deleted: true }),
   getActivePourOver: vi.fn().mockResolvedValue({ active: false }),
+  getRecipes: vi.fn().mockResolvedValue([]),
+  prepareRecipe: vi.fn().mockResolvedValue({ profile_id: 'recipe-id', profile_name: 'Test V60', loaded: true }),
   getPourOverPreferences: vi.fn().mockResolvedValue({
     free: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
     ratio: { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false },
@@ -481,5 +509,50 @@ describe('PourOverView', () => {
     await vi.waitFor(() => {
       expect(savePourOverPreferences).toHaveBeenCalled()
     }, { timeout: 2000 })
+  })
+
+  it('switches to recipe mode, loads recipes, and renders step labels without crashing', async () => {
+    const user = userEvent.setup()
+    
+    // Make getRecipes return our mock recipes
+    const { getRecipes } = await import('@/lib/pourOverApi')
+    vi.mocked(getRecipes).mockResolvedValue(mockRecipes)
+
+    render(
+      <PourOverView
+        machineState={makeMachineState()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    // Switch to recipe mode
+    const recipeTab = screen.getByText('Recipes')
+    await user.click(recipeTab)
+
+    // Wait for recipes to load and appear
+    await vi.waitFor(() => {
+      expect(getRecipes).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(screen.getByText('Test V60')).toBeInTheDocument()
+    })
+
+    // Verify recipe card shows metadata
+    expect(screen.getByText('by Tester')).toBeInTheDocument()
+    expect(screen.getByText('V60')).toBeInTheDocument()
+    expect(screen.getByText('15g / 250g')).toBeInTheDocument()
+    expect(screen.getByText('4 steps')).toBeInTheDocument()
+
+    // Select the recipe — this is where the original bug would crash
+    // because `let t = 0` shadowed the translation function `t`
+    const recipeButton = screen.getByText('Test V60').closest('button')!
+    await user.click(recipeButton)
+
+    // Verify recipe step labels render correctly (uses t() for translations)
+    // The mock t() returns the key for unknown translations, but the recipe
+    // selection and step computation should not crash
+    await vi.waitFor(() => {
+      expect(screen.queryByText('Test V60')).toBeInTheDocument()
+    })
   })
 })

@@ -22,8 +22,8 @@ const config: StorybookConfig = {
     getAbsolutePath('@storybook/addon-a11y'),
   ],
   "framework": getAbsolutePath('@storybook/react-vite'),
-  async viteFinal(config) {
-    return mergeConfig(config, {
+  async viteFinal(viteConfig) {
+    return mergeConfig(viteConfig, {
       resolve: {
         alias: {
           '@': fileURLToPath(new URL('../src', import.meta.url))
