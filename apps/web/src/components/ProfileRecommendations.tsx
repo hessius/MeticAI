@@ -125,7 +125,7 @@ export function ProfileRecommendations({
       <CollapsibleContent>
         <div className="space-y-2 pt-2">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-2" aria-busy="true" aria-label={t('a11y.recommendations.loading')}>
               {[1, 2, 3].map(i => (
                 <Card key={i} className="p-3">
                   <div className="flex items-center gap-3">

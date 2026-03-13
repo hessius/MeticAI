@@ -1194,5 +1194,38 @@
       "completeFailed": "Kunde inte avsluta sessionen",
       "recommendFailed": "Kunde inte ladda rekommendationer"
     }
+  },
+  "a11y": {
+    "skipToMain": "Hoppa till huvudinnehåll",
+    "skipToNav": "Hoppa till navigering",
+    "toggleTheme": "Byt till {{mode}}-läge",
+    "openOnMobile": "Öppna på mobil enhet",
+    "goHome": "Gå till startskärmen",
+    "goBack": "Tillbaka",
+    "stepProgress": "Steg {{current}} av {{total}}: {{step}}",
+    "progressBar": "Framsteg: {{percent}}% klart",
+    "loading": "Laddar, vänta",
+    "searching": "Söker, vänta",
+    "analyzing": "Analyserar, vänta",
+    "chart": {
+      "espressoShot": "Espressoshotdiagram som visar tryck, flöde och vikt över tid",
+      "espressoShotLive": "Livediagram för espressoshot som visar tryck, flöde och vikt över tid"
+    },
+    "expandSection": "Expandera {{section}}",
+    "collapseSection": "Komprimera {{section}}",
+    "recommendations": {
+      "loading": "Laddar rekommendationer",
+      "loaded": "{{count}} rekommendationer laddade",
+      "group": "{{stage}}-rekommendationer"
+    },
+    "shotList": {
+      "viewShot": "Visa shot från {{time}}",
+      "rating": "{{rating}} av 5 stjärnor"
+    },
+    "resetVariable": "Återställ {{name}} till ursprungligt värde",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, intervall {{min}} till {{max}}",
+    "searchProgress": "Sökframsteg: {{percent}}%",
+    "similarProfile": "Välj profil {{name}}, {{score}}% matchning",
+    "useProfile": "Använd profil {{name}}"
   }
 }

@@ -1194,5 +1194,38 @@
       "completeFailed": "Sitzung konnte nicht abgeschlossen werden",
       "recommendFailed": "Empfehlungen konnten nicht geladen werden"
     }
+  },
+  "a11y": {
+    "skipToMain": "Zum Hauptinhalt springen",
+    "skipToNav": "Zur Navigation springen",
+    "toggleTheme": "Zum {{mode}}-Modus wechseln",
+    "openOnMobile": "Auf Mobilgerät öffnen",
+    "goHome": "Zum Startbildschirm",
+    "goBack": "Zurück",
+    "stepProgress": "Schritt {{current}} von {{total}}: {{step}}",
+    "progressBar": "Fortschritt: {{percent}}% abgeschlossen",
+    "loading": "Laden, bitte warten",
+    "searching": "Suche läuft, bitte warten",
+    "analyzing": "Analyse läuft, bitte warten",
+    "chart": {
+      "espressoShot": "Espresso-Shot-Diagramm mit Druck, Fluss und Gewicht über die Zeit",
+      "espressoShotLive": "Live-Espresso-Shot-Diagramm mit Druck, Fluss und Gewicht über die Zeit"
+    },
+    "expandSection": "{{section}} aufklappen",
+    "collapseSection": "{{section}} zuklappen",
+    "recommendations": {
+      "loading": "Empfehlungen werden geladen",
+      "loaded": "{{count}} Empfehlungen geladen",
+      "group": "{{stage}}-Empfehlungen"
+    },
+    "shotList": {
+      "viewShot": "Shot von {{time}} anzeigen",
+      "rating": "{{rating}} von 5 Sternen"
+    },
+    "resetVariable": "{{name}} auf Originalwert zurücksetzen",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, Bereich {{min}} bis {{max}}",
+    "searchProgress": "Suchfortschritt: {{percent}}%",
+    "similarProfile": "Profil {{name}} auswählen, {{score}}% Übereinstimmung",
+    "useProfile": "Profil {{name}} verwenden"
   }
 }

@@ -83,6 +83,7 @@ export function ExpertAnalysisView({
             size="icon"
             onClick={onBack}
             className="shrink-0"
+            aria-label={t('a11y.goBack')}
           >
             <CaretLeft size={22} weight="bold" />
           </Button>
@@ -116,7 +117,7 @@ export function ExpertAnalysisView({
         
         {/* Loading State */}
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="flex flex-col items-center justify-center py-16 gap-4" role="status" aria-live="polite" aria-busy="true">
             <div className="relative">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <Sparkles className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />

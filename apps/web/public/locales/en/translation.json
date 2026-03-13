@@ -1209,5 +1209,38 @@
       "completeFailed": "Failed to complete session",
       "recommendFailed": "Failed to load recommendations"
     }
+  },
+  "a11y": {
+    "skipToMain": "Skip to main content",
+    "skipToNav": "Skip to navigation",
+    "toggleTheme": "Switch to {{mode}} mode",
+    "openOnMobile": "Open on mobile device",
+    "goHome": "Go to home screen",
+    "goBack": "Go back",
+    "stepProgress": "Step {{current}} of {{total}}: {{step}}",
+    "progressBar": "Progress: {{percent}}% complete",
+    "loading": "Loading, please wait",
+    "searching": "Searching, please wait",
+    "analyzing": "Analyzing, please wait",
+    "chart": {
+      "espressoShot": "Espresso shot chart showing pressure, flow, and weight over time",
+      "espressoShotLive": "Live espresso shot chart showing pressure, flow, and weight over time"
+    },
+    "expandSection": "Expand {{section}}",
+    "collapseSection": "Collapse {{section}}",
+    "recommendations": {
+      "loading": "Loading recommendations",
+      "loaded": "{{count}} recommendations loaded",
+      "group": "{{stage}} recommendations"
+    },
+    "shotList": {
+      "viewShot": "View shot from {{time}}",
+      "rating": "{{rating}} out of 5 stars"
+    },
+    "resetVariable": "Reset {{name}} to original value",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, range {{min}} to {{max}}",
+    "searchProgress": "Search progress: {{percent}}%",
+    "similarProfile": "Select profile {{name}}, {{score}}% match",
+    "useProfile": "Use profile {{name}}"
   }
 }

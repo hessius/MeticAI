@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { ArrowLeft } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { toast } from 'sonner'
+import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
 import { DialInCoffeeStep } from './DialInCoffeeStep'
 import { DialInProfileStep } from './DialInProfileStep'
 import { DialInPrepStep } from './DialInPrepStep'
@@ -67,6 +68,11 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
 
   const stepIndex = STEPS.indexOf(step)
   const progress = ((stepIndex + 1) / STEPS.length) * 100
+  const { announce } = useScreenReaderAnnouncement()
+
+  useEffect(() => {
+    announce(t('a11y.stepProgress', { current: stepIndex + 1, total: STEPS.length }))
+  }, [step, stepIndex, announce, t])
 
   // API helpers
   const apiCall = useCallback(async (path: string, options?: RequestInit) => {
@@ -184,7 +190,7 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
       <Card className="p-6 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleStepBack}>
+          <Button variant="ghost" size="icon" onClick={handleStepBack} aria-label={t('a11y.goBack')}>
             <ArrowLeft size={20} />
           </Button>
           <div className="flex-1">
@@ -196,7 +202,14 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
         </div>
 
         {/* Progress */}
-        <Progress value={progress} className="h-1.5" />
+        <Progress
+          value={progress}
+          className="h-1.5"
+          aria-label={t('a11y.progressBar')}
+          aria-valuenow={Math.round(progress)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
 
         {/* Step content */}
         <AnimatePresence mode="wait">

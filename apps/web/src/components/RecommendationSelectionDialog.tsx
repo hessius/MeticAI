@@ -162,8 +162,8 @@ export function RecommendationSelectionDialog({
             )}
 
             {Object.entries(grouped).map(([stage, items]) => (
-              <div key={stage} className="space-y-2">
-                <h4 className="text-sm font-semibold capitalize text-muted-foreground">
+              <div key={stage} className="space-y-2" role="group" aria-labelledby={`stage-${stage}`}>
+                <h4 id={`stage-${stage}`} className="text-sm font-semibold capitalize text-muted-foreground">
                   {stage === "global" ? "Global Settings" : stage}
                 </h4>
                 <AnimatePresence>

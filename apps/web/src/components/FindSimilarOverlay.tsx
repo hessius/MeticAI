@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -94,7 +95,7 @@ export function FindSimilarOverlay({
 
         <div className="space-y-2 mt-2">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-2" aria-busy="true" aria-label={t('a11y.loading')}>
               {[1, 2, 3, 4].map(i => (
                 <Card key={i} className="p-3">
                   <div className="flex items-center gap-3">
@@ -124,6 +125,10 @@ export function FindSimilarOverlay({
                   <Card
                     className={`p-3 transition-colors ${onSelectProfile ? 'cursor-pointer hover:bg-secondary/40' : ''}`}
                     onClick={() => onSelectProfile?.(rec.profile_name)}
+                    role={onSelectProfile ? 'button' : undefined}
+                    tabIndex={onSelectProfile ? 0 : undefined}
+                    onKeyDown={onSelectProfile ? (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectProfile(rec.profile_name) } } : undefined}
+                    aria-label={t('a11y.useProfile', { name: rec.profile_name })}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 shrink-0">

@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface SkipNavigationProps {
   links?: Array<{
@@ -14,9 +15,10 @@ interface SkipNavigationProps {
 const FOCUS_CLEANUP_DELAY = 100; // milliseconds
 
 export function SkipNavigation({ links }: SkipNavigationProps) {
+  const { t } = useTranslation();
   const defaultLinks = [
-    { id: 'main-content', label: 'Skip to main content' },
-    { id: 'navigation', label: 'Skip to navigation' },
+    { id: 'main-content', label: t('a11y.skipToMain') },
+    { id: 'navigation', label: t('a11y.skipToNav') },
   ];
 
   const skipLinks = links || defaultLinks;

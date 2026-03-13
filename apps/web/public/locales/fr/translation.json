@@ -1194,5 +1194,38 @@
       "completeFailed": "Impossible de terminer la session",
       "recommendFailed": "Impossible de charger les recommandations"
     }
+  },
+  "a11y": {
+    "skipToMain": "Aller au contenu principal",
+    "skipToNav": "Aller à la navigation",
+    "toggleTheme": "Passer en mode {{mode}}",
+    "openOnMobile": "Ouvrir sur appareil mobile",
+    "goHome": "Retour à l'écran d'accueil",
+    "goBack": "Retour",
+    "stepProgress": "Étape {{current}} sur {{total}} : {{step}}",
+    "progressBar": "Progression : {{percent}}% terminé",
+    "loading": "Chargement, veuillez patienter",
+    "searching": "Recherche en cours, veuillez patienter",
+    "analyzing": "Analyse en cours, veuillez patienter",
+    "chart": {
+      "espressoShot": "Graphique d'extraction espresso montrant la pression, le débit et le poids au fil du temps",
+      "espressoShotLive": "Graphique en direct d'extraction espresso montrant la pression, le débit et le poids au fil du temps"
+    },
+    "expandSection": "Développer {{section}}",
+    "collapseSection": "Réduire {{section}}",
+    "recommendations": {
+      "loading": "Chargement des recommandations",
+      "loaded": "{{count}} recommandations chargées",
+      "group": "Recommandations {{stage}}"
+    },
+    "shotList": {
+      "viewShot": "Voir le shot du {{time}}",
+      "rating": "{{rating}} sur 5 étoiles"
+    },
+    "resetVariable": "Réinitialiser {{name}} à la valeur originale",
+    "variableSlider": "{{name}} : {{value}}{{unit}}, plage de {{min}} à {{max}}",
+    "searchProgress": "Progression de la recherche : {{percent}}%",
+    "similarProfile": "Sélectionner le profil {{name}}, {{score}}% de correspondance",
+    "useProfile": "Utiliser le profil {{name}}"
   }
 }

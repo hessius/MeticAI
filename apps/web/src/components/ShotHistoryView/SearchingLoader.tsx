@@ -36,9 +36,16 @@ export function SearchingLoader({ estimatedSeconds = 60 }: { estimatedSeconds?: 
   }, [])
   
   return (
-    <div className="flex flex-col items-center gap-4 py-12">
+    <div className="flex flex-col items-center gap-4 py-12" role="status" aria-live="polite" aria-busy="true" aria-label={t('a11y.searching')}>
       <div className="w-full max-w-xs space-y-2">
-        <Progress value={progress} className="h-2" />
+        <Progress
+          value={progress}
+          className="h-2"
+          aria-label={t('a11y.searchProgress')}
+          aria-valuenow={Math.round(progress)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>{t('shotHistory.searching')}</span>
           <span>{Math.round(progress)}%</span>

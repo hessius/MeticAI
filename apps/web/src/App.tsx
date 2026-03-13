@@ -24,6 +24,8 @@ import { LoadingView, LOADING_MESSAGE_COUNT } from '@/views/LoadingView'
 import { ResultsView } from '@/views/ResultsView'
 import { ErrorView } from '@/views/ErrorView'
 import { useGenerationProgress } from '@/hooks/useGenerationProgress'
+import { useReducedMotion } from '@/hooks/a11y/useScreenReader'
+import { SkipNavigation } from '@/components/SkipNavigation'
 
 import { AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
 import type { APIResponse, ViewState } from '@/types'
@@ -731,8 +733,12 @@ function App() {
     viewState !== 'pour-over' &&
     !shotBannerDismissed
 
+  const prefersReducedMotion = useReducedMotion()
+  const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
+
   return (
     <>
+      <SkipNavigation />
       {showBlobs && <AmbientBackground />}
 
       {/* Beta version banner — fixed at top */}
@@ -748,31 +754,35 @@ function App() {
       <div className={`min-h-screen text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-center py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
+        <header>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
           className={isHome ? "text-center mb-10" : "text-center mb-6"}
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative">
             <div 
               className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={handleTitleClick}
-              title="Tap to go home"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
+              aria-label={t('a11y.goHome')}
             >
               <MeticAILogo size={isHome ? 48 : 28} variant={isDark ? 'white' : 'default'} />
               <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-5xl' : 'text-2xl'}`}>
                 Metic<span className="gold-text">AI</span>
               </h1>
             </div>
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
               {themeMounted && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
                   onClick={toggleTheme}
-                  title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
                 >
                   {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
                 </Button>
@@ -783,20 +793,21 @@ function App() {
                   size="icon"
                   className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
                   onClick={() => setQrDialogOpen(true)}
-                  title="Open on mobile"
+                  aria-label={t('a11y.openOnMobile')}
                 >
                   <QrCode size={18} weight="duotone" />
                 </Button>
               )}
-            </div>
+            </nav>
           </div>
 
         </motion.div>
+        </header>
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
         <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
-          <div>
+          <main id="main-content">
             <AnimatePresence mode="wait">
               {isInitializing && (
                 <motion.div
@@ -804,7 +815,7 @@ function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+                  transition={motionTransition ?? { duration: 0.15 }}
                 >
                   <Card className="p-6">
                     <div className="flex items-center justify-center h-32">
@@ -1029,7 +1040,7 @@ function App() {
                 />
               </div>
             )}
-          </div>
+          </main>
 
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (

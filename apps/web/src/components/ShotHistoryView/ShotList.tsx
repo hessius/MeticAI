@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -61,6 +62,7 @@ export function ShotList({
             size="icon"
             onClick={onBack}
             className="shrink-0"
+            aria-label={t('a11y.goBack')}
           >
             <CaretLeft size={22} weight="bold" />
           </Button>
@@ -120,7 +122,7 @@ export function ShotList({
             </p>
           </div>
         ) : (
-          <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
+          <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1 -mr-1" role="list" aria-label={t('shotHistory.title')}>
             <AnimatePresence>
               {shots.map((shot, index) => (
                 <motion.div
@@ -130,7 +132,11 @@ export function ShotList({
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2, delay: index * 0.02 }}
                   onClick={() => onSelectShot(shot)}
+                  onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectShot(shot) } }}
                   className="group cursor-pointer"
+                  role="listitem"
+                  tabIndex={0}
+                  aria-label={t('a11y.shotList.viewShot', { time: formatShotTime(shot) })}
                 >
                   <div className="p-4 bg-secondary/40 hover:bg-secondary/70 rounded-xl border border-border/20 hover:border-border/40 transition-all duration-200">
                     <div className="flex items-center justify-between gap-3">

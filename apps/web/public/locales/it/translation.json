@@ -1194,5 +1194,38 @@
       "completeFailed": "Impossibile completare la sessione",
       "recommendFailed": "Impossibile caricare le raccomandazioni"
     }
+  },
+  "a11y": {
+    "skipToMain": "Vai al contenuto principale",
+    "skipToNav": "Vai alla navigazione",
+    "toggleTheme": "Passa alla modalità {{mode}}",
+    "openOnMobile": "Apri su dispositivo mobile",
+    "goHome": "Vai alla schermata iniziale",
+    "goBack": "Indietro",
+    "stepProgress": "Passaggio {{current}} di {{total}}: {{step}}",
+    "progressBar": "Progresso: {{percent}}% completato",
+    "loading": "Caricamento in corso, attendere",
+    "searching": "Ricerca in corso, attendere",
+    "analyzing": "Analisi in corso, attendere",
+    "chart": {
+      "espressoShot": "Grafico dello shot espresso che mostra pressione, flusso e peso nel tempo",
+      "espressoShotLive": "Grafico in tempo reale dello shot espresso che mostra pressione, flusso e peso nel tempo"
+    },
+    "expandSection": "Espandi {{section}}",
+    "collapseSection": "Comprimi {{section}}",
+    "recommendations": {
+      "loading": "Caricamento raccomandazioni",
+      "loaded": "{{count}} raccomandazioni caricate",
+      "group": "Raccomandazioni {{stage}}"
+    },
+    "shotList": {
+      "viewShot": "Visualizza shot del {{time}}",
+      "rating": "{{rating}} su 5 stelle"
+    },
+    "resetVariable": "Ripristina {{name}} al valore originale",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, intervallo da {{min}} a {{max}}",
+    "searchProgress": "Progresso della ricerca: {{percent}}%",
+    "similarProfile": "Seleziona profilo {{name}}, {{score}}% di corrispondenza",
+    "useProfile": "Usa profilo {{name}}"
   }
 }

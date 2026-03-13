@@ -114,6 +114,8 @@ export function VariableAdjustPanel({
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center justify-between"
+        aria-expanded={isExpanded}
+        aria-controls="variable-adjust-content"
       >
         <div className="flex items-center gap-2">
           <Label className="text-base font-medium cursor-pointer">
@@ -131,6 +133,7 @@ export function VariableAdjustPanel({
       <AnimatePresence>
         {isExpanded && (
           <motion.div
+            id="variable-adjust-content"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -193,7 +196,7 @@ export function VariableAdjustPanel({
                                   size="icon"
                                   className="h-6 w-6"
                                   onClick={() => handleResetOne(variable.key)}
-                                  title={t('variables.reset')}
+                                  aria-label={t('a11y.resetVariable', { name: variable.name })}
                                 >
                                   <ArrowCounterClockwise size={12} />
                                 </Button>
@@ -214,6 +217,13 @@ export function VariableAdjustPanel({
                           onValueChange={([v]) =>
                             handleSliderChange(variable.key, v)
                           }
+                          aria-label={t('a11y.variableSlider', {
+                            name: variable.name,
+                            value: Number(currentValue.toFixed(2)),
+                            unit: config.unit,
+                            min: config.min,
+                            max: config.max,
+                          })}
                           className={isModified ? '[&_[role=slider]]:border-primary' : ''}
                         />
 

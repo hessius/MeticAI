@@ -110,7 +110,7 @@ describe('VariableAdjustPanel', () => {
       />
     )
     fireEvent.click(screen.getByText('Adjust Variables'))
-    const resetButtons = screen.getAllByTitle('Reset')
+    const resetButtons = screen.getAllByLabelText(/a11y\.resetVariable/)
     expect(resetButtons.length).toBeGreaterThanOrEqual(1)
     fireEvent.click(resetButtons[0])
     expect(onOverridesChange).toHaveBeenCalledWith({ flow_rate: 3.0 })
