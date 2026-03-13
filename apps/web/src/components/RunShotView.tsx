@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { 
   CaretLeft, 
@@ -20,10 +21,13 @@ import {
   Repeat,
   Plus,
   Trash,
-  PencilSimple
+  PencilSimple,
+  FloppyDisk,
+  FloppyDiskBack
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { format, addMinutes } from 'date-fns'
+import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
 
 interface MachineProfile {
   id: string
@@ -101,11 +105,24 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
   // Ref to track preheat timeout for cleanup
   const preheatTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Cleanup preheat timeout on unmount
+  // Variable overrides state
+  const [profileVariables, setProfileVariables] = useState<ProfileVariable[]>([])
+  const [overrides, setOverrides] = useState<Record<string, number>>({})
+  const [showSaveModeDialog, setShowSaveModeDialog] = useState(false)
+  const [saveModeNewName, setSaveModeNewName] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const saveModeTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Track which profile ID and overrides were used in the last shot
+  const lastShotRef = useRef<{ profileId: string; overrides: Record<string, number> } | null>(null)
+
+  // Cleanup preheat timeout and save-mode timer on unmount
   useEffect(() => {
     return () => {
       if (preheatTimeoutRef.current) {
         clearTimeout(preheatTimeoutRef.current)
+      }
+      if (saveModeTimerRef.current) {
+        clearTimeout(saveModeTimerRef.current)
       }
     }
   }, [])
@@ -132,6 +149,32 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
     }
     fetchProfiles()
   }, [])
+
+  // Fetch profile variables when a profile is selected
+  const selectedProfileId = selectedProfile?.id
+  useEffect(() => {
+    if (!selectedProfileId) {
+      setProfileVariables([])
+      setOverrides({})
+      return
+    }
+    const fetchVariables = async () => {
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/machine/profile/${selectedProfileId}`)
+        if (response.ok) {
+          const data = await response.json()
+          const vars: ProfileVariable[] = (data.variables || data.profile?.variables || [])
+            .filter((v: ProfileVariable) => v.key && v.name && v.type != null)
+          setProfileVariables(vars)
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile variables:', err)
+      }
+    }
+    fetchVariables()
+    setOverrides({})
+  }, [selectedProfileId])
 
   // Fetch machine status and scheduled shots
   useEffect(() => {
@@ -253,23 +296,60 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
         }
       } else if (selectedProfile) {
-        // Run profile immediately
-        const response = await fetch(`${serverUrl}/api/machine/run-profile/${selectedProfile.id}`, {
-          method: 'POST'
-        })
+        const hasOverrides = Object.keys(overrides).length > 0
         
-        if (!response.ok) {
-          let errorMessage = t('runShot.toasts.runFailed')
-          try {
-            const error = await response.json()
-            errorMessage = error?.detail || errorMessage
-          } catch {
-            // Ignore JSON parse errors and fall back to default message
+        if (hasOverrides) {
+          // Run profile with variable overrides
+          const formData = new FormData()
+          formData.append('overrides_json', JSON.stringify(overrides))
+          formData.append('save_mode', 'none')
+          
+          const response = await fetch(
+            `${serverUrl}/api/machine/run-profile-with-overrides/${selectedProfile.id}`,
+            { method: 'POST', body: formData }
+          )
+          
+          if (!response.ok) {
+            let errorMessage = t('runShot.toasts.runFailed')
+            try {
+              const error = await response.json()
+              errorMessage = error?.detail || errorMessage
+            } catch {
+              // Ignore JSON parse errors
+            }
+            throw new Error(errorMessage)
           }
-          throw new Error(errorMessage)
+          
+          // Store shot info for save mode dialog
+          lastShotRef.current = { profileId: selectedProfile.id, overrides: { ...overrides } }
+          toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
+          
+          // Show save mode dialog after a short delay
+          setTimeout(() => setShowSaveModeDialog(true), 2000)
+          // Auto-dismiss after 30 seconds
+          saveModeTimerRef.current = setTimeout(() => {
+            setShowSaveModeDialog(false)
+            lastShotRef.current = null
+          }, 32000)
+        } else {
+          // Run profile immediately (no overrides)
+          const response = await fetch(`${serverUrl}/api/machine/run-profile/${selectedProfile.id}`, {
+            method: 'POST'
+          })
+          
+          if (!response.ok) {
+            let errorMessage = t('runShot.toasts.runFailed')
+            try {
+              const error = await response.json()
+              errorMessage = error?.detail || errorMessage
+            } catch {
+              // Ignore JSON parse errors
+            }
+            throw new Error(errorMessage)
+          }
+          
+          toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
         }
-        
-        toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
       }
     } catch (err) {
       console.error('Failed to run shot:', err)
@@ -285,6 +365,53 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       setIsRunning(false)
     }
   }
+
+  const handleSaveMode = useCallback(async (mode: 'none' | 'save_original' | 'save_new') => {
+    if (!lastShotRef.current) return
+    setIsSaving(true)
+    
+    try {
+      if (mode === 'none') {
+        // Just dismiss — temp profile will be cleaned up automatically
+        setShowSaveModeDialog(false)
+        lastShotRef.current = null
+        return
+      }
+      
+      const serverUrl = await getServerUrl()
+      const formData = new FormData()
+      formData.append('overrides_json', JSON.stringify(lastShotRef.current.overrides))
+      formData.append('save_mode', mode)
+      if (mode === 'save_new' && saveModeNewName.trim()) {
+        formData.append('new_name', saveModeNewName.trim())
+      }
+      
+      const response = await fetch(
+        `${serverUrl}/api/machine/run-profile-with-overrides/${lastShotRef.current.profileId}`,
+        { method: 'POST', body: formData }
+      )
+      
+      if (response.ok) {
+        const msg = mode === 'save_original'
+          ? t('variables.savedToOriginal')
+          : t('variables.savedAsNew')
+        toast.success(msg)
+      } else {
+        toast.error(t('variables.saveFailed'))
+      }
+    } catch {
+      toast.error(t('variables.saveFailed'))
+    } finally {
+      setIsSaving(false)
+      setShowSaveModeDialog(false)
+      setSaveModeNewName('')
+      lastShotRef.current = null
+      if (saveModeTimerRef.current) {
+        clearTimeout(saveModeTimerRef.current)
+        saveModeTimerRef.current = null
+      }
+    }
+  }, [saveModeNewName, t])
 
   const handleSchedule = async () => {
     if (!selectedProfile && !preheat) {
@@ -639,6 +766,15 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           )}
         </AnimatePresence>
       </Card>
+
+      {/* Variable Adjustments */}
+      {selectedProfile && profileVariables.length > 0 && (
+        <VariableAdjustPanel
+          variables={profileVariables}
+          overrides={overrides}
+          onChange={setOverrides}
+        />
+      )}
 
       {/* Options */}
       <Card className="p-6 space-y-4">
@@ -1004,6 +1140,68 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       </Card>
       </div>{/* end right column */}
       </div>{/* end two-column wrapper */}
+
+      {/* Save Mode Dialog */}
+      <Dialog open={showSaveModeDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowSaveModeDialog(false)
+          lastShotRef.current = null
+          if (saveModeTimerRef.current) {
+            clearTimeout(saveModeTimerRef.current)
+            saveModeTimerRef.current = null
+          }
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FloppyDisk size={20} />
+              {t('variables.saveDialogTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('variables.saveDialogDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              disabled={isSaving}
+              onClick={() => handleSaveMode('none')}
+            >
+              <Trash size={18} />
+              {t('variables.discardChanges')}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              disabled={isSaving}
+              onClick={() => handleSaveMode('save_original')}
+            >
+              <FloppyDiskBack size={18} />
+              {t('variables.saveToOriginal')}
+            </Button>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                disabled={isSaving || !saveModeNewName.trim()}
+                onClick={() => handleSaveMode('save_new')}
+              >
+                <Plus size={18} />
+                {t('variables.saveAsNew')}
+              </Button>
+              <input
+                type="text"
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background"
+                placeholder={t('variables.newProfileName')}
+                value={saveModeNewName}
+                onChange={(e) => setSaveModeNewName(e.target.value)}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

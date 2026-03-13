@@ -13336,3 +13336,196 @@ class TestApplyRecommendationsEndpoint:
             data={"recommendations": recs},
         )
         assert response.status_code == 404
+
+
+class TestRunProfileWithOverrides:
+    """Tests for the run-profile-with-overrides endpoint and apply_variable_overrides."""
+
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+
+    # ---- apply_variable_overrides unit tests ----
+
+    def test_apply_variable_overrides_basic(self):
+        """Test basic variable override application."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {
+            "id": "p1",
+            "variables": [
+                {"key": "pressure_main", "name": "Pressure", "type": "pressure", "value": 9.0},
+                {"key": "flow_main", "name": "Flow", "type": "flow", "value": 4.0},
+            ],
+        }
+        result = apply_variable_overrides(profile, {"pressure_main": 7.5})
+        # Original unchanged
+        assert profile["variables"][0]["value"] == 9.0
+        # Result modified
+        assert result["variables"][0]["value"] == 7.5
+        assert result["variables"][1]["value"] == 4.0
+
+    def test_apply_variable_overrides_skips_info_keys(self):
+        """Info_ prefixed variables should be silently skipped."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {
+            "variables": [
+                {"key": "info_beans", "name": "☕ Beans", "type": "pressure", "value": 0},
+                {"key": "pressure_main", "name": "Pressure", "type": "pressure", "value": 9.0},
+            ],
+        }
+        result = apply_variable_overrides(profile, {"info_beans": 99, "pressure_main": 8.0})
+        assert result["variables"][0]["value"] == 0  # unchanged
+        assert result["variables"][1]["value"] == 8.0  # applied
+
+    def test_apply_variable_overrides_empty(self):
+        """Empty overrides should return an identical deep copy."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {"variables": [{"key": "x", "name": "X", "type": "pressure", "value": 1}]}
+        result = apply_variable_overrides(profile, {})
+        assert result == profile
+        assert result is not profile
+
+    def test_apply_variable_overrides_no_variables(self):
+        """Profile without variables key should return a deep copy."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {"id": "p1", "name": "Simple"}
+        result = apply_variable_overrides(profile, {"x": 1})
+        assert result == profile
+        assert result is not profile
+
+    # ---- endpoint tests ----
+
+    @patch('services.temp_profile_service.force_cleanup', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.create_and_load', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_run_with_overrides_none_mode(
+        self, mock_get_api, mock_get_profile, mock_execute, mock_create_load, mock_cleanup, client
+    ):
+        """Test run-profile-with-overrides with save_mode=none."""
+        mock_get_api.return_value = MagicMock()
+        mock_get_profile.return_value = {
+            "id": "p1",
+            "name": "Test Profile",
+            "variables": [
+                {"key": "pressure_main", "name": "P", "type": "pressure", "value": 9.0},
+            ],
+        }
+        mock_create_load.return_value = MagicMock(id="temp-1", name="MeticAI Override: Test Profile")
+        mock_result = MagicMock(spec=['status', 'action'])
+        mock_result.status = "ok"
+        mock_execute.return_value = mock_result
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={"overrides_json": '{"pressure_main": 7.5}', "save_mode": "none"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["save_mode"] == "none"
+        mock_get_profile.assert_called_once()
+        mock_create_load.assert_called_once()
+
+    @patch('api.routes.scheduling.async_save_profile', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.create_and_load', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_save_original_mode(
+        self, mock_get_api, mock_get_profile, mock_execute, mock_create_load, mock_save_profile, client
+    ):
+        """Test save_mode=save_original persists overrides back."""
+        mock_get_api.return_value = MagicMock()
+        mock_get_profile.return_value = {
+            "id": "p1",
+            "name": "Test Profile",
+            "variables": [
+                {"key": "flow_main", "name": "F", "type": "flow", "value": 4.0},
+            ],
+        }
+        mock_create_load.return_value = MagicMock(id="temp-1")
+        mock_result = MagicMock(spec=['status', 'action'])
+        mock_result.status = "ok"
+        mock_execute.return_value = mock_result
+        mock_save_profile.return_value = MagicMock()
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={"overrides_json": '{"flow_main": 3.0}', "save_mode": "save_original"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["save_mode"] == "save_original"
+        mock_save_profile.assert_called_once()
+
+    @patch('api.routes.scheduling.async_create_profile', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.create_and_load', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_save_new_mode(
+        self, mock_get_api, mock_get_profile, mock_execute, mock_create_load, mock_create_profile, client
+    ):
+        """Test save_mode=save_new creates a new profile."""
+        mock_get_api.return_value = MagicMock()
+        mock_get_profile.return_value = {
+            "id": "p1",
+            "name": "Original",
+            "variables": [
+                {"key": "weight", "name": "W", "type": "weight", "value": 36.0},
+            ],
+        }
+        mock_create_load.return_value = MagicMock(id="temp-1")
+        mock_result = MagicMock(spec=['status', 'action'])
+        mock_result.status = "ok"
+        mock_execute.return_value = mock_result
+        mock_create_profile.return_value = MagicMock(id="new-1")
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={
+                "overrides_json": '{"weight": 40.0}',
+                "save_mode": "save_new",
+                "new_name": "My Custom Profile",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["save_mode"] == "save_new"
+        mock_create_profile.assert_called_once()
+
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_no_connection(self, mock_get_api, client):
+        """Test that 503 is returned when machine is not connected."""
+        mock_get_api.return_value = None
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={"overrides_json": '{"pressure_main": 7.5}', "save_mode": "none"},
+        )
+
+        assert response.status_code == 503
+
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_profile_not_found(self, mock_get_api, mock_get_profile, client):
+        """Test 404 when profile fetch returns error."""
+        mock_get_api.return_value = MagicMock()
+        result = MagicMock()
+        result.error = "Not found"
+        mock_get_profile.return_value = result
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/nonexistent",
+            data={"overrides_json": '{}', "save_mode": "none"},
+        )
+
+        assert response.status_code == 404

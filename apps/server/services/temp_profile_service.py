@@ -13,6 +13,7 @@ removed on startup.
 """
 
 import asyncio
+import copy
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
@@ -31,8 +32,8 @@ logger = logging.getLogger(__name__)
 # Used by cleanup_stale() to remove orphans on startup.
 TEMP_PROFILE_NAMES = frozenset({"MeticAI Ratio Pour-Over"})
 
-# Prefixes for temporary profile names (e.g. recipe profiles).
-TEMP_PROFILE_PREFIXES = frozenset({"MeticAI Recipe: "})
+# Prefixes for temporary profile names (e.g. recipe profiles, override profiles).
+TEMP_PROFILE_PREFIXES = frozenset({"MeticAI Recipe: ", "MeticAI Override: "})
 
 
 def is_temp_profile(name: str) -> bool:
@@ -89,6 +90,53 @@ def get_active() -> Optional[Dict[str, Any]]:
         "profile_name": _active.profile_name,
         "original_params": _active.original_params,
     }
+
+
+# Variable types recognised by the Meticulous profile format.
+VARIABLE_TYPES = frozenset({
+    "pressure", "flow", "weight", "power", "time", "piston_position",
+})
+
+
+def apply_variable_overrides(
+    profile_data: Dict[str, Any],
+    overrides: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Apply variable value overrides to a deep-copied profile.
+
+    Only adjustable variables (key does NOT start with ``info_``) can be
+    overridden.  Unknown keys or ``info_`` keys are silently skipped so
+    callers don't need to pre-filter.
+
+    Returns a new profile dict — the original is not mutated.
+    """
+    profile = copy.deepcopy(profile_data)
+    variables = profile.get("variables")
+    if not variables or not overrides:
+        return profile
+
+    # Build a lookup of adjustable variable keys
+    adjustable_keys: set[str] = set()
+    for var in variables:
+        key = var.get("key", "")
+        if key and not key.startswith("info_"):
+            adjustable_keys.add(key)
+
+    applied: dict[str, Any] = {}
+    for key, value in overrides.items():
+        if key not in adjustable_keys:
+            logger.debug("Skipping override for non-adjustable key: %s", key)
+            continue
+        # Update the variable definition value
+        for var in variables:
+            if var.get("key") == key:
+                var["value"] = value
+                applied[key] = value
+                break
+
+    if applied:
+        logger.info("Applied %d variable override(s): %s", len(applied), list(applied))
+    return profile
 
 
 async def create_and_load(
