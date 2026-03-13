@@ -681,11 +681,25 @@ async def analyze_shot_with_llm(
     4. Any issues found in the profile design itself?
     """
     request_id = request.state.request_id
-    
-    # Parse taste descriptors from comma-separated string
+
+    # Validate taste coordinate bounds
+    if taste_x is not None and not (-1.0 <= taste_x <= 1.0):
+        raise HTTPException(status_code=422, detail="taste_x must be between -1 and 1")
+    if taste_y is not None and not (-1.0 <= taste_y <= 1.0):
+        raise HTTPException(status_code=422, detail="taste_y must be between -1 and 1")
+
+    # Parse and validate taste descriptors from comma-separated string
+    _VALID_DESCRIPTORS = {
+        "sweet", "clean", "complex", "juicy", "smooth", "balanced", "floral", "fruity",
+        "astringent", "muddy", "flat", "chalky", "harsh", "watery", "burnt", "grassy",
+    }
     parsed_descriptors: list[str] | None = None
     if taste_descriptors:
-        parsed_descriptors = [d.strip() for d in taste_descriptors.split(",") if d.strip()]
+        parsed_descriptors = [
+            d.strip().lower()
+            for d in taste_descriptors.split(",")
+            if d.strip() and d.strip().lower() in _VALID_DESCRIPTORS
+        ] or None
 
     # Compute taste hash for cache differentiation
     taste_hash = compute_taste_hash(taste_x, taste_y, parsed_descriptors)

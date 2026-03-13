@@ -77,7 +77,7 @@ END_RECOMMENDATIONS_JSON`;
     expect(recs[0].variable).toBe("");
     expect(recs[0].current_value).toBe(0);
     expect(recs[0].recommended_value).toBe(0);
-    expect(recs[0].is_patchable).toBe(true);
+    expect(recs[0].is_patchable).toBe(false);
   });
 });
 

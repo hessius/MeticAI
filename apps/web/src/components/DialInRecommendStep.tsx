@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ArrowClockwise, ListBullets, CheckCircle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { toast } from 'sonner'
 
 interface TasteFeedback {
   x: number
@@ -39,10 +38,9 @@ interface DialInRecommendStepProps {
   onTryAgain: () => void
   onViewHistory: () => void
   onComplete: () => void
-  aiConfigured?: boolean
 }
 
-export function DialInRecommendStep({ session, onTryAgain, onViewHistory, onComplete, aiConfigured }: DialInRecommendStepProps) {
+export function DialInRecommendStep({ session, onTryAgain, onViewHistory, onComplete }: DialInRecommendStepProps) {
   const { t } = useTranslation()
   const [recommendations, setRecommendations] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +48,7 @@ export function DialInRecommendStep({ session, onTryAgain, onViewHistory, onComp
   const latestIteration = session.iterations[session.iterations.length - 1]
 
   useEffect(() => {
-    if (!aiConfigured || !latestIteration) {
+    if (!latestIteration) {
       setLoading(false)
       return
     }
@@ -59,51 +57,41 @@ export function DialInRecommendStep({ session, onTryAgain, onViewHistory, onComp
     const fetchRecommendations = async () => {
       try {
         const serverUrl = await getServerUrl()
-        // Generate recommendations based on taste data
-        const { x, y } = latestIteration.taste
-        const recs: string[] = []
+        const res = await fetch(`${serverUrl}/api/dialin/sessions/${session.id}/recommend`, {
+          method: 'POST',
+        })
 
-        if (x < -0.2) {
-          recs.push(t('dialIn.recommend.tips.grindFiner'))
-          recs.push(t('dialIn.recommend.tips.increaseTemp'))
-        }
-        if (x > 0.2) {
-          recs.push(t('dialIn.recommend.tips.grindCoarser'))
-          recs.push(t('dialIn.recommend.tips.decreaseTemp'))
-        }
-        if (y < -0.2) {
-          recs.push(t('dialIn.recommend.tips.increaseDose'))
-        }
-        if (y > 0.2) {
-          recs.push(t('dialIn.recommend.tips.decreaseDose'))
-        }
-        if (recs.length === 0) {
-          recs.push(t('dialIn.recommend.tips.lookingGood'))
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
+        const data = await res.json()
         if (!cancelled) {
-          setRecommendations(recs)
-
-          // Update recommendations on the server
-          try {
-            await fetch(`${serverUrl}/api/dialin/sessions/${session.id}/iterations/${latestIteration.iteration_number}/recommendations`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ recommendations: recs }),
-            })
-          } catch {
-            // Non-critical — local recs still show
-          }
+          setRecommendations(data.recommendations ?? [])
         }
       } catch {
-        if (!cancelled) toast.error(t('dialIn.errors.recommendFailed'))
+        if (!cancelled) {
+          // Fallback to basic rules if API call fails
+          const { x, y } = latestIteration.taste
+          const recs: string[] = []
+          if (x < -0.2) {
+            recs.push(t('dialIn.recommend.tips.grindFiner'))
+            recs.push(t('dialIn.recommend.tips.increaseTemp'))
+          }
+          if (x > 0.2) {
+            recs.push(t('dialIn.recommend.tips.grindCoarser'))
+            recs.push(t('dialIn.recommend.tips.decreaseTemp'))
+          }
+          if (y < -0.2) recs.push(t('dialIn.recommend.tips.increaseDose'))
+          if (y > 0.2) recs.push(t('dialIn.recommend.tips.decreaseDose'))
+          if (recs.length === 0) recs.push(t('dialIn.recommend.tips.lookingGood'))
+          setRecommendations(recs)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
     fetchRecommendations()
     return () => { cancelled = true }
-  }, [session.id, latestIteration, aiConfigured, t])
+  }, [session.id, latestIteration, t])
 
   return (
     <div className="space-y-4">

@@ -260,7 +260,6 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
                 onTryAgain={handleTryAgain}
                 onViewHistory={handleViewHistory}
                 onComplete={handleComplete}
-                aiConfigured={aiConfigured}
               />
             )}
             {step === 'history' && session && (
