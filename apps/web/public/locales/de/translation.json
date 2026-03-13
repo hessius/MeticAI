@@ -208,7 +208,11 @@
     "generateAiDescription": "KI-Erklärung generieren",
     "generatingAiDescription": "KI-Erklärung wird generiert...",
     "aiDescriptionGenerated": "KI-Erklärung erfolgreich generiert",
-    "aiDescriptionFailed": "KI-Erklärung konnte nicht generiert werden"
+    "aiDescriptionFailed": "KI-Erklärung konnte nicht generiert werden",
+    "notes": "Notizen",
+    "notesPlaceholder": "Notizen zu diesem Profil hinzufügen…",
+    "notesSaveFailed": "Notizen konnten nicht gespeichert werden",
+    "notesSaved": "Notizen gespeichert"
   },
   "runShot": {
     "title": "Ausführen / Planen",
@@ -716,7 +720,8 @@
       "soundsOn": "Töne aktiviert",
       "soundsOff": "Töne deaktiviert",
       "error": "Befehl fehlgeschlagen",
-      "profileSelected": "Profil ausgewählt: {{name}}"
+      "profileSelected": "Profil ausgewählt: {{name}}",
+      "started": "Gestartet"
     },
     "profileSelector": {
       "placeholder": "Profil wechseln…"
@@ -909,7 +914,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Gießen bis {{weight}}g",
-    "recipeWait": "Warten {{seconds}}s"
+    "recipeWait": "Warten {{seconds}}s",
+    "changeRecipe": "Rezept ändern",
+    "followWeight": "Gewicht folgen",
+    "followWeightDescription": "Schritte automatisch nach Gewicht weiterschalten",
+    "hideRecipeDetails": "Rezeptdetails ausblenden",
+    "mode": "Modus",
+    "nextStep": "Nächster Schritt",
+    "noRecipes": "Keine Rezepte verfügbar",
+    "recipeMode": "Rezeptmodus",
+    "selectRecipe": "Rezept auswählen",
+    "viewRecipeDetails": "Rezeptdetails anzeigen"
   },
   "markdownEditor": {
     "edit": "Bearbeiten",
@@ -1026,6 +1041,219 @@
       "restoreProfileFailed": "Profil konnte nicht wiederhergestellt werden",
       "deleteFromMachineFailed": "Löschen von der Maschine fehlgeschlagen",
       "deleteProfileFailed": "Profil konnte nicht gelöscht werden"
+    }
+  },
+  "recommendations": {
+    "apply": "Empfehlungen anwenden",
+    "selectChanges": "Änderungen zum Anwenden auswählen",
+    "confidence": {
+      "high": "Hohe Zuversicht",
+      "medium": "Mittlere Zuversicht",
+      "low": "Geringe Zuversicht"
+    },
+    "infoOnly": "Nur Information (kann nicht geändert werden)",
+    "applying": "Änderungen werden angewendet...",
+    "applied": "Empfehlungen erfolgreich angewendet",
+    "noRecommendations": "Keine umsetzbaren Empfehlungen gefunden",
+    "currentValue": "Aktuell",
+    "recommendedValue": "Empfohlen",
+    "selectAll": "Alle anwendbaren auswählen",
+    "deselectAll": "Alle abwählen",
+    "globalSettings": "Globale Einstellungen"
+  },
+  "taste": {
+    "compass": {
+      "title": "Geschmackskompass",
+      "sour": "Sauer",
+      "bitter": "Bitter",
+      "weak": "Schwach",
+      "strong": "Stark",
+      "balanced": "Ausgewogen",
+      "reset": "Geschmack zurücksetzen",
+      "descriptors": "Geschmacksbeschreibungen",
+      "positive": "Positiv",
+      "negative": "Negativ",
+      "hint": "Ziehen Sie den Punkt, um Ihr Geschmackserlebnis zu beschreiben"
+    },
+    "section": {
+      "title": "Geschmacksbasierte Empfehlungen"
+    }
+  },
+  "variables": {
+    "panelTitle": "Variablen-Anpassungen",
+    "resetAll": "Alle zurücksetzen",
+    "reset": "Zurücksetzen",
+    "adjusted": "angepasst",
+    "noVariables": "Keine anpassbaren Variablen in diesem Profil",
+    "saveDialogTitle": "Variablenänderungen speichern?",
+    "saveDialogDescription": "Ihr Shot verwendete angepasste Variablen. Möchten Sie diese Änderungen beibehalten?",
+    "discardChanges": "Änderungen verwerfen",
+    "saveToOriginal": "Im Originalprofil speichern",
+    "saveAsNew": "Als neues Profil speichern",
+    "newProfileName": "Neuer Profilname...",
+    "savedToOriginal": "Änderungen im Originalprofil gespeichert",
+    "savedAsNew": "Als neues Profil gespeichert",
+    "saveFailed": "Profiländerungen konnten nicht gespeichert werden",
+    "adjust": "Variablen anpassen",
+    "overridesApplied": "{{count}} angepasst",
+    "original": "Original: {{value}}",
+    "noAdjustable": "Keine anpassbaren Variablen in diesem Profil",
+    "type": {
+      "pressure": "Druck",
+      "flow": "Durchfluss",
+      "weight": "Gewicht",
+      "power": "Leistung",
+      "time": "Zeit",
+      "piston": "Kolben"
+    }
+  },
+  "profileRecommendations": {
+    "title": "Empfohlene Profile",
+    "loading": "Passende Profile werden gesucht…",
+    "empty": "Keine passenden Profile gefunden. Versuche andere Tags.",
+    "basedOn": "Basierend auf deinen ausgewählten Tags und Vorlieben",
+    "useProfile": "Verwenden",
+    "findSimilar": "Ähnliche finden",
+    "similarTo": "Profile ähnlich zu \"{{name}}\"",
+    "noSimilar": "Keine ähnlichen Profile gefunden."
+  },
+  "dialIn": {
+    "title": "Einwahl-Assistent",
+    "stepOf": "Schritt {{current}} von {{total}}",
+    "sessionCompleted": "Einwahl-Sitzung abgeschlossen!",
+    "steps": {
+      "coffee": "Kaffeedetails",
+      "profile": "Profil wählen",
+      "prep": "Vorbereitung",
+      "brew": "Shot ziehen",
+      "taste": "Geschmack",
+      "recommend": "Empfehlungen",
+      "history": "Verlauf"
+    },
+    "coffee": {
+      "description": "Erzähl uns von dem Kaffee, den du einstellst.",
+      "roastLevel": "Röstgrad",
+      "roasts": {
+        "light": "Hell",
+        "medium-light": "M-Hell",
+        "medium": "Mittel",
+        "medium-dark": "M-Dkl",
+        "dark": "Dunkel"
+      },
+      "origin": "Herkunft",
+      "originPlaceholder": "z.B. Äthiopien Yirgacheffe",
+      "process": "Aufbereitung",
+      "processes": {
+        "washed": "Gewaschen",
+        "natural": "Natural",
+        "honey": "Honey",
+        "anaerobic": "Anaerob",
+        "other": "Andere"
+      },
+      "roastDate": "Röstdatum",
+      "profileName": "Profilname (optional)",
+      "profileNamePlaceholder": "z.B. Morgenblüte",
+      "continue": "Weiter"
+    },
+    "profile": {
+      "description": "Wähle ein Startprofil für diesen Kaffee.",
+      "noProfiles": "Keine Profile auf der Maschine gefunden.",
+      "manual": "Oder Profilname eingeben",
+      "manualPlaceholder": "Profilname…",
+      "defaultName": "Standardprofil",
+      "skip": "Überspringen — Standard verwenden"
+    },
+    "prep": {
+      "description": "Bereite deinen Shot mit {{profile}} vor.",
+      "items": {
+        "grind": "Frisch mahlen",
+        "dose": "Dosis auf Waage wiegen",
+        "distribute": "Kaffeemehl gleichmäßig verteilen",
+        "tamp": "Mit gleichmäßigem Druck tampen",
+        "purge": "Brühgruppe spülen"
+      },
+      "ready": "Bereit zum Brühen",
+      "skip": "Checkliste überspringen"
+    },
+    "brew": {
+      "title": "Shot ziehen",
+      "description": "Brühe deinen Espresso mit dem gewählten Profil. Tippe unten, wenn der Shot fertig ist.",
+      "done": "Shot fertig"
+    },
+    "taste": {
+      "description": "Wie hat der Shot geschmeckt? Nutze den Kompass, um den Geschmack zu beschreiben.",
+      "submit": "Feedback senden"
+    },
+    "recommend": {
+      "title": "Empfehlungen",
+      "iteration": "Iteration {{number}}",
+      "loading": "Feedback wird analysiert…",
+      "tryAgain": "Anpassen & nochmal",
+      "viewHistory": "Verlauf anzeigen",
+      "done": "Einwahl beenden",
+      "tips": {
+        "grindFiner": "1–2 Stufen feiner mahlen für mehr Extraktion",
+        "grindCoarser": "1–2 Stufen gröber mahlen für weniger Extraktion",
+        "increaseTemp": "Brühtemperatur um 1–2 °C erhöhen",
+        "decreaseTemp": "Brühtemperatur um 1–2 °C senken",
+        "increaseDose": "Dosis um 0,3–0,5 g erhöhen für mehr Körper",
+        "decreaseDose": "Dosis um 0,3–0,5 g senken für weniger Intensität",
+        "lookingGood": "Sieht gut aus! Dieser Shot ist gut ausbalanciert."
+      }
+    },
+    "history": {
+      "title": "Iterationsverlauf",
+      "iterations": "{{count}} Iterationen",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Ausgewogen",
+      "sour": "Sauer",
+      "bitter": "Bitter",
+      "medium": "Mittlerer Körper",
+      "weak": "Dünn/Schwach",
+      "strong": "Schwer/Stark"
+    },
+    "errors": {
+      "createFailed": "Einwahl-Sitzung konnte nicht erstellt werden",
+      "iterationFailed": "Geschmacksfeedback konnte nicht gespeichert werden",
+      "completeFailed": "Sitzung konnte nicht abgeschlossen werden",
+      "recommendFailed": "Empfehlungen konnten nicht geladen werden"
+    }
+  },
+  "a11y": {
+    "skipToMain": "Zum Hauptinhalt springen",
+    "skipToNav": "Zur Navigation springen",
+    "toggleTheme": "Zum {{mode}}-Modus wechseln",
+    "openOnMobile": "Auf Mobilgerät öffnen",
+    "goHome": "Zum Startbildschirm",
+    "goBack": "Zurück",
+    "stepProgress": "Schritt {{current}} von {{total}}: {{step}}",
+    "progressBar": "Fortschritt: {{percent}}% abgeschlossen",
+    "loading": "Laden, bitte warten",
+    "searching": "Suche läuft, bitte warten",
+    "analyzing": "Analyse läuft, bitte warten",
+    "chart": {
+      "espressoShot": "Espresso-Shot-Diagramm mit Druck, Fluss und Gewicht über die Zeit",
+      "espressoShotLive": "Live-Espresso-Shot-Diagramm mit Druck, Fluss und Gewicht über die Zeit"
+    },
+    "expandSection": "{{section}} aufklappen",
+    "collapseSection": "{{section}} zuklappen",
+    "recommendations": {
+      "loading": "Empfehlungen werden geladen",
+      "loaded": "{{count}} Empfehlungen geladen",
+      "group": "{{stage}}-Empfehlungen",
+      "selectVariable": "{{variable}} auswählen"
+    },
+    "shotList": {
+      "viewShot": "Shot von {{time}} anzeigen",
+      "rating": "{{rating}} von 5 Sternen"
+    },
+    "resetVariable": "{{name}} auf Originalwert zurücksetzen",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, Bereich {{min}} bis {{max}}",
+    "searchProgress": "Suchfortschritt: {{percent}}%",
+    "similarProfile": "Profil {{name}} auswählen, {{score}}% Übereinstimmung",
+    "useProfile": "Profil {{name}} verwenden",
+    "dialIn": {
+      "submitProfileName": "Eingegebenen Profilnamen verwenden"
     }
   }
 }

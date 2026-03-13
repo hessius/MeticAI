@@ -1042,5 +1042,218 @@
     "weightPositive": "Target weight must be greater than 0",
     "unsavedChanges": "You have unsaved changes. Discard them?",
     "noChanges": "No changes to save"
+  },
+  "recommendations": {
+    "apply": "Apply Recommendations",
+    "selectChanges": "Select changes to apply",
+    "confidence": {
+      "high": "High confidence",
+      "medium": "Medium confidence",
+      "low": "Low confidence"
+    },
+    "infoOnly": "Information only (cannot be changed)",
+    "applying": "Applying changes...",
+    "applied": "Recommendations applied successfully",
+    "noRecommendations": "No actionable recommendations found",
+    "currentValue": "Current",
+    "recommendedValue": "Recommended",
+    "selectAll": "Select all patchable",
+    "deselectAll": "Deselect all",
+    "globalSettings": "Global Settings"
+  },
+  "taste": {
+    "compass": {
+      "title": "Taste Compass",
+      "sour": "Sour",
+      "bitter": "Bitter",
+      "weak": "Weak",
+      "strong": "Strong",
+      "balanced": "Balanced",
+      "reset": "Reset Taste",
+      "descriptors": "Taste Descriptors",
+      "positive": "Positive",
+      "negative": "Negative",
+      "hint": "Drag the point to describe your taste experience"
+    },
+    "section": {
+      "title": "Taste-Based Recommendations"
+    }
+  },
+  "variables": {
+    "panelTitle": "Variable Adjustments",
+    "resetAll": "Reset All",
+    "reset": "Reset",
+    "adjusted": "adjusted",
+    "noVariables": "No adjustable variables in this profile",
+    "saveDialogTitle": "Save Variable Changes?",
+    "saveDialogDescription": "Your shot used adjusted variables. Would you like to keep these changes?",
+    "discardChanges": "Discard changes",
+    "saveToOriginal": "Save to original profile",
+    "saveAsNew": "Save as new profile",
+    "newProfileName": "New profile name...",
+    "savedToOriginal": "Changes saved to original profile",
+    "savedAsNew": "Saved as new profile",
+    "saveFailed": "Failed to save profile changes",
+    "adjust": "Adjust Variables",
+    "overridesApplied": "{{count}} adjusted",
+    "original": "Original: {{value}}",
+    "noAdjustable": "No adjustable variables in this profile",
+    "type": {
+      "pressure": "Pressure",
+      "flow": "Flow",
+      "weight": "Weight",
+      "power": "Power",
+      "time": "Time",
+      "piston": "Piston"
+    }
+  },
+  "profileRecommendations": {
+    "title": "Recommended Profiles",
+    "loading": "Finding matching profiles…",
+    "empty": "No matching profiles found. Try selecting different tags.",
+    "basedOn": "Based on your selected tags and preferences",
+    "useProfile": "Use",
+    "findSimilar": "Find Similar",
+    "similarTo": "Profiles similar to \"{{name}}\"",
+    "noSimilar": "No similar profiles found."
+  },
+  "dialIn": {
+    "title": "Dial-In Guide",
+    "stepOf": "Step {{current}} of {{total}}",
+    "sessionCompleted": "Dial-in session completed!",
+    "steps": {
+      "coffee": "Coffee Details",
+      "profile": "Select Profile",
+      "prep": "Preparation",
+      "brew": "Pull Shot",
+      "taste": "Taste Feedback",
+      "recommend": "Recommendations",
+      "history": "History"
+    },
+    "coffee": {
+      "description": "Tell us about the coffee you're dialling in.",
+      "roastLevel": "Roast Level",
+      "roasts": {
+        "light": "Light",
+        "medium-light": "Med-Lt",
+        "medium": "Medium",
+        "medium-dark": "Med-Dk",
+        "dark": "Dark"
+      },
+      "origin": "Origin",
+      "originPlaceholder": "e.g. Ethiopia Yirgacheffe",
+      "process": "Process",
+      "processes": {
+        "washed": "Washed",
+        "natural": "Natural",
+        "honey": "Honey",
+        "anaerobic": "Anaerobic",
+        "other": "Other"
+      },
+      "roastDate": "Roast Date",
+      "profileName": "Profile Name (optional)",
+      "profileNamePlaceholder": "e.g. Morning Bloom",
+      "continue": "Continue"
+    },
+    "profile": {
+      "description": "Choose a starting profile for this coffee.",
+      "noProfiles": "No profiles found on machine.",
+      "manual": "Or enter a profile name",
+      "manualPlaceholder": "Profile name…",
+      "defaultName": "Default Profile",
+      "skip": "Skip — use default"
+    },
+    "prep": {
+      "description": "Prepare your shot with {{profile}}.",
+      "items": {
+        "grind": "Grind fresh dose",
+        "dose": "Weigh dose on scale",
+        "distribute": "Distribute grounds evenly",
+        "tamp": "Tamp with consistent pressure",
+        "purge": "Purge group head"
+      },
+      "ready": "Ready to Brew",
+      "skip": "Skip checklist"
+    },
+    "brew": {
+      "title": "Pull Your Shot",
+      "description": "Brew your espresso using the selected profile. Once the shot is complete, tap below to continue.",
+      "done": "Shot Complete"
+    },
+    "taste": {
+      "description": "How did that shot taste? Use the compass to describe the flavour.",
+      "submit": "Submit Feedback"
+    },
+    "recommend": {
+      "title": "Recommendations",
+      "iteration": "Iteration {{number}}",
+      "loading": "Analysing your feedback…",
+      "tryAgain": "Adjust & Try Again",
+      "viewHistory": "View Iteration History",
+      "done": "Finish Dial-In",
+      "tips": {
+        "grindFiner": "Grind 1–2 steps finer to increase extraction",
+        "grindCoarser": "Grind 1–2 steps coarser to reduce extraction",
+        "increaseTemp": "Increase brew temperature by 1–2 °C",
+        "decreaseTemp": "Decrease brew temperature by 1–2 °C",
+        "increaseDose": "Increase dose by 0.3–0.5 g for more body",
+        "decreaseDose": "Decrease dose by 0.3–0.5 g for less intensity",
+        "lookingGood": "Looking good! This shot is well balanced."
+      }
+    },
+    "history": {
+      "title": "Iteration History",
+      "iterations": "{{count}} iterations",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Balanced",
+      "sour": "Sour",
+      "bitter": "Bitter",
+      "medium": "Medium body",
+      "weak": "Thin/Weak",
+      "strong": "Heavy/Strong"
+    },
+    "errors": {
+      "createFailed": "Failed to create dial-in session",
+      "iterationFailed": "Failed to save taste feedback",
+      "completeFailed": "Failed to complete session",
+      "recommendFailed": "Failed to load recommendations"
+    }
+  },
+  "a11y": {
+    "skipToMain": "Skip to main content",
+    "skipToNav": "Skip to navigation",
+    "toggleTheme": "Switch to {{mode}} mode",
+    "openOnMobile": "Open on mobile device",
+    "goHome": "Go to home screen",
+    "goBack": "Go back",
+    "stepProgress": "Step {{current}} of {{total}}: {{step}}",
+    "progressBar": "Progress: {{percent}}% complete",
+    "loading": "Loading, please wait",
+    "searching": "Searching, please wait",
+    "analyzing": "Analyzing, please wait",
+    "chart": {
+      "espressoShot": "Espresso shot chart showing pressure, flow, and weight over time",
+      "espressoShotLive": "Live espresso shot chart showing pressure, flow, and weight over time"
+    },
+    "expandSection": "Expand {{section}}",
+    "collapseSection": "Collapse {{section}}",
+    "recommendations": {
+      "loading": "Loading recommendations",
+      "loaded": "{{count}} recommendations loaded",
+      "group": "{{stage}} recommendations",
+      "selectVariable": "Select {{variable}}"
+    },
+    "shotList": {
+      "viewShot": "View shot from {{time}}",
+      "rating": "{{rating}} out of 5 stars"
+    },
+    "resetVariable": "Reset {{name}} to original value",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, range {{min}} to {{max}}",
+    "searchProgress": "Search progress: {{percent}}%",
+    "similarProfile": "Select profile {{name}}, {{score}}% match",
+    "useProfile": "Use profile {{name}}",
+    "dialIn": {
+      "submitProfileName": "Use entered profile name"
+    }
   }
 }

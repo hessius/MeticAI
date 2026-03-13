@@ -208,7 +208,11 @@
     "generateAiDescription": "Generera AI-förklaring",
     "generatingAiDescription": "Genererar AI-förklaring...",
     "aiDescriptionGenerated": "AI-förklaring genererad",
-    "aiDescriptionFailed": "Kunde inte generera AI-förklaring"
+    "aiDescriptionFailed": "Kunde inte generera AI-förklaring",
+    "notes": "Anteckningar",
+    "notesPlaceholder": "Lägg till anteckningar om denna profil…",
+    "notesSaveFailed": "Kunde inte spara anteckningar",
+    "notesSaved": "Anteckningar sparade"
   },
   "runShot": {
     "title": "Kör / Schemalägg",
@@ -721,7 +725,8 @@
       "soundsOn": "Ljud aktiverat",
       "soundsOff": "Ljud inaktiverat",
       "error": "Kommandot misslyckades",
-      "profileSelected": "Profil vald: {{name}}"
+      "profileSelected": "Profil vald: {{name}}",
+      "started": "Startad"
     },
     "profileSelector": {
       "placeholder": "Byt profil…"
@@ -909,7 +914,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Häll till {{weight}}g",
-    "recipeWait": "Vänta {{seconds}}s"
+    "recipeWait": "Vänta {{seconds}}s",
+    "changeRecipe": "Byt recept",
+    "followWeight": "Följ vikt",
+    "followWeightDescription": "Gå automatiskt vidare baserat på vikt",
+    "hideRecipeDetails": "Dölj receptdetaljer",
+    "mode": "Läge",
+    "nextStep": "Nästa steg",
+    "noRecipes": "Inga recept tillgängliga",
+    "recipeMode": "Receptläge",
+    "selectRecipe": "Välj recept",
+    "viewRecipeDetails": "Visa receptdetaljer"
   },
   "markdownEditor": {
     "edit": "Redigera",
@@ -1026,6 +1041,219 @@
       "restoreProfileFailed": "Kunde inte återställa profilen",
       "deleteFromMachineFailed": "Kunde inte ta bort från maskinen",
       "deleteProfileFailed": "Kunde inte ta bort profilen"
+    }
+  },
+  "recommendations": {
+    "apply": "Tillämpa rekommendationer",
+    "selectChanges": "Välj ändringar att tillämpa",
+    "confidence": {
+      "high": "Hög tillförlitlighet",
+      "medium": "Medelhög tillförlitlighet",
+      "low": "Låg tillförlitlighet"
+    },
+    "infoOnly": "Endast information (kan inte ändras)",
+    "applying": "Tillämpar ändringar...",
+    "applied": "Rekommendationer tillämpade framgångsrikt",
+    "noRecommendations": "Inga tillämpbara rekommendationer hittades",
+    "currentValue": "Nuvarande",
+    "recommendedValue": "Rekommenderat",
+    "selectAll": "Välj alla tillämpbara",
+    "deselectAll": "Avmarkera alla",
+    "globalSettings": "Globala inställningar"
+  },
+  "taste": {
+    "compass": {
+      "title": "Smakkompass",
+      "sour": "Surt",
+      "bitter": "Bittert",
+      "weak": "Svagt",
+      "strong": "Starkt",
+      "balanced": "Balanserat",
+      "reset": "Återställ Smak",
+      "descriptors": "Smakbeskrivningar",
+      "positive": "Positiv",
+      "negative": "Negativ",
+      "hint": "Dra punkten för att beskriva din smakupplevelse"
+    },
+    "section": {
+      "title": "Smakbaserade Rekommendationer"
+    }
+  },
+  "variables": {
+    "panelTitle": "Variabeljusteringar",
+    "resetAll": "Återställ alla",
+    "reset": "Återställ",
+    "adjusted": "justerad",
+    "noVariables": "Inga justerbara variabler i denna profil",
+    "saveDialogTitle": "Spara variabeländringar?",
+    "saveDialogDescription": "Ditt shot använde justerade variabler. Vill du behålla dessa ändringar?",
+    "discardChanges": "Förkasta ändringar",
+    "saveToOriginal": "Spara i originalprofilen",
+    "saveAsNew": "Spara som ny profil",
+    "newProfileName": "Nytt profilnamn...",
+    "savedToOriginal": "Ändringar sparade i originalprofilen",
+    "savedAsNew": "Sparad som ny profil",
+    "saveFailed": "Kunde inte spara profiländringar",
+    "adjust": "Justera variabler",
+    "overridesApplied": "{{count}} justerade",
+    "original": "Original: {{value}}",
+    "noAdjustable": "Inga justerbara variabler i denna profil",
+    "type": {
+      "pressure": "Tryck",
+      "flow": "Flöde",
+      "weight": "Vikt",
+      "power": "Effekt",
+      "time": "Tid",
+      "piston": "Kolv"
+    }
+  },
+  "profileRecommendations": {
+    "title": "Rekommenderade profiler",
+    "loading": "Söker matchande profiler…",
+    "empty": "Inga matchande profiler hittades. Prova andra taggar.",
+    "basedOn": "Baserat på dina valda taggar och preferenser",
+    "useProfile": "Använd",
+    "findSimilar": "Hitta liknande",
+    "similarTo": "Profiler liknande \"{{name}}\"",
+    "noSimilar": "Inga liknande profiler hittades."
+  },
+  "dialIn": {
+    "title": "Inställningsguide",
+    "stepOf": "Steg {{current}} av {{total}}",
+    "sessionCompleted": "Inställningssession klar!",
+    "steps": {
+      "coffee": "Kaffedetaljer",
+      "profile": "Välj profil",
+      "prep": "Förberedelse",
+      "brew": "Dra shot",
+      "taste": "Smak",
+      "recommend": "Rekommendationer",
+      "history": "Historik"
+    },
+    "coffee": {
+      "description": "Berätta om kaffet du ställer in.",
+      "roastLevel": "Rostningsgrad",
+      "roasts": {
+        "light": "Ljus",
+        "medium-light": "M-Ljus",
+        "medium": "Medel",
+        "medium-dark": "M-Mörk",
+        "dark": "Mörk"
+      },
+      "origin": "Ursprung",
+      "originPlaceholder": "t.ex. Etiopien Yirgacheffe",
+      "process": "Process",
+      "processes": {
+        "washed": "Tvättat",
+        "natural": "Natural",
+        "honey": "Honey",
+        "anaerobic": "Anaerobt",
+        "other": "Annat"
+      },
+      "roastDate": "Rostdatum",
+      "profileName": "Profilnamn (valfritt)",
+      "profileNamePlaceholder": "t.ex. Morgonblomma",
+      "continue": "Fortsätt"
+    },
+    "profile": {
+      "description": "Välj en startprofil för detta kaffe.",
+      "noProfiles": "Inga profiler hittades på maskinen.",
+      "manual": "Eller ange ett profilnamn",
+      "manualPlaceholder": "Profilnamn…",
+      "defaultName": "Standardprofil",
+      "skip": "Hoppa över — använd standard"
+    },
+    "prep": {
+      "description": "Förbered din shot med {{profile}}.",
+      "items": {
+        "grind": "Mal färsk dos",
+        "dose": "Väg dos på våg",
+        "distribute": "Fördela kaffet jämnt",
+        "tamp": "Pressa med jämnt tryck",
+        "purge": "Spola brygggruppen"
+      },
+      "ready": "Redo att brygga",
+      "skip": "Hoppa över checklistan"
+    },
+    "brew": {
+      "title": "Dra din shot",
+      "description": "Brygga din espresso med den valda profilen. När shoten är klar, tryck nedan för att fortsätta.",
+      "done": "Shot klar"
+    },
+    "taste": {
+      "description": "Hur smakade den shoten? Använd kompassen för att beskriva smaken.",
+      "submit": "Skicka omdöme"
+    },
+    "recommend": {
+      "title": "Rekommendationer",
+      "iteration": "Iteration {{number}}",
+      "loading": "Analyserar ditt omdöme…",
+      "tryAgain": "Justera & försök igen",
+      "viewHistory": "Visa historik",
+      "done": "Avsluta inställning",
+      "tips": {
+        "grindFiner": "Mal 1–2 steg finare för mer extraktion",
+        "grindCoarser": "Mal 1–2 steg grövre för mindre extraktion",
+        "increaseTemp": "Öka bryggtemperaturen med 1–2 °C",
+        "decreaseTemp": "Sänk bryggtemperaturen med 1–2 °C",
+        "increaseDose": "Öka dosen med 0,3–0,5 g för mer kropp",
+        "decreaseDose": "Minska dosen med 0,3–0,5 g för mindre intensitet",
+        "lookingGood": "Ser bra ut! Denna shot är välbalanserad."
+      }
+    },
+    "history": {
+      "title": "Iterationshistorik",
+      "iterations": "{{count}} iterationer",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Balanserad",
+      "sour": "Sur",
+      "bitter": "Bitter",
+      "medium": "Medel kropp",
+      "weak": "Tunn/Svag",
+      "strong": "Tung/Stark"
+    },
+    "errors": {
+      "createFailed": "Kunde inte skapa inställningssession",
+      "iterationFailed": "Kunde inte spara smakomdöme",
+      "completeFailed": "Kunde inte avsluta sessionen",
+      "recommendFailed": "Kunde inte ladda rekommendationer"
+    }
+  },
+  "a11y": {
+    "skipToMain": "Hoppa till huvudinnehåll",
+    "skipToNav": "Hoppa till navigering",
+    "toggleTheme": "Byt till {{mode}}-läge",
+    "openOnMobile": "Öppna på mobil enhet",
+    "goHome": "Gå till startskärmen",
+    "goBack": "Tillbaka",
+    "stepProgress": "Steg {{current}} av {{total}}: {{step}}",
+    "progressBar": "Framsteg: {{percent}}% klart",
+    "loading": "Laddar, vänta",
+    "searching": "Söker, vänta",
+    "analyzing": "Analyserar, vänta",
+    "chart": {
+      "espressoShot": "Espressoshotdiagram som visar tryck, flöde och vikt över tid",
+      "espressoShotLive": "Livediagram för espressoshot som visar tryck, flöde och vikt över tid"
+    },
+    "expandSection": "Expandera {{section}}",
+    "collapseSection": "Komprimera {{section}}",
+    "recommendations": {
+      "loading": "Laddar rekommendationer",
+      "loaded": "{{count}} rekommendationer laddade",
+      "group": "{{stage}}-rekommendationer",
+      "selectVariable": "Välj {{variable}}"
+    },
+    "shotList": {
+      "viewShot": "Visa shot från {{time}}",
+      "rating": "{{rating}} av 5 stjärnor"
+    },
+    "resetVariable": "Återställ {{name}} till ursprungligt värde",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, intervall {{min}} till {{max}}",
+    "searchProgress": "Sökframsteg: {{percent}}%",
+    "similarProfile": "Välj profil {{name}}, {{score}}% matchning",
+    "useProfile": "Använd profil {{name}}",
+    "dialIn": {
+      "submitProfileName": "Använd angivet profilnamn"
     }
   }
 }

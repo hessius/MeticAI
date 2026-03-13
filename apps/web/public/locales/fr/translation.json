@@ -208,7 +208,11 @@
     "generateAiDescription": "Générer une explication IA",
     "generatingAiDescription": "Génération de l'explication IA...",
     "aiDescriptionGenerated": "Explication IA générée avec succès",
-    "aiDescriptionFailed": "Échec de la génération de l'explication IA"
+    "aiDescriptionFailed": "Échec de la génération de l'explication IA",
+    "notes": "Notes",
+    "notesPlaceholder": "Ajouter des notes sur ce profil…",
+    "notesSaveFailed": "Échec de la sauvegarde des notes",
+    "notesSaved": "Notes sauvegardées"
   },
   "runShot": {
     "title": "Exécuter / Programmer",
@@ -716,7 +720,8 @@
       "soundsOn": "Sons activés",
       "soundsOff": "Sons désactivés",
       "error": "Échec de la commande",
-      "profileSelected": "Profil sélectionné : {{name}}"
+      "profileSelected": "Profil sélectionné : {{name}}",
+      "started": "Démarré"
     },
     "profileSelector": {
       "placeholder": "Changer de profil…"
@@ -909,7 +914,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Verser jusqu'à {{weight}}g",
-    "recipeWait": "Attendre {{seconds}}s"
+    "recipeWait": "Attendre {{seconds}}s",
+    "changeRecipe": "Changer la recette",
+    "followWeight": "Suivre le poids",
+    "followWeightDescription": "Passer automatiquement aux étapes suivantes selon le poids",
+    "hideRecipeDetails": "Masquer les détails de la recette",
+    "mode": "Mode",
+    "nextStep": "Étape suivante",
+    "noRecipes": "Aucune recette disponible",
+    "recipeMode": "Mode recette",
+    "selectRecipe": "Sélectionner une recette",
+    "viewRecipeDetails": "Voir les détails de la recette"
   },
   "markdownEditor": {
     "edit": "Modifier",
@@ -1026,6 +1041,219 @@
       "restoreProfileFailed": "Échec de la restauration du profil",
       "deleteFromMachineFailed": "Échec de la suppression de la machine",
       "deleteProfileFailed": "Échec de la suppression du profil"
+    }
+  },
+  "recommendations": {
+    "apply": "Appliquer les recommandations",
+    "selectChanges": "Sélectionner les modifications à appliquer",
+    "confidence": {
+      "high": "Confiance élevée",
+      "medium": "Confiance moyenne",
+      "low": "Confiance faible"
+    },
+    "infoOnly": "Information uniquement (non modifiable)",
+    "applying": "Application des modifications...",
+    "applied": "Recommandations appliquées avec succès",
+    "noRecommendations": "Aucune recommandation applicable trouvée",
+    "currentValue": "Actuel",
+    "recommendedValue": "Recommandé",
+    "selectAll": "Tout sélectionner",
+    "deselectAll": "Tout désélectionner",
+    "globalSettings": "Paramètres globaux"
+  },
+  "taste": {
+    "compass": {
+      "title": "Boussole de Goût",
+      "sour": "Acide",
+      "bitter": "Amer",
+      "weak": "Faible",
+      "strong": "Fort",
+      "balanced": "Équilibré",
+      "reset": "Réinitialiser le Goût",
+      "descriptors": "Descripteurs de Goût",
+      "positive": "Positif",
+      "negative": "Négatif",
+      "hint": "Faites glisser le point pour décrire votre expérience gustative"
+    },
+    "section": {
+      "title": "Recommandations Basées sur le Goût"
+    }
+  },
+  "variables": {
+    "panelTitle": "Ajustements des Variables",
+    "resetAll": "Tout réinitialiser",
+    "reset": "Réinitialiser",
+    "adjusted": "ajusté",
+    "noVariables": "Aucune variable ajustable dans ce profil",
+    "saveDialogTitle": "Sauvegarder les modifications ?",
+    "saveDialogDescription": "Votre shot a utilisé des variables ajustées. Souhaitez-vous conserver ces modifications ?",
+    "discardChanges": "Abandonner les modifications",
+    "saveToOriginal": "Sauvegarder dans le profil original",
+    "saveAsNew": "Sauvegarder comme nouveau profil",
+    "newProfileName": "Nom du nouveau profil...",
+    "savedToOriginal": "Modifications sauvegardées dans le profil original",
+    "savedAsNew": "Sauvegardé comme nouveau profil",
+    "saveFailed": "Échec de la sauvegarde des modifications",
+    "adjust": "Ajuster les variables",
+    "overridesApplied": "{{count}} ajustées",
+    "original": "Original : {{value}}",
+    "noAdjustable": "Aucune variable ajustable dans ce profil",
+    "type": {
+      "pressure": "Pression",
+      "flow": "Débit",
+      "weight": "Poids",
+      "power": "Puissance",
+      "time": "Temps",
+      "piston": "Piston"
+    }
+  },
+  "profileRecommendations": {
+    "title": "Profils recommandés",
+    "loading": "Recherche de profils correspondants…",
+    "empty": "Aucun profil correspondant trouvé. Essayez d'autres tags.",
+    "basedOn": "Basé sur vos tags et préférences sélectionnés",
+    "useProfile": "Utiliser",
+    "findSimilar": "Trouver similaires",
+    "similarTo": "Profils similaires à \"{{name}}\"",
+    "noSimilar": "Aucun profil similaire trouvé."
+  },
+  "dialIn": {
+    "title": "Guide de réglage",
+    "stepOf": "Étape {{current}} sur {{total}}",
+    "sessionCompleted": "Session de réglage terminée !",
+    "steps": {
+      "coffee": "Détails du café",
+      "profile": "Choisir un profil",
+      "prep": "Préparation",
+      "brew": "Extraire le shot",
+      "taste": "Goût",
+      "recommend": "Recommandations",
+      "history": "Historique"
+    },
+    "coffee": {
+      "description": "Parlez-nous du café que vous réglez.",
+      "roastLevel": "Niveau de torréfaction",
+      "roasts": {
+        "light": "Clair",
+        "medium-light": "M-Clair",
+        "medium": "Moyen",
+        "medium-dark": "M-Fonc",
+        "dark": "Foncé"
+      },
+      "origin": "Origine",
+      "originPlaceholder": "ex. Éthiopie Yirgacheffe",
+      "process": "Traitement",
+      "processes": {
+        "washed": "Lavé",
+        "natural": "Naturel",
+        "honey": "Honey",
+        "anaerobic": "Anaérobique",
+        "other": "Autre"
+      },
+      "roastDate": "Date de torréfaction",
+      "profileName": "Nom du profil (optionnel)",
+      "profileNamePlaceholder": "ex. Fleur du matin",
+      "continue": "Continuer"
+    },
+    "profile": {
+      "description": "Choisissez un profil de départ pour ce café.",
+      "noProfiles": "Aucun profil trouvé sur la machine.",
+      "manual": "Ou entrez un nom de profil",
+      "manualPlaceholder": "Nom du profil…",
+      "defaultName": "Profil par défaut",
+      "skip": "Passer — utiliser le défaut"
+    },
+    "prep": {
+      "description": "Préparez votre shot avec {{profile}}.",
+      "items": {
+        "grind": "Moudre une dose fraîche",
+        "dose": "Peser la dose sur la balance",
+        "distribute": "Répartir le café uniformément",
+        "tamp": "Tasser avec une pression constante",
+        "purge": "Purger le groupe"
+      },
+      "ready": "Prêt à extraire",
+      "skip": "Passer la liste"
+    },
+    "brew": {
+      "title": "Extraire le shot",
+      "description": "Préparez votre espresso avec le profil sélectionné. Une fois le shot terminé, appuyez ci-dessous pour continuer.",
+      "done": "Shot terminé"
+    },
+    "taste": {
+      "description": "Comment était ce shot ? Utilisez la boussole pour décrire la saveur.",
+      "submit": "Envoyer l'avis"
+    },
+    "recommend": {
+      "title": "Recommandations",
+      "iteration": "Itération {{number}}",
+      "loading": "Analyse de votre avis…",
+      "tryAgain": "Ajuster et réessayer",
+      "viewHistory": "Voir l'historique",
+      "done": "Terminer le réglage",
+      "tips": {
+        "grindFiner": "Moudre 1–2 crans plus fin pour plus d'extraction",
+        "grindCoarser": "Moudre 1–2 crans plus gros pour moins d'extraction",
+        "increaseTemp": "Augmenter la température de 1–2 °C",
+        "decreaseTemp": "Diminuer la température de 1–2 °C",
+        "increaseDose": "Augmenter la dose de 0,3–0,5 g pour plus de corps",
+        "decreaseDose": "Diminuer la dose de 0,3–0,5 g pour moins d'intensité",
+        "lookingGood": "C'est bien ! Ce shot est bien équilibré."
+      }
+    },
+    "history": {
+      "title": "Historique des itérations",
+      "iterations": "{{count}} itérations",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Équilibré",
+      "sour": "Acide",
+      "bitter": "Amer",
+      "medium": "Corps moyen",
+      "weak": "Léger/Faible",
+      "strong": "Lourd/Fort"
+    },
+    "errors": {
+      "createFailed": "Impossible de créer la session de réglage",
+      "iterationFailed": "Impossible de sauvegarder l'avis de goût",
+      "completeFailed": "Impossible de terminer la session",
+      "recommendFailed": "Impossible de charger les recommandations"
+    }
+  },
+  "a11y": {
+    "skipToMain": "Aller au contenu principal",
+    "skipToNav": "Aller à la navigation",
+    "toggleTheme": "Passer en mode {{mode}}",
+    "openOnMobile": "Ouvrir sur appareil mobile",
+    "goHome": "Retour à l'écran d'accueil",
+    "goBack": "Retour",
+    "stepProgress": "Étape {{current}} sur {{total}} : {{step}}",
+    "progressBar": "Progression : {{percent}}% terminé",
+    "loading": "Chargement, veuillez patienter",
+    "searching": "Recherche en cours, veuillez patienter",
+    "analyzing": "Analyse en cours, veuillez patienter",
+    "chart": {
+      "espressoShot": "Graphique d'extraction espresso montrant la pression, le débit et le poids au fil du temps",
+      "espressoShotLive": "Graphique en direct d'extraction espresso montrant la pression, le débit et le poids au fil du temps"
+    },
+    "expandSection": "Développer {{section}}",
+    "collapseSection": "Réduire {{section}}",
+    "recommendations": {
+      "loading": "Chargement des recommandations",
+      "loaded": "{{count}} recommandations chargées",
+      "group": "Recommandations {{stage}}",
+      "selectVariable": "Sélectionner {{variable}}"
+    },
+    "shotList": {
+      "viewShot": "Voir le shot du {{time}}",
+      "rating": "{{rating}} sur 5 étoiles"
+    },
+    "resetVariable": "Réinitialiser {{name}} à la valeur originale",
+    "variableSlider": "{{name}} : {{value}}{{unit}}, plage de {{min}} à {{max}}",
+    "searchProgress": "Progression de la recherche : {{percent}}%",
+    "similarProfile": "Sélectionner le profil {{name}}, {{score}}% de correspondance",
+    "useProfile": "Utiliser le profil {{name}}",
+    "dialIn": {
+      "submitProfileName": "Utiliser le nom de profil saisi"
     }
   }
 }

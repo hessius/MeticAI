@@ -28,6 +28,7 @@ import {
   type ProfileTargetPoint,
 } from './chartConstants'
 import { CustomTooltip } from './CustomTooltip'
+import { useTranslation } from 'react-i18next'
 
 // ---------------------------------------------------------------------------
 // Reference line descriptor (for live-view limits)
@@ -100,6 +101,7 @@ export function EspressoChart({
   targetCurves,
 }: EspressoChartProps) {
   const { resolvedTheme } = useTheme()
+  const { t } = useTranslation()
   const isDark = resolvedTheme === 'dark'
   const theme = getChartTheme(isDark)
 
@@ -136,7 +138,7 @@ export function EspressoChart({
     : [0, xMax ?? Math.ceil(Math.max(...data.map(d => d.time), 1))]
 
   return (
-    <div className={className}>
+    <div className={className} role="img" aria-label={liveMode ? t('a11y.chart.espressoShotLive') : t('a11y.chart.espressoShot')}>
       <div className={heightClass}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart

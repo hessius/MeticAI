@@ -194,6 +194,13 @@ async def lifespan(app: FastAPI):
             )
     except Exception as e:
         logger.warning("Failed to clean stale temp profiles at startup: %s", e)
+
+    # Restore dial-in sessions from persistence
+    try:
+        from services.dialin_service import _load as load_dialin_sessions
+        await load_dialin_sessions()
+    except Exception as e:
+        logger.warning("Failed to restore dial-in sessions at startup: %s", e)
     
     yield
     
@@ -263,7 +270,7 @@ async def _httpx_connect_timeout(_request: Request, exc: httpx.ConnectTimeout):
 
 
 # Import route modules
-from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands, pour_over, recipes
+from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands, pour_over, recipes, dialin
 
 # Middleware for request logging and tracking
 @app.middleware("http")
@@ -357,6 +364,7 @@ app.include_router(websocket.router)
 app.include_router(commands.router)
 app.include_router(pour_over.router)
 app.include_router(recipes.router)
+app.include_router(dialin.router)
 
 
 # ============================================================================

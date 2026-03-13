@@ -19,13 +19,15 @@ import {
   CheckCircle,
   SpinnerGap,
   FileJs,
-  X
+  X,
+  MagnifyingGlass
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
 import { SyncReport, SyncResults } from './SyncReport'
+import { FindSimilarOverlay } from './FindSimilarOverlay'
 
 interface MachineProfile {
   id: string
@@ -133,6 +135,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
 
   // Detect coarse pointer (touch device)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
+  const [similarTarget, setSimilarTarget] = useState<string | null>(null)
   useEffect(() => {
     const mql = window.matchMedia('(pointer: coarse)')
     setIsCoarsePointer(mql.matches)
@@ -571,8 +574,18 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setSimilarTarget(profile.name)}
+                            title={t('profileRecommendations.findSimilar')}
+                            aria-label={t('profileRecommendations.findSimilar')}
+                          >
+                            <MagnifyingGlass className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleExport(profile)}
                             title={t('profileCatalogue.export')}
+                            aria-label={t('profileCatalogue.export')}
                           >
                             <FileJs className="w-4 h-4" />
                           </Button>
@@ -581,6 +594,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => startRename(profile)}
                             title={t('profileCatalogue.rename')}
+                            aria-label={t('profileCatalogue.rename')}
                           >
                             <PencilSimple className="w-4 h-4" />
                           </Button>
@@ -589,6 +603,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => openDeleteDialog(profile)}
                             title={t('profileCatalogue.delete')}
+                            aria-label={t('profileCatalogue.delete')}
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash className="w-4 h-4" />
@@ -678,6 +693,12 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
           fetchOrphaned()
           fetchSyncStatus()
         }}
+      />
+
+      <FindSimilarOverlay
+        open={!!similarTarget}
+        onOpenChange={(open) => { if (!open) setSimilarTarget(null) }}
+        profileName={similarTarget || ''}
       />
     </div>
   )

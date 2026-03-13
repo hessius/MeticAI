@@ -1,6 +1,7 @@
 """Machine status and scheduling endpoints."""
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Form, Request, HTTPException
 from datetime import datetime, timezone
+import json
 import uuid
 import logging
 import asyncio
@@ -11,6 +12,9 @@ from services.meticulous_service import (
     async_get_last_profile,
     async_execute_action,
     async_load_profile_by_id,
+    async_get_profile,
+    async_create_profile,
+    async_save_profile,
     async_session_get,
     async_session_post,
 )
@@ -24,6 +28,8 @@ from services.scheduling_state import (
     get_next_occurrence as _get_next_occurrence,
     PREHEAT_DURATION_MINUTES,
 )
+from services import temp_profile_service
+from utils.file_utils import deep_convert_to_dict
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -263,6 +269,150 @@ async def run_profile(profile_id: str, request: Request):
             status_code=500,
             detail={"status": "error", "error": str(e)}
         )
+
+
+@router.post("/machine/run-profile-with-overrides/{profile_id}")
+@router.post("/api/machine/run-profile-with-overrides/{profile_id}")
+async def run_profile_with_overrides(
+    request: Request,
+    profile_id: str,
+    overrides_json: str = Form(default="{}"),
+    save_mode: str = Form(default="none"),
+    new_name: str = Form(default=""),
+):
+    """Run a profile with temporary variable overrides.
+
+    Loads the original profile, applies overrides to create a temp copy,
+    runs that copy, and handles save semantics afterwards.
+
+    Args:
+        profile_id: ID of the source profile.
+        overrides: JSON string mapping variable keys to new numeric values.
+        save_mode: ``"none"`` | ``"save_original"`` | ``"save_new"``.
+        new_name: Required when *save_mode* is ``"save_new"``.
+    """
+    request_id = request.state.request_id
+
+    try:
+        overrides_dict: dict = json.loads(overrides_json)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid overrides JSON: {exc}")
+
+    if save_mode not in ("none", "save_original", "save_new"):
+        raise HTTPException(status_code=422, detail=f"Invalid save_mode: {save_mode}")
+
+    if save_mode == "save_new" and not new_name.strip():
+        raise HTTPException(status_code=422, detail="new_name is required when save_mode is save_new")
+
+    # Reject info_ variable overrides
+    info_keys = [k for k in overrides_dict if k.startswith("info_")]
+    if info_keys:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot override info variables: {info_keys}",
+        )
+
+    try:
+        logger.info(
+            "Running profile with overrides: %s (%d override(s), save_mode=%s)",
+            profile_id, len(overrides_dict), save_mode,
+            extra={"request_id": request_id},
+        )
+
+        if get_meticulous_api() is None:
+            raise HTTPException(status_code=503, detail="Meticulous machine not connected")
+
+        # Fetch the original profile
+        original_profile = await async_get_profile(profile_id)
+        if original_profile is None:
+            raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
+        if hasattr(original_profile, "error") and original_profile.error:
+            raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found: {original_profile.error}")
+
+        # Normalise to dict
+        if hasattr(original_profile, "__dict__"):
+            profile_data: dict = deep_convert_to_dict(original_profile)
+        elif isinstance(original_profile, dict):
+            profile_data = original_profile
+        else:
+            raise HTTPException(status_code=500, detail="Unexpected profile format from machine")
+
+        original_name = profile_data.get("name", "Unknown Profile")
+
+        if overrides_dict:
+            # Apply overrides to a deep-copied profile
+            modified_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
+            modified_profile["name"] = f"MeticAI Override: {original_name}"
+            # Remove the id so the machine assigns a fresh one
+            modified_profile.pop("id", None)
+
+            # Create and load the temp profile
+            result = await temp_profile_service.create_and_load(
+                modified_profile,
+                params={"overrides": overrides_dict, "source_profile_id": profile_id},
+                previous_profile_id=profile_id,
+                previous_profile_name=original_name,
+            )
+        else:
+            # No overrides — just load the original
+            await async_load_profile_by_id(profile_id)
+            result = {"profile_id": profile_id, "profile_name": original_name}
+
+        # Start extraction
+        from meticulous.api_types import ActionType
+        action_result = await async_execute_action(ActionType.START)
+        if hasattr(action_result, "error") and action_result.error:
+            # Cleanup on failed start
+            if overrides_dict:
+                await temp_profile_service.force_cleanup()
+            raise HTTPException(status_code=502, detail=f"Failed to start profile: {action_result.error}")
+
+        # Handle save modes (async — don't block the response)
+        if save_mode == "save_original" and overrides_dict:
+            # Persist overrides back into the original profile
+            saved_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
+            saved_profile["id"] = profile_id
+            saved_profile["name"] = original_name
+            try:
+                await async_save_profile(saved_profile)
+                logger.info("Overrides saved back to original profile %s", profile_id)
+            except Exception as exc:
+                logger.error("Failed to save overrides to original profile: %s", exc)
+
+        elif save_mode == "save_new" and overrides_dict:
+            # Save as a brand-new profile
+            new_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
+            new_profile.pop("id", None)
+            new_profile["name"] = new_name.strip()
+            try:
+                await async_create_profile(new_profile)
+                logger.info("Overrides saved as new profile '%s'", new_name.strip())
+            except Exception as exc:
+                logger.error("Failed to save overrides as new profile: %s", exc)
+
+        return {
+            "status": "success",
+            "message": "Profile started with overrides" if overrides_dict else "Profile started",
+            "profile_id": result["profile_id"],
+            "profile_name": result["profile_name"],
+            "overrides_applied": len(overrides_dict),
+            "save_mode": save_mode,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Attempt cleanup on unexpected errors
+        try:
+            await temp_profile_service.force_cleanup()
+        except Exception:
+            pass
+        logger.error(
+            "Failed to run profile with overrides: %s",
+            str(e), exc_info=True,
+            extra={"request_id": request_id, "profile_id": profile_id},
+        )
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
 
 
 @router.post("/api/machine/schedule-shot")
