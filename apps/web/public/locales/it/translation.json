@@ -1092,5 +1092,107 @@
     "findSimilar": "Trova simili",
     "similarTo": "Profili simili a \"{{name}}\"",
     "noSimilar": "Nessun profilo simile trovato."
+  },
+  "dialIn": {
+    "title": "Guida alla regolazione",
+    "stepOf": "Passo {{current}} di {{total}}",
+    "sessionCompleted": "Sessione di regolazione completata!",
+    "steps": {
+      "coffee": "Dettagli caffè",
+      "profile": "Seleziona profilo",
+      "prep": "Preparazione",
+      "brew": "Estrarre shot",
+      "taste": "Gusto",
+      "recommend": "Raccomandazioni",
+      "history": "Cronologia"
+    },
+    "coffee": {
+      "description": "Parlaci del caffè che stai regolando.",
+      "roastLevel": "Livello di tostatura",
+      "roasts": {
+        "light": "Chiaro",
+        "medium-light": "M-Chiaro",
+        "medium": "Medio",
+        "medium-dark": "M-Scuro",
+        "dark": "Scuro"
+      },
+      "origin": "Origine",
+      "originPlaceholder": "es. Etiopia Yirgacheffe",
+      "process": "Lavorazione",
+      "processes": {
+        "washed": "Lavato",
+        "natural": "Naturale",
+        "honey": "Honey",
+        "anaerobic": "Anaerobico",
+        "other": "Altro"
+      },
+      "roastDate": "Data di tostatura",
+      "profileName": "Nome profilo (opzionale)",
+      "profileNamePlaceholder": "es. Fiore del mattino",
+      "continue": "Continua"
+    },
+    "profile": {
+      "description": "Scegli un profilo di partenza per questo caffè.",
+      "noProfiles": "Nessun profilo trovato sulla macchina.",
+      "manual": "Oppure inserisci un nome profilo",
+      "manualPlaceholder": "Nome profilo…",
+      "defaultName": "Profilo predefinito",
+      "skip": "Salta — usa predefinito"
+    },
+    "prep": {
+      "description": "Prepara il tuo shot con {{profile}}.",
+      "items": {
+        "grind": "Macinare dose fresca",
+        "dose": "Pesare dose sulla bilancia",
+        "distribute": "Distribuire il caffè uniformemente",
+        "tamp": "Pressare con pressione costante",
+        "purge": "Spurgare il gruppo"
+      },
+      "ready": "Pronto per estrarre",
+      "skip": "Salta la lista"
+    },
+    "brew": {
+      "title": "Estrarre lo shot",
+      "description": "Prepara il tuo espresso con il profilo selezionato. Quando lo shot è pronto, tocca sotto per continuare.",
+      "done": "Shot completato"
+    },
+    "taste": {
+      "description": "Com'era questo shot? Usa la bussola per descrivere il sapore.",
+      "submit": "Invia feedback"
+    },
+    "recommend": {
+      "title": "Raccomandazioni",
+      "iteration": "Iterazione {{number}}",
+      "loading": "Analisi del tuo feedback…",
+      "tryAgain": "Regola e riprova",
+      "viewHistory": "Vedi cronologia",
+      "done": "Termina regolazione",
+      "tips": {
+        "grindFiner": "Macinare 1–2 passi più fine per più estrazione",
+        "grindCoarser": "Macinare 1–2 passi più grosso per meno estrazione",
+        "increaseTemp": "Aumentare temperatura di 1–2 °C",
+        "decreaseTemp": "Diminuire temperatura di 1–2 °C",
+        "increaseDose": "Aumentare dose di 0,3–0,5 g per più corpo",
+        "decreaseDose": "Diminuire dose di 0,3–0,5 g per meno intensità",
+        "lookingGood": "Ottimo! Questo shot è ben bilanciato."
+      }
+    },
+    "history": {
+      "title": "Cronologia iterazioni",
+      "iterations": "{{count}} iterazioni",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Bilanciato",
+      "sour": "Acido",
+      "bitter": "Amaro",
+      "medium": "Corpo medio",
+      "weak": "Leggero/Debole",
+      "strong": "Pesante/Forte"
+    },
+    "errors": {
+      "createFailed": "Impossibile creare la sessione di regolazione",
+      "iterationFailed": "Impossibile salvare il feedback di gusto",
+      "completeFailed": "Impossibile completare la sessione",
+      "recommendFailed": "Impossibile caricare le raccomandazioni"
+    }
   }
 }

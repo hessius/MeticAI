@@ -1092,5 +1092,107 @@
     "findSimilar": "Ähnliche finden",
     "similarTo": "Profile ähnlich zu \"{{name}}\"",
     "noSimilar": "Keine ähnlichen Profile gefunden."
+  },
+  "dialIn": {
+    "title": "Einwahl-Assistent",
+    "stepOf": "Schritt {{current}} von {{total}}",
+    "sessionCompleted": "Einwahl-Sitzung abgeschlossen!",
+    "steps": {
+      "coffee": "Kaffeedetails",
+      "profile": "Profil wählen",
+      "prep": "Vorbereitung",
+      "brew": "Shot ziehen",
+      "taste": "Geschmack",
+      "recommend": "Empfehlungen",
+      "history": "Verlauf"
+    },
+    "coffee": {
+      "description": "Erzähl uns von dem Kaffee, den du einstellst.",
+      "roastLevel": "Röstgrad",
+      "roasts": {
+        "light": "Hell",
+        "medium-light": "M-Hell",
+        "medium": "Mittel",
+        "medium-dark": "M-Dkl",
+        "dark": "Dunkel"
+      },
+      "origin": "Herkunft",
+      "originPlaceholder": "z.B. Äthiopien Yirgacheffe",
+      "process": "Aufbereitung",
+      "processes": {
+        "washed": "Gewaschen",
+        "natural": "Natural",
+        "honey": "Honey",
+        "anaerobic": "Anaerob",
+        "other": "Andere"
+      },
+      "roastDate": "Röstdatum",
+      "profileName": "Profilname (optional)",
+      "profileNamePlaceholder": "z.B. Morgenblüte",
+      "continue": "Weiter"
+    },
+    "profile": {
+      "description": "Wähle ein Startprofil für diesen Kaffee.",
+      "noProfiles": "Keine Profile auf der Maschine gefunden.",
+      "manual": "Oder Profilname eingeben",
+      "manualPlaceholder": "Profilname…",
+      "defaultName": "Standardprofil",
+      "skip": "Überspringen — Standard verwenden"
+    },
+    "prep": {
+      "description": "Bereite deinen Shot mit {{profile}} vor.",
+      "items": {
+        "grind": "Frisch mahlen",
+        "dose": "Dosis auf Waage wiegen",
+        "distribute": "Kaffeemehl gleichmäßig verteilen",
+        "tamp": "Mit gleichmäßigem Druck tampen",
+        "purge": "Brühgruppe spülen"
+      },
+      "ready": "Bereit zum Brühen",
+      "skip": "Checkliste überspringen"
+    },
+    "brew": {
+      "title": "Shot ziehen",
+      "description": "Brühe deinen Espresso mit dem gewählten Profil. Tippe unten, wenn der Shot fertig ist.",
+      "done": "Shot fertig"
+    },
+    "taste": {
+      "description": "Wie hat der Shot geschmeckt? Nutze den Kompass, um den Geschmack zu beschreiben.",
+      "submit": "Feedback senden"
+    },
+    "recommend": {
+      "title": "Empfehlungen",
+      "iteration": "Iteration {{number}}",
+      "loading": "Feedback wird analysiert…",
+      "tryAgain": "Anpassen & nochmal",
+      "viewHistory": "Verlauf anzeigen",
+      "done": "Einwahl beenden",
+      "tips": {
+        "grindFiner": "1–2 Stufen feiner mahlen für mehr Extraktion",
+        "grindCoarser": "1–2 Stufen gröber mahlen für weniger Extraktion",
+        "increaseTemp": "Brühtemperatur um 1–2 °C erhöhen",
+        "decreaseTemp": "Brühtemperatur um 1–2 °C senken",
+        "increaseDose": "Dosis um 0,3–0,5 g erhöhen für mehr Körper",
+        "decreaseDose": "Dosis um 0,3–0,5 g senken für weniger Intensität",
+        "lookingGood": "Sieht gut aus! Dieser Shot ist gut ausbalanciert."
+      }
+    },
+    "history": {
+      "title": "Iterationsverlauf",
+      "iterations": "{{count}} Iterationen",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Ausgewogen",
+      "sour": "Sauer",
+      "bitter": "Bitter",
+      "medium": "Mittlerer Körper",
+      "weak": "Dünn/Schwach",
+      "strong": "Schwer/Stark"
+    },
+    "errors": {
+      "createFailed": "Einwahl-Sitzung konnte nicht erstellt werden",
+      "iterationFailed": "Geschmacksfeedback konnte nicht gespeichert werden",
+      "completeFailed": "Sitzung konnte nicht abgeschlossen werden",
+      "recommendFailed": "Empfehlungen konnten nicht geladen werden"
+    }
   }
 }

@@ -13529,3 +13529,208 @@ class TestRunProfileWithOverrides:
         )
 
         assert response.status_code == 404
+
+
+class TestDialInGuide:
+    """Tests for the Dial-In Guide endpoints."""
+
+    def _clear(self):
+        from services import dialin_service
+        dialin_service._sessions.clear()
+
+    def test_create_session(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"},
+            "profile_name": "Test Profile"
+        })
+        assert resp.status_code == 201
+        data = resp.json()
+        assert "id" in data
+        assert data["coffee"]["roast_level"] == "medium"
+        assert data["profile_name"] == "Test Profile"
+        assert data["status"] == "active"
+
+    def test_list_sessions(self):
+        self._clear()
+        client = TestClient(app)
+        client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "light"}
+        })
+        resp = client.get("/api/dialin/sessions")
+        assert resp.status_code == 200
+        assert "sessions" in resp.json()
+        assert len(resp.json()["sessions"]) >= 1
+
+    def test_get_session(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "dark"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.get(f"/api/dialin/sessions/{session_id}")
+        assert resp.status_code == 200
+        assert resp.json()["id"] == session_id
+
+    def test_get_session_not_found(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.get("/api/dialin/sessions/nonexistent")
+        assert resp.status_code == 404
+
+    def test_add_iteration(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": 0.3, "y": -0.2, "descriptors": ["Sour", "Watery"]}
+        })
+        assert resp.status_code == 201
+        assert resp.json()["iteration_number"] == 1
+        assert resp.json()["taste"]["x"] == 0.3
+
+    def test_add_multiple_iterations(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": -0.5, "y": 0.1, "descriptors": ["Sour"]}
+        })
+        resp = client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": -0.2, "y": 0.3, "descriptors": ["Sweet"]}
+        })
+        assert resp.json()["iteration_number"] == 2
+
+    def test_update_recommendations(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": 0.5, "y": 0.0, "descriptors": []}
+        })
+        resp = client.put(
+            f"/api/dialin/sessions/{session_id}/iterations/1/recommendations",
+            json={"recommendations": ["Grind 2 steps finer", "Reduce temp by 1°C"]}
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()["recommendations"]) == 2
+
+    def test_complete_session(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.post(f"/api/dialin/sessions/{session_id}/complete")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "completed"
+
+    def test_delete_session(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.delete(f"/api/dialin/sessions/{session_id}")
+        assert resp.status_code == 200
+        assert resp.json()["deleted"] is True
+        resp = client.get(f"/api/dialin/sessions/{session_id}")
+        assert resp.status_code == 404
+
+    def test_delete_session_not_found(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.delete("/api/dialin/sessions/nonexistent")
+        assert resp.status_code == 404
+
+    def test_dual_registration(self):
+        """Verify both /dialin/... and /api/dialin/... paths work."""
+        self._clear()
+        client = TestClient(app)
+        resp1 = client.post("/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        assert resp1.status_code == 201
+        resp2 = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "light"}
+        })
+        assert resp2.status_code == 201
+
+    def test_create_session_invalid_roast(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "invalid"}
+        })
+        assert resp.status_code == 422
+
+    def test_add_iteration_to_nonexistent_session(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.post("/api/dialin/sessions/nonexistent/iterations", json={
+            "taste": {"x": 0, "y": 0, "descriptors": []}
+        })
+        assert resp.status_code == 404
+
+    def test_list_sessions_filter_by_status(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        client.post(f"/api/dialin/sessions/{session_id}/complete")
+        resp = client.get("/api/dialin/sessions?status=completed")
+        assert resp.status_code == 200
+        for s in resp.json()["sessions"]:
+            assert s["status"] == "completed"
+
+
+class TestDialInPromptBuilder:
+    """Tests for the dial-in recommendation prompt builder."""
+
+    def test_basic_prompt(self):
+        from prompt_builder import build_dialin_recommendation_prompt
+        prompt = build_dialin_recommendation_prompt(roast_level="medium")
+        assert "medium" in prompt
+        assert "Dial-In" in prompt
+
+    def test_prompt_with_iterations(self):
+        from prompt_builder import build_dialin_recommendation_prompt
+        iterations = [
+            {"iteration_number": 1, "taste": {"x": -0.5, "y": 0.2, "descriptors": ["Sour"]}, "recommendations": []},
+            {"iteration_number": 2, "taste": {"x": -0.1, "y": 0.1, "descriptors": ["Sweet"]}, "recommendations": ["Grind finer"]},
+        ]
+        prompt = build_dialin_recommendation_prompt(
+            roast_level="light",
+            origin="Ethiopia",
+            process="washed",
+            profile_name="Blooming",
+            iterations=iterations,
+        )
+        assert "Ethiopia" in prompt
+        assert "washed" in prompt
+        assert "Blooming" in prompt
+        assert "Iteration 1" in prompt
+        assert "Iteration 2" in prompt
+        assert "Sour" in prompt
+        assert "Grind finer" in prompt
+
+    def test_prompt_empty_iterations(self):
+        from prompt_builder import build_dialin_recommendation_prompt
+        prompt = build_dialin_recommendation_prompt(roast_level="dark", iterations=[])
+        assert "dark" in prompt
+        assert "Iteration" not in prompt

@@ -46,6 +46,7 @@ import { PourOverView } from '@/components/PourOverView'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
 import { ShotAnalysisView } from '@/components/ShotAnalysisView'
 import { ProfileCatalogueView } from '@/components/ProfileCatalogueView'
+import { DialInWizard } from '@/components/DialInWizard'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
@@ -586,6 +587,7 @@ function App() {
       case 'pour-over':
       case 'live-shot':
       case 'shot-analysis':
+      case 'dial-in':
         handleBackToStart()
         break
       case 'shot-history': {
@@ -823,6 +825,7 @@ function App() {
                     setViewState('run-shot')
                   }}
                   onPourOver={() => setViewState('pour-over')}
+                  onDialIn={() => setViewState('dial-in')}
                   onShotAnalysis={() => setViewState('shot-analysis')}
                   onSettings={() => setViewState('settings')}
                   aiConfigured={aiAvailable}
@@ -937,6 +940,13 @@ function App() {
                 <PourOverView
                   machineState={machineState}
                   onBack={handleBackToStart}
+                />
+              )}
+
+              {viewState === 'dial-in' && (
+                <DialInWizard
+                  onBack={handleBackToStart}
+                  aiConfigured={aiAvailable}
                 />
               )}
 

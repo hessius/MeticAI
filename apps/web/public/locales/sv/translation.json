@@ -1092,5 +1092,107 @@
     "findSimilar": "Hitta liknande",
     "similarTo": "Profiler liknande \"{{name}}\"",
     "noSimilar": "Inga liknande profiler hittades."
+  },
+  "dialIn": {
+    "title": "Inställningsguide",
+    "stepOf": "Steg {{current}} av {{total}}",
+    "sessionCompleted": "Inställningssession klar!",
+    "steps": {
+      "coffee": "Kaffedetaljer",
+      "profile": "Välj profil",
+      "prep": "Förberedelse",
+      "brew": "Dra shot",
+      "taste": "Smak",
+      "recommend": "Rekommendationer",
+      "history": "Historik"
+    },
+    "coffee": {
+      "description": "Berätta om kaffet du ställer in.",
+      "roastLevel": "Rostningsgrad",
+      "roasts": {
+        "light": "Ljus",
+        "medium-light": "M-Ljus",
+        "medium": "Medel",
+        "medium-dark": "M-Mörk",
+        "dark": "Mörk"
+      },
+      "origin": "Ursprung",
+      "originPlaceholder": "t.ex. Etiopien Yirgacheffe",
+      "process": "Process",
+      "processes": {
+        "washed": "Tvättat",
+        "natural": "Natural",
+        "honey": "Honey",
+        "anaerobic": "Anaerobt",
+        "other": "Annat"
+      },
+      "roastDate": "Rostdatum",
+      "profileName": "Profilnamn (valfritt)",
+      "profileNamePlaceholder": "t.ex. Morgonblomma",
+      "continue": "Fortsätt"
+    },
+    "profile": {
+      "description": "Välj en startprofil för detta kaffe.",
+      "noProfiles": "Inga profiler hittades på maskinen.",
+      "manual": "Eller ange ett profilnamn",
+      "manualPlaceholder": "Profilnamn…",
+      "defaultName": "Standardprofil",
+      "skip": "Hoppa över — använd standard"
+    },
+    "prep": {
+      "description": "Förbered din shot med {{profile}}.",
+      "items": {
+        "grind": "Mal färsk dos",
+        "dose": "Väg dos på våg",
+        "distribute": "Fördela kaffet jämnt",
+        "tamp": "Pressa med jämnt tryck",
+        "purge": "Spola brygggruppen"
+      },
+      "ready": "Redo att brygga",
+      "skip": "Hoppa över checklistan"
+    },
+    "brew": {
+      "title": "Dra din shot",
+      "description": "Brygga din espresso med den valda profilen. När shoten är klar, tryck nedan för att fortsätta.",
+      "done": "Shot klar"
+    },
+    "taste": {
+      "description": "Hur smakade den shoten? Använd kompassen för att beskriva smaken.",
+      "submit": "Skicka omdöme"
+    },
+    "recommend": {
+      "title": "Rekommendationer",
+      "iteration": "Iteration {{number}}",
+      "loading": "Analyserar ditt omdöme…",
+      "tryAgain": "Justera & försök igen",
+      "viewHistory": "Visa historik",
+      "done": "Avsluta inställning",
+      "tips": {
+        "grindFiner": "Mal 1–2 steg finare för mer extraktion",
+        "grindCoarser": "Mal 1–2 steg grövre för mindre extraktion",
+        "increaseTemp": "Öka bryggtemperaturen med 1–2 °C",
+        "decreaseTemp": "Sänk bryggtemperaturen med 1–2 °C",
+        "increaseDose": "Öka dosen med 0,3–0,5 g för mer kropp",
+        "decreaseDose": "Minska dosen med 0,3–0,5 g för mindre intensitet",
+        "lookingGood": "Ser bra ut! Denna shot är välbalanserad."
+      }
+    },
+    "history": {
+      "title": "Iterationshistorik",
+      "iterations": "{{count}} iterationer",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Balanserad",
+      "sour": "Sur",
+      "bitter": "Bitter",
+      "medium": "Medel kropp",
+      "weak": "Tunn/Svag",
+      "strong": "Tung/Stark"
+    },
+    "errors": {
+      "createFailed": "Kunde inte skapa inställningssession",
+      "iterationFailed": "Kunde inte spara smakomdöme",
+      "completeFailed": "Kunde inte avsluta sessionen",
+      "recommendFailed": "Kunde inte ladda rekommendationer"
+    }
   }
 }

@@ -1107,5 +1107,107 @@
     "findSimilar": "Find Similar",
     "similarTo": "Profiles similar to \"{{name}}\"",
     "noSimilar": "No similar profiles found."
+  },
+  "dialIn": {
+    "title": "Dial-In Guide",
+    "stepOf": "Step {{current}} of {{total}}",
+    "sessionCompleted": "Dial-in session completed!",
+    "steps": {
+      "coffee": "Coffee Details",
+      "profile": "Select Profile",
+      "prep": "Preparation",
+      "brew": "Pull Shot",
+      "taste": "Taste Feedback",
+      "recommend": "Recommendations",
+      "history": "History"
+    },
+    "coffee": {
+      "description": "Tell us about the coffee you're dialling in.",
+      "roastLevel": "Roast Level",
+      "roasts": {
+        "light": "Light",
+        "medium-light": "Med-Lt",
+        "medium": "Medium",
+        "medium-dark": "Med-Dk",
+        "dark": "Dark"
+      },
+      "origin": "Origin",
+      "originPlaceholder": "e.g. Ethiopia Yirgacheffe",
+      "process": "Process",
+      "processes": {
+        "washed": "Washed",
+        "natural": "Natural",
+        "honey": "Honey",
+        "anaerobic": "Anaerobic",
+        "other": "Other"
+      },
+      "roastDate": "Roast Date",
+      "profileName": "Profile Name (optional)",
+      "profileNamePlaceholder": "e.g. Morning Bloom",
+      "continue": "Continue"
+    },
+    "profile": {
+      "description": "Choose a starting profile for this coffee.",
+      "noProfiles": "No profiles found on machine.",
+      "manual": "Or enter a profile name",
+      "manualPlaceholder": "Profile name…",
+      "defaultName": "Default Profile",
+      "skip": "Skip — use default"
+    },
+    "prep": {
+      "description": "Prepare your shot with {{profile}}.",
+      "items": {
+        "grind": "Grind fresh dose",
+        "dose": "Weigh dose on scale",
+        "distribute": "Distribute grounds evenly",
+        "tamp": "Tamp with consistent pressure",
+        "purge": "Purge group head"
+      },
+      "ready": "Ready to Brew",
+      "skip": "Skip checklist"
+    },
+    "brew": {
+      "title": "Pull Your Shot",
+      "description": "Brew your espresso using the selected profile. Once the shot is complete, tap below to continue.",
+      "done": "Shot Complete"
+    },
+    "taste": {
+      "description": "How did that shot taste? Use the compass to describe the flavour.",
+      "submit": "Submit Feedback"
+    },
+    "recommend": {
+      "title": "Recommendations",
+      "iteration": "Iteration {{number}}",
+      "loading": "Analysing your feedback…",
+      "tryAgain": "Adjust & Try Again",
+      "viewHistory": "View Iteration History",
+      "done": "Finish Dial-In",
+      "tips": {
+        "grindFiner": "Grind 1–2 steps finer to increase extraction",
+        "grindCoarser": "Grind 1–2 steps coarser to reduce extraction",
+        "increaseTemp": "Increase brew temperature by 1–2 °C",
+        "decreaseTemp": "Decrease brew temperature by 1–2 °C",
+        "increaseDose": "Increase dose by 0.3–0.5 g for more body",
+        "decreaseDose": "Decrease dose by 0.3–0.5 g for less intensity",
+        "lookingGood": "Looking good! This shot is well balanced."
+      }
+    },
+    "history": {
+      "title": "Iteration History",
+      "iterations": "{{count}} iterations",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Balanced",
+      "sour": "Sour",
+      "bitter": "Bitter",
+      "medium": "Medium body",
+      "weak": "Thin/Weak",
+      "strong": "Heavy/Strong"
+    },
+    "errors": {
+      "createFailed": "Failed to create dial-in session",
+      "iterationFailed": "Failed to save taste feedback",
+      "completeFailed": "Failed to complete session",
+      "recommendFailed": "Failed to load recommendations"
+    }
   }
 }

@@ -263,7 +263,7 @@ async def _httpx_connect_timeout(_request: Request, exc: httpx.ConnectTimeout):
 
 
 # Import route modules
-from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands, pour_over, recipes
+from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands, pour_over, recipes, dialin
 
 # Middleware for request logging and tracking
 @app.middleware("http")
@@ -357,6 +357,7 @@ app.include_router(websocket.router)
 app.include_router(commands.router)
 app.include_router(pour_over.router)
 app.include_router(recipes.router)
+app.include_router(dialin.router)
 
 
 # ============================================================================
