@@ -192,7 +192,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
   const toggleFilterTag = (tag: string) => {
     setSelectedFilterTags(prev => 
       prev.includes(tag) 
-        ? prev.filter(t => t !== tag)
+        ? prev.filter(item => item !== tag)
         : [...prev, tag]
     )
   }

@@ -696,8 +696,8 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
       link.download = filename
       link.href = dataUrl
       link.click()
-    } catch (error) {
-      console.error('Error exporting analysis:', error)
+    } catch (exportError) {
+      console.error('Error exporting analysis:', exportError)
     } finally {
       setIsExportingAnalysis(false)
     }
@@ -1008,8 +1008,8 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
           if (timeDiff === 0) {
             targetPressure = before.target_pressure!
           } else {
-            const t = (point.time - before.time) / timeDiff
-            targetPressure = before.target_pressure! + t * (after.target_pressure! - before.target_pressure!)
+            const ratio = (point.time - before.time) / timeDiff
+            targetPressure = before.target_pressure! + ratio * (after.target_pressure! - before.target_pressure!)
           }
         }
       }
@@ -1031,8 +1031,8 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
           if (timeDiff === 0) {
             targetFlow = before.target_flow!
           } else {
-            const t = (point.time - before.time) / timeDiff
-            targetFlow = before.target_flow! + t * (after.target_flow! - before.target_flow!)
+            const ratio = (point.time - before.time) / timeDiff
+            targetFlow = before.target_flow! + ratio * (after.target_flow! - before.target_flow!)
           }
         }
       }
@@ -1053,8 +1053,8 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
           if (timeDiff === 0) {
             targetPower = before.target_power!
           } else {
-            const t = (point.time - before.time) / timeDiff
-            targetPower = before.target_power! + t * (after.target_power! - before.target_power!)
+            const ratio = (point.time - before.time) / timeDiff
+            targetPower = before.target_power! + ratio * (after.target_power! - before.target_power!)
           }
         }
       }
@@ -1147,8 +1147,8 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
     const weightArray = telemetry.weight as number[] | undefined
     
     if (Array.isArray(timeArray) && timeArray.length > 0) {
-      return timeArray.map((t, i) => ({
-        time: t,
+      return timeArray.map((timeVal, i) => ({
+        time: timeVal,
         pressure: pressureArray?.[i] || 0,
         flow: flowArray?.[i] || 0,
         weight: weightArray?.[i] || 0
@@ -1229,11 +1229,11 @@ export function ShotHistoryView({ profileName, initialShotDate, initialShotFilen
       if (idx === 0 || data[idx].time === time) return data[idx]
       
       const before = data[idx - 1], after = data[idx]
-      const t = (time - before.time) / (after.time - before.time)
+      const ratio = (time - before.time) / (after.time - before.time)
       return {
-        pressure: before.pressure + t * (after.pressure - before.pressure),
-        flow: before.flow + t * (after.flow - before.flow),
-        weight: before.weight + t * (after.weight - before.weight)
+        pressure: before.pressure + ratio * (after.pressure - before.pressure),
+        flow: before.flow + ratio * (after.flow - before.flow),
+        weight: before.weight + ratio * (after.weight - before.weight)
       }
     }
     

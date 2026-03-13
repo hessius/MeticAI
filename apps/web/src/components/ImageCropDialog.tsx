@@ -89,16 +89,16 @@ export function ImageCropDialog({
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
 
-  const onCropChange = useCallback((crop: { x: number; y: number }) => {
-    setCrop(crop)
+  const onCropChange = useCallback((newCrop: { x: number; y: number }) => {
+    setCrop(newCrop)
   }, [])
 
-  const onZoomChange = useCallback((zoom: number) => {
-    setZoom(zoom)
+  const onZoomChange = useCallback((newZoom: number) => {
+    setZoom(newZoom)
   }, [])
 
-  const onCropAreaComplete = useCallback((_: Area, croppedAreaPixels: Area) => {
-    setCroppedAreaPixels(croppedAreaPixels)
+  const onCropAreaComplete = useCallback((_: Area, newCroppedAreaPixels: Area) => {
+    setCroppedAreaPixels(newCroppedAreaPixels)
   }, [])
 
   const handleConfirm = useCallback(async () => {
