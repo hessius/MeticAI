@@ -21,5 +21,6 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,  // Disabled for production — don't expose source code
+    cssMinify: 'esbuild',  // Workaround: lightningcss can't parse TW 4.2 output (tailwindlabs/tailwindcss#19789)
   },
 });

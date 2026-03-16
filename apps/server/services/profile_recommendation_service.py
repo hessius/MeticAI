@@ -12,7 +12,7 @@ from collections import OrderedDict
 from typing import Optional
 
 from logging_config import get_logger
-from services.gemini_service import is_ai_available, get_gemini_client, _MODEL_NAME
+from services.gemini_service import is_ai_available, get_gemini_client, get_model_name
 from services.meticulous_service import async_list_profiles, async_get_profile
 
 logger = get_logger()
@@ -231,7 +231,7 @@ async def _llm_rank(
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: client.models.generate_content(model=_MODEL_NAME, contents=prompt),
+            lambda: client.models.generate_content(model=get_model_name(), contents=prompt),
         )
 
         text = response.text.strip()
