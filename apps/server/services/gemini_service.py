@@ -12,7 +12,7 @@ logger = get_logger()
 
 # Lazy-loaded Gemini client
 _gemini_client: Optional[genai.Client] = None
-_MODEL_NAME = "gemini-2.0-flash"
+_MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
 _GEMINI_NOISE_PREFIXES = (
@@ -334,6 +334,18 @@ def parse_gemini_error(error_text: str) -> str:
         A clean, user-friendly error message
     """
     error_text_lower = error_text.lower()
+    
+    # Check for deprecated / unavailable model errors (404 NOT_FOUND)
+    if (
+        'no longer available' in error_text_lower
+        or ('not_found' in error_text_lower and 'model' in error_text_lower)
+        or ('404' in error_text_lower and 'model' in error_text_lower)
+        or 'deprecated' in error_text_lower
+    ):
+        return (
+            "The AI model is no longer available. Please update MeticAI to the "
+            "latest version, or set a custom GEMINI_MODEL in your environment."
+        )
     
     # Check for quota errors
     if 'quota' in error_text_lower or 'exhausted' in error_text_lower:
