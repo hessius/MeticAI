@@ -116,7 +116,7 @@
         "eslint-plugin-react-refresh": "^0.5.2",
         "globals": "^17.4.0",
         "happy-dom": "^20.1.0",
-        "storybook": "^10.2.17",
+        "storybook": "^10.2.19",
         "tailwindcss": "^4.1.11",
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.56.1",
