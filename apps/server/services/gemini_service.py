@@ -12,7 +12,18 @@ logger = get_logger()
 
 # Lazy-loaded Gemini client
 _gemini_client: Optional[genai.Client] = None
-_MODEL_NAME = "gemini-2.0-flash"
+_DEFAULT_MODEL = "gemini-2.5-flash"
+
+
+def get_model_name() -> str:
+    """Return the configured Gemini model name, resolved at call time.
+
+    Reads GEMINI_MODEL from the environment on every call so that
+    hot-reloaded service restarts pick up changes.  Treats blank /
+    whitespace-only values as unset and falls back to the default.
+    """
+    value = os.environ.get("GEMINI_MODEL", "").strip()
+    return value or _DEFAULT_MODEL
 
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
 _GEMINI_NOISE_PREFIXES = (
@@ -335,6 +346,18 @@ def parse_gemini_error(error_text: str) -> str:
     """
     error_text_lower = error_text.lower()
     
+    # Check for deprecated / unavailable model errors (404 NOT_FOUND)
+    if (
+        'no longer available' in error_text_lower
+        or ('not_found' in error_text_lower and 'model' in error_text_lower)
+        or ('404' in error_text_lower and 'model' in error_text_lower)
+        or 'deprecated' in error_text_lower
+    ):
+        return (
+            "The AI model is no longer available. Please update MeticAI to the "
+            "latest version, or set a custom GEMINI_MODEL in your environment."
+        )
+    
     # Check for quota errors
     if 'quota' in error_text_lower or 'exhausted' in error_text_lower:
         return (
@@ -502,7 +525,7 @@ class _GeminiModelWrapper:
             GenerateContentResponse with .text attribute.
         """
         return self._client.models.generate_content(
-            model=_MODEL_NAME,
+            model=get_model_name(),
             contents=contents,
         )
 

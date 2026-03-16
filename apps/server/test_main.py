@@ -7452,6 +7452,57 @@ class TestParseGeminiErrorExtended:
         result = services.gemini_service.parse_gemini_error(error)
         assert "api key" in result.lower() or "configured" in result.lower()
 
+    def test_parse_gemini_error_model_no_longer_available(self):
+        """Test deprecated / unavailable model error (404 NOT_FOUND)."""
+        error = (
+            "404 NOT_FOUND. {'error': {'code': 404, 'message': "
+            "'This model models/gemini-2.0-flash is no longer available to new users.', "
+            "'status': 'NOT_FOUND'}}"
+        )
+        result = services.gemini_service.parse_gemini_error(error)
+        assert "no longer available" in result.lower()
+        assert "update" in result.lower()
+
+    def test_parse_gemini_error_model_deprecated(self):
+        """Test generic deprecated model message."""
+        error = "Error: The model gemini-1.5-pro has been deprecated"
+        result = services.gemini_service.parse_gemini_error(error)
+        assert "no longer available" in result.lower()
+
+    def test_parse_gemini_error_model_not_found(self):
+        """Test 404 NOT_FOUND with model reference."""
+        error = "404 NOT_FOUND: model 'models/gemini-old' not found"
+        result = services.gemini_service.parse_gemini_error(error)
+        assert "no longer available" in result.lower()
+
+
+class TestGetModelName:
+    """Tests for get_model_name() env var resolution."""
+
+    def test_default_model_when_env_unset(self, monkeypatch):
+        """Returns default model when GEMINI_MODEL is not set."""
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+        from services.gemini_service import get_model_name
+        assert get_model_name() == "gemini-2.5-flash"
+
+    def test_custom_model_from_env(self, monkeypatch):
+        """Returns custom model when GEMINI_MODEL is set."""
+        monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-pro")
+        from services.gemini_service import get_model_name
+        assert get_model_name() == "gemini-2.5-pro"
+
+    def test_empty_env_falls_back_to_default(self, monkeypatch):
+        """Falls back to default when GEMINI_MODEL is empty string."""
+        monkeypatch.setenv("GEMINI_MODEL", "")
+        from services.gemini_service import get_model_name
+        assert get_model_name() == "gemini-2.5-flash"
+
+    def test_whitespace_env_falls_back_to_default(self, monkeypatch):
+        """Falls back to default when GEMINI_MODEL is whitespace."""
+        monkeypatch.setenv("GEMINI_MODEL", "   ")
+        from services.gemini_service import get_model_name
+        assert get_model_name() == "gemini-2.5-flash"
+
 
 class TestSettingsHydration:
     """Test that stored settings are hydrated into os.environ at startup."""

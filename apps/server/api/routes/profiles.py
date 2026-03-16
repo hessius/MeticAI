@@ -348,9 +348,9 @@ async def generate_profile_image(
     tags: str = "",
     preview: bool = False
 ):
-    """Generate an AI image for a profile using Gemini's native image generation.
+    """Generate an AI image for a profile using Google's Imagen model.
     
-    Uses the google-genai SDK with the gemini-2.5-flash-image model (Nano Banana)
+    Uses the google-genai SDK with the imagen-4.0-fast-generate-001 model
     to generate a square image based on the profile name and optional tags.
     
     Args:
