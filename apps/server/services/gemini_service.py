@@ -12,7 +12,18 @@ logger = get_logger()
 
 # Lazy-loaded Gemini client
 _gemini_client: Optional[genai.Client] = None
-_MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+_DEFAULT_MODEL = "gemini-2.5-flash"
+
+
+def get_model_name() -> str:
+    """Return the configured Gemini model name, resolved at call time.
+
+    Reads GEMINI_MODEL from the environment on every call so that
+    hot-reloaded service restarts pick up changes.  Treats blank /
+    whitespace-only values as unset and falls back to the default.
+    """
+    value = os.environ.get("GEMINI_MODEL", "").strip()
+    return value or _DEFAULT_MODEL
 
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
 _GEMINI_NOISE_PREFIXES = (
@@ -514,7 +525,7 @@ class _GeminiModelWrapper:
             GenerateContentResponse with .text attribute.
         """
         return self._client.models.generate_content(
-            model=_MODEL_NAME,
+            model=get_model_name(),
             contents=contents,
         )
 
