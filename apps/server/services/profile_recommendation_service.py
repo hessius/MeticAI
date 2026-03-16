@@ -106,7 +106,7 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 
 
 def _extract_profile_tags(profile: object) -> set[str]:
-    """Extract tag-like labels from a profile's stages/variables and name."""
+    """Extract tag-like labels from a profile's name and stage names."""
     tags: set[str] = set()
     name = getattr(profile, "name", "") or ""
     # Some profiles embed tag keywords in the name
@@ -118,6 +118,20 @@ def _extract_profile_tags(profile: object) -> set[str]:
     ]:
         if keyword in name.lower():
             tags.add(keyword)
+
+    # Extract keywords from stage names (e.g. "preinfusion", "bloom", "ramp")
+    stages = getattr(profile, "stages", None) or []
+    stage_keywords = [
+        "preinfusion", "pre-infusion", "bloom", "ramp", "soak", "infusion",
+        "extraction", "decline", "taper", "hold", "pulse", "turbo", "lever",
+        "flat", "pressure", "flow",
+    ]
+    for stage in stages:
+        stage_name = (getattr(stage, "name", "") or "").lower()
+        for kw in stage_keywords:
+            if kw in stage_name:
+                tags.add(kw)
+
     return tags
 
 

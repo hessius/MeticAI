@@ -1115,7 +1115,8 @@
     "useProfile": "Use",
     "findSimilar": "Find Similar",
     "similarTo": "Profiles similar to \"{{name}}\"",
-    "noSimilar": "No similar profiles found."
+    "noSimilar": "No similar profiles found.",
+    "aiDisclaimer": "This feature uses AI tokens to rank similar profiles."
   },
   "dialIn": {
     "title": "Dial-In Guide",

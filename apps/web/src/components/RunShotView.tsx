@@ -63,13 +63,14 @@ interface RecurringSchedule {
 
 interface RunShotViewProps {
   onBack: () => void
+  onNavigateToLive?: () => void
   initialProfileId?: string
   initialProfileName?: string
 }
 
 const PREHEAT_DURATION_MINUTES = 10
 
-export function RunShotView({ onBack, initialProfileId, initialProfileName }: RunShotViewProps) {
+export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName }: RunShotViewProps) {
   const { t } = useTranslation()
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
@@ -324,6 +325,11 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           lastShotRef.current = { profileId: selectedProfile.id, overrides: { ...overrides } }
           toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
           
+          // Navigate to live view after successful run (with overrides)
+          if (onNavigateToLive) {
+            setTimeout(() => onNavigateToLive(), 500)
+          }
+          
           // Show save mode dialog after a short delay
           setTimeout(() => setShowSaveModeDialog(true), 2000)
           // Auto-dismiss after 30 seconds
@@ -349,6 +355,10 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           }
           
           toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
+          // Navigate to live view after successful run (no overrides)
+          if (onNavigateToLive) {
+            setTimeout(() => onNavigateToLive(), 500)
+          }
         }
       }
     } catch (err) {

@@ -13211,12 +13211,12 @@ END_RECOMMENDATIONS_JSON
         assert _classify_recommendation_patchable(rec, []) is True
 
     def test_classify_unknown_variable(self):
-        """Unknown variable not in profile is not patchable."""
+        """Unknown variable not in profile is patchable (LLM may use descriptive names)."""
         from api.routes.shots import _classify_recommendation_patchable
 
         rec = {"variable": "unknown_var", "stage": "extraction"}
         variables = [{"key": "flow_main", "name": "Main Flow", "type": "flow", "value": 2.5}]
-        assert _classify_recommendation_patchable(rec, variables) is False
+        assert _classify_recommendation_patchable(rec, variables) is True
 
 
 class TestApplyRecommendationsEndpoint:

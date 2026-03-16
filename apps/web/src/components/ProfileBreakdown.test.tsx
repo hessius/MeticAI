@@ -435,7 +435,7 @@ describe('ProfileBreakdown', () => {
       expect(screen.getByText(/Info variable "Dose" should start with an emoji so it displays correctly/)).toBeInTheDocument()
     })
 
-    it('should show warning when adjustable variable has emoji', () => {
+    it('should NOT show warning when adjustable variable has emoji (info-style display)', () => {
       const profile: ProfileData = {
         temperature: 93,
         variables: [
@@ -447,7 +447,8 @@ describe('ProfileBreakdown', () => {
       }
       render(<ProfileBreakdown profile={profile} />)
       
-      expect(screen.getByText(/Adjustable variable "☕ Peak Pressure" starts with an emoji/)).toBeInTheDocument()
+      // Emoji-prefixed variables should NOT trigger warnings — they are common in machine profiles
+      expect(screen.queryByText(/starts with an emoji/)).not.toBeInTheDocument()
     })
 
     it('should show warning when adjustable variable is unused', () => {

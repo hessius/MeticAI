@@ -1338,6 +1338,7 @@ def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict])
     - Its key does NOT start with 'info_'
     - It is not marked adjustable=false
     - OR the recommendation targets a global setting (temperature, final_weight)
+    - OR the variable is not found in the profile (LLM may use descriptive names)
     """
     variable = rec.get("variable", "")
     stage = rec.get("stage", "")
@@ -1356,8 +1357,21 @@ def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict])
                 return False
             return True
 
-    # Variable not found in profile — not patchable
-    return False
+    # Variable not found by exact key — try fuzzy match (LLM may use descriptive names)
+    variable_lower = variable.lower().replace("_", " ").replace("-", " ")
+    for var in profile_variables:
+        var_key = var.get("key", "").lower().replace("_", " ").replace("-", " ")
+        var_name = var.get("name", "").lower()
+        if variable_lower in var_key or var_key in variable_lower or variable_lower in var_name:
+            if var.get("key", "").startswith("info_"):
+                return False
+            if var.get("adjustable") is False:
+                return False
+            return True
+
+    # Variable not found in profile at all — consider patchable
+    # The LLM may use descriptive names for stage-level settings
+    return True
 
 
 @router.post("/shots/analyze-recommendations")

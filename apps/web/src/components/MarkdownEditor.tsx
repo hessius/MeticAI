@@ -72,7 +72,7 @@ export function MarkdownEditor({
   if (isEditing) {
     return (
       <div className={`space-y-2 ${className}`}>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={showPreview ? 'outline' : 'secondary'}
             size="sm"
@@ -89,7 +89,7 @@ export function MarkdownEditor({
             <Eye className="w-4 h-4 mr-1" />
             {t('markdownEditor.preview')}
           </Button>
-          <div className="flex-1" />
+          <div className="flex-1 min-w-0" />
           <Button
             variant="ghost"
             size="sm"

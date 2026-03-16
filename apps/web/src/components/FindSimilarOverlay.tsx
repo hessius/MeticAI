@@ -9,10 +9,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Sparkle } from '@phosphor-icons/react'
+import { Sparkle, Coffee, Info } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
 interface Recommendation {
@@ -38,7 +39,13 @@ export function FindSimilarOverlay({
   const { t } = useTranslation()
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
+  const [serverUrl, setServerUrl] = useState<string>('')
+
+  useEffect(() => {
+    getServerUrl().then(setServerUrl)
+  }, [])
 
   const fetchSimilar = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort()
@@ -46,13 +53,14 @@ export function FindSimilarOverlay({
     abortRef.current = controller
 
     setIsLoading(true)
+    setImageErrors(new Set())
     try {
-      const serverUrl = await getServerUrl()
+      const url = serverUrl || await getServerUrl()
       const formData = new FormData()
       formData.append('profile_name', profileName)
       formData.append('limit', '10')
 
-      const response = await fetch(`${serverUrl}/api/profiles/find-similar`, {
+      const response = await fetch(`${url}/api/profiles/find-similar`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
@@ -69,7 +77,7 @@ export function FindSimilarOverlay({
     } finally {
       if (!controller.signal.aborted) setIsLoading(false)
     }
-  }, [profileName])
+  }, [profileName, serverUrl])
 
   useEffect(() => {
     if (open) {
@@ -80,9 +88,13 @@ export function FindSimilarOverlay({
     }
   }, [open, fetchSimilar])
 
+  const handleSelect = useCallback((name: string) => {
+    onSelectProfile?.(name)
+  }, [onSelectProfile])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkle size={20} weight="fill" className="text-primary" />
@@ -93,13 +105,21 @@ export function FindSimilarOverlay({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 mt-2">
+        {/* AI Token Disclaimer */}
+        <Alert className="bg-amber-500/10 border-amber-500/30">
+          <Info size={16} weight="fill" className="text-amber-500" />
+          <AlertDescription className="text-xs text-amber-700 dark:text-amber-400">
+            {t('profileRecommendations.aiDisclaimer')}
+          </AlertDescription>
+        </Alert>
+
+        <div className="space-y-2">
           {isLoading ? (
             <div className="space-y-2" aria-busy="true" aria-label={t('a11y.loading')}>
               {[1, 2, 3, 4].map(i => (
                 <Card key={i} className="p-3">
                   <div className="flex items-center gap-3">
-                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <Skeleton className="h-10 w-10 rounded-lg" />
                     <div className="flex-1 space-y-1.5">
                       <Skeleton className="h-4 w-3/5" />
                       <Skeleton className="h-3 w-4/5" />
@@ -123,18 +143,26 @@ export function FindSimilarOverlay({
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
                   <Card
-                    className={`p-3 transition-colors ${onSelectProfile ? 'cursor-pointer hover:bg-secondary/40' : ''}`}
-                    onClick={() => onSelectProfile?.(rec.profile_name)}
-                    role={onSelectProfile ? 'button' : undefined}
-                    tabIndex={onSelectProfile ? 0 : undefined}
-                    onKeyDown={onSelectProfile ? (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectProfile(rec.profile_name) } } : undefined}
+                    className="p-3 transition-colors cursor-pointer hover:bg-secondary/40"
+                    onClick={() => handleSelect(rec.profile_name)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(rec.profile_name) } }}
                     aria-label={t('a11y.useProfile', { name: rec.profile_name })}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 shrink-0">
-                        <span className="text-xs font-bold text-primary">
-                          {Math.round(rec.score)}
-                        </span>
+                    <div className="flex items-start gap-3 min-w-0">
+                      {/* Profile Image */}
+                      <div className="w-10 h-10 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
+                        {serverUrl && !imageErrors.has(rec.profile_name) ? (
+                          <img
+                            src={`${serverUrl}/api/profile/${encodeURIComponent(rec.profile_name)}/image-proxy`}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={() => setImageErrors(prev => new Set(prev).add(rec.profile_name))}
+                          />
+                        ) : (
+                          <Coffee size={18} weight="fill" className="text-muted-foreground/40" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium truncate">{rec.profile_name}</h4>

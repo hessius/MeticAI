@@ -1115,7 +1115,8 @@
     "useProfile": "Usa",
     "findSimilar": "Trova simili",
     "similarTo": "Profili simili a \"{{name}}\"",
-    "noSimilar": "Nessun profilo simile trovato."
+    "noSimilar": "Nessun profilo simile trovato.",
+    "aiDisclaimer": "Questa funzione utilizza token AI per classificare profili simili."
   },
   "dialIn": {
     "title": "Guida alla regolazione",

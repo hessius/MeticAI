@@ -29,7 +29,8 @@ import {
   Play,
   PencilSimple,
   FloppyDisk,
-  GearSix
+  GearSix,
+  MagnifyingGlass
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
@@ -42,6 +43,7 @@ import { ImageCropDialog } from '@/components/ImageCropDialog'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
+import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
 import { profileService } from '@/services/profileService'
 
@@ -575,12 +577,13 @@ interface ProfileDetailViewProps {
   onBack: () => void
   onRunProfile?: (profileId: string, profileName: string) => void
   onEntryUpdated?: (entry: HistoryEntry) => void
+  onViewProfile?: (profileName: string) => void
   cachedImageUrl?: string
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
 }
 
-export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
+export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated, onViewProfile, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
   const { t } = useTranslation()
   const { downloadJson } = useHistory()
   const { invalidate: invalidateImageCache } = useProfileImageCache()
@@ -611,6 +614,9 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
   
   // Machine profile ID for run/schedule functionality
   const [machineProfileId, setMachineProfileId] = useState<string | null>(null)
+  
+  // Find Similar state
+  const [showFindSimilar, setShowFindSimilar] = useState(false)
   
   // Notes state
   const [notes, setNotes] = useState<string>(entry.notes || '')
@@ -1342,6 +1348,18 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                 {t('results.runScheduleShot')}
               </Button>
             )}
+
+            {/* Find Similar Button — only for profiles with AI descriptions */}
+            {extractDescription(currentReply) && (
+              <Button
+                variant="outline"
+                onClick={() => setShowFindSimilar(true)}
+                className="flex-1 min-w-[180px] h-12 text-sm font-semibold"
+              >
+                <MagnifyingGlass size={18} className="mr-2" weight="bold" />
+                {t('profileRecommendations.findSimilar')}
+              </Button>
+            )}
           </div>
         )}
 
@@ -1837,6 +1855,17 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Find Similar Overlay */}
+      <FindSimilarOverlay
+        open={showFindSimilar}
+        onOpenChange={setShowFindSimilar}
+        profileName={entry.profile_name}
+        onSelectProfile={onViewProfile ? (name) => {
+          setShowFindSimilar(false)
+          onViewProfile(name)
+        } : undefined}
+      />
     </motion.div>
   )
 }

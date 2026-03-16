@@ -159,6 +159,11 @@ function App() {
     prevViewStateRef.current = viewState
   }, [viewState])
 
+  // Scroll to top on view transitions
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [viewState])
+
   useEffect(() => {
     setAiEnabled(getAiEnabled())
     setHideAiWhenUnavailable(getHideAiWhenUnavailable())
@@ -619,6 +624,21 @@ function App() {
     setViewState('history-detail')
   }
 
+  const handleViewProfileByName = async (profileName: string) => {
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+      if (!response.ok) return
+      const data = await response.json()
+      const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
+      if (match) {
+        handleViewHistoryEntry(match)
+      }
+    } catch {
+      // Silently fail — profile may not exist in history
+    }
+  }
+
   const handleDownloadJson = () => {
     const jsonData = selectedHistoryEntry?.profile_json || currentProfileJson
     if (!jsonData) {
@@ -905,6 +925,7 @@ function App() {
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
                   onEntryUpdated={(updated) => setSelectedHistoryEntry(updated)}
+                  onViewProfile={handleViewProfileByName}
                   onRunProfile={(profileId, profileName) => {
                     setRunShotProfileId(profileId)
                     setRunShotProfileName(profileName)
@@ -928,6 +949,7 @@ function App() {
               {viewState === 'run-shot' && (
                 <RunShotView
                   onBack={handleBackToStart}
+                  onNavigateToLive={() => setViewState('live-shot')}
                   initialProfileId={runShotProfileId}
                   initialProfileName={runShotProfileName}
                 />

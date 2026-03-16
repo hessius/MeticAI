@@ -127,10 +127,16 @@ export const CIRCLED_NUMBERS = [
  *   **Assessment:** [Good/Acceptable/Needs Improvement/Problematic]
  */
 export function parseStructuredAnalysis(text: string): ParsedSection[] {
+  // Strip the RECOMMENDATIONS_JSON block before parsing sections
+  const cleanText = text.replace(
+    /RECOMMENDATIONS_JSON:\s*\n[\s\S]*?END_RECOMMENDATIONS_JSON/g,
+    "",
+  );
+
   const sections: ParsedSection[] = [];
 
   const sectionRegex = /^## (\d+)\.\s+(.+)$/gm;
-  const matches = [...text.matchAll(sectionRegex)];
+  const matches = [...cleanText.matchAll(sectionRegex)];
 
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
@@ -138,8 +144,8 @@ export function parseStructuredAnalysis(text: string): ParsedSection[] {
     const title = `${number}. ${match[2].trim()}`;
     const startIndex = match.index! + match[0].length;
     const endIndex =
-      i < matches.length - 1 ? matches[i + 1].index! : text.length;
-    const sectionContent = text.slice(startIndex, endIndex).trim();
+      i < matches.length - 1 ? matches[i + 1].index! : cleanText.length;
+    const sectionContent = cleanText.slice(startIndex, endIndex).trim();
 
     // Parse subsections (bold headers like **What Happened:**)
     const subsections: { title: string; items: string[] }[] = [];

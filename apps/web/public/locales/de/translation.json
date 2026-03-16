@@ -1115,7 +1115,8 @@
     "useProfile": "Verwenden",
     "findSimilar": "Ähnliche finden",
     "similarTo": "Profile ähnlich zu \"{{name}}\"",
-    "noSimilar": "Keine ähnlichen Profile gefunden."
+    "noSimilar": "Keine ähnlichen Profile gefunden.",
+    "aiDisclaimer": "Diese Funktion nutzt AI-Tokens, um ähnliche Profile zu bewerten."
   },
   "dialIn": {
     "title": "Einwahl-Assistent",

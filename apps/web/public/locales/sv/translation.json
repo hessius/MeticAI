@@ -1115,7 +1115,8 @@
     "useProfile": "Använd",
     "findSimilar": "Hitta liknande",
     "similarTo": "Profiler liknande \"{{name}}\"",
-    "noSimilar": "Inga liknande profiler hittades."
+    "noSimilar": "Inga liknande profiler hittades.",
+    "aiDisclaimer": "Denna funktion använder AI-tokens för att ranka liknande profiler."
   },
   "dialIn": {
     "title": "Inställningsguide",
