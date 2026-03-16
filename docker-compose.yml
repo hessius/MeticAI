@@ -21,6 +21,7 @@ services:
       - "3550:3550"   # Web UI (nginx proxy)
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-}
       - METICULOUS_IP=${METICULOUS_IP:-}
       - DATA_DIR=/data
     volumes:

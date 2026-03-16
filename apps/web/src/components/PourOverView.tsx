@@ -231,7 +231,7 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, blo
         ticks.push(v)
       }
     }
-    return ticks.filter(t => t <= yMax)
+    return ticks.filter(v => v <= yMax)
   }
   const weightTicks = getWeightTicks()
 
@@ -659,20 +659,20 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
   const recipeTimings = useMemo((): RecipeStepTiming[] => {
     if (!selectedRecipe) return []
-    let t = 0, cw = 0
+    let elapsed = 0, cw = 0
     return selectedRecipe.protocol.map((step, i) => {
-      const start = t
-      const end = t + step.duration_s
+      const start = elapsed
+      const end = elapsed + step.duration_s
       if (step.action === 'bloom' || step.action === 'pour') cw += step.water_g ?? 0
       let label: string
       if (step.action === 'bloom') label = step.water_g !== undefined ? t('pourOver.recipeBloomWeight', { weight: step.water_g }) : t('pourOver.recipeBloom')
       else if (step.action === 'pour') label = t('pourOver.recipePourTo', { weight: cw })
       else if (step.action === 'wait') label = t('pourOver.recipeWait', { seconds: step.duration_s })
       else label = step.action.charAt(0).toUpperCase() + step.action.slice(1)
-      t = end
+      elapsed = end
       return { stepIndex: i, action: step.action, label, startTimeSec: start, endTimeSec: end, cumulativeWeight: cw, notes: step.notes }
     })
-  }, [selectedRecipe])
+  }, [selectedRecipe, t])
 
   // ── Machine integration: detect brewing state transitions ──
   useEffect(() => {
@@ -1246,12 +1246,12 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     size="sm"
                     className="w-full h-8 text-xs"
                     onClick={() => {
-                      const t = recipeTimings[recipeCurrentStep]
-                      if (t) {
+                      const stepTiming = recipeTimings[recipeCurrentStep]
+                      if (stepTiming) {
                         const timeMs = meticulousIntegration
                           ? (machineState.shot_timer ?? 0) * 1000
                           : elapsedMs
-                        const skipMs = Math.max(0, t.endTimeSec * 1000 - (timeMs + stepTimeOffsetMs))
+                        const skipMs = Math.max(0, stepTiming.endTimeSec * 1000 - (timeMs + stepTimeOffsetMs))
                         setStepTimeOffsetMs(prev => prev + skipMs)
                       }
                       setRecipeCurrentStep(prev => Math.min(prev + 1, recipeTimings.length - 1))

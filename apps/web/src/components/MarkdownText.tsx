@@ -218,7 +218,7 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
     return result
   }
 
-  const processInlineMarkdown = (text: string, lineIndex: number): React.ReactNode[] => {
+  const processInlineMarkdown = (lineText: string, lineIndex: number): React.ReactNode[] => {
     const parts: React.ReactNode[] = []
 
     // Combined regex for links, bold, italic, and code
@@ -226,10 +226,10 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
     let lastIndex = 0
     let match
 
-    while ((match = inlineRegex.exec(text)) !== null) {
+    while ((match = inlineRegex.exec(lineText)) !== null) {
       // Add text before the match
       if (match.index > lastIndex) {
-        parts.push(<span key={`t-${lineIndex}-${parts.length}`}>{text.substring(lastIndex, match.index)}</span>)
+        parts.push(<span key={`t-${lineIndex}-${parts.length}`}>{lineText.substring(lastIndex, match.index)}</span>)
       }
 
       if (match[2] && match[3]) {
@@ -280,12 +280,12 @@ export function MarkdownText({ children, text, className = '' }: MarkdownTextPro
     }
 
     // Add remaining text
-    if (lastIndex < text.length) {
-      parts.push(<span key={`t-${lineIndex}-${parts.length}`}>{text.substring(lastIndex)}</span>)
+    if (lastIndex < lineText.length) {
+      parts.push(<span key={`t-${lineIndex}-${parts.length}`}>{lineText.substring(lastIndex)}</span>)
     }
 
     // If no matches found, return original text
-    return parts.length > 0 ? parts : [<span key={`t-${lineIndex}-0`}>{text}</span>]
+    return parts.length > 0 ? parts : [<span key={`t-${lineIndex}-0`}>{lineText}</span>]
   }
 
   return (
