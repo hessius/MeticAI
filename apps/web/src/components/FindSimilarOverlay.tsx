@@ -56,6 +56,7 @@ export function FindSimilarOverlay({
     setImageErrors(new Set())
     try {
       const url = serverUrl || await getServerUrl()
+      if (!serverUrl && url) setServerUrl(url)
       const formData = new FormData()
       formData.append('profile_name', profileName)
       formData.append('limit', '10')
@@ -94,7 +95,7 @@ export function FindSimilarOverlay({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[80vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkle size={20} weight="fill" className="text-primary" />
@@ -150,9 +151,9 @@ export function FindSimilarOverlay({
                     onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(rec.profile_name) } }}
                     aria-label={t('a11y.useProfile', { name: rec.profile_name })}
                   >
-                    <div className="flex items-start gap-3 min-w-0">
+                    <div className="flex items-start gap-2.5 min-w-0">
                       {/* Profile Image */}
-                      <div className="w-10 h-10 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
                         {serverUrl && !imageErrors.has(rec.profile_name) ? (
                           <img
                             src={`${serverUrl}/api/profile/${encodeURIComponent(rec.profile_name)}/image-proxy`}
@@ -161,13 +162,21 @@ export function FindSimilarOverlay({
                             onError={() => setImageErrors(prev => new Set(prev).add(rec.profile_name))}
                           />
                         ) : (
-                          <Coffee size={18} weight="fill" className="text-muted-foreground/40" />
+                          <Coffee size={16} weight="fill" className="text-muted-foreground/40" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium truncate">{rec.profile_name}</h4>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h4 className="text-sm font-medium truncate flex-1 min-w-0">{rec.profile_name}</h4>
+                          <Badge
+                            variant={rec.score >= 70 ? 'default' : rec.score >= 40 ? 'secondary' : 'outline'}
+                            className="text-xs shrink-0"
+                          >
+                            {Math.round(rec.score)}%
+                          </Badge>
+                        </div>
                         {rec.explanation && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words">
                             {rec.explanation}
                           </p>
                         )}
@@ -185,12 +194,6 @@ export function FindSimilarOverlay({
                           </div>
                         )}
                       </div>
-                      <Badge
-                        variant={rec.score >= 70 ? 'default' : rec.score >= 40 ? 'secondary' : 'outline'}
-                        className="text-xs shrink-0"
-                      >
-                        {Math.round(rec.score)}%
-                      </Badge>
                     </div>
                   </Card>
                 </motion.div>

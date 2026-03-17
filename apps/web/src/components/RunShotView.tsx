@@ -780,9 +780,10 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       {/* Variable Adjustments */}
       {selectedProfile && profileVariables.length > 0 && (
         <VariableAdjustPanel
-          variables={profileVariables}
+          profileVariables={profileVariables}
           overrides={overrides}
-          onChange={setOverrides}
+          onOverridesChange={setOverrides}
+          onReset={() => setOverrides({})}
         />
       )}
 

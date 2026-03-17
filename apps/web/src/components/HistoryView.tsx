@@ -64,7 +64,11 @@ function extractDescription(reply: string): string | null {
     // Clean up any leading/trailing ** artifacts
     desc = desc.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '')
     // Clean up any trailing headers or code blocks
-    return desc.replace(/```[\s\S]*$/g, '').trim() || null
+    desc = desc.replace(/```[\s\S]*$/g, '').trim()
+    if (!desc) return null
+    // Filter out placeholder/auto-generated descriptions (not real AI analysis)
+    if (desc.includes('summary generated from the profile')) return null
+    return desc
   }
   return null
 }
@@ -1349,17 +1353,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               </Button>
             )}
 
-            {/* Find Similar Button — only for profiles with AI descriptions */}
-            {extractDescription(currentReply) && (
-              <Button
-                variant="outline"
-                onClick={() => setShowFindSimilar(true)}
-                className="flex-1 min-w-[180px] h-12 text-sm font-semibold"
-              >
-                <MagnifyingGlass size={18} className="mr-2" weight="bold" />
-                {t('profileRecommendations.findSimilar')}
-              </Button>
-            )}
+            
           </div>
         )}
 
@@ -1535,6 +1529,17 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               }}
               disabled={isSavingEdit}
             />
+          )}
+          {/* Find Similar Button — only for profiles with real AI descriptions */}
+          {!isCapturing && extractDescription(currentReply) && (
+            <Button
+              variant="outline"
+              onClick={() => setShowFindSimilar(true)}
+              className="w-full h-11 text-sm font-semibold mt-3"
+            >
+              <MagnifyingGlass size={18} className="mr-2" weight="bold" />
+              {t('profileRecommendations.findSimilar')}
+            </Button>
           )}
         </div>{/* end right column */}
         </div>{/* end two-column wrapper */}
