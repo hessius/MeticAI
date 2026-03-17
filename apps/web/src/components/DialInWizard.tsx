@@ -224,8 +224,6 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
               <DialInCoffeeStep
                 coffee={coffee}
                 onChange={setCoffee}
-                profileName={profileName}
-                onProfileNameChange={setProfileName}
                 onSubmit={handleCoffeeSubmit}
                 loading={loading}
               />

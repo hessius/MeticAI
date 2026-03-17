@@ -54,7 +54,7 @@ const PourOverView = lazy(() => import('./components/PourOverView').then(m => ({
 const ShotHistoryView = lazy(() => import('./components/ShotHistoryView').then(m => ({ default: m.ShotHistoryView })))
 const ShotAnalysisView = lazy(() => import('./components/ShotAnalysisView').then(m => ({ default: m.ShotAnalysisView })))
 const ProfileCatalogueView = lazy(() => import('./components/ProfileCatalogueView').then(m => ({ default: m.ProfileCatalogueView })))
-const DialInWizard = lazy(() => import('./components/DialInWizard').then(m => ({ default: m.DialInWizard })))
+const EspressoCompass = lazy(() => import('./components/EspressoCompass').then(m => ({ default: m.EspressoCompass })))
 const ProfileBreakdown = lazy(() => import('./components/ProfileBreakdown').then(m => ({ default: m.ProfileBreakdown })))
 
 function App() {
@@ -1003,10 +1003,9 @@ function App() {
               )}
 
               {viewState === 'dial-in' && (
-                <FeatureErrorBoundary feature="Dial-In Wizard">
-                  <DialInWizard
+                <FeatureErrorBoundary feature="Espresso Compass">
+                  <EspressoCompass
                     onBack={handleBackToStart}
-                    aiConfigured={aiAvailable}
                   />
                 </FeatureErrorBoundary>
               )}

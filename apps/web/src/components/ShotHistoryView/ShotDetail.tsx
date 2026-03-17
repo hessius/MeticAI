@@ -1289,7 +1289,7 @@ export function ShotDetail({
                                           return (
                                             <div
                                               key={tIdx}
-                                              className={`px-2 py-1 rounded text-xs whitespace-nowrap ${
+                                              className={`px-2 py-1 rounded text-xs ${
                                                 wasTriggered
                                                   ? 'bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30'
                                                   : 'bg-secondary/60 text-muted-foreground border border-border/30'
@@ -1399,7 +1399,7 @@ export function ShotDetail({
               </Card>
 
               {/* Shot Annotation */}
-              <Card className="p-4 border-border/40 mt-4">
+              <Card className="p-4 border-border/40 mt-6">
                 <ShotAnnotation
                   date={selectedShot.date}
                   filename={selectedShot.filename}

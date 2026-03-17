@@ -14,8 +14,6 @@ interface CoffeeDetails {
 interface DialInCoffeeStepProps {
   coffee: CoffeeDetails
   onChange: (coffee: CoffeeDetails) => void
-  profileName: string
-  onProfileNameChange: (name: string) => void
   onSubmit: (coffee: CoffeeDetails) => void
   loading: boolean
 }
@@ -23,17 +21,17 @@ interface DialInCoffeeStepProps {
 const ROAST_LEVELS = ['light', 'medium-light', 'medium', 'medium-dark', 'dark'] as const
 const PROCESSES = ['washed', 'natural', 'honey', 'anaerobic', 'other'] as const
 
-export function DialInCoffeeStep({ coffee, onChange, profileName, onProfileNameChange, onSubmit, loading }: DialInCoffeeStepProps) {
+export function DialInCoffeeStep({ coffee, onChange, onSubmit, loading }: DialInCoffeeStepProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <p className="text-sm text-muted-foreground">{t('dialIn.coffee.description')}</p>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
           <Label>{t('dialIn.coffee.roastLevel')}</Label>
-          <div className="grid grid-cols-5 gap-1.5 mt-1.5">
+          <div className="grid grid-cols-5 gap-1.5 mt-2">
             {ROAST_LEVELS.map((level) => (
               <Button
                 key={level}
@@ -60,7 +58,7 @@ export function DialInCoffeeStep({ coffee, onChange, profileName, onProfileNameC
 
         <div>
           <Label>{t('dialIn.coffee.process')}</Label>
-          <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+          <div className="grid grid-cols-3 gap-1.5 mt-2">
             {PROCESSES.map((proc) => (
               <Button
                 key={proc}
@@ -82,16 +80,6 @@ export function DialInCoffeeStep({ coffee, onChange, profileName, onProfileNameC
             type="date"
             value={coffee.roast_date || ''}
             onChange={(e) => onChange({ ...coffee, roast_date: e.target.value || undefined })}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="profile-name">{t('dialIn.coffee.profileName')}</Label>
-          <Input
-            id="profile-name"
-            placeholder={t('dialIn.coffee.profileNamePlaceholder')}
-            value={profileName}
-            onChange={(e) => onProfileNameChange(e.target.value)}
           />
         </div>
       </div>
