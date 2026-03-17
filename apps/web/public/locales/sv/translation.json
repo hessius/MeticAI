@@ -1256,5 +1256,9 @@
     "dialIn": {
       "submitProfileName": "Använd angivet profilnamn"
     }
+  },
+  "errorBoundary": {
+    "featureError": "Något gick fel i {{feature}}",
+    "tryAgain": "Försök igen"
   }
 }

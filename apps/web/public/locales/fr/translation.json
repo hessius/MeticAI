@@ -1256,5 +1256,9 @@
     "dialIn": {
       "submitProfileName": "Utiliser le nom de profil saisi"
     }
+  },
+  "errorBoundary": {
+    "featureError": "Une erreur est survenue dans {{feature}}",
+    "tryAgain": "Réessayer"
   }
 }

@@ -1256,5 +1256,9 @@
     "dialIn": {
       "submitProfileName": "Usa il nome profilo inserito"
     }
+  },
+  "errorBoundary": {
+    "featureError": "Qualcosa è andato storto in {{feature}}",
+    "tryAgain": "Riprova"
   }
 }

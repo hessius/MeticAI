@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
+import { collapse, snappySpring } from '@/lib/animations'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -43,6 +44,7 @@ export function AdvancedCustomization({ value, onChange }: AdvancedCustomization
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
+          transition={snappySpring}
           className="w-full flex items-center justify-between p-3 rounded-xl border border-border/50 bg-secondary/30 hover:bg-secondary/50 transition-all duration-200"
         >
           <span className="text-sm font-semibold tracking-wide text-foreground/90">
@@ -50,7 +52,7 @@ export function AdvancedCustomization({ value, onChange }: AdvancedCustomization
           </span>
           <motion.div
             animate={{ rotate: isOpen ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
+            transition={snappySpring}
           >
             <CaretDown size={18} weight="bold" className="text-muted-foreground" />
           </motion.div>
@@ -61,10 +63,11 @@ export function AdvancedCustomization({ value, onChange }: AdvancedCustomization
         {isOpen && (
           <CollapsibleContent forceMount>
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
+              variants={collapse}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              transition={snappySpring}
               className="overflow-hidden"
             >
               <div className="mt-3 p-4 rounded-xl border border-border/50 bg-secondary/30 space-y-4 overflow-hidden">

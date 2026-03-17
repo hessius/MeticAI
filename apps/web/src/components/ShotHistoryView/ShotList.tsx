@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
+import { slideInRight, slideUp, snappySpring } from '@/lib/animations'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -50,10 +51,11 @@ export function ShotList({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      variants={slideInRight}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      transition={snappySpring}
     >
       <Card className="p-6 space-y-5">
         <div className="flex items-center gap-3">
@@ -97,6 +99,7 @@ export function ShotList({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
+            transition={snappySpring}
             className="space-y-2"
           >
             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -127,10 +130,11 @@ export function ShotList({
               {shots.map((shot, index) => (
                 <motion.div
                   key={`${shot.date}-${shot.filename}`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  variants={slideUp}
+                  initial="hidden"
+                  animate="visible"
                   exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.02 }}
+                  transition={{ ...snappySpring, delay: index * 0.02 }}
                   onClick={() => onSelectShot(shot)}
                   onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectShot(shot) } }}
                   className="group cursor-pointer"
