@@ -1428,6 +1428,7 @@ def _build_static_profile_description(profile_json: dict) -> str:
         f"barista-level analysis with expert brewing recommendations.\n\n"
         f"Special Notes:\n"
         f"This description was generated without AI assistance and may not capture "
-        f"all nuances of the extraction design. To generate a full AI summary, delete this "
-        f"profile from the MeticAI catalogue and re-import it after enabling AI features."
+        f"all nuances of the extraction design. You can generate a full AI-powered "
+        f"description using the \"Generate AI descriptions\" button in the profile view "
+        f"(requires AI features to be enabled in Settings)."
     )
