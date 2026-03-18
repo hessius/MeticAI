@@ -431,6 +431,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         setBloomSeconds(String(mp.bloomSeconds))
         setBloomWeightMultiplier(String(mp.bloomWeightMultiplier ?? 2))
         setMeticulousIntegration(mp.machineIntegration)
+        if (mp.doseGrams != null) setDoseGrams(String(mp.doseGrams))
+        if (mp.brewRatio != null) setBrewRatio(String(mp.brewRatio))
       })
       .catch(() => {
         // Silently keep defaults if server unreachable
@@ -454,6 +456,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setBloomSeconds(String(mp.bloomSeconds))
       setBloomWeightMultiplier(String(mp.bloomWeightMultiplier ?? 2))
       setMeticulousIntegration(mp.machineIntegration)
+      if (mp.doseGrams != null) setDoseGrams(String(mp.doseGrams))
+      if (mp.brewRatio != null) setBrewRatio(String(mp.brewRatio))
     }
   }, [])
 
@@ -503,6 +507,24 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     const n = Number(v)
     if (prefsRef.current && !isNaN(n) && n > 0 && (mode === 'free' || mode === 'ratio')) {
       prefsRef.current[mode].bloomWeightMultiplier = n
+      persistPrefs()
+    }
+  }, [mode, persistPrefs])
+
+  const updateDoseGrams = useCallback((v: string) => {
+    setDoseGrams(v)
+    const n = Number(v)
+    if (prefsRef.current && !isNaN(n) && n > 0 && (mode === 'free' || mode === 'ratio')) {
+      prefsRef.current[mode].doseGrams = n
+      persistPrefs()
+    }
+  }, [mode, persistPrefs])
+
+  const updateBrewRatio = useCallback((v: string) => {
+    setBrewRatio(v)
+    const n = Number(v)
+    if (prefsRef.current && !isNaN(n) && n > 0 && (mode === 'free' || mode === 'ratio')) {
+      prefsRef.current[mode].brewRatio = n
       persistPrefs()
     }
   }, [mode, persistPrefs])
@@ -1408,19 +1430,19 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     <Label htmlFor="pour-over-dose">{t('pourOver.doseLabel')}</Label>
                     <div className="flex items-center gap-1.5">
                       <IncrementButton
-                        onIncrement={() => setDoseGrams(prev => String(Math.max(1, (parseFloat(prev) || 0) - 1)))}
+                        onIncrement={() => updateDoseGrams(String(Math.max(1, (parseFloat(doseGrams) || 0) - 1)))}
                         label="−"
                       />
                       <Input
                         id="pour-over-dose"
                         inputMode="decimal"
                         value={doseGrams}
-                        onChange={(event) => setDoseGrams(event.target.value)}
+                        onChange={(event) => updateDoseGrams(event.target.value)}
                         placeholder="20"
                         className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
                       />
                       <IncrementButton
-                        onIncrement={() => setDoseGrams(prev => String((parseFloat(prev) || 0) + 1))}
+                        onIncrement={() => updateDoseGrams(String((parseFloat(doseGrams) || 0) + 1))}
                         label="+"
                       />
                     </div>
@@ -1433,7 +1455,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                         if (weight > 50) {
                           setShowDoseWarning(true)
                         } else {
-                          setDoseGrams(weight.toFixed(1))
+                          updateDoseGrams(weight.toFixed(1))
                           handleTare()
                         }
                       }}
@@ -1450,19 +1472,19 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     <Label htmlFor="pour-over-ratio">{t('pourOver.ratioLabel')}</Label>
                     <div className="flex items-center gap-1.5">
                       <IncrementButton
-                        onIncrement={() => setBrewRatio(prev => String(Math.max(1, (parseFloat(prev) || 0) - 1)))}
+                        onIncrement={() => updateBrewRatio(String(Math.max(1, (parseFloat(brewRatio) || 0) - 1)))}
                         label="−"
                       />
                       <Input
                         id="pour-over-ratio"
                         inputMode="decimal"
                         value={brewRatio}
-                        onChange={(event) => setBrewRatio(event.target.value)}
+                        onChange={(event) => updateBrewRatio(event.target.value)}
                         placeholder="15"
                         className="w-16 text-center bg-slate-300 dark:bg-[rgba(0,0,0,0.3)]"
                       />
                       <IncrementButton
-                        onIncrement={() => setBrewRatio(prev => String((parseFloat(prev) || 0) + 1))}
+                        onIncrement={() => updateBrewRatio(String((parseFloat(brewRatio) || 0) + 1))}
                         label="+"
                       />
                     </div>
@@ -1687,7 +1709,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
-              setDoseGrams(weight.toFixed(1))
+              updateDoseGrams(weight.toFixed(1))
               handleTare()
             }}>
               {t('pourOver.doseWarningConfirm', { weight: weight.toFixed(0) })}

@@ -111,6 +111,8 @@ export interface ModePreferences {
   bloomSeconds: number
   bloomWeightMultiplier: number
   machineIntegration: boolean
+  doseGrams?: number
+  brewRatio?: number
 }
 
 export interface RecipeModePreferences {
