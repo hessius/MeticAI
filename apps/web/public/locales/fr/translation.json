@@ -212,7 +212,12 @@
     "notes": "Notes",
     "notesPlaceholder": "Ajouter des notes sur ce profil…",
     "notesSaveFailed": "Échec de la sauvegarde des notes",
-    "notesSaved": "Notes sauvegardées"
+    "notesSaved": "Notes sauvegardées",
+    "fetchFailed": "Échec du chargement de l'historique",
+    "fetchEntryFailed": "Échec du chargement de l'entrée",
+    "deleteEntryFailed": "Échec de la suppression de l'entrée",
+    "clearFailed": "Échec de la suppression de l'historique",
+    "noProfileJson": "Aucune donnée de profil disponible pour cette entrée"
   },
   "runShot": {
     "title": "Exécuter / Programmer",
@@ -282,7 +287,9 @@
     "changeProfile": "Changer",
     "everyXDaysCount": "Tous les {{count}} jours",
     "noProfileSelected": "Aucun profil sélectionné. Sélectionnez un profil ou utilisez uniquement le préchauffage.",
-    "selectProfile": "Sélectionner un profil"
+    "selectProfile": "Sélectionner un profil",
+    "scheduleFailed": "Échec de la programmation du shot",
+    "saveScheduleFailed": "Échec de la sauvegarde de la programmation"
   },
   "shotHistory": {
     "duration": "Durée",
@@ -340,7 +347,10 @@
     "getAiAnalysis": "Obtenir l'analyse IA",
     "runAnalysisForOverlay": "Lancer l'analyse pour voir la superposition graphique",
     "aiUnavailable": "L'analyse IA n'est pas disponible. Activez les fonctionnalités IA dans les Réglages et assurez-vous qu'une clé API Gemini est configurée.",
-    "lastUpdated": "Dernière mise à jour : {{time}}"
+    "lastUpdated": "Dernière mise à jour : {{time}}",
+    "fetchFailed": "Échec du chargement des shots",
+    "fetchDatesFailed": "Échec du chargement des dates",
+    "backgroundRefreshFailed": "Échec de l'actualisation en arrière-plan"
   },
   "shotAnalysisView": {
     "title": "Analyse des extractions",
@@ -520,7 +530,9 @@
       "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
     },
     "runsOn": "Runs on",
-    "andCaffeine": "and caffeine ☕"
+    "andCaffeine": "and caffeine ☕",
+    "betaChannelFailed": "Échec du changement de canal bêta",
+    "feedbackFailed": "Échec de l'envoi du commentaire"
   },
   "profileBreakdown": {
     "title": "Détails du profil",
@@ -632,7 +644,10 @@
     "importFailed": "Échec de l'importation",
     "fetchFailed": "Échec de la récupération des profils depuis la machine",
     "connectFailed": "Échec de la connexion à la machine",
-    "bulkImportFailed": "Échec de l'importation en masse"
+    "bulkImportFailed": "Échec de l'importation en masse",
+    "fetchDetailsFailed": "Échec de la récupération des détails du profil",
+    "noResponseStream": "Aucun flux de réponse disponible",
+    "bulkImportStartFailed": "Échec du démarrage de l'importation en masse"
   },
   "imageCrop": {
     "title": "Recadrer l'image du profil",
@@ -925,7 +940,17 @@
     "noRecipes": "Aucune recette disponible",
     "recipeMode": "Mode recette",
     "selectRecipe": "Sélectionner une recette",
-    "viewRecipeDetails": "Voir les détails de la recette"
+    "viewRecipeDetails": "Voir les détails de la recette",
+    "errors": {
+      "prepareFailed": "Échec de la préparation",
+      "cleanupFailed": "Échec du nettoyage",
+      "forceCleanupFailed": "Échec du nettoyage forcé",
+      "getActiveFailed": "Échec de la récupération de la session active",
+      "getPreferencesFailed": "Échec du chargement des préférences",
+      "savePreferencesFailed": "Échec de la sauvegarde des préférences",
+      "loadRecipesFailed": "Échec du chargement des recettes",
+      "prepareRecipeFailed": "Échec de la préparation de la recette"
+    }
   },
   "markdownEditor": {
     "edit": "Modifier",
@@ -1042,7 +1067,11 @@
       "restoreProfileFailed": "Échec de la restauration du profil",
       "deleteFromMachineFailed": "Échec de la suppression de la machine",
       "deleteProfileFailed": "Échec de la suppression du profil"
-    }
+    },
+    "fetchFailed": "Échec du chargement des profils",
+    "syncFailed": "Échec de la synchronisation",
+    "renameFailed": "Échec du renommage du profil",
+    "exportFailed": "Échec de l'exportation du profil"
   },
   "recommendations": {
     "apply": "Appliquer les recommandations",
@@ -1060,7 +1089,9 @@
     "recommendedValue": "Recommandé",
     "selectAll": "Tout sélectionner",
     "deselectAll": "Tout désélectionner",
-    "globalSettings": "Paramètres globaux"
+    "globalSettings": "Paramètres globaux",
+    "applyFailed": "Échec de l'application des recommandations",
+    "classifyFailed": "Échec de la classification"
   },
   "taste": {
     "compass": {
@@ -1174,7 +1205,8 @@
     "findSimilar": "Trouver similaires",
     "similarTo": "Profils similaires à \"{{name}}\"",
     "noSimilar": "Aucun profil similaire trouvé.",
-    "aiDisclaimer": "Cette fonctionnalité utilise des jetons IA pour classer les profils similaires."
+    "aiDisclaimer": "Cette fonctionnalité utilise des jetons IA pour classer les profils similaires.",
+    "fetchFailed": "Échec du chargement des recommandations"
   },
   "espressoCompass": {
     "title": "Boussole Espresso",
@@ -1369,5 +1401,22 @@
   },
   "error": {
     "somethingWentWrong": "Quelque chose s'est mal passé"
+  },
+  "findSimilar": {
+    "fetchFailed": "Échec du chargement des profils similaires"
+  },
+  "shotAnalysis": {
+    "fetchFailed": "Échec du chargement des shots"
+  },
+  "update": {
+    "failed": "Échec de la mise à jour",
+    "timeout": "La mise à jour ne s'est pas terminée dans le temps prévu. Veuillez actualiser manuellement."
+  },
+  "sync": {
+    "fetchProfileFailed": "Échec de la récupération du profil",
+    "importProfileFailed": "Échec de l'importation du profil",
+    "acceptUpdateFailed": "Échec de l'acceptation de la mise à jour",
+    "removeFailed": "Échec de la suppression",
+    "restoreFailed": "Échec de la restauration"
   }
 }

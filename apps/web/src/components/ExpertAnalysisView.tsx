@@ -116,10 +116,10 @@ export function ExpertAnalysisView({
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail?.message || body.detail || "Failed to apply recommendations");
+        throw new Error(body.detail?.message || body.detail || t('recommendations.applyFailed'));
       }
     },
-    [profileName],
+    [profileName, t],
   );
   
   return (

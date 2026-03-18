@@ -638,12 +638,12 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           setFeedbackDescription('')
         }
       } else {
-        throw new Error('Failed to submit feedback')
+        throw new Error(t('settings.feedbackFailed'))
       }
     } catch (err) {
       setFeedbackResult({
         status: 'error',
-        message: err instanceof Error ? err.message : 'Failed to submit feedback'
+        message: err instanceof Error ? err.message : t('settings.feedbackFailed')
       })
     } finally {
       setFeedbackSubmitting(false)

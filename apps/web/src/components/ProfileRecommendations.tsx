@@ -59,7 +59,7 @@ export function ProfileRecommendations({
         signal: controller.signal,
       })
 
-      if (!response.ok) throw new Error('Failed to fetch recommendations')
+      if (!response.ok) throw new Error(t('profileRecommendations.fetchFailed'))
       const data = await response.json()
       if (!controller.signal.aborted) {
         setRecommendations(data.recommendations || [])
@@ -74,7 +74,7 @@ export function ProfileRecommendations({
         setIsLoading(false)
       }
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (tags.length < 2) {

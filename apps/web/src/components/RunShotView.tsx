@@ -467,7 +467,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.detail || 'Failed to schedule shot')
+        throw new Error(error.detail || t('runShot.scheduleFailed'))
       }
       
       const data = await response.json()
@@ -540,7 +540,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.detail || 'Failed to save schedule')
+        throw new Error(error.detail || t('runShot.saveScheduleFailed'))
       }
       
       const data = await response.json()

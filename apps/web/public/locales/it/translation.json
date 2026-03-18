@@ -212,7 +212,12 @@
     "notes": "Note",
     "notesPlaceholder": "Aggiungi note su questo profilo…",
     "notesSaveFailed": "Impossibile salvare le note",
-    "notesSaved": "Note salvate"
+    "notesSaved": "Note salvate",
+    "fetchFailed": "Impossibile caricare la cronologia",
+    "fetchEntryFailed": "Impossibile caricare la voce",
+    "deleteEntryFailed": "Impossibile eliminare la voce",
+    "clearFailed": "Impossibile cancellare la cronologia",
+    "noProfileJson": "Nessun dato profilo disponibile per questa voce"
   },
   "runShot": {
     "title": "Esegui / Programma",
@@ -282,7 +287,9 @@
     "changeProfile": "Cambia",
     "everyXDaysCount": "Ogni {{count}} giorni",
     "noProfileSelected": "Nessun profilo selezionato. Seleziona un profilo o usa solo il preriscaldamento.",
-    "selectProfile": "Seleziona profilo"
+    "selectProfile": "Seleziona profilo",
+    "scheduleFailed": "Impossibile programmare lo shot",
+    "saveScheduleFailed": "Impossibile salvare la programmazione"
   },
   "shotHistory": {
     "duration": "Durata",
@@ -340,7 +347,10 @@
     "getAiAnalysis": "Ottieni analisi IA",
     "runAnalysisForOverlay": "Esegui analisi per vedere sovrapposizione grafico",
     "aiUnavailable": "L'analisi IA non è disponibile. Abilita le funzionalità IA nelle Impostazioni e assicurati che sia configurata una chiave API Gemini.",
-    "lastUpdated": "Ultimo aggiornamento: {{time}}"
+    "lastUpdated": "Ultimo aggiornamento: {{time}}",
+    "fetchFailed": "Impossibile caricare gli shot",
+    "fetchDatesFailed": "Impossibile caricare le date",
+    "backgroundRefreshFailed": "Aggiornamento in background fallito"
   },
   "shotAnalysisView": {
     "title": "Analisi delle estrazioni",
@@ -520,7 +530,9 @@
       "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
     },
     "runsOn": "Runs on",
-    "andCaffeine": "and caffeine ☕"
+    "andCaffeine": "and caffeine ☕",
+    "betaChannelFailed": "Impossibile cambiare il canale beta",
+    "feedbackFailed": "Impossibile inviare il feedback"
   },
   "profileBreakdown": {
     "title": "Dettagli profilo",
@@ -632,7 +644,10 @@
     "importFailed": "Importazione fallita",
     "fetchFailed": "Impossibile recuperare profili dalla macchina",
     "connectFailed": "Impossibile connettersi alla macchina",
-    "bulkImportFailed": "Importazione di massa fallita"
+    "bulkImportFailed": "Importazione di massa fallita",
+    "fetchDetailsFailed": "Impossibile recuperare i dettagli del profilo",
+    "noResponseStream": "Nessun flusso di risposta disponibile",
+    "bulkImportStartFailed": "Impossibile avviare l'importazione di massa"
   },
   "imageCrop": {
     "title": "Ritaglia immagine profilo",
@@ -925,7 +940,17 @@
     "noRecipes": "Nessuna ricetta disponibile",
     "recipeMode": "Modalità ricetta",
     "selectRecipe": "Seleziona ricetta",
-    "viewRecipeDetails": "Vedi dettagli ricetta"
+    "viewRecipeDetails": "Vedi dettagli ricetta",
+    "errors": {
+      "prepareFailed": "Preparazione fallita",
+      "cleanupFailed": "Pulizia fallita",
+      "forceCleanupFailed": "Pulizia forzata fallita",
+      "getActiveFailed": "Impossibile ottenere la sessione attiva",
+      "getPreferencesFailed": "Impossibile caricare le preferenze",
+      "savePreferencesFailed": "Impossibile salvare le preferenze",
+      "loadRecipesFailed": "Impossibile caricare le ricette",
+      "prepareRecipeFailed": "Impossibile preparare la ricetta"
+    }
   },
   "markdownEditor": {
     "edit": "Modifica",
@@ -1042,7 +1067,11 @@
       "restoreProfileFailed": "Impossibile ripristinare il profilo",
       "deleteFromMachineFailed": "Impossibile eliminare dalla macchina",
       "deleteProfileFailed": "Impossibile eliminare il profilo"
-    }
+    },
+    "fetchFailed": "Impossibile caricare i profili",
+    "syncFailed": "Sincronizzazione fallita",
+    "renameFailed": "Impossibile rinominare il profilo",
+    "exportFailed": "Impossibile esportare il profilo"
   },
   "recommendations": {
     "apply": "Applica raccomandazioni",
@@ -1060,7 +1089,9 @@
     "recommendedValue": "Raccomandato",
     "selectAll": "Seleziona tutti applicabili",
     "deselectAll": "Deseleziona tutti",
-    "globalSettings": "Impostazioni globali"
+    "globalSettings": "Impostazioni globali",
+    "applyFailed": "Impossibile applicare le raccomandazioni",
+    "classifyFailed": "Classificazione fallita"
   },
   "taste": {
     "compass": {
@@ -1174,7 +1205,8 @@
     "findSimilar": "Trova simili",
     "similarTo": "Profili simili a \"{{name}}\"",
     "noSimilar": "Nessun profilo simile trovato.",
-    "aiDisclaimer": "Questa funzione utilizza token AI per classificare profili simili."
+    "aiDisclaimer": "Questa funzione utilizza token AI per classificare profili simili.",
+    "fetchFailed": "Impossibile caricare le raccomandazioni"
   },
   "espressoCompass": {
     "title": "Bussola Espresso",
@@ -1369,5 +1401,22 @@
   },
   "error": {
     "somethingWentWrong": "Qualcosa è andato storto"
+  },
+  "findSimilar": {
+    "fetchFailed": "Impossibile caricare profili simili"
+  },
+  "shotAnalysis": {
+    "fetchFailed": "Impossibile caricare i shots"
+  },
+  "update": {
+    "failed": "Aggiornamento fallito",
+    "timeout": "L'aggiornamento non è stato completato nel tempo previsto. Aggiornare manualmente."
+  },
+  "sync": {
+    "fetchProfileFailed": "Impossibile recuperare il profilo",
+    "importProfileFailed": "Impossibile importare il profilo",
+    "acceptUpdateFailed": "Impossibile accettare l'aggiornamento",
+    "removeFailed": "Impossibile rimuovere",
+    "restoreFailed": "Impossibile ripristinare"
   }
 }

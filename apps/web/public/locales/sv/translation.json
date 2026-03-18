@@ -212,7 +212,12 @@
     "notes": "Anteckningar",
     "notesPlaceholder": "Lägg till anteckningar om denna profil…",
     "notesSaveFailed": "Kunde inte spara anteckningar",
-    "notesSaved": "Anteckningar sparade"
+    "notesSaved": "Anteckningar sparade",
+    "fetchFailed": "Kunde inte ladda historik",
+    "fetchEntryFailed": "Kunde inte ladda post",
+    "deleteEntryFailed": "Kunde inte ta bort post",
+    "clearFailed": "Kunde inte rensa historik",
+    "noProfileJson": "Ingen profildata tillgänglig för denna post"
   },
   "runShot": {
     "title": "Kör / Schemalägg",
@@ -282,7 +287,9 @@
       "shotScheduled": "Shot schemalagd till {{time}}{{preheatInfo}}",
       "shotScheduleFailed": "Misslyckades schemalägg shot",
       "shotCancelled": "Schemalagd shot avbruten"
-    }
+    },
+    "scheduleFailed": "Kunde inte schemalägga shot",
+    "saveScheduleFailed": "Kunde inte spara schema"
   },
   "shotHistory": {
     "duration": "Varaktighet",
@@ -340,7 +347,10 @@
     "getAiAnalysis": "Hämta AI-analys",
     "runAnalysisForOverlay": "Kör analys för att se graföverlappning",
     "aiUnavailable": "AI-analys är inte tillgänglig. Aktivera AI-funktioner i Inställningar och se till att en Gemini API-nyckel är konfigurerad.",
-    "lastUpdated": "Senast uppdaterad: {{time}}"
+    "lastUpdated": "Senast uppdaterad: {{time}}",
+    "fetchFailed": "Kunde inte ladda shots",
+    "fetchDatesFailed": "Kunde inte ladda datum",
+    "backgroundRefreshFailed": "Bakgrundsuppdatering misslyckades"
   },
   "shotAnalysisView": {
     "title": "Körningsanalys",
@@ -520,7 +530,9 @@
       "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
     },
     "runsOn": "Runs on",
-    "andCaffeine": "and caffeine ☕"
+    "andCaffeine": "and caffeine ☕",
+    "betaChannelFailed": "Kunde inte byta betakanal",
+    "feedbackFailed": "Kunde inte skicka feedback"
   },
   "profileBreakdown": {
     "title": "Profildetaljer",
@@ -637,7 +649,10 @@
     "importFailed": "Import misslyckades",
     "fetchFailed": "Misslyckades hämta profiler från maskin",
     "connectFailed": "Misslyckades ansluta till maskin",
-    "bulkImportFailed": "Bulkimport misslyckades"
+    "bulkImportFailed": "Bulkimport misslyckades",
+    "fetchDetailsFailed": "Kunde inte hämta profildetaljer",
+    "noResponseStream": "Ingen svarsström tillgänglig",
+    "bulkImportStartFailed": "Kunde inte starta bulkimport"
   },
   "imageCrop": {
     "title": "Beskär profilbild",
@@ -925,7 +940,17 @@
     "noRecipes": "Inga recept tillgängliga",
     "recipeMode": "Receptläge",
     "selectRecipe": "Välj recept",
-    "viewRecipeDetails": "Visa receptdetaljer"
+    "viewRecipeDetails": "Visa receptdetaljer",
+    "errors": {
+      "prepareFailed": "Förberedelse misslyckades",
+      "cleanupFailed": "Rensning misslyckades",
+      "forceCleanupFailed": "Tvångsrensning misslyckades",
+      "getActiveFailed": "Kunde inte hämta aktiv session",
+      "getPreferencesFailed": "Kunde inte ladda inställningar",
+      "savePreferencesFailed": "Kunde inte spara inställningar",
+      "loadRecipesFailed": "Kunde inte ladda recept",
+      "prepareRecipeFailed": "Kunde inte förbereda recept"
+    }
   },
   "markdownEditor": {
     "edit": "Redigera",
@@ -1042,7 +1067,11 @@
       "restoreProfileFailed": "Kunde inte återställa profilen",
       "deleteFromMachineFailed": "Kunde inte ta bort från maskinen",
       "deleteProfileFailed": "Kunde inte ta bort profilen"
-    }
+    },
+    "fetchFailed": "Kunde inte ladda profiler",
+    "syncFailed": "Synkronisering misslyckades",
+    "renameFailed": "Kunde inte byta namn på profil",
+    "exportFailed": "Kunde inte exportera profil"
   },
   "recommendations": {
     "apply": "Tillämpa rekommendationer",
@@ -1060,7 +1089,9 @@
     "recommendedValue": "Rekommenderat",
     "selectAll": "Välj alla tillämpbara",
     "deselectAll": "Avmarkera alla",
-    "globalSettings": "Globala inställningar"
+    "globalSettings": "Globala inställningar",
+    "applyFailed": "Kunde inte tillämpa rekommendationer",
+    "classifyFailed": "Klassificering misslyckades"
   },
   "taste": {
     "compass": {
@@ -1174,7 +1205,8 @@
     "findSimilar": "Hitta liknande",
     "similarTo": "Profiler liknande \"{{name}}\"",
     "noSimilar": "Inga liknande profiler hittades.",
-    "aiDisclaimer": "Denna funktion använder AI-tokens för att ranka liknande profiler."
+    "aiDisclaimer": "Denna funktion använder AI-tokens för att ranka liknande profiler.",
+    "fetchFailed": "Kunde inte hämta rekommendationer"
   },
   "espressoCompass": {
     "title": "Espressokompass",
@@ -1369,5 +1401,22 @@
   },
   "error": {
     "somethingWentWrong": "Något gick fel"
+  },
+  "findSimilar": {
+    "fetchFailed": "Kunde inte hämta liknande profiler"
+  },
+  "shotAnalysis": {
+    "fetchFailed": "Kunde inte ladda shots"
+  },
+  "update": {
+    "failed": "Uppdatering misslyckades",
+    "timeout": "Uppdateringen slutfördes inte inom förväntad tid. Vänligen uppdatera manuellt."
+  },
+  "sync": {
+    "fetchProfileFailed": "Kunde inte hämta profil",
+    "importProfileFailed": "Kunde inte importera profil",
+    "acceptUpdateFailed": "Kunde inte acceptera uppdatering",
+    "removeFailed": "Kunde inte ta bort",
+    "restoreFailed": "Kunde inte återställa"
   }
 }

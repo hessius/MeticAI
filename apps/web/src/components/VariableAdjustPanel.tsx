@@ -246,11 +246,6 @@ export function VariableAdjustPanel({
                 </div>
               ))}
 
-              {adjustableVars.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  {t('variables.noAdjustable')}
-                </p>
-              )}
             </div>
           </motion.div>
         )}

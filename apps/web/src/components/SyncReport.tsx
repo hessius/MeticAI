@@ -92,7 +92,7 @@ export function SyncReport({
       const jsonRes = await fetch(
         `${serverUrl}/api/machine/profile/${profile.profile_id}/json`
       )
-      if (!jsonRes.ok) throw new Error('Failed to fetch profile')
+      if (!jsonRes.ok) throw new Error(t('sync.fetchProfileFailed'))
       const { profile: profileJson } = await jsonRes.json()
 
       const importRes = await fetch(`${serverUrl}/api/profile/import`, {
@@ -104,7 +104,7 @@ export function SyncReport({
           generate_description: aiDescription,
         }),
       })
-      if (!importRes.ok) throw new Error('Failed to import profile')
+      if (!importRes.ok) throw new Error(t('sync.importProfileFailed'))
 
       toast.success(
         t('profileCatalogue.sync.imported', { name: profile.profile_name })
@@ -112,7 +112,7 @@ export function SyncReport({
       onResolved()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Import failed'
+        err instanceof Error ? err.message : t('sync.importProfileFailed')
       toast.error(message)
     } finally {
       clearProcessing(profile.profile_id)
@@ -127,7 +127,7 @@ export function SyncReport({
         `${serverUrl}/api/profiles/sync/accept/${profile.profile_id}?ai_description=${aiDescription}`,
         { method: 'POST' }
       )
-      if (!res.ok) throw new Error('Failed to accept update')
+      if (!res.ok) throw new Error(t('sync.acceptUpdateFailed'))
 
       toast.success(
         t('profileCatalogue.sync.accepted', { name: profile.profile_name })
@@ -135,7 +135,7 @@ export function SyncReport({
       onResolved()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Accept failed'
+        err instanceof Error ? err.message : t('sync.acceptUpdateFailed')
       toast.error(message)
     } finally {
       clearProcessing(profile.profile_id)
@@ -149,13 +149,13 @@ export function SyncReport({
       const res = await fetch(`${serverUrl}/api/history/${entry.id}`, {
         method: 'DELETE',
       })
-      if (!res.ok) throw new Error('Failed to remove')
+      if (!res.ok) throw new Error(t('sync.removeFailed'))
 
       toast.success(t('profileCatalogue.removedFromHistory'))
       onResolved()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Remove failed'
+        err instanceof Error ? err.message : t('sync.removeFailed')
       toast.error(message)
     } finally {
       clearProcessing(entry.id)
@@ -170,7 +170,7 @@ export function SyncReport({
         `${serverUrl}/api/machine/profile/restore/${entry.id}`,
         { method: 'POST' }
       )
-      if (!res.ok) throw new Error('Failed to restore')
+      if (!res.ok) throw new Error(t('sync.restoreFailed'))
 
       toast.success(
         t('profileCatalogue.restoredToMachine', {
@@ -180,7 +180,7 @@ export function SyncReport({
       onResolved()
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Restore failed'
+        err instanceof Error ? err.message : t('sync.restoreFailed')
       toast.error(message)
     } finally {
       clearProcessing(entry.id)

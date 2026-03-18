@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getServerUrl } from '@/lib/config'
 
 interface TriggerUpdateResponse {
@@ -28,6 +29,7 @@ const MAX_UPDATE_CHECKS = 120
 const INITIAL_UPDATE_WAIT = 5000
 
 export function useUpdateTrigger(): UseUpdateTriggerReturn {
+  const { t } = useTranslation()
   const [isUpdating, setIsUpdating] = useState(false)
   const [updateError, setUpdateError] = useState<string | null>(null)
   const [updateSuccess, setUpdateSuccess] = useState(false)
@@ -105,14 +107,14 @@ export function useUpdateTrigger(): UseUpdateTriggerReturn {
       const data: TriggerUpdateResponse = await response.json()
 
       if (data.status === 'error') {
-        throw new Error(data.error || data.message || 'Update failed')
+        throw new Error(data.error || data.message || t('update.failed'))
       }
 
       // Wait for update to complete (server comes back up with update_available: false)
       const updateComplete = await waitForUpdateComplete(serverUrl)
 
       if (!updateComplete) {
-        throw new Error('Update did not complete within expected time. Please refresh manually.')
+        throw new Error(t('update.timeout'))
       }
 
       setUpdateSuccess(true)
@@ -121,10 +123,10 @@ export function useUpdateTrigger(): UseUpdateTriggerReturn {
       window.location.reload()
     } catch (err) {
       console.error('Error triggering update:', err)
-      setUpdateError(err instanceof Error ? err.message : 'Failed to trigger update')
+      setUpdateError(err instanceof Error ? err.message : t('update.triggerFailed'))
       setIsUpdating(false)
     }
-  }, [waitForUpdateComplete])
+  }, [waitForUpdateComplete, t])
 
   return {
     triggerUpdate,

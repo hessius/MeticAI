@@ -86,7 +86,7 @@ describe('useHistory', () => {
         }
       })
 
-      expect(result.current.error).toBe('Failed to fetch history: 500')
+      expect(result.current.error).toBe('history.fetchFailed')
       expect(result.current.entries).toEqual([])
     })
 
@@ -177,7 +177,7 @@ describe('useHistory', () => {
         act(async () => {
           await result.current.fetchEntry('non-existent')
         })
-      ).rejects.toThrow('Failed to fetch entry: 404')
+      ).rejects.toThrow('history.fetchEntryFailed')
     })
   })
 
@@ -252,7 +252,7 @@ describe('useHistory', () => {
         act(async () => {
           await result.current.deleteEntry('non-existent')
         })
-      ).rejects.toThrow('Failed to delete entry: 404')
+      ).rejects.toThrow('history.deleteEntryFailed')
     })
   })
 
@@ -321,7 +321,7 @@ describe('useHistory', () => {
         act(async () => {
           await result.current.downloadJson(mockHistoryEntry2)
         })
-      ).rejects.toThrow('No profile JSON available for this entry')
+      ).rejects.toThrow('history.noProfileJson')
     })
 
     it('should create blob with correct JSON content', async () => {

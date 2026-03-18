@@ -112,7 +112,7 @@ export function RecommendationSelectionDialog({
       }, 1500);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : t("recommendations.applying") + " failed",
+        err instanceof Error ? err.message : t('recommendations.applyFailed'),
       );
     } finally {
       setIsApplying(false);

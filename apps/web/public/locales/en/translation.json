@@ -212,7 +212,12 @@
     "generateAiDescription": "Generate AI Explanation",
     "generatingAiDescription": "Generating AI explanation...",
     "aiDescriptionGenerated": "AI explanation generated successfully",
-    "aiDescriptionFailed": "Failed to generate AI explanation"
+    "aiDescriptionFailed": "Failed to generate AI explanation",
+    "fetchFailed": "Failed to load history",
+    "fetchEntryFailed": "Failed to load entry",
+    "deleteEntryFailed": "Failed to delete entry",
+    "clearFailed": "Failed to clear history",
+    "noProfileJson": "No profile data available for this entry"
   },
   "runShot": {
     "title": "Run / Schedule",
@@ -282,7 +287,9 @@
       "shotScheduled": "Shot scheduled for {{time}}{{preheatInfo}}",
       "shotScheduleFailed": "Failed to schedule shot",
       "shotCancelled": "Scheduled shot cancelled"
-    }
+    },
+    "scheduleFailed": "Failed to schedule shot",
+    "saveScheduleFailed": "Failed to save schedule"
   },
   "shotHistory": {
     "title": "Shot History",
@@ -340,7 +347,10 @@
     "getAiAnalysis": "Get AI Analysis",
     "runAnalysisForOverlay": "Run analysis to see graph overlay",
     "aiUnavailable": "AI analysis is unavailable. Enable AI features in Settings and ensure a Gemini API key is configured.",
-    "lastUpdated": "Last updated: {{time}}"
+    "lastUpdated": "Last updated: {{time}}",
+    "fetchFailed": "Failed to load shots",
+    "fetchDatesFailed": "Failed to load dates",
+    "backgroundRefreshFailed": "Background refresh failed"
   },
   "shotAnalysisView": {
     "title": "Shot Analysis",
@@ -520,7 +530,9 @@
       "watchtowerStatus": "Watchtower status"
     },
     "version": "Version",
-    "footer": "MeticAI • Built with ❤️ for coffee lovers"
+    "footer": "MeticAI • Built with ❤️ for coffee lovers",
+    "feedbackFailed": "Failed to submit feedback",
+    "betaChannelFailed": "Failed to switch beta channel"
   },
   "profileBreakdown": {
     "title": "Profile Details",
@@ -637,7 +649,10 @@
     "importFailed": "Import failed",
     "fetchFailed": "Failed to fetch profiles from machine",
     "connectFailed": "Failed to connect to machine",
-    "bulkImportFailed": "Bulk import failed"
+    "bulkImportFailed": "Bulk import failed",
+    "bulkImportStartFailed": "Failed to start bulk import",
+    "noResponseStream": "No response stream available",
+    "fetchDetailsFailed": "Failed to fetch profile details"
   },
   "imageCrop": {
     "title": "Crop Profile Image",
@@ -925,7 +940,17 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Pour to {{weight}}g",
-    "recipeWait": "Wait {{seconds}}s"
+    "recipeWait": "Wait {{seconds}}s",
+    "errors": {
+      "prepareFailed": "Prepare failed",
+      "cleanupFailed": "Cleanup failed",
+      "forceCleanupFailed": "Force cleanup failed",
+      "getActiveFailed": "Failed to get active session",
+      "getPreferencesFailed": "Failed to load preferences",
+      "savePreferencesFailed": "Failed to save preferences",
+      "loadRecipesFailed": "Failed to load recipes",
+      "prepareRecipeFailed": "Failed to prepare recipe"
+    }
   },
   "profileCatalogue": {
     "title": "Profile Catalogue",
@@ -988,7 +1013,11 @@
       "restoreProfileFailed": "Failed to restore profile",
       "deleteFromMachineFailed": "Failed to delete from machine",
       "deleteProfileFailed": "Failed to delete profile"
-    }
+    },
+    "fetchFailed": "Failed to load profiles",
+    "syncFailed": "Sync failed",
+    "renameFailed": "Failed to rename profile",
+    "exportFailed": "Failed to export profile"
   },
   "markdownEditor": {
     "edit": "Edit",
@@ -1060,7 +1089,9 @@
     "recommendedValue": "Recommended",
     "selectAll": "Select all patchable",
     "deselectAll": "Deselect all",
-    "globalSettings": "Global Settings"
+    "globalSettings": "Global Settings",
+    "applyFailed": "Failed to apply recommendations",
+    "classifyFailed": "Classification failed"
   },
   "taste": {
     "compass": {
@@ -1174,7 +1205,8 @@
     "findSimilar": "Find Similar",
     "similarTo": "Profiles similar to \"{{name}}\"",
     "noSimilar": "No similar profiles found.",
-    "aiDisclaimer": "This feature uses AI tokens to rank similar profiles."
+    "aiDisclaimer": "This feature uses AI tokens to rank similar profiles.",
+    "fetchFailed": "Failed to fetch recommendations"
   },
   "espressoCompass": {
     "title": "Espresso Compass",
@@ -1369,5 +1401,24 @@
   },
   "error": {
     "somethingWentWrong": "Something went wrong"
+  },
+  "findSimilar": {
+    "fetchFailed": "Failed to fetch similar profiles"
+  },
+  "shotAnalysis": {
+    "fetchFailed": "Failed to load shots"
+  },
+  "sync": {
+    "fetchProfileFailed": "Failed to fetch profile",
+    "importProfileFailed": "Failed to import profile",
+    "acceptUpdateFailed": "Failed to accept update",
+    "removeFailed": "Failed to remove",
+    "restoreFailed": "Failed to restore"
+  },
+  "update": {
+    "failed": "Update failed",
+    "timeout": "Update did not complete within expected time. Please refresh manually.",
+    "triggerFailed": "Failed to trigger update",
+    "checkFailed": "Failed to check for updates"
   }
 }

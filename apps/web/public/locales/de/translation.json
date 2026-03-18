@@ -212,7 +212,12 @@
     "notes": "Notizen",
     "notesPlaceholder": "Notizen zu diesem Profil hinzufügen…",
     "notesSaveFailed": "Notizen konnten nicht gespeichert werden",
-    "notesSaved": "Notizen gespeichert"
+    "notesSaved": "Notizen gespeichert",
+    "fetchFailed": "Fehler beim Laden der Historie",
+    "fetchEntryFailed": "Fehler beim Laden des Eintrags",
+    "deleteEntryFailed": "Fehler beim Löschen des Eintrags",
+    "clearFailed": "Fehler beim Leeren der Historie",
+    "noProfileJson": "Keine Profildaten für diesen Eintrag verfügbar"
   },
   "runShot": {
     "title": "Ausführen / Planen",
@@ -282,7 +287,9 @@
     "changeProfile": "Ändern",
     "everyXDaysCount": "Alle {{count}} Tage",
     "noProfileSelected": "Kein Profil ausgewählt. Wählen Sie ein Profil oder verwenden Sie nur Vorheizen.",
-    "selectProfile": "Profil auswählen"
+    "selectProfile": "Profil auswählen",
+    "scheduleFailed": "Fehler beim Planen des Shots",
+    "saveScheduleFailed": "Fehler beim Speichern des Zeitplans"
   },
   "shotHistory": {
     "duration": "Dauer",
@@ -340,7 +347,10 @@
     "getAiAnalysis": "KI-Analyse abrufen",
     "runAnalysisForOverlay": "Analyse ausführen, um Grafik-Overlay zu sehen",
     "aiUnavailable": "KI-Analyse ist nicht verfügbar. Aktivieren Sie die KI-Funktionen in den Einstellungen und stellen Sie sicher, dass ein Gemini API-Schlüssel konfiguriert ist.",
-    "lastUpdated": "Zuletzt aktualisiert: {{time}}"
+    "lastUpdated": "Zuletzt aktualisiert: {{time}}",
+    "fetchFailed": "Fehler beim Laden der Shots",
+    "fetchDatesFailed": "Fehler beim Laden der Daten",
+    "backgroundRefreshFailed": "Hintergrundaktualisierung fehlgeschlagen"
   },
   "shotAnalysisView": {
     "title": "Bezugsanalyse",
@@ -520,7 +530,9 @@
       "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
     },
     "runsOn": "Runs on",
-    "andCaffeine": "and caffeine ☕"
+    "andCaffeine": "and caffeine ☕",
+    "betaChannelFailed": "Fehler beim Wechsel des Betakanals",
+    "feedbackFailed": "Fehler beim Senden des Feedbacks"
   },
   "profileBreakdown": {
     "title": "Profildetails",
@@ -632,7 +644,10 @@
     "importFailed": "Import fehlgeschlagen",
     "fetchFailed": "Profile konnten nicht von Maschine abgerufen werden",
     "connectFailed": "Verbindung zur Maschine fehlgeschlagen",
-    "bulkImportFailed": "Massen-Import fehlgeschlagen"
+    "bulkImportFailed": "Massen-Import fehlgeschlagen",
+    "fetchDetailsFailed": "Fehler beim Abrufen der Profildetails",
+    "noResponseStream": "Kein Antwortstream verfügbar",
+    "bulkImportStartFailed": "Fehler beim Starten des Massenimports"
   },
   "imageCrop": {
     "title": "Profilbild zuschneiden",
@@ -925,7 +940,17 @@
     "noRecipes": "Keine Rezepte verfügbar",
     "recipeMode": "Rezeptmodus",
     "selectRecipe": "Rezept auswählen",
-    "viewRecipeDetails": "Rezeptdetails anzeigen"
+    "viewRecipeDetails": "Rezeptdetails anzeigen",
+    "errors": {
+      "prepareFailed": "Vorbereitung fehlgeschlagen",
+      "cleanupFailed": "Bereinigung fehlgeschlagen",
+      "forceCleanupFailed": "Erzwungene Bereinigung fehlgeschlagen",
+      "getActiveFailed": "Fehler beim Abrufen der aktiven Sitzung",
+      "getPreferencesFailed": "Fehler beim Laden der Einstellungen",
+      "savePreferencesFailed": "Fehler beim Speichern der Einstellungen",
+      "loadRecipesFailed": "Fehler beim Laden der Rezepte",
+      "prepareRecipeFailed": "Fehler beim Vorbereiten des Rezepts"
+    }
   },
   "markdownEditor": {
     "edit": "Bearbeiten",
@@ -1042,7 +1067,11 @@
       "restoreProfileFailed": "Profil konnte nicht wiederhergestellt werden",
       "deleteFromMachineFailed": "Löschen von der Maschine fehlgeschlagen",
       "deleteProfileFailed": "Profil konnte nicht gelöscht werden"
-    }
+    },
+    "fetchFailed": "Fehler beim Laden der Profile",
+    "syncFailed": "Synchronisierung fehlgeschlagen",
+    "renameFailed": "Fehler beim Umbenennen des Profils",
+    "exportFailed": "Fehler beim Exportieren des Profils"
   },
   "recommendations": {
     "apply": "Empfehlungen anwenden",
@@ -1060,7 +1089,9 @@
     "recommendedValue": "Empfohlen",
     "selectAll": "Alle anwendbaren auswählen",
     "deselectAll": "Alle abwählen",
-    "globalSettings": "Globale Einstellungen"
+    "globalSettings": "Globale Einstellungen",
+    "applyFailed": "Empfehlungen konnten nicht angewendet werden",
+    "classifyFailed": "Klassifizierung fehlgeschlagen"
   },
   "taste": {
     "compass": {
@@ -1174,7 +1205,8 @@
     "findSimilar": "Ähnliche finden",
     "similarTo": "Profile ähnlich zu \"{{name}}\"",
     "noSimilar": "Keine ähnlichen Profile gefunden.",
-    "aiDisclaimer": "Diese Funktion nutzt AI-Tokens, um ähnliche Profile zu bewerten."
+    "aiDisclaimer": "Diese Funktion nutzt AI-Tokens, um ähnliche Profile zu bewerten.",
+    "fetchFailed": "Empfehlungen konnten nicht geladen werden"
   },
   "espressoCompass": {
     "title": "Espresso-Kompass",
@@ -1369,5 +1401,22 @@
   },
   "error": {
     "somethingWentWrong": "Etwas ist schiefgelaufen"
+  },
+  "findSimilar": {
+    "fetchFailed": "Ähnliche Profile konnten nicht geladen werden"
+  },
+  "shotAnalysis": {
+    "fetchFailed": "Bezüge konnten nicht geladen werden"
+  },
+  "update": {
+    "failed": "Aktualisierung fehlgeschlagen",
+    "timeout": "Aktualisierung wurde nicht innerhalb der erwarteten Zeit abgeschlossen. Bitte manuell aktualisieren."
+  },
+  "sync": {
+    "fetchProfileFailed": "Fehler beim Abrufen des Profils",
+    "importProfileFailed": "Fehler beim Importieren des Profils",
+    "acceptUpdateFailed": "Fehler beim Akzeptieren der Aktualisierung",
+    "removeFailed": "Fehler beim Entfernen",
+    "restoreFailed": "Fehler beim Wiederherstellen"
   }
 }

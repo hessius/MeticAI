@@ -110,7 +110,7 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/shots/recent?limit=50&offset=0`)
-      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`)
+      if (!response.ok) throw new Error(t('shotAnalysis.fetchFailed'))
       const data = await response.json()
       const shots = data.shots || []
       shotAnalysisCache.recent = { shots, fetchedAt: Date.now() }
@@ -118,13 +118,13 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
     } catch (err) {
       // Only set error if we have no cached data to show
       if (!shotAnalysisCache.recent) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+        setError(err instanceof Error ? err.message : t('shotAnalysis.fetchFailed'))
       }
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   const fetchByProfile = useCallback(async (force = false) => {
     // Serve from cache immediately (stale-while-revalidate)
@@ -146,7 +146,7 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/shots/recent/by-profile?limit=50&offset=0`)
-      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`)
+      if (!response.ok) throw new Error(t('shotAnalysis.fetchFailed'))
       const data = await response.json()
       const profiles = data.profiles || []
       shotAnalysisCache.byProfile = { profiles, fetchedAt: Date.now() }
@@ -156,13 +156,13 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
       }
     } catch (err) {
       if (!shotAnalysisCache.byProfile) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+        setError(err instanceof Error ? err.message : t('shotAnalysis.fetchFailed'))
       }
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (activeTab === 'recent') {

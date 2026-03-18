@@ -792,13 +792,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         // Timeout — machine may already be past this state; try anyway
       }
       await cmd(() => machine.continueShot(), 'started')
-    } catch (err) {
+    } catch {
       setMachineLifecycle('error')
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : t('pourOver.integration.prepareFailed'),
-      )
+      toast.error(t('pourOver.integration.prepareFailed'))
     }
   }, [meticulousIntegration, machineLifecycle, targetWeight, bloomEnabled, bloomSeconds, doseGrams, brewRatio, t, cmd, waitForState, machine])
 
@@ -861,9 +857,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         // Timeout — machine may already be past this state; try anyway
       }
       await cmd(() => machine.continueShot(), 'started')
-    } catch (err) {
+    } catch {
       setMachineLifecycle('error')
-      toast.error(err instanceof Error ? err.message : t('pourOver.integration.prepareFailed'))
+      toast.error(t('pourOver.integration.prepareFailed'))
     }
   }, [meticulousIntegration, machineLifecycle, selectedRecipe, t, cmd, waitForState, machine])
 

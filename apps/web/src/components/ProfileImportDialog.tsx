@@ -102,7 +102,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       const response = await fetch(`${serverUrl}/api/machine/profiles`)
       
       if (!response.ok) {
-        throw new Error('Failed to fetch profiles from machine')
+        throw new Error(t('profileImport.fetchFailed'))
       }
       
       const data = await response.json()
@@ -112,7 +112,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setMachineProfiles(availableProfiles)
       setStep('machine')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to connect to machine')
+      setError(err instanceof Error ? err.message : t('profileImport.connectFailed'))
     } finally {
       setLoadingMachine(false)
     }
@@ -136,14 +136,14 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       })
       
       if (!response.ok) {
-        throw new Error('Failed to start bulk import')
+        throw new Error(t('profileImport.bulkImportStartFailed'))
       }
       
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       
       if (!reader) {
-        throw new Error('No response stream available')
+        throw new Error(t('profileImport.noResponseStream'))
       }
       
       let buffer = ''
@@ -184,7 +184,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
         // Import was cancelled
         return
       }
-      setError(err instanceof Error ? err.message : 'Bulk import failed')
+      setError(err instanceof Error ? err.message : t('profileImport.bulkImportFailed'))
       setStep('error')
     }
   }
@@ -218,14 +218,14 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
         const errorData = await response.json()
         const errorMessage = typeof errorData.detail === 'string' 
           ? errorData.detail 
-          : errorData.detail?.error || errorData.detail?.message || 'Import failed'
+          : errorData.detail?.error || errorData.detail?.message || t('profileImport.importFailed')
         throw new Error(errorMessage)
       }
       
       const result = await response.json()
       
       if (result.status === 'exists') {
-        setError(`Profile "${result.profile_name || profileJson.name}" already exists in your catalogue`)
+        setError(t('profileImport.profileExists', { name: result.profile_name || profileJson.name }))
         setStep('error')
         return
       }
@@ -234,9 +234,9 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setStep('success')
     } catch (err) {
       if (err instanceof SyntaxError) {
-        setError('Invalid JSON file. Please select a valid profile JSON.')
+        setError(t('profileImport.invalidJson'))
       } else {
-        setError(err instanceof Error ? err.message : 'Import failed')
+        setError(err instanceof Error ? err.message : t('profileImport.importFailed'))
       }
       setStep('error')
     }
@@ -255,7 +255,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       const profileResponse = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
       
       if (!profileResponse.ok) {
-        throw new Error('Failed to fetch profile details')
+        throw new Error(t('profileImport.fetchDetailsFailed'))
       }
       
       const profileData = await profileResponse.json()
@@ -277,7 +277,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
         const errorData = await importResponse.json()
         const errorMessage = typeof errorData.detail === 'string' 
           ? errorData.detail 
-          : errorData.detail?.error || errorData.detail?.message || 'Import failed'
+          : errorData.detail?.error || errorData.detail?.message || t('profileImport.importFailed')
         throw new Error(errorMessage)
       }
       
@@ -285,7 +285,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setImportedProfileName(result.profile_name)
       setStep('success')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed')
+      setError(err instanceof Error ? err.message : t('profileImport.importFailed'))
       setStep('error')
     }
   }

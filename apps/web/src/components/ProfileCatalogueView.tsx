@@ -150,13 +150,13 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/profiles`)
       if (!response.ok) {
-        throw new Error('Failed to fetch profiles')
+        throw new Error(t('profileCatalogue.fetchFailed'))
       }
       
       const data = await response.json()
       setProfiles(data.profiles || [])
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load profiles'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.fetchFailed')
       setError(message)
       toast.error(message)
     } finally {
@@ -200,7 +200,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       const response = await fetch(`${serverUrl}/api/profiles/sync`, {
         method: 'POST',
       })
-      if (!response.ok) throw new Error('Sync failed')
+      if (!response.ok) throw new Error(t('profileCatalogue.syncFailed'))
       const data: SyncResults = await response.json()
       setSyncResults(data)
 
@@ -211,7 +211,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       }
       setStaleProfileNames(stale)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sync failed'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.syncFailed')
       toast.error(message)
     } finally {
       setIsSyncing(false)
@@ -265,7 +265,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       })
       
       if (!response.ok) {
-        throw new Error('Failed to rename profile')
+        throw new Error(t('profileCatalogue.renameFailed'))
       }
       
       const result = await response.json()
@@ -276,7 +276,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       setRenamingId(null)
       setRenameValue('')
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to rename profile'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.renameFailed')
       toast.error(message)
     } finally {
       setIsRenaming(false)
@@ -305,7 +305,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
       if (!response.ok) {
-        throw new Error('Failed to export profile')
+        throw new Error(t('profileCatalogue.exportFailed'))
       }
       
       const data = await response.json()
@@ -322,7 +322,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       
       toast.success(t('profileCatalogue.exported'))
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to export profile'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.exportFailed')
       toast.error(message)
     }
   }

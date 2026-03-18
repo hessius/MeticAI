@@ -3,6 +3,7 @@ from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from typing import Optional, Any
 from datetime import datetime, timezone
 import json
+import math
 import os
 import logging
 import asyncio
@@ -3484,12 +3485,24 @@ async def apply_recommendations(
         skipped: list[dict] = []
 
         for rec in recs:
+            if not isinstance(rec, dict):
+                skipped.append({"variable": "?", "reason": "invalid entry (not an object)"})
+                continue
             variable = rec.get("variable", "")
             recommended_value = rec.get("recommended_value")
             stage = rec.get("stage", "")
 
             if recommended_value is None:
                 skipped.append({"variable": variable, "reason": "no recommended_value"})
+                continue
+
+            # Validate recommended_value is coercible to a finite number
+            try:
+                rv_float = float(recommended_value)
+                if not math.isfinite(rv_float):
+                    raise ValueError("non-finite")
+            except (TypeError, ValueError):
+                skipped.append({"variable": variable, "reason": "invalid recommended_value"})
                 continue
 
             # --- global settings (temperature, final_weight) ---

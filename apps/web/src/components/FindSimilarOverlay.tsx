@@ -67,7 +67,7 @@ export function FindSimilarOverlay({
         signal: controller.signal,
       })
 
-      if (!response.ok) throw new Error('Failed to fetch similar profiles')
+      if (!response.ok) throw new Error(t('findSimilar.fetchFailed'))
       const data = await response.json()
       if (!controller.signal.aborted) {
         setRecommendations(data.recommendations || [])
@@ -78,7 +78,7 @@ export function FindSimilarOverlay({
     } finally {
       if (!controller.signal.aborted) setIsLoading(false)
     }
-  }, [profileName, serverUrl])
+  }, [profileName, serverUrl, t])
 
   useEffect(() => {
     if (open) {

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getServerUrl } from '@/lib/config'
 
 export interface HistoryEntry {
@@ -21,6 +22,7 @@ export interface HistoryResponse {
 }
 
 export function useHistory() {
+  const { t } = useTranslation()
   const [entries, setEntries] = useState<HistoryEntry[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
@@ -35,7 +37,7 @@ export function useHistory() {
       const response = await fetch(`${serverUrl}/api/history?limit=${limit}&offset=${offset}`)
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch history: ${response.status}`)
+        throw new Error(t('history.fetchFailed'))
       }
 
       const data: HistoryResponse = await response.json()
@@ -43,24 +45,24 @@ export function useHistory() {
       setTotal(data.total)
       return data
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch history'
+      const message = err instanceof Error ? err.message : t('history.fetchFailed')
       setError(message)
       throw err
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   const fetchEntry = useCallback(async (entryId: string): Promise<HistoryEntry> => {
     const serverUrl = await getServerUrl()
     const response = await fetch(`${serverUrl}/api/history/${entryId}`)
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch entry: ${response.status}`)
+      throw new Error(t('history.fetchEntryFailed'))
     }
 
     return response.json()
-  }, [])
+  }, [t])
 
   const deleteEntry = useCallback(async (entryId: string) => {
     const serverUrl = await getServerUrl()
@@ -69,7 +71,7 @@ export function useHistory() {
     })
     
     if (!response.ok) {
-      throw new Error(`Failed to delete entry: ${response.status}`)
+      throw new Error(t('history.deleteEntryFailed'))
     }
 
     // Update local state
@@ -77,7 +79,7 @@ export function useHistory() {
     setTotal(prev => prev - 1)
     
     return response.json()
-  }, [])
+  }, [t])
 
   const clearHistory = useCallback(async () => {
     const serverUrl = await getServerUrl()
@@ -86,18 +88,18 @@ export function useHistory() {
     })
     
     if (!response.ok) {
-      throw new Error(`Failed to clear history: ${response.status}`)
+      throw new Error(t('history.clearFailed'))
     }
 
     setEntries([])
     setTotal(0)
     
     return response.json()
-  }, [])
+  }, [t])
 
   const downloadJson = useCallback(async (entry: HistoryEntry) => {
     if (!entry.profile_json) {
-      throw new Error('No profile JSON available for this entry')
+      throw new Error(t('history.noProfileJson'))
     }
 
     // Create filename from profile name
@@ -116,7 +118,7 @@ export function useHistory() {
     link.download = `${safeName || 'profile'}.json`
     link.click()
     URL.revokeObjectURL(url)
-  }, [])
+  }, [t])
 
   return {
     entries,

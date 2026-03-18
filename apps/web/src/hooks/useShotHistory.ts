@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getServerUrl } from '@/lib/config'
 
 export interface ShotInfo {
@@ -68,6 +69,7 @@ const shotCache: ShotCache = {
 }
 
 export function useShotHistory() {
+  const { t } = useTranslation()
   // Initialize state from cache
   const [shots, setShots] = useState<ShotInfo[]>(shotCache.shots)
   const [isLoading, setIsLoading] = useState(false)
@@ -117,7 +119,7 @@ export function useShotHistory() {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = typeof errorData.detail === 'string' 
           ? errorData.detail 
-          : errorData.detail?.message || `Failed to fetch shots: ${response.status}`
+          : errorData.detail?.message || t('shotHistory.fetchFailed')
         throw new Error(errorMessage)
       }
 
@@ -134,14 +136,14 @@ export function useShotHistory() {
       
       return data
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch shot history'
+      const message = err instanceof Error ? err.message : t('shotHistory.fetchFailed')
       setError(message)
       throw err
     } finally {
       setIsLoading(false)
       setIsBackgroundRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   // Background refresh that doesn't block UI - shows cached data while refreshing
   const backgroundRefresh = useCallback(async (
@@ -197,20 +199,20 @@ export function useShotHistory() {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = typeof errorData.detail === 'string' 
           ? errorData.detail 
-          : errorData.detail?.message || `Failed to fetch shot data: ${response.status}`
+          : errorData.detail?.message || t('shotHistory.loadFailed')
         throw new Error(errorMessage)
       }
 
       const result: ShotDataResponse = await response.json()
       return result.data
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch shot data'
+      const message = err instanceof Error ? err.message : t('shotHistory.loadFailed')
       setError(message)
       throw err
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   const fetchAvailableDates = useCallback(async (): Promise<string[]> => {
     try {
@@ -218,17 +220,17 @@ export function useShotHistory() {
       const response = await fetch(`${serverUrl}/api/shots/dates`)
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch dates: ${response.status}`)
+        throw new Error(t('shotHistory.fetchDatesFailed'))
       }
 
       const data = await response.json()
       return data.dates || []
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch dates'
+      const message = err instanceof Error ? err.message : t('shotHistory.fetchDatesFailed')
       setError(message)
       throw err
     }
-  }, [])
+  }, [t])
 
   // Check if cache is valid for a given profile
   const isCacheValidForProfile = useCallback((profileName: string): boolean => {
