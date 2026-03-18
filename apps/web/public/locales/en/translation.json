@@ -1104,7 +1104,8 @@
       "weight": "Weight",
       "power": "Power",
       "time": "Time",
-      "piston": "Piston"
+      "piston": "Piston",
+      "temperature": "Temperature"
     }
   },
   "profileRecommendations": {

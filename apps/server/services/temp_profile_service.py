@@ -95,6 +95,7 @@ def get_active() -> Optional[Dict[str, Any]]:
 # Variable types recognised by the Meticulous profile format.
 VARIABLE_TYPES = frozenset({
     "pressure", "flow", "weight", "power", "time", "piston_position",
+    "temperature",
 })
 
 
@@ -108,31 +109,49 @@ def apply_variable_overrides(
     overridden.  Unknown keys or ``info_`` keys are silently skipped so
     callers don't need to pre-filter.
 
+    When overriding synthesised top-level keys (``final_weight``,
+    ``temperature``) the corresponding top-level profile field is also
+    updated so that the Meticulous machine receives the correct value
+    regardless of whether it reads from ``variables`` or the top-level.
+
     Returns a new profile dict — the original is not mutated.
     """
     profile = copy.deepcopy(profile_data)
     variables = profile.get("variables")
-    if not variables or not overrides:
+
+    # Top-level keys that may be synthesised as variables
+    TOP_LEVEL_KEYS = {"final_weight", "temperature"}
+
+    if not overrides:
         return profile
 
-    # Build a lookup of adjustable variable keys
-    adjustable_keys: set[str] = set()
-    for var in variables:
-        key = var.get("key", "")
-        if key and not key.startswith("info_"):
-            adjustable_keys.add(key)
-
     applied: dict[str, Any] = {}
-    for key, value in overrides.items():
-        if key not in adjustable_keys:
-            logger.debug("Skipping override for non-adjustable key: %s", key)
-            continue
-        # Update the variable definition value
+
+    # Apply overrides to the variables array if present
+    if variables:
+        adjustable_keys: set[str] = set()
         for var in variables:
-            if var.get("key") == key:
-                var["value"] = value
-                applied[key] = value
-                break
+            key = var.get("key", "")
+            if key and not key.startswith("info_"):
+                adjustable_keys.add(key)
+
+        for key, value in overrides.items():
+            if key not in adjustable_keys:
+                if key not in TOP_LEVEL_KEYS:
+                    logger.debug("Skipping override for non-adjustable key: %s", key)
+                continue
+            for var in variables:
+                if var.get("key") == key:
+                    var["value"] = value
+                    applied[key] = value
+                    break
+
+    # Always apply top-level key overrides directly on the profile dict
+    for key in TOP_LEVEL_KEYS:
+        if key in overrides:
+            profile[key] = overrides[key]
+            if key not in applied:
+                applied[key] = overrides[key]
 
     if applied:
         logger.info("Applied %d variable override(s): %s", len(applied), list(applied))

@@ -1104,7 +1104,8 @@
       "weight": "Peso",
       "power": "Potenza",
       "time": "Tempo",
-      "piston": "Pistone"
+      "piston": "Pistone",
+      "temperature": "Temperatura"
     }
   },
   "profileRecommendations": {

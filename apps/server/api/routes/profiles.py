@@ -1765,6 +1765,93 @@ async def list_machine_profiles(request: Request):
         )
 
 
+@router.get("/machine/profile/{profile_id}")
+@router.get("/api/machine/profile/{profile_id}")
+async def get_machine_profile(profile_id: str, request: Request):
+    """Get a single profile from the Meticulous machine with variables.
+
+    Returns the profile dict including a ``variables`` array.  When the
+    machine profile does not contain an explicit variables list the endpoint
+    synthesises basic entries from the top-level ``final_weight`` and
+    ``temperature`` fields so that callers always get adjustable parameters.
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            f"Fetching profile: {profile_id}",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+
+        profile = await async_get_profile(profile_id)
+
+        if hasattr(profile, 'error') and profile.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profile.error}"
+            )
+
+        # Convert to dict for JSON serialization
+        profile_json: dict = {}
+        for attr in ['id', 'name', 'author', 'temperature', 'final_weight',
+                     'stages', 'variables', 'display', 'isDefault', 'source',
+                     'beverage_type', 'tank_temperature']:
+            if hasattr(profile, attr):
+                val = getattr(profile, attr)
+                if val is not None:
+                    if hasattr(val, '__dict__'):
+                        profile_json[attr] = val.__dict__
+                    elif isinstance(val, list):
+                        profile_json[attr] = [
+                            item.__dict__ if hasattr(item, '__dict__') else item
+                            for item in val
+                        ]
+                    else:
+                        profile_json[attr] = val
+
+        # Ensure there is always a variables array.  When the Meticulous
+        # profile format omits it we synthesise entries from the well-known
+        # top-level fields so the UI can always offer adjustment sliders.
+        variables = profile_json.get("variables")
+        if not variables or not isinstance(variables, list) or len(variables) == 0:
+            synthesised: list[dict] = []
+            if profile_json.get("final_weight") is not None:
+                synthesised.append({
+                    "key": "final_weight",
+                    "name": "Final Weight",
+                    "type": "weight",
+                    "value": float(profile_json["final_weight"]),
+                })
+            if profile_json.get("temperature") is not None:
+                synthesised.append({
+                    "key": "temperature",
+                    "name": "Temperature",
+                    "type": "temperature",
+                    "value": float(profile_json["temperature"]),
+                })
+            if synthesised:
+                profile_json["variables"] = synthesised
+
+        return {
+            "status": "success",
+            "profile": profile_json,
+            "variables": profile_json.get("variables", []),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
 @router.get("/api/machine/profile/{profile_id}/json")
 async def get_machine_profile_json(profile_id: str, request: Request):
     """Get the full profile JSON from the Meticulous machine.

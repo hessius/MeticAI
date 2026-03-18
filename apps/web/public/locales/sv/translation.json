@@ -1104,7 +1104,8 @@
       "weight": "Vikt",
       "power": "Effekt",
       "time": "Tid",
-      "piston": "Kolv"
+      "piston": "Kolv",
+      "temperature": "Temperatur"
     }
   },
   "profileRecommendations": {

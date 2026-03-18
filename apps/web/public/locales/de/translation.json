@@ -1104,7 +1104,8 @@
       "weight": "Gewicht",
       "power": "Leistung",
       "time": "Zeit",
-      "piston": "Kolben"
+      "piston": "Kolben",
+      "temperature": "Temperatur"
     }
   },
   "profileRecommendations": {
