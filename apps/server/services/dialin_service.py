@@ -174,16 +174,18 @@ async def create_session(
 
 async def get_session(session_id: str) -> Optional[DialInSession]:
     """Get session by id. Returns None if not found."""
-    return _sessions.get(session_id)
+    async with _get_state_lock():
+        return _sessions.get(session_id)
 
 
 async def list_sessions(
     status: Optional[SessionStatus] = None,
 ) -> list[DialInSession]:
     """List all sessions, optionally filtered by status."""
-    if status is None:
-        return list(_sessions.values())
-    return [s for s in _sessions.values() if s.status == status]
+    async with _get_state_lock():
+        if status is None:
+            return list(_sessions.values())
+        return [s for s in _sessions.values() if s.status == status]
 
 
 async def add_iteration(

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Dialog,
@@ -17,6 +18,7 @@ interface QRCodeDialogProps {
 }
 
 export function QRCodeDialog({ open, onOpenChange }: QRCodeDialogProps) {
+  const { t } = useTranslation()
   const [url, setUrl] = useState<string>('')
   const isLocalhost = isLocalhostUrl()
 
@@ -70,7 +72,7 @@ export function QRCodeDialog({ open, onOpenChange }: QRCodeDialogProps) {
               </div>
             </>
           ) : (
-            <div className="text-sm text-muted-foreground">Loading...</div>
+            <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
           )}
         </div>
       </DialogContent>

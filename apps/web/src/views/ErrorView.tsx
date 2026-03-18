@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -11,6 +12,7 @@ interface ErrorViewProps {
 }
 
 export function ErrorView({ errorMessage, onRetry, onBack }: ErrorViewProps) {
+  const { t } = useTranslation()
   return (
     <motion.div
       key="error"
@@ -24,7 +26,7 @@ export function ErrorView({ errorMessage, onRetry, onBack }: ErrorViewProps) {
           <div className="p-2 rounded-xl bg-destructive/15">
             <Warning size={24} weight="fill" className="text-destructive" />
           </div>
-          <h2 className="text-xl font-bold text-foreground">Something went wrong</h2>
+          <h2 className="text-xl font-bold text-foreground">{t('error.somethingWentWrong')}</h2>
         </div>
 
         <Alert variant="destructive" className="border-destructive/30 bg-destructive/8 rounded-xl overflow-hidden">

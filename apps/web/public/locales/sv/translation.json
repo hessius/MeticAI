@@ -820,7 +820,8 @@
     "shotBDashed": "Shot B (dashed)",
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
-    "tooltipStage": "Stage"
+    "tooltipStage": "Stage",
+    "targets": "Målvärden"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -1300,5 +1301,16 @@
   "errorBoundary": {
     "featureError": "Något gick fel i {{feature}}",
     "tryAgain": "Försök igen"
+  },
+  "shotDetail": {
+    "stagesNeverReached": "Steg som aldrig nåddes:"
+  },
+  "llmAnalysis": {
+    "analyzingTitle": "Analyserar skottdata",
+    "analyzingDescription": "Vår AI-barista granskar din extraktion...",
+    "noAnalysis": "Ingen analys tillgänglig"
+  },
+  "error": {
+    "somethingWentWrong": "Något gick fel"
   }
 }

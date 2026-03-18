@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import Cropper, { Area } from 'react-easy-crop'
 import { Button } from '@/components/ui/button'
 import {
@@ -85,6 +86,7 @@ export function ImageCropDialog({
   onCropComplete,
   isUploading = false
 }: ImageCropDialogProps) {
+  const { t } = useTranslation()
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
@@ -148,7 +150,7 @@ export function ImageCropDialog({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Zoom</Label>
+          <Label className="text-sm font-medium">{t('imageCrop.zoom')}</Label>
           <Slider
             value={[zoom]}
             min={1}

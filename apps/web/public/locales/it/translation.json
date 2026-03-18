@@ -815,7 +815,8 @@
     "shotBDashed": "Shot B (dashed)",
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
-    "tooltipStage": "Stage"
+    "tooltipStage": "Stage",
+    "targets": "Obiettivi"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -1300,5 +1301,16 @@
   "errorBoundary": {
     "featureError": "Qualcosa è andato storto in {{feature}}",
     "tryAgain": "Riprova"
+  },
+  "shotDetail": {
+    "stagesNeverReached": "Fasi mai raggiunte:"
+  },
+  "llmAnalysis": {
+    "analyzingTitle": "Analisi dei dati dello shot",
+    "analyzingDescription": "Il nostro barista IA sta esaminando la tua estrazione...",
+    "noAnalysis": "Nessuna analisi disponibile"
+  },
+  "error": {
+    "somethingWentWrong": "Qualcosa è andato storto"
   }
 }

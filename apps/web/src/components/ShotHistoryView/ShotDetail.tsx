@@ -1050,7 +1050,7 @@ export function ShotDetail({
                             <Alert variant="destructive" className="border-red-500/30 bg-red-500/10 rounded-xl">
                               <Warning size={18} weight="fill" />
                               <AlertDescription className="text-sm">
-                                <span className="font-semibold">Stages never reached:</span>{' '}
+                                <span className="font-semibold">{t('shotDetail.stagesNeverReached')}</span>{' '}
                                 {analysisResult.unreached_stages.join(', ')}
                               </AlertDescription>
                             </Alert>

@@ -820,7 +820,8 @@
     "shotBDashed": "Shot B (dashed)",
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
-    "tooltipStage": "Stage"
+    "tooltipStage": "Stage",
+    "targets": "Targets"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -1300,5 +1301,16 @@
   "errorBoundary": {
     "featureError": "Something went wrong in {{feature}}",
     "tryAgain": "Try Again"
+  },
+  "shotDetail": {
+    "stagesNeverReached": "Stages never reached:"
+  },
+  "llmAnalysis": {
+    "analyzingTitle": "Analyzing Shot Data",
+    "analyzingDescription": "Our AI barista is reviewing your extraction...",
+    "noAnalysis": "No analysis available"
+  },
+  "error": {
+    "somethingWentWrong": "Something went wrong"
   }
 }

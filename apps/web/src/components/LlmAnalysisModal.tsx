@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ export function LlmAnalysisModal({
   shotDate,
   isCached,
 }: LlmAnalysisModalProps) {
+  const { t } = useTranslation();
   const sections = useMemo(() => {
     if (!analysisResult) return [];
     return parseStructuredAnalysis(analysisResult);
@@ -84,8 +86,8 @@ export function LlmAnalysisModal({
                 <Sparkles className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
               <div className="text-center space-y-1">
-                <p className="text-lg font-medium">Analyzing Shot Data</p>
-                <p className="text-sm text-muted-foreground">Our AI barista is reviewing your extraction...</p>
+                <p className="text-lg font-medium">{t('llmAnalysis.analyzingTitle')}</p>
+                <p className="text-sm text-muted-foreground">{t('llmAnalysis.analyzingDescription')}</p>
               </div>
             </div>
           )}
@@ -122,7 +124,7 @@ export function LlmAnalysisModal({
           {!isLoading && !error && !analysisResult && (
             <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
               <Sparkles className="h-12 w-12 opacity-30" />
-              <p className="text-lg">No analysis available</p>
+              <p className="text-lg">{t('llmAnalysis.noAnalysis')}</p>
             </div>
           )}
         </div>

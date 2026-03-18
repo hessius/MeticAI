@@ -159,22 +159,28 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       setOverrides({})
       return
     }
+    let cancelled = false
     const fetchVariables = async () => {
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/machine/profile/${selectedProfileId}`)
+        if (cancelled) return
         if (response.ok) {
           const data = await response.json()
+          if (cancelled) return
           const vars: ProfileVariable[] = (data.variables || data.profile?.variables || [])
             .filter((v: ProfileVariable) => v.key && v.name && v.type != null)
           setProfileVariables(vars)
         }
       } catch (err) {
-        console.error('Failed to fetch profile variables:', err)
+        if (!cancelled) {
+          console.error('Failed to fetch profile variables:', err)
+        }
       }
     }
     fetchVariables()
     setOverrides({})
+    return () => { cancelled = true }
   }, [selectedProfileId])
 
   // Fetch machine status and scheduled shots
@@ -378,16 +384,21 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
 
   const handleSaveMode = useCallback(async (mode: 'none' | 'save_original' | 'save_new') => {
     if (!lastShotRef.current) return
+    
+    if (mode === 'none') {
+      // Just dismiss — temp profile will be cleaned up automatically
+      setShowSaveModeDialog(false)
+      lastShotRef.current = null
+      if (saveModeTimerRef.current) {
+        clearTimeout(saveModeTimerRef.current)
+        saveModeTimerRef.current = null
+      }
+      return
+    }
+
     setIsSaving(true)
     
     try {
-      if (mode === 'none') {
-        // Just dismiss — temp profile will be cleaned up automatically
-        setShowSaveModeDialog(false)
-        lastShotRef.current = null
-        return
-      }
-      
       const serverUrl = await getServerUrl()
       const formData = new FormData()
       formData.append('overrides_json', JSON.stringify(lastShotRef.current.overrides))
