@@ -77,6 +77,25 @@ END_RECOMMENDATIONS_JSON`;
     expect(recs[0].variable).toBe("");
     expect(recs[0].current_value).toBe(0);
     expect(recs[0].recommended_value).toBe(0);
+    expect(recs[0].is_patchable).toBe(true);
+  });
+
+  it("defaults is_patchable to true when field is missing", () => {
+    const text = `RECOMMENDATIONS_JSON:
+[{"variable":"grind_size","current_value":15,"recommended_value":14,"stage":"prep","confidence":"high","reason":"Finer grind needed"}]
+END_RECOMMENDATIONS_JSON`;
+    const recs = parseRecommendationsJSON(text);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].is_patchable).toBe(true);
+    expect(recs[0].variable).toBe("grind_size");
+  });
+
+  it("respects explicit is_patchable false from backend", () => {
+    const text = `RECOMMENDATIONS_JSON:
+[{"variable":"info_note","current_value":0,"recommended_value":0,"stage":"global","confidence":"low","reason":"General advice","is_patchable":false}]
+END_RECOMMENDATIONS_JSON`;
+    const recs = parseRecommendationsJSON(text);
+    expect(recs).toHaveLength(1);
     expect(recs[0].is_patchable).toBe(false);
   });
 });

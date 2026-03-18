@@ -1809,28 +1809,29 @@ async def get_machine_profile(profile_id: str, request: Request):
                     else:
                         profile_json[attr] = val
 
-        # Ensure there is always a variables array.  When the Meticulous
-        # profile format omits it we synthesise entries from the well-known
-        # top-level fields so the UI can always offer adjustment sliders.
+        # Ensure there is always a variables array.  Merge well-known
+        # top-level fields (final_weight, temperature) with any explicit
+        # variables so the UI can always offer adjustment sliders.
         variables = profile_json.get("variables")
-        if not variables or not isinstance(variables, list) or len(variables) == 0:
-            synthesised: list[dict] = []
-            if profile_json.get("final_weight") is not None:
-                synthesised.append({
-                    "key": "final_weight",
-                    "name": "Final Weight",
-                    "type": "weight",
-                    "value": float(profile_json["final_weight"]),
-                })
-            if profile_json.get("temperature") is not None:
-                synthesised.append({
-                    "key": "temperature",
-                    "name": "Temperature",
-                    "type": "temperature",
-                    "value": float(profile_json["temperature"]),
-                })
-            if synthesised:
-                profile_json["variables"] = synthesised
+        if not variables or not isinstance(variables, list):
+            variables = []
+
+        existing_keys = {v.get("key") for v in variables if isinstance(v, dict)}
+        if profile_json.get("final_weight") is not None and "final_weight" not in existing_keys:
+            variables.append({
+                "key": "final_weight",
+                "name": "Final Weight",
+                "type": "weight",
+                "value": float(profile_json["final_weight"]),
+            })
+        if profile_json.get("temperature") is not None and "temperature" not in existing_keys:
+            variables.append({
+                "key": "temperature",
+                "name": "Temperature",
+                "type": "temperature",
+                "value": float(profile_json["temperature"]),
+            })
+        profile_json["variables"] = variables
 
         return {
             "status": "success",

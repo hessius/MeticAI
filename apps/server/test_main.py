@@ -4226,6 +4226,82 @@ class TestMachineProfileJsonEndpoint:
         
         assert response.status_code == 500
 
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_merges_synthesized_variables(self, mock_get_profile, client):
+        """Test that top-level final_weight/temperature are merged with explicit variables."""
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-merge"
+        mock_profile.name = "Yirgacheffe You Going?"
+        mock_profile.author = "MeticAI"
+        mock_profile.temperature = 94.0
+        mock_profile.final_weight = 38.0
+        mock_profile.error = None
+        # Explicit variables that do NOT include final_weight or temperature
+        mock_profile.variables = [
+            {"key": "pressure", "name": "Brew Pressure", "type": "pressure", "value": 9.0},
+        ]
+
+        mock_get_profile.return_value = mock_profile
+
+        response = client.get("/api/machine/profile/profile-merge")
+
+        assert response.status_code == 200
+        data = response.json()
+        variables = data["variables"]
+        keys = [v["key"] for v in variables]
+        assert "pressure" in keys, "Explicit variable should be preserved"
+        assert "final_weight" in keys, "Synthesized final_weight should be merged"
+        assert "temperature" in keys, "Synthesized temperature should be merged"
+        assert len(variables) == 3
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_no_duplicate_variables(self, mock_get_profile, client):
+        """Test that explicit variables are not duplicated by synthesis."""
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-dedup"
+        mock_profile.name = "Dedup Profile"
+        mock_profile.temperature = 94.0
+        mock_profile.final_weight = 38.0
+        mock_profile.error = None
+        # Explicit variables already include temperature
+        mock_profile.variables = [
+            {"key": "temperature", "name": "Brew Temp", "type": "temperature", "value": 92.0},
+        ]
+
+        mock_get_profile.return_value = mock_profile
+
+        response = client.get("/api/machine/profile/profile-dedup")
+
+        assert response.status_code == 200
+        data = response.json()
+        variables = data["variables"]
+        temp_vars = [v for v in variables if v["key"] == "temperature"]
+        assert len(temp_vars) == 1, "Should not duplicate existing temperature variable"
+        assert temp_vars[0]["value"] == 92.0, "Should keep explicit value, not synthesized"
+        fw_vars = [v for v in variables if v["key"] == "final_weight"]
+        assert len(fw_vars) == 1, "Should still add missing final_weight"
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_synthesizes_when_no_variables(self, mock_get_profile, client):
+        """Test that variables are synthesized when profile has none."""
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-synth"
+        mock_profile.name = "Bare Profile"
+        mock_profile.temperature = 93.0
+        mock_profile.final_weight = 36.0
+        mock_profile.error = None
+
+        mock_get_profile.return_value = mock_profile
+
+        response = client.get("/api/machine/profile/profile-synth")
+
+        assert response.status_code == 200
+        data = response.json()
+        variables = data["variables"]
+        assert len(variables) == 2
+        keys = {v["key"] for v in variables}
+        assert keys == {"final_weight", "temperature"}
+
 
 class TestProfileImportEndpoint:
     """Tests for the /api/profile/import endpoint."""

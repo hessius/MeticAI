@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,6 +20,7 @@ interface ExpertAnalysisViewProps {
   onBack: () => void;
   onReAnalyze?: () => void;
   profileName?: string;
+  shotFilename?: string;
   shotDate?: string;
   isCached?: boolean;
 }
@@ -31,6 +32,7 @@ export function ExpertAnalysisView({
   onBack,
   onReAnalyze,
   profileName,
+  shotFilename,
   shotDate,
   isCached,
 }: ExpertAnalysisViewProps) {
@@ -45,10 +47,60 @@ export function ExpertAnalysisView({
     [analysisResult],
   );
 
-  const recommendations: Recommendation[] = useMemo(() => {
+  const localRecommendations: Recommendation[] = useMemo(() => {
     if (!analysisResult) return [];
     return parseRecommendationsJSON(analysisResult);
   }, [analysisResult]);
+
+  const [classifiedRecs, setClassifiedRecs] = useState<Recommendation[] | null>(null);
+
+  // Fetch backend-classified recommendations with proper is_patchable flags
+  useEffect(() => {
+    if (!showRecommendations || !profileName || !shotFilename) {
+      setClassifiedRecs(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchClassified() {
+      try {
+        const serverUrl = await getServerUrl();
+        const form = new FormData();
+        form.append("profile_name", profileName!);
+        form.append("shot_filename", shotFilename!);
+        const res = await fetch(`${serverUrl}/api/shots/analyze-recommendations`, {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) throw new Error("Backend classification failed");
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.recommendations)) {
+          setClassifiedRecs(
+            data.recommendations.map((r: Record<string, unknown>) => ({
+              variable: String(r.variable ?? ""),
+              current_value: Number(r.current_value ?? 0),
+              recommended_value: Number(r.recommended_value ?? 0),
+              stage: String(r.stage ?? ""),
+              confidence: (["high", "medium", "low"].includes(String(r.confidence))
+                ? String(r.confidence)
+                : "low") as "high" | "medium" | "low",
+              reason: String(r.reason ?? ""),
+              is_patchable: Boolean(r.is_patchable),
+            })),
+          );
+        }
+      } catch {
+        // Fallback: use locally-parsed recommendations (is_patchable defaults to true)
+        if (!cancelled) setClassifiedRecs(null);
+      }
+    }
+
+    fetchClassified();
+    return () => { cancelled = true; };
+  }, [showRecommendations, profileName, shotFilename]);
+
+  const recommendations = classifiedRecs ?? localRecommendations;
 
   const [recDialogOpen, setRecDialogOpen] = useState(false);
 

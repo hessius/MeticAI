@@ -521,6 +521,7 @@ export function ShotDetail({
         onBack={handleCloseLlmView}
         onReAnalyze={handleReAnalyze}
         profileName={profileName}
+        shotFilename={selectedShot?.filename}
         shotDate={selectedShot?.date}
         isCached={isLlmCached}
       />

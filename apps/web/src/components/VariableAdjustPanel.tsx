@@ -131,6 +131,9 @@ export function VariableAdjustPanel({
         </div>
         {isExpanded ? <CaretUp size={18} /> : <CaretDown size={18} />}
       </button>
+      <p className="text-xs text-muted-foreground">
+        {t('variables.temporaryNote')}
+      </p>
 
       <AnimatePresence>
         {isExpanded && (
