@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import {
   TasteCompassInput,
   DEFAULT_TASTE_DATA,
-  POSITIVE_DESCRIPTORS,
-  NEGATIVE_DESCRIPTORS,
+  POSITIVE_DESCRIPTOR_KEYS,
+  NEGATIVE_DESCRIPTOR_KEYS,
 } from './TasteCompassInput'
 import type { TasteData } from './TasteCompassInput'
 
@@ -65,15 +65,15 @@ describe('TasteCompassInput', () => {
 
   it('renders all positive descriptor badges', () => {
     render(<TasteCompassInput value={DEFAULT_TASTE_DATA} onChange={onChange} />)
-    for (const desc of POSITIVE_DESCRIPTORS) {
-      expect(screen.getByText(desc)).toBeInTheDocument()
+    for (const desc of POSITIVE_DESCRIPTOR_KEYS) {
+      expect(screen.getByText(`taste.positiveDescriptors.${desc}`)).toBeInTheDocument()
     }
   })
 
   it('renders all negative descriptor badges', () => {
     render(<TasteCompassInput value={DEFAULT_TASTE_DATA} onChange={onChange} />)
-    for (const desc of NEGATIVE_DESCRIPTORS) {
-      expect(screen.getByText(desc)).toBeInTheDocument()
+    for (const desc of NEGATIVE_DESCRIPTOR_KEYS) {
+      expect(screen.getByText(`taste.negativeDescriptors.${desc}`)).toBeInTheDocument()
     }
   })
 
@@ -92,11 +92,11 @@ describe('TasteCompassInput', () => {
     const user = userEvent.setup()
     render(<TasteCompassInput value={DEFAULT_TASTE_DATA} onChange={onChange} />)
 
-    await user.click(screen.getByText('Sweet'))
+    await user.click(screen.getByText('taste.positiveDescriptors.sweet'))
 
     expect(onChange).toHaveBeenCalledTimes(1)
     const call = onChange.mock.calls[0][0] as TasteData
-    expect(call.descriptors).toContain('Sweet')
+    expect(call.descriptors).toContain('sweet')
     expect(call.hasInput).toBe(true)
   })
 
@@ -105,16 +105,16 @@ describe('TasteCompassInput', () => {
     const dataWithDescriptor: TasteData = {
       x: 0,
       y: 0,
-      descriptors: ['Sweet'],
+      descriptors: ['sweet'],
       hasInput: true,
     }
     render(<TasteCompassInput value={dataWithDescriptor} onChange={onChange} />)
 
-    await user.click(screen.getByText('Sweet'))
+    await user.click(screen.getByText('taste.positiveDescriptors.sweet'))
 
     expect(onChange).toHaveBeenCalledTimes(1)
     const call = onChange.mock.calls[0][0] as TasteData
-    expect(call.descriptors).not.toContain('Sweet')
+    expect(call.descriptors).not.toContain('sweet')
   })
 
   it('calls onChange with reset data when reset button is clicked', async () => {
@@ -122,7 +122,7 @@ describe('TasteCompassInput', () => {
     const dataWithInput: TasteData = {
       x: 0.5,
       y: -0.3,
-      descriptors: ['Sweet', 'Bitter'],
+      descriptors: ['sweet', 'bitter'],
       hasInput: true,
     }
     render(<TasteCompassInput value={dataWithInput} onChange={onChange} />)
@@ -143,7 +143,7 @@ describe('TasteCompassInput', () => {
       <TasteCompassInput value={DEFAULT_TASTE_DATA} onChange={onChange} disabled />
     )
 
-    await user.click(screen.getByText('Sweet'))
+    await user.click(screen.getByText('taste.positiveDescriptors.sweet'))
     expect(onChange).not.toHaveBeenCalled()
   })
 
@@ -170,10 +170,10 @@ describe('TasteCompassInput', () => {
   })
 
   it('exports expected descriptor arrays', () => {
-    expect(POSITIVE_DESCRIPTORS).toHaveLength(8)
-    expect(NEGATIVE_DESCRIPTORS).toHaveLength(8)
-    expect(POSITIVE_DESCRIPTORS).toContain('Sweet')
-    expect(NEGATIVE_DESCRIPTORS).toContain('Harsh')
+    expect(POSITIVE_DESCRIPTOR_KEYS).toHaveLength(8)
+    expect(NEGATIVE_DESCRIPTOR_KEYS).toHaveLength(8)
+    expect(POSITIVE_DESCRIPTOR_KEYS).toContain('sweet')
+    expect(NEGATIVE_DESCRIPTOR_KEYS).toContain('harsh')
   })
 
   it('reflects the current value coordinates visually', () => {

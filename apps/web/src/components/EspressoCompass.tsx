@@ -10,47 +10,47 @@ import { ArrowLeft, Info, Warning, ArrowRight, Crosshair, Eraser } from '@phosph
 // X-Axis: -1 (under-extracted) to +1 (over-extracted)
 // Y-Axis: -1 (weak/thin) to +1 (strong/heavy)
 type Zone = 'sweet' | 'under' | 'over' | 'strong' | 'weak'
-interface Descriptor { word: string; x: number; y: number; zone: Zone }
+interface Descriptor { key: string; x: number; y: number; zone: Zone }
 
-const DESCRIPTORS = ([
+const DESCRIPTORS: Descriptor[] = [
   // Sour / Under-extracted quadrant
-  { word: 'Overwhelming', x: -1.0, y: 0.8, zone: 'under' },
-  { word: 'Intense Sour', x: -0.8, y: 0.6, zone: 'under' },
-  { word: 'Salty', x: -0.8, y: 0.8, zone: 'under' },
-  { word: 'Sour', x: -0.9, y: 0.5, zone: 'under' },
-  { word: 'Generic', x: -0.7, y: 0.0, zone: 'under' },
-  { word: 'Quick Finish', x: -0.8, y: -0.2, zone: 'under' },
-  { word: 'Bland', x: -0.6, y: -0.4, zone: 'under' },
-  { word: 'Thin', x: -0.4, y: -0.5, zone: 'weak' },
+  { key: 'overwhelming', x: -1.0, y: 0.8, zone: 'under' },
+  { key: 'intenseSour', x: -0.8, y: 0.6, zone: 'under' },
+  { key: 'salty', x: -0.8, y: 0.8, zone: 'under' },
+  { key: 'sour', x: -0.9, y: 0.5, zone: 'under' },
+  { key: 'generic', x: -0.7, y: 0.0, zone: 'under' },
+  { key: 'quickFinish', x: -0.8, y: -0.2, zone: 'under' },
+  { key: 'bland', x: -0.6, y: -0.4, zone: 'under' },
+  { key: 'thin', x: -0.4, y: -0.5, zone: 'weak' },
   // Strong / Heavy
-  { word: 'Strong', x: -0.2, y: 0.8, zone: 'strong' },
-  { word: 'Thick', x: 0.0, y: 0.9, zone: 'strong' },
-  { word: 'Robust', x: -0.1, y: 0.7, zone: 'strong' },
-  { word: 'Plump', x: 0.0, y: 0.6, zone: 'strong' },
-  { word: 'Substantial', x: -0.2, y: 0.4, zone: 'strong' },
+  { key: 'strong', x: -0.2, y: 0.8, zone: 'strong' },
+  { key: 'thick', x: 0.0, y: 0.9, zone: 'strong' },
+  { key: 'robust', x: -0.1, y: 0.7, zone: 'strong' },
+  { key: 'plump', x: 0.0, y: 0.6, zone: 'strong' },
+  { key: 'substantial', x: -0.2, y: 0.4, zone: 'strong' },
   // Sweet Spot (Center)
-  { word: 'Balanced', x: 0.0, y: 0.0, zone: 'sweet' },
-  { word: 'Ripe', x: -0.1, y: -0.1, zone: 'sweet' },
-  { word: 'Tasty', x: 0.0, y: -0.2, zone: 'sweet' },
-  { word: 'Transparent', x: 0.1, y: 0.4, zone: 'sweet' },
-  { word: 'Sweet', x: 0.2, y: 0.3, zone: 'sweet' },
-  { word: 'Luscious', x: 0.3, y: 0.2, zone: 'sweet' },
-  { word: 'Rich', x: 0.2, y: 0.1, zone: 'sweet' },
-  { word: 'Creamy', x: 0.3, y: 0.0, zone: 'sweet' },
-  { word: 'Fruity', x: 0.4, y: -0.1, zone: 'sweet' },
-  { word: 'Nuanced', x: 0.3, y: -0.2, zone: 'sweet' },
-  { word: 'Fluffy', x: 0.2, y: -0.3, zone: 'sweet' },
+  { key: 'balanced', x: 0.0, y: 0.0, zone: 'sweet' },
+  { key: 'ripe', x: -0.1, y: -0.1, zone: 'sweet' },
+  { key: 'tasty', x: 0.0, y: -0.2, zone: 'sweet' },
+  { key: 'transparent', x: 0.1, y: 0.4, zone: 'sweet' },
+  { key: 'sweet', x: 0.2, y: 0.3, zone: 'sweet' },
+  { key: 'luscious', x: 0.3, y: 0.2, zone: 'sweet' },
+  { key: 'rich', x: 0.2, y: 0.1, zone: 'sweet' },
+  { key: 'creamy', x: 0.3, y: 0.0, zone: 'sweet' },
+  { key: 'fruity', x: 0.4, y: -0.1, zone: 'sweet' },
+  { key: 'nuanced', x: 0.3, y: -0.2, zone: 'sweet' },
+  { key: 'fluffy', x: 0.2, y: -0.3, zone: 'sweet' },
   // Weak
-  { word: 'Light', x: 0.0, y: -0.4, zone: 'weak' },
-  { word: 'Slender', x: 0.3, y: -0.5, zone: 'weak' },
-  { word: 'Delicate', x: 0.4, y: -0.6, zone: 'weak' },
-  { word: 'Watery', x: 0.0, y: -1.0, zone: 'weak' },
+  { key: 'light', x: 0.0, y: -0.4, zone: 'weak' },
+  { key: 'slender', x: 0.3, y: -0.5, zone: 'weak' },
+  { key: 'delicate', x: 0.4, y: -0.6, zone: 'weak' },
+  { key: 'watery', x: 0.0, y: -1.0, zone: 'weak' },
   // Bitter / Over-extracted
-  { word: 'Bitter', x: 0.8, y: -0.5, zone: 'over' },
-  { word: 'Dry', x: 0.7, y: -0.7, zone: 'over' },
-  { word: 'Powdery', x: 0.6, y: -0.6, zone: 'over' },
-  { word: 'Empty', x: 0.9, y: -0.8, zone: 'over' },
-] satisfies Descriptor[]).sort((a, b) => a.word.localeCompare(b.word))
+  { key: 'bitter', x: 0.8, y: -0.5, zone: 'over' },
+  { key: 'dry', x: 0.7, y: -0.7, zone: 'over' },
+  { key: 'powdery', x: 0.6, y: -0.6, zone: 'over' },
+  { key: 'empty', x: 0.9, y: -0.8, zone: 'over' },
+]
 
 // --- Color helpers ---
 const ZONE_COLORS = {
@@ -100,17 +100,17 @@ function analyzeDescriptors(selected: string[]): Analysis | null {
   let sumX = 0, sumY = 0
 
   const hasUnder = selected.some(w => {
-    const d = DESCRIPTORS.find(dd => dd.word === w)
+    const d = DESCRIPTORS.find(dd => dd.key === w)
     return d && d.x < -0.5
   })
   const hasOver = selected.some(w => {
-    const d = DESCRIPTORS.find(dd => dd.word === w)
+    const d = DESCRIPTORS.find(dd => dd.key === w)
     return d && d.x > 0.5
   })
   const isUneven = hasUnder && hasOver
 
   selected.forEach(word => {
-    const item = DESCRIPTORS.find(d => d.word === word)
+    const item = DESCRIPTORS.find(d => d.key === word)
     if (item) { sumX += item.x; sumY += item.y }
   })
 
@@ -175,6 +175,11 @@ export function EspressoCompass({ onBack }: EspressoCompassProps) {
 
   const analysis = useMemo(() => analyzeDescriptors(selectedWords), [selectedWords])
 
+  const sortedDescriptors = useMemo(() =>
+    [...DESCRIPTORS].sort((a, b) => t(`taste.compass.${a.key}`).localeCompare(t(`taste.compass.${b.key}`))),
+    [t]
+  )
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -212,19 +217,19 @@ export function EspressoCompass({ onBack }: EspressoCompassProps) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {DESCRIPTORS.map((item) => {
-            const isSelected = selectedWords.includes(item.word)
+          {sortedDescriptors.map((item) => {
+            const isSelected = selectedWords.includes(item.key)
             return (
               <button
-                key={item.word}
-                onClick={() => toggleWord(item.word)}
+                key={item.key}
+                onClick={() => toggleWord(item.key)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 border cursor-pointer ${
                   isSelected
                     ? getSelectedColor(item)
                     : getDescriptorColor(item)
                 }`}
               >
-                {item.word}
+                {t(`taste.compass.${item.key}`)}
               </button>
             )
           })}

@@ -28,26 +28,26 @@ export interface TasteCompassInputProps {
 
 // ---- Constants ----
 
-const POSITIVE_DESCRIPTORS = [
-  "Sweet",
-  "Clean",
-  "Complex",
-  "Juicy",
-  "Smooth",
-  "Balanced",
-  "Floral",
-  "Fruity",
+const POSITIVE_DESCRIPTOR_KEYS = [
+  "sweet",
+  "clean",
+  "complex",
+  "juicy",
+  "smooth",
+  "balanced",
+  "floral",
+  "fruity",
 ] as const;
 
-const NEGATIVE_DESCRIPTORS = [
-  "Astringent",
-  "Muddy",
-  "Flat",
-  "Chalky",
-  "Harsh",
-  "Watery",
-  "Burnt",
-  "Grassy",
+const NEGATIVE_DESCRIPTOR_KEYS = [
+  "astringent",
+  "muddy",
+  "flat",
+  "chalky",
+  "harsh",
+  "watery",
+  "burnt",
+  "grassy",
 ] as const;
 
 export const DEFAULT_TASTE_DATA: TasteData = {
@@ -68,9 +68,9 @@ function describeAxis(
   const abs = Math.abs(value);
   if (abs < 0.15) return balancedLabel;
   const label = value > 0 ? positiveLabel : negativeLabel;
-  if (abs < 0.4) return `Slightly ${label}`;
-  if (abs < 0.7) return `Moderately ${label}`;
-  return `Very ${label}`;
+  if (abs < 0.4) return `${label} (+)`;
+  if (abs < 0.7) return `${label} (++)`;
+  return `${label} (+++)`;
 }
 
 function clamp(v: number, min: number, max: number) {
@@ -175,7 +175,7 @@ function CompassCanvas({
       onPointerCancel={handlePointerUp}
       role="slider"
       aria-label={t("taste.compass.title")}
-      aria-valuetext={`${describeAxis(x, "Sour", "Bitter", "Balanced")}, ${describeAxis(y, "Weak", "Strong", "Balanced")}`}
+      aria-valuetext={`${describeAxis(x, t("taste.compass.sour"), t("taste.compass.bitter"), t("taste.compass.balanced"))}, ${describeAxis(y, t("taste.compass.weak"), t("taste.compass.strong"), t("taste.compass.balanced"))}`}
     >
       {/* Quadrant backgrounds */}
       {/* Top-left: Sour + Strong */}
@@ -363,7 +363,7 @@ function DescriptorTags({
               )}
               onClick={() => !disabled && onToggle(d)}
             >
-              {d}
+              {t(`taste.${variant}Descriptors.${d}`)}
             </Badge>
           );
         })}
@@ -377,12 +377,12 @@ function DescriptorTags({
         {t("taste.compass.descriptors")}
       </span>
       {renderGroup(
-        POSITIVE_DESCRIPTORS,
+        POSITIVE_DESCRIPTOR_KEYS,
         t("taste.compass.positive"),
         "positive",
       )}
       {renderGroup(
-        NEGATIVE_DESCRIPTORS,
+        NEGATIVE_DESCRIPTOR_KEYS,
         t("taste.compass.negative"),
         "negative",
       )}
@@ -547,4 +547,4 @@ export function useTasteAnalysis() {
   return { appendTasteParams };
 }
 
-export { POSITIVE_DESCRIPTORS, NEGATIVE_DESCRIPTORS };
+export { POSITIVE_DESCRIPTOR_KEYS, NEGATIVE_DESCRIPTOR_KEYS };

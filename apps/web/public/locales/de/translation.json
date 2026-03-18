@@ -103,14 +103,14 @@
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
       "generateFailedNetwork": "Connection lost during profile generation. Check your network and try again.",
-      "generateFailed404Route": "Profilgenerierung fehlgeschlagen: Die Server-Route wurde nicht gefunden (404). Dies ist häufig ein Reverse-Proxy/API-Pfad-Fehler — überprüfen Sie, ob Ihr Proxy /api/* an MeticAI weiterleitet.",
+      "generateFailed404Route": "Profilgenerierung fehlgeschlagen: Die Server-Route wurde nicht gefunden (404). Dies ist häufig ein Reverse-Proxy/API-Pfad-Fehler: überprüfen Sie, ob Ihr Proxy /api/* an MeticAI weiterleitet.",
       "generateFailedTimeout": "Profilgenerierung fehlgeschlagen: Die AI-Anfrage hat das Zeitlimit überschritten. Bitte erneut versuchen; wenn das Problem weiterhin besteht, reduzieren Sie die Prompt-Komplexität oder verwenden Sie ein stärkeres Gemini-Modell.",
-      "generateFailedValidation": "Profilgenerierung fehlgeschlagen: Die AI hat ein ungültiges Profilschema erstellt. Bitte erneut versuchen — ein zweiter Versuch ist oft erfolgreich.",
+      "generateFailedValidation": "Profilgenerierung fehlgeschlagen: Die AI hat ein ungültiges Profilschema erstellt. Bitte erneut versuchen; ein zweiter Versuch ist oft erfolgreich.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
       "aiDisabled": "KI-Profilerstellung ist derzeit deaktiviert. Aktivieren Sie KI in den Einstellungen und stellen Sie sicher, dass ein API-Schlüssel konfiguriert ist.",
-      "generateBusy": "Ein Profil wird bereits generiert. Ihr Formular wurde gespeichert — bitte versuchen Sie es in wenigen Minuten erneut."
+      "generateBusy": "Ein Profil wird bereits generiert. Ihr Formular wurde gespeichert; bitte versuchen Sie es in wenigen Minuten erneut."
     }
   },
   "navigation": {
@@ -367,14 +367,14 @@
   },
   "betaBanner": {
     "runningBeta": "Sie verwenden MeticAI Beta {{version}}",
-    "betaChannelEnabled": "Beta-Updates aktiv — Sie erhalten Vorabversionen",
+    "betaChannelEnabled": "Beta-Updates aktiv - Sie erhalten Vorabversionen",
     "reportIssue": "Problem melden"
   },
   "settings": {
     "title": "Einstellungen",
     "aboutMeticAI": "Über MeticAI",
-    "aboutDescription1": "Als ich meinen Meticulous bekam, nach einer seeehr langen Wartezeit, war ich überwältigt von den Optionen — das Einstellen war nicht mehr nur das Anpassen der Mahlgradgröße, das Potenzial war (und ist) im Grunde grenzenlos — mein Wissen und meine Zeit nicht so sehr.",
-    "aboutDescription2": "Dies, \"MeticAI\", ist eine wachsende Sammlung von KI-Tools, die es mir und dir ermöglichen, das Beste aus einer Meticulous Espressomaschine herauszuholen. Unter anderem kannst du damit automatisch Espressoprofile erstellen, die auf deine Vorlieben und den vorhandenen Kaffee zugeschnitten sind, deine Espressoprofile und Bezugsdaten wie nie zuvor verstehen und letztendlich — deinen Meticulous entfesseln.",
+    "aboutDescription1": "Als ich meinen Meticulous bekam, nach einer seeehr langen Wartezeit, war ich überwältigt von den Optionen - das Einstellen war nicht mehr nur das Anpassen der Mahlgradgröße, das Potenzial war (und ist) im Grunde grenzenlos - mein Wissen und meine Zeit nicht so sehr.",
+    "aboutDescription2": "Dies, \"MeticAI\", ist eine wachsende Sammlung von KI-Tools, die es mir und dir ermöglichen, das Beste aus einer Meticulous Espressomaschine herauszuholen. Unter anderem kannst du damit automatisch Espressoprofile erstellen, die auf deine Vorlieben und den vorhandenen Kaffee zugeschnitten sind, deine Espressoprofile und Bezugsdaten wie nie zuvor verstehen und letztendlich: deinen Meticulous entfesseln.",
     "viewOnGitHub": "Auf GitHub ansehen",
     "configuration": "Konfiguration",
     "loadingSettings": "Lade Einstellungen...",
@@ -450,7 +450,7 @@
       "disconnected": "Getrennt",
       "notRunning": "Nicht gestartet",
       "status": "Status",
-      "authKeyExpired": "Authentifizierungsschlüssel abgelaufen — erneut authentifizieren, um den Fernzugriff wiederherzustellen.",
+      "authKeyExpired": "Authentifizierungsschlüssel abgelaufen: erneut authentifizieren, um den Fernzugriff wiederherzustellen.",
       "hostname": "Hostname",
       "remoteUrl": "Remote-URL",
       "copyUrl": "URL kopieren",
@@ -552,12 +552,12 @@
       "smooth": "(smooth)"
     },
     "validation": {
-      "highPressure": "⚠ Stage {{stage}} sets pressure to {{value}} bar — typical max is 12 bar",
-      "noEmojiPrefix": "Adjustable variable \"{{name}}\" should not start with an emoji — it may not render in the Meticulous app",
-      "lowWeight": "⚠ Target weight {{value}}g is unusually low — check your dose/yield"
+      "highPressure": "⚠ Stage {{stage}} sets pressure to {{value}} bar; typical max is 12 bar",
+      "noEmojiPrefix": "Adjustable variable \"{{name}}\" should not start with an emoji; it may not render in the Meticulous app",
+      "lowWeight": "⚠ Target weight {{value}}g is unusually low; check your dose/yield"
     },
     "warningInfoMissingEmoji": "Info-Variable \"{{name}}\" sollte mit einem Emoji beginnen, damit sie in der Meticulous-App korrekt angezeigt wird",
-    "warningAdjustableHasEmoji": "Einstellbare Variable \"{{name}}\" beginnt mit einem Emoji — dies kann in der Meticulous-App Probleme verursachen",
+    "warningAdjustableHasEmoji": "Einstellbare Variable \"{{name}}\" beginnt mit einem Emoji; dies kann in der Meticulous-App Probleme verursachen",
     "warningUnused": "Einstellbare Variable \"{{name}}\" wird in keinem Schritt verwendet"
   },
   "advancedCustomization": {
@@ -887,14 +887,14 @@
     "weight": "Gewicht",
     "weightLegend": "Gewicht",
     "weightTrendLabel": "Gewichtstrend",
-    "timeoutReached": "Brühtimer gestoppt — 10-Minuten-Sicherheits-Timeout erreicht.",
+    "timeoutReached": "Brühtimer gestoppt: 10-Minuten-Sicherheits-Timeout erreicht.",
     "integration": {
       "toggle": "Maschinenintegration",
-      "toggleDescription": "Verfolgt dein Pour-Over auf dem Meticulous-Display. Der Timer startet automatisch — beginne mit dem Gießen, wenn du den Ton hörst.",
+      "toggleDescription": "Verfolgt dein Pour-Over auf dem Meticulous-Display. Der Timer startet automatisch - beginne mit dem Gießen, wenn du den Ton hörst.",
       "startOnMachine": "Auf Maschine starten",
       "stop": "Stopp",
       "newShot": "Neuer Shot",
-      "profileReady": "Profil geladen — Shot auf Maschine wird gestartet.",
+      "profileReady": "Profil geladen: Shot auf Maschine wird gestartet.",
       "cleanupSuccess": "Temporäres Profil bereinigt.",
       "forceCleanupUsed": "Profil bereinigt (Spülung übersprungen).",
       "cleanupFailed": "Temporäres Profil konnte nicht bereinigt werden.",
@@ -904,9 +904,9 @@
       "shotEndedAt": "Shot beendet bei",
       "status": {
         "preparing": "Profil wird vorbereitet…",
-        "ready": "Profil geladen — warte auf Maschine…",
+        "ready": "Profil geladen: warte auf Maschine…",
         "brewing": "Brüht auf der Maschine…",
-        "drawdown": "Ziel erreicht — Ablaufzeit wird gemessen…",
+        "drawdown": "Ziel erreicht: Ablaufzeit wird gemessen…",
         "purging": "Profil wird bereinigt…",
         "done": "Shot fertig!",
         "error": "Etwas ist schief gelaufen."
@@ -976,7 +976,7 @@
     "saveFailed": "Profil konnte nicht aktualisiert werden",
     "nameRequired": "Der Profilname darf nicht leer sein",
     "temperatureMax": "Die Temperatur darf 100 °C nicht überschreiten",
-    "temperatureLow": "Die Temperatur liegt unter 70 °C — das ist ungewöhnlich. Bitte überprüfen.",
+    "temperatureLow": "Die Temperatur liegt unter 70 °C; das ist ungewöhnlich. Bitte überprüfen.",
     "weightPositive": "Das Zielgewicht muss größer als 0 sein",
     "unsavedChanges": "Es gibt ungespeicherte Änderungen. Verwerfen?",
     "noChanges": "Keine Änderungen zum Speichern"
@@ -996,7 +996,7 @@
     "orphanedSection": "Verwaiste Profile",
     "orphanHint": "Dieses Profil ist nicht mehr auf Ihrer Maschine. Tippen zum Bearbeiten.",
     "keepInHistory": "In MeticAI behalten",
-    "keepInHistoryHint": "Schließen — diesen Eintrag im Katalog behalten",
+    "keepInHistoryHint": "Schließen - diesen Eintrag im Katalog behalten",
     "removeOrphanHint": "Diesen Eintrag dauerhaft aus dem MeticAI-Katalog löschen",
     "restoreToMachine": "Auf Maschine wiederherstellen",
     "restoreToMachineHint": "Dieses Profil erneut auf Ihre Meticulous-Maschine hochladen",
@@ -1005,7 +1005,7 @@
       "button": "Sync",
       "title": "Profil-Sync-Bericht",
       "description": "Unterschiede zwischen Ihrer Maschine und dem MeticAI-Katalog gefunden.",
-      "allInSync": "Alle Profile sind synchron — nichts zu tun!",
+      "allInSync": "Alle Profile sind synchron: nichts zu tun!",
       "newSection": "{{count}} neue(s) Profil(e)",
       "updatedSection": "{{count}} aktualisierte(s) Profil(e)",
       "orphanedSection": "{{count}} verwaiste(s) Profil(e)",
@@ -1074,7 +1074,62 @@
       "descriptors": "Geschmacksbeschreibungen",
       "positive": "Positiv",
       "negative": "Negativ",
-      "hint": "Ziehen Sie den Punkt, um Ihr Geschmackserlebnis zu beschreiben"
+      "hint": "Ziehen Sie den Punkt, um Ihr Geschmackserlebnis zu beschreiben",
+      "overwhelming": "Überwältigend",
+      "intenseSour": "Intensiv sauer",
+      "salty": "Salzig",
+      "generic": "Generisch",
+      "quickFinish": "Kurzes Finish",
+      "bland": "Fade",
+      "thin": "Dünn",
+      "thick": "Dick",
+      "robust": "Robust",
+      "plump": "Vollmundig",
+      "substantial": "Substanziell",
+      "ripe": "Reif",
+      "tasty": "Schmackhaft",
+      "transparent": "Transparent",
+      "sweet": "Süß",
+      "luscious": "Köstlich",
+      "rich": "Reich",
+      "creamy": "Cremig",
+      "fruity": "Fruchtig",
+      "nuanced": "Nuanciert",
+      "fluffy": "Fluffig",
+      "light": "Leicht",
+      "slender": "Schlank",
+      "delicate": "Zart",
+      "watery": "Wässrig",
+      "dry": "Trocken",
+      "powdery": "Pudrig",
+      "empty": "Leer"
+    },
+    "positiveDescriptors": {
+      "sweet": "Süß",
+      "clean": "Klar",
+      "complex": "Komplex",
+      "juicy": "Saftig",
+      "smooth": "Weich",
+      "balanced": "Ausgewogen",
+      "floral": "Blumig",
+      "fruity": "Fruchtig"
+    },
+    "negativeDescriptors": {
+      "astringent": "Adstringierend",
+      "muddy": "Trüb",
+      "flat": "Flach",
+      "chalky": "Kreidig",
+      "harsh": "Harsch",
+      "watery": "Wässrig",
+      "burnt": "Verbrannt",
+      "grassy": "Grasig"
+    },
+    "axis": {
+      "sour": "Sauer",
+      "bitter": "Bitter",
+      "balanced": "Ausgewogen",
+      "weak": "Schwach",
+      "strong": "Stark"
     },
     "section": {
       "title": "Geschmacksbasierte Empfehlungen"
@@ -1132,10 +1187,10 @@
     "under": "Unter",
     "over": "Über",
     "goldenRulesTitle": "Goldene Regeln für die Meticulous",
-    "ruleStartSimple": "<strong>Fangen Sie einfach an.</strong> Beginnen Sie beim Einstellen eines neuen Kaffees mit einem der eingebauten Meticulous-Profile (wie \"Italian\"). Dieser Kompass deckt die Grundlagen ab — Dosis, Ertrag und Temperatur. Fortgeschrittene Fluss- und Druckprofilierung ist mächtig, sollte aber später kommen.",
-    "ruleDontChangeDose": "Wenn Sie den Ertrag (Endgewicht) anpassen, <strong>ändern Sie nicht die Dosis</strong> in Ihrem Siebträger — ändern Sie nur das Profil.",
+    "ruleStartSimple": "<strong>Fangen Sie einfach an.</strong> Beginnen Sie beim Einstellen eines neuen Kaffees mit einem der eingebauten Meticulous-Profile (wie \"Italian\"). Dieser Kompass deckt die Grundlagen ab: Dosis, Ertrag und Temperatur. Fortgeschrittene Fluss- und Druckprofilierung ist mächtig, sollte aber später kommen.",
+    "ruleDontChangeDose": "Wenn Sie den Ertrag (Endgewicht) anpassen, <strong>ändern Sie nicht die Dosis</strong> in Ihrem Siebträger; ändern Sie nur das Profil.",
     "ruleYieldTime": "Eine Änderung des Ertrags wird die Schusszeit verändern. Passen Sie den Mahlgrad nur an, wenn die Schusszeit völlig außerhalb des erwarteten Bereichs liegt.",
-    "ruleEvenExtraction": "Eine perfekt gleichmäßige Extraktion schafft einen größeren \"Sweet Spot\" — konzentrieren Sie sich zuerst auf die Puck-Vorbereitung.",
+    "ruleEvenExtraction": "Eine perfekt gleichmäßige Extraktion schafft einen größeren \"Sweet Spot\": konzentrieren Sie sich zuerst auf die Puck-Vorbereitung.",
     "rulePreciseControl": "Die Meticulous gibt Ihnen präzise Kontrolle über Druck- und Flussprofile. Nutzen Sie diese Kraft, um bestimmte Schritte zu verlängern oder zu verkürzen, anstatt nur den Mahlgrad anzupassen.",
     "attribution": "Konzeptionell inspiriert vom <em>Espresso Compass von Barista Hustle</em>. Angepasst für die Meticulous Espressomaschine.",
     "emptyState": "Wählen Sie oben Aromen aus, um Ihren Schuss zu analysieren und Einstellungstipps zu erhalten.",
@@ -1147,16 +1202,16 @@
       "tooConcentrated": "Zu konzentriert",
       "lackingBody": "Fehlender Körper",
       "sweetSpotDesc": "Sie sind genau im Sweet Spot! Extraktion und Stärke sind gut ausbalanciert.",
-      "sweetSpotAdvice": "Weitere Änderungen sind Geschmackssache. Probieren Sie kleine Anpassungen — ±0,5°C Temperatur oder ±1g Ertrag — um die Aromen Ihres Kaffees zu erkunden.",
-      "underDesc": "Der Schuss ist unterextrahiert — zu viel Säure kommt durch, bevor die süßen und ausgewogenen Verbindungen sich lösen können.",
+      "sweetSpotAdvice": "Weitere Änderungen sind Geschmackssache. Probieren Sie kleine Anpassungen: ±0,5°C Temperatur oder ±1g Ertrag - um die Aromen Ihres Kaffees zu erkunden.",
+      "underDesc": "Der Schuss ist unterextrahiert: zu viel Säure kommt durch, bevor die süßen und ausgewogenen Verbindungen sich lösen können.",
       "underAdvice": "Erhöhen Sie das Endgewicht/den Ertrag Ihres Profils, um mehr Wasser durch den Puck zu lassen. Sie können auch versuchen, die Temperatur um 1–2°C zu erhöhen. Bei sehr niedriger Extraktion feiner mahlen.",
-      "overDesc": "Der Espresso ist überextrahiert — bittere, trockene und scharfe Verbindungen aus dem späten Teil der Extraktion dominieren.",
+      "overDesc": "Der Espresso ist überextrahiert: bittere, trockene und scharfe Verbindungen aus dem späten Teil der Extraktion dominieren.",
       "overAdvice": "Reduzieren Sie das Endgewicht/den Ertrag Ihres Profils, damit der Schuss früher endet. Sie können auch versuchen, die Temperatur um 1–2°C zu senken. Bei starker Überextraktion gröber mahlen.",
-      "strongDesc": "Der Schuss ist sehr dicht und intensiv — die Konzentration ist hoch.",
+      "strongDesc": "Der Schuss ist sehr dicht und intensiv: die Konzentration ist hoch.",
       "strongAdvice": "Erhöhen Sie das Endgewicht Ihres Profils, damit mehr Wasser durchfließt und die Konzentration verdünnt. Dies verschiebt das Brühverhältnis zu einem längeren Schuss.",
-      "weakDesc": "Der Schuss fühlt sich dünn oder wässrig an — ihm fehlt der sirupartige Körper, der von Espresso erwartet wird.",
+      "weakDesc": "Der Schuss fühlt sich dünn oder wässrig an: ihm fehlt der sirupartige Körper, der von Espresso erwartet wird.",
       "weakAdvice": "Verringern Sie das Endgewicht Ihres Profils, damit weniger Wasser durchfließt und die Aromen konzentriert werden. Sie können auch die Dosis leicht erhöhen.",
-      "unevenDesc": "Sie schmecken gleichzeitig Säure und Bitterkeit — ein klassisches Zeichen für Channeling (Wasser findet den Weg des geringsten Widerstands durch den Puck).",
+      "unevenDesc": "Sie schmecken gleichzeitig Säure und Bitterkeit: ein klassisches Zeichen für Channeling (Wasser findet den Weg des geringsten Widerstands durch den Puck).",
       "unevenAdvice": "Konzentrieren Sie sich auf die Puck-Vorbereitung, bevor Sie das Profil ändern. Verwenden Sie ein WDT-Werkzeug, um das Mahlgut gleichmäßig zu verteilen, und stellen Sie sicher, dass der Tamp perfekt eben ist. Überprüfen Sie bei der Meticulous auch, ob die Vorinfusionsphase genug Zeit hat, den Puck gleichmäßig zu sättigen."
     }
   },
@@ -1204,7 +1259,7 @@
       "manual": "Oder Profilname eingeben",
       "manualPlaceholder": "Profilname…",
       "defaultName": "Standardprofil",
-      "skip": "Überspringen — Standard verwenden"
+      "skip": "Überspringen - Standard verwenden"
     },
     "prep": {
       "description": "Bereite deinen Shot mit {{profile}} vor.",
