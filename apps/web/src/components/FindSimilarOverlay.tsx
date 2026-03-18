@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Sparkle, Coffee, Info } from '@phosphor-icons/react'
+import { Sparkle, Info } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
 interface Recommendation {
@@ -144,7 +144,7 @@ export function FindSimilarOverlay({
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
                   <Card
-                    className="p-3 transition-colors cursor-pointer hover:bg-secondary/40"
+                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40"
                     onClick={() => handleSelect(rec.profile_name)}
                     role="button"
                     tabIndex={0}
@@ -162,7 +162,9 @@ export function FindSimilarOverlay({
                             onError={() => setImageErrors(prev => new Set(prev).add(rec.profile_name))}
                           />
                         ) : (
-                          <Coffee size={16} weight="fill" className="text-muted-foreground/40" />
+                          <span className="text-[10px] font-bold text-muted-foreground/60 uppercase leading-none">
+                            {rec.profile_name.split(/[\s-]+/).slice(0, 2).map(w => w[0]).join('')}
+                          </span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -176,7 +178,7 @@ export function FindSimilarOverlay({
                           </Badge>
                         </div>
                         {rec.explanation && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words">
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words min-w-0">
                             {rec.explanation}
                           </p>
                         )}

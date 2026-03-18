@@ -1282,14 +1282,14 @@ export function ShotDetail({
                                   {stage.exit_triggers.length > 0 && (
                                     <div className="mb-3">
                                       <span className="text-xs text-muted-foreground block mb-1.5">{t('shotHistory.exitTriggers')}</span>
-                                      <div className="flex flex-wrap gap-2">
+                                      <div className="flex flex-wrap gap-2 overflow-hidden">
                                         {stage.exit_triggers.map((trigger, tIdx) => {
                                           const wasTriggered = stage.exit_trigger_result?.triggered?.type === trigger.type
                                           const notTriggeredData = stage.exit_trigger_result?.not_triggered?.find(nt => nt.type === trigger.type)
                                           return (
                                             <div
                                               key={tIdx}
-                                              className={`px-2 py-1 rounded text-xs ${
+                                              className={`px-2 py-1 rounded text-xs max-w-full break-words ${
                                                 wasTriggered
                                                   ? 'bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30'
                                                   : 'bg-secondary/60 text-muted-foreground border border-border/30'
@@ -1399,7 +1399,7 @@ export function ShotDetail({
               </Card>
 
               {/* Shot Annotation */}
-              <Card className="p-4 border-border/40 mt-6">
+              <Card className="p-4 border-border/40 mt-8">
                 <ShotAnnotation
                   date={selectedShot.date}
                   filename={selectedShot.filename}
