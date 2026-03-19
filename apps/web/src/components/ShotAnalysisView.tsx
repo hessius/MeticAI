@@ -75,8 +75,10 @@ function formatShotTimestamp(shot: RecentShot): string {
   }
 }
 
-// Module-level cache for recent shots (persists across mounts, 5 min TTL)
-const CACHE_TTL_MS = 5 * 60 * 1000
+// Module-level cache for recent shots (persists across mounts)
+// Data is served from cache for up to 24 hours, but background-revalidated after 15 minutes
+const CACHE_STALE_MS = 15 * 60 * 1000
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 interface ShotAnalysisCache {
   recent: { shots: RecentShot[]; fetchedAt: number } | null
   byProfile: { profiles: ProfileGroup[]; fetchedAt: number } | null
@@ -96,11 +98,12 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
   const fetchRecentShots = useCallback(async (force = false) => {
     // Serve from cache immediately (stale-while-revalidate)
     const cached = shotAnalysisCache.recent
-    if (cached) {
+    const age = cached ? Date.now() - cached.fetchedAt : Infinity
+    if (cached && age < CACHE_TTL_MS) {
       setRecentShots(cached.shots)
       setIsLoading(false)
       // If still fresh and not forced, skip revalidation
-      if (!force && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return
+      if (!force && age < CACHE_STALE_MS) return
       // Revalidate in background
       setIsRefreshing(true)
     } else {
@@ -129,14 +132,15 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
   const fetchByProfile = useCallback(async (force = false) => {
     // Serve from cache immediately (stale-while-revalidate)
     const cached = shotAnalysisCache.byProfile
-    if (cached) {
+    const age = cached ? Date.now() - cached.fetchedAt : Infinity
+    if (cached && age < CACHE_TTL_MS) {
       setProfileGroups(cached.profiles)
       if (cached.profiles.length > 0) {
         setExpandedProfiles(prev => prev.size > 0 ? prev : new Set([cached.profiles[0].profile_name]))
       }
       setIsLoading(false)
       // If still fresh and not forced, skip revalidation
-      if (!force && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return
+      if (!force && age < CACHE_STALE_MS) return
       // Revalidate in background
       setIsRefreshing(true)
     } else {

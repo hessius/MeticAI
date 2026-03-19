@@ -930,6 +930,14 @@ Rules for recommendations:
 - Use actual variable keys from the Profile Variables section above
 - For top-level settings (temperature, final_weight), use stage="global"
 - For stage-specific changes, use the stage name from Profile Stages
+- For exit trigger changes, use these variable keys with the stage name:
+  - "exit_weight" — change the weight exit trigger value
+  - "exit_time" — change the time exit trigger value
+  - "exit_pressure" — change the pressure exit trigger value
+  - "exit_flow" — change the flow exit trigger value
+- For stage limit changes, use these variable keys with the stage name:
+  - "limit_pressure" — change the pressure limit value
+  - "limit_flow" — change the flow limit value
 - confidence: "high" = strong evidence from data, "medium" = likely beneficial, "low" = worth trying
 - If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
 """
@@ -1338,6 +1346,8 @@ def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict])
     - Its key does NOT start with 'info_'
     - It is not marked adjustable=false
     - OR the recommendation targets a global setting (temperature, final_weight)
+    - OR it targets a stage exit trigger (exit_weight, exit_time, etc.)
+    - OR it targets a stage limit (limit_pressure, limit_flow, etc.)
     - OR the variable is not found in the profile (LLM may use descriptive names)
     """
     variable = rec.get("variable", "")
@@ -1345,6 +1355,14 @@ def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict])
 
     # Global top-level settings are always patchable
     if stage == "global" and variable in ("temperature", "final_weight"):
+        return True
+
+    # Stage exit triggers and limits are patchable
+    stage_variables = {
+        "exit_weight", "exit_time", "exit_pressure", "exit_flow", "exit_volume",
+        "limit_pressure", "limit_flow", "limit_weight",
+    }
+    if variable in stage_variables and stage and stage != "global":
         return True
 
     # Check against profile variables

@@ -3555,6 +3555,84 @@ async def apply_recommendations(
                 if matched_var:
                     continue
 
+            # --- stage exit triggers ---
+            # Variables like "exit_weight", "exit_time" target a stage's exit_triggers
+            exit_trigger_map = {
+                "exit_weight": "weight",
+                "exit_time": "time",
+                "exit_pressure": "pressure",
+                "exit_flow": "flow",
+                "exit_volume": "volume",
+            }
+            trigger_type = exit_trigger_map.get(variable)
+            if trigger_type and stage and hasattr(full_profile, "stages") and full_profile.stages:
+                matched_stage = False
+                stage_lower = stage.lower()
+                for profile_stage in full_profile.stages:
+                    stage_name = getattr(profile_stage, "name", "")
+                    if stage_name.lower() == stage_lower:
+                        triggers = getattr(profile_stage, "exit_triggers", None)
+                        if triggers:
+                            for trigger in triggers:
+                                if getattr(trigger, "type", "") == trigger_type:
+                                    try:
+                                        trigger.value = float(recommended_value)
+                                    except (TypeError, ValueError):
+                                        skipped.append({"variable": variable, "reason": "invalid value"})
+                                        matched_stage = True
+                                        break
+                                    applied.append({
+                                        "variable": variable,
+                                        "stage": stage,
+                                        "value": trigger.value,
+                                    })
+                                    matched_stage = True
+                                    break
+                        if not matched_stage:
+                            skipped.append({"variable": variable, "reason": f"no {trigger_type} exit trigger in stage '{stage_name}'"})
+                            matched_stage = True
+                        break
+                if matched_stage:
+                    continue
+
+            # --- stage limits ---
+            # Variables like "limit_pressure", "limit_flow" target a stage's limits
+            limit_map = {
+                "limit_pressure": "pressure",
+                "limit_flow": "flow",
+                "limit_weight": "weight",
+            }
+            limit_type = limit_map.get(variable)
+            if limit_type and stage and hasattr(full_profile, "stages") and full_profile.stages:
+                matched_stage = False
+                stage_lower = stage.lower()
+                for profile_stage in full_profile.stages:
+                    stage_name = getattr(profile_stage, "name", "")
+                    if stage_name.lower() == stage_lower:
+                        limits = getattr(profile_stage, "limits", None)
+                        if limits:
+                            for limit in limits:
+                                if getattr(limit, "type", "") == limit_type:
+                                    try:
+                                        limit.value = float(recommended_value)
+                                    except (TypeError, ValueError):
+                                        skipped.append({"variable": variable, "reason": "invalid value"})
+                                        matched_stage = True
+                                        break
+                                    applied.append({
+                                        "variable": variable,
+                                        "stage": stage,
+                                        "value": limit.value,
+                                    })
+                                    matched_stage = True
+                                    break
+                        if not matched_stage:
+                            skipped.append({"variable": variable, "reason": f"no {limit_type} limit in stage '{stage_name}'"})
+                            matched_stage = True
+                        break
+                if matched_stage:
+                    continue
+
             skipped.append({"variable": variable, "reason": "variable not found in profile"})
 
         if not applied:
