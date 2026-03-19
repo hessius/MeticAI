@@ -1400,7 +1400,7 @@ export function ShotDetail({
               </Card>
 
               {/* Shot Annotation */}
-              <Card className="p-4 border-border/40 mt-8">
+              <Card className="p-4 border-border/40 mt-4">
                 <ShotAnnotation
                   date={selectedShot.date}
                   filename={selectedShot.filename}
