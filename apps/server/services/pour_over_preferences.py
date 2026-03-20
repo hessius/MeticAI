@@ -24,6 +24,8 @@ _MODE_DEFAULTS = {
     "bloomSeconds": 30,
     "bloomWeightMultiplier": 2,
     "machineIntegration": False,
+    "doseGrams": None,
+    "brewRatio": None,
 }
 
 _RECIPE_MODE_DEFAULTS = {
