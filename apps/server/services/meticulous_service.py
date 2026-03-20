@@ -66,6 +66,8 @@ _http_client: Optional[httpx.AsyncClient] = None
 _PROFILE_CACHE_TTL = 10  # seconds
 _profile_list_cache: Optional[list] = None
 _profile_list_cache_time: float = 0.0
+_full_profile_cache: Optional[list] = None
+_full_profile_cache_time: float = 0.0
 
 
 def _resolve_meticulous_base_url() -> str:
@@ -268,8 +270,29 @@ async def async_list_profiles():
 def invalidate_profile_list_cache():
     """Clear the profile list cache (call after create / update / delete)."""
     global _profile_list_cache, _profile_list_cache_time
+    global _full_profile_cache, _full_profile_cache_time
     _profile_list_cache = None
     _profile_list_cache_time = 0.0
+    _full_profile_cache = None
+    _full_profile_cache_time = 0.0
+
+
+@_wrap_machine_call
+async def async_fetch_all_profiles():
+    """fetch_all_profiles() offloaded to a thread, with short-lived TTL cache.
+
+    Returns full Profile objects including stages, dynamics, and variables.
+    """
+    global _full_profile_cache, _full_profile_cache_time
+    now = time.monotonic()
+    if _full_profile_cache is not None and (now - _full_profile_cache_time) < _PROFILE_CACHE_TTL:
+        return _full_profile_cache
+    api = get_meticulous_api()
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, api.fetch_all_profiles)
+    _full_profile_cache = result
+    _full_profile_cache_time = now
+    return result
 
 
 @_wrap_machine_call

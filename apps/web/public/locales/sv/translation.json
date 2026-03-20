@@ -1205,8 +1205,18 @@
     "findSimilar": "Hitta liknande",
     "similarTo": "Profiler liknande \"{{name}}\"",
     "noSimilar": "Inga liknande profiler hittades.",
-    "aiDisclaimer": "Denna funktion använder AI-tokens för att ranka liknande profiler.",
-    "fetchFailed": "Kunde inte hämta rekommendationer"
+    "fetchFailed": "Kunde inte hämta rekommendationer",
+    "matchReasons": {
+      "pressureControlled": "Tryckstyrd",
+      "flowControlled": "Flödesstyrd",
+      "mixedControl": "Blandad styrning",
+      "techniques": "Tekniker: {{techniques}}",
+      "matchingTags": "Matchande: {{tags}}",
+      "targetWeight": "Målvikt: {{weight}}g",
+      "peakPressure": "Maxtryck: {{pressure}} bar",
+      "temperature": "Temperatur: {{temp}}°C",
+      "flatProfile": "Platt profil"
+    }
   },
   "espressoCompass": {
     "title": "Espressokompass",

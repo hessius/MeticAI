@@ -1205,8 +1205,18 @@
     "findSimilar": "Find Similar",
     "similarTo": "Profiles similar to \"{{name}}\"",
     "noSimilar": "No similar profiles found.",
-    "aiDisclaimer": "This feature uses AI tokens to rank similar profiles.",
-    "fetchFailed": "Failed to fetch recommendations"
+    "fetchFailed": "Failed to fetch recommendations",
+    "matchReasons": {
+      "pressureControlled": "Pressure-controlled",
+      "flowControlled": "Flow-controlled",
+      "mixedControl": "Mixed control",
+      "techniques": "Techniques: {{techniques}}",
+      "matchingTags": "Matching: {{tags}}",
+      "targetWeight": "Target weight: {{weight}}g",
+      "peakPressure": "Peak pressure: {{pressure}} bar",
+      "temperature": "Temperature: {{temp}}°C",
+      "flatProfile": "Flat profile"
+    }
   },
   "espressoCompass": {
     "title": "Espresso Compass",

@@ -18,15 +18,11 @@ interface Recommendation {
 
 interface ProfileRecommendationsProps {
   tags: string[]
-  roastLevel?: string
-  beverageType?: string
   onUseProfile?: (profileName: string) => void
 }
 
 export function ProfileRecommendations({
   tags,
-  roastLevel,
-  beverageType,
   onUseProfile,
 }: ProfileRecommendationsProps) {
   const { t } = useTranslation()
@@ -38,8 +34,6 @@ export function ProfileRecommendations({
 
   const fetchRecommendations = useCallback(async (
     currentTags: string[],
-    roast: string | undefined,
-    bev: string | undefined,
   ) => {
     if (abortRef.current) abortRef.current.abort()
     const controller = new AbortController()
@@ -50,8 +44,6 @@ export function ProfileRecommendations({
       const serverUrl = await getServerUrl()
       const formData = new FormData()
       currentTags.forEach(tag => formData.append('tags', tag))
-      if (roast) formData.append('roast_level', roast)
-      if (bev) formData.append('beverage_type', bev)
 
       const response = await fetch(`${serverUrl}/api/profiles/recommend`, {
         method: 'POST',
@@ -84,13 +76,13 @@ export function ProfileRecommendations({
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      fetchRecommendations(tags, roastLevel, beverageType)
+      fetchRecommendations(tags)
     }, 500)
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [tags, roastLevel, beverageType, fetchRecommendations])
+  }, [tags, fetchRecommendations])
 
   useEffect(() => {
     return () => {

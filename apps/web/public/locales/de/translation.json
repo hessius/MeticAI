@@ -1205,8 +1205,18 @@
     "findSimilar": "Ähnliche finden",
     "similarTo": "Profile ähnlich zu \"{{name}}\"",
     "noSimilar": "Keine ähnlichen Profile gefunden.",
-    "aiDisclaimer": "Diese Funktion nutzt AI-Tokens, um ähnliche Profile zu bewerten.",
-    "fetchFailed": "Empfehlungen konnten nicht geladen werden"
+    "fetchFailed": "Empfehlungen konnten nicht geladen werden",
+    "matchReasons": {
+      "pressureControlled": "Druckgesteuert",
+      "flowControlled": "Durchflussgesteuert",
+      "mixedControl": "Gemischte Steuerung",
+      "techniques": "Techniken: {{techniques}}",
+      "matchingTags": "Passend: {{tags}}",
+      "targetWeight": "Zielgewicht: {{weight}}g",
+      "peakPressure": "Maximaldruck: {{pressure}} bar",
+      "temperature": "Temperatur: {{temp}}°C",
+      "flatProfile": "Flaches Profil"
+    }
   },
   "espressoCompass": {
     "title": "Espresso-Kompass",

@@ -9,11 +9,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Sparkle, Info } from '@phosphor-icons/react'
+import { Sparkle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
 interface Recommendation {
@@ -105,14 +104,6 @@ export function FindSimilarOverlay({
             {t('profileRecommendations.similarTo', { name: profileName })}
           </DialogDescription>
         </DialogHeader>
-
-        {/* AI Token Disclaimer */}
-        <Alert className="bg-amber-500/10 border-amber-500/30">
-          <Info size={16} weight="fill" className="text-amber-500" />
-          <AlertDescription className="text-xs text-amber-700 dark:text-amber-400">
-            {t('profileRecommendations.aiDisclaimer')}
-          </AlertDescription>
-        </Alert>
 
         <div className="space-y-2">
           {isLoading ? (

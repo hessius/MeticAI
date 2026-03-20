@@ -1205,8 +1205,18 @@
     "findSimilar": "Buscar similares",
     "similarTo": "Perfiles similares a \"{{name}}\"",
     "noSimilar": "No se encontraron perfiles similares.",
-    "aiDisclaimer": "Esta función utiliza tokens de IA para clasificar perfiles similares.",
-    "fetchFailed": "Error al obtener recomendaciones"
+    "fetchFailed": "Error al obtener recomendaciones",
+    "matchReasons": {
+      "pressureControlled": "Control por presión",
+      "flowControlled": "Control por flujo",
+      "mixedControl": "Control mixto",
+      "techniques": "Técnicas: {{techniques}}",
+      "matchingTags": "Coincidencias: {{tags}}",
+      "targetWeight": "Peso objetivo: {{weight}}g",
+      "peakPressure": "Presión máxima: {{pressure}} bar",
+      "temperature": "Temperatura: {{temp}}°C",
+      "flatProfile": "Perfil plano"
+    }
   },
   "espressoCompass": {
     "title": "Brújula de Espresso",

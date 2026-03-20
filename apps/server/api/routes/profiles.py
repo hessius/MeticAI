@@ -3682,25 +3682,18 @@ async def apply_recommendations(
 async def recommend_profiles(
     request: Request,
     tags: list[str] = Form(default=[]),
-    roast_level: Optional[str] = Form(default=None),
-    beverage_type: Optional[str] = Form(default=None),
-    description: Optional[str] = Form(default=None),
     limit: int = Form(default=5),
 ):
-    """Return profile recommendations based on user preferences.
+    """Return profile recommendations based on tag preferences.
 
-    Uses a two-tier scoring system:
-    1. Local tag/roast/beverage matching (always available)
-    2. LLM semantic ranking via Gemini (when available)
+    Uses structural comparison (stage types, pressure/flow control,
+    peak pressure, target weight, temperature) — no AI tokens consumed.
     """
     request_id = request.state.request_id
 
     try:
         results = await recommendation_service.get_recommendations(
             tags=tags,
-            roast_level=roast_level,
-            beverage_type=beverage_type,
-            description=description,
             limit=limit,
         )
 

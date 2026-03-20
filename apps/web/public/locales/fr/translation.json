@@ -1205,8 +1205,18 @@
     "findSimilar": "Trouver similaires",
     "similarTo": "Profils similaires à \"{{name}}\"",
     "noSimilar": "Aucun profil similaire trouvé.",
-    "aiDisclaimer": "Cette fonctionnalité utilise des jetons IA pour classer les profils similaires.",
-    "fetchFailed": "Échec du chargement des recommandations"
+    "fetchFailed": "Échec du chargement des recommandations",
+    "matchReasons": {
+      "pressureControlled": "Contrôle par pression",
+      "flowControlled": "Contrôle par débit",
+      "mixedControl": "Contrôle mixte",
+      "techniques": "Techniques : {{techniques}}",
+      "matchingTags": "Correspondances : {{tags}}",
+      "targetWeight": "Poids cible : {{weight}}g",
+      "peakPressure": "Pression maximale : {{pressure}} bar",
+      "temperature": "Température : {{temp}}°C",
+      "flatProfile": "Profil plat"
+    }
   },
   "espressoCompass": {
     "title": "Boussole Espresso",
