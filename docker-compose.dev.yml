@@ -13,3 +13,5 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.unified
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
