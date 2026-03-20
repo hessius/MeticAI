@@ -154,28 +154,50 @@ async def get_machine_status(request: Request):
 @router.post("/api/machine/preheat")
 async def start_preheat(request: Request):
     """Start preheating the machine.
-    
+
     Preheating takes approximately 10 minutes to reach optimal temperature.
+    When *profile_id* is provided the profile is loaded on the machine first
+    so the display shows the correct profile during the heating phase.
     """
     request_id = request.state.request_id
-    
+
+    # Accept optional JSON body with profile_id
+    profile_id: str | None = None
+    try:
+        body = await request.json()
+        profile_id = body.get("profile_id") if isinstance(body, dict) else None
+    except Exception:
+        pass  # No body or non-JSON body is fine
+
     try:
         logger.info(
             "Starting machine preheat",
-            extra={"request_id": request_id}
+            extra={"request_id": request_id, "profile_id": profile_id}
         )
-        
+
         if get_meticulous_api() is None:
             raise HTTPException(
                 status_code=503,
                 detail="Meticulous machine not connected"
             )
-        
+
+        # Pre-select the profile so the machine shows it during preheat
+        if profile_id:
+            try:
+                await async_load_profile_by_id(profile_id)
+                logger.info(
+                    "Profile pre-selected for preheat: %s",
+                    profile_id,
+                    extra={"request_id": request_id},
+                )
+            except Exception as exc:
+                logger.warning("Failed to pre-select profile for preheat: %s", exc)
+
         # Use ActionType.PREHEAT to start the preheat cycle
         try:
             from meticulous.api_types import ActionType
             result = await async_execute_action(ActionType.PREHEAT)
-            
+
             if hasattr(result, 'error') and result.error:
                 raise HTTPException(
                     status_code=502,
@@ -192,13 +214,14 @@ async def start_preheat(request: Request):
                     status_code=502,
                     detail=f"Failed to start preheat: {result.text}"
                 )
-        
+
         return {
             "status": "success",
             "message": "Preheat started",
-            "estimated_ready_in_minutes": PREHEAT_DURATION_MINUTES
+            "estimated_ready_in_minutes": PREHEAT_DURATION_MINUTES,
+            "profile_preselected": profile_id is not None,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

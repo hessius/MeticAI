@@ -6824,6 +6824,26 @@ class TestRunShotEndpoints:
         assert "message" in data
         assert "preheat" in data["message"].lower() or "Preheat" in data["message"]
 
+    @patch('api.routes.scheduling.async_load_profile_by_id', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_preheat_with_profile_preselection(self, mock_get_api, mock_execute_action, mock_load, client):
+        """Test POST /api/machine/preheat with profile_id pre-selects the profile."""
+        mock_get_api.return_value = MagicMock()
+        mock_result = MagicMock(spec=[])
+        mock_execute_action.return_value = mock_result
+        mock_load.return_value = MagicMock(spec=[])
+
+        response = client.post(
+            "/api/machine/preheat",
+            json={"profile_id": "my-profile-123"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_preselected"] is True
+        mock_load.assert_called_once_with("my-profile-123")
+
     @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
     def test_preheat_connection_error(self, mock_get_api, mock_execute_action, client):

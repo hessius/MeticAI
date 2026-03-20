@@ -268,7 +268,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         
         setIsPreheating(true)
         const preheatResponse = await fetch(`${serverUrl}/api/machine/preheat`, {
-          method: 'POST'
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profile_id: selectedProfile?.id ?? null
+          })
         })
         
         if (!preheatResponse.ok) {
