@@ -141,7 +141,14 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           return
         }
         const data = await response.json()
-        setProfiles(data.profiles || [])
+        const all: MachineProfile[] = data.profiles || []
+        setProfiles(all)
+
+        // Enrich initial profile with full data (variables, temperature, etc.)
+        if (initialProfileId) {
+          const full = all.find((p) => p.id === initialProfileId)
+          if (full) setSelectedProfile(full)
+        }
       } catch (err) {
         console.error('Failed to fetch profiles:', err)
         toast.error(t('runShot.noProfilesFound'))
