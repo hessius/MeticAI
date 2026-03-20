@@ -35,6 +35,7 @@ interface MachineProfile {
   author?: string
   temperature?: number
   final_weight?: number
+  variables?: ProfileVariable[]
 }
 
 interface ScheduledShot {
@@ -151,36 +152,43 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
     fetchProfiles()
   }, [])
 
-  // Fetch profile variables when a profile is selected
+  // Derive profile variables from the selected profile data (already fetched
+  // in the profile list). Synthesise final_weight / temperature entries when
+  // they are not present in the explicit variables array so every profile has
+  // at least basic adjustable parameters.
   const selectedProfileId = selectedProfile?.id
   useEffect(() => {
-    if (!selectedProfileId) {
+    if (!selectedProfile) {
       setProfileVariables([])
       setOverrides({})
       return
     }
-    let cancelled = false
-    const fetchVariables = async () => {
-      try {
-        const serverUrl = await getServerUrl()
-        const response = await fetch(`${serverUrl}/api/machine/profile/${selectedProfileId}`)
-        if (cancelled) return
-        if (response.ok) {
-          const data = await response.json()
-          if (cancelled) return
-          const vars: ProfileVariable[] = (data.variables || data.profile?.variables || [])
-            .filter((v: ProfileVariable) => v.key && v.name && v.type != null)
-          setProfileVariables(vars)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Failed to fetch profile variables:', err)
-        }
-      }
+
+    const raw: ProfileVariable[] = (selectedProfile.variables || [])
+      .filter((v: ProfileVariable) => v.key && v.name && v.type != null)
+
+    const existingKeys = new Set(raw.map((v) => v.key))
+
+    // Synthesise from top-level fields when missing
+    if (selectedProfile.final_weight != null && !existingKeys.has('final_weight')) {
+      raw.push({
+        key: 'final_weight',
+        name: 'Final Weight',
+        type: 'weight',
+        value: selectedProfile.final_weight,
+      })
     }
-    fetchVariables()
+    if (selectedProfile.temperature != null && !existingKeys.has('temperature')) {
+      raw.push({
+        key: 'temperature',
+        name: 'Temperature',
+        type: 'temperature',
+        value: selectedProfile.temperature,
+      })
+    }
+
+    setProfileVariables(raw)
     setOverrides({})
-    return () => { cancelled = true }
   }, [selectedProfileId])
 
   // Fetch machine status and scheduled shots

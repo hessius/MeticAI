@@ -282,12 +282,14 @@ async def run_profile_with_overrides(
 ):
     """Run a profile with temporary variable overrides.
 
-    Loads the original profile, applies overrides to create a temp copy,
-    runs that copy, and handles save semantics afterwards.
+    Uses the machine's ephemeral load endpoint (``POST /api/v1/profile/load``)
+    to load the modified profile into memory **without** saving it to the
+    catalogue.  The original profile on the machine remains untouched, and
+    shot history records the original profile name.
 
     Args:
         profile_id: ID of the source profile.
-        overrides: JSON string mapping variable keys to new numeric values.
+        overrides_json: JSON string mapping variable keys to new numeric values.
         save_mode: ``"none"`` | ``"save_original"`` | ``"save_new"``.
         new_name: Required when *save_mode* is ``"save_new"``.
     """
@@ -340,14 +342,13 @@ async def run_profile_with_overrides(
         original_name = profile_data.get("name", "Unknown Profile")
 
         if overrides_dict:
-            # Apply overrides to a deep-copied profile
+            # Apply overrides to a deep copy — keeps the original name and ID
             modified_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
-            modified_profile["name"] = f"MeticAI Override: {original_name}"
-            # Remove the id so the machine assigns a fresh one
-            modified_profile.pop("id", None)
 
-            # Create and load the temp profile
-            result = await temp_profile_service.create_and_load(
+            # Ephemeral load: loads into machine memory without persisting.
+            # The original profile on disk is unchanged; shot history records
+            # the real profile name, not a temporary one.
+            result = await temp_profile_service.load_ephemeral(
                 modified_profile,
                 params={"overrides": overrides_dict, "source_profile_id": profile_id},
                 previous_profile_id=profile_id,
@@ -362,14 +363,10 @@ async def run_profile_with_overrides(
         from meticulous.api_types import ActionType
         action_result = await async_execute_action(ActionType.START)
         if hasattr(action_result, "error") and action_result.error:
-            # Cleanup on failed start
-            if overrides_dict:
-                await temp_profile_service.force_cleanup()
             raise HTTPException(status_code=502, detail=f"Failed to start profile: {action_result.error}")
 
-        # Handle save modes (async — don't block the response)
+        # Handle save modes — persist changes only when explicitly requested
         if save_mode == "save_original" and overrides_dict:
-            # Persist overrides back into the original profile
             saved_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
             saved_profile["id"] = profile_id
             saved_profile["name"] = original_name
@@ -380,7 +377,6 @@ async def run_profile_with_overrides(
                 logger.error("Failed to save overrides to original profile: %s", exc)
 
         elif save_mode == "save_new" and overrides_dict:
-            # Save as a brand-new profile
             new_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
             new_profile.pop("id", None)
             new_profile["name"] = new_name.strip()
@@ -402,11 +398,6 @@ async def run_profile_with_overrides(
     except HTTPException:
         raise
     except Exception as e:
-        # Attempt cleanup on unexpected errors
-        try:
-            await temp_profile_service.force_cleanup()
-        except Exception:
-            pass
         logger.error(
             "Failed to run profile with overrides: %s",
             str(e), exc_info=True,

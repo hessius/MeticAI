@@ -497,6 +497,43 @@ async def async_create_profile(profile_json):
 
 
 @_wrap_machine_call
+async def async_load_profile_from_json(profile_json: Dict[str, Any]):
+    """Load a profile into the machine's memory without persisting to storage.
+
+    POSTs to ``/api/v1/profile/load`` which makes the profile the active
+    selection for the next shot but does **not** save it to the machine's
+    profile catalogue.  This is ideal for temporary variable overrides —
+    the original profile remains untouched on disk.
+
+    Args:
+        profile_json: Full profile dict (will be normalised before sending).
+
+    Returns:
+        The JSON response from the machine.
+    """
+    normalised = _normalize_profile_for_machine(profile_json)
+    base_url = _resolve_meticulous_base_url()
+    client = _get_http_client()
+    response = await client.post(
+        f"{base_url}/api/v1/profile/load",
+        json=normalised,
+        timeout=30.0,
+    )
+    if response.status_code != 200:
+        body = response.text
+        logger.error(
+            "Machine rejected ephemeral profile load: %s",
+            body[:1000],
+            extra={
+                "status": response.status_code,
+                "profile_name": normalised.get("name"),
+            }
+        )
+    response.raise_for_status()
+    return response.json()
+
+
+@_wrap_machine_call
 async def async_delete_profile(profile_id: str):
     """delete_profile() offloaded to a thread."""
     api = get_meticulous_api()

@@ -11747,16 +11747,13 @@ class TestTempProfileService:
 class TestPourOverEndpoints:
     """Tests for /api/pour-over/* endpoints."""
 
-    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
-    @patch("services.temp_profile_service.async_create_profile")
-    @patch("services.temp_profile_service.async_load_profile_by_id")
-    def test_prepare_success(self, mock_load, mock_create, mock_list, client):
-        """POST /api/pour-over/prepare creates and loads a temp profile."""
+    @patch("services.temp_profile_service.async_load_profile_from_json")
+    def test_prepare_success(self, mock_load_json, client):
+        """POST /api/pour-over/prepare loads an ephemeral temp profile."""
         import services.temp_profile_service as tps
         tps._set_active(None)
 
-        mock_create.return_value = {"id": "prep-id-123"}
-        mock_load.return_value = None
+        mock_load_json.return_value = {"id": "prep-id-123", "name": "MeticAI Ratio Pour-Over"}
 
         response = client.post("/api/pour-over/prepare", json={
             "target_weight": 250.0,
@@ -11768,18 +11765,16 @@ class TestPourOverEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["profile_id"] == "prep-id-123"
         assert data["profile_name"] == "MeticAI Ratio Pour-Over"
+        mock_load_json.assert_called_once()
 
-    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
-    @patch("services.temp_profile_service.async_create_profile")
-    @patch("services.temp_profile_service.async_load_profile_by_id")
-    def test_prepare_without_bloom(self, mock_load, mock_create, mock_list, client):
+    @patch("services.temp_profile_service.async_load_profile_from_json")
+    def test_prepare_without_bloom(self, mock_load_json, client):
         """POST /api/pour-over/prepare works without bloom."""
         import services.temp_profile_service as tps
         tps._set_active(None)
 
-        mock_create.return_value = {"id": "no-bloom-id"}
+        mock_load_json.return_value = {"id": "no-bloom-id", "name": "MeticAI Ratio Pour-Over"}
 
         response = client.post("/api/pour-over/prepare", json={
             "target_weight": 300.0,
@@ -11788,7 +11783,7 @@ class TestPourOverEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["profile_id"] == "no-bloom-id"
+        assert data["profile_name"] == "MeticAI Ratio Pour-Over"
 
     def test_prepare_invalid_weight(self, client):
         """POST /api/pour-over/prepare rejects non-positive weight."""
@@ -11802,16 +11797,15 @@ class TestPourOverEndpoints:
         response = client.post("/api/pour-over/prepare", json={})
         assert response.status_code == 422
 
-    @patch("services.temp_profile_service.async_delete_profile")
-    def test_cleanup_success(self, mock_delete, client):
-        """POST /api/pour-over/cleanup cleans up the active profile."""
+    def test_cleanup_success(self, client):
+        """POST /api/pour-over/cleanup cleans up the active ephemeral profile."""
         import services.temp_profile_service as tps
         from services.temp_profile_service import ActiveTempProfile
 
         tps._set_active(ActiveTempProfile(
-            profile_id="cleanup-ep-id", profile_name="MeticAI Ratio Pour-Over"
+            profile_id="cleanup-ep-id", profile_name="MeticAI Ratio Pour-Over",
+            ephemeral=True,
         ))
-        mock_delete.return_value = None
 
         with patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
              patch("api.routes.commands._do_publish"):
@@ -11829,16 +11823,15 @@ class TestPourOverEndpoints:
         assert response.status_code == 200
         assert response.json()["status"] == "no_active_profile"
 
-    @patch("services.temp_profile_service.async_delete_profile")
-    def test_force_cleanup_success(self, mock_delete, client):
-        """POST /api/pour-over/force-cleanup deletes without purge."""
+    def test_force_cleanup_success(self, client):
+        """POST /api/pour-over/force-cleanup cleans up without purge."""
         import services.temp_profile_service as tps
         from services.temp_profile_service import ActiveTempProfile
 
         tps._set_active(ActiveTempProfile(
-            profile_id="force-ep-id", profile_name="MeticAI Ratio Pour-Over"
+            profile_id="force-ep-id", profile_name="MeticAI Ratio Pour-Over",
+            ephemeral=True,
         ))
-        mock_delete.return_value = None
 
         response = client.post("/api/pour-over/force-cleanup")
         assert response.status_code == 200
@@ -12344,13 +12337,13 @@ class TestPrepareRecipeEndpoint:
         """POST /api/pour-over/prepare-recipe with valid slug returns 200."""
         mock_mqtt_sub.return_value.get_snapshot.return_value = {}
 
-        async def _fake_create_and_load(profile_json, params, previous_profile_name=None):
+        async def _fake_load_ephemeral(profile_json, params, previous_profile_name=None):
             return {
                 "profile_id": "test-uuid-1234",
                 "profile_name": "MeticAI Recipe: Tetsu Kasuya 4:6",
             }
 
-        mock_temp_svc.create_and_load = _fake_create_and_load
+        mock_temp_svc.load_ephemeral = _fake_load_ephemeral
 
         response = client.post(
             "/api/pour-over/prepare-recipe",
@@ -13526,13 +13519,12 @@ class TestRunProfileWithOverrides:
 
     # ---- endpoint tests ----
 
-    @patch('services.temp_profile_service.force_cleanup', new_callable=AsyncMock)
-    @patch('services.temp_profile_service.create_and_load', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.load_ephemeral', new_callable=AsyncMock)
     @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
     def test_endpoint_run_with_overrides_none_mode(
-        self, mock_get_api, mock_get_profile, mock_execute, mock_create_load, mock_cleanup, client
+        self, mock_get_api, mock_get_profile, mock_execute, mock_load_ephemeral, client
     ):
         """Test run-profile-with-overrides with save_mode=none."""
         mock_get_api.return_value = MagicMock()
@@ -13543,7 +13535,7 @@ class TestRunProfileWithOverrides:
                 {"key": "pressure_main", "name": "P", "type": "pressure", "value": 9.0},
             ],
         }
-        mock_create_load.return_value = MagicMock(id="temp-1", name="MeticAI Override: Test Profile")
+        mock_load_ephemeral.return_value = {"profile_id": "p1", "profile_name": "Test Profile"}
         mock_result = MagicMock(spec=['status', 'action'])
         mock_result.status = "ok"
         mock_execute.return_value = mock_result
@@ -13556,16 +13548,17 @@ class TestRunProfileWithOverrides:
         assert response.status_code == 200
         data = response.json()
         assert data["save_mode"] == "none"
+        assert data["profile_name"] == "Test Profile"
         mock_get_profile.assert_called_once()
-        mock_create_load.assert_called_once()
+        mock_load_ephemeral.assert_called_once()
 
     @patch('api.routes.scheduling.async_save_profile', new_callable=AsyncMock)
-    @patch('services.temp_profile_service.create_and_load', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.load_ephemeral', new_callable=AsyncMock)
     @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
     def test_endpoint_save_original_mode(
-        self, mock_get_api, mock_get_profile, mock_execute, mock_create_load, mock_save_profile, client
+        self, mock_get_api, mock_get_profile, mock_execute, mock_load_ephemeral, mock_save_profile, client
     ):
         """Test save_mode=save_original persists overrides back."""
         mock_get_api.return_value = MagicMock()
@@ -13576,7 +13569,7 @@ class TestRunProfileWithOverrides:
                 {"key": "flow_main", "name": "F", "type": "flow", "value": 4.0},
             ],
         }
-        mock_create_load.return_value = MagicMock(id="temp-1")
+        mock_load_ephemeral.return_value = {"profile_id": "p1", "profile_name": "Test Profile"}
         mock_result = MagicMock(spec=['status', 'action'])
         mock_result.status = "ok"
         mock_execute.return_value = mock_result
@@ -13593,12 +13586,12 @@ class TestRunProfileWithOverrides:
         mock_save_profile.assert_called_once()
 
     @patch('api.routes.scheduling.async_create_profile', new_callable=AsyncMock)
-    @patch('services.temp_profile_service.create_and_load', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.load_ephemeral', new_callable=AsyncMock)
     @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
     def test_endpoint_save_new_mode(
-        self, mock_get_api, mock_get_profile, mock_execute, mock_create_load, mock_create_profile, client
+        self, mock_get_api, mock_get_profile, mock_execute, mock_load_ephemeral, mock_create_profile, client
     ):
         """Test save_mode=save_new creates a new profile."""
         mock_get_api.return_value = MagicMock()
@@ -13609,7 +13602,7 @@ class TestRunProfileWithOverrides:
                 {"key": "weight", "name": "W", "type": "weight", "value": 36.0},
             ],
         }
-        mock_create_load.return_value = MagicMock(id="temp-1")
+        mock_load_ephemeral.return_value = {"profile_id": "p1", "profile_name": "Original"}
         mock_result = MagicMock(spec=['status', 'action'])
         mock_result.status = "ok"
         mock_execute.return_value = mock_result
