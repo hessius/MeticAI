@@ -1071,7 +1071,21 @@
     "fetchFailed": "Échec du chargement des profils",
     "syncFailed": "Échec de la synchronisation",
     "renameFailed": "Échec du renommage du profil",
-    "exportFailed": "Échec de l'exportation du profil"
+    "exportFailed": "Échec de l'exportation du profil",
+    "bulkDelete": {
+      "button": "Supprimer en masse",
+      "title": "Suppression en masse",
+      "description": "Sélectionnez les profils à supprimer définitivement de votre machine. Les profils du catalogue sont exclus.",
+      "selectAll": "Tout sélectionner",
+      "deselectAll": "Tout désélectionner",
+      "selected": "{{count}} sélectionné(s)",
+      "confirm": "Supprimer {{count}} profils",
+      "deleting": "Suppression...",
+      "success": "{{count}} profils supprimés",
+      "partial": "{{deleted}} sur {{total}} supprimés ({{failed}} échoué(s))",
+      "failed": "Suppression en masse échouée",
+      "noneAvailable": "Tous les profils sont déjà dans votre catalogue"
+    }
   },
   "recommendations": {
     "apply": "Appliquer les recommandations",

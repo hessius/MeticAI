@@ -1071,7 +1071,21 @@
     "fetchFailed": "Error al cargar perfiles",
     "syncFailed": "Error de sincronización",
     "renameFailed": "Error al renombrar perfil",
-    "exportFailed": "Error al exportar perfil"
+    "exportFailed": "Error al exportar perfil",
+    "bulkDelete": {
+      "button": "Eliminar en masa",
+      "title": "Eliminar perfiles en masa",
+      "description": "Seleccione los perfiles a eliminar permanentemente de su máquina. Los perfiles del catálogo están excluidos.",
+      "selectAll": "Seleccionar todos",
+      "deselectAll": "Deseleccionar todos",
+      "selected": "{{count}} seleccionados",
+      "confirm": "Eliminar {{count}} perfiles",
+      "deleting": "Eliminando...",
+      "success": "{{count}} perfiles eliminados",
+      "partial": "{{deleted}} de {{total}} eliminados ({{failed}} fallidos)",
+      "failed": "Eliminación en masa fallida",
+      "noneAvailable": "Todos los perfiles ya están en su catálogo"
+    }
   },
   "recommendations": {
     "apply": "Aplicar recomendaciones",

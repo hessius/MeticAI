@@ -24,6 +24,7 @@ import {
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
+import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
 import { SyncReport, SyncResults } from './SyncReport'
 
@@ -130,6 +131,9 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   // Auto-sync state
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => getAutoSync())
   const [autoSyncAiDesc, setAutoSyncAiDesc] = useState(() => getAutoSyncAiDescription())
+
+  // Bulk delete dialog state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   // Detect coarse pointer (touch device)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
@@ -365,6 +369,16 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkDeleteOpen(true)}
+              disabled={isLoading || profiles.filter(p => !p.in_history).length === 0}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash className="w-4 h-4 mr-2" />
+              {t('profileCatalogue.bulkDelete.button')}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -651,6 +665,18 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       </div>
 
       {/* Dialogs */}
+      <BulkDeleteDialog
+        isOpen={bulkDeleteOpen}
+        profiles={profiles}
+        onClose={() => setBulkDeleteOpen(false)}
+        onDeleted={() => {
+          setBulkDeleteOpen(false)
+          fetchProfiles()
+          fetchOrphaned()
+          fetchSyncStatus()
+        }}
+      />
+
       <DeleteProfileDialog
         isOpen={!!deleteTarget}
         profileId={deleteTarget?.profileId ?? ''}

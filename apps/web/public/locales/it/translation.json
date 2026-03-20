@@ -1071,7 +1071,21 @@
     "fetchFailed": "Impossibile caricare i profili",
     "syncFailed": "Sincronizzazione fallita",
     "renameFailed": "Impossibile rinominare il profilo",
-    "exportFailed": "Impossibile esportare il profilo"
+    "exportFailed": "Impossibile esportare il profilo",
+    "bulkDelete": {
+      "button": "Elimina in blocco",
+      "title": "Eliminazione in blocco",
+      "description": "Seleziona i profili da eliminare permanentemente dalla tua macchina. I profili nel catalogo sono esclusi.",
+      "selectAll": "Seleziona tutti",
+      "deselectAll": "Deseleziona tutti",
+      "selected": "{{count}} selezionati",
+      "confirm": "Elimina {{count}} profili",
+      "deleting": "Eliminazione...",
+      "success": "{{count}} profili eliminati",
+      "partial": "{{deleted}} di {{total}} eliminati ({{failed}} falliti)",
+      "failed": "Eliminazione in blocco fallita",
+      "noneAvailable": "Tutti i profili sono già nel tuo catalogo"
+    }
   },
   "recommendations": {
     "apply": "Applica raccomandazioni",

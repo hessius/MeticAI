@@ -1071,7 +1071,21 @@
     "fetchFailed": "Kunde inte ladda profiler",
     "syncFailed": "Synkronisering misslyckades",
     "renameFailed": "Kunde inte byta namn på profil",
-    "exportFailed": "Kunde inte exportera profil"
+    "exportFailed": "Kunde inte exportera profil",
+    "bulkDelete": {
+      "button": "Massradera",
+      "title": "Massradera profiler",
+      "description": "Välj profiler att permanent ta bort från din maskin. Profiler i din katalog är exkluderade.",
+      "selectAll": "Välj alla",
+      "deselectAll": "Avmarkera alla",
+      "selected": "{{count}} valda",
+      "confirm": "Ta bort {{count}} profiler",
+      "deleting": "Raderar...",
+      "success": "{{count}} profiler borttagna",
+      "partial": "{{deleted}} av {{total}} borttagna ({{failed}} misslyckades)",
+      "failed": "Massradering misslyckades",
+      "noneAvailable": "Alla profiler finns redan i din katalog"
+    }
   },
   "recommendations": {
     "apply": "Tillämpa rekommendationer",

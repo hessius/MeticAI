@@ -1071,7 +1071,21 @@
     "fetchFailed": "Fehler beim Laden der Profile",
     "syncFailed": "Synchronisierung fehlgeschlagen",
     "renameFailed": "Fehler beim Umbenennen des Profils",
-    "exportFailed": "Fehler beim Exportieren des Profils"
+    "exportFailed": "Fehler beim Exportieren des Profils",
+    "bulkDelete": {
+      "button": "Mehrere löschen",
+      "title": "Profile löschen",
+      "description": "Wählen Sie Profile aus, die dauerhaft von Ihrer Maschine gelöscht werden sollen. Profile im Katalog sind ausgeschlossen.",
+      "selectAll": "Alle auswählen",
+      "deselectAll": "Alle abwählen",
+      "selected": "{{count}} ausgewählt",
+      "confirm": "{{count}} Profile löschen",
+      "deleting": "Wird gelöscht...",
+      "success": "{{count}} Profile gelöscht",
+      "partial": "{{deleted}} von {{total}} gelöscht ({{failed}} fehlgeschlagen)",
+      "failed": "Massenlöschung fehlgeschlagen",
+      "noneAvailable": "Alle Profile befinden sich bereits in Ihrem Katalog"
+    }
   },
   "recommendations": {
     "apply": "Empfehlungen anwenden",

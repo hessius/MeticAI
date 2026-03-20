@@ -1017,7 +1017,21 @@
     "fetchFailed": "Failed to load profiles",
     "syncFailed": "Sync failed",
     "renameFailed": "Failed to rename profile",
-    "exportFailed": "Failed to export profile"
+    "exportFailed": "Failed to export profile",
+    "bulkDelete": {
+      "button": "Bulk Delete",
+      "title": "Bulk Delete Profiles",
+      "description": "Select profiles to permanently delete from your machine. Profiles in your catalogue are excluded.",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "selected": "{{count}} selected",
+      "confirm": "Delete {{count}} profiles",
+      "deleting": "Deleting...",
+      "success": "{{count}} profiles deleted",
+      "partial": "{{deleted}} of {{total}} deleted ({{failed}} failed)",
+      "failed": "Bulk delete failed",
+      "noneAvailable": "All profiles are already in your catalogue"
+    }
   },
   "markdownEditor": {
     "edit": "Edit",

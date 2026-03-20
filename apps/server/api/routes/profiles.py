@@ -1968,6 +1968,74 @@ async def delete_machine_profile(profile_id: str, request: Request):
         )
 
 
+@router.post("/api/machine/profiles/bulk-delete")
+async def bulk_delete_machine_profiles(request: Request):
+    """Delete multiple profiles from the Meticulous machine.
+
+    Body:
+        profile_ids: list of profile ID strings to delete
+
+    Returns:
+        Summary with succeeded / failed counts and per-profile results.
+    """
+    request_id = request.state.request_id
+
+    try:
+        body = await request.json()
+        profile_ids = body.get("profile_ids", [])
+
+        if not isinstance(profile_ids, list) or len(profile_ids) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="profile_ids must be a non-empty list",
+            )
+
+        results: list[dict] = []
+        succeeded = 0
+
+        for pid in profile_ids:
+            try:
+                profile = await async_get_profile(pid)
+                name = getattr(profile, "name", pid) if profile else pid
+                await async_delete_profile(pid)
+                results.append({"profile_id": pid, "name": name, "status": "success"})
+                succeeded += 1
+            except Exception as e:
+                logger.warning(
+                    f"Bulk delete: failed to delete {pid}: {e}",
+                    extra={"request_id": request_id},
+                )
+                results.append({"profile_id": pid, "status": "error", "error": str(e)})
+
+        recommendation_service.invalidate_cache()
+
+        logger.info(
+            f"Bulk delete: {succeeded}/{len(profile_ids)} profiles deleted",
+            extra={"request_id": request_id},
+        )
+
+        return {
+            "status": "success",
+            "deleted": succeeded,
+            "failed": len(profile_ids) - succeeded,
+            "total": len(profile_ids),
+            "results": results,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Bulk delete failed: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
 @router.patch("/api/machine/profile/{profile_id}")
 async def update_machine_profile(profile_id: str, request: Request):
     """Update a profile on the Meticulous machine.
