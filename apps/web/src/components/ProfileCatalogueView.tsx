@@ -18,11 +18,11 @@ import {
   Warning,
   CheckCircle,
   SpinnerGap,
-  FileJs,
   X
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
+import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
@@ -98,6 +98,27 @@ function SwipeableCard({
   )
 }
 
+function ProfileImage({ imageUrl }: { imageUrl?: string }) {
+  const [error, setError] = useState(false)
+
+  return (
+    <div className="w-10 h-10 rounded-full overflow-hidden border border-border/30 shrink-0 bg-secondary/60">
+      {imageUrl && !error ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setError(true)}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <Coffee size={18} className="text-muted-foreground/40" weight="fill" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
   
@@ -134,6 +155,9 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
 
   // Bulk delete dialog state
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+
+  // Profile image cache
+  const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
 
   // Detect coarse pointer (touch device)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
@@ -228,6 +252,13 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     fetchSyncStatus()
   }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
 
+  // Fetch profile images when profile list changes
+  useEffect(() => {
+    if (profiles.length > 0) {
+      fetchImagesForProfiles(profiles.map(p => p.name))
+    }
+  }, [profiles, fetchImagesForProfiles])
+
   // Auto-sync is now handled globally in App.tsx — just refresh data periodically
   // when the catalogue view is visible
   useEffect(() => {
@@ -303,34 +334,6 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     fetchOrphaned()
   }
   
-  // Export profile JSON
-  const handleExport = async (profile: MachineProfile) => {
-    try {
-      const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
-      if (!response.ok) {
-        throw new Error(t('profileCatalogue.exportFailed'))
-      }
-      
-      const data = await response.json()
-      const blob = new Blob([JSON.stringify(data.profile, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      
-      toast.success(t('profileCatalogue.exported'))
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('profileCatalogue.exportFailed')
-      toast.error(message)
-    }
-  }
-  
   // Start rename
   const startRename = (profile: MachineProfile) => {
     setRenamingId(profile.id)
@@ -351,24 +354,27 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            className="shrink-0"
-          >
-            <CaretLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold">
-              {t('profileCatalogue.title')}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {t('profileCatalogue.description', { count: profiles.length })}
-            </p>
+        <div className="space-y-3">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="shrink-0"
+              aria-label={t('a11y.goBack')}
+            >
+              <CaretLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-xl font-semibold">
+                {t('profileCatalogue.title')}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {t('profileCatalogue.description', { count: profiles.length })}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -503,10 +509,8 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                 >
                   <Card className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''}`}>
                     <div className="flex items-start gap-4">
-                      {/* Profile icon */}
-                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                        <Coffee className="w-5 h-5 text-muted-foreground" />
-                      </div>
+                      {/* Profile image */}
+                      <ProfileImage imageUrl={getImageUrl(profile.name) ?? undefined} />
                       
                       {/* Profile info */}
                       <div className="flex-1 min-w-0">
@@ -585,30 +589,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleExport(profile)}
-                            title={t('profileCatalogue.export')}
-                            aria-label={t('profileCatalogue.export')}
-                          >
-                            <FileJs className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
                             onClick={() => startRename(profile)}
                             title={t('profileCatalogue.rename')}
                             aria-label={t('profileCatalogue.rename')}
                           >
                             <PencilSimple className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openDeleteDialog(profile)}
-                            title={t('profileCatalogue.delete')}
-                            aria-label={t('profileCatalogue.delete')}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash className="w-4 h-4" />
                           </Button>
                         </div>
                       )}
