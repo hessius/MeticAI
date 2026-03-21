@@ -1203,6 +1203,8 @@
     "overridesApplied": "{{count}} adjusted",
     "original": "Original: {{value}}",
     "noAdjustable": "No adjustable variables in this profile",
+    "baseVariables": "Base Variables",
+    "unusedWarning": "This variable is defined but not used in any stage",
     "type": {
       "pressure": "Pressure",
       "flow": "Flow",

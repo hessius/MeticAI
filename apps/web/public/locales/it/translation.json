@@ -1203,6 +1203,8 @@
     "overridesApplied": "{{count}} regolate",
     "original": "Originale: {{value}}",
     "noAdjustable": "Nessuna variabile regolabile in questo profilo",
+    "baseVariables": "Variabili base",
+    "unusedWarning": "Questa variabile è definita ma non utilizzata in nessuna fase",
     "type": {
       "pressure": "Pressione",
       "flow": "Flusso",

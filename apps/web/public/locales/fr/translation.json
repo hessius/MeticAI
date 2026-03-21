@@ -1203,6 +1203,8 @@
     "overridesApplied": "{{count}} ajustées",
     "original": "Original : {{value}}",
     "noAdjustable": "Aucune variable ajustable dans ce profil",
+    "baseVariables": "Variables de base",
+    "unusedWarning": "Cette variable est définie mais non utilisée dans aucune étape",
     "type": {
       "pressure": "Pression",
       "flow": "Débit",

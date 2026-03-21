@@ -36,6 +36,7 @@ interface MachineProfile {
   temperature?: number
   final_weight?: number
   variables?: ProfileVariable[]
+  stages?: Record<string, unknown>[]
 }
 
 interface ScheduledShot {
@@ -822,6 +823,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       {selectedProfile && profileVariables.length > 0 && (
         <VariableAdjustPanel
           profileVariables={profileVariables}
+          profileStages={selectedProfile.stages}
           overrides={overrides}
           onOverridesChange={setOverrides}
           onReset={() => setOverrides({})}
@@ -974,7 +976,6 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       {/* Help Text */}
       <p className="text-xs text-muted-foreground text-center">
         {!selectedProfile && preheat && t('runShot.preheatOnlyHelper')}
-        {selectedProfile && !preheat && !scheduleMode && t('runShot.preheatStartsNow')}
         {selectedProfile && preheat && !scheduleMode && t('runShot.preheatStartsNow')}
         {scheduleMode && preheat && t('runShot.preheatStartsBefore')}
       </p>

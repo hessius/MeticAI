@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -6,9 +6,10 @@ import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import {
-  CaretDown,
-  CaretUp,
+  Minus,
+  Plus,
   ArrowCounterClockwise,
+  Warning,
 } from '@phosphor-icons/react'
 
 export interface ProfileVariable {
@@ -20,6 +21,7 @@ export interface ProfileVariable {
 
 export interface VariableAdjustPanelProps {
   profileVariables: ProfileVariable[]
+  profileStages?: Record<string, unknown>[]
   overrides: Record<string, number>
   onOverridesChange: (overrides: Record<string, number>) => void
   onReset: () => void
@@ -52,8 +54,31 @@ const TYPE_LABEL_KEYS: Record<string, string> = {
   piston_position: 'variables.type.piston',
 }
 
+// Base variable keys that get their own section at the top
+const BASE_VAR_KEYS = new Set(['final_weight', 'temperature'])
+
+/** Recursively find all $variable_key references in a stage object */
+function findVariableRefs(obj: unknown, knownKeys: Set<string>): Set<string> {
+  const refs = new Set<string>()
+  if (typeof obj === 'string') {
+    for (const key of knownKeys) {
+      if (obj.includes(`$${key}`)) refs.add(key)
+    }
+  } else if (Array.isArray(obj)) {
+    for (const item of obj) {
+      for (const ref of findVariableRefs(item, knownKeys)) refs.add(ref)
+    }
+  } else if (obj && typeof obj === 'object') {
+    for (const val of Object.values(obj)) {
+      for (const ref of findVariableRefs(val, knownKeys)) refs.add(ref)
+    }
+  }
+  return refs
+}
+
 export function VariableAdjustPanel({
   profileVariables,
+  profileStages,
   overrides,
   onOverridesChange,
   onReset,
@@ -66,12 +91,27 @@ export function VariableAdjustPanel({
     (v) => !v.key.startsWith('info_')
   )
 
+  // Detect which variables are actually used in profile stages
+  const usedKeys = useMemo(() => {
+    if (!profileStages || profileStages.length === 0) return null // null = unknown (no stages data)
+    const knownKeys = new Set(adjustableVars.map((v) => v.key))
+    const used = new Set<string>()
+    for (const stage of profileStages) {
+      for (const ref of findVariableRefs(stage, knownKeys)) used.add(ref)
+    }
+    return used
+  }, [profileStages, adjustableVars])
+
   if (adjustableVars.length === 0) {
     return null
   }
 
-  // Group by type
-  const grouped = adjustableVars.reduce<Record<string, ProfileVariable[]>>(
+  // Split into base variables (final_weight, temperature) and the rest
+  const baseVars = adjustableVars.filter((v) => BASE_VAR_KEYS.has(v.key))
+  const otherVars = adjustableVars.filter((v) => !BASE_VAR_KEYS.has(v.key))
+
+  // Group remaining variables by type
+  const grouped = otherVars.reduce<Record<string, ProfileVariable[]>>(
     (acc, v) => {
       const type = v.type || 'other'
       if (!acc[type]) acc[type] = []
@@ -129,7 +169,7 @@ export function VariableAdjustPanel({
             </span>
           )}
         </div>
-        {isExpanded ? <CaretUp size={18} /> : <CaretDown size={18} />}
+        {isExpanded ? <Minus size={18} /> : <Plus size={18} />}
       </button>
       <p className="text-xs text-muted-foreground">
         {t('variables.temporaryNote')}
@@ -155,94 +195,23 @@ export function VariableAdjustPanel({
                 </div>
               )}
 
-              {/* Variable groups */}
+              {/* Base Variables (Final Weight & Temperature) */}
+              {baseVars.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t('variables.baseVariables')}
+                  </p>
+                  {baseVars.map((variable) => renderVariable(variable))}
+                </div>
+              )}
+
+              {/* Other Variable groups */}
               {Object.entries(grouped).map(([type, vars]) => (
                 <div key={type} className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {t(TYPE_LABEL_KEYS[type] ?? type, type)}
                   </p>
-
-                  {vars.map((variable) => {
-                    const config = VARIABLE_CONFIG[variable.type] ?? {
-                      min: 0,
-                      max: 100,
-                      step: 1,
-                      unit: '',
-                    }
-                    const currentValue = getDisplayValue(variable)
-                    const diff = getDiff(variable)
-                    const isModified = diff !== null
-
-                    return (
-                      <div
-                        key={variable.key}
-                        className="space-y-1.5 p-3 rounded-lg bg-muted/30"
-                      >
-                        {/* Variable header */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium truncate">
-                            {variable.name}
-                          </span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {isModified && (
-                              <>
-                                <span
-                                  className={`text-xs font-medium ${
-                                    diff! > 0
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-red-600 dark:text-red-400'
-                                  }`}
-                                >
-                                  {diff! > 0 ? '+' : ''}
-                                  {Number(diff!.toFixed(2))}{config.unit}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => handleResetOne(variable.key)}
-                                  aria-label={t('a11y.resetVariable', { name: variable.name })}
-                                >
-                                  <ArrowCounterClockwise size={12} />
-                                </Button>
-                              </>
-                            )}
-                            <span className="text-sm font-mono tabular-nums min-w-[4rem] text-right">
-                              {Number(currentValue.toFixed(2))}{config.unit}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Slider */}
-                        <Slider
-                          value={[currentValue]}
-                          min={config.min}
-                          max={config.max}
-                          step={config.step}
-                          onValueChange={([v]) =>
-                            handleSliderChange(variable.key, v)
-                          }
-                          aria-label={t('a11y.variableSlider', {
-                            name: variable.name,
-                            value: Number(currentValue.toFixed(2)),
-                            unit: config.unit,
-                            min: config.min,
-                            max: config.max,
-                          })}
-                          className={isModified ? '[&_[role=slider]]:border-primary' : ''}
-                        />
-
-                        {/* Original value hint */}
-                        {isModified && (
-                          <p className="text-xs text-muted-foreground">
-                            {t('variables.original', {
-                              value: `${variable.value}${config.unit}`,
-                            })}
-                          </p>
-                        )}
-                      </div>
-                    )
-                  })}
+                  {vars.map((variable) => renderVariable(variable))}
                 </div>
               ))}
 
@@ -252,4 +221,99 @@ export function VariableAdjustPanel({
       </AnimatePresence>
     </Card>
   )
+
+  function renderVariable(variable: ProfileVariable) {
+    const config = VARIABLE_CONFIG[variable.type] ?? {
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '',
+    }
+    const currentValue = getDisplayValue(variable)
+    const diff = getDiff(variable)
+    const isModified = diff !== null
+    const isUnused = usedKeys !== null && !usedKeys.has(variable.key)
+
+    return (
+      <div
+        key={variable.key}
+        className={`space-y-1.5 p-3 rounded-lg ${isUnused ? 'bg-amber-500/5 border border-amber-500/20' : 'bg-muted/30'}`}
+      >
+        {/* Variable header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {isUnused && (
+              <Warning size={14} className="text-amber-500 shrink-0" weight="fill" />
+            )}
+            <span className={`text-sm font-medium truncate ${isUnused ? 'text-amber-700 dark:text-amber-400' : ''}`}>
+              {variable.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {isModified && (
+              <>
+                <span
+                  className={`text-xs font-medium ${
+                    diff! > 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}
+                >
+                  {diff! > 0 ? '+' : ''}
+                  {Number(diff!.toFixed(2))}{config.unit}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => handleResetOne(variable.key)}
+                  aria-label={t('a11y.resetVariable', { name: variable.name })}
+                >
+                  <ArrowCounterClockwise size={12} />
+                </Button>
+              </>
+            )}
+            <span className="text-sm font-mono tabular-nums min-w-[4rem] text-right">
+              {Number(currentValue.toFixed(2))}{config.unit}
+            </span>
+          </div>
+        </div>
+
+        {/* Unused warning */}
+        {isUnused && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            {t('variables.unusedWarning')}
+          </p>
+        )}
+
+        {/* Slider */}
+        <Slider
+          value={[currentValue]}
+          min={config.min}
+          max={config.max}
+          step={config.step}
+          onValueChange={([v]) =>
+            handleSliderChange(variable.key, v)
+          }
+          aria-label={t('a11y.variableSlider', {
+            name: variable.name,
+            value: Number(currentValue.toFixed(2)),
+            unit: config.unit,
+            min: config.min,
+            max: config.max,
+          })}
+          className={isModified ? '[&_[role=slider]]:border-primary' : ''}
+        />
+
+        {/* Original value hint */}
+        {isModified && (
+          <p className="text-xs text-muted-foreground">
+            {t('variables.original', {
+              value: `${variable.value}${config.unit}`,
+            })}
+          </p>
+        )}
+      </div>
+    )
+  }
 }

@@ -1203,6 +1203,8 @@
     "overridesApplied": "{{count}} justerade",
     "original": "Original: {{value}}",
     "noAdjustable": "Inga justerbara variabler i denna profil",
+    "baseVariables": "Grundvariabler",
+    "unusedWarning": "Denna variabel är definierad men används inte i något steg",
     "type": {
       "pressure": "Tryck",
       "flow": "Flöde",
