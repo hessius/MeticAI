@@ -110,6 +110,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   // Variable overrides state
   const [profileVariables, setProfileVariables] = useState<ProfileVariable[]>([])
   const [overrides, setOverrides] = useState<Record<string, number>>({})
+  const [saveAsNew, setSaveAsNew] = useState(false)
+  const [saveAsNewName, setSaveAsNewName] = useState('')
   const [showSaveModeDialog, setShowSaveModeDialog] = useState(false)
   const [saveModeNewName, setSaveModeNewName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -163,7 +165,6 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   // in the profile list). Synthesise final_weight / temperature entries when
   // they are not present in the explicit variables array so every profile has
   // at least basic adjustable parameters.
-  const selectedProfileId = selectedProfile?.id
   useEffect(() => {
     if (!selectedProfile) {
       setProfileVariables([])
@@ -180,7 +181,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
     if (selectedProfile.final_weight != null && !existingKeys.has('final_weight')) {
       raw.push({
         key: 'final_weight',
-        name: 'Final Weight',
+        name: t('variables.synthesized.finalWeight', 'Final Weight'),
         type: 'weight',
         value: selectedProfile.final_weight,
       })
@@ -188,7 +189,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
     if (selectedProfile.temperature != null && !existingKeys.has('temperature')) {
       raw.push({
         key: 'temperature',
-        name: 'Temperature',
+        name: t('variables.synthesized.temperature', 'Temperature'),
         type: 'temperature',
         value: selectedProfile.temperature,
       })
@@ -196,7 +197,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
 
     setProfileVariables(raw)
     setOverrides({})
-  }, [selectedProfileId])
+  }, [selectedProfile, t])
 
   // Fetch machine status and scheduled shots
   useEffect(() => {
@@ -321,6 +322,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
 
           toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
         }
+
+        // Navigate to live view after preheat started
+        if (onNavigateToLive) {
+          setTimeout(() => onNavigateToLive(), 500)
+        }
       } else if (selectedProfile) {
         const hasOverrides = Object.keys(overrides).length > 0
         
@@ -328,7 +334,10 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           // Run profile with variable overrides
           const formData = new FormData()
           formData.append('overrides_json', JSON.stringify(overrides))
-          formData.append('save_mode', 'none')
+          formData.append('save_mode', saveAsNew ? 'save_new' : 'none')
+          if (saveAsNew && saveAsNewName.trim()) {
+            formData.append('new_name', saveAsNewName.trim())
+          }
           
           const response = await fetch(
             `${serverUrl}/api/machine/run-profile-with-overrides/${selectedProfile.id}`,
@@ -346,8 +355,6 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             throw new Error(errorMessage)
           }
           
-          // Store shot info for save mode dialog
-          lastShotRef.current = { profileId: selectedProfile.id, overrides: { ...overrides } }
           toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
           
           // Navigate to live view after successful run (with overrides)
@@ -355,13 +362,17 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             setTimeout(() => onNavigateToLive(), 500)
           }
           
-          // Show save mode dialog after a short delay
-          setTimeout(() => setShowSaveModeDialog(true), 2000)
-          // Auto-dismiss after 30 seconds
-          saveModeTimerRef.current = setTimeout(() => {
-            setShowSaveModeDialog(false)
-            lastShotRef.current = null
-          }, 32000)
+          // If not saving as new, show post-shot dialog as a reminder
+          if (!saveAsNew) {
+            // Store shot info for save mode dialog
+            lastShotRef.current = { profileId: selectedProfile.id, overrides: { ...overrides } }
+            setTimeout(() => setShowSaveModeDialog(true), 2000)
+            // Auto-dismiss after 30 seconds
+            saveModeTimerRef.current = setTimeout(() => {
+              setShowSaveModeDialog(false)
+              lastShotRef.current = null
+            }, 32000)
+          }
         } else {
           // Run profile immediately (no overrides)
           const response = await fetch(`${serverUrl}/api/machine/run-profile/${selectedProfile.id}`, {
@@ -856,6 +867,46 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             onCheckedChange={setScheduleMode}
           />
         </div>
+
+        {/* Save as New Profile Toggle (only when overrides exist) */}
+        {Object.keys(overrides).length > 0 && (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="saveAsNew" className="text-sm font-medium flex items-center gap-2">
+                  <FloppyDiskBack size={18} className={saveAsNew ? 'text-primary' : 'text-muted-foreground'} />
+                  {t('runShot.saveAsNew')}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('runShot.saveAsNewDescription')}
+                </p>
+              </div>
+              <Switch
+                id="saveAsNew"
+                checked={saveAsNew}
+                onCheckedChange={setSaveAsNew}
+              />
+            </div>
+            <AnimatePresence>
+              {saveAsNew && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <input
+                    type="text"
+                    value={saveAsNewName}
+                    onChange={e => setSaveAsNewName(e.target.value)}
+                    placeholder={t('runShot.newProfileNamePlaceholder')}
+                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
 
         {/* Time Picker (when scheduling) */}
         <AnimatePresence>
