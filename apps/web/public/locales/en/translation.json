@@ -962,6 +962,7 @@
     "noProfiles": "No profiles found on the machine",
     "inHistory": "In catalogue",
     "rename": "Rename",
+    "editMode": "Edit",
     "delete": "Delete",
     "export": "Export JSON",
     "confirmDelete": "Delete",

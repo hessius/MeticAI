@@ -1056,6 +1056,7 @@
     "noProfiles": "Keine Profile auf der Maschine gefunden",
     "inHistory": "Im Katalog",
     "rename": "Umbenennen",
+    "editMode": "Bearbeiten",
     "delete": "Löschen",
     "export": "JSON exportieren",
     "confirmDelete": "Löschen",

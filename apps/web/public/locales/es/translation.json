@@ -1056,6 +1056,7 @@
     "noProfiles": "No se encontraron perfiles en la máquina",
     "inHistory": "En el catálogo",
     "rename": "Renombrar",
+    "editMode": "Editar",
     "delete": "Eliminar",
     "export": "Exportar JSON",
     "confirmDelete": "Eliminar",

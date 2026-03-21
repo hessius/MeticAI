@@ -1056,6 +1056,7 @@
     "noProfiles": "Nessun profilo trovato sulla macchina",
     "inHistory": "Nel catalogo",
     "rename": "Rinomina",
+    "editMode": "Modifica",
     "delete": "Elimina",
     "export": "Esporta JSON",
     "confirmDelete": "Elimina",

@@ -1056,6 +1056,7 @@
     "noProfiles": "Aucun profil trouvé sur la machine",
     "inHistory": "Dans le catalogue",
     "rename": "Renommer",
+    "editMode": "Modifier",
     "delete": "Supprimer",
     "export": "Exporter JSON",
     "confirmDelete": "Supprimer",

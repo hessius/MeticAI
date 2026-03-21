@@ -18,6 +18,7 @@ import {
   Warning,
   CheckCircle,
   SpinnerGap,
+  FileJs,
   X
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
@@ -155,6 +156,9 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
 
   // Bulk delete dialog state
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false)
 
   // Profile image cache
   const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
@@ -334,6 +338,34 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     fetchOrphaned()
   }
   
+  // Export profile JSON
+  const handleExport = async (profile: MachineProfile) => {
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/machine/profile/${encodeURIComponent(profile.id)}/json`)
+      if (!response.ok) {
+        throw new Error(t('profileCatalogue.exportFailed'))
+      }
+      
+      const data = await response.json()
+      const blob = new Blob([JSON.stringify(data.profile, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${profile.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      toast.success(t('profileCatalogue.exported'))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('profileCatalogue.exportFailed')
+      toast.error(message)
+    }
+  }
+
   // Start rename
   const startRename = (profile: MachineProfile) => {
     setRenamingId(profile.id)
@@ -376,15 +408,25 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              variant="outline"
+              variant={isEditing ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setBulkDeleteOpen(true)}
-              disabled={isLoading || profiles.filter(p => !p.in_history).length === 0}
-              className="text-destructive hover:text-destructive"
+              onClick={() => setIsEditing(!isEditing)}
             >
-              <Trash className="w-4 h-4 mr-2" />
-              {t('profileCatalogue.bulkDelete.button')}
+              <PencilSimple className="w-4 h-4 mr-2" />
+              {isEditing ? t('common.done') : t('profileCatalogue.editMode')}
             </Button>
+            {isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkDeleteOpen(true)}
+                disabled={isLoading || profiles.filter(p => !p.in_history).length === 0}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash className="w-4 h-4 mr-2" />
+                {t('profileCatalogue.bulkDelete.button')}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -584,8 +626,17 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                       </div>
                       
                       {/* Actions */}
-                      {renamingId !== profile.id && (
+                      {renamingId !== profile.id && isEditing && (
                         <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleExport(profile)}
+                            title={t('profileCatalogue.export')}
+                            aria-label={t('profileCatalogue.export')}
+                          >
+                            <FileJs className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -594,6 +645,16 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             aria-label={t('profileCatalogue.rename')}
                           >
                             <PencilSimple className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDeleteDialog(profile)}
+                            title={t('profileCatalogue.delete')}
+                            aria-label={t('profileCatalogue.delete')}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash className="w-4 h-4" />
                           </Button>
                         </div>
                       )}
