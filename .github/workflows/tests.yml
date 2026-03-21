@@ -2,7 +2,7 @@ name: Test Suite
 
 on:
   push:
-    branches: [main, develop, version/2.0.0]
+    branches: [main, develop, version/2.0.0, "feat/machine-hosted-pwa"]
   pull_request:
     branches: [main, develop, version/2.0.0]
 
@@ -106,6 +106,9 @@ jobs:
 
       - name: Run unit tests
         run: bun run test:run
+
+      - name: Run direct-mode tests
+        run: bun run test:direct
 
       - name: Generate coverage report
         run: bun run test:coverage
