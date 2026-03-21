@@ -289,7 +289,10 @@
     "noProfileSelected": "Kein Profil ausgewählt. Wählen Sie ein Profil oder verwenden Sie nur Vorheizen.",
     "selectProfile": "Profil auswählen",
     "scheduleFailed": "Fehler beim Planen des Shots",
-    "saveScheduleFailed": "Fehler beim Speichern des Zeitplans"
+    "saveScheduleFailed": "Fehler beim Speichern des Zeitplans",
+    "saveAsNew": "Als neues Profil speichern",
+    "saveAsNewDescription": "Angepasste Variablen als neues Profil speichern",
+    "newProfileNamePlaceholder": "Neuer Profilname..."
   },
   "shotHistory": {
     "duration": "Dauer",
@@ -1208,6 +1211,10 @@
       "piston": "Kolben",
       "temperature": "Temperatur"
     },
+    "synthesized": {
+      "finalWeight": "Endgewicht",
+      "temperature": "Temperatur"
+    },
     "temporaryNote": "Änderungen gelten nur vorübergehend für diesen Shot. Vollständige Profilbearbeitung ist im Profilkatalog verfügbar."
   },
   "profileRecommendations": {
@@ -1387,7 +1394,10 @@
     "analyzing": "Analyse läuft, bitte warten",
     "chart": {
       "espressoShot": "Espresso-Shot-Diagramm mit Druck, Fluss und Gewicht über die Zeit",
-      "espressoShotLive": "Live-Espresso-Shot-Diagramm mit Druck, Fluss und Gewicht über die Zeit"
+      "espressoShotLive": "Live-Espresso-Shot-Diagramm mit Druck, Fluss und Gewicht über die Zeit",
+      "extractionReplay": "Wiedergabediagramm mit Druck, Fluss und Gewicht über die Zeit",
+      "extractionComparison": "Vergleichsdiagramm mit zwei Shots nebeneinander",
+      "shotVsProfile": "Diagramm zum Vergleich der tatsächlichen Shotdaten mit dem Zielprofil"
     },
     "expandSection": "{{section}} aufklappen",
     "collapseSection": "{{section}} zuklappen",

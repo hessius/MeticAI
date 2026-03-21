@@ -289,7 +289,10 @@
       "shotCancelled": "Schemalagd shot avbruten"
     },
     "scheduleFailed": "Kunde inte schemalägga shot",
-    "saveScheduleFailed": "Kunde inte spara schema"
+    "saveScheduleFailed": "Kunde inte spara schema",
+    "saveAsNew": "Spara som ny profil",
+    "saveAsNewDescription": "Spara justerade variabler som en ny profil",
+    "newProfileNamePlaceholder": "Nytt profilnamn..."
   },
   "shotHistory": {
     "duration": "Varaktighet",
@@ -1208,6 +1211,10 @@
       "piston": "Kolv",
       "temperature": "Temperatur"
     },
+    "synthesized": {
+      "finalWeight": "Slutvikt",
+      "temperature": "Temperatur"
+    },
     "temporaryNote": "Ändringar gäller bara tillfälligt för denna shot. Fullständig profilredigering finns i profilkatalogen."
   },
   "profileRecommendations": {
@@ -1387,7 +1394,10 @@
     "analyzing": "Analyserar, vänta",
     "chart": {
       "espressoShot": "Espressoshotdiagram som visar tryck, flöde och vikt över tid",
-      "espressoShotLive": "Livediagram för espressoshot som visar tryck, flöde och vikt över tid"
+      "espressoShotLive": "Livediagram för espressoshot som visar tryck, flöde och vikt över tid",
+      "extractionReplay": "Uppspelningsdiagram som visar tryck, flöde och vikt över tid",
+      "extractionComparison": "Jämförelsediagram som visar två shot sida vid sida",
+      "shotVsProfile": "Diagram som jämför faktisk shotdata mot målprofilen"
     },
     "expandSection": "Expandera {{section}}",
     "collapseSection": "Komprimera {{section}}",

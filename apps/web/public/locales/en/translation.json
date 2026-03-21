@@ -289,7 +289,10 @@
       "shotCancelled": "Scheduled shot cancelled"
     },
     "scheduleFailed": "Failed to schedule shot",
-    "saveScheduleFailed": "Failed to save schedule"
+    "saveScheduleFailed": "Failed to save schedule",
+    "saveAsNew": "Save as new profile",
+    "saveAsNewDescription": "Save adjusted variables as a new profile",
+    "newProfileNamePlaceholder": "New profile name..."
   },
   "shotHistory": {
     "title": "Shot History",
@@ -1208,6 +1211,10 @@
       "piston": "Piston",
       "temperature": "Temperature"
     },
+    "synthesized": {
+      "finalWeight": "Final Weight",
+      "temperature": "Temperature"
+    },
     "temporaryNote": "Changes are temporary for this shot only. Full profile editing is available in the Profile Catalogue."
   },
   "profileRecommendations": {
@@ -1387,7 +1394,10 @@
     "analyzing": "Analyzing, please wait",
     "chart": {
       "espressoShot": "Espresso shot chart showing pressure, flow, and weight over time",
-      "espressoShotLive": "Live espresso shot chart showing pressure, flow, and weight over time"
+      "espressoShotLive": "Live espresso shot chart showing pressure, flow, and weight over time",
+      "extractionReplay": "Extraction replay chart showing pressure, flow, and weight over time",
+      "extractionComparison": "Comparison chart showing two shots side by side",
+      "shotVsProfile": "Chart comparing actual shot data against the target profile"
     },
     "expandSection": "Expand {{section}}",
     "collapseSection": "Collapse {{section}}",

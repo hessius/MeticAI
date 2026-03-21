@@ -29,7 +29,6 @@ import {
   Play,
   PencilSimple,
   FloppyDisk,
-  GearSix,
   MagnifyingGlass
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
@@ -258,6 +257,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
             size="icon"
             onClick={onBack}
             className="shrink-0"
+            aria-label={t('a11y.goBack')}
           >
             <CaretLeft size={22} weight="bold" />
           </Button>
@@ -268,14 +268,6 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
             <h2 className="text-lg font-bold tracking-tight">{t('history.title')}</h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Button
-              onClick={() => setShowImportDialog(true)}
-              size="icon"
-              className="h-9 w-9 bg-amber-500 hover:bg-amber-600 text-zinc-900"
-              title={t('history.addProfile')}
-            >
-              <Plus size={18} weight="bold" />
-            </Button>
             {onManageMachine && (
               <Button
                 variant="ghost"
@@ -284,7 +276,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
                 className="relative shrink-0 h-9 w-9"
                 title={t('history.manageMachine')}
               >
-                <GearSix size={18} weight="fill" />
+                <PencilSimple size={18} weight="fill" />
                 {syncBadgeCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-bold leading-4 text-white bg-destructive rounded-full">
                     {syncBadgeCount}
@@ -1228,6 +1220,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                   onBack()
                 }}
                 className="shrink-0"
+                aria-label={t('a11y.goBack')}
               >
                 <CaretLeft size={22} weight="bold" />
               </Button>

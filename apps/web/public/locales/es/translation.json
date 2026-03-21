@@ -289,7 +289,10 @@
     "noProfileSelected": "Ningún perfil seleccionado. Seleccione un perfil o use solo precalentamiento.",
     "selectProfile": "Seleccionar perfil",
     "scheduleFailed": "Error al programar shot",
-    "saveScheduleFailed": "Error al guardar programación"
+    "saveScheduleFailed": "Error al guardar programación",
+    "saveAsNew": "Guardar como nuevo perfil",
+    "saveAsNewDescription": "Guardar variables ajustadas como nuevo perfil",
+    "newProfileNamePlaceholder": "Nombre del nuevo perfil..."
   },
   "shotHistory": {
     "duration": "Duración",
@@ -1208,6 +1211,10 @@
       "piston": "Pistón",
       "temperature": "Temperatura"
     },
+    "synthesized": {
+      "finalWeight": "Peso final",
+      "temperature": "Temperatura"
+    },
     "temporaryNote": "Los cambios son temporales solo para este shot. La edición completa del perfil está disponible en el Catálogo de Perfiles."
   },
   "profileRecommendations": {
@@ -1387,7 +1394,10 @@
     "analyzing": "Analizando, por favor espere",
     "chart": {
       "espressoShot": "Gráfico de shot de espresso mostrando presión, flujo y peso a lo largo del tiempo",
-      "espressoShotLive": "Gráfico en vivo de shot de espresso mostrando presión, flujo y peso a lo largo del tiempo"
+      "espressoShotLive": "Gráfico en vivo de shot de espresso mostrando presión, flujo y peso a lo largo del tiempo",
+      "extractionReplay": "Gráfico de reproducción mostrando presión, flujo y peso a lo largo del tiempo",
+      "extractionComparison": "Gráfico comparativo mostrando dos extracciones lado a lado",
+      "shotVsProfile": "Gráfico comparando los datos reales del shot con el perfil objetivo"
     },
     "expandSection": "Expandir {{section}}",
     "collapseSection": "Contraer {{section}}",

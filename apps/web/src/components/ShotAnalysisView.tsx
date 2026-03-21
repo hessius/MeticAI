@@ -262,7 +262,7 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
       <Card className="p-6 space-y-5">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
             <CaretLeft size={20} weight="bold" />
           </Button>
           <div className="flex-1 min-w-0">
