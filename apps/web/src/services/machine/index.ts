@@ -5,6 +5,16 @@
  * Use `useMachineService()` hook in components to access machine commands.
  */
 
-export type { MachineService, CommandResult } from './MachineService'
-export { MachineServiceProvider, MachineServiceContext } from './MachineServiceContext'
+export type {
+  MachineService,
+  CommandResult,
+  StatusCallback,
+  ActuatorsCallback,
+  NotificationCallback,
+  ProfileUpdateCallback,
+  ConnectionCallback,
+  Unsubscribe,
+} from './MachineService'
+export { MachineServiceProvider, MachineServiceContext, useMachineService } from './MachineServiceContext'
 export { createMeticAIAdapter, meticAIAdapter } from './MeticAIAdapter'
+export { createDirectAdapter } from './DirectAdapter'

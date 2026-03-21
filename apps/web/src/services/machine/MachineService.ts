@@ -1,75 +1,103 @@
 /**
  * MachineService interface — abstraction layer for machine communication.
  *
- * This interface defines all commands and telemetry operations that can be
- * performed against a Meticulous espresso machine. The default implementation
- * (MeticAIAdapter) delegates to the MeticAI backend REST API, but alternative
- * implementations could target the machine directly or provide mock behavior.
+ * Defines all operations that can be performed against a Meticulous espresso
+ * machine. Two implementations exist:
+ *
+ * - **ProxyAdapter** — delegates to the MeticAI FastAPI backend (Docker mode)
+ * - **DirectAdapter** — talks directly to the machine via @meticulous-home/espresso-api (PWA mode)
  */
 
+import type { Profile } from '@meticulous-home/espresso-profile'
+import type {
+  ActionType,
+  Actuators,
+  DeviceInfo,
+  HistoryListingEntry,
+  Notification as MachineNotification,
+  ProfileIdent,
+  Settings as MachineSettings,
+  StatusData,
+} from '@meticulous-home/espresso-api'
+
+// Re-export for convenience
+export type { Profile, ProfileIdent, StatusData, Actuators, MachineNotification, MachineSettings, DeviceInfo, ActionType }
+
 // ---------------------------------------------------------------------------
-// Types
+// Result types
 // ---------------------------------------------------------------------------
 
-/** Result of a machine command execution */
 export interface CommandResult {
   success: boolean
   message?: string
 }
 
-/** Brewing-related commands */
-export interface BrewingCommands {
-  /** Start a shot (machine must be idle or ready) */
-  startShot(): Promise<CommandResult>
+// ---------------------------------------------------------------------------
+// Telemetry callback types
+// ---------------------------------------------------------------------------
 
-  /** Stop a shot gracefully (machine must be brewing) */
-  stopShot(): Promise<CommandResult>
-
-  /** Abort a shot immediately (machine must be brewing) */
-  abortShot(): Promise<CommandResult>
-
-  /** Continue past a prompt / hold stage */
-  continueShot(): Promise<CommandResult>
-}
-
-/** Machine control commands */
-export interface MachineCommands {
-  /** Start pre-heating (machine must be idle) */
-  preheat(): Promise<CommandResult>
-
-  /** Tare the scale */
-  tareScale(): Promise<CommandResult>
-
-  /** Home the plunger */
-  homePlunger(): Promise<CommandResult>
-
-  /** Run a purge cycle (machine must be idle) */
-  purge(): Promise<CommandResult>
-}
-
-/** Configuration commands */
-export interface ConfigCommands {
-  /** Load a profile by name */
-  loadProfile(name: string): Promise<CommandResult>
-
-  /** Set display brightness (0–100) */
-  setBrightness(value: number): Promise<CommandResult>
-
-  /** Enable or disable sounds */
-  enableSounds(enabled: boolean): Promise<CommandResult>
-}
+export type StatusCallback = (data: StatusData) => void
+export type ActuatorsCallback = (data: Actuators) => void
+export type NotificationCallback = (data: MachineNotification) => void
+export type ProfileUpdateCallback = (data: { change: string; profile_id?: string }) => void
+export type ConnectionCallback = (connected: boolean) => void
+export type Unsubscribe = () => void
 
 // ---------------------------------------------------------------------------
 // Main Interface
 // ---------------------------------------------------------------------------
 
-/**
- * Complete interface for machine service operations.
- *
- * Combines brewing, machine, and config commands into a single facade.
- * Components should use `useMachineService()` hook to access this interface.
- */
-export interface MachineService extends BrewingCommands, MachineCommands, ConfigCommands {
-  /** Service name for debugging/logging */
+export interface MachineService {
   readonly name: string
+
+  // -- Connection -----------------------------------------------------------
+  connect(url: string): Promise<void>
+  disconnect(): void
+  isConnected(): boolean
+  onConnectionChange(cb: ConnectionCallback): Unsubscribe
+
+  // -- Commands (brewing) ---------------------------------------------------
+  startShot(): Promise<CommandResult>
+  stopShot(): Promise<CommandResult>
+  abortShot(): Promise<CommandResult>
+  continueShot(): Promise<CommandResult>
+
+  // -- Commands (machine) ---------------------------------------------------
+  preheat(): Promise<CommandResult>
+  tareScale(): Promise<CommandResult>
+  homePlunger(): Promise<CommandResult>
+  purge(): Promise<CommandResult>
+
+  // -- Commands (config) ----------------------------------------------------
+  loadProfile(name: string): Promise<CommandResult>
+  loadProfileFromJSON(profile: Profile): Promise<CommandResult>
+  setBrightness(value: number): Promise<CommandResult>
+  enableSounds(enabled: boolean): Promise<CommandResult>
+
+  // -- Profiles -------------------------------------------------------------
+  listProfiles(): Promise<ProfileIdent[]>
+  fetchAllProfiles(): Promise<Profile[]>
+  getProfile(id: string): Promise<Profile>
+  saveProfile(profile: Profile): Promise<ProfileIdent>
+  deleteProfile(id: string): Promise<void>
+
+  // -- Telemetry (real-time) ------------------------------------------------
+  onStatus(cb: StatusCallback): Unsubscribe
+  onActuators(cb: ActuatorsCallback): Unsubscribe
+  onNotification(cb: NotificationCallback): Unsubscribe
+  onProfileUpdate(cb: ProfileUpdateCallback): Unsubscribe
+
+  // -- History --------------------------------------------------------------
+  getHistoryListing(): Promise<HistoryListingEntry[]>
+  getLastShot(): Promise<HistoryListingEntry | null>
+
+  // -- Settings / Device ----------------------------------------------------
+  getSettings(): Promise<MachineSettings>
+  updateSetting(settings: Partial<MachineSettings>): Promise<MachineSettings>
+  getDeviceInfo(): Promise<DeviceInfo>
 }
+
+// Legacy sub-interfaces kept for backward compatibility with existing code
+export type BrewingCommands = Pick<MachineService, 'startShot' | 'stopShot' | 'abortShot' | 'continueShot'>
+export type MachineCommands = Pick<MachineService, 'preheat' | 'tareScale' | 'homePlunger' | 'purge'>
+export type ConfigCommands = Pick<MachineService, 'loadProfile' | 'setBrightness' | 'enableSounds'>
