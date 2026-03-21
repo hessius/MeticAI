@@ -189,6 +189,8 @@ class ModePreferences(BaseModel):
     bloomSeconds: float = 30
     bloomWeightMultiplier: float = 2
     machineIntegration: bool = False
+    doseGrams: Optional[float] = None
+    brewRatio: Optional[float] = None
 
 
 class RecipeModePreferences(BaseModel):
