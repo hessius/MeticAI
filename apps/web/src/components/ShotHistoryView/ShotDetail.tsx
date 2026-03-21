@@ -13,6 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from '@/components/ui/select'
+import { useScrollToTop } from '@/hooks/useScrollToTop'
 import {
   CaretLeft,
   Warning,
@@ -156,6 +157,8 @@ export function ShotDetail({
   const [llmAnalysisError, setLlmAnalysisError] = useState<string | null>(null)
   const [showLlmView, setShowLlmView] = useState(false)
   const [isLlmCached, setIsLlmCached] = useState(false)
+
+  useScrollToTop([showLlmView])
 
   // ---- Replay hooks -------------------------------------------------------
   const mainMaxTime = useMemo(() => {

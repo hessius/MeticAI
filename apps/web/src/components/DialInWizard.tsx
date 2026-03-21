@@ -8,6 +8,7 @@ import { ArrowLeft } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { toast } from 'sonner'
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
+import { useScrollToTop } from '@/hooks/useScrollToTop'
 import { DialInCoffeeStep } from './DialInCoffeeStep'
 import { DialInProfileStep } from './DialInProfileStep'
 import { DialInPrepStep } from './DialInPrepStep'
@@ -65,6 +66,8 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
   const [coffee, setCoffee] = useState<CoffeeDetails>({ roast_level: 'medium' })
   const [profileName, setProfileName] = useState<string>('')
   const [loading, setLoading] = useState(false)
+
+  useScrollToTop([step])
 
   const stepIndex = STEPS.indexOf(step)
   const progress = ((stepIndex + 1) / STEPS.length) * 100

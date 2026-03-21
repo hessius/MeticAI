@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import { AnimatePresence } from 'framer-motion'
 import { useShotHistory } from '@/hooks/useShotHistory'
+import { useScrollToTop } from '@/hooks/useScrollToTop'
 import { getServerUrl } from '@/lib/config'
 
 import type { ShotInfo } from './types'
@@ -48,6 +49,8 @@ export function ShotHistoryView({
   const [annotationSummaries, setAnnotationSummaries] = useState<
     Record<string, { has_annotation: boolean; rating: number | null }>
   >({})
+
+  useScrollToTop([selectedShot])
 
   // Track whether the component was opened with a specific shot pre-selected
   const enteredWithShot = useRef(!!(initialShotDate && initialShotFilename))

@@ -29,7 +29,6 @@ import {
   Play,
   PencilSimple,
   FloppyDisk,
-  GearSix,
   MagnifyingGlass,
   DownloadSimple
 } from '@phosphor-icons/react'
