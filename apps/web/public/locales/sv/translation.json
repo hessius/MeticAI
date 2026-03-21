@@ -153,6 +153,7 @@
     "deleteConfirm": "Är du säker på att du vill ta bort denna profil från katalogen?",
     "jsonNotAvailable": "Profil-JSON är inte tillgänglig för denna post",
     "downloadJson": "Ladda ner JSON",
+    "saveImage": "Spara bild",
     "profilePicture": "Profilbild",
     "selectStyle": "Välj stil",
     "exportAs": "Exportera som",

@@ -153,6 +153,7 @@
     "deleteConfirm": "Are you sure you want to delete this profile from the catalogue?",
     "jsonNotAvailable": "Profile JSON not available for this entry",
     "downloadJson": "Download JSON",
+    "saveImage": "Save Image",
     "profilePicture": "Profile Picture",
     "selectStyle": "Select Style",
     "exportAs": "Export as",

@@ -153,6 +153,7 @@
     "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce profil du catalogue ?",
     "jsonNotAvailable": "JSON du profil non disponible pour cette entrée",
     "downloadJson": "Télécharger JSON",
+    "saveImage": "Enregistrer l'image",
     "profilePicture": "Image de profil",
     "selectStyle": "Sélectionner le style",
     "exportAs": "Exporter en tant que",

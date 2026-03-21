@@ -473,6 +473,11 @@ class PromptBuilder:
         # Build the prompt sections
         prompt_parts = []
         
+        # 0. Strong no-text directive up front for maximum model adherence
+        prompt_parts.append(
+            "IMPORTANT: Generate an image with absolutely no text, words, letters, numbers, or typography of any kind"
+        )
+        
         # 1. Profile name as central concept
         prompt_parts.append(
             f'"{self.profile_name}" {profile_emphasis}'

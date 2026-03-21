@@ -29,7 +29,9 @@ import {
   Play,
   PencilSimple,
   FloppyDisk,
-  MagnifyingGlass
+  GearSix,
+  MagnifyingGlass,
+  DownloadSimple
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
@@ -607,6 +609,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
   const [showLightbox, setShowLightbox] = useState(false)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const imageSectionRef = useRef<HTMLDivElement>(null)
   
   // Machine profile ID for run/schedule functionality
   const [machineProfileId, setMachineProfileId] = useState<string | null>(null)
@@ -1541,7 +1544,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         {!isCapturing && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Profile Image Upload */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" ref={imageSectionRef}>
               <Label className="text-xs font-medium text-muted-foreground block text-center">{t('history.profilePicture')}</Label>
               <input
                 ref={imageInputRef}
@@ -1756,6 +1759,21 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               <p className="text-center text-white/80 mt-4 text-sm font-medium">{cleanProfileName(entry.profile_name)}</p>
               {/* Image actions in lightbox */}
               <div className="flex gap-2 mt-4 justify-center">
+                {profileImage && (
+                  <Button
+                    variant="outline"
+                    className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    onClick={() => {
+                      const link = document.createElement('a')
+                      link.href = profileImage
+                      link.download = `${cleanProfileName(entry.profile_name).replace(/\s+/g, '_')}.png`
+                      link.click()
+                    }}
+                  >
+                    <DownloadSimple size={16} className="mr-1.5" weight="bold" />
+                    {t('history.saveImage')}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20"
@@ -1763,6 +1781,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                   onClick={() => {
                     setShowLightbox(false)
                     imageInputRef.current?.click()
+                    setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
                   }}
                 >
                   {isUploadingImage ? (
@@ -1780,6 +1799,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                     onClick={() => {
                       setShowLightbox(false)
                       setShowStylePicker(true)
+                      setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
                     }}
                   >
                     {isGeneratingImage ? (
