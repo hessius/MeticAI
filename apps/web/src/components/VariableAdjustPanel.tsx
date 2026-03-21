@@ -86,9 +86,11 @@ export function VariableAdjustPanel({
   const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Filter to only adjustable variables (no info_ prefix)
+  // Filter to only adjustable variables:
+  // - Exclude info_ prefix variables (display-only metadata)
+  // - Exclude variables whose name starts with an emoji (info variables)
   const adjustableVars = profileVariables.filter(
-    (v) => !v.key.startsWith('info_')
+    (v) => !v.key.startsWith('info_') && !/^\p{Emoji}/u.test(v.name)
   )
 
   // Detect which variables are actually used in profile stages
@@ -232,7 +234,7 @@ export function VariableAdjustPanel({
     const currentValue = getDisplayValue(variable)
     const diff = getDiff(variable)
     const isModified = diff !== null
-    const isUnused = usedKeys !== null && !usedKeys.has(variable.key)
+    const isUnused = usedKeys !== null && !BASE_VAR_KEYS.has(variable.key) && !usedKeys.has(variable.key)
 
     return (
       <div
