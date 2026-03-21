@@ -140,7 +140,7 @@ export function RecommendationSelectionDialog({
             <Sparkles className="h-5 w-5 text-primary" />
             {t("recommendations.apply")}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             {t("recommendations.selectChanges")} — {profileName}
           </DialogDescription>
         </DialogHeader>
@@ -185,7 +185,7 @@ export function RecommendationSelectionDialog({
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.04 }}
-                        className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        className={`flex items-start gap-2 sm:gap-3 rounded-lg border p-2 sm:p-3 transition-colors ${
                           isPatchable
                             ? isSelected
                               ? "border-primary/40 bg-primary/5"
@@ -194,7 +194,7 @@ export function RecommendationSelectionDialog({
                         }`}
                       >
                         {/* Checkbox / Info icon */}
-                        <div className="pt-0.5">
+                        <div className="pt-0.5 shrink-0">
                           {isPatchable ? (
                             <Checkbox
                               checked={isSelected}
@@ -208,8 +208,8 @@ export function RecommendationSelectionDialog({
 
                         {/* Content */}
                         <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-sm font-medium">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                            <span className="font-mono text-xs sm:text-sm font-medium break-all">
                               {rec.variable}
                             </span>
                             <Badge
@@ -228,15 +228,14 @@ export function RecommendationSelectionDialog({
                             )}
                           </div>
 
-                          {/* Value change arrow */}
-                          <div className="flex items-center gap-2 text-sm">
+                          {/* Value change */}
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm">
                             <span className="text-muted-foreground">
-                              {t("recommendations.currentValue")}:{" "}
                               <span className="font-mono">
                                 {rec.current_value}
                               </span>
                             </span>
-                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
                             <span className="font-mono font-semibold text-foreground">
                               {rec.recommended_value}
                             </span>
