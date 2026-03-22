@@ -1,15 +1,40 @@
 #!/bin/bash
 # install-meticai.sh — Install MeticAI PWA on a Meticulous machine
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/machine/install-meticai.sh | bash
+# Usage (from another computer, then copy to machine):
+#   wget -qO- https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/machine/install-meticai.sh | bash
 #   # Or with a specific version:
-#   curl -fsSL .../install-meticai.sh | bash -s -- v2.4.0
+#   wget -qO- .../install-meticai.sh | bash -s -- v2.4.0
 set -euo pipefail
 
 METICAI_VERSION="${1:-latest}"
 INSTALL_DIR="/opt/meticai-web"
 MIN_FREE_DISK_MB=20
+
+# ── HTTP helper (wget preferred, curl fallback) ────────────────────────────
+
+fetch() {
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO- "$1"
+  elif command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$1"
+  else
+    echo "ERROR: Neither wget nor curl found. Install wget: apt-get install wget"
+    exit 1
+  fi
+}
+
+download() {
+  local url="$1" dest="$2"
+  if command -v wget >/dev/null 2>&1; then
+    wget -q "$url" -O "$dest"
+  elif command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$dest"
+  else
+    echo "ERROR: Neither wget nor curl found."
+    exit 1
+  fi
+}
 
 echo "╔══════════════════════════════════════════╗"
 echo "║   MeticAI PWA Installer                  ║"
@@ -35,7 +60,7 @@ fi
 
 if [ "$METICAI_VERSION" = "latest" ]; then
   echo "Resolving latest release..."
-  RELEASE_URL=$(curl -fsSL https://api.github.com/repos/hessius/MeticAI/releases/latest \
+  RELEASE_URL=$(fetch https://api.github.com/repos/hessius/MeticAI/releases/latest \
     | grep "browser_download_url.*meticai-web.tar.gz" | head -1 | cut -d'"' -f4)
   if [ -z "$RELEASE_URL" ]; then
     echo "ERROR: Could not find meticai-web.tar.gz in latest release"
@@ -47,7 +72,7 @@ else
 fi
 
 echo "Downloading: ${RELEASE_URL}"
-curl -fsSL "$RELEASE_URL" -o /tmp/meticai-web.tar.gz
+download "$RELEASE_URL" /tmp/meticai-web.tar.gz
 DOWNLOAD_SIZE=$(du -m /tmp/meticai-web.tar.gz | cut -f1)
 echo "Downloaded: ${DOWNLOAD_SIZE} MB"
 echo ""

@@ -72,15 +72,28 @@ LOCALE_COUNT=$(find "$INSTALL_DIR" -path "*/locales/*/translation.json" 2>/dev/n
 check "Locale files (${LOCALE_COUNT}/6)" "$([ "$LOCALE_COUNT" -ge 6 ] && echo 'OK' || echo 'Missing locales')"
 echo ""
 
+# ── HTTP helper ─────────────────────────────────────────────────────────────
+
+http_status() {
+  local url="$1"
+  if command -v wget >/dev/null 2>&1; then
+    wget --spider -q -T 5 "$url" 2>/dev/null && echo "200" || echo "000"
+  elif command -v curl >/dev/null 2>&1; then
+    curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null || echo "000"
+  else
+    echo "000"
+  fi
+}
+
 # ── Routes ──────────────────────────────────────────────────────────────────
 
 echo "── Routes ──"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8080/meticai/ 2>/dev/null || echo "000")
+HTTP_CODE=$(http_status http://localhost:8080/meticai/)
 check "GET /meticai/ (HTTP ${HTTP_CODE})" "$([ "$HTTP_CODE" = "200" ] && echo 'OK' || echo 'Route not configured')"
 
 # ── Machine API ─────────────────────────────────────────────────────────────
 
-API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8080/api/v1/profile 2>/dev/null || echo "000")
+API_CODE=$(http_status http://localhost:8080/api/v1/profile)
 check "Machine API (HTTP ${API_CODE})" "$([ "$API_CODE" = "200" ] && echo 'OK' || echo 'API not responding')"
 echo ""
 
