@@ -76,10 +76,19 @@ echo ""
 
 http_status() {
   local url="$1"
-  if command -v wget >/dev/null 2>&1; then
-    wget --spider -q -T 5 "$url" 2>/dev/null && echo "200" || echo "000"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import urllib.request, sys
+try:
+    r = urllib.request.urlopen('$url', timeout=5)
+    print(r.status)
+except Exception:
+    print('000')
+" 2>/dev/null
   elif command -v curl >/dev/null 2>&1; then
     curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null || echo "000"
+  elif busybox wget --spider -q -T 5 "$url" 2>/dev/null; then
+    echo "200"
   else
     echo "000"
   fi

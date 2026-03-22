@@ -1,37 +1,63 @@
 #!/bin/bash
 # install-meticai.sh — Install MeticAI PWA on a Meticulous machine
 #
-# Usage (from another computer, then copy to machine):
-#   wget -qO- https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/machine/install-meticai.sh | bash
-#   # Or with a specific version:
-#   wget -qO- .../install-meticai.sh | bash -s -- v2.4.0
+# Usage (auto-download from GitHub):
+#   python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
+#     https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/machine/install-meticai.sh | bash
+#
+# Usage (manual — build locally and SCP):
+#   # On your dev machine:
+#   cd apps/web && bun run build:machine
+#   tar -czf meticai-web.tar.gz -C dist .
+#   scp meticai-web.tar.gz root@<machine-ip>:/tmp/
+#   scp scripts/machine/install-meticai.sh root@<machine-ip>:/tmp/
+#   # On the machine:
+#   bash /tmp/install-meticai.sh --local /tmp/meticai-web.tar.gz
 set -euo pipefail
 
-METICAI_VERSION="${1:-latest}"
+LOCAL_TARBALL=""
+METICAI_VERSION="latest"
+
+# Parse arguments
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --local) LOCAL_TARBALL="$2"; shift 2 ;;
+    *) METICAI_VERSION="$1"; shift ;;
+  esac
+done
+
 INSTALL_DIR="/opt/meticai-web"
 MIN_FREE_DISK_MB=20
 
-# ── HTTP helper (wget preferred, curl fallback) ────────────────────────────
+# ── HTTP helper (busybox wget → python3 urllib → curl → wget) ───────────────
 
 fetch() {
-  if command -v wget >/dev/null 2>&1; then
-    wget -qO- "$1"
+  if busybox wget -q -O - "$1" 2>/dev/null; then
+    return 0
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen('$1').read())"
   elif command -v curl >/dev/null 2>&1; then
     curl -fsSL "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- "$1"
   else
-    echo "ERROR: Neither wget nor curl found. Install wget: apt-get install wget"
+    echo "ERROR: No HTTP tool found (tried busybox wget, python3, curl, wget)"
     exit 1
   fi
 }
 
 download() {
   local url="$1" dest="$2"
-  if command -v wget >/dev/null 2>&1; then
-    wget -q "$url" -O "$dest"
+  if busybox wget -q "$url" -O "$dest" 2>/dev/null; then
+    return 0
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "import urllib.request; urllib.request.urlretrieve('$url', '$dest')"
   elif command -v curl >/dev/null 2>&1; then
     curl -fsSL "$url" -o "$dest"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$url" -O "$dest"
   else
-    echo "ERROR: Neither wget nor curl found."
+    echo "ERROR: No HTTP tool found."
     exit 1
   fi
 }
@@ -56,9 +82,17 @@ if [ "$FREE_DISK_MB" -lt "$MIN_FREE_DISK_MB" ]; then
   exit 1
 fi
 
-# ── Resolve download URL ────────────────────────────────────────────────────
+# ── Resolve source tarball ───────────────────────────────────────────────────
 
-if [ "$METICAI_VERSION" = "latest" ]; then
+if [ -n "$LOCAL_TARBALL" ]; then
+  # Local mode — tarball already on disk (SCP'd from dev machine)
+  if [ ! -f "$LOCAL_TARBALL" ]; then
+    echo "ERROR: Local tarball not found: ${LOCAL_TARBALL}"
+    exit 1
+  fi
+  cp "$LOCAL_TARBALL" /tmp/meticai-web.tar.gz
+  echo "Using local tarball: ${LOCAL_TARBALL}"
+elif [ "$METICAI_VERSION" = "latest" ]; then
   echo "Resolving latest release..."
   RELEASE_URL=$(fetch https://api.github.com/repos/hessius/MeticAI/releases/latest \
     | grep "browser_download_url.*meticai-web.tar.gz" | head -1 | cut -d'"' -f4)
@@ -67,14 +101,16 @@ if [ "$METICAI_VERSION" = "latest" ]; then
     echo "Check https://github.com/hessius/MeticAI/releases"
     exit 1
   fi
+  echo "Downloading: ${RELEASE_URL}"
+  download "$RELEASE_URL" /tmp/meticai-web.tar.gz
 else
   RELEASE_URL="https://github.com/hessius/MeticAI/releases/download/${METICAI_VERSION}/meticai-web.tar.gz"
+  echo "Downloading: ${RELEASE_URL}"
+  download "$RELEASE_URL" /tmp/meticai-web.tar.gz
 fi
 
-echo "Downloading: ${RELEASE_URL}"
-download "$RELEASE_URL" /tmp/meticai-web.tar.gz
 DOWNLOAD_SIZE=$(du -m /tmp/meticai-web.tar.gz | cut -f1)
-echo "Downloaded: ${DOWNLOAD_SIZE} MB"
+echo "Tarball: ${DOWNLOAD_SIZE} MB"
 echo ""
 
 # ── Backup existing installation ────────────────────────────────────────────
