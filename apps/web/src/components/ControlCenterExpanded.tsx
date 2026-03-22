@@ -48,6 +48,7 @@ import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
 import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 import { relativeTime } from '@/lib/timeUtils'
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,9 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     ;(async () => {
       const base = await getServerUrl()
       if (!cancelled) {
-        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
+        if (!isDirectMode()) {
+          setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
+        }
         setProfileImgError(false)
       }
     })()

@@ -49,6 +49,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -126,8 +127,10 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     const fetchData = async () => {
       const base = await getServerUrl()
 
-      // Build profile image URL
-      setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(profileName!)}/image-proxy`)
+      // Build profile image URL (not available in direct mode)
+      if (!isDirectMode()) {
+        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(profileName!)}/image-proxy`)
+      }
 
       // Fetch target curves
       try {

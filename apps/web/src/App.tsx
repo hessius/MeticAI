@@ -138,8 +138,10 @@ function App() {
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
         }
-        // Build image URL
-        setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
+        // Build image URL (not available in direct mode — no AI-generated images)
+        if (!isDirectMode()) {
+          setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
+        }
       } catch { /* non-critical */ }
     })()
   }, [viewState, machineState.active_profile])

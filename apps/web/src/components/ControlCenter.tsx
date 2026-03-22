@@ -33,6 +33,7 @@ import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 
 // ---------------------------------------------------------------------------
@@ -130,7 +131,10 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     ;(async () => {
       const base = await getServerUrl()
       if (!cancelled) {
-        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
+        // In direct mode, no AI-generated profile images exist
+        if (!isDirectMode()) {
+          setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
+        }
         setProfileImgError(false)
       }
       // Fetch profile author from machine profiles
