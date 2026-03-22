@@ -100,5 +100,8 @@ echo '        }),'
 echo '    ]'
 echo ""
 echo "  Then access MeticAI at:"
-echo "    http://meticulous.local:8080/meticai/"
+echo "    http://\$(hostname).local:8080/meticai/"
+echo ""
+echo "  Note: Your machine hostname may be randomized (e.g. meticulous-abc123.local)."
+echo "  Check your machine's actual hostname with: hostname"
 echo ""

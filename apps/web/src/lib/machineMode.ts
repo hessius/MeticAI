@@ -32,6 +32,7 @@ export function getDefaultMachineUrl(): string {
     return `${window.location.protocol}//${window.location.host}`
   }
 
+  // Fallback for proxy mode — user needs to configure their machine URL
   return 'http://meticulous.local:8080'
 }
 

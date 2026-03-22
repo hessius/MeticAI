@@ -42,6 +42,13 @@ echo "── Memory ──"
 free -m | awk '/Mem:/{printf "  Total: %s MB | Used: %s MB | Available: %s MB\n",$2,$3,$7}'
 echo ""
 
+# ── CPU ─────────────────────────────────────────────────────────────────────
+
+echo "── CPU ──"
+LOAD=$(cat /proc/loadavg | awk '{printf "%s %s %s", $1, $2, $3}')
+echo "  Load avg (1/5/15 min): ${LOAD}"
+echo ""
+
 # ── Files ───────────────────────────────────────────────────────────────────
 
 echo "── Files ──"
