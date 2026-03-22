@@ -90,7 +90,7 @@ if [ -n "$LOCAL_TARBALL" ]; then
     echo "ERROR: Local tarball not found: ${LOCAL_TARBALL}"
     exit 1
   fi
-  cp "$LOCAL_TARBALL" /tmp/meticai-web.tar.gz
+  TARBALL="$LOCAL_TARBALL"
   echo "Using local tarball: ${LOCAL_TARBALL}"
 elif [ "$METICAI_VERSION" = "latest" ]; then
   echo "Resolving latest release..."
@@ -103,13 +103,15 @@ elif [ "$METICAI_VERSION" = "latest" ]; then
   fi
   echo "Downloading: ${RELEASE_URL}"
   download "$RELEASE_URL" /tmp/meticai-web.tar.gz
+  TARBALL="/tmp/meticai-web.tar.gz"
 else
   RELEASE_URL="https://github.com/hessius/MeticAI/releases/download/${METICAI_VERSION}/meticai-web.tar.gz"
   echo "Downloading: ${RELEASE_URL}"
   download "$RELEASE_URL" /tmp/meticai-web.tar.gz
+  TARBALL="/tmp/meticai-web.tar.gz"
 fi
 
-DOWNLOAD_SIZE=$(du -m /tmp/meticai-web.tar.gz | cut -f1)
+DOWNLOAD_SIZE=$(du -m "$TARBALL" | cut -f1)
 echo "Tarball: ${DOWNLOAD_SIZE} MB"
 echo ""
 
@@ -129,8 +131,9 @@ fi
 
 echo "Installing to ${INSTALL_DIR}..."
 mkdir -p "$INSTALL_DIR"
-tar -xzf /tmp/meticai-web.tar.gz -C "$INSTALL_DIR"
-rm /tmp/meticai-web.tar.gz
+tar -xzf "$TARBALL" -C "$INSTALL_DIR"
+# Clean up only if we downloaded it (not if user provided --local)
+[ -z "$LOCAL_TARBALL" ] && rm -f "$TARBALL"
 
 # ── Report ──────────────────────────────────────────────────────────────────
 
