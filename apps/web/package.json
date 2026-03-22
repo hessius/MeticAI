@@ -8,7 +8,7 @@
         "kill": "fuser -k ${PORT:-5173}/tcp",
         "build": "tsc -b --noCheck && vite build",
         "build:docker": "VITE_MACHINE_MODE=proxy tsc -b --noCheck && vite build",
-        "build:machine": "VITE_MACHINE_MODE=direct tsc -b --noCheck && vite build",
+        "build:machine": "export VITE_MACHINE_MODE=direct && tsc -b --noCheck && vite build",
         "lint": "eslint .",
         "optimize": "vite optimize",
         "preview": "vite preview",
