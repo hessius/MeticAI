@@ -56,6 +56,7 @@ function useDirectTelemetry(enabled: boolean): MachineState {
   const [state, setState] = useState<MachineState>(INITIAL_STATE)
   const machine = useMachineService()
   const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastProfileIdRef = useRef<string | null>(null)
 
   const resetStaleTimer = useCallback(() => {
     if (staleTimerRef.current) clearTimeout(staleTimerRef.current)
@@ -87,26 +88,53 @@ function useDirectTelemetry(enabled: boolean): MachineState {
 
     // Status events (main telemetry stream)
     unsubs.push(machine.onStatus((data) => {
-      setState(prev => ({
-        ...prev,
-        connected: true,
-        _wsConnected: true,
-        availability: 'online',
-        // Map espresso-api StatusData fields to our MachineState
-        boiler_temperature: data.sensors?.t ?? prev.boiler_temperature,
-        brew_head_temperature: data.sensors?.t ?? prev.brew_head_temperature,
-        pressure: data.sensors?.p ?? prev.pressure,
-        flow_rate: data.sensors?.f ?? prev.flow_rate,
-        shot_weight: data.sensors?.w ?? prev.shot_weight,
-        shot_timer: data.profile_time ?? prev.shot_timer,
-        state: data.state ?? prev.state,
-        brewing: data.extracting ?? prev.brewing,
-        active_profile: data.name ?? data.profile ?? prev.active_profile,
-        target_temperature: data.setpoints?.temperature ?? prev.target_temperature,
-        target_weight: data.setpoints?.flow ?? prev.target_weight,
-        _ts: Date.now(),
-        _stale: false,
-      }))
+      setState(prev => {
+        // Machine sends profile_time in milliseconds — convert to seconds
+        const shotTimer = data.profile_time != null
+          ? data.profile_time / 1000
+          : prev.shot_timer
+
+        // data.name = current stage/phase (e.g. "heating", "Preinfusion")
+        // data.profile / data.loaded_profile = actual profile name
+        // data.state = machine state ('idle', 'brewing', 'home', 'purge')
+        const ext = data as {loaded_profile?: string; id?: string}
+        const profileName = ext.loaded_profile || data.profile || prev.active_profile
+
+        // Fetch target weight from loaded profile when profile changes
+        const profileId = ext.id
+        if (profileId && profileId !== lastProfileIdRef.current) {
+          lastProfileIdRef.current = profileId
+          fetch(`/api/v1/profile/get/${profileId}`)
+            .then(r => r.ok ? r.json() : null)
+            .then((p: {final_weight?: number} | null) => {
+              if (p?.final_weight) {
+                setState(s => ({ ...s, target_weight: p.final_weight ?? null }))
+              }
+            })
+            .catch(() => {/* ignore */})
+        }
+
+        return {
+          ...prev,
+          connected: true,
+          _wsConnected: true,
+          availability: 'online',
+          boiler_temperature: data.sensors?.t ?? prev.boiler_temperature,
+          brew_head_temperature: data.sensors?.t ?? prev.brew_head_temperature,
+          pressure: data.sensors?.p ?? prev.pressure,
+          flow_rate: data.sensors?.f ?? prev.flow_rate,
+          shot_weight: data.sensors?.w ?? prev.shot_weight,
+          shot_timer: shotTimer,
+          // Show stage name (data.name) as the state — matches proxy mode behavior
+          state: data.name || data.state || prev.state,
+          brewing: data.extracting ?? prev.brewing,
+          active_profile: profileName,
+          target_temperature: data.setpoints?.temperature ?? prev.target_temperature,
+          target_weight: prev.target_weight,
+          _ts: Date.now(),
+          _stale: false,
+        }
+      })
       resetStaleTimer()
     }))
 

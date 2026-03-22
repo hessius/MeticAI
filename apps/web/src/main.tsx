@@ -174,22 +174,28 @@ if (isDirectMode()) {
         .catch(() => jsonResponse({ success: false }, 502))
     }
 
-    // GET /api/machine/profiles → /api/v1/profile/list (wrap array in { profiles })
+    // GET /api/machine/profiles → /api/v1/profile/list (add in_history/has_description)
     if (url.match(/\/api\/machine\/profiles$/)) {
       return _fetch('/api/v1/profile/list').then(r => {
         if (!r.ok) return jsonResponse({ profiles: [] })
-        return r.json().then((data: unknown[]) =>
-          jsonResponse({ profiles: data })
+        return r.json().then((data: {id: string; name: string; author?: string; temperature?: number; final_weight?: number}[]) =>
+          jsonResponse({
+            profiles: data.map(p => ({
+              ...p,
+              in_history: true,
+              has_description: false,
+            }))
+          })
         )
       }).catch(() => jsonResponse({ profiles: [] }))
     }
 
-    // /api/machine/profile/:id/json → /api/v1/profile/get/:id
+    // /api/machine/profile/:id/json → /api/v1/profile/get/:id (wrap in {profile})
     const profileJsonMatch = url.match(/\/api\/machine\/profile\/([^/]+)\/json/)
     if (profileJsonMatch) {
       return _fetch(`/api/v1/profile/get/${profileJsonMatch[1]}`).then(r => {
         if (!r.ok) return jsonResponse({})
-        return r.json().then((data: unknown) => jsonResponse(data))
+        return r.json().then((data: unknown) => jsonResponse({ profile: data }))
       }).catch(() => jsonResponse({}))
     }
 
@@ -201,25 +207,48 @@ if (isDirectMode()) {
       }))
     }
 
-    // /api/last-shot → /api/v1/history/last
+    // /api/last-shot → /api/v1/history/last (translate to MeticAI format)
     if (url.match(/\/api\/last-shot/)) {
       return _fetch('/api/v1/history/last').then(r => {
         if (!r.ok) return jsonResponse({})
-        return r.json().then((data: unknown) => jsonResponse(data))
+        return r.json().then((e: {id?: string; time?: number; name?: string; profile?: {name?: string}}) =>
+          jsonResponse({
+            id: e.id,
+            created_at: e.time ? new Date(e.time * 1000).toISOString() : null,
+            profile_name: e.profile?.name ?? e.name ?? 'Unknown',
+            coffee_analysis: null,
+            user_preferences: null,
+            reply: '',
+            profile_json: e.profile ?? null,
+          })
+        )
       }).catch(() => jsonResponse({}))
     }
 
-    // /api/history → /api/v1/history (translate response format)
+    // /api/history → /api/v1/history (translate machine history to MeticAI format)
     if (url.match(/\/api\/history/)) {
       return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse({ entries: [], total: 0 })
-        return r.json().then((data: unknown) => {
-          if (Array.isArray(data)) {
-            return jsonResponse({ entries: data, total: data.length })
+        if (!r.ok) return jsonResponse({ entries: [], total: 0, limit: 50, offset: 0 })
+        return r.json().then((raw: unknown) => {
+          type MachineHistEntry = {
+            id: string; time: number; name: string;
+            profile?: {name?: string; final_weight?: number; temperature?: number};
+            data?: {shot?: {weight?: number}; time?: number}[];
           }
-          return jsonResponse({ entries: [], total: 0, ...data as object })
+          const list: MachineHistEntry[] = Array.isArray(raw) ? raw : ((raw as {history?: MachineHistEntry[]}).history ?? [])
+          const entries = list.map(e => ({
+            id: e.id,
+            created_at: new Date(e.time * 1000).toISOString(),
+            profile_name: e.profile?.name ?? e.name ?? 'Unknown',
+            coffee_analysis: null,
+            user_preferences: null,
+            reply: '',
+            profile_json: e.profile ?? null,
+            notes: null,
+          }))
+          return jsonResponse({ entries, total: entries.length, limit: 50, offset: 0 })
         })
-      }).catch(() => jsonResponse({ entries: [], total: 0 }))
+      }).catch(() => jsonResponse({ entries: [], total: 0, limit: 50, offset: 0 }))
     }
 
     // POST /api/machine/preheat → GET /api/v1/action/preheat
