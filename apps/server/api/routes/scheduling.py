@@ -364,13 +364,33 @@ async def run_profile_with_overrides(
 
         original_name = profile_data.get("name", "Unknown Profile")
 
+        # --- Save-as-new: persist BEFORE loading so the machine reports ---
+        # --- the new name and the profile/image is available immediately ---
+        if save_mode == "save_new" and overrides_dict:
+            new_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
+            new_profile.pop("id", None)
+            new_profile["name"] = new_name.strip()
+            try:
+                await async_create_profile(new_profile)
+                logger.info("Overrides saved as new profile '%s'", new_name.strip())
+            except Exception as exc:
+                logger.error("Failed to save overrides as new profile: %s", exc)
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to save new profile: {exc}",
+                )
+
         if overrides_dict:
-            # Apply overrides to a deep copy — keeps the original name and ID
+            # Apply overrides to a deep copy
             modified_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
 
+            # When saving as new, use the new name for the ephemeral load so
+            # the machine broadcasts the correct active_profile via WebSocket.
+            if save_mode == "save_new":
+                modified_profile["name"] = new_name.strip()
+                modified_profile.pop("id", None)
+
             # Ephemeral load: loads into machine memory without persisting.
-            # The original profile on disk is unchanged; shot history records
-            # the real profile name, not a temporary one.
             result = await temp_profile_service.load_ephemeral(
                 modified_profile,
                 params={"overrides": overrides_dict, "source_profile_id": profile_id},
@@ -388,7 +408,7 @@ async def run_profile_with_overrides(
         if hasattr(action_result, "error") and action_result.error:
             raise HTTPException(status_code=502, detail=f"Failed to start profile: {action_result.error}")
 
-        # Handle save modes — persist changes only when explicitly requested
+        # Handle save-to-original after starting (non-blocking)
         if save_mode == "save_original" and overrides_dict:
             saved_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
             saved_profile["id"] = profile_id
@@ -398,16 +418,6 @@ async def run_profile_with_overrides(
                 logger.info("Overrides saved back to original profile %s", profile_id)
             except Exception as exc:
                 logger.error("Failed to save overrides to original profile: %s", exc)
-
-        elif save_mode == "save_new" and overrides_dict:
-            new_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
-            new_profile.pop("id", None)
-            new_profile["name"] = new_name.strip()
-            try:
-                await async_create_profile(new_profile)
-                logger.info("Overrides saved as new profile '%s'", new_name.strip())
-            except Exception as exc:
-                logger.error("Failed to save overrides as new profile: %s", exc)
 
         return {
             "status": "success",

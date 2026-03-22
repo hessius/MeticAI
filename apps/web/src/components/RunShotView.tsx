@@ -356,7 +356,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             throw new Error(errorMessage)
           }
           
-          toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
+          toast.success(t('runShot.toasts.started', { name: saveAsNew && saveAsNewName.trim() ? saveAsNewName.trim() : selectedProfile.name }))
           
           // Navigate to live view after successful run (with overrides)
           if (onNavigateToLive) {
