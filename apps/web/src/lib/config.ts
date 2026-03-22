@@ -1,3 +1,5 @@
+import { isDirectMode } from './machineMode';
+
 /**
  * Configuration loader for application settings
  * Reads configuration from config.json file
@@ -16,6 +18,12 @@ let cachedConfig: AppConfig | null = null;
  */
 export async function loadConfig(): Promise<AppConfig> {
   if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  // In direct mode, no config.json exists — use defaults immediately
+  if (isDirectMode()) {
+    cachedConfig = getDefaultConfig();
     return cachedConfig;
   }
 
