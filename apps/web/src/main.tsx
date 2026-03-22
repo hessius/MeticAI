@@ -35,7 +35,138 @@ if (isDirectMode()) {
 
     // ── Translate key MeticAI proxy endpoints to Meticulous native API ──
 
-    // /api/machine/profiles → /api/v1/profile/list (wrap array in { profiles })
+    const method = init?.method?.toUpperCase() || 'GET'
+
+    // POST /api/machine/run-profile/:id → home → load profile → start
+    const runMatch = url.match(/\/api\/machine\/run-profile\/([^/?]+)/)
+    if (runMatch && method === 'POST') {
+      const profileId = decodeURIComponent(runMatch[1])
+      return (async () => {
+        // Send home command to ensure machine is idle
+        await _fetch('/api/v1/action/home')
+        // Retry load with 2s backoff — machine needs several seconds to reach idle
+        for (let attempt = 0; attempt < 10; attempt++) {
+          await new Promise(r => setTimeout(r, 2000))
+          const loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+          if (loadResp.ok) {
+            const startResp = await _fetch('/api/v1/action/start')
+            return startResp.ok
+              ? jsonResponse({ status: 'success', message: 'Profile started' })
+              : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
+          }
+          const body = await loadResp.json().catch(() => ({})) as {error?: string}
+          if (body.error !== 'machine is busy') {
+            return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+          }
+        }
+        return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
+      })()
+    }
+
+    // POST /api/machine/run-profile-with-overrides/:id → same as run-profile (overrides not supported in direct mode)
+    const runOverridesMatch = url.match(/\/api\/machine\/run-profile-with-overrides\/([^/?]+)/)
+    if (runOverridesMatch && method === 'POST') {
+      const profileId = decodeURIComponent(runOverridesMatch[1])
+      return (async () => {
+        await _fetch('/api/v1/action/home')
+        for (let attempt = 0; attempt < 10; attempt++) {
+          await new Promise(r => setTimeout(r, 2000))
+          const loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+          if (loadResp.ok) {
+            const startResp = await _fetch('/api/v1/action/start')
+            return startResp.ok
+              ? jsonResponse({ status: 'success', message: 'Profile started (overrides ignored in direct mode)' })
+              : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
+          }
+          const body = await loadResp.json().catch(() => ({})) as {error?: string}
+          if (body.error !== 'machine is busy') {
+            return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+          }
+        }
+        return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
+      })()
+    }
+
+    // POST /api/machine/command/start → GET /api/v1/action/start
+    if (url.match(/\/api\/machine\/command\/start/) && method === 'POST') {
+      return _fetch('/api/v1/action/start').then(r =>
+        r.ok ? jsonResponse({ success: true }) : jsonResponse({ success: false }, 502)
+      ).catch(() => jsonResponse({ success: false }, 502))
+    }
+
+    // POST /api/machine/command/stop → GET /api/v1/action/stop
+    if (url.match(/\/api\/machine\/command\/stop/) && method === 'POST') {
+      return _fetch('/api/v1/action/stop').then(r =>
+        r.ok ? jsonResponse({ success: true }) : jsonResponse({ success: false }, 502)
+      ).catch(() => jsonResponse({ success: false }, 502))
+    }
+
+    // POST /api/machine/command/load-profile → load by name
+    if (url.match(/\/api\/machine\/command\/load-profile/) && method === 'POST') {
+      return new Response(init?.body || '{}').json().then((body: {name?: string}) => {
+        if (!body.name) return jsonResponse({ success: false, message: 'No profile name' }, 400)
+        // Find profile ID by name, then load it
+        return _fetch('/api/v1/profile/list').then(r => r.json()).then((profiles: {name: string; id: string}[]) => {
+          const match = profiles.find(p => p.name === body.name)
+          if (!match) return jsonResponse({ success: false, message: 'Profile not found' }, 404)
+          return _fetch(`/api/v1/profile/load/${match.id}`).then(r =>
+            r.ok ? jsonResponse({ success: true }) : jsonResponse({ success: false }, 502)
+          )
+        })
+      }).catch(() => jsonResponse({ success: false }, 502))
+    }
+
+    // POST /api/profile/import → save to machine (file import) or no-op (machine import)
+    if (url.match(/\/api\/profile\/import$/) && method === 'POST') {
+      return (async () => {
+        try {
+          const body = await new Response(init?.body || '{}').json() as {
+            profile?: Record<string, unknown>; source?: string; generate_description?: boolean
+          }
+          const profileName = (body.profile as {name?: string})?.name || 'Unknown'
+          if (body.source === 'file' && body.profile) {
+            // Upload profile to machine
+            const saveResp = await _fetch('/api/v1/profile/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body.profile),
+            })
+            if (!saveResp.ok) {
+              return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
+            }
+          }
+          return jsonResponse({
+            status: 'success',
+            entry_id: 'direct-' + Date.now(),
+            profile_name: profileName,
+            has_description: false,
+            uploaded_to_machine: true,
+          })
+        } catch {
+          return jsonResponse({ status: 'error', detail: 'Import failed' }, 500)
+        }
+      })()
+    }
+
+    // POST /api/profile/import-all → return success (profiles already on machine)
+    if (url.match(/\/api\/profile\/import-all/) && method === 'POST') {
+      return Promise.resolve(jsonResponse({
+        status: 'success',
+        imported: 0,
+        skipped: 0,
+        message: 'All profiles already on machine',
+      }))
+    }
+
+    // DELETE /api/machine/profile/:id → DELETE /api/v1/profile/delete/:id
+    const deleteMatch = url.match(/\/api\/machine\/profile\/([^/?]+)$/)
+    if (deleteMatch && method === 'DELETE') {
+      return _fetch(`/api/v1/profile/delete/${deleteMatch[1]}`, { method: 'DELETE' })
+        .then(r => r.ok ? jsonResponse({ success: true }) : jsonResponse({ success: false }, 502))
+        .catch(() => jsonResponse({ success: false }, 502))
+    }
+
+    // GET /api/machine/profiles → /api/v1/profile/list (wrap array in { profiles })
     if (url.match(/\/api\/machine\/profiles$/)) {
       return _fetch('/api/v1/profile/list').then(r => {
         if (!r.ok) return jsonResponse({ profiles: [] })
@@ -88,9 +219,9 @@ if (isDirectMode()) {
   }
 }
 
-function jsonResponse(data: unknown): Response {
+function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
-    status: 200,
+    status,
     headers: { 'Content-Type': 'application/json' },
   })
 }
