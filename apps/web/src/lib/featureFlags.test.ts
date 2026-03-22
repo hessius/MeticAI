@@ -6,7 +6,7 @@ vi.mock('@/lib/machineMode', () => ({
 }))
 
 import { isDirectMode } from '@/lib/machineMode'
-import { getFeatureFlags, hasFeature, resetFeatureFlags, type FeatureFlags } from '@/lib/featureFlags'
+import { getFeatureFlags, hasFeature, resetFeatureFlags } from '@/lib/featureFlags'
 
 const mockedIsDirectMode = vi.mocked(isDirectMode)
 
@@ -148,7 +148,7 @@ describe('featureFlags', () => {
 
     it('every FeatureFlags key should be a boolean', () => {
       const flags = getFeatureFlags()
-      for (const [key, value] of Object.entries(flags)) {
+      for (const [, value] of Object.entries(flags)) {
         expect(typeof value).toBe('boolean')
       }
     })

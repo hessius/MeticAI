@@ -20,7 +20,6 @@ import {
   listDialInSessions,
   deleteDialInSession,
   getProfileImage,
-  setProfileImage,
   deleteProfileImage,
   initializeStorage,
 } from '@/services/storage/AppDatabase'

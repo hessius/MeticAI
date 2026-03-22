@@ -42,8 +42,22 @@ function getStoredApiKey(): string | null {
 
 function getClient(): GoogleGenAI {
   const key = getStoredApiKey()
-  if (!key) throw new Error('Gemini API key not configured')
+  if (!key) throw new Error('Gemini API key not configured. Please set your API key in Settings.')
   return new GoogleGenAI({ apiKey: key })
+}
+
+/** Map common Gemini SDK errors to user-friendly messages */
+function wrapApiError(err: unknown): never {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota'))
+    throw new Error('API quota exceeded. Please check your Gemini billing settings or try again later.')
+  if (msg.includes('401') || msg.includes('403') || msg.includes('API_KEY_INVALID'))
+    throw new Error('Invalid Gemini API key. Please check your key in Settings.')
+  if (msg.includes('404') || msg.includes('NOT_FOUND'))
+    throw new Error('AI model not available. Please update MeticAI to the latest version.')
+  if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch'))
+    throw new Error('Network error. Please check your internet connection.')
+  throw err
 }
 
 export function createBrowserAIService(): AIService {
@@ -83,10 +97,15 @@ export function createBrowserAIService(): AIService {
 
       onProgress?.({ phase: 'generating', message: 'Generating profile...' })
 
-      const response = await client.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [{ role: 'user', parts }],
-      })
+      let response
+      try {
+        response = await client.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [{ role: 'user', parts }],
+        })
+      } catch (err) {
+        wrapApiError(err)
+      }
 
       const text = response.text ?? ''
 
@@ -114,10 +133,15 @@ export function createBrowserAIService(): AIService {
         request.profileDescription,
       )
 
-      const response = await client.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      })
+      let response
+      try {
+        response = await client.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        })
+      } catch (err) {
+        wrapApiError(err)
+      }
 
       return {
         status: 'success',
@@ -130,13 +154,18 @@ export function createBrowserAIService(): AIService {
       const client = getClient()
       const prompt = buildImagePrompt(request.profileName, request.style, request.tags)
 
-      const response = await client.models.generateImages({
-        model: IMAGE_MODEL,
-        prompt,
-        config: {
-          numberOfImages: 1,
-        },
-      })
+      let response
+      try {
+        response = await client.models.generateImages({
+          model: IMAGE_MODEL,
+          prompt,
+          config: {
+            numberOfImages: 1,
+          },
+        })
+      } catch (err) {
+        wrapApiError(err)
+      }
 
       const images = response.generatedImages
       if (!images || images.length === 0) {
@@ -161,10 +190,15 @@ export function createBrowserAIService(): AIService {
       const client = getClient()
       const prompt = buildRecommendationPrompt(request.profileName, request.shotFilename)
 
-      const response = await client.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      })
+      let response
+      try {
+        response = await client.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        })
+      } catch (err) {
+        wrapApiError(err)
+      }
 
       const text = response.text ?? ''
       try {
@@ -201,10 +235,15 @@ export function createBrowserAIService(): AIService {
       const client = getClient()
       const prompt = buildDialInPrompt()
 
-      const response = await client.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      })
+      let response
+      try {
+        response = await client.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        })
+      } catch (err) {
+        wrapApiError(err)
+      }
 
       const text = response.text ?? ''
       try {

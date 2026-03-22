@@ -364,15 +364,75 @@ export function buildTasteContext(
   return lines.join('\n')
 }
 
-export function buildDialInPrompt(): string {
-  return [
+interface DialInIteration {
+  iteration_number: number
+  taste: {
+    x: number
+    y: number
+    descriptors?: string[]
+    notes?: string
+  }
+  recommendations?: string[]
+}
+
+export function buildDialInPrompt(options?: {
+  roastLevel?: string
+  origin?: string
+  process?: string
+  roastDate?: string
+  profileName?: string
+  iterations?: DialInIteration[]
+}): string {
+  const lines = [
     '# Espresso Dial-In Recommendation',
     '',
-    'You are an expert barista helping dial in a new bag of coffee.',
-    'Provide concrete, actionable adjustment recommendations.',
+    'You are an expert barista helping the user dial in a new bag of coffee.',
+    'Analyse the coffee details and all taste-feedback iterations below,',
+    'then provide **concrete, actionable** adjustment recommendations.',
+    '',
+    '## Coffee Details',
+    `- Roast level: ${options?.roastLevel ?? 'Unknown'}`,
+  ]
+
+  if (options?.origin) lines.push(`- Origin: ${options.origin}`)
+  if (options?.process) lines.push(`- Process: ${options.process}`)
+  if (options?.roastDate) lines.push(`- Roast date: ${options.roastDate}`)
+  if (options?.profileName) lines.push(`- Profile: ${options.profileName}`)
+
+  if (options?.iterations?.length) {
+    lines.push('', '## Taste Iteration History')
+    for (const it of options.iterations) {
+      const balanceDesc = describeAxisValue(it.taste.x, 'Sour', 'Bitter')
+      const bodyDesc = describeAxisValue(it.taste.y, 'Weak/Thin', 'Strong/Heavy')
+      lines.push(`### Iteration ${it.iteration_number}`)
+      lines.push(`- Balance: ${balanceDesc} (X: ${it.taste.x.toFixed(2)})`)
+      lines.push(`- Body: ${bodyDesc} (Y: ${it.taste.y.toFixed(2)})`)
+      if (it.taste.descriptors?.length) {
+        lines.push(`- Descriptors: ${it.taste.descriptors.join(', ')}`)
+      }
+      if (it.taste.notes) {
+        lines.push(`- Notes: ${it.taste.notes}`)
+      }
+      if (it.recommendations?.length) {
+        lines.push(`- Previous recommendations: ${it.recommendations.join('; ')}`)
+      }
+    }
+  }
+
+  lines.push(
     '',
     '## Instructions',
     'Return a JSON object with a single key `recommendations` whose value is',
     'an array of short, actionable recommendation strings (max 6).',
-  ].join('\n')
+    'Each recommendation should be a single sentence describing one specific',
+    "adjustment (e.g. 'Grind 2 steps finer', 'Reduce dose by 0.5 g').",
+    'Consider the full iteration history to track progress and avoid repeating',
+    'adjustments that did not help. Base your reasoning on extraction science:',
+    '- Sour → under-extracted → finer grind, higher temp, longer pre-infusion',
+    '- Bitter → over-extracted → coarser grind, lower temp, shorter contact',
+    '- Weak → increase dose or decrease yield',
+    '- Strong → decrease dose or increase yield',
+  )
+
+  return lines.join('\n')
 }

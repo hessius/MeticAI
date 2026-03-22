@@ -40,7 +40,7 @@ import { Sun, Moon } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
-import { useWebSocket } from '@/hooks/useWebSocket'
+import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
@@ -57,8 +57,12 @@ const ProfileCatalogueView = lazy(() => import('./components/ProfileCatalogueVie
 const EspressoCompass = lazy(() => import('./components/EspressoCompass').then(m => ({ default: m.EspressoCompass })))
 const ProfileBreakdown = lazy(() => import('./components/ProfileBreakdown').then(m => ({ default: m.ProfileBreakdown })))
 
+// Storage migration — initialises IndexedDB in direct/PWA mode
+import { useStorageMigration } from '@/services/storage'
+
 function App() {
   const { t } = useTranslation()
+  useStorageMigration()
   const [isInitializing, setIsInitializing] = useState(true)
   const [viewState, setViewState] = useState<ViewState>('start')
   const previousViewStateRef = useRef<ViewState>('start')
@@ -96,12 +100,12 @@ function App() {
   // Background blobs preference (localStorage)
   const { showBlobs, toggleBlobs } = useBackgroundBlobs()
 
-  // Phase 3 — MQTT / WebSocket telemetry
+  // Phase 3 — MQTT / WebSocket telemetry (mode-aware: proxy=WS, direct=Socket.IO)
   const [mqttEnabled, setMqttEnabled] = useState(false)
   const [isAiConfigured, setIsAiConfigured] = useState(false)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
-  const { state: machineState, patchState: patchMachineState } = useWebSocket(mqttEnabled)
+  const machineState = useMachineTelemetry(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
@@ -971,7 +975,6 @@ function App() {
                   <RunShotView
                     onBack={handleBackToStart}
                     onNavigateToLive={() => setViewState('live-shot')}
-                    onProfileSelected={(name) => patchMachineState({ active_profile: name })}
                     initialProfileId={runShotProfileId}
                     initialProfileName={runShotProfileName}
                   />

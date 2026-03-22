@@ -294,7 +294,10 @@ const MAX_IMAGE_CACHE_BYTES = 50 * 1024 * 1024 // 50 MB
 export async function getProfileImage(profileId: string): Promise<Blob | null> {
   const db = await getDB()
   const entry = await db.get('profile-images', profileId)
-  return entry?.imageBlob ?? null
+  if (!entry) return null
+  // Touch timestamp for true LRU semantics
+  await db.put('profile-images', { ...entry, updatedAt: Date.now() })
+  return entry.imageBlob
 }
 
 export async function setProfileImage(profileId: string, imageBlob: Blob): Promise<void> {

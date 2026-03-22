@@ -94,6 +94,7 @@ function useDirectTelemetry(enabled: boolean): MachineState {
         availability: 'online',
         // Map espresso-api StatusData fields to our MachineState
         boiler_temperature: data.sensors?.t ?? prev.boiler_temperature,
+        brew_head_temperature: data.sensors?.t ?? prev.brew_head_temperature,
         pressure: data.sensors?.p ?? prev.pressure,
         flow_rate: data.sensors?.f ?? prev.flow_rate,
         shot_weight: data.sensors?.w ?? prev.shot_weight,

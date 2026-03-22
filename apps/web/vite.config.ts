@@ -18,7 +18,9 @@ export default defineConfig({
           VitePWA({
             registerType: 'autoUpdate',
             workbox: {
-              globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+              globPatterns: ['**/*.{js,css,html,ico,svg,json}'],
+              globIgnores: ['**/manifest.json'],
+              maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
               runtimeCaching: [
                 {
                   // Machine API: network-first with 5s timeout

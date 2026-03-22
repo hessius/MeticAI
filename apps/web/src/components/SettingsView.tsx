@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
+import { hasFeature } from '@/lib/featureFlags'
 import { 
   CaretLeft, 
   GithubLogo, 
@@ -1174,7 +1175,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         </AnimatePresence>
       </Card>
 
-      {/* Remote Access (Tailscale) Section — always visible */}
+      {/* Remote Access (Tailscale) Section — hidden in direct/PWA mode */}
+      {hasFeature('tailscaleConfig') && (
       <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1416,6 +1418,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           )}
         </div>
       </Card>
+      )}
 
       {/* Version Info Section - Unified */}
       <Card className="p-6 space-y-4">
@@ -1434,7 +1437,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         </div>
       </Card>
 
-      {/* Updates Section */}
+      {/* Updates Section — hidden in direct/PWA mode (no Watchtower) */}
+      {hasFeature('watchtowerUpdate') && (
       <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-primary">{t('settings.updates')}</h3>
         
@@ -1512,6 +1516,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           </Button>
         </div>
       </Card>
+      )}
 
       {/* Beta Testing Section */}
       <Card className="p-6 space-y-4">
