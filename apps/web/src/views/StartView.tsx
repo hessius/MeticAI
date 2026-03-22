@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Plus, Coffee, Play, Gear, Drop, ChartLine, Crosshair } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 
 const IGNORED_NAMES = ['meticai', 'metic ai', 'gemini', 'admin', 'user', 'default']
 
@@ -78,6 +79,7 @@ export function StartView({
 
   useEffect(() => {
     const fetchAuthorName = async () => {
+      if (isDirectMode()) return // No MeticAI backend
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/settings`)

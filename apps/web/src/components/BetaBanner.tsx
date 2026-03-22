@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Flask } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 
 interface BetaBannerProps {
   className?: string
@@ -16,6 +17,7 @@ export function BetaBanner({ className }: BetaBannerProps) {
 
   useEffect(() => {
     const checkBetaStatus = async () => {
+      if (isDirectMode()) return // No MeticAI backend in direct mode
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/version`)

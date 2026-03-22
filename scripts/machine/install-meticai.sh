@@ -115,17 +115,28 @@ DOWNLOAD_SIZE=$(du -m "$TARBALL" | cut -f1)
 echo "Tarball: ${DOWNLOAD_SIZE} MB"
 echo ""
 
-# ── Backup existing installation ────────────────────────────────────────────
+# ── Clean up existing installation ───────────────────────────────────────────
 
 if [ -d "$INSTALL_DIR" ]; then
-  BACKUP="${INSTALL_DIR}.bak.$(date +%s)"
-  echo "Backing up existing installation to ${BACKUP}..."
-  mv "$INSTALL_DIR" "$BACKUP"
+  if [ -n "$LOCAL_TARBALL" ]; then
+    # Local mode — dev iteration, just replace in-place
+    echo "Removing previous installation..."
+    rm -rf "$INSTALL_DIR"
+  else
+    # Remote mode — keep one backup for safety
+    BACKUP="${INSTALL_DIR}.bak.$(date +%s)"
+    echo "Backing up existing installation to ${BACKUP}..."
+    mv "$INSTALL_DIR" "$BACKUP"
 
-  # Keep only the 2 most recent backups
-  # shellcheck disable=SC2012
-  ls -dt "${INSTALL_DIR}.bak."* 2>/dev/null | tail -n +3 | xargs rm -rf 2>/dev/null || true
+    # Keep only the 1 most recent backup
+    # shellcheck disable=SC2012
+    ls -dt "${INSTALL_DIR}.bak."* 2>/dev/null | tail -n +2 | xargs rm -rf 2>/dev/null || true
+  fi
 fi
+
+# Clean up any stale backups from previous installs
+# shellcheck disable=SC2012
+ls -dt "${INSTALL_DIR}.bak."* 2>/dev/null | tail -n +2 | xargs rm -rf 2>/dev/null || true
 
 # ── Extract ─────────────────────────────────────────────────────────────────
 

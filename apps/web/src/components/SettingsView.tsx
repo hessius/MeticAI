@@ -32,6 +32,7 @@ import {
   Info
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
@@ -193,6 +194,19 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   // Load current settings on mount
   useEffect(() => {
     const loadSettings = async () => {
+      if (isDirectMode()) {
+        // In direct mode, load from localStorage
+        setSettings({
+          geminiApiKey: localStorage.getItem('meticai-gemini-key') || '',
+          meticulousIp: window.location.hostname,
+          authorName: localStorage.getItem('meticai-author-name') || '',
+          mqttEnabled: true,
+          geminiApiKeyMasked: false,
+          geminiApiKeyConfigured: Boolean(localStorage.getItem('meticai-gemini-key')?.trim()),
+        })
+        setIsLoading(false)
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/settings`)
@@ -248,6 +262,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   // Load version info
   useEffect(() => {
     const loadVersionInfo = async () => {
+      if (isDirectMode()) {
+        setVersionInfo({ version: __APP_VERSION__ || 'PWA', repoUrl: 'https://github.com/hessius/MeticAI' })
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/version`)
@@ -335,6 +353,19 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
     setErrorMessage('')
 
     try {
+      if (isDirectMode()) {
+        // In direct mode, persist to localStorage
+        if (settings.geminiApiKey && !settings.geminiApiKey.startsWith('*')) {
+          localStorage.setItem('meticai-gemini-key', settings.geminiApiKey)
+        }
+        if (settings.authorName) {
+          localStorage.setItem('meticai-author-name', settings.authorName)
+        }
+        setSaveStatus('success')
+        setTimeout(() => setSaveStatus('idle'), 3000)
+        return
+      }
+
       const serverUrl = await getServerUrl()
       
       // Build the payload, only including fields that should be sent

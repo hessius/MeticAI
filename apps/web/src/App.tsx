@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
 import { Toaster } from '@/components/ui/sonner'
@@ -147,6 +148,12 @@ function App() {
   const prevViewStateRef = useRef<ViewState | null>(null)
   useEffect(() => {
     const fetchMqttSetting = async () => {
+      // In direct mode, no MeticAI backend — use sensible defaults
+      if (isDirectMode()) {
+        setMqttEnabled(true) // Socket.IO is always available on machine
+        setIsAiConfigured(Boolean(localStorage.getItem('meticai-gemini-key')?.trim()))
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const res = await fetch(`${serverUrl}/api/settings`)
@@ -249,6 +256,12 @@ function App() {
   // Check for existing profiles on mount
   useEffect(() => {
     const checkProfiles = async () => {
+      // In direct mode, skip proxy API — default to form view
+      if (isDirectMode()) {
+        setProfileCount(0)
+        setIsInitializing(false)
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
@@ -269,6 +282,7 @@ function App() {
 
   // Update profile count when returning from history view
   const refreshProfileCount = useCallback(async () => {
+    if (isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
@@ -634,6 +648,7 @@ function App() {
   }
 
   const handleViewProfileByName = async (profileName: string) => {
+    if (isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)

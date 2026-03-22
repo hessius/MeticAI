@@ -20,7 +20,8 @@ export async function loadConfig(): Promise<AppConfig> {
   }
 
   try {
-    const response = await fetch('/config.json');
+    const base = import.meta.env.BASE_URL || '/';
+    const response = await fetch(`${base}config.json`);
     if (!response.ok) {
       // Expected when running without a config file — use defaults silently
       cachedConfig = getDefaultConfig();

@@ -21,7 +21,8 @@ export function MeticAILogo({
   className = '',
   ...props 
 }: MeticAILogoProps) {
-  const logoSrc = variant === 'white' ? '/logo-white.svg' : '/logo.svg'
+  const base = import.meta.env.BASE_URL || '/'
+  const logoSrc = variant === 'white' ? `${base}logo-white.svg` : `${base}logo.svg`
 
   return (
     <img
