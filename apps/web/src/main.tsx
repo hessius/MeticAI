@@ -37,29 +37,33 @@ if (isDirectMode()) {
 
     const method = init?.method?.toUpperCase() || 'GET'
 
-    // POST /api/machine/run-profile/:id → home → load profile → start
+    // POST /api/machine/run-profile/:id → load profile → start
     const runMatch = url.match(/\/api\/machine\/run-profile\/([^/?]+)/)
     if (runMatch && method === 'POST') {
       const profileId = decodeURIComponent(runMatch[1])
       return (async () => {
-        // Send home command to ensure machine is idle
-        await _fetch('/api/v1/action/home')
-        // Retry load with 2s backoff — machine needs several seconds to reach idle
-        for (let attempt = 0; attempt < 10; attempt++) {
-          await new Promise(r => setTimeout(r, 2000))
-          const loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
-          if (loadResp.ok) {
-            const startResp = await _fetch('/api/v1/action/start')
-            return startResp.ok
-              ? jsonResponse({ status: 'success', message: 'Profile started' })
-              : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
+        // Try loading directly first
+        let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+        if (!loadResp.ok) {
+          // Machine is busy — send stop, then retry with backoff
+          await _fetch('/api/v1/action/stop')
+          for (let attempt = 0; attempt < 10; attempt++) {
+            await new Promise(r => setTimeout(r, 2000))
+            loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+            if (loadResp.ok) break
+            const body = await loadResp.json().catch(() => ({})) as {error?: string}
+            if (body.error !== 'machine is busy') {
+              return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+            }
           }
-          const body = await loadResp.json().catch(() => ({})) as {error?: string}
-          if (body.error !== 'machine is busy') {
-            return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+          if (!loadResp.ok) {
+            return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
           }
         }
-        return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
+        const startResp = await _fetch('/api/v1/action/start')
+        return startResp.ok
+          ? jsonResponse({ status: 'success', message: 'Profile started' })
+          : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
       })()
     }
 
@@ -68,22 +72,26 @@ if (isDirectMode()) {
     if (runOverridesMatch && method === 'POST') {
       const profileId = decodeURIComponent(runOverridesMatch[1])
       return (async () => {
-        await _fetch('/api/v1/action/home')
-        for (let attempt = 0; attempt < 10; attempt++) {
-          await new Promise(r => setTimeout(r, 2000))
-          const loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
-          if (loadResp.ok) {
-            const startResp = await _fetch('/api/v1/action/start')
-            return startResp.ok
-              ? jsonResponse({ status: 'success', message: 'Profile started (overrides ignored in direct mode)' })
-              : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
+        let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+        if (!loadResp.ok) {
+          await _fetch('/api/v1/action/stop')
+          for (let attempt = 0; attempt < 10; attempt++) {
+            await new Promise(r => setTimeout(r, 2000))
+            loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+            if (loadResp.ok) break
+            const body = await loadResp.json().catch(() => ({})) as {error?: string}
+            if (body.error !== 'machine is busy') {
+              return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+            }
           }
-          const body = await loadResp.json().catch(() => ({})) as {error?: string}
-          if (body.error !== 'machine is busy') {
-            return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+          if (!loadResp.ok) {
+            return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
           }
         }
-        return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
+        const startResp = await _fetch('/api/v1/action/start')
+        return startResp.ok
+          ? jsonResponse({ status: 'success', message: 'Profile started (overrides ignored in direct mode)' })
+          : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
       })()
     }
 
@@ -212,6 +220,74 @@ if (isDirectMode()) {
           return jsonResponse({ entries: [], total: 0, ...data as object })
         })
       }).catch(() => jsonResponse({ entries: [], total: 0 }))
+    }
+
+    // POST /api/machine/preheat → GET /api/v1/action/preheat
+    if (url.match(/\/api\/machine\/preheat/) && method === 'POST') {
+      return _fetch('/api/v1/action/preheat').then(r =>
+        r.ok
+          ? jsonResponse({ status: 'success', message: 'Preheat started' })
+          : jsonResponse({ status: 'error', detail: 'Preheat failed' }, 502)
+      ).catch(() => jsonResponse({ status: 'error', detail: 'Preheat failed' }, 502))
+    }
+
+    // POST /api/machine/schedule-shot → load profile now and schedule start via setTimeout
+    if (url.match(/\/api\/machine\/schedule-shot/) && method === 'POST') {
+      return (async () => {
+        try {
+          const body = await new Response(init?.body || '{}').json() as {
+            profile_id?: string; scheduled_time?: string; preheat?: boolean
+          }
+
+          // If preheat requested, start it immediately
+          if (body.preheat) {
+            await _fetch('/api/v1/action/preheat')
+          }
+
+          // Calculate delay until scheduled time
+          if (body.profile_id && body.scheduled_time) {
+            const delay = new Date(body.scheduled_time).getTime() - Date.now()
+            if (delay > 0) {
+              // Schedule the profile run after delay
+              setTimeout(async () => {
+                try {
+                  const loadResp = await _fetch(`/api/v1/profile/load/${body.profile_id}`)
+                  if (loadResp.ok) {
+                    await _fetch('/api/v1/action/start')
+                  }
+                } catch { /* best effort */ }
+              }, delay)
+            }
+          }
+
+          return jsonResponse({
+            status: 'success',
+            scheduled_shot: {
+              id: 'direct-' + Date.now(),
+              profile_id: body.profile_id,
+              scheduled_time: body.scheduled_time,
+              preheat: body.preheat || false,
+            },
+          })
+        } catch {
+          return jsonResponse({ status: 'error', detail: 'Schedule failed' }, 500)
+        }
+      })()
+    }
+
+    // /api/machine/profiles/orphaned → empty list (no MeticAI DB in direct mode)
+    if (url.match(/\/api\/machine\/profiles\/orphaned/)) {
+      return Promise.resolve(jsonResponse({ orphaned: [] }))
+    }
+
+    // /api/profiles/sync/status → no sync needed in direct mode
+    if (url.match(/\/api\/profiles\/sync\/status/)) {
+      return Promise.resolve(jsonResponse({ new_count: 0, updated_count: 0, orphaned_count: 0 }))
+    }
+
+    // POST /api/profiles/sync → no-op in direct mode
+    if (url.match(/\/api\/profiles\/sync/) && method === 'POST') {
+      return Promise.resolve(jsonResponse({ synced: 0, updated: [], created: [], orphaned: [] }))
     }
 
     // Everything else → return 200 with empty JSON (silences errors)
