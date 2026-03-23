@@ -121,6 +121,7 @@ export function createMeticAIAdapter(): MachineService {
     // -- Telemetry (no-ops in proxy mode) -----------------------------------
     onStatus: () => noop,
     onActuators: () => noop,
+    onHeaterStatus: () => noop,
     onNotification: () => noop,
     onProfileUpdate: () => noop,
 

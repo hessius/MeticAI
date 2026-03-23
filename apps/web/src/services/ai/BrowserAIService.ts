@@ -21,16 +21,16 @@ import type {
   ProgressCallback,
 } from './AIService'
 import {
-  buildProfileSystemPrompt,
   buildShotAnalysisPrompt,
   buildImagePrompt,
   buildRecommendationPrompt,
   buildDialInPrompt,
 } from './prompts'
+import { buildFullProfilePrompt, validateAndRetryProfile } from './profilePromptFull'
 
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const IMAGE_MODEL = 'imagen-3.0-generate-002'
-const API_KEY_STORAGE = 'meticai-gemini-api-key'
+const API_KEY_STORAGE = 'meticai-gemini-key'
 
 function getStoredApiKey(): string | null {
   try {
@@ -91,8 +91,17 @@ export function createBrowserAIService(): AIService {
         })
       }
 
-      // Build the system prompt
-      const systemPrompt = buildProfileSystemPrompt(request.preferences, request.tags, request.advancedOptions)
+      // Build the full system prompt (matching server parity)
+      const authorName = (() => {
+        try { return localStorage.getItem('meticai-author-name') || 'MeticAI' }
+        catch { return 'MeticAI' }
+      })()
+      const systemPrompt = buildFullProfilePrompt(
+        authorName,
+        request.preferences,
+        request.tags,
+        !!request.image,
+      )
       parts.push({ text: systemPrompt })
 
       onProgress?.({ phase: 'generating', message: 'Generating profile...' })
@@ -107,20 +116,28 @@ export function createBrowserAIService(): AIService {
         wrapApiError(err)
       }
 
-      const text = response.text ?? ''
+      let text = response.text ?? ''
 
       onProgress?.({ phase: 'validating', message: 'Validating profile...' })
 
-      // Parse the JSON profile from the response
-      const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\{[\s\S]*\}/)
-      const profileJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : text
+      // Validation + retry loop
+      const generateFix = async (fixPrompt: string) => {
+        const fixResponse = await client.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [{ role: 'user', parts: [{ text: fixPrompt }] }],
+        })
+        return fixResponse.text ?? ''
+      }
+
+      const { profileJson, reply: validatedReply } = await validateAndRetryProfile(text, generateFix)
+      text = validatedReply
 
       onProgress?.({ phase: 'complete', message: 'Profile generated successfully' })
 
       return {
         status: 'success',
         analysis: text,
-        reply: profileJson,
+        reply: profileJson ? JSON.stringify(profileJson) : text,
       }
     },
 

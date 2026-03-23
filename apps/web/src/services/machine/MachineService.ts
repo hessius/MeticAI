@@ -40,6 +40,7 @@ export type StatusCallback = (data: StatusData) => void
 export type ActuatorsCallback = (data: Actuators) => void
 export type NotificationCallback = (data: MachineNotification) => void
 export type ProfileUpdateCallback = (data: { change: string; profile_id?: string }) => void
+export type HeaterStatusCallback = (countdown: number) => void
 export type ConnectionCallback = (connected: boolean) => void
 export type Unsubscribe = () => void
 
@@ -84,6 +85,7 @@ export interface MachineService {
   // -- Telemetry (real-time) ------------------------------------------------
   onStatus(cb: StatusCallback): Unsubscribe
   onActuators(cb: ActuatorsCallback): Unsubscribe
+  onHeaterStatus(cb: HeaterStatusCallback): Unsubscribe
   onNotification(cb: NotificationCallback): Unsubscribe
   onProfileUpdate(cb: ProfileUpdateCallback): Unsubscribe
 
