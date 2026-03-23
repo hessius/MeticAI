@@ -66,13 +66,15 @@ interface RecurringSchedule {
 interface RunShotViewProps {
   onBack: () => void
   onNavigateToLive?: () => void
+  /** Called when a profile is loaded on the machine (optimistic update for control center). */
+  onProfileSelected?: (profileName: string) => void
   initialProfileId?: string
   initialProfileName?: string
 }
 
 const PREHEAT_DURATION_MINUTES = 10
 
-export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName }: RunShotViewProps) {
+export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initialProfileId, initialProfileName }: RunShotViewProps) {
   const { t } = useTranslation()
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
@@ -322,12 +324,16 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           }
 
           toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
-        }
 
-        // Navigate to live view after preheat started
-        if (onNavigateToLive) {
-          setTimeout(() => onNavigateToLive(), 500)
+          // Optimistically update the active profile in the control center
+          onProfileSelected?.(selectedProfile.name)
+
+          // Navigate to live view only when a profile is scheduled (preheat + profile)
+          if (onNavigateToLive) {
+            setTimeout(() => onNavigateToLive(), 500)
+          }
         }
+        // Preheat-only (no profile): stay on this page — don't navigate to live view
       } else if (selectedProfile) {
         const hasOverrides = Object.keys(overrides).length > 0
         
@@ -358,6 +364,9 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           
           toast.success(t('runShot.toasts.started', { name: saveAsNew && saveAsNewName.trim() ? saveAsNewName.trim() : selectedProfile.name }))
           
+          // Optimistically update the active profile in the control center
+          onProfileSelected?.(selectedProfile.name)
+
           // Navigate to live view after successful run (with overrides)
           if (onNavigateToLive) {
             setTimeout(() => onNavigateToLive(), 500)
@@ -392,6 +401,10 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           }
           
           toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
+
+          // Optimistically update the active profile in the control center
+          onProfileSelected?.(selectedProfile.name)
+
           // Navigate to live view after successful run (no overrides)
           if (onNavigateToLive) {
             setTimeout(() => onNavigateToLive(), 500)

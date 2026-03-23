@@ -93,7 +93,14 @@ const RECONNECT_MAX_MS = 15_000
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useWebSocket(enabled: boolean): MachineState {
+export interface WebSocketResult {
+  state: MachineState
+  /** Optimistically patch the local machine state (e.g. to set active_profile
+   *  immediately after loading a profile, before the MQTT round-trip). */
+  patchState: (patch: Partial<MachineState>) => void
+}
+
+export function useWebSocket(enabled: boolean): WebSocketResult {
   const [state, setState] = useState<MachineState>(INITIAL_STATE)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -235,5 +242,9 @@ export function useWebSocket(enabled: boolean): MachineState {
     }
   }, [enabled, connect])
 
-  return state
+  const patchState = useCallback((patch: Partial<MachineState>) => {
+    setState(prev => ({ ...prev, ...patch }))
+  }, [])
+
+  return { state, patchState }
 }

@@ -101,7 +101,7 @@ function App() {
   const [isAiConfigured, setIsAiConfigured] = useState(false)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
-  const machineState = useWebSocket(mqttEnabled)
+  const { state: machineState, patchState: patchMachineState } = useWebSocket(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
@@ -971,6 +971,7 @@ function App() {
                   <RunShotView
                     onBack={handleBackToStart}
                     onNavigateToLive={() => setViewState('live-shot')}
+                    onProfileSelected={(name) => patchMachineState({ active_profile: name })}
                     initialProfileId={runShotProfileId}
                     initialProfileName={runShotProfileName}
                   />
