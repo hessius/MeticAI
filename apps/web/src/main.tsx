@@ -53,11 +53,60 @@ if (isDirectMode()) {
     }
   } catch { /* ignore */ }
 
+  // ── Static profile description cache ──────────────────────────────────────
+  // Stores the full "Profile Created / Description / Preparation / …" text
+  // keyed by profile ID.  Persisted to localStorage and exposed on window so
+  // App.tsx can read descriptions when navigating to profile detail.
+  const DESC_CACHE_KEY = 'meticai-direct-desc-cache'
+  const _descriptionCache = new Map<string, string>()
+  try {
+    const stored = localStorage.getItem(DESC_CACHE_KEY)
+    if (stored) {
+      const parsed: Record<string, string> = JSON.parse(stored)
+      for (const [k, v] of Object.entries(parsed)) _descriptionCache.set(k, v)
+    }
+  } catch { /* ignore */ }
+
+  function _persistDescriptionCache() {
+    try {
+      const obj: Record<string, string> = {}
+      _descriptionCache.forEach((v, k) => { obj[k] = v })
+      localStorage.setItem(DESC_CACHE_KEY, JSON.stringify(obj))
+    } catch { /* ignore */ }
+  }
+
+  // Expose on window for App.tsx to read
+  ;(window as unknown as Record<string, unknown>).__meticaiDescriptionCache = _descriptionCache
+
+  // Background: generate static descriptions for every profile on the machine.
+  // Fetches each profile's JSON sequentially (1 at a time) to avoid overloading
+  // the machine, then runs the client-side static analysis.
+  async function _generateDescriptionsInBackground(profiles: CachedProfile[]) {
+    const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+    for (const p of profiles) {
+      if (_descriptionCache.has(p.id)) continue          // already described
+      try {
+        const r = await _fetch(`/api/v1/profile/get/${p.id}`)
+        if (!r.ok) continue
+        const profileJson = await r.json()
+        const desc = buildStaticProfileDescription(profileJson)
+        _descriptionCache.set(p.id, desc)
+      } catch { /* non-critical */ }
+    }
+    _persistDescriptionCache()
+  }
+
   // Background prefetch: refresh profile list on startup so catalogue loads instantly
   setTimeout(() => {
     _fetch('/api/v1/profile/list')
       .then(r => r.ok ? r.json() : null)
-      .then((data: CachedProfile[] | null) => { if (data) _processProfileList(data) })
+      .then((data: CachedProfile[] | null) => {
+        if (data) {
+          _processProfileList(data)
+          // Kick off background description generation
+          _generateDescriptionsInBackground(data)
+        }
+      })
       .catch(() => { /* non-critical */ })
   }, 2000)
 

@@ -129,6 +129,16 @@ function ProfileImage({ imageUrl }: { imageUrl?: string }) {
 
 export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
+
+  // Read static description cache (populated by main.tsx in direct mode)
+  const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+  const getShortDescription = (profile: MachineProfile): string | undefined => {
+    if (profile.display?.shortDescription) return profile.display.shortDescription
+    const full = descCache?.get(profile.id)
+    if (!full) return undefined
+    const m = full.match(/Description:\s*([\s\S]*?)(?:\n\n|Preparation:)/i)
+    return m?.[1]?.trim() || undefined
+  }
   
   // State
   const [profiles, setProfiles] = useState<MachineProfile[]>([])
@@ -627,9 +637,9 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                                 <span>{profile.final_weight}g</span>
                               )}
                             </div>
-                            {profile.display?.shortDescription && (
+                            {getShortDescription(profile) && (
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                {profile.display.shortDescription}
+                                {getShortDescription(profile)}
                               </p>
                             )}
                             {profile.in_history && (

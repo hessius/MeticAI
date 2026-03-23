@@ -671,10 +671,16 @@ function App() {
       const res = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
       const data = res.ok ? await res.json() : {}
       const profileJson = data.profile ?? null
-      const description = profile.display?.description
-      const reply = description
-        ? `**Description:**\n${description}`
-        : ''
+
+      // Use cached static description if available, else generate on the fly
+      const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+      let reply = descCache?.get(profile.id) ?? ''
+      if (!reply && profileJson) {
+        const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+        reply = buildStaticProfileDescription(profileJson)
+        descCache?.set(profile.id, reply)
+      }
+
       const entry: HistoryEntry = {
         id: profile.id,
         profile_name: profile.name,
