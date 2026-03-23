@@ -26,6 +26,7 @@ import {
   FloppyDiskBack
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { hasFeature } from '@/lib/featureFlags'
 import { format, addMinutes } from 'date-fns'
 import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
 
@@ -66,15 +67,13 @@ interface RecurringSchedule {
 interface RunShotViewProps {
   onBack: () => void
   onNavigateToLive?: () => void
-  /** Called when a profile is loaded on the machine (optimistic update for control center). */
-  onProfileSelected?: (profileName: string) => void
   initialProfileId?: string
   initialProfileName?: string
 }
 
 const PREHEAT_DURATION_MINUTES = 10
 
-export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initialProfileId, initialProfileName }: RunShotViewProps) {
+export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName }: RunShotViewProps) {
   const { t } = useTranslation()
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
@@ -327,15 +326,7 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
 
           toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
 
-          // Optimistically update the active profile in the control center
-          onProfileSelected?.(selectedProfile.name)
-
-          // Navigate to live view only when a profile is scheduled (preheat + profile)
-          if (onNavigateToLive) {
-            setTimeout(() => onNavigateToLive(), 500)
-          }
-        }
-        // Preheat-only (no profile): stay on this page — don't navigate to live view
+        // Stay on this view — only navigate to live on actual shot start
       } else if (selectedProfile) {
         const hasOverrides = Object.keys(overrides).length > 0
         
@@ -365,9 +356,6 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
           }
           
           toast.success(t('runShot.toasts.started', { name: saveAsNew && saveAsNewName.trim() ? saveAsNewName.trim() : selectedProfile.name }))
-          
-          // Optimistically update the active profile in the control center
-          onProfileSelected?.(selectedProfile.name)
 
           // Navigate to live view after successful run (with overrides)
           if (onNavigateToLive) {
@@ -403,9 +391,6 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
           }
           
           toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
-
-          // Optimistically update the active profile in the control center
-          onProfileSelected?.(selectedProfile.name)
 
           // Navigate to live view after successful run (no overrides)
           if (onNavigateToLive) {
@@ -868,7 +853,7 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
         </div>
 
         {/* Schedule Toggle */}
-        <div className="flex items-center justify-between">
+        {hasFeature('scheduledShots') && <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="schedule" className="text-sm font-medium flex items-center gap-2">
               <CalendarBlank size={18} className={scheduleMode ? 'text-primary' : 'text-muted-foreground'} />
@@ -883,7 +868,7 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
             checked={scheduleMode}
             onCheckedChange={setScheduleMode}
           />
-        </div>
+        </div>}
 
         {/* Save as New Profile Toggle (only when overrides exist) */}
         {Object.keys(overrides).length > 0 && (
@@ -1036,7 +1021,7 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
       )}
 
       {/* Recurring Schedules */}
-      <Card className="p-6 space-y-4">
+      {hasFeature('scheduledShots') && <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Repeat size={20} className="text-primary" />
@@ -1245,7 +1230,7 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
             {t('runShot.noRecurringSchedules')}
           </p>
         )}
-      </Card>
+      </Card>}
       </div>{/* end right column */}
       </div>{/* end two-column wrapper */}
 

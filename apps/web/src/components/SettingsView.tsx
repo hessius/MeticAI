@@ -888,7 +888,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
             </div>
 
-            {/* Meticulous IP */}
+            {/* Meticulous IP — hidden in direct mode (IP is implicit) */}
+            {!isDirectMode() && (
             <div className="space-y-2">
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
                 {t('settings.meticulousIp')}
@@ -945,6 +946,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 {t('settings.meticulousIpDescription')}
               </p>
             </div>
+            )}
 
             {/* Author Name */}
             <div className="space-y-2">
@@ -964,7 +966,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </div>
 
             {/* MQTT Bridge */}
-            <div className="space-y-3 pt-2 border-t border-border">
+            {hasFeature('bridgeStatus') && <div className="space-y-3 pt-2 border-t border-border">
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Control Center</h3>
                 <a
@@ -1053,7 +1055,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   </Button>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Appearance */}
             {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (
@@ -1550,7 +1552,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       )}
 
       {/* Beta Testing Section */}
-      <Card className="p-6 space-y-4">
+      {hasFeature('watchtowerUpdate') && <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-primary">{t('settings.beta.title')}</h3>
         
         <div className="space-y-4">
@@ -1684,10 +1686,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </div>
           )}
         </div>
-      </Card>
+      </Card>}
 
       {/* System Section */}
-      <Card className="p-6 space-y-4">
+      {hasFeature('systemManagement') && <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-primary">{t('settings.system')}</h3>
         
         <div className="space-y-3">
@@ -1738,7 +1740,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </Alert>
           )}
         </div>
-      </Card>
+      </Card>}
 
       {/* Footer */}
       <div className="text-center text-xs text-muted-foreground/50 pb-4 space-y-1">

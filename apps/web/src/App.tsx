@@ -883,6 +883,7 @@ function App() {
                   profileCount={profileCount}
                   onGenerateNew={() => setViewState('form')}
                   onViewHistory={() => setViewState('history')}
+                  onProfileCatalogue={() => setViewState('profile-catalogue')}
                   onRunShot={() => {
                     setRunShotProfileId(undefined)
                     setRunShotProfileName(undefined)
@@ -1068,7 +1069,7 @@ function App() {
 
               {viewState === 'profile-catalogue' && (
                 <FeatureErrorBoundary feature="Profile Catalogue">
-                  <ProfileCatalogueView onBack={() => setViewState('history')} />
+                  <ProfileCatalogueView onBack={() => setViewState(isDirectMode() ? 'start' : 'history')} />
                 </FeatureErrorBoundary>
               )}
 

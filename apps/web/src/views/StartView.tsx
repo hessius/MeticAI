@@ -48,6 +48,7 @@ interface StartViewProps {
   profileCount: number | null
   onGenerateNew: () => void
   onViewHistory: () => void
+  onProfileCatalogue?: () => void
   onRunShot: () => void
   onDialIn: () => void
   onPourOver: () => void
@@ -62,6 +63,7 @@ export function StartView({
   profileCount,
   onGenerateNew,
   onViewHistory,
+  onProfileCatalogue,
   onRunShot,
   onDialIn,
   onPourOver,
@@ -145,7 +147,7 @@ export function StartView({
           
           {/* Style 2: Dark Brew — deep brown, gold text */}
           <Button
-            onClick={onViewHistory}
+            onClick={onProfileCatalogue ?? onViewHistory}
             variant="dark-brew"
             className="w-full h-14 text-base"
           >

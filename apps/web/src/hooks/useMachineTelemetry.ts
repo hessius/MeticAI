@@ -126,7 +126,11 @@ function useDirectTelemetry(enabled: boolean): MachineState {
           shot_weight: data.sensors?.w ?? prev.shot_weight,
           shot_timer: shotTimer,
           // Show stage name (data.name) as the state — matches proxy mode behavior
-          state: data.name || data.state || prev.state,
+          // Preserve 'preheating' override when preheat countdown is active
+          state: (prev.preheat_countdown != null && prev.preheat_countdown > 0
+            && ((data.name || data.state || '') === 'idle' || (data.name || data.state || '') === 'Idle' || !(data.name || data.state)))
+            ? 'preheating'
+            : (data.name || data.state || prev.state),
           brewing: data.extracting ?? prev.brewing,
           active_profile: profileName,
           target_temperature: data.setpoints?.temperature ?? prev.target_temperature,
@@ -144,6 +148,22 @@ function useDirectTelemetry(enabled: boolean): MachineState {
         ...prev,
         power: data.bh_pwr ?? prev.power,
       }))
+    }))
+
+    // Heater status events — detect preheat from countdown value
+    // Machine sends heater_status with countdown (float seconds).
+    // When countdown > 0 and machine state is idle, override to "preheating".
+    unsubs.push(machine.onHeaterStatus((countdown: number) => {
+      setState(prev => {
+        const preheatActive = countdown > 0
+        const stateLC = (prev.state ?? '').toLowerCase()
+        const isIdleState = stateLC === 'idle' || stateLC === ''
+        return {
+          ...prev,
+          preheat_countdown: preheatActive ? countdown : 0,
+          state: preheatActive && isIdleState ? 'preheating' : prev.state,
+        }
+      })
     }))
 
     return () => {

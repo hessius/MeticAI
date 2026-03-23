@@ -37,6 +37,12 @@ interface MachineProfile {
   final_weight?: number
   in_history: boolean
   has_description: boolean
+  display?: {
+    description?: string
+    shortDescription?: string
+    accentColor?: string
+    image?: string
+  }
 }
 
 interface OrphanedEntry {
@@ -382,6 +388,24 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const isOrphaned = (profileName: string): boolean =>
     orphanedEntries.some((e) => e.profile_name === profileName)
 
+  // Load a profile on the machine (tap to select)
+  const handleLoadProfile = async (profile: MachineProfile) => {
+    if (isEditing) return
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/machine/profile/load`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profile.id }),
+      })
+      if (!response.ok) throw new Error(t('profileCatalogue.loadFailed'))
+      toast.success(t('profileCatalogue.loaded', { name: profile.name }))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('profileCatalogue.loadFailed')
+      toast.error(message)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -549,10 +573,13 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                   isCoarse={isCoarsePointer}
                   onSwipeDelete={() => openDeleteDialog(profile)}
                 >
-                  <Card className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''}`}>
+                  <Card
+                    className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''} ${!isEditing ? 'cursor-pointer active:bg-accent/50 transition-colors' : ''}`}
+                    onClick={() => handleLoadProfile(profile)}
+                  >
                     <div className="flex items-start gap-4">
-                      {/* Profile image */}
-                      <ProfileImage imageUrl={getImageUrl(profile.name) ?? undefined} />
+                      {/* Profile image — prefer machine's direct URL over image-proxy cache */}
+                      <ProfileImage imageUrl={profile.display?.image ?? getImageUrl(profile.name) ?? undefined} />
                       
                       {/* Profile info */}
                       <div className="flex-1 min-w-0">
@@ -615,6 +642,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                                 <span>{profile.final_weight}g</span>
                               )}
                             </div>
+                            {profile.display?.shortDescription && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {profile.display.shortDescription}
+                              </p>
+                            )}
                             {profile.in_history && (
                               <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
                                 <CheckCircle className="w-3 h-3 mr-1" />

@@ -446,9 +446,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     setMode(newMode)
     if (!prefsRef.current) return
     if (newMode === 'recipe') {
-      setMeticulousIntegration(prefsRef.current.recipe.machineIntegration)
-      setAutoStartEnabled(prefsRef.current.recipe.autoStart ?? true)
-      setRecipeProgressionMode(prefsRef.current.recipe.progressionMode ?? 'weight')
+      setMeticulousIntegration(prefsRef.current.recipe?.machineIntegration ?? false)
+      setAutoStartEnabled(prefsRef.current.recipe?.autoStart ?? true)
+      setRecipeProgressionMode(prefsRef.current.recipe?.progressionMode ?? 'weight')
     } else {
       const mp = prefsRef.current[newMode]
       setAutoStartEnabled(mp.autoStart)
