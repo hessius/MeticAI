@@ -160,23 +160,73 @@ echo ""
 echo "  Files:      ${FILE_COUNT}"
 echo "  Size:       ${INSTALL_SIZE} MB"
 echo "  Free disk:  ${FREE_AFTER} MB (was ${FREE_DISK_MB} MB)"
+# ── Auto-patch Tornado route ────────────────────────────────────────────────
+
+WEB_UI="/opt/meticulous-backend/api/web_ui.py"
+
+if [ -f "$WEB_UI" ]; then
+  if grep -q '/meticai' "$WEB_UI"; then
+    echo "  ✓ Tornado route already configured"
+  else
+    echo "  Patching ${WEB_UI}..."
+    # Insert MeticAI routes before the closing bracket of WEB_UI_HANDLER
+    # Find the last line of WEB_UI_HANDLER array and append before it
+    cp "$WEB_UI" "${WEB_UI}.bak"
+    python3 -c "
+import re, sys
+with open('$WEB_UI', 'r') as f:
+    content = f.read()
+# Find WEB_UI_HANDLER closing bracket and insert before it
+patch = '''    (r\"/meticai\", tornado.web.RedirectHandler, {\"url\": \"/meticai/\"}),
+    (r\"/meticai/(.*)\", tornado.web.StaticFileHandler, {
+        \"default_filename\": \"index.html\",
+        \"path\": \"/opt/meticai-web\",
+    }),
+'''
+# Insert before the closing ] of WEB_UI_HANDLER
+content = re.sub(r'(WEB_UI_HANDLER\s*=\s*\[.*?)(^\])', lambda m: m.group(1) + patch + m.group(2), content, count=1, flags=re.DOTALL | re.MULTILINE)
+with open('$WEB_UI', 'w') as f:
+    f.write(content)
+"
+    if grep -q '/meticai' "$WEB_UI"; then
+      echo "  ✓ Tornado route patched successfully"
+    else
+      echo "  ⚠ Auto-patch failed. Restoring backup..."
+      mv "${WEB_UI}.bak" "$WEB_UI"
+      echo ""
+      echo "  Please add manually to ${WEB_UI}, inside WEB_UI_HANDLER:"
+      echo '    (r"/meticai", tornado.web.RedirectHandler, {"url": "/meticai/"}),'
+      echo '    (r"/meticai/(.*)", tornado.web.StaticFileHandler, {'
+      echo '        "default_filename": "index.html",'
+      echo '        "path": "/opt/meticai-web",'
+      echo '    }),'
+    fi
+  fi
+else
+  echo "  ⚠ meticulous-backend not found at expected location."
+  echo "  You may need to add the Tornado route manually."
+fi
+
 echo ""
-echo "── Next Steps ──────────────────────────────"
+
+# ── Restart backend to pick up route ────────────────────────────────────────
+
+if [ -f "$WEB_UI" ] && grep -q '/meticai' "$WEB_UI"; then
+  echo "  Restarting meticulous-backend..."
+  if command -v supervisorctl >/dev/null 2>&1; then
+    supervisorctl restart meticulous-backend 2>/dev/null && echo "  ✓ Backend restarted" || echo "  ⚠ Restart via supervisorctl failed"
+  elif command -v systemctl >/dev/null 2>&1; then
+    systemctl restart meticulous-backend 2>/dev/null && echo "  ✓ Backend restarted" || echo "  ⚠ Restart via systemctl failed"
+  else
+    echo "  ⚠ Could not auto-restart. Please reboot the machine."
+  fi
+fi
+
 echo ""
-echo "  Add the Tornado route to meticulous-backend."
-echo "  In api/web_ui.py, add:"
+echo "── Access MeticAI ──────────────────────────"
 echo ""
-echo '    METICAI_HANDLER = ['
-echo '        (r"/meticai", tornado.web.RedirectHandler, {"url": "/meticai/"}),'
-echo '        (r"/meticai/(.*)", tornado.web.StaticFileHandler, {'
-echo '            "default_filename": "index.html",'
-echo '            "path": "/opt/meticai-web",'
-echo '        }),'
-echo '    ]'
+echo "  http://$(hostname).local:8080/meticai/"
 echo ""
-echo "  Then access MeticAI at:"
-echo "    http://\$(hostname).local:8080/meticai/"
-echo ""
-echo "  Note: Your machine hostname may be randomized (e.g. meticulous-abc123.local)."
-echo "  Check your machine's actual hostname with: hostname"
+echo "  Tip: Add this URL to your iOS/Android home screen for"
+echo "  a native app experience."
 echo ""
