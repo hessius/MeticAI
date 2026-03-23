@@ -23,7 +23,8 @@
     "fri": "Fre",
     "sat": "Lör",
     "sun": "Sön",
-    "tryAgain": "Försök igen"
+    "tryAgain": "Försök igen",
+    "done": "Klar"
   },
   "greetings": {
     "morning": [
@@ -1077,6 +1078,8 @@
     "syncFailed": "Synkronisering misslyckades",
     "renameFailed": "Kunde inte byta namn på profil",
     "exportFailed": "Kunde inte exportera profil",
+    "loadFailed": "Kunde inte ladda profil",
+    "loaded": "{{name}} laddad",
     "bulkDelete": {
       "button": "Massradera",
       "title": "Massradera profiler",
