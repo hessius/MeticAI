@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isDirectMode } from '@/lib/machineMode'
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -642,7 +643,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                                 {getShortDescription(profile)}
                               </p>
                             )}
-                            {profile.in_history && (
+                            {profile.in_history && !isDirectMode() && (
                               <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 {t('profileCatalogue.inHistory')}
