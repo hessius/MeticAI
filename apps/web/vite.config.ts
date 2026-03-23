@@ -2,7 +2,6 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig } from "vite";
 import { resolve } from 'path'
-import { VitePWA } from 'vite-plugin-pwa'
 
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
 const machineMode = process.env.VITE_MACHINE_MODE || 'proxy'

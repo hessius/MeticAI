@@ -6,12 +6,18 @@ let getServerUrl: (typeof import('./config'))['getServerUrl']
 
 describe('config loader', () => {
   beforeEach(async () => {
+    // Ensure proxy mode so loadConfig actually fetches config.json
+    vi.stubEnv('VITE_MACHINE_MODE', '')
     // Reset modules to clear cached config
     vi.resetModules()
     // Re-import the module to get fresh instances
     const configModule = await import('./config')
     loadConfig = configModule.loadConfig
     getServerUrl = configModule.getServerUrl
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   describe('loadConfig', () => {

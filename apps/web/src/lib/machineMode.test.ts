@@ -17,16 +17,22 @@ describe('machineMode', () => {
   })
 
   function stubLocation(port: string, protocol = 'http:', host?: string) {
+    const resolvedHost = host ?? `meticulous.local:${port}`
+    const hostname = resolvedHost.split(':')[0]
     Object.defineProperty(window, 'location', {
       value: {
         port,
         protocol,
-        host: host ?? `meticulous.local:${port}`,
-        hostname: 'meticulous.local',
+        host: resolvedHost,
+        hostname,
       },
       writable: true,
       configurable: true,
     })
+  }
+
+  function clearMachineMode() {
+    vi.stubEnv('VITE_MACHINE_MODE', '')
   }
 
   // -------------------------------------------------------------------
@@ -52,6 +58,7 @@ describe('machineMode', () => {
     })
 
     it('should fall back to proxy when port is not 8080 and no env var', async () => {
+      clearMachineMode()
       stubLocation('3550')
       const { getMachineMode } = await import('@/lib/machineMode')
       expect(getMachineMode()).toBe('proxy')
@@ -62,6 +69,13 @@ describe('machineMode', () => {
       stubLocation('3550')
       const { getMachineMode } = await import('@/lib/machineMode')
       expect(getMachineMode()).toBe('proxy')
+    })
+
+    it('should detect direct mode from port 8080 without env var', async () => {
+      clearMachineMode()
+      stubLocation('8080')
+      const { getMachineMode } = await import('@/lib/machineMode')
+      expect(getMachineMode()).toBe('direct')
     })
 
     it('should prioritise env var over runtime port detection', async () => {
@@ -95,6 +109,7 @@ describe('machineMode', () => {
     })
 
     it('should return false when served from any other port', async () => {
+      clearMachineMode()
       stubLocation('5173')
       const { isDirectMode } = await import('@/lib/machineMode')
       expect(isDirectMode()).toBe(false)
