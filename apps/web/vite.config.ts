@@ -12,46 +12,8 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // PWA plugin — only active in machine (direct) builds
-    ...(machineMode === 'direct'
-      ? [
-          VitePWA({
-            registerType: 'autoUpdate',
-            workbox: {
-              globPatterns: ['**/*.{js,css,html,ico,svg,json}'],
-              globIgnores: ['**/manifest.json'],
-              maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-              runtimeCaching: [
-                {
-                  // Machine API: network-first with 5s timeout
-                  urlPattern: /\/api\/v1\//,
-                  handler: 'NetworkFirst',
-                  options: {
-                    cacheName: 'machine-api',
-                    networkTimeoutSeconds: 5,
-                    expiration: { maxEntries: 100, maxAgeSeconds: 3600 },
-                  },
-                },
-              ],
-            },
-            manifest: {
-              name: 'MeticAI',
-              short_name: 'MeticAI',
-              description: 'AI-powered Meticulous Espresso Controller',
-              theme_color: '#1a1a2e',
-              background_color: '#1a1a2e',
-              display: 'standalone',
-              start_url: '/meticai/',
-              scope: '/meticai/',
-              icons: [
-                { src: '/meticai/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-                { src: '/meticai/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-                { src: '/meticai/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-              ],
-            },
-          }),
-        ]
-      : []),
+    // PWA plugin — disabled: workbox/path-scurry lru-cache compat issue
+    // TODO: re-enable once vite-plugin-pwa fixes LRUCache constructor error
   ],
   define: {
     __APP_VERSION__: JSON.stringify(Date.now().toString()),
