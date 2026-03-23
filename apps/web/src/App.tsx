@@ -665,6 +665,33 @@ function App() {
     }
   }
 
+  const handleViewMachineProfile = async (profile: { id: string; name: string; display?: { image?: string; description?: string } }) => {
+    try {
+      const serverUrl = await getServerUrl()
+      const res = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
+      const data = res.ok ? await res.json() : {}
+      const profileJson = data.profile ?? null
+      const description = profile.display?.description
+      const reply = description
+        ? `**Description:**\n${description}`
+        : ''
+      const entry: HistoryEntry = {
+        id: profile.id,
+        profile_name: profile.name,
+        created_at: new Date().toISOString(),
+        coffee_analysis: null,
+        user_preferences: null,
+        reply,
+        profile_json: profileJson,
+      }
+      const imageUrl = profile.display?.image || undefined
+      previousViewStateRef.current = 'profile-catalogue'
+      handleViewHistoryEntry(entry, imageUrl)
+    } catch {
+      toast.error(t('profileCatalogue.loadFailed'))
+    }
+  }
+
   const handleDownloadJson = () => {
     const jsonData = selectedHistoryEntry?.profile_json || currentProfileJson
     if (!jsonData) {
@@ -959,7 +986,10 @@ function App() {
                 <FeatureErrorBoundary feature="Profile Detail">
                   <ProfileDetailView
                     entry={selectedHistoryEntry}
-                    onBack={() => setViewState('history')}
+                    onBack={() => {
+                      const prev = previousViewStateRef.current
+                      setViewState(prev === 'profile-catalogue' ? 'profile-catalogue' : 'history')
+                    }}
                     cachedImageUrl={selectedHistoryImageUrl}
                     aiConfigured={aiAvailable}
                     hideAiWhenUnavailable={hideAiWhenUnavailable}
@@ -1069,7 +1099,7 @@ function App() {
 
               {viewState === 'profile-catalogue' && (
                 <FeatureErrorBoundary feature="Profile Catalogue">
-                  <ProfileCatalogueView onBack={() => setViewState(isDirectMode() ? 'start' : 'history')} />
+                  <ProfileCatalogueView onBack={() => setViewState(isDirectMode() ? 'start' : 'history')} onViewProfile={handleViewMachineProfile} />
                 </FeatureErrorBoundary>
               )}
 

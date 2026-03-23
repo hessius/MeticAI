@@ -27,9 +27,12 @@ export function getDefaultMachineUrl(): string {
   const envUrl = import.meta.env.VITE_DEFAULT_MACHINE_URL
   if (envUrl) return envUrl
 
-  // When served from the machine, use same origin
-  if (typeof window !== 'undefined' && window.location.port === '8080') {
-    return `${window.location.protocol}//${window.location.host}`
+  // When served from the machine (build-time or port detection), use same origin.
+  // Port 80 works because nginx proxies /api and /socket.io to 8080.
+  if (typeof window !== 'undefined') {
+    if (import.meta.env.VITE_MACHINE_MODE === 'direct' || window.location.port === '8080') {
+      return `${window.location.protocol}//${window.location.hostname}:8080`
+    }
   }
 
   // Fallback for proxy mode — user needs to configure their machine URL

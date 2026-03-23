@@ -54,6 +54,7 @@ interface OrphanedEntry {
 
 interface ProfileCatalogueViewProps {
   onBack: () => void
+  onViewProfile?: (profile: MachineProfile) => void
 }
 
 const SWIPE_THRESHOLD = -80
@@ -126,7 +127,7 @@ function ProfileImage({ imageUrl }: { imageUrl?: string }) {
   )
 }
 
-export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
+export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
   
   // State
@@ -388,23 +389,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const isOrphaned = (profileName: string): boolean =>
     orphanedEntries.some((e) => e.profile_name === profileName)
 
-  // Load a profile on the machine (tap to select)
-  const handleLoadProfile = async (profile: MachineProfile) => {
-    if (isEditing) return
-    try {
-      const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/api/machine/profile/load`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile_id: profile.id }),
-      })
-      if (!response.ok) throw new Error(t('profileCatalogue.loadFailed'))
-      toast.success(t('profileCatalogue.loaded', { name: profile.name }))
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('profileCatalogue.loadFailed')
-      toast.error(message)
-    }
-  }
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -575,7 +560,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                 >
                   <Card
                     className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''} ${!isEditing ? 'cursor-pointer active:bg-accent/50 transition-colors' : ''}`}
-                    onClick={() => handleLoadProfile(profile)}
+                    onClick={() => !isEditing && onViewProfile?.(profile)}
                   >
                     <div className="flex items-start gap-4">
                       {/* Profile image — prefer machine's direct URL over image-proxy cache */}
