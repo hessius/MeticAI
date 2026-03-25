@@ -271,12 +271,14 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
         }
         
         setIsPreheating(true)
+        // Never send profile_id to the preheat endpoint. Loading a profile
+        // before preheat causes the Meticulous machine to auto-start extraction
+        // once it reaches temperature. The scheduled task will load the profile
+        // at the correct time instead.
         const preheatResponse = await fetch(`${serverUrl}/api/machine/preheat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profile_id: selectedProfile?.id ?? null
-          })
+          body: JSON.stringify({})
         })
         
         if (!preheatResponse.ok) {
