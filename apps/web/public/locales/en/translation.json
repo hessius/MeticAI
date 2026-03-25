@@ -423,6 +423,8 @@
     "authorName": "Author Name",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"MeticAI\" if left empty.",
+    "geminiModel": "Gemini Model",
+    "geminiModelDescription": "Select which AI model to use for profile generation and analysis.",
     "mqttEnabled": "MQTT Bridge",
     "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
     "addToHomeAssistant": "Add to Home Assistant",
@@ -865,7 +867,13 @@
     "followSystemTheme": "Follow system theme",
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
-    "animationsDescription": "Show animated background effects"
+    "animationsDescription": "Show animated background effects",
+    "platformTheme": "Platform theme",
+    "platformThemeDescription": "Adjust the visual style to match your device",
+    "platformThemeAuto": "Auto-detect",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Default"
   },
   "pourOver": {
     "title": "Pour-over",

@@ -54,6 +54,7 @@ interface Settings {
   geminiApiKey: string
   meticulousIp: string
   authorName: string
+  geminiModel?: string
   mqttEnabled?: boolean
   geminiApiKeyMasked?: boolean
   geminiApiKeyConfigured?: boolean
@@ -105,6 +106,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
     geminiApiKey: '',
     meticulousIp: '',
     authorName: '',
+    geminiModel: 'gemini-2.5-flash',
     mqttEnabled: true
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -201,6 +203,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           geminiApiKey: localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || '',
           meticulousIp: window.location.hostname,
           authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
+          geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
           mqttEnabled: true,
           geminiApiKeyMasked: false,
           geminiApiKeyConfigured: Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()),
@@ -217,6 +220,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             geminiApiKey: data.geminiApiKey || '',
             meticulousIp: data.meticulousIp || '',
             authorName: data.authorName || '',
+            geminiModel: data.geminiModel || 'gemini-2.5-flash',
             mqttEnabled: data.mqttEnabled !== false,
             geminiApiKeyMasked: data.geminiApiKeyMasked || false,
             geminiApiKeyConfigured: data.geminiApiKeyConfigured || false
@@ -362,6 +366,9 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         if (settings.authorName) {
           localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, settings.authorName)
         }
+        if (settings.geminiModel) {
+          localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, settings.geminiModel)
+        }
         setSaveStatus('success')
         setTimeout(() => setSaveStatus('idle'), 3000)
         return
@@ -374,6 +381,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         authorName: settings.authorName,
         meticulousIp: settings.meticulousIp,
         mqttEnabled: settings.mqttEnabled,
+        geminiModel: settings.geminiModel,
       }
       
       // Only send API key if user actually typed a new value (not the masked stars)
@@ -963,6 +971,26 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               />
               <p className="text-xs text-muted-foreground">
                 {t('settings.authorNameDescription')}
+              </p>
+            </div>
+
+            {/* Gemini Model */}
+            <div className="space-y-2">
+              <Label htmlFor="geminiModel" className="text-sm font-medium">
+                {t('settings.geminiModel')}
+              </Label>
+              <select
+                id="geminiModel"
+                value={settings.geminiModel || 'gemini-2.5-flash'}
+                onChange={(e) => handleChange('geminiModel', e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {t('settings.geminiModelDescription')}
               </p>
             </div>
 

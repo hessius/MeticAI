@@ -9,10 +9,14 @@
 // -- User settings (persisted in direct/PWA mode) --
 export const STORAGE_KEYS = {
   GEMINI_API_KEY: 'meticai-gemini-key',
+  GEMINI_MODEL: 'meticai-gemini-model',
   AUTHOR_NAME: 'meticai-author-name',
 
   // -- Direct mode caches --
   PROFILE_LIST_CACHE: 'meticai-direct-profile-list',
   DESCRIPTION_CACHE: 'meticai-direct-desc-cache',
   POUR_OVER_PREFS: 'meticai-direct-pour-over-prefs',
+
+  // -- Appearance --
+  PLATFORM_THEME: 'meticai-platform-theme',
 } as const

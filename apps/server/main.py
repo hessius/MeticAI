@@ -140,6 +140,7 @@ async def lifespan(app: FastAPI):
         stored = load_settings()
         _ENV_SETTINGS_MAP = {
             "geminiApiKey": "GEMINI_API_KEY",
+            "geminiModel": "GEMINI_MODEL",
             "meticulousIp": "METICULOUS_IP",
             "authorName": "AUTHOR_NAME",
         }

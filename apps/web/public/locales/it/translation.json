@@ -423,6 +423,8 @@
     "authorName": "Nome autore",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Il tuo nome per il campo autore nel JSON del profilo generato. Predefinito \"MeticAI\" se lasciato vuoto.",
+    "geminiModel": "Modello Gemini",
+    "geminiModelDescription": "Seleziona quale modello AI utilizzare per la generazione di profili e l'analisi.",
     "mqttEnabled": "Bridge MQTT",
     "mqttEnabledDescription": "Telemetria macchina in tempo reale via MQTT. Alimenta la dashboard di controllo dal vivo.",
     "saveSettings": "Salva impostazioni",
@@ -860,7 +862,13 @@
     "followSystemTheme": "Follow system theme",
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
-    "animationsDescription": "Show animated background effects"
+    "animationsDescription": "Show animated background effects",
+    "platformTheme": "Tema piattaforma",
+    "platformThemeDescription": "Adatta lo stile visivo al tuo dispositivo",
+    "platformThemeAuto": "Rilevamento automatico",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Predefinito"
   },
   "advanced": {
     "detailedKnowledge": "Conoscenza IA dettagliata",
