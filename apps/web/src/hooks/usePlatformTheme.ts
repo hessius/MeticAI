@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useLayoutEffect, useCallback } from 'react'
 import { STORAGE_KEYS } from '@/lib/constants'
 
 export type PlatformTheme = 'auto' | 'ios' | 'material' | 'none'
@@ -37,7 +37,7 @@ export function usePlatformTheme() {
     try { localStorage.setItem(STORAGE_KEYS.PLATFORM_THEME, next) } catch { /* noop */ }
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement
     const cls = resolveThemeClass(theme, platform)
     root.classList.remove('ios-theme', 'material-theme')
