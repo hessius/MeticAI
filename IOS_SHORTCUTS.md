@@ -53,8 +53,9 @@ Share a profile URL (`.json` or `.met`) from any app to import it directly into 
 | # | Action | Configuration |
 |---|--------|---------------|
 | 1 | **Receive** | URLs from Share Sheet |
-| 2 | **URL** | `http://<SERVER_IP>:3550/?import=` appended with Shortcut Input |
-| 3 | **Open URLs** | Open the URL from step 2 |
+| 2 | **URL Encode** | Encode Shortcut Input |
+| 3 | **URL** | `http://<SERVER_IP>:3550/?import=` appended with URL Encoded Text |
+| 4 | **Open URLs** | Open the URL from step 3 |
 
 ### How It Works
 

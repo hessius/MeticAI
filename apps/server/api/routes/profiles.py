@@ -2266,6 +2266,25 @@ async def import_profile(request: Request):
 
 
 
+def _validate_url_for_ssrf(url: str) -> None:
+    """Reject URLs that could hit internal/private network resources."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported scheme: {parsed.scheme}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("No hostname in URL")
+    blocked = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "metadata.google.internal"}
+    if hostname.lower() in blocked:
+        raise ValueError(f"Blocked hostname: {hostname}")
+    try:
+        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError(f"URL resolves to private/reserved IP: {ip}")
+    except socket.gaierror:
+        pass  # Let httpx handle DNS errors
+
+
 @router.post("/api/import-from-url")
 async def import_from_url(request: Request):
     """Import a profile from a URL (JSON or .met format)."""
@@ -2279,22 +2298,32 @@ async def import_from_url(request: Request):
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
             raise HTTPException(status_code=400, detail="Only http and https URLs are supported")
+        try:
+            _validate_url_for_ssrf(url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Blocked URL: {exc}")
         logger.info("Importing profile from URL: %s", url, extra={"request_id": request_id})
         max_size = 5 * 1024 * 1024
         try:
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
+                async with client.stream("GET", url) as resp:
+                    resp.raise_for_status()
+                    chunks: list[bytes] = []
+                    total = 0
+                    async for chunk in resp.aiter_bytes(8192):
+                        total += len(chunk)
+                        if total > max_size:
+                            raise HTTPException(status_code=413, detail="Response too large (max 5 MB)")
+                        chunks.append(chunk)
+                    content = b"".join(chunks)
         except httpx.TimeoutException:
             raise HTTPException(status_code=408, detail="Request timed out fetching URL")
         except httpx.HTTPStatusError as exc:
             raise HTTPException(status_code=502, detail=f"Remote server returned {exc.response.status_code}")
         except httpx.RequestError as exc:
             raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {exc}")
-        if len(resp.content) > max_size:
-            raise HTTPException(status_code=413, detail="Response too large (max 5 MB)")
         try:
-            profile_json = resp.json()
+            profile_json = json.loads(content)
         except Exception:
             raise HTTPException(status_code=400, detail="URL did not return valid JSON")
         if not isinstance(profile_json, dict):
@@ -2302,11 +2331,6 @@ async def import_from_url(request: Request):
         if not profile_json.get("name"):
             raise HTTPException(status_code=400, detail="Profile is missing a 'name' field")
         profile_name = profile_json["name"]
-        history = load_history()
-        entries = history if isinstance(history, list) else history.get("entries", [])
-        for entry in entries:
-            if entry.get("profile_name") == profile_name:
-                return {"status": "exists", "message": f"Profile '{profile_name}' already exists", "entry_id": entry.get("id"), "profile_name": profile_name}
         reply = None
         if generate_description:
             try:
@@ -2323,10 +2347,12 @@ async def import_from_url(request: Request):
         new_entry = {"id": entry_id, "created_at": created_at, "profile_name": profile_name, "user_preferences": f"Imported from URL: {url}", "reply": reply, "profile_json": deep_convert_to_dict(profile_json), "imported": True, "import_source": "url"}
         with _history_lock:
             history = load_history()
-            if not isinstance(history, list):
-                history = history.get("entries", [])
-            history.insert(0, new_entry)
-            save_history(history)
+            entries = history if isinstance(history, list) else history.get("entries", [])
+            for entry in entries:
+                if entry.get("profile_name") == profile_name:
+                    return {"status": "exists", "message": f"Profile '{profile_name}' already exists", "entry_id": entry.get("id"), "profile_name": profile_name}
+            entries.insert(0, new_entry)
+            save_history(entries)
         machine_profile_id = None
         try:
             result = await async_create_profile(profile_json)

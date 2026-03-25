@@ -76,6 +76,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
   const [importUrl, setImportUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const autoImportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -90,10 +91,14 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setBulkLogs([])
       setGenerateDescriptions(aiConfigured)
       if (initialUrl) {
-        setTimeout(() => handleUrlImport(initialUrl), 100)
+        autoImportTimerRef.current = setTimeout(() => handleUrlImport(initialUrl), 100)
       }
     } else {
       setImportUrl('')
+      if (autoImportTimerRef.current) {
+        clearTimeout(autoImportTimerRef.current)
+        autoImportTimerRef.current = null
+      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
         abortControllerRef.current = null
