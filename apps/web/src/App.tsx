@@ -37,6 +37,7 @@ import type { APIResponse, ViewState } from '@/types'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
+import { usePlatformTheme } from '@/hooks/usePlatformTheme'
 import { Sun, Moon } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
@@ -252,6 +253,7 @@ function App() {
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
+  const { theme: platformTheme, setTheme: setPlatformTheme } = usePlatformTheme()
 
   const isHome = viewState === 'start'
 
@@ -1020,6 +1022,8 @@ function App() {
                     isFollowSystem={isFollowSystem}
                     onToggleTheme={toggleTheme}
                     onSetFollowSystem={setFollowSystem}
+                    platformTheme={platformTheme}
+                    onSetPlatformTheme={setPlatformTheme}
                   />
                 </FeatureErrorBoundary>
               )}

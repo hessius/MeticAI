@@ -865,7 +865,13 @@
     "followSystemTheme": "Följ systemtema",
     "followSystemDescription": "Matcha automatiskt ditt systems mörkt-/ljust-läge",
     "backgroundAnimations": "Bakgrundsanimationer",
-    "animationsDescription": "Visa animerade bakgrundseffekter"
+    "animationsDescription": "Visa animerade bakgrundseffekter",
+    "platformTheme": "Plattformstema",
+    "platformThemeDescription": "Anpassa utseendet efter din enhet",
+    "platformThemeAuto": "Automatisk",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Standard"
   },
   "pourOver": {
     "title": "Pour Over",

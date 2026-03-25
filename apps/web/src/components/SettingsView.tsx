@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { hasFeature } from '@/lib/featureFlags'
@@ -39,6 +40,7 @@ import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
 import { LanguageSelector } from '@/components/LanguageSelector'
+import type { PlatformTheme } from '@/hooks/usePlatformTheme'
 
 interface SettingsViewProps {
   onBack: () => void
@@ -48,6 +50,8 @@ interface SettingsViewProps {
   isFollowSystem?: boolean
   onToggleTheme?: () => void
   onSetFollowSystem?: (follow: boolean) => void
+  platformTheme?: PlatformTheme
+  onSetPlatformTheme?: (theme: PlatformTheme) => void
 }
 
 interface Settings {
@@ -98,7 +102,7 @@ const PROGRESS_UPDATE_INTERVAL = 500
 const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
 const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
-export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
+export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, platformTheme, onSetPlatformTheme }: SettingsViewProps) {
   const { t } = useTranslation()
   
   const [settings, setSettings] = useState<Settings>({
@@ -1059,7 +1063,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </div>}
 
             {/* Appearance */}
-            {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (
+            {(onToggleBlobs !== undefined || onToggleTheme !== undefined || onSetPlatformTheme !== undefined) && (
               <div className="space-y-3 pt-2 border-t border-border">
                 <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{t('appearance.title')}</h3>
                 
@@ -1107,6 +1111,30 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                       checked={showBlobs}
                       onCheckedChange={onToggleBlobs}
                     />
+                  </div>
+                )}
+
+                {/* Platform theme */}
+                {onSetPlatformTheme !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="platform-theme-select" className="text-sm font-medium">{t('appearance.platformTheme')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('appearance.platformThemeDescription')}</p>
+                    </div>
+                    <Select
+                      value={platformTheme ?? 'auto'}
+                      onValueChange={(value) => onSetPlatformTheme(value as PlatformTheme)}
+                    >
+                      <SelectTrigger id="platform-theme-select" className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">{t('appearance.platformThemeAuto')}</SelectItem>
+                        <SelectItem value="ios">{t('appearance.platformThemeIos')}</SelectItem>
+                        <SelectItem value="material">{t('appearance.platformThemeMaterial')}</SelectItem>
+                        <SelectItem value="none">{t('appearance.platformThemeNone')}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
 

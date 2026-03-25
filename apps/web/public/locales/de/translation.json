@@ -860,7 +860,13 @@
     "followSystemTheme": "Follow system theme",
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
-    "animationsDescription": "Show animated background effects"
+    "animationsDescription": "Show animated background effects",
+    "platformTheme": "Plattform-Design",
+    "platformThemeDescription": "Visuellen Stil an Ihr Gerät anpassen",
+    "platformThemeAuto": "Automatisch",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Standard"
   },
   "advanced": {
     "detailedKnowledge": "Detailliertes KI-Wissen",

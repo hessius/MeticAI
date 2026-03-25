@@ -860,7 +860,13 @@
     "followSystemTheme": "Follow system theme",
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
-    "animationsDescription": "Show animated background effects"
+    "animationsDescription": "Show animated background effects",
+    "platformTheme": "Tema piattaforma",
+    "platformThemeDescription": "Adatta lo stile visivo al tuo dispositivo",
+    "platformThemeAuto": "Rilevamento automatico",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Predefinito"
   },
   "advanced": {
     "detailedKnowledge": "Conoscenza IA dettagliata",

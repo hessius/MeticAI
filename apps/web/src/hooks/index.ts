@@ -27,5 +27,8 @@ export { useIsMobile } from './use-mobile';
 
 export { useSwipeNavigation } from './use-swipe-navigation';
 
+export { usePlatformTheme } from './usePlatformTheme';
+export type { PlatformTheme, DetectedPlatform } from './usePlatformTheme';
+
 // Accessibility Hooks
 export * from './a11y';

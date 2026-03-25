@@ -14,6 +14,8 @@ import './i18n/config'
 
 import "./main.css"
 import "./styles/theme.css"
+import "./styles/ios-theme.css"
+import "./styles/material-theme.css"
 import "./index.css"
 
 // In direct mode (PWA on machine), intercept MeticAI proxy API calls and either

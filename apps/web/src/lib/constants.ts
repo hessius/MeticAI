@@ -15,4 +15,7 @@ export const STORAGE_KEYS = {
   PROFILE_LIST_CACHE: 'meticai-direct-profile-list',
   DESCRIPTION_CACHE: 'meticai-direct-desc-cache',
   POUR_OVER_PREFS: 'meticai-direct-pour-over-prefs',
+
+  // -- Appearance --
+  PLATFORM_THEME: 'meticai-platform-theme',
 } as const
