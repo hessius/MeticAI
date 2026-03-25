@@ -51,7 +51,7 @@ function getClient(): GoogleGenAI {
  * Typed AI service error codes — UI layer translates these via i18n.
  * This keeps the service layer free of user-facing strings.
  */
-export type AIErrorCode = 'API_KEY_MISSING' | 'QUOTA_EXCEEDED' | 'API_KEY_INVALID' | 'MODEL_NOT_FOUND' | 'NETWORK_ERROR' | 'UNKNOWN'
+export type AIErrorCode = 'API_KEY_MISSING' | 'QUOTA_EXCEEDED' | 'API_KEY_INVALID' | 'MODEL_NOT_FOUND' | 'NETWORK_ERROR' | 'IMAGE_GENERATION_FAILED' | 'IMAGE_NO_DATA' | 'UNKNOWN'
 
 export class AIServiceError extends Error {
   constructor(public readonly code: AIErrorCode, cause?: unknown) {
@@ -86,14 +86,14 @@ export function createBrowserAIService(): AIService {
       onProgress?: ProgressCallback,
     ): Promise<ProfileGenerationResult> => {
       const client = getClient()
-      onProgress?.({ phase: 'analyzing', message: 'Preparing prompt...' })
+      onProgress?.({ phase: 'analyzing', message: 'generation.progress.preparingPrompt' })
 
       // Build multipart content
       const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = []
 
       // Add image if provided
       if (request.image) {
-        onProgress?.({ phase: 'analyzing', message: 'Processing image...' })
+        onProgress?.({ phase: 'analyzing', message: 'generation.progress.processingImage' })
         const buffer = await request.image.arrayBuffer()
         const base64 = btoa(
           new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''),
@@ -119,7 +119,7 @@ export function createBrowserAIService(): AIService {
       )
       parts.push({ text: systemPrompt })
 
-      onProgress?.({ phase: 'generating', message: 'Generating profile...' })
+      onProgress?.({ phase: 'generating', message: 'generation.progress.generatingProfile' })
 
       let response
       try {
@@ -133,7 +133,7 @@ export function createBrowserAIService(): AIService {
 
       let text = response.text ?? ''
 
-      onProgress?.({ phase: 'validating', message: 'Validating profile...' })
+      onProgress?.({ phase: 'validating', message: 'generation.progress.validatingProfile' })
 
       // Validation + retry loop
       const generateFix = async (fixPrompt: string) => {
@@ -147,7 +147,7 @@ export function createBrowserAIService(): AIService {
       const { profileJson, reply: validatedReply } = await validateAndRetryProfile(text, generateFix)
       text = validatedReply
 
-      onProgress?.({ phase: 'complete', message: 'Profile generated successfully' })
+      onProgress?.({ phase: 'complete', message: 'generation.progress.profileGenerated' })
 
       return {
         status: 'success',
@@ -201,12 +201,12 @@ export function createBrowserAIService(): AIService {
 
       const images = response.generatedImages
       if (!images || images.length === 0) {
-        throw new Error('No image generated')
+        throw new AIServiceError('IMAGE_GENERATION_FAILED')
       }
 
       const imageData = images[0].image
       if (!imageData?.imageBytes) {
-        throw new Error('No image data in response')
+        throw new AIServiceError('IMAGE_NO_DATA')
       }
 
       // Convert base64 to Blob

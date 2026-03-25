@@ -1459,5 +1459,14 @@
     "acceptUpdateFailed": "Error al aceptar actualización",
     "removeFailed": "Error al eliminar",
     "restoreFailed": "Error al restaurar"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Preparando prompt...",
+      "processingImage": "Procesando imagen...",
+      "generatingProfile": "Generando perfil...",
+      "validatingProfile": "Validando perfil...",
+      "profileGenerated": "Perfil generado con éxito"
+    }
   }
 }

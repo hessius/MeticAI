@@ -1459,5 +1459,14 @@
     "acceptUpdateFailed": "Impossibile accettare l'aggiornamento",
     "removeFailed": "Impossibile rimuovere",
     "restoreFailed": "Impossibile ripristinare"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Preparazione del prompt...",
+      "processingImage": "Elaborazione immagine...",
+      "generatingProfile": "Generazione del profilo...",
+      "validatingProfile": "Convalida del profilo...",
+      "profileGenerated": "Profilo generato con successo"
+    }
   }
 }

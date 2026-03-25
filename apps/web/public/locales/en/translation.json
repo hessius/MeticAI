@@ -1461,5 +1461,14 @@
     "timeout": "Update did not complete within expected time. Please refresh manually.",
     "triggerFailed": "Failed to trigger update",
     "checkFailed": "Failed to check for updates"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Preparing prompt...",
+      "processingImage": "Processing image...",
+      "generatingProfile": "Generating profile...",
+      "validatingProfile": "Validating profile...",
+      "profileGenerated": "Profile generated successfully"
+    }
   }
 }

@@ -53,14 +53,12 @@ export function MachineServiceProvider({
     return meticAIAdapter
   }, [service])
 
-  // Connect in direct mode
+  // Connect/disconnect the active adapter (MeticAIAdapter.connect is a safe no-op)
   useEffect(() => {
-    if (value.name === 'DirectAdapter') {
-      value.connect(getDefaultMachineUrl()).catch((err) => {
-        console.error('[MachineService] Failed to connect:', err)
-      })
-      return () => value.disconnect()
-    }
+    value.connect(getDefaultMachineUrl()).catch((err) => {
+      console.error('[MachineService] Failed to connect:', err)
+    })
+    return () => value.disconnect()
   }, [value])
 
   return (

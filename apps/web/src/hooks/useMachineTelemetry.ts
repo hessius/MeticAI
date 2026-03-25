@@ -104,14 +104,14 @@ function useDirectTelemetry(enabled: boolean): MachineState {
         const profileId = ext.id
         if (profileId && profileId !== lastProfileIdRef.current) {
           lastProfileIdRef.current = profileId
-          fetch(`/api/v1/profile/get/${profileId}`)
-            .then(r => r.ok ? r.json() : null)
-            .then((p: {final_weight?: number} | null) => {
-              if (p?.final_weight) {
-                setState(s => ({ ...s, target_weight: p.final_weight ?? null }))
+          machine.getProfile(profileId)
+            .then((profile) => {
+              const weight = (profile as unknown as {final_weight?: number})?.final_weight
+              if (weight) {
+                setState(s => ({ ...s, target_weight: weight }))
               }
             })
-            .catch(() => {/* ignore */})
+            .catch(() => {/* ignore — profile may not exist */})
         }
 
         return {

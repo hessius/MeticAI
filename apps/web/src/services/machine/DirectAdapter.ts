@@ -65,6 +65,9 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     const socket = api.getSocket()
     if (!socket) return
 
+    // Remove any existing listeners to prevent accumulation on reconnect / StrictMode remounts
+    socket.removeAllListeners()
+
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
     socket.on('status', (data) => statusCallbacks.forEach(cb => cb(data)))

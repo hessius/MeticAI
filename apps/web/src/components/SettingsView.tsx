@@ -33,6 +33,7 @@ import {
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode } from '@/lib/machineMode'
+import { STORAGE_KEYS } from '@/lib/constants'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
@@ -197,12 +198,12 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       if (isDirectMode()) {
         // In direct mode, load from localStorage
         setSettings({
-          geminiApiKey: localStorage.getItem('meticai-gemini-key') || '',
+          geminiApiKey: localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || '',
           meticulousIp: window.location.hostname,
-          authorName: localStorage.getItem('meticai-author-name') || '',
+          authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
           mqttEnabled: true,
           geminiApiKeyMasked: false,
-          geminiApiKeyConfigured: Boolean(localStorage.getItem('meticai-gemini-key')?.trim()),
+          geminiApiKeyConfigured: Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()),
         })
         setIsLoading(false)
         return
@@ -356,10 +357,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       if (isDirectMode()) {
         // In direct mode, persist to localStorage
         if (settings.geminiApiKey && !settings.geminiApiKey.startsWith('*')) {
-          localStorage.setItem('meticai-gemini-key', settings.geminiApiKey)
+          localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, settings.geminiApiKey)
         }
         if (settings.authorName) {
-          localStorage.setItem('meticai-author-name', settings.authorName)
+          localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, settings.authorName)
         }
         setSaveStatus('success')
         setTimeout(() => setSaveStatus('idle'), 3000)

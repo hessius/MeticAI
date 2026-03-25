@@ -1459,5 +1459,14 @@
     "acceptUpdateFailed": "Fehler beim Akzeptieren der Aktualisierung",
     "removeFailed": "Fehler beim Entfernen",
     "restoreFailed": "Fehler beim Wiederherstellen"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Prompt wird vorbereitet...",
+      "processingImage": "Bild wird verarbeitet...",
+      "generatingProfile": "Profil wird generiert...",
+      "validatingProfile": "Profil wird validiert...",
+      "profileGenerated": "Profil erfolgreich generiert"
+    }
   }
 }

@@ -4,7 +4,7 @@
  * Defines all operations that can be performed against a Meticulous espresso
  * machine. Two implementations exist:
  *
- * - **ProxyAdapter** — delegates to the MeticAI FastAPI backend (Docker mode)
+ * - **MeticAIAdapter** — delegates to the MeticAI FastAPI backend (Docker mode)
  * - **DirectAdapter** — talks directly to the machine via @meticulous-home/espresso-api (PWA mode)
  */
 

@@ -1459,5 +1459,14 @@
     "acceptUpdateFailed": "Kunde inte acceptera uppdatering",
     "removeFailed": "Kunde inte ta bort",
     "restoreFailed": "Kunde inte återställa"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Förbereder prompt...",
+      "processingImage": "Bearbetar bild...",
+      "generatingProfile": "Genererar profil...",
+      "validatingProfile": "Validerar profil...",
+      "profileGenerated": "Profilen genererades framgångsrikt"
+    }
   }
 }

@@ -23,6 +23,6 @@ else
   echo "No existing installation found."
 fi
 
-# Delegate to installer (handles backup, download, extract)
+# Delegate to the install-direct.sh installer (handles backup, download, extract)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "${SCRIPT_DIR}/install-meticai.sh" "$METICAI_VERSION"
+exec "${SCRIPT_DIR}/../install-direct.sh" "$METICAI_VERSION"
