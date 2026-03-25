@@ -40,9 +40,8 @@ test.describe('History View', () => {
 
     await historyButton.click()
 
-    // Should show profile entries or profile catalogue
-    const profileContent = page.locator('h2, h3, [data-testid="profile-card"]')
-    await expect(profileContent.first()).toBeVisible({ timeout: 5000 })
+    // Should show the Profile Catalogue heading (view-specific, not the start view h2)
+    await expect(page.getByText('Profile Catalogue').first()).toBeVisible({ timeout: 5000 })
   })
 
   test('should allow navigation back from history', async ({ page }) => {

@@ -527,48 +527,13 @@ if (isDirectMode()) {
       ).catch(() => jsonResponse({ status: 'error', detail: 'Preheat failed' }, 502))
     }
 
-    // POST /api/machine/schedule-shot → load profile now and schedule start via setTimeout
+    // POST /api/machine/schedule-shot → not supported in direct mode
+    // (feature flag scheduledShots=false already hides the UI, but be explicit)
     if (url.match(/\/api\/machine\/schedule-shot/) && method === 'POST') {
-      return (async () => {
-        try {
-          const body = await new Response(init?.body || '{}').json() as {
-            profile_id?: string; scheduled_time?: string; preheat?: boolean
-          }
-
-          // If preheat requested, start it immediately
-          if (body.preheat) {
-            await _fetch('/api/v1/action/preheat')
-          }
-
-          // Calculate delay until scheduled time
-          if (body.profile_id && body.scheduled_time) {
-            const delay = new Date(body.scheduled_time).getTime() - Date.now()
-            if (delay > 0) {
-              // Schedule the profile run after delay
-              setTimeout(async () => {
-                try {
-                  const loadResp = await _fetch(`/api/v1/profile/load/${body.profile_id}`)
-                  if (loadResp.ok) {
-                    await _fetch('/api/v1/action/start')
-                  }
-                } catch { /* best effort */ }
-              }, delay)
-            }
-          }
-
-          return jsonResponse({
-            status: 'success',
-            scheduled_shot: {
-              id: 'direct-' + Date.now(),
-              profile_id: body.profile_id,
-              scheduled_time: body.scheduled_time,
-              preheat: body.preheat || false,
-            },
-          })
-        } catch {
-          return jsonResponse({ status: 'error', detail: 'Schedule failed' }, 500)
-        }
-      })()
+      return jsonResponse({
+        status: 'error',
+        detail: 'Scheduled shots are not supported in direct mode. Use the machine UI or MeticAI Docker mode.',
+      }, 501)
     }
 
     // /api/machine/profiles/orphaned → empty list (no MeticAI DB in direct mode)
