@@ -985,9 +985,9 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 onChange={(e) => handleChange('geminiModel', e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
+                <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
+                <option value="gemini-2.0-flash">{t('settings.geminiModel20Flash')}</option>
               </select>
               <p className="text-xs text-muted-foreground">
                 {t('settings.geminiModelDescription')}

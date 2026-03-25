@@ -424,7 +424,7 @@
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"MeticAI\" if left empty.",
     "geminiModel": "Gemini Model",
-    "geminiModelDescription": "Select which AI model to use for profile generation and analysis.",
+    "geminiModelDescription": "Select which Gemini model to use for AI features.",
     "mqttEnabled": "MQTT Bridge",
     "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
     "addToHomeAssistant": "Add to Home Assistant",
@@ -539,7 +539,10 @@
     "version": "Version",
     "footer": "MeticAI • Built with ❤️ for coffee lovers",
     "feedbackFailed": "Failed to submit feedback",
-    "betaChannelFailed": "Failed to switch beta channel"
+    "betaChannelFailed": "Failed to switch beta channel",
+    "geminiModel25Flash": "Gemini 2.5 Flash (Recommended)",
+    "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel20Flash": "Gemini 2.0 Flash"
   },
   "profileBreakdown": {
     "title": "Profile Details",

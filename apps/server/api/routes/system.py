@@ -1259,7 +1259,8 @@ async def save_settings_endpoint(request: Request):
 
         # Gemini model selection
         if "geminiModel" in body:
-            current_settings["geminiModel"] = str(body["geminiModel"]).strip()
+            model_value = str(body["geminiModel"]).strip()
+            current_settings["geminiModel"] = model_value if model_value else "gemini-2.5-flash"
         
         # For IP and API key changes, also update .env file
         env_updated = False

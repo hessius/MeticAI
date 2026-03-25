@@ -424,7 +424,7 @@
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Il tuo nome per il campo autore nel JSON del profilo generato. Predefinito \"MeticAI\" se lasciato vuoto.",
     "geminiModel": "Modello Gemini",
-    "geminiModelDescription": "Seleziona quale modello AI utilizzare per la generazione di profili e l'analisi.",
+    "geminiModelDescription": "Seleziona quale modello Gemini utilizzare per le funzioni IA.",
     "mqttEnabled": "Bridge MQTT",
     "mqttEnabledDescription": "Telemetria macchina in tempo reale via MQTT. Alimenta la dashboard di controllo dal vivo.",
     "saveSettings": "Salva impostazioni",
@@ -539,7 +539,10 @@
     "runsOn": "Runs on",
     "andCaffeine": "and caffeine ☕",
     "betaChannelFailed": "Impossibile cambiare il canale beta",
-    "feedbackFailed": "Impossibile inviare il feedback"
+    "feedbackFailed": "Impossibile inviare il feedback",
+    "geminiModel25Flash": "Gemini 2.5 Flash (Consigliato)",
+    "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel20Flash": "Gemini 2.0 Flash"
   },
   "profileBreakdown": {
     "title": "Dettagli profilo",

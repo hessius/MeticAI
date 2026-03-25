@@ -424,7 +424,7 @@
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Ditt namn för författarfältet i genererad profil-JSON. Standardvärde \"MeticAI\" om det lämnas tomt.",
     "geminiModel": "Gemini-modell",
-    "geminiModelDescription": "Välj vilken AI-modell som ska användas för profilgenerering och analys.",
+    "geminiModelDescription": "Välj vilken Gemini-modell som ska användas för AI-funktioner.",
     "mqttEnabled": "MQTT-brygga",
     "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
     "saveSettings": "Spara inställningar",
@@ -539,7 +539,10 @@
     "runsOn": "Runs on",
     "andCaffeine": "and caffeine ☕",
     "betaChannelFailed": "Kunde inte byta betakanal",
-    "feedbackFailed": "Kunde inte skicka feedback"
+    "feedbackFailed": "Kunde inte skicka feedback",
+    "geminiModel25Flash": "Gemini 2.5 Flash (Rekommenderad)",
+    "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel20Flash": "Gemini 2.0 Flash"
   },
   "profileBreakdown": {
     "title": "Profildetaljer",

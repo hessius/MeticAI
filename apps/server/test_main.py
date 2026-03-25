@@ -7927,6 +7927,46 @@ class TestSaveSettingsEndpoint:
         # Should handle gracefully
         assert response.status_code in [200, 400, 500]
 
+    def test_save_gemini_model_persists_and_returns(self, client, monkeypatch, tmp_path):
+        """POST geminiModel then GET and verify it is returned."""
+        import services.settings_service as settings_svc
+
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text("{}")
+        monkeypatch.setattr(settings_svc, "SETTINGS_FILE", settings_file)
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+
+        resp = client.post("/api/settings", json={"geminiModel": "gemini-2.5-pro"})
+        assert resp.status_code == 200
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["geminiModel"] == "gemini-2.5-pro"
+
+    def test_save_gemini_model_empty_falls_back_to_default(self, client, monkeypatch, tmp_path):
+        """POST empty geminiModel falls back to the default model."""
+        import services.settings_service as settings_svc
+
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text("{}")
+        monkeypatch.setattr(settings_svc, "SETTINGS_FILE", settings_file)
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+
+        resp = client.post("/api/settings", json={"geminiModel": "  "})
+        assert resp.status_code == 200
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["geminiModel"] == "gemini-2.5-flash"
+
+    def test_get_settings_includes_gemini_model(self, client, monkeypatch):
+        """GET /api/settings always includes geminiModel."""
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert "geminiModel" in resp.json()
+
 
 class TestDecompressShotData:
     """Test shot data decompression."""
