@@ -3,6 +3,7 @@
  */
 
 import { getServerUrl } from './config'
+import { isDirectMode } from './machineMode'
 
 /**
  * Gets the current page URL with network-accessible hostname.
@@ -20,19 +21,21 @@ export async function getNetworkUrl(): Promise<string> {
     return currentUrl.href;
   }
   
-  // 1. Try auto-detected LAN IP from the backend
-  try {
-    const res = await fetch('/api/network-ip');
-    if (res.ok) {
-      const data = await res.json();
-      const ip: string | undefined = data?.ip;
-      if (ip && ip !== '127.0.0.1' && ip !== '::1') {
-        currentUrl.hostname = ip;
-        return currentUrl.href;
+  // 1. Try auto-detected LAN IP from the backend (proxy mode only)
+  if (!isDirectMode()) {
+    try {
+      const res = await fetch('/api/network-ip');
+      if (res.ok) {
+        const data = await res.json();
+        const ip: string | undefined = data?.ip;
+        if (ip && ip !== '127.0.0.1' && ip !== '::1') {
+          currentUrl.hostname = ip;
+          return currentUrl.href;
+        }
       }
+    } catch {
+      // Non-fatal – try config.json next
     }
-  } catch {
-    // Non-fatal – try config.json next
   }
   
   // 2. Fall back to configured serverUrl

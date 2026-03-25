@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
 import { Toaster } from '@/components/ui/sonner'
@@ -40,7 +41,7 @@ import { Sun, Moon } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
-import { useWebSocket } from '@/hooks/useWebSocket'
+import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
@@ -57,8 +58,12 @@ const ProfileCatalogueView = lazy(() => import('./components/ProfileCatalogueVie
 const EspressoCompass = lazy(() => import('./components/EspressoCompass').then(m => ({ default: m.EspressoCompass })))
 const ProfileBreakdown = lazy(() => import('./components/ProfileBreakdown').then(m => ({ default: m.ProfileBreakdown })))
 
+// Storage migration — initialises IndexedDB in direct/PWA mode
+import { useStorageMigration } from '@/services/storage'
+
 function App() {
   const { t } = useTranslation()
+  useStorageMigration()
   const [isInitializing, setIsInitializing] = useState(true)
   const [viewState, setViewState] = useState<ViewState>('start')
   const previousViewStateRef = useRef<ViewState>('start')
@@ -96,12 +101,12 @@ function App() {
   // Background blobs preference (localStorage)
   const { showBlobs, toggleBlobs } = useBackgroundBlobs()
 
-  // Phase 3 — MQTT / WebSocket telemetry
+  // Phase 3 — MQTT / WebSocket telemetry (mode-aware: proxy=WS, direct=Socket.IO)
   const [mqttEnabled, setMqttEnabled] = useState(false)
   const [isAiConfigured, setIsAiConfigured] = useState(false)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
-  const { state: machineState, patchState: patchMachineState } = useWebSocket(mqttEnabled)
+  const machineState = useMachineTelemetry(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
@@ -133,8 +138,10 @@ function App() {
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
         }
-        // Build image URL
-        setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
+        // Build image URL (not available in direct mode — no AI-generated images)
+        if (!isDirectMode()) {
+          setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
+        }
       } catch { /* non-critical */ }
     })()
   }, [viewState, machineState.active_profile])
@@ -143,6 +150,12 @@ function App() {
   const prevViewStateRef = useRef<ViewState | null>(null)
   useEffect(() => {
     const fetchMqttSetting = async () => {
+      // In direct mode, no MeticAI backend — use sensible defaults
+      if (isDirectMode()) {
+        setMqttEnabled(true) // Socket.IO is always available on machine
+        setIsAiConfigured(Boolean(localStorage.getItem('meticai-gemini-key')?.trim()))
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const res = await fetch(`${serverUrl}/api/settings`)
@@ -245,6 +258,12 @@ function App() {
   // Check for existing profiles on mount
   useEffect(() => {
     const checkProfiles = async () => {
+      // In direct mode, skip proxy API — default to form view
+      if (isDirectMode()) {
+        setProfileCount(0)
+        setIsInitializing(false)
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
@@ -265,6 +284,7 @@ function App() {
 
   // Update profile count when returning from history view
   const refreshProfileCount = useCallback(async () => {
+    if (isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
@@ -630,6 +650,7 @@ function App() {
   }
 
   const handleViewProfileByName = async (profileName: string) => {
+    if (isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
@@ -641,6 +662,39 @@ function App() {
       }
     } catch {
       // Silently fail — profile may not exist in history
+    }
+  }
+
+  const handleViewMachineProfile = async (profile: { id: string; name: string; display?: { image?: string; description?: string } }) => {
+    try {
+      const serverUrl = await getServerUrl()
+      const res = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
+      const data = res.ok ? await res.json() : {}
+      const profileJson = data.profile ?? null
+
+      // Use cached static description if available, else generate on the fly
+      const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+      let reply = descCache?.get(profile.id) ?? ''
+      if (!reply && profileJson) {
+        const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+        reply = buildStaticProfileDescription(profileJson)
+        descCache?.set(profile.id, reply)
+      }
+
+      const entry: HistoryEntry = {
+        id: profile.id,
+        profile_name: profile.name,
+        created_at: new Date().toISOString(),
+        coffee_analysis: null,
+        user_preferences: null,
+        reply,
+        profile_json: profileJson,
+      }
+      const imageUrl = profile.display?.image || undefined
+      previousViewStateRef.current = 'profile-catalogue'
+      handleViewHistoryEntry(entry, imageUrl)
+    } catch {
+      toast.error(t('profileCatalogue.loadFailed'))
     }
   }
 
@@ -862,6 +916,7 @@ function App() {
                   profileCount={profileCount}
                   onGenerateNew={() => setViewState('form')}
                   onViewHistory={() => setViewState('history')}
+                  onProfileCatalogue={() => setViewState('profile-catalogue')}
                   onRunShot={() => {
                     setRunShotProfileId(undefined)
                     setRunShotProfileName(undefined)
@@ -937,7 +992,10 @@ function App() {
                 <FeatureErrorBoundary feature="Profile Detail">
                   <ProfileDetailView
                     entry={selectedHistoryEntry}
-                    onBack={() => setViewState('history')}
+                    onBack={() => {
+                      const prev = previousViewStateRef.current
+                      setViewState(prev === 'profile-catalogue' ? 'profile-catalogue' : 'history')
+                    }}
                     cachedImageUrl={selectedHistoryImageUrl}
                     aiConfigured={aiAvailable}
                     hideAiWhenUnavailable={hideAiWhenUnavailable}
@@ -971,7 +1029,6 @@ function App() {
                   <RunShotView
                     onBack={handleBackToStart}
                     onNavigateToLive={() => setViewState('live-shot')}
-                    onProfileSelected={(name) => patchMachineState({ active_profile: name })}
                     initialProfileId={runShotProfileId}
                     initialProfileName={runShotProfileName}
                   />
@@ -1048,7 +1105,7 @@ function App() {
 
               {viewState === 'profile-catalogue' && (
                 <FeatureErrorBoundary feature="Profile Catalogue">
-                  <ProfileCatalogueView onBack={() => setViewState('history')} />
+                  <ProfileCatalogueView onBack={() => setViewState(isDirectMode() ? 'start' : 'history')} onViewProfile={handleViewMachineProfile} />
                 </FeatureErrorBoundary>
               )}
 

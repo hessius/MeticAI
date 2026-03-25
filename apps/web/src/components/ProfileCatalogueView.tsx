@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isDirectMode } from '@/lib/machineMode'
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -37,6 +38,12 @@ interface MachineProfile {
   final_weight?: number
   in_history: boolean
   has_description: boolean
+  display?: {
+    description?: string
+    shortDescription?: string
+    accentColor?: string
+    image?: string
+  }
 }
 
 interface OrphanedEntry {
@@ -48,6 +55,7 @@ interface OrphanedEntry {
 
 interface ProfileCatalogueViewProps {
   onBack: () => void
+  onViewProfile?: (profile: MachineProfile) => void
 }
 
 const SWIPE_THRESHOLD = -80
@@ -120,8 +128,18 @@ function ProfileImage({ imageUrl }: { imageUrl?: string }) {
   )
 }
 
-export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
+export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
+
+  // Read static description cache (populated by main.tsx in direct mode)
+  const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+  const getShortDescription = (profile: MachineProfile): string | undefined => {
+    if (profile.display?.shortDescription) return profile.display.shortDescription
+    const full = descCache?.get(profile.id)
+    if (!full) return undefined
+    const m = full.match(/Description:\s*([\s\S]*?)(?:\n\n|Preparation:)/i)
+    return m?.[1]?.trim() || undefined
+  }
   
   // State
   const [profiles, setProfiles] = useState<MachineProfile[]>([])
@@ -382,6 +400,8 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const isOrphaned = (profileName: string): boolean =>
     orphanedEntries.some((e) => e.profile_name === profileName)
 
+
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -549,10 +569,13 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                   isCoarse={isCoarsePointer}
                   onSwipeDelete={() => openDeleteDialog(profile)}
                 >
-                  <Card className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''}`}>
+                  <Card
+                    className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''} ${!isEditing ? 'cursor-pointer active:bg-accent/50 transition-colors' : ''}`}
+                    onClick={() => !isEditing && onViewProfile?.(profile)}
+                  >
                     <div className="flex items-start gap-4">
-                      {/* Profile image */}
-                      <ProfileImage imageUrl={getImageUrl(profile.name) ?? undefined} />
+                      {/* Profile image — prefer machine's direct URL over image-proxy cache */}
+                      <ProfileImage imageUrl={profile.display?.image ?? getImageUrl(profile.name) ?? undefined} />
                       
                       {/* Profile info */}
                       <div className="flex-1 min-w-0">
@@ -615,7 +638,12 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                                 <span>{profile.final_weight}g</span>
                               )}
                             </div>
-                            {profile.in_history && (
+                            {getShortDescription(profile) && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {getShortDescription(profile)}
+                              </p>
+                            )}
+                            {profile.in_history && !isDirectMode() && (
                               <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 {t('profileCatalogue.inHistory')}

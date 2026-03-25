@@ -16,12 +16,16 @@
     position: relative;
   }
   
-  /* iOS PWA safe area handling */
+  /* iOS PWA safe area handling — let background show through the notch
+     while keeping content below it */
   body {
-    padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+  
+  #root {
+    padding-top: env(safe-area-inset-top);
   }
   
   /* Prevent scroll jump when Radix UI dialogs/selects open */

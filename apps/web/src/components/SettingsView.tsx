@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
+import { hasFeature } from '@/lib/featureFlags'
 import { 
   CaretLeft, 
   GithubLogo, 
@@ -31,6 +32,8 @@ import {
   Info
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
+import { STORAGE_KEYS } from '@/lib/constants'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
@@ -192,6 +195,19 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   // Load current settings on mount
   useEffect(() => {
     const loadSettings = async () => {
+      if (isDirectMode()) {
+        // In direct mode, load from localStorage
+        setSettings({
+          geminiApiKey: localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || '',
+          meticulousIp: window.location.hostname,
+          authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
+          mqttEnabled: true,
+          geminiApiKeyMasked: false,
+          geminiApiKeyConfigured: Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()),
+        })
+        setIsLoading(false)
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/settings`)
@@ -247,6 +263,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   // Load version info
   useEffect(() => {
     const loadVersionInfo = async () => {
+      if (isDirectMode()) {
+        setVersionInfo({ version: __APP_VERSION__ || 'PWA', repoUrl: 'https://github.com/hessius/MeticAI' })
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/version`)
@@ -334,6 +354,19 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
     setErrorMessage('')
 
     try {
+      if (isDirectMode()) {
+        // In direct mode, persist to localStorage
+        if (settings.geminiApiKey && !settings.geminiApiKey.startsWith('*')) {
+          localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, settings.geminiApiKey)
+        }
+        if (settings.authorName) {
+          localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, settings.authorName)
+        }
+        setSaveStatus('success')
+        setTimeout(() => setSaveStatus('idle'), 3000)
+        return
+      }
+
       const serverUrl = await getServerUrl()
       
       // Build the payload, only including fields that should be sent
@@ -856,7 +889,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
             </div>
 
-            {/* Meticulous IP */}
+            {/* Meticulous IP — hidden in direct mode (IP is implicit) */}
+            {!isDirectMode() && (
             <div className="space-y-2">
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
                 {t('settings.meticulousIp')}
@@ -913,6 +947,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 {t('settings.meticulousIpDescription')}
               </p>
             </div>
+            )}
 
             {/* Author Name */}
             <div className="space-y-2">
@@ -932,7 +967,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </div>
 
             {/* MQTT Bridge */}
-            <div className="space-y-3 pt-2 border-t border-border">
+            {hasFeature('bridgeStatus') && <div className="space-y-3 pt-2 border-t border-border">
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Control Center</h3>
                 <a
@@ -1021,7 +1056,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   </Button>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Appearance */}
             {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (
@@ -1174,7 +1209,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         </AnimatePresence>
       </Card>
 
-      {/* Remote Access (Tailscale) Section — always visible */}
+      {/* Remote Access (Tailscale) Section — hidden in direct/PWA mode */}
+      {hasFeature('tailscaleConfig') && (
       <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1416,6 +1452,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           )}
         </div>
       </Card>
+      )}
 
       {/* Version Info Section - Unified */}
       <Card className="p-6 space-y-4">
@@ -1434,7 +1471,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         </div>
       </Card>
 
-      {/* Updates Section */}
+      {/* Updates Section — hidden in direct/PWA mode (no Watchtower) */}
+      {hasFeature('watchtowerUpdate') && (
       <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-primary">{t('settings.updates')}</h3>
         
@@ -1512,9 +1550,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           </Button>
         </div>
       </Card>
+      )}
 
       {/* Beta Testing Section */}
-      <Card className="p-6 space-y-4">
+      {hasFeature('watchtowerUpdate') && <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-primary">{t('settings.beta.title')}</h3>
         
         <div className="space-y-4">
@@ -1648,10 +1687,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </div>
           )}
         </div>
-      </Card>
+      </Card>}
 
       {/* System Section */}
-      <Card className="p-6 space-y-4">
+      {hasFeature('systemManagement') && <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-primary">{t('settings.system')}</h3>
         
         <div className="space-y-3">
@@ -1702,7 +1741,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </Alert>
           )}
         </div>
-      </Card>
+      </Card>}
 
       {/* Footer */}
       <div className="text-center text-xs text-muted-foreground/50 pb-4 space-y-1">

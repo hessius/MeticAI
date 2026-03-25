@@ -4,12 +4,15 @@ import { defineConfig } from "vite";
 import { resolve } from 'path'
 
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
+const machineMode = process.env.VITE_MACHINE_MODE || 'proxy'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // PWA plugin — disabled: workbox/path-scurry lru-cache compat issue
+    // TODO: re-enable once vite-plugin-pwa fixes LRUCache constructor error
   ],
   define: {
     __APP_VERSION__: JSON.stringify(Date.now().toString()),
@@ -19,14 +22,21 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  // Machine builds set base path for Tornado's /meticai/ static handler
+  base: machineMode === 'direct' ? '/meticai/' : '/',
   build: {
-    sourcemap: false,  // Disabled for production — don't expose source code
-    cssMinify: 'esbuild',  // Workaround: lightningcss can't parse TW 4.2 output (tailwindlabs/tailwindcss#19789)
+    sourcemap: false,
+    cssMinify: 'esbuild',
     rolldownOptions: {
       output: {
         manualChunks: (id: string) => {
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'recharts'
           if (id.includes('node_modules/framer-motion')) return 'framer-motion'
+          // In direct mode, bundle espresso-api + genai together
+          if (machineMode === 'direct') {
+            if (id.includes('@meticulous-home/espresso-api') || id.includes('@meticulous-home/espresso-profile')) return 'machine-api'
+            if (id.includes('@google/genai')) return 'genai'
+          }
         },
       },
     },

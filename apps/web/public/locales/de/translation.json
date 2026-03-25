@@ -23,7 +23,8 @@
     "thu": "Do",
     "fri": "Fr",
     "sat": "Sa",
-    "sun": "So"
+    "sun": "So",
+    "done": "Fertig"
   },
   "greetings": {
     "morning": [
@@ -1077,6 +1078,8 @@
     "syncFailed": "Synchronisierung fehlgeschlagen",
     "renameFailed": "Fehler beim Umbenennen des Profils",
     "exportFailed": "Fehler beim Exportieren des Profils",
+    "loadFailed": "Profil konnte nicht geladen werden",
+    "loaded": "{{name}} geladen",
     "bulkDelete": {
       "button": "Mehrere löschen",
       "title": "Profile löschen",
@@ -1456,5 +1459,14 @@
     "acceptUpdateFailed": "Fehler beim Akzeptieren der Aktualisierung",
     "removeFailed": "Fehler beim Entfernen",
     "restoreFailed": "Fehler beim Wiederherstellen"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Prompt wird vorbereitet...",
+      "processingImage": "Bild wird verarbeitet...",
+      "generatingProfile": "Profil wird generiert...",
+      "validatingProfile": "Profil wird validiert...",
+      "profileGenerated": "Profil erfolgreich generiert"
+    }
   }
 }

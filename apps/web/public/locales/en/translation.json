@@ -23,7 +23,8 @@
     "thu": "Thu",
     "fri": "Fri",
     "sat": "Sat",
-    "sun": "Sun"
+    "sun": "Sun",
+    "done": "Done"
   },
   "greetings": {
     "morning": [
@@ -1023,6 +1024,8 @@
     "syncFailed": "Sync failed",
     "renameFailed": "Failed to rename profile",
     "exportFailed": "Failed to export profile",
+    "loadFailed": "Failed to load profile",
+    "loaded": "{{name}} loaded",
     "bulkDelete": {
       "button": "Bulk Delete",
       "title": "Bulk Delete Profiles",
@@ -1458,5 +1461,14 @@
     "timeout": "Update did not complete within expected time. Please refresh manually.",
     "triggerFailed": "Failed to trigger update",
     "checkFailed": "Failed to check for updates"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Preparing prompt...",
+      "processingImage": "Processing image...",
+      "generatingProfile": "Generating profile...",
+      "validatingProfile": "Validating profile...",
+      "profileGenerated": "Profile generated successfully"
+    }
   }
 }
