@@ -78,7 +78,10 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     name: 'DirectAdapter',
 
     // -- Connection ---------------------------------------------------------
-    connect: async () => {
+    connect: async (_url?: string) => {
+      // URL is set at adapter creation time via createDirectAdapter(baseUrl).
+      // The _url parameter satisfies the MachineService interface but the
+      // underlying espresso-api client is bound to baseUrl at construction.
       api.connectToSocket()
       setupSocketListeners()
     },

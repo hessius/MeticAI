@@ -52,24 +52,28 @@ echo ""
 # ── Files ───────────────────────────────────────────────────────────────────
 
 echo "── Files ──"
-if [ -f "${INSTALL_DIR}/index.html" ]; then
-  check "index.html exists" "OK"
+if [ -d "$INSTALL_DIR" ]; then
+  if [ -f "${INSTALL_DIR}/index.html" ]; then
+    check "index.html exists" "OK"
+  else
+    check "index.html exists" "NOT FOUND"
+  fi
+
+  FILE_COUNT=$(find "$INSTALL_DIR" -type f 2>/dev/null | wc -l || echo 0)
+  check "File count (${FILE_COUNT})" "$([ "$FILE_COUNT" -gt 5 ] && echo 'OK' || echo 'Too few files')"
+
+  JS_COUNT=$(find "$INSTALL_DIR" -name '*.js' 2>/dev/null | wc -l || echo 0)
+  check "JS chunks (${JS_COUNT})" "$([ "$JS_COUNT" -gt 0 ] && echo 'OK' || echo 'No JS files')"
+
+  CSS_COUNT=$(find "$INSTALL_DIR" -name '*.css' 2>/dev/null | wc -l || echo 0)
+  check "CSS files (${CSS_COUNT})" "$([ "$CSS_COUNT" -gt 0 ] && echo 'OK' || echo 'No CSS files')"
+
+  # Check for locale files
+  LOCALE_COUNT=$(find "$INSTALL_DIR" -path "*/locales/*/translation.json" 2>/dev/null | wc -l || echo 0)
+  check "Locale files (${LOCALE_COUNT}/6)" "$([ "$LOCALE_COUNT" -ge 6 ] && echo 'OK' || echo 'Missing locales')"
 else
-  check "index.html exists" "NOT FOUND"
+  check "Install directory" "NOT INSTALLED — ${INSTALL_DIR} does not exist"
 fi
-
-FILE_COUNT=$(find "$INSTALL_DIR" -type f 2>/dev/null | wc -l)
-check "File count (${FILE_COUNT})" "$([ "$FILE_COUNT" -gt 5 ] && echo 'OK' || echo 'Too few files')"
-
-JS_COUNT=$(find "$INSTALL_DIR" -name '*.js' 2>/dev/null | wc -l)
-check "JS chunks (${JS_COUNT})" "$([ "$JS_COUNT" -gt 0 ] && echo 'OK' || echo 'No JS files')"
-
-CSS_COUNT=$(find "$INSTALL_DIR" -name '*.css' 2>/dev/null | wc -l)
-check "CSS files (${CSS_COUNT})" "$([ "$CSS_COUNT" -gt 0 ] && echo 'OK' || echo 'No CSS files')"
-
-# Check for locale files
-LOCALE_COUNT=$(find "$INSTALL_DIR" -path "*/locales/*/translation.json" 2>/dev/null | wc -l)
-check "Locale files (${LOCALE_COUNT}/6)" "$([ "$LOCALE_COUNT" -ge 6 ] && echo 'OK' || echo 'Missing locales')"
 echo ""
 
 # ── HTTP helper ─────────────────────────────────────────────────────────────

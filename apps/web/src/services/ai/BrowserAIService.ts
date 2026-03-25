@@ -28,13 +28,14 @@ import {
 } from './prompts'
 import { buildFullProfilePrompt, validateAndRetryProfile } from './profilePromptFull'
 
+import { STORAGE_KEYS } from '@/lib/constants'
+
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const IMAGE_MODEL = 'imagen-3.0-generate-002'
-const API_KEY_STORAGE = 'meticai-gemini-key'
 
 function getStoredApiKey(): string | null {
   try {
-    return localStorage.getItem(API_KEY_STORAGE)
+    return localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
   } catch {
     return null
   }
@@ -93,7 +94,7 @@ export function createBrowserAIService(): AIService {
 
       // Build the full system prompt (matching server parity)
       const authorName = (() => {
-        try { return localStorage.getItem('meticai-author-name') || 'MeticAI' }
+        try { return localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || 'MeticAI' }
         catch { return 'MeticAI' }
       })()
       const systemPrompt = buildFullProfilePrompt(

@@ -56,7 +56,9 @@ export function MachineServiceProvider({
   // Connect in direct mode
   useEffect(() => {
     if (value.name === 'DirectAdapter') {
-      value.connect(getDefaultMachineUrl())
+      value.connect(getDefaultMachineUrl()).catch((err) => {
+        console.error('[MachineService] Failed to connect:', err)
+      })
       return () => value.disconnect()
     }
   }, [value])
