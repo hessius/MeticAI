@@ -3,6 +3,7 @@ from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from typing import Optional, Any
 from datetime import datetime, timezone
 import json
+import math
 import os
 import logging
 import asyncio
@@ -34,6 +35,7 @@ from services.meticulous_service import (
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
+from services.profile_recommendation_service import recommendation_service
 from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
@@ -1127,6 +1129,7 @@ async def edit_profile(profile_name: str, request: Request):
 
         # --- persist -------------------------------------------------------------
         await async_save_profile(full_profile)
+        recommendation_service.invalidate_cache()
 
         logger.info(
             f"Profile edited: '{old_name}' → '{full_profile.name}'",
@@ -1763,6 +1766,94 @@ async def list_machine_profiles(request: Request):
         )
 
 
+@router.get("/machine/profile/{profile_id}")
+@router.get("/api/machine/profile/{profile_id}")
+async def get_machine_profile(profile_id: str, request: Request):
+    """Get a single profile from the Meticulous machine with variables.
+
+    Returns the profile dict including a ``variables`` array.  When the
+    machine profile does not contain an explicit variables list the endpoint
+    synthesises basic entries from the top-level ``final_weight`` and
+    ``temperature`` fields so that callers always get adjustable parameters.
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            f"Fetching profile: {profile_id}",
+            extra={"request_id": request_id, "profile_id": profile_id}
+        )
+
+        profile = await async_get_profile(profile_id)
+
+        if hasattr(profile, 'error') and profile.error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine API error: {profile.error}"
+            )
+
+        # Convert to dict for JSON serialization
+        profile_json: dict = {}
+        for attr in ['id', 'name', 'author', 'temperature', 'final_weight',
+                     'stages', 'variables', 'display', 'isDefault', 'source',
+                     'beverage_type', 'tank_temperature']:
+            if hasattr(profile, attr):
+                val = getattr(profile, attr)
+                if val is not None:
+                    if hasattr(val, '__dict__'):
+                        profile_json[attr] = val.__dict__
+                    elif isinstance(val, list):
+                        profile_json[attr] = [
+                            item.__dict__ if hasattr(item, '__dict__') else item
+                            for item in val
+                        ]
+                    else:
+                        profile_json[attr] = val
+
+        # Ensure there is always a variables array.  Merge well-known
+        # top-level fields (final_weight, temperature) with any explicit
+        # variables so the UI can always offer adjustment sliders.
+        variables = profile_json.get("variables")
+        if not variables or not isinstance(variables, list):
+            variables = []
+
+        existing_keys = {v.get("key") for v in variables if isinstance(v, dict)}
+        if profile_json.get("final_weight") is not None and "final_weight" not in existing_keys:
+            variables.append({
+                "key": "final_weight",
+                "name": "Final Weight",
+                "type": "weight",
+                "value": float(profile_json["final_weight"]),
+            })
+        if profile_json.get("temperature") is not None and "temperature" not in existing_keys:
+            variables.append({
+                "key": "temperature",
+                "name": "Temperature",
+                "type": "temperature",
+                "value": float(profile_json["temperature"]),
+            })
+        profile_json["variables"] = variables
+
+        return {
+            "status": "success",
+            "profile": profile_json,
+            "variables": profile_json.get("variables", []),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get profile: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)}
+        )
+
+
 @router.get("/api/machine/profile/{profile_id}/json")
 async def get_machine_profile_json(profile_id: str, request: Request):
     """Get the full profile JSON from the Meticulous machine.
@@ -1850,6 +1941,7 @@ async def delete_machine_profile(profile_id: str, request: Request):
         )
         
         result = await async_delete_profile(profile_id)
+        recommendation_service.invalidate_cache()
         
         logger.info(
             f"Successfully deleted profile: {profile_name}",
@@ -1873,6 +1965,74 @@ async def delete_machine_profile(profile_id: str, request: Request):
         raise HTTPException(
             status_code=500,
             detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.post("/api/machine/profiles/bulk-delete")
+async def bulk_delete_machine_profiles(request: Request):
+    """Delete multiple profiles from the Meticulous machine.
+
+    Body:
+        profile_ids: list of profile ID strings to delete
+
+    Returns:
+        Summary with succeeded / failed counts and per-profile results.
+    """
+    request_id = request.state.request_id
+
+    try:
+        body = await request.json()
+        profile_ids = body.get("profile_ids", [])
+
+        if not isinstance(profile_ids, list) or len(profile_ids) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="profile_ids must be a non-empty list",
+            )
+
+        results: list[dict] = []
+        succeeded = 0
+
+        for pid in profile_ids:
+            try:
+                profile = await async_get_profile(pid)
+                name = getattr(profile, "name", pid) if profile else pid
+                await async_delete_profile(pid)
+                results.append({"profile_id": pid, "name": name, "status": "success"})
+                succeeded += 1
+            except Exception as e:
+                logger.warning(
+                    f"Bulk delete: failed to delete {pid}: {e}",
+                    extra={"request_id": request_id},
+                )
+                results.append({"profile_id": pid, "status": "error", "error": str(e)})
+
+        recommendation_service.invalidate_cache()
+
+        logger.info(
+            f"Bulk delete: {succeeded}/{len(profile_ids)} profiles deleted",
+            extra={"request_id": request_id},
+        )
+
+        return {
+            "status": "success",
+            "deleted": succeeded,
+            "failed": len(profile_ids) - succeeded,
+            "total": len(profile_ids),
+            "results": results,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Bulk delete failed: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
         )
 
 
@@ -1942,6 +2102,7 @@ async def update_machine_profile(profile_id: str, request: Request):
         
         # Save the updated profile
         await async_save_profile(profile_dict)
+        recommendation_service.invalidate_cache()
         
         logger.info(
             f"Successfully renamed profile to '{new_name}'",
@@ -3335,3 +3496,322 @@ async def _restore_scheduled_shots():
     if restored_count > 0:
         logger.info(f"Restored {restored_count} scheduled shot(s) from persistence")
 
+
+# ============================================================================
+# Apply AI Recommendations
+# ============================================================================
+
+@router.post("/profile/{name:path}/apply-recommendations")
+@router.post("/api/profile/{name:path}/apply-recommendations")
+async def apply_recommendations(
+    name: str,
+    request: Request,
+    recommendations: str = Form(...),
+):
+    """Apply selected AI recommendations to a profile.
+
+    Only applies patchable (adjustable) variables. Info-only variables
+    and unknown keys are silently skipped.
+
+    Args:
+        name: Profile name on the machine.
+        recommendations: JSON string — list of recommendation objects with
+            at least ``variable``, ``recommended_value``, ``stage``.
+
+    Returns:
+        Updated profile dict.
+    """
+    request_id = request.state.request_id
+
+    try:
+        recs = json.loads(recommendations)
+        if not isinstance(recs, list):
+            raise HTTPException(status_code=400, detail="recommendations must be a JSON array")
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid recommendations JSON: {exc}")
+
+    try:
+        # --- find profile by name ------------------------------------------------
+        profiles_result = await async_list_profiles()
+        if hasattr(profiles_result, "error") and profiles_result.error:
+            raise HTTPException(status_code=502, detail=f"Machine API error: {profiles_result.error}")
+
+        matching_profile = None
+        for p in profiles_result:
+            if p.name == name:
+                matching_profile = p
+                break
+
+        if matching_profile is None:
+            raise HTTPException(status_code=404, detail=f"Profile '{name}' not found on machine")
+
+        full_profile = await async_get_profile(matching_profile.id)
+        if hasattr(full_profile, "error") and full_profile.error:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch profile: {full_profile.error}")
+
+        applied: list[dict] = []
+        skipped: list[dict] = []
+
+        for rec in recs:
+            if not isinstance(rec, dict):
+                skipped.append({"variable": "?", "reason": "invalid entry (not an object)"})
+                continue
+            variable = rec.get("variable", "")
+            recommended_value = rec.get("recommended_value")
+            stage = rec.get("stage", "")
+
+            if recommended_value is None:
+                skipped.append({"variable": variable, "reason": "no recommended_value"})
+                continue
+
+            # Validate recommended_value is coercible to a finite number
+            try:
+                rv_float = float(recommended_value)
+                if not math.isfinite(rv_float):
+                    raise ValueError("non-finite")
+            except (TypeError, ValueError):
+                skipped.append({"variable": variable, "reason": "invalid recommended_value"})
+                continue
+
+            # --- global settings (temperature, final_weight) ---
+            if stage == "global":
+                if variable == "temperature" and hasattr(full_profile, "temperature"):
+                    try:
+                        val = float(recommended_value)
+                    except (TypeError, ValueError):
+                        skipped.append({"variable": variable, "reason": "invalid value"})
+                        continue
+                    if val > 100:
+                        skipped.append({"variable": variable, "reason": "exceeds 100 °C"})
+                        continue
+                    full_profile.temperature = val
+                    applied.append({"variable": variable, "stage": stage, "value": val})
+                    continue
+                elif variable == "final_weight" and hasattr(full_profile, "final_weight"):
+                    try:
+                        val = float(recommended_value)
+                    except (TypeError, ValueError):
+                        skipped.append({"variable": variable, "reason": "invalid value"})
+                        continue
+                    if val <= 0:
+                        skipped.append({"variable": variable, "reason": "must be > 0"})
+                        continue
+                    full_profile.final_weight = val
+                    applied.append({"variable": variable, "stage": stage, "value": val})
+                    continue
+
+            # --- profile variables ---
+            if hasattr(full_profile, "variables") and full_profile.variables:
+                matched_var = False
+                for var in full_profile.variables:
+                    var_key = getattr(var, "key", "")
+                    if var_key == variable:
+                        # Skip info-only variables
+                        if var_key.startswith("info_") or getattr(var, "adjustable", None) is False:
+                            skipped.append({"variable": variable, "reason": "info-only / not adjustable"})
+                            matched_var = True
+                            break
+                        try:
+                            var.value = float(recommended_value)
+                        except (TypeError, ValueError):
+                            skipped.append({"variable": variable, "reason": "invalid value"})
+                            matched_var = True
+                            break
+                        applied.append({"variable": variable, "stage": stage, "value": var.value})
+                        matched_var = True
+                        break
+                if matched_var:
+                    continue
+
+            # --- stage exit triggers ---
+            # Variables like "exit_weight", "exit_time" target a stage's exit_triggers
+            exit_trigger_map = {
+                "exit_weight": "weight",
+                "exit_time": "time",
+                "exit_pressure": "pressure",
+                "exit_flow": "flow",
+                "exit_volume": "volume",
+            }
+            trigger_type = exit_trigger_map.get(variable)
+            if trigger_type and stage and hasattr(full_profile, "stages") and full_profile.stages:
+                matched_stage = False
+                stage_lower = stage.lower()
+                for profile_stage in full_profile.stages:
+                    stage_name = getattr(profile_stage, "name", "")
+                    if stage_name.lower() == stage_lower:
+                        triggers = getattr(profile_stage, "exit_triggers", None)
+                        if triggers:
+                            for trigger in triggers:
+                                if getattr(trigger, "type", "") == trigger_type:
+                                    try:
+                                        trigger.value = float(recommended_value)
+                                    except (TypeError, ValueError):
+                                        skipped.append({"variable": variable, "reason": "invalid value"})
+                                        matched_stage = True
+                                        break
+                                    applied.append({
+                                        "variable": variable,
+                                        "stage": stage,
+                                        "value": trigger.value,
+                                    })
+                                    matched_stage = True
+                                    break
+                        if not matched_stage:
+                            skipped.append({"variable": variable, "reason": f"no {trigger_type} exit trigger in stage '{stage_name}'"})
+                            matched_stage = True
+                        break
+                if matched_stage:
+                    continue
+
+            # --- stage limits ---
+            # Variables like "limit_pressure", "limit_flow" target a stage's limits
+            limit_map = {
+                "limit_pressure": "pressure",
+                "limit_flow": "flow",
+                "limit_weight": "weight",
+            }
+            limit_type = limit_map.get(variable)
+            if limit_type and stage and hasattr(full_profile, "stages") and full_profile.stages:
+                matched_stage = False
+                stage_lower = stage.lower()
+                for profile_stage in full_profile.stages:
+                    stage_name = getattr(profile_stage, "name", "")
+                    if stage_name.lower() == stage_lower:
+                        limits = getattr(profile_stage, "limits", None)
+                        if limits:
+                            for limit in limits:
+                                if getattr(limit, "type", "") == limit_type:
+                                    try:
+                                        limit.value = float(recommended_value)
+                                    except (TypeError, ValueError):
+                                        skipped.append({"variable": variable, "reason": "invalid value"})
+                                        matched_stage = True
+                                        break
+                                    applied.append({
+                                        "variable": variable,
+                                        "stage": stage,
+                                        "value": limit.value,
+                                    })
+                                    matched_stage = True
+                                    break
+                        if not matched_stage:
+                            skipped.append({"variable": variable, "reason": f"no {limit_type} limit in stage '{stage_name}'"})
+                            matched_stage = True
+                        break
+                if matched_stage:
+                    continue
+
+            skipped.append({"variable": variable, "reason": "variable not found in profile"})
+
+        if not applied:
+            return {
+                "status": "no_changes",
+                "message": "No applicable recommendations to apply",
+                "applied": [],
+                "skipped": skipped,
+            }
+
+        # --- persist -------------------------------------------------------------
+        await async_save_profile(full_profile)
+
+        logger.info(
+            f"Applied {len(applied)} recommendation(s) to profile '{name}'",
+            extra={"request_id": request_id, "applied_count": len(applied), "skipped_count": len(skipped)},
+        )
+
+        return {
+            "status": "success",
+            "profile": deep_convert_to_dict(full_profile),
+            "applied": applied,
+            "skipped": skipped,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to apply recommendations: {e}",
+            exc_info=True,
+            extra={"request_id": request_id, "profile_name": name},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+# ============================================================================
+# Profile recommendations
+# ============================================================================
+
+
+@router.post("/profiles/recommend")
+@router.post("/api/profiles/recommend")
+async def recommend_profiles(
+    request: Request,
+    tags: list[str] = Form(default=[]),
+    limit: int = Form(default=5),
+):
+    """Return profile recommendations based on tag preferences.
+
+    Uses structural comparison (stage types, pressure/flow control,
+    peak pressure, target weight, temperature) — no AI tokens consumed.
+    """
+    request_id = request.state.request_id
+
+    try:
+        results = await recommendation_service.get_recommendations(
+            tags=tags,
+            limit=limit,
+        )
+
+        return {
+            "status": "success",
+            "recommendations": results,
+            "count": len(results),
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get recommendations: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/profiles/find-similar")
+@router.post("/api/profiles/find-similar")
+async def find_similar_profiles(
+    request: Request,
+    profile_name: str = Form(...),
+    limit: int = Form(default=10),
+):
+    """Find profiles similar to a given source profile."""
+    request_id = request.state.request_id
+
+    try:
+        results = await recommendation_service.find_similar(
+            source_profile_name=profile_name,
+            limit=limit,
+        )
+
+        return {
+            "status": "success",
+            "recommendations": results,
+            "count": len(results),
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Failed to find similar profiles: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )

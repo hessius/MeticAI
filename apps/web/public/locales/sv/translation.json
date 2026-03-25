@@ -103,10 +103,10 @@
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
       "generateFailedNetwork": "Connection lost during profile generation. Check your network and try again.",
-      "generateFailed404Route": "Kunde inte generera profil: Server-routen hittades inte (404). Detta beror ofta på fel i reverse-proxy/API-path — kontrollera att proxyn skickar /api/* till MeticAI.",
+      "generateFailed404Route": "Kunde inte generera profil: Server-routen hittades inte (404). Detta beror ofta på fel i reverse-proxy/API-path: kontrollera att proxyn skickar /api/* till MeticAI.",
       "generateFailedTimeout": "Kunde inte generera profil: AI-förfrågan fick timeout. Försök igen; om det fortsätter, minska promptens komplexitet eller prova en starkare Gemini-modell.",
-      "generateFailedValidation": "Kunde inte generera profil: AI:n skapade en ogiltig profilschema. Försök igen — ett andra försök lyckas ofta.",
-      "generateBusy": "En profil genereras redan. Ditt formulär har sparats — försök igen om några minuter.",
+      "generateFailedValidation": "Kunde inte generera profil: AI:n skapade en ogiltig profilschema. Försök igen; ett andra försök lyckas ofta.",
+      "generateBusy": "En profil genereras redan. Ditt formulär har sparats; försök igen om några minuter.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
@@ -153,6 +153,7 @@
     "deleteConfirm": "Är du säker på att du vill ta bort denna profil från katalogen?",
     "jsonNotAvailable": "Profil-JSON är inte tillgänglig för denna post",
     "downloadJson": "Ladda ner JSON",
+    "saveImage": "Spara bild",
     "profilePicture": "Profilbild",
     "selectStyle": "Välj stil",
     "exportAs": "Exportera som",
@@ -208,7 +209,16 @@
     "generateAiDescription": "Generera AI-förklaring",
     "generatingAiDescription": "Genererar AI-förklaring...",
     "aiDescriptionGenerated": "AI-förklaring genererad",
-    "aiDescriptionFailed": "Kunde inte generera AI-förklaring"
+    "aiDescriptionFailed": "Kunde inte generera AI-förklaring",
+    "notes": "Anteckningar",
+    "notesPlaceholder": "Lägg till anteckningar om denna profil…",
+    "notesSaveFailed": "Kunde inte spara anteckningar",
+    "notesSaved": "Anteckningar sparade",
+    "fetchFailed": "Kunde inte ladda historik",
+    "fetchEntryFailed": "Kunde inte ladda post",
+    "deleteEntryFailed": "Kunde inte ta bort post",
+    "clearFailed": "Kunde inte rensa historik",
+    "noProfileJson": "Ingen profildata tillgänglig för denna post"
   },
   "runShot": {
     "title": "Kör / Schemalägg",
@@ -278,7 +288,12 @@
       "shotScheduled": "Shot schemalagd till {{time}}{{preheatInfo}}",
       "shotScheduleFailed": "Misslyckades schemalägg shot",
       "shotCancelled": "Schemalagd shot avbruten"
-    }
+    },
+    "scheduleFailed": "Kunde inte schemalägga shot",
+    "saveScheduleFailed": "Kunde inte spara schema",
+    "saveAsNew": "Spara som ny profil",
+    "saveAsNewDescription": "Spara justerade variabler som en ny profil",
+    "newProfileNamePlaceholder": "Nytt profilnamn..."
   },
   "shotHistory": {
     "duration": "Varaktighet",
@@ -336,7 +351,10 @@
     "getAiAnalysis": "Hämta AI-analys",
     "runAnalysisForOverlay": "Kör analys för att se graföverlappning",
     "aiUnavailable": "AI-analys är inte tillgänglig. Aktivera AI-funktioner i Inställningar och se till att en Gemini API-nyckel är konfigurerad.",
-    "lastUpdated": "Senast uppdaterad: {{time}}"
+    "lastUpdated": "Senast uppdaterad: {{time}}",
+    "fetchFailed": "Kunde inte ladda shots",
+    "fetchDatesFailed": "Kunde inte ladda datum",
+    "backgroundRefreshFailed": "Bakgrundsuppdatering misslyckades"
   },
   "shotAnalysisView": {
     "title": "Körningsanalys",
@@ -363,14 +381,14 @@
   },
   "betaBanner": {
     "runningBeta": "Du kör MeticAI beta {{version}}",
-    "betaChannelEnabled": "Beta-uppdateringar aktiverade — du tar emot förhandsversioner",
+    "betaChannelEnabled": "Beta-uppdateringar aktiverade - du tar emot förhandsversioner",
     "reportIssue": "Rapportera problem"
   },
   "settings": {
     "title": "Inställningar",
     "aboutMeticAI": "Om MeticAI",
-    "aboutDescription1": "När jag fick min Meticulous, efter ett lååångt väntetid, blev jag överväldigad av alternativen — att ställa in var inte längre bara att justera malningsgrad, potentialen var (och är) i princip obegränsad — min kunskap och tid inte lika.",
-    "aboutDescription2": "Detta, \"MeticAI\", är en växande uppsättning AI-verktyg för att göra det möjligt för mig, och dig, att få ut det mesta av en Meticulous Espresso-maskin. Bland annat låter den dig automatiskt skapa espressoprofiler skräddarsydda för dina preferenser och kaffe till hands, förstå dina espressoprofiler och körningsdata som aldrig förr, och i slutändan — låter dig släppa lös din Meticulous.",
+    "aboutDescription1": "När jag fick min Meticulous, efter ett lååångt väntetid, blev jag överväldigad av alternativen - att ställa in var inte längre bara att justera malningsgrad, potentialen var (och är) i princip obegränsad - min kunskap och tid inte lika.",
+    "aboutDescription2": "Detta, \"MeticAI\", är en växande uppsättning AI-verktyg för att göra det möjligt för mig, och dig, att få ut det mesta av en Meticulous Espresso-maskin. Bland annat låter den dig automatiskt skapa espressoprofiler skräddarsydda för dina preferenser och kaffe till hands, förstå dina espressoprofiler och körningsdata som aldrig förr, och i slutändan: låter dig släppa lös din Meticulous.",
     "viewOnGitHub": "Visa på GitHub",
     "configuration": "Konfiguration",
     "loadingSettings": "Laddar inställningar...",
@@ -446,7 +464,7 @@
       "disconnected": "Frånkopplad",
       "notRunning": "Körs inte",
       "status": "Status",
-      "authKeyExpired": "Autentiseringsnyckeln har gått ut — autentisera igen för att återställa fjärråtkomst.",
+      "authKeyExpired": "Autentiseringsnyckeln har gått ut: autentisera igen för att återställa fjärråtkomst.",
       "hostname": "Värdnamn",
       "remoteUrl": "Fjärr-URL",
       "copyUrl": "Kopiera URL",
@@ -516,7 +534,9 @@
       "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
     },
     "runsOn": "Runs on",
-    "andCaffeine": "and caffeine ☕"
+    "andCaffeine": "and caffeine ☕",
+    "betaChannelFailed": "Kunde inte byta betakanal",
+    "feedbackFailed": "Kunde inte skicka feedback"
   },
   "profileBreakdown": {
     "title": "Profildetaljer",
@@ -548,12 +568,12 @@
       "smooth": "(smooth)"
     },
     "validation": {
-      "highPressure": "⚠ Stage {{stage}} sets pressure to {{value}} bar — typical max is 12 bar",
-      "noEmojiPrefix": "Adjustable variable \"{{name}}\" should not start with an emoji — it may not render in the Meticulous app",
-      "lowWeight": "⚠ Target weight {{value}}g is unusually low — check your dose/yield"
+      "highPressure": "⚠ Stage {{stage}} sets pressure to {{value}} bar; typical max is 12 bar",
+      "noEmojiPrefix": "Adjustable variable \"{{name}}\" should not start with an emoji; it may not render in the Meticulous app",
+      "lowWeight": "⚠ Target weight {{value}}g is unusually low; check your dose/yield"
     },
     "warningInfoMissingEmoji": "Informationsvariabeln \"{{name}}\" bör börja med en emoji för korrekt visning i Meticulous-appen",
-    "warningAdjustableHasEmoji": "Justerbar variabel \"{{name}}\" börjar med en emoji — detta kan orsaka problem i Meticulous-appen",
+    "warningAdjustableHasEmoji": "Justerbar variabel \"{{name}}\" börjar med en emoji; detta kan orsaka problem i Meticulous-appen",
     "warningUnused": "Justerbar variabel \"{{name}}\" används inte i något steg"
   },
   "advancedCustomization": {
@@ -633,7 +653,10 @@
     "importFailed": "Import misslyckades",
     "fetchFailed": "Misslyckades hämta profiler från maskin",
     "connectFailed": "Misslyckades ansluta till maskin",
-    "bulkImportFailed": "Bulkimport misslyckades"
+    "bulkImportFailed": "Bulkimport misslyckades",
+    "fetchDetailsFailed": "Kunde inte hämta profildetaljer",
+    "noResponseStream": "Ingen svarsström tillgänglig",
+    "bulkImportStartFailed": "Kunde inte starta bulkimport"
   },
   "imageCrop": {
     "title": "Beskär profilbild",
@@ -721,7 +744,8 @@
       "soundsOn": "Ljud aktiverat",
       "soundsOff": "Ljud inaktiverat",
       "error": "Kommandot misslyckades",
-      "profileSelected": "Profil vald: {{name}}"
+      "profileSelected": "Profil vald: {{name}}",
+      "started": "Startad"
     },
     "profileSelector": {
       "placeholder": "Byt profil…"
@@ -815,7 +839,8 @@
     "shotBDashed": "Shot B (dashed)",
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
-    "tooltipStage": "Stage"
+    "tooltipStage": "Stage",
+    "targets": "Målvärden"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -823,7 +848,7 @@
     "disclaimer": "This analysis is generated by AI and may not always be accurate. Use it as a starting point for your own experimentation.",
     "analyzing": "Analyzing Shot Data",
     "analyzingDescription": "Vår AI-barista granskar dina extraktionsdata och jämför med profilmålen...",
-    "noAnalysis": "Ingen analys tillgänglig",
+    "noAnalysis": "Ingen analys tillgänglig. Klicka på Analysera-knappen för att generera en AI-driven shotanalys.",
     "reAnalyze": "Analysera igen",
     "forFreshInsights": "för nya insikter",
     "shotPerformance": "Shot-prestation",
@@ -881,14 +906,14 @@
     "weightLegend": "vikt",
     "flowLegend": "flöde",
     "weightTrendLabel": "Vikttrend",
-    "timeoutReached": "Brygningstimer stoppad — 10-minuters säkerhetstimeout nådd.",
+    "timeoutReached": "Brygningstimer stoppad: 10-minuters säkerhetstimeout nådd.",
     "integration": {
       "toggle": "Maskinintegration",
-      "toggleDescription": "Följer ditt pour-over på Meticulous-skärmen. Timern startar automatiskt — börja hälla när du hör signalen.",
+      "toggleDescription": "Följer ditt pour-over på Meticulous-skärmen. Timern startar automatiskt - börja hälla när du hör signalen.",
       "startOnMachine": "Starta på maskin",
       "stop": "Stopp",
       "newShot": "Ny shot",
-      "profileReady": "Profil laddad — startar shot på maskinen.",
+      "profileReady": "Profil laddad: startar shot på maskinen.",
       "cleanupSuccess": "Temporär profil städad.",
       "forceCleanupUsed": "Profil städad (rensning överhoppad).",
       "cleanupFailed": "Kunde inte städa temporär profil.",
@@ -898,9 +923,9 @@
       "shotEndedAt": "Shot avslutad vid",
       "status": {
         "preparing": "Förbereder profil…",
-        "ready": "Profil laddad — väntar på maskinen…",
+        "ready": "Profil laddad: väntar på maskinen…",
         "brewing": "Brygger på maskinen…",
-        "drawdown": "Mål nått — mäter avrinningstid…",
+        "drawdown": "Mål nått: mäter avrinningstid…",
         "purging": "Städar profil…",
         "done": "Shot klar!",
         "error": "Något gick fel."
@@ -909,7 +934,27 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Häll till {{weight}}g",
-    "recipeWait": "Vänta {{seconds}}s"
+    "recipeWait": "Vänta {{seconds}}s",
+    "changeRecipe": "Byt recept",
+    "followWeight": "Följ vikt",
+    "followWeightDescription": "Gå automatiskt vidare baserat på vikt",
+    "hideRecipeDetails": "Dölj receptdetaljer",
+    "mode": "Läge",
+    "nextStep": "Nästa steg",
+    "noRecipes": "Inga recept tillgängliga",
+    "recipeMode": "Receptläge",
+    "selectRecipe": "Välj recept",
+    "viewRecipeDetails": "Visa receptdetaljer",
+    "errors": {
+      "prepareFailed": "Förberedelse misslyckades",
+      "cleanupFailed": "Rensning misslyckades",
+      "forceCleanupFailed": "Tvångsrensning misslyckades",
+      "getActiveFailed": "Kunde inte hämta aktiv session",
+      "getPreferencesFailed": "Kunde inte ladda inställningar",
+      "savePreferencesFailed": "Kunde inte spara inställningar",
+      "loadRecipesFailed": "Kunde inte ladda recept",
+      "prepareRecipeFailed": "Kunde inte förbereda recept"
+    }
   },
   "markdownEditor": {
     "edit": "Redigera",
@@ -960,7 +1005,7 @@
     "saveFailed": "Kunde inte uppdatera profilen",
     "nameRequired": "Profilnamnet får inte vara tomt",
     "temperatureMax": "Temperaturen får inte överstiga 100 °C",
-    "temperatureLow": "Temperaturen är under 70 °C — det är ovanligt. Vänligen kontrollera.",
+    "temperatureLow": "Temperaturen är under 70 °C; det är ovanligt. Vänligen kontrollera.",
     "weightPositive": "Målvikten måste vara större än 0",
     "unsavedChanges": "Du har osparade ändringar. Kasta dem?",
     "noChanges": "Inga ändringar att spara"
@@ -980,7 +1025,7 @@
     "orphanedSection": "Föräldralösa profiler",
     "orphanHint": "Denna profil finns inte längre på din maskin. Tryck för att hantera.",
     "keepInHistory": "Behåll i MeticAI",
-    "keepInHistoryHint": "Avfärda — behåll denna post i din katalog",
+    "keepInHistoryHint": "Avfärda - behåll denna post i din katalog",
     "removeOrphanHint": "Ta permanent bort denna post från MeticAI-katalogen",
     "restoreToMachine": "Återställ till maskinen",
     "restoreToMachineHint": "Ladda upp profilen igen till din Meticulous-maskin",
@@ -989,7 +1034,7 @@
       "button": "Synka",
       "title": "Profilsynkrapport",
       "description": "Skillnader hittades mellan din maskin och MeticAI-katalogen.",
-      "allInSync": "Alla profiler är synkade — inget att göra!",
+      "allInSync": "Alla profiler är synkade: inget att göra!",
       "newSection": "{{count}} ny(a) profil(er)",
       "updatedSection": "{{count}} uppdaterad(e) profil(er)",
       "orphanedSection": "{{count}} föräldralös(a) profil(er)",
@@ -1012,6 +1057,7 @@
     "noProfiles": "Inga profiler hittades på maskinen",
     "inHistory": "I katalogen",
     "rename": "Byt namn",
+    "editMode": "Redigera",
     "delete": "Ta bort",
     "export": "Exportera JSON",
     "confirmDelete": "Ta bort",
@@ -1026,6 +1072,389 @@
       "restoreProfileFailed": "Kunde inte återställa profilen",
       "deleteFromMachineFailed": "Kunde inte ta bort från maskinen",
       "deleteProfileFailed": "Kunde inte ta bort profilen"
+    },
+    "fetchFailed": "Kunde inte ladda profiler",
+    "syncFailed": "Synkronisering misslyckades",
+    "renameFailed": "Kunde inte byta namn på profil",
+    "exportFailed": "Kunde inte exportera profil",
+    "bulkDelete": {
+      "button": "Massradera",
+      "title": "Massradera profiler",
+      "description": "Välj profiler att permanent ta bort från din maskin. Profiler i din katalog är exkluderade.",
+      "selectAll": "Välj alla",
+      "deselectAll": "Avmarkera alla",
+      "selected": "{{count}} valda",
+      "confirm": "Ta bort {{count}} profiler",
+      "deleting": "Raderar...",
+      "success": "{{count}} profiler borttagna",
+      "partial": "{{deleted}} av {{total}} borttagna ({{failed}} misslyckades)",
+      "failed": "Massradering misslyckades",
+      "noneAvailable": "Alla profiler finns redan i din katalog"
     }
+  },
+  "recommendations": {
+    "apply": "Tillämpa rekommendationer",
+    "selectChanges": "Välj ändringar att tillämpa",
+    "confidence": {
+      "high": "Hög tillförlitlighet",
+      "medium": "Medelhög tillförlitlighet",
+      "low": "Låg tillförlitlighet"
+    },
+    "infoOnly": "Endast information (kan inte ändras)",
+    "applying": "Tillämpar ändringar...",
+    "applied": "Rekommendationer tillämpade framgångsrikt",
+    "noRecommendations": "Inga tillämpbara rekommendationer hittades",
+    "currentValue": "Nuvarande",
+    "recommendedValue": "Rekommenderat",
+    "selectAll": "Välj alla tillämpbara",
+    "deselectAll": "Avmarkera alla",
+    "globalSettings": "Globala inställningar",
+    "applyFailed": "Kunde inte tillämpa rekommendationer",
+    "classifyFailed": "Klassificering misslyckades"
+  },
+  "taste": {
+    "compass": {
+      "title": "Smakkompass",
+      "sour": "Surt",
+      "bitter": "Bittert",
+      "weak": "Svagt",
+      "strong": "Starkt",
+      "balanced": "Balanserat",
+      "reset": "Återställ Smak",
+      "descriptors": "Smakbeskrivningar",
+      "positive": "Positiv",
+      "negative": "Negativ",
+      "hint": "Dra punkten för att beskriva din smakupplevelse",
+      "overwhelming": "Överväldigande",
+      "intenseSour": "Intensivt surt",
+      "salty": "Salt",
+      "generic": "Generiskt",
+      "quickFinish": "Kort avslut",
+      "bland": "Intetsägande",
+      "thin": "Tunt",
+      "thick": "Tjockt",
+      "robust": "Robust",
+      "plump": "Fylligt",
+      "substantial": "Substantiellt",
+      "ripe": "Moget",
+      "tasty": "Smakfullt",
+      "transparent": "Transparent",
+      "sweet": "Sött",
+      "luscious": "Ljuvligt",
+      "rich": "Rikt",
+      "creamy": "Krämigt",
+      "fruity": "Fruktigt",
+      "nuanced": "Nyanserat",
+      "fluffy": "Fluffigt",
+      "light": "Lätt",
+      "slender": "Smalt",
+      "delicate": "Delikat",
+      "watery": "Vattnigt",
+      "dry": "Torrt",
+      "powdery": "Pulvrigt",
+      "empty": "Tomt"
+    },
+    "positiveDescriptors": {
+      "sweet": "Sött",
+      "clean": "Rent",
+      "complex": "Komplext",
+      "juicy": "Saftigt",
+      "smooth": "Lent",
+      "balanced": "Balanserat",
+      "floral": "Blommigt",
+      "fruity": "Fruktigt"
+    },
+    "negativeDescriptors": {
+      "astringent": "Adstringerande",
+      "muddy": "Grumligt",
+      "flat": "Platt",
+      "chalky": "Kritigt",
+      "harsh": "Skarpt",
+      "watery": "Vattnigt",
+      "burnt": "Bränt",
+      "grassy": "Gräsigt"
+    },
+    "axis": {
+      "sour": "Surt",
+      "bitter": "Beskt",
+      "balanced": "Balanserat",
+      "weak": "Svagt",
+      "strong": "Starkt"
+    },
+    "section": {
+      "title": "Smakbaserade Rekommendationer"
+    }
+  },
+  "variables": {
+    "panelTitle": "Variabeljusteringar",
+    "resetAll": "Återställ alla",
+    "reset": "Återställ",
+    "adjusted": "justerad",
+    "noVariables": "Inga justerbara variabler i denna profil",
+    "saveDialogTitle": "Spara variabeländringar?",
+    "saveDialogDescription": "Ditt shot använde justerade variabler. Vill du behålla dessa ändringar?",
+    "discardChanges": "Förkasta ändringar",
+    "saveToOriginal": "Spara i originalprofilen",
+    "saveAsNew": "Spara som ny profil",
+    "newProfileName": "Nytt profilnamn...",
+    "savedToOriginal": "Ändringar sparade i originalprofilen",
+    "savedAsNew": "Sparad som ny profil",
+    "saveFailed": "Kunde inte spara profiländringar",
+    "adjust": "Justera variabler",
+    "overridesApplied": "{{count}} justerade",
+    "original": "Original: {{value}}",
+    "noAdjustable": "Inga justerbara variabler i denna profil",
+    "baseVariables": "Grundvariabler",
+    "unusedWarning": "Denna variabel är definierad men används inte i något steg",
+    "type": {
+      "pressure": "Tryck",
+      "flow": "Flöde",
+      "weight": "Vikt",
+      "power": "Effekt",
+      "time": "Tid",
+      "piston": "Kolv",
+      "temperature": "Temperatur"
+    },
+    "synthesized": {
+      "finalWeight": "Slutvikt",
+      "temperature": "Temperatur"
+    },
+    "temporaryNote": "Ändringar gäller bara tillfälligt för denna shot. Fullständig profilredigering finns i profilkatalogen."
+  },
+  "profileRecommendations": {
+    "title": "Rekommenderade profiler",
+    "loading": "Söker matchande profiler…",
+    "empty": "Inga matchande profiler hittades. Prova andra taggar.",
+    "basedOn": "Baserat på dina valda taggar och preferenser",
+    "useProfile": "Använd",
+    "findSimilar": "Hitta liknande",
+    "similarTo": "Profiler liknande \"{{name}}\"",
+    "noSimilar": "Inga liknande profiler hittades.",
+    "fetchFailed": "Kunde inte hämta rekommendationer",
+    "matchReasons": {
+      "pressureControlled": "Tryckstyrd",
+      "flowControlled": "Flödesstyrd",
+      "mixedControl": "Blandad styrning",
+      "techniques": "Tekniker: {{techniques}}",
+      "matchingTags": "Matchande: {{tags}}",
+      "targetWeight": "Målvikt: {{weight}}g",
+      "peakPressure": "Maxtryck: {{pressure}} bar",
+      "temperature": "Temperatur: {{temp}}°C",
+      "flatProfile": "Platt profil"
+    }
+  },
+  "espressoCompass": {
+    "title": "Espressokompass",
+    "subtitle": "Välj de smaker du upplever för att få tips om inställning.",
+    "whatTasting": "Vad smakar du?",
+    "clear": "Rensa",
+    "flavorMap": "Smakkarta",
+    "strong": "Stark",
+    "weak": "Svag",
+    "under": "Under",
+    "over": "Över",
+    "goldenRulesTitle": "Gyllene regler för Meticulous",
+    "ruleStartSimple": "<strong>Börja enkelt.</strong> När du ställer in ett nytt kaffe, börja med en av de inbyggda Meticulous-profilerna (t.ex. \"Italian\"). Denna kompass täcker grunderna: dos, utbyte och temperatur. Avancerad flödes- och tryckprofilering är kraftfullt men bör komma senare.",
+    "ruleDontChangeDose": "När du justerar utbytet (slutvikt), <strong>ändra inte dosen</strong> i din portafilter; ändra bara profilen.",
+    "ruleYieldTime": "Att ändra utbytet kommer i sig att ändra shottiden. Justera bara malningsgraden om shottiden är helt utanför förväntat intervall.",
+    "ruleEvenExtraction": "En perfekt jämn extraktion skapar ett större \"sweet spot\" att arbeta inom: fokusera på puckprep först.",
+    "rulePreciseControl": "Meticulous ger dig exakt kontroll över tryck- och flödesprofiler. Använd den kraften för att förlänga eller förkorta specifika steg istället för att bara justera malningen.",
+    "attribution": "Konceptuellt inspirerad av <em>Espresso Compass av Barista Hustle</em>. Anpassad för Meticulous espressomaskin.",
+    "emptyState": "Välj smaker ovan för att analysera din shot och få tips om inställning.",
+    "analysis": {
+      "sweetSpot": "I sweet spot",
+      "underExtracted": "Underextraherat",
+      "overExtracted": "Överextraherat",
+      "unevenExtraction": "Ojämn extraktion",
+      "tooConcentrated": "För koncentrerat",
+      "lackingBody": "Saknar kropp",
+      "sweetSpotDesc": "Du är mitt i sweet spot! Extraktion och styrka är välbalanserade.",
+      "sweetSpotAdvice": "Ytterligare ändringar är en fråga om personlig preferens. Prova små justeringar: ±0,5°C temperatur eller ±1g utbyte - för att utforska kaffets smaker.",
+      "underDesc": "Skottet är underextraherat: för mycket syra kommer igenom innan de söta och balanserade föreningarna hinner lösa upp sig.",
+      "underAdvice": "Öka slutvikten/utbytet i din profil för att låta mer vatten passera genom pucken. Du kan också prova att höja temperaturen med 1–2°C. Om extraktionen är mycket låg, mal finare.",
+      "overDesc": "Espressen är överextraherad: beska, torra och sträva föreningar från sent i extraktionen dominerar.",
+      "overAdvice": "Minska slutvikten/utbytet i din profil så att shoten avslutas tidigare. Du kan också prova att sänka temperaturen med 1–2°C. Om kraftigt överextraherat, mal grövre.",
+      "strongDesc": "Skottet är mycket tätt och intensivt: koncentrationen är hög.",
+      "strongAdvice": "Öka slutvikten i din profil så att mer vatten passerar igenom och späder ut koncentrationen. Detta skiftar bryggkvoten mot ett längre shot.",
+      "weakDesc": "Skottet känns tunt eller vattnigt: det saknar den sirapslika kropp som förväntas av espresso.",
+      "weakAdvice": "Minska slutvikten i din profil så att mindre vatten passerar igenom och koncentrerar smakerna. Du kan också öka dosen något.",
+      "unevenDesc": "Du smakar både syrlighet och bitterhet samtidigt: ett klassiskt tecken på channeling (vattnet hittar minsta motståndets väg genom pucken).",
+      "unevenAdvice": "Fokusera på puckprep innan du ändrar profilen. Använd ett WDT-verktyg för att fördela malet jämnt och se till att tampen är perfekt plan. På Meticulous, verifiera även att förinfusionssteget har tillräckligt med tid för att mätta pucken jämnt."
+    }
+  },
+  "dialIn": {
+    "title": "Inställningsguide",
+    "stepOf": "Steg {{current}} av {{total}}",
+    "sessionCompleted": "Inställningssession klar!",
+    "steps": {
+      "coffee": "Kaffedetaljer",
+      "profile": "Välj profil",
+      "prep": "Förberedelse",
+      "brew": "Dra shot",
+      "taste": "Smak",
+      "recommend": "Rekommendationer",
+      "history": "Historik"
+    },
+    "coffee": {
+      "description": "Berätta om kaffet du ställer in.",
+      "roastLevel": "Rostningsgrad",
+      "roasts": {
+        "light": "Ljus",
+        "medium-light": "M-Ljus",
+        "medium": "Medel",
+        "medium-dark": "M-Mörk",
+        "dark": "Mörk"
+      },
+      "origin": "Ursprung",
+      "originPlaceholder": "t.ex. Etiopien Yirgacheffe",
+      "process": "Process",
+      "processes": {
+        "washed": "Tvättat",
+        "natural": "Natural",
+        "honey": "Honey",
+        "anaerobic": "Anaerobt",
+        "other": "Annat"
+      },
+      "roastDate": "Rostdatum",
+      "profileName": "Profilnamn (valfritt)",
+      "profileNamePlaceholder": "t.ex. Morgonblomma",
+      "continue": "Fortsätt"
+    },
+    "profile": {
+      "description": "Välj en startprofil för detta kaffe.",
+      "noProfiles": "Inga profiler hittades på maskinen.",
+      "manual": "Eller ange ett profilnamn",
+      "manualPlaceholder": "Profilnamn…",
+      "defaultName": "Standardprofil",
+      "skip": "Hoppa över - använd standard"
+    },
+    "prep": {
+      "description": "Förbered din shot med {{profile}}.",
+      "items": {
+        "grind": "Mal färsk dos",
+        "dose": "Väg dos på våg",
+        "distribute": "Fördela kaffet jämnt",
+        "tamp": "Pressa med jämnt tryck",
+        "purge": "Spola brygggruppen"
+      },
+      "ready": "Redo att brygga",
+      "skip": "Hoppa över checklistan"
+    },
+    "brew": {
+      "title": "Dra din shot",
+      "description": "Brygga din espresso med den valda profilen. När shoten är klar, tryck nedan för att fortsätta.",
+      "done": "Shot klar"
+    },
+    "taste": {
+      "description": "Hur smakade den shoten? Använd kompassen för att beskriva smaken.",
+      "submit": "Skicka omdöme"
+    },
+    "recommend": {
+      "title": "Rekommendationer",
+      "iteration": "Iteration {{number}}",
+      "loading": "Analyserar ditt omdöme…",
+      "tryAgain": "Justera & försök igen",
+      "viewHistory": "Visa historik",
+      "done": "Avsluta inställning",
+      "tips": {
+        "grindFiner": "Mal 1–2 steg finare för mer extraktion",
+        "grindCoarser": "Mal 1–2 steg grövre för mindre extraktion",
+        "increaseTemp": "Öka bryggtemperaturen med 1–2 °C",
+        "decreaseTemp": "Sänk bryggtemperaturen med 1–2 °C",
+        "increaseDose": "Öka dosen med 0,3–0,5 g för mer kropp",
+        "decreaseDose": "Minska dosen med 0,3–0,5 g för mindre intensitet",
+        "lookingGood": "Ser bra ut! Denna shot är välbalanserad."
+      }
+    },
+    "history": {
+      "title": "Iterationshistorik",
+      "iterations": "{{count}} iterationer",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Balanserad",
+      "sour": "Sur",
+      "bitter": "Bitter",
+      "medium": "Medel kropp",
+      "weak": "Tunn/Svag",
+      "strong": "Tung/Stark"
+    },
+    "errors": {
+      "createFailed": "Kunde inte skapa inställningssession",
+      "iterationFailed": "Kunde inte spara smakomdöme",
+      "completeFailed": "Kunde inte avsluta sessionen",
+      "recommendFailed": "Kunde inte ladda rekommendationer"
+    }
+  },
+  "a11y": {
+    "skipToMain": "Hoppa till huvudinnehåll",
+    "skipToNav": "Hoppa till navigering",
+    "toggleTheme": "Byt till {{mode}}-läge",
+    "openOnMobile": "Öppna på mobil enhet",
+    "goHome": "Gå till startskärmen",
+    "goBack": "Tillbaka",
+    "stepProgress": "Steg {{current}} av {{total}}: {{step}}",
+    "progressBar": "Framsteg: {{percent}}% klart",
+    "loading": "Laddar, vänta",
+    "searching": "Söker, vänta",
+    "analyzing": "Analyserar, vänta",
+    "chart": {
+      "espressoShot": "Espressoshotdiagram som visar tryck, flöde och vikt över tid",
+      "espressoShotLive": "Livediagram för espressoshot som visar tryck, flöde och vikt över tid",
+      "extractionReplay": "Uppspelningsdiagram som visar tryck, flöde och vikt över tid",
+      "extractionComparison": "Jämförelsediagram som visar två shot sida vid sida",
+      "shotVsProfile": "Diagram som jämför faktisk shotdata mot målprofilen"
+    },
+    "expandSection": "Expandera {{section}}",
+    "collapseSection": "Komprimera {{section}}",
+    "recommendations": {
+      "loading": "Laddar rekommendationer",
+      "loaded": "{{count}} rekommendationer laddade",
+      "group": "{{stage}}-rekommendationer",
+      "selectVariable": "Välj {{variable}}"
+    },
+    "shotList": {
+      "viewShot": "Visa shot från {{time}}",
+      "rating": "{{rating}} av 5 stjärnor"
+    },
+    "resetVariable": "Återställ {{name}} till ursprungligt värde",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, intervall {{min}} till {{max}}",
+    "searchProgress": "Sökframsteg: {{percent}}%",
+    "similarProfile": "Välj profil {{name}}, {{score}}% matchning",
+    "useProfile": "Använd profil {{name}}",
+    "dialIn": {
+      "submitProfileName": "Använd angivet profilnamn"
+    }
+  },
+  "errorBoundary": {
+    "featureError": "Något gick fel i {{feature}}",
+    "tryAgain": "Försök igen"
+  },
+  "shotDetail": {
+    "stagesNeverReached": "Steg som aldrig nåddes:"
+  },
+  "llmAnalysis": {
+    "analyzingTitle": "Analyserar shotdata",
+    "analyzingDescription": "Vår AI-barista granskar din extraktion...",
+    "noAnalysis": "Ingen analys tillgänglig. Klicka på Analysera-knappen för att generera en AI-driven shotanalys.",
+    "disclaimer": "Denna analys är genererad av AI baserat på shotdata. Resultaten bör användas som vägledning, inte absolut sanning. Lita alltid på dina egna smakpreferenser."
+  },
+  "error": {
+    "somethingWentWrong": "Något gick fel"
+  },
+  "findSimilar": {
+    "fetchFailed": "Kunde inte hämta liknande profiler"
+  },
+  "shotAnalysis": {
+    "fetchFailed": "Kunde inte ladda shots"
+  },
+  "update": {
+    "failed": "Uppdatering misslyckades",
+    "timeout": "Uppdateringen slutfördes inte inom förväntad tid. Vänligen uppdatera manuellt."
+  },
+  "sync": {
+    "fetchProfileFailed": "Kunde inte hämta profil",
+    "importProfileFailed": "Kunde inte importera profil",
+    "acceptUpdateFailed": "Kunde inte acceptera uppdatering",
+    "removeFailed": "Kunde inte ta bort",
+    "restoreFailed": "Kunde inte återställa"
   }
 }

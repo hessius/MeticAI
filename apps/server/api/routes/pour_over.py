@@ -1,9 +1,9 @@
 """Pour-over machine integration endpoints.
 
 Provides the lifecycle for temporary pour-over profiles:
-  - Prepare: adapt template → create on machine → load
-  - Cleanup: purge + delete after shot finishes
-  - Force-cleanup: delete without purge (aborted shots)
+  - Prepare: adapt template → ephemeral load (no save to catalogue)
+  - Cleanup: purge + restore previous profile
+  - Force-cleanup: restore without purge (aborted shots)
   - Active: query the current temp profile
 """
 
@@ -92,7 +92,7 @@ async def prepare_pour_over(body: PrepareRequest):
     except Exception as exc:
         logger.warning("Could not read active profile from MQTT snapshot: %s", exc)
 
-    result = await temp_profile_service.create_and_load(
+    result = await temp_profile_service.load_ephemeral(
         profile_json,
         params={
             "target_weight": body.target_weight,
@@ -138,7 +138,7 @@ async def prepare_recipe(body: PrepareRecipeRequest):
     except Exception as exc:
         logger.warning("Could not read active profile from MQTT snapshot: %s", exc)
 
-    result = await temp_profile_service.create_and_load(
+    result = await temp_profile_service.load_ephemeral(
         profile_json,
         params={"recipe_slug": body.recipe_slug},
         previous_profile_name=previous_profile_name,
@@ -189,6 +189,8 @@ class ModePreferences(BaseModel):
     bloomSeconds: float = 30
     bloomWeightMultiplier: float = 2
     machineIntegration: bool = False
+    doseGrams: Optional[float] = None
+    brewRatio: Optional[float] = None
 
 
 class RecipeModePreferences(BaseModel):

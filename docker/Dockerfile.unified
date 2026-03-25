@@ -76,7 +76,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install s6-overlay for process management
-ARG S6_OVERLAY_VERSION=3.2.0.2
+ARG S6_OVERLAY_VERSION=3.2.2.0
 ARG TARGETARCH
 RUN case "${TARGETARCH}" in \
         amd64) S6_ARCH="x86_64" ;; \

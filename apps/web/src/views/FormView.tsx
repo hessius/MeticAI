@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Camera, Sparkle, Warning, Upload, X, Coffee, CaretLeft } from '@phosphor-icons/react'
 import { PRESET_TAGS, getTagColorClass } from '@/lib/tags'
 import { AdvancedCustomization, AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
+import { ProfileRecommendations } from '@/components/ProfileRecommendations'
 import type { RefObject, ChangeEvent, DragEvent } from 'react'
 
 interface FormViewProps {
@@ -227,6 +228,10 @@ export function FormView({
             {t('profileGeneration.describeFlavor')}
           </p>
         </div>
+
+        <ProfileRecommendations
+          tags={selectedTags}
+        />
 
         <AdvancedCustomization
           value={advancedOptions}

@@ -103,14 +103,14 @@
       "generateFailed": "Failed to generate profile: {{message}}",
       "generateFailedGeneric": "Failed to generate profile. Please check your connection and try again.",
       "generateFailedNetwork": "Connection lost during profile generation. Check your network and try again.",
-      "generateFailed404Route": "Generazione profilo fallita: La route del server non è stata trovata (404). Questo è spesso un problema di proxy inverso/percorso API — verifica che il tuo proxy inoltri /api/* a MeticAI.",
+      "generateFailed404Route": "Generazione profilo fallita: La route del server non è stata trovata (404). Questo è spesso un problema di proxy inverso/percorso API: verifica che il tuo proxy inoltri /api/* a MeticAI.",
       "generateFailedTimeout": "Generazione profilo fallita: La richiesta AI è scaduta. Riprova; se il problema persiste, riduci la complessità del prompt o prova un modello Gemini più potente.",
-      "generateFailedValidation": "Generazione profilo fallita: L'AI ha generato uno schema di profilo non valido. Riprova — un secondo tentativo spesso ha successo.",
+      "generateFailedValidation": "Generazione profilo fallita: L'AI ha generato uno schema di profilo non valido. Riprova; un secondo tentativo spesso ha successo.",
       "noProfileJson": "No profile JSON available",
       "profileJsonDownloaded": "Profile JSON downloaded!",
       "saveFailed": "Failed to save results. Please try again.",
       "aiDisabled": "La generazione di profili AI è attualmente disabilitata. Abilita l'AI nelle Impostazioni e assicurati che sia configurata una chiave API.",
-      "generateBusy": "Un profilo è già in fase di generazione. Il modulo è stato salvato — riprova tra qualche minuto."
+      "generateBusy": "Un profilo è già in fase di generazione. Il modulo è stato salvato; riprova tra qualche minuto."
     }
   },
   "navigation": {
@@ -153,6 +153,7 @@
     "deleteConfirm": "Sei sicuro di voler eliminare questo profilo dal catalogo?",
     "jsonNotAvailable": "JSON del profilo non disponibile per questa voce",
     "downloadJson": "Scarica JSON",
+    "saveImage": "Salva immagine",
     "profilePicture": "Immagine profilo",
     "selectStyle": "Seleziona stile",
     "exportAs": "Esporta come",
@@ -208,7 +209,16 @@
     "generateAiDescription": "Genera spiegazione AI",
     "generatingAiDescription": "Generazione spiegazione AI...",
     "aiDescriptionGenerated": "Spiegazione AI generata con successo",
-    "aiDescriptionFailed": "Impossibile generare la spiegazione AI"
+    "aiDescriptionFailed": "Impossibile generare la spiegazione AI",
+    "notes": "Note",
+    "notesPlaceholder": "Aggiungi note su questo profilo…",
+    "notesSaveFailed": "Impossibile salvare le note",
+    "notesSaved": "Note salvate",
+    "fetchFailed": "Impossibile caricare la cronologia",
+    "fetchEntryFailed": "Impossibile caricare la voce",
+    "deleteEntryFailed": "Impossibile eliminare la voce",
+    "clearFailed": "Impossibile cancellare la cronologia",
+    "noProfileJson": "Nessun dato profilo disponibile per questa voce"
   },
   "runShot": {
     "title": "Esegui / Programma",
@@ -278,7 +288,12 @@
     "changeProfile": "Cambia",
     "everyXDaysCount": "Ogni {{count}} giorni",
     "noProfileSelected": "Nessun profilo selezionato. Seleziona un profilo o usa solo il preriscaldamento.",
-    "selectProfile": "Seleziona profilo"
+    "selectProfile": "Seleziona profilo",
+    "scheduleFailed": "Impossibile programmare lo shot",
+    "saveScheduleFailed": "Impossibile salvare la programmazione",
+    "saveAsNew": "Salva come nuovo profilo",
+    "saveAsNewDescription": "Salva le variabili regolate come nuovo profilo",
+    "newProfileNamePlaceholder": "Nome del nuovo profilo..."
   },
   "shotHistory": {
     "duration": "Durata",
@@ -336,7 +351,10 @@
     "getAiAnalysis": "Ottieni analisi IA",
     "runAnalysisForOverlay": "Esegui analisi per vedere sovrapposizione grafico",
     "aiUnavailable": "L'analisi IA non è disponibile. Abilita le funzionalità IA nelle Impostazioni e assicurati che sia configurata una chiave API Gemini.",
-    "lastUpdated": "Ultimo aggiornamento: {{time}}"
+    "lastUpdated": "Ultimo aggiornamento: {{time}}",
+    "fetchFailed": "Impossibile caricare gli shot",
+    "fetchDatesFailed": "Impossibile caricare le date",
+    "backgroundRefreshFailed": "Aggiornamento in background fallito"
   },
   "shotAnalysisView": {
     "title": "Analisi delle estrazioni",
@@ -363,13 +381,13 @@
   },
   "betaBanner": {
     "runningBeta": "Stai usando MeticAI beta {{version}}",
-    "betaChannelEnabled": "Aggiornamenti beta attivi — riceverai versioni preliminari",
+    "betaChannelEnabled": "Aggiornamenti beta attivi - riceverai versioni preliminari",
     "reportIssue": "Segnala problema"
   },
   "settings": {
     "title": "Impostazioni",
     "aboutMeticAI": "Informazioni su MeticAI",
-    "aboutDescription1": "Quando ho ricevuto il mio Meticulous, dopo un'attesa loooonga, ero sopraffatto dalle opzioni — regolare non era più solo modificare la dimensione della macinatura, il potenziale era (ed è) praticamente illimitato — la mia conoscenza e il mio tempo non altrettanto.",
+    "aboutDescription1": "Quando ho ricevuto il mio Meticulous, dopo un'attesa loooonga, ero sopraffatto dalle opzioni - regolare non era più solo modificare la dimensione della macinatura, il potenziale era (ed è) praticamente illimitato - la mia conoscenza e il mio tempo non altrettanto.",
     "aboutDescription2": "Questo, \"MeticAI\", è un insieme crescente di strumenti AI per consentire a me, e a te, di ottenere il massimo da una macchina espresso Meticulous. Tra le altre cose, ti permette di creare automaticamente profili espresso personalizzati in base alle tue preferenze e al caffè a disposizione, comprendere i tuoi profili espresso e i dati delle estrazioni come mai prima d'ora e, infine, ti permette di scatenare il tuo Meticulous.",
     "viewOnGitHub": "Visualizza su GitHub",
     "configuration": "Configurazione",
@@ -446,7 +464,7 @@
       "disconnected": "Disconnesso",
       "notRunning": "Non in esecuzione",
       "status": "Stato",
-      "authKeyExpired": "La chiave di autenticazione è scaduta — riautenticati per ripristinare l'accesso remoto.",
+      "authKeyExpired": "La chiave di autenticazione è scaduta: riautenticati per ripristinare l'accesso remoto.",
       "hostname": "Nome host",
       "remoteUrl": "URL remoto",
       "copyUrl": "Copia URL",
@@ -516,7 +534,9 @@
       "meticulousAddon": "MQTT bridge for real-time telemetry by @nickwilsonr"
     },
     "runsOn": "Runs on",
-    "andCaffeine": "and caffeine ☕"
+    "andCaffeine": "and caffeine ☕",
+    "betaChannelFailed": "Impossibile cambiare il canale beta",
+    "feedbackFailed": "Impossibile inviare il feedback"
   },
   "profileBreakdown": {
     "title": "Dettagli profilo",
@@ -548,12 +568,12 @@
       "smooth": "(smooth)"
     },
     "validation": {
-      "highPressure": "⚠ Stage {{stage}} sets pressure to {{value}} bar — typical max is 12 bar",
-      "noEmojiPrefix": "Adjustable variable \"{{name}}\" should not start with an emoji — it may not render in the Meticulous app",
-      "lowWeight": "⚠ Target weight {{value}}g is unusually low — check your dose/yield"
+      "highPressure": "⚠ Stage {{stage}} sets pressure to {{value}} bar; typical max is 12 bar",
+      "noEmojiPrefix": "Adjustable variable \"{{name}}\" should not start with an emoji; it may not render in the Meticulous app",
+      "lowWeight": "⚠ Target weight {{value}}g is unusually low; check your dose/yield"
     },
     "warningInfoMissingEmoji": "La variabile informativa \"{{name}}\" dovrebbe iniziare con un emoji per essere visualizzata correttamente nell'app Meticulous",
-    "warningAdjustableHasEmoji": "La variabile regolabile \"{{name}}\" inizia con un emoji — questo potrebbe causare problemi nell'app Meticulous",
+    "warningAdjustableHasEmoji": "La variabile regolabile \"{{name}}\" inizia con un emoji; questo potrebbe causare problemi nell'app Meticulous",
     "warningUnused": "La variabile regolabile \"{{name}}\" non è utilizzata in nessuna fase"
   },
   "advancedCustomization": {
@@ -628,7 +648,10 @@
     "importFailed": "Importazione fallita",
     "fetchFailed": "Impossibile recuperare profili dalla macchina",
     "connectFailed": "Impossibile connettersi alla macchina",
-    "bulkImportFailed": "Importazione di massa fallita"
+    "bulkImportFailed": "Importazione di massa fallita",
+    "fetchDetailsFailed": "Impossibile recuperare i dettagli del profilo",
+    "noResponseStream": "Nessun flusso di risposta disponibile",
+    "bulkImportStartFailed": "Impossibile avviare l'importazione di massa"
   },
   "imageCrop": {
     "title": "Ritaglia immagine profilo",
@@ -716,7 +739,8 @@
       "soundsOn": "Suoni attivati",
       "soundsOff": "Suoni disattivati",
       "error": "Comando fallito",
-      "profileSelected": "Profilo selezionato: {{name}}"
+      "profileSelected": "Profilo selezionato: {{name}}",
+      "started": "Avviato"
     },
     "profileSelector": {
       "placeholder": "Cambia profilo…"
@@ -810,7 +834,8 @@
     "shotBDashed": "Shot B (dashed)",
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
-    "tooltipStage": "Stage"
+    "tooltipStage": "Stage",
+    "targets": "Obiettivi"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -818,7 +843,7 @@
     "disclaimer": "This analysis is generated by AI and may not always be accurate. Use it as a starting point for your own experimentation.",
     "analyzing": "Analyzing Shot Data",
     "analyzingDescription": "Our AI barista is reviewing your extraction data and comparing it against the profile targets...",
-    "noAnalysis": "No analysis available",
+    "noAnalysis": "Nessuna analisi disponibile. Clicca sul pulsante Analizza per generare un'analisi dello shot con IA.",
     "reAnalyze": "Re-Analyze",
     "forFreshInsights": "for Fresh Insights",
     "shotPerformance": "Shot Performance",
@@ -881,14 +906,14 @@
     "weight": "Peso",
     "weightLegend": "peso",
     "weightTrendLabel": "Andamento peso",
-    "timeoutReached": "Timer di infusione fermato — raggiunto il timeout di sicurezza di 10 minuti.",
+    "timeoutReached": "Timer di infusione fermato: raggiunto il timeout di sicurezza di 10 minuti.",
     "integration": {
       "toggle": "Integrazione macchina",
-      "toggleDescription": "Monitora il tuo pour-over sullo schermo Meticulous. Il timer si avvia automaticamente — inizia a versare quando senti il segnale.",
+      "toggleDescription": "Monitora il tuo pour-over sullo schermo Meticulous. Il timer si avvia automaticamente - inizia a versare quando senti il segnale.",
       "startOnMachine": "Avvia sulla macchina",
       "stop": "Ferma",
       "newShot": "Nuova estrazione",
-      "profileReady": "Profilo caricato — avvio estrazione sulla macchina.",
+      "profileReady": "Profilo caricato: avvio estrazione sulla macchina.",
       "cleanupSuccess": "Profilo temporaneo rimosso.",
       "forceCleanupUsed": "Profilo rimosso (spurgo saltato).",
       "cleanupFailed": "Impossibile rimuovere il profilo temporaneo.",
@@ -898,9 +923,9 @@
       "shotEndedAt": "Estrazione terminata a",
       "status": {
         "preparing": "Preparazione profilo…",
-        "ready": "Profilo caricato — in attesa della macchina…",
+        "ready": "Profilo caricato: in attesa della macchina…",
         "brewing": "Estrazione in corso sulla macchina…",
-        "drawdown": "Obiettivo raggiunto — misurazione del tempo di deflusso…",
+        "drawdown": "Obiettivo raggiunto: misurazione del tempo di deflusso…",
         "purging": "Pulizia profilo…",
         "done": "Estrazione completata!",
         "error": "Qualcosa è andato storto."
@@ -909,7 +934,27 @@
     "recipeBloom": "Bloom",
     "recipeBloomWeight": "Bloom {{weight}}g",
     "recipePourTo": "Versare fino a {{weight}}g",
-    "recipeWait": "Attendere {{seconds}}s"
+    "recipeWait": "Attendere {{seconds}}s",
+    "changeRecipe": "Cambia ricetta",
+    "followWeight": "Segui peso",
+    "followWeightDescription": "Avanza automaticamente i passaggi in base al peso",
+    "hideRecipeDetails": "Nascondi dettagli ricetta",
+    "mode": "Modalità",
+    "nextStep": "Prossimo passaggio",
+    "noRecipes": "Nessuna ricetta disponibile",
+    "recipeMode": "Modalità ricetta",
+    "selectRecipe": "Seleziona ricetta",
+    "viewRecipeDetails": "Vedi dettagli ricetta",
+    "errors": {
+      "prepareFailed": "Preparazione fallita",
+      "cleanupFailed": "Pulizia fallita",
+      "forceCleanupFailed": "Pulizia forzata fallita",
+      "getActiveFailed": "Impossibile ottenere la sessione attiva",
+      "getPreferencesFailed": "Impossibile caricare le preferenze",
+      "savePreferencesFailed": "Impossibile salvare le preferenze",
+      "loadRecipesFailed": "Impossibile caricare le ricette",
+      "prepareRecipeFailed": "Impossibile preparare la ricetta"
+    }
   },
   "markdownEditor": {
     "edit": "Modifica",
@@ -960,7 +1005,7 @@
     "saveFailed": "Impossibile aggiornare il profilo",
     "nameRequired": "Il nome del profilo non può essere vuoto",
     "temperatureMax": "La temperatura non deve superare i 100 °C",
-    "temperatureLow": "La temperatura è inferiore a 70 °C — è insolito. Si prega di verificare.",
+    "temperatureLow": "La temperatura è inferiore a 70 °C; è insolito. Si prega di verificare.",
     "weightPositive": "Il peso obiettivo deve essere maggiore di 0",
     "unsavedChanges": "Ci sono modifiche non salvate. Annullare?",
     "noChanges": "Nessuna modifica da salvare"
@@ -980,7 +1025,7 @@
     "orphanedSection": "Profili orfani",
     "orphanHint": "Questo profilo non è più sulla tua macchina. Tocca per risolvere.",
     "keepInHistory": "Mantieni in MeticAI",
-    "keepInHistoryHint": "Ignora — mantieni questa voce nel catalogo",
+    "keepInHistoryHint": "Ignora - mantieni questa voce nel catalogo",
     "removeOrphanHint": "Elimina permanentemente questa voce dal catalogo MeticAI",
     "restoreToMachine": "Ripristina sulla macchina",
     "restoreToMachineHint": "Ricarica questo profilo sulla tua macchina Meticulous",
@@ -989,7 +1034,7 @@
       "button": "Sincronizza",
       "title": "Rapporto di sincronizzazione profili",
       "description": "Differenze trovate tra la tua macchina e il catalogo MeticAI.",
-      "allInSync": "Tutti i profili sono sincronizzati — niente da fare!",
+      "allInSync": "Tutti i profili sono sincronizzati: niente da fare!",
       "newSection": "{{count}} profilo/i nuovo/i",
       "updatedSection": "{{count}} profilo/i aggiornato/i",
       "orphanedSection": "{{count}} profilo/i orfano/i",
@@ -1012,6 +1057,7 @@
     "noProfiles": "Nessun profilo trovato sulla macchina",
     "inHistory": "Nel catalogo",
     "rename": "Rinomina",
+    "editMode": "Modifica",
     "delete": "Elimina",
     "export": "Esporta JSON",
     "confirmDelete": "Elimina",
@@ -1026,6 +1072,389 @@
       "restoreProfileFailed": "Impossibile ripristinare il profilo",
       "deleteFromMachineFailed": "Impossibile eliminare dalla macchina",
       "deleteProfileFailed": "Impossibile eliminare il profilo"
+    },
+    "fetchFailed": "Impossibile caricare i profili",
+    "syncFailed": "Sincronizzazione fallita",
+    "renameFailed": "Impossibile rinominare il profilo",
+    "exportFailed": "Impossibile esportare il profilo",
+    "bulkDelete": {
+      "button": "Elimina in blocco",
+      "title": "Eliminazione in blocco",
+      "description": "Seleziona i profili da eliminare permanentemente dalla tua macchina. I profili nel catalogo sono esclusi.",
+      "selectAll": "Seleziona tutti",
+      "deselectAll": "Deseleziona tutti",
+      "selected": "{{count}} selezionati",
+      "confirm": "Elimina {{count}} profili",
+      "deleting": "Eliminazione...",
+      "success": "{{count}} profili eliminati",
+      "partial": "{{deleted}} di {{total}} eliminati ({{failed}} falliti)",
+      "failed": "Eliminazione in blocco fallita",
+      "noneAvailable": "Tutti i profili sono già nel tuo catalogo"
     }
+  },
+  "recommendations": {
+    "apply": "Applica raccomandazioni",
+    "selectChanges": "Seleziona le modifiche da applicare",
+    "confidence": {
+      "high": "Alta affidabilità",
+      "medium": "Media affidabilità",
+      "low": "Bassa affidabilità"
+    },
+    "infoOnly": "Solo informazione (non modificabile)",
+    "applying": "Applicazione modifiche...",
+    "applied": "Raccomandazioni applicate con successo",
+    "noRecommendations": "Nessuna raccomandazione applicabile trovata",
+    "currentValue": "Attuale",
+    "recommendedValue": "Raccomandato",
+    "selectAll": "Seleziona tutti applicabili",
+    "deselectAll": "Deseleziona tutti",
+    "globalSettings": "Impostazioni globali",
+    "applyFailed": "Impossibile applicare le raccomandazioni",
+    "classifyFailed": "Classificazione fallita"
+  },
+  "taste": {
+    "compass": {
+      "title": "Bussola del Gusto",
+      "sour": "Acido",
+      "bitter": "Amaro",
+      "weak": "Debole",
+      "strong": "Forte",
+      "balanced": "Equilibrato",
+      "reset": "Reimposta Gusto",
+      "descriptors": "Descrittori di Gusto",
+      "positive": "Positivo",
+      "negative": "Negativo",
+      "hint": "Trascina il punto per descrivere la tua esperienza di gusto",
+      "overwhelming": "Opprimente",
+      "intenseSour": "Acido intenso",
+      "salty": "Salato",
+      "generic": "Generico",
+      "quickFinish": "Finale breve",
+      "bland": "Insipido",
+      "thin": "Sottile",
+      "thick": "Denso",
+      "robust": "Robusto",
+      "plump": "Corposo",
+      "substantial": "Sostanziale",
+      "ripe": "Maturo",
+      "tasty": "Gustoso",
+      "transparent": "Trasparente",
+      "sweet": "Dolce",
+      "luscious": "Delizioso",
+      "rich": "Ricco",
+      "creamy": "Cremoso",
+      "fruity": "Fruttato",
+      "nuanced": "Sfumato",
+      "fluffy": "Soffice",
+      "light": "Leggero",
+      "slender": "Snello",
+      "delicate": "Delicato",
+      "watery": "Acquoso",
+      "dry": "Secco",
+      "powdery": "Polveroso",
+      "empty": "Vuoto"
+    },
+    "positiveDescriptors": {
+      "sweet": "Dolce",
+      "clean": "Pulito",
+      "complex": "Complesso",
+      "juicy": "Succoso",
+      "smooth": "Morbido",
+      "balanced": "Bilanciato",
+      "floral": "Floreale",
+      "fruity": "Fruttato"
+    },
+    "negativeDescriptors": {
+      "astringent": "Astringente",
+      "muddy": "Torbido",
+      "flat": "Piatto",
+      "chalky": "Gessoso",
+      "harsh": "Aspro",
+      "watery": "Acquoso",
+      "burnt": "Bruciato",
+      "grassy": "Erbaceo"
+    },
+    "axis": {
+      "sour": "Acido",
+      "bitter": "Amaro",
+      "balanced": "Bilanciato",
+      "weak": "Debole",
+      "strong": "Forte"
+    },
+    "section": {
+      "title": "Raccomandazioni Basate sul Gusto"
+    }
+  },
+  "variables": {
+    "panelTitle": "Regolazioni Variabili",
+    "resetAll": "Ripristina tutto",
+    "reset": "Ripristina",
+    "adjusted": "regolato",
+    "noVariables": "Nessuna variabile regolabile in questo profilo",
+    "saveDialogTitle": "Salvare le modifiche alle variabili?",
+    "saveDialogDescription": "Il tuo shot ha utilizzato variabili regolate. Vuoi mantenere queste modifiche?",
+    "discardChanges": "Scarta le modifiche",
+    "saveToOriginal": "Salva nel profilo originale",
+    "saveAsNew": "Salva come nuovo profilo",
+    "newProfileName": "Nome del nuovo profilo...",
+    "savedToOriginal": "Modifiche salvate nel profilo originale",
+    "savedAsNew": "Salvato come nuovo profilo",
+    "saveFailed": "Impossibile salvare le modifiche al profilo",
+    "adjust": "Regola variabili",
+    "overridesApplied": "{{count}} regolate",
+    "original": "Originale: {{value}}",
+    "noAdjustable": "Nessuna variabile regolabile in questo profilo",
+    "baseVariables": "Variabili base",
+    "unusedWarning": "Questa variabile è definita ma non utilizzata in nessuna fase",
+    "type": {
+      "pressure": "Pressione",
+      "flow": "Flusso",
+      "weight": "Peso",
+      "power": "Potenza",
+      "time": "Tempo",
+      "piston": "Pistone",
+      "temperature": "Temperatura"
+    },
+    "synthesized": {
+      "finalWeight": "Peso finale",
+      "temperature": "Temperatura"
+    },
+    "temporaryNote": "Le modifiche sono temporanee solo per questo shot. La modifica completa del profilo è disponibile nel Catalogo Profili."
+  },
+  "profileRecommendations": {
+    "title": "Profili consigliati",
+    "loading": "Ricerca profili corrispondenti…",
+    "empty": "Nessun profilo corrispondente trovato. Prova con altri tag.",
+    "basedOn": "In base ai tag e alle preferenze selezionati",
+    "useProfile": "Usa",
+    "findSimilar": "Trova simili",
+    "similarTo": "Profili simili a \"{{name}}\"",
+    "noSimilar": "Nessun profilo simile trovato.",
+    "fetchFailed": "Impossibile caricare le raccomandazioni",
+    "matchReasons": {
+      "pressureControlled": "Controllo a pressione",
+      "flowControlled": "Controllo a flusso",
+      "mixedControl": "Controllo misto",
+      "techniques": "Tecniche: {{techniques}}",
+      "matchingTags": "Corrispondenze: {{tags}}",
+      "targetWeight": "Peso obiettivo: {{weight}}g",
+      "peakPressure": "Pressione massima: {{pressure}} bar",
+      "temperature": "Temperatura: {{temp}}°C",
+      "flatProfile": "Profilo piatto"
+    }
+  },
+  "espressoCompass": {
+    "title": "Bussola Espresso",
+    "subtitle": "Seleziona i sapori che stai assaggiando per ottenere consigli sulla regolazione.",
+    "whatTasting": "Cosa stai assaggiando?",
+    "clear": "Cancella",
+    "flavorMap": "Mappa dei sapori",
+    "strong": "Forte",
+    "weak": "Debole",
+    "under": "Sotto",
+    "over": "Sopra",
+    "goldenRulesTitle": "Regole d'oro per il Meticulous",
+    "ruleStartSimple": "<strong>Inizia semplice.</strong> Quando regoli un caffè nuovo, inizia con uno dei profili integrati del Meticulous (come \"Italian\"). Questa bussola copre le basi: dose, resa e temperatura. La profilazione avanzata di flusso e pressione è potente ma dovrebbe venire dopo.",
+    "ruleDontChangeDose": "Quando regoli la resa (peso finale), <strong>non cambiare la dose</strong> nel tuo portafiltro; cambia solo il profilo.",
+    "ruleYieldTime": "Cambiare la resa cambierà intrinsecamente il tempo dell'estrazione. Regola la macinatura solo se il tempo è completamente fuori dall'intervallo previsto.",
+    "ruleEvenExtraction": "Un'estrazione perfettamente uniforme crea uno \"sweet spot\" più ampio: concentrati prima sulla preparazione del puck.",
+    "rulePreciseControl": "Il Meticulous ti dà un controllo preciso sui profili di pressione e flusso. Usa quel potere per estendere o accorciare fasi specifiche invece di regolare solo la macinatura.",
+    "attribution": "Concettualmente ispirato dall'<em>Espresso Compass di Barista Hustle</em>. Adattato per la macchina espresso Meticulous.",
+    "emptyState": "Seleziona i sapori sopra per analizzare il tuo shot e ottenere consigli sulla regolazione.",
+    "analysis": {
+      "sweetSpot": "Nel Sweet Spot",
+      "underExtracted": "Sotto-estratto",
+      "overExtracted": "Sovra-estratto",
+      "unevenExtraction": "Estrazione irregolare",
+      "tooConcentrated": "Troppo concentrato",
+      "lackingBody": "Manca corpo",
+      "sweetSpotDesc": "Sei proprio nel sweet spot! L'estrazione e l'intensità sono ben bilanciate.",
+      "sweetSpotAdvice": "Qualsiasi ulteriore modifica è questione di preferenza personale. Prova piccoli aggiustamenti: ±0,5°C di temperatura o ±1g di resa - per esplorare i sapori del tuo caffè.",
+      "underDesc": "Lo shot è sotto-estratto: troppa acidità sta passando prima che i composti dolci e bilanciati possano dissolversi.",
+      "underAdvice": "Aumenta il peso finale/la resa del tuo profilo per far passare più acqua attraverso il puck. Puoi anche provare ad aumentare la temperatura di 1–2°C. Se l'estrazione è molto bassa, macina più fine.",
+      "overDesc": "L'espresso è sovra-estratto: composti amari, secchi e aspri dalla parte finale dell'estrazione stanno dominando.",
+      "overAdvice": "Riduci il peso finale/la resa del tuo profilo in modo che lo shot finisca prima. Puoi anche provare a diminuire la temperatura di 1–2°C. Se molto sovra-estratto, macina più grosso.",
+      "strongDesc": "Lo shot è molto denso e intenso: la concentrazione è alta.",
+      "strongAdvice": "Aumenta il peso finale del tuo profilo in modo che più acqua passi, diluendo la concentrazione. Questo sposta il rapporto di preparazione verso uno shot più lungo.",
+      "weakDesc": "Lo shot sembra sottile o acquoso: manca il corpo sciropposo atteso dall'espresso.",
+      "weakAdvice": "Diminuisci il peso finale del tuo profilo in modo che meno acqua passi, concentrando i sapori. Puoi anche aumentare leggermente la dose.",
+      "unevenDesc": "Stai assaggiando sia acidità che amarezza simultaneamente: un segno classico di channeling (l'acqua trova percorsi di minore resistenza attraverso il puck).",
+      "unevenAdvice": "Concentrati sulla preparazione del puck prima di cambiare il profilo. Usa uno strumento WDT per distribuire il caffè macinato uniformemente e assicurati di un tamper perfettamente livellato. Sul Meticulous, verifica anche che la fase di pre-infusione abbia abbastanza tempo per saturare il puck uniformemente."
+    }
+  },
+  "dialIn": {
+    "title": "Guida alla regolazione",
+    "stepOf": "Passo {{current}} di {{total}}",
+    "sessionCompleted": "Sessione di regolazione completata!",
+    "steps": {
+      "coffee": "Dettagli caffè",
+      "profile": "Seleziona profilo",
+      "prep": "Preparazione",
+      "brew": "Estrarre shot",
+      "taste": "Gusto",
+      "recommend": "Raccomandazioni",
+      "history": "Cronologia"
+    },
+    "coffee": {
+      "description": "Parlaci del caffè che stai regolando.",
+      "roastLevel": "Livello di tostatura",
+      "roasts": {
+        "light": "Chiaro",
+        "medium-light": "M-Chiaro",
+        "medium": "Medio",
+        "medium-dark": "M-Scuro",
+        "dark": "Scuro"
+      },
+      "origin": "Origine",
+      "originPlaceholder": "es. Etiopia Yirgacheffe",
+      "process": "Lavorazione",
+      "processes": {
+        "washed": "Lavato",
+        "natural": "Naturale",
+        "honey": "Honey",
+        "anaerobic": "Anaerobico",
+        "other": "Altro"
+      },
+      "roastDate": "Data di tostatura",
+      "profileName": "Nome profilo (opzionale)",
+      "profileNamePlaceholder": "es. Fiore del mattino",
+      "continue": "Continua"
+    },
+    "profile": {
+      "description": "Scegli un profilo di partenza per questo caffè.",
+      "noProfiles": "Nessun profilo trovato sulla macchina.",
+      "manual": "Oppure inserisci un nome profilo",
+      "manualPlaceholder": "Nome profilo…",
+      "defaultName": "Profilo predefinito",
+      "skip": "Salta - usa predefinito"
+    },
+    "prep": {
+      "description": "Prepara il tuo shot con {{profile}}.",
+      "items": {
+        "grind": "Macinare dose fresca",
+        "dose": "Pesare dose sulla bilancia",
+        "distribute": "Distribuire il caffè uniformemente",
+        "tamp": "Pressare con pressione costante",
+        "purge": "Spurgare il gruppo"
+      },
+      "ready": "Pronto per estrarre",
+      "skip": "Salta la lista"
+    },
+    "brew": {
+      "title": "Estrarre lo shot",
+      "description": "Prepara il tuo espresso con il profilo selezionato. Quando lo shot è pronto, tocca sotto per continuare.",
+      "done": "Shot completato"
+    },
+    "taste": {
+      "description": "Com'era questo shot? Usa la bussola per descrivere il sapore.",
+      "submit": "Invia feedback"
+    },
+    "recommend": {
+      "title": "Raccomandazioni",
+      "iteration": "Iterazione {{number}}",
+      "loading": "Analisi del tuo feedback…",
+      "tryAgain": "Regola e riprova",
+      "viewHistory": "Vedi cronologia",
+      "done": "Termina regolazione",
+      "tips": {
+        "grindFiner": "Macinare 1–2 passi più fine per più estrazione",
+        "grindCoarser": "Macinare 1–2 passi più grosso per meno estrazione",
+        "increaseTemp": "Aumentare temperatura di 1–2 °C",
+        "decreaseTemp": "Diminuire temperatura di 1–2 °C",
+        "increaseDose": "Aumentare dose di 0,3–0,5 g per più corpo",
+        "decreaseDose": "Diminuire dose di 0,3–0,5 g per meno intensità",
+        "lookingGood": "Ottimo! Questo shot è ben bilanciato."
+      }
+    },
+    "history": {
+      "title": "Cronologia iterazioni",
+      "iterations": "{{count}} iterazioni",
+      "iterationLabel": "Shot #{{number}}",
+      "balanced": "Bilanciato",
+      "sour": "Acido",
+      "bitter": "Amaro",
+      "medium": "Corpo medio",
+      "weak": "Leggero/Debole",
+      "strong": "Pesante/Forte"
+    },
+    "errors": {
+      "createFailed": "Impossibile creare la sessione di regolazione",
+      "iterationFailed": "Impossibile salvare il feedback di gusto",
+      "completeFailed": "Impossibile completare la sessione",
+      "recommendFailed": "Impossibile caricare le raccomandazioni"
+    }
+  },
+  "a11y": {
+    "skipToMain": "Vai al contenuto principale",
+    "skipToNav": "Vai alla navigazione",
+    "toggleTheme": "Passa alla modalità {{mode}}",
+    "openOnMobile": "Apri su dispositivo mobile",
+    "goHome": "Vai alla schermata iniziale",
+    "goBack": "Indietro",
+    "stepProgress": "Passaggio {{current}} di {{total}}: {{step}}",
+    "progressBar": "Progresso: {{percent}}% completato",
+    "loading": "Caricamento in corso, attendere",
+    "searching": "Ricerca in corso, attendere",
+    "analyzing": "Analisi in corso, attendere",
+    "chart": {
+      "espressoShot": "Grafico dello shot espresso che mostra pressione, flusso e peso nel tempo",
+      "espressoShotLive": "Grafico in tempo reale dello shot espresso che mostra pressione, flusso e peso nel tempo",
+      "extractionReplay": "Grafico di riproduzione che mostra pressione, flusso e peso nel tempo",
+      "extractionComparison": "Grafico comparativo che mostra due estrazioni affiancate",
+      "shotVsProfile": "Grafico che confronta i dati reali dello shot con il profilo target"
+    },
+    "expandSection": "Espandi {{section}}",
+    "collapseSection": "Comprimi {{section}}",
+    "recommendations": {
+      "loading": "Caricamento raccomandazioni",
+      "loaded": "{{count}} raccomandazioni caricate",
+      "group": "Raccomandazioni {{stage}}",
+      "selectVariable": "Seleziona {{variable}}"
+    },
+    "shotList": {
+      "viewShot": "Visualizza shot del {{time}}",
+      "rating": "{{rating}} su 5 stelle"
+    },
+    "resetVariable": "Ripristina {{name}} al valore originale",
+    "variableSlider": "{{name}}: {{value}}{{unit}}, intervallo da {{min}} a {{max}}",
+    "searchProgress": "Progresso della ricerca: {{percent}}%",
+    "similarProfile": "Seleziona profilo {{name}}, {{score}}% di corrispondenza",
+    "useProfile": "Usa profilo {{name}}",
+    "dialIn": {
+      "submitProfileName": "Usa il nome profilo inserito"
+    }
+  },
+  "errorBoundary": {
+    "featureError": "Qualcosa è andato storto in {{feature}}",
+    "tryAgain": "Riprova"
+  },
+  "shotDetail": {
+    "stagesNeverReached": "Fasi mai raggiunte:"
+  },
+  "llmAnalysis": {
+    "analyzingTitle": "Analisi dei dati dello shot",
+    "analyzingDescription": "Il nostro barista IA sta esaminando la tua estrazione...",
+    "noAnalysis": "Nessuna analisi disponibile. Clicca sul pulsante Analizza per generare un'analisi dello shot con IA.",
+    "disclaimer": "Questa analisi è generata dall'IA basandosi sui dati dello shot. I risultati dovrebbero essere usati come guida, non come verità assoluta. Fidati sempre delle tue preferenze di gusto personali."
+  },
+  "error": {
+    "somethingWentWrong": "Qualcosa è andato storto"
+  },
+  "findSimilar": {
+    "fetchFailed": "Impossibile caricare profili simili"
+  },
+  "shotAnalysis": {
+    "fetchFailed": "Impossibile caricare i shots"
+  },
+  "update": {
+    "failed": "Aggiornamento fallito",
+    "timeout": "L'aggiornamento non è stato completato nel tempo previsto. Aggiornare manualmente."
+  },
+  "sync": {
+    "fetchProfileFailed": "Impossibile recuperare il profilo",
+    "importProfileFailed": "Impossibile importare il profilo",
+    "acceptUpdateFailed": "Impossibile accettare l'aggiornamento",
+    "removeFailed": "Impossibile rimuovere",
+    "restoreFailed": "Impossibile ripristinare"
   }
 }

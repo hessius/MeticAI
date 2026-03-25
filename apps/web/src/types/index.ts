@@ -123,7 +123,8 @@ export type ViewState =
   | 'live-shot'
   | 'shot-history'
   | 'shot-analysis'
-  | 'profile-catalogue';
+  | 'profile-catalogue'
+  | 'dial-in';
 
 // ============================================================================
 // Tag Types

@@ -13,7 +13,7 @@ The system combines:
 """
 
 import random
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Sequence
 from dataclasses import dataclass, field
 
 
@@ -473,6 +473,11 @@ class PromptBuilder:
         # Build the prompt sections
         prompt_parts = []
         
+        # 0. Strong no-text directive up front for maximum model adherence
+        prompt_parts.append(
+            "IMPORTANT: Generate an image with absolutely no text, words, letters, numbers, or typography of any kind"
+        )
+        
         # 1. Profile name as central concept
         prompt_parts.append(
             f'"{self.profile_name}" {profile_emphasis}'
@@ -576,3 +581,157 @@ def build_image_prompt_with_metadata(profile_name: str, style: str, tags: List[s
     """
     builder = PromptBuilder(profile_name, style, tags)
     return builder.build_with_metadata()
+
+
+# =============================================================================
+# TASTE COMPASS — Espresso Compass prompt context
+# =============================================================================
+
+def _describe_axis_value(value: float, negative_label: str, positive_label: str) -> str:
+    """Convert a -1..1 axis value to a human-readable description."""
+    abs_val = abs(value)
+    if abs_val < 0.15:
+        return "Balanced"
+    if abs_val < 0.4:
+        intensity = "Slightly"
+    elif abs_val < 0.7:
+        intensity = "Moderately"
+    else:
+        intensity = "Very"
+    direction = positive_label if value > 0 else negative_label
+    return f"{intensity} {direction}"
+
+
+def build_taste_context(
+    taste_x: float | None,
+    taste_y: float | None,
+    taste_descriptors: list[str] | None,
+) -> str:
+    """Build taste feedback context for the analysis prompt.
+
+    Args:
+        taste_x: -1 (sour) to 1 (bitter), or None
+        taste_y: -1 (weak/thin) to 1 (strong/heavy), or None
+        taste_descriptors: optional list of taste descriptor strings
+
+    Returns:
+        A prompt section string, or empty string when no data is present.
+    """
+    has_coords = taste_x is not None and taste_y is not None
+    has_descriptors = bool(taste_descriptors)
+
+    if not has_coords and not has_descriptors:
+        return ""
+
+    lines: List[str] = [
+        "",
+        "## User Taste Feedback (Espresso Compass)",
+        "The user reports this shot tasted:",
+    ]
+
+    if has_coords:
+        balance_desc = _describe_axis_value(taste_x, "Sour", "Bitter")
+        body_desc = _describe_axis_value(taste_y, "Weak/Thin", "Strong/Heavy")
+        lines.append(f"- Balance: {balance_desc} (X: {taste_x:.2f})")
+        lines.append(f"- Body: {body_desc} (Y: {taste_y:.2f})")
+
+    if has_descriptors:
+        lines.append(f"- Descriptors: {', '.join(taste_descriptors)}")
+
+    lines.append("")
+    lines.append("### Espresso Compass Domain Knowledge")
+    lines.append("- Sour (negative X) typically indicates under-extraction → increase temperature, pressure, or contact time")
+    lines.append("- Bitter (positive X) typically indicates over-extraction → decrease temperature, pressure, or contact time")
+    lines.append("- Weak/Thin (negative Y) → increase dose or decrease water volume (lower ratio)")
+    lines.append("- Strong/Heavy (positive Y) → decrease dose or increase water volume (higher ratio)")
+    lines.append("- Quadrant: Sour + Weak = severely under-extracted, needs major grind/temp adjustment")
+    lines.append("- Quadrant: Sour + Strong = high-dose under-extraction, grind finer or increase temp")
+    lines.append("- Quadrant: Bitter + Weak = channeling likely, improve puck prep and lower temp")
+    lines.append("- Quadrant: Bitter + Strong = over-extracted and over-dosed, coarsen grind and reduce dose")
+    lines.append("")
+    lines.append("Based on this taste feedback, include a '## 6. Taste-Based Recommendations' section in your analysis that:")
+    lines.append("1. Correlates the taste perception with the extraction data")
+    lines.append("2. Suggests specific variable adjustments to address taste issues")
+    lines.append("3. Explains the coffee science behind the recommendations")
+
+    return "\n".join(lines)
+
+
+# ============================================================================
+# Dial-In Guide prompt
+# ============================================================================
+
+
+def build_dialin_recommendation_prompt(
+    *,
+    roast_level: str,
+    origin: Optional[str] = None,
+    process: Optional[str] = None,
+    roast_date: Optional[str] = None,
+    profile_name: Optional[str] = None,
+    iterations: Sequence[Dict] = (),
+) -> str:
+    """Build a prompt asking the AI for dial-in adjustment recommendations.
+
+    Each element of *iterations* is expected to contain at least
+    ``taste`` (with ``x``, ``y``, ``descriptors``) and ``iteration_number``.
+    """
+    lines: List[str] = [
+        "# Espresso Dial-In Recommendation",
+        "",
+        "You are an expert barista helping the user dial in a new bag of coffee.",
+        "Analyse the coffee details and all taste-feedback iterations below,",
+        "then provide **concrete, actionable** adjustment recommendations.",
+        "",
+        "## Coffee Details",
+        f"- Roast level: {roast_level}",
+    ]
+
+    if origin:
+        lines.append(f"- Origin: {origin}")
+    if process:
+        lines.append(f"- Process: {process}")
+    if roast_date:
+        lines.append(f"- Roast date: {roast_date}")
+    if profile_name:
+        lines.append(f"- Profile: {profile_name}")
+
+    if iterations:
+        lines.append("")
+        lines.append("## Taste Iteration History")
+        for it in iterations:
+            taste = it.get("taste", {})
+            num = it.get("iteration_number", "?")
+            balance_desc = _describe_axis_value(
+                taste.get("x", 0), "Sour", "Bitter"
+            )
+            body_desc = _describe_axis_value(
+                taste.get("y", 0), "Weak/Thin", "Strong/Heavy"
+            )
+            lines.append(f"### Iteration {num}")
+            lines.append(f"- Balance: {balance_desc} (X: {taste.get('x', 0):.2f})")
+            lines.append(f"- Body: {body_desc} (Y: {taste.get('y', 0):.2f})")
+            descriptors = taste.get("descriptors", [])
+            if descriptors:
+                lines.append(f"- Descriptors: {', '.join(descriptors)}")
+            notes = taste.get("notes")
+            if notes:
+                lines.append(f"- Notes: {notes}")
+            prev_recs = it.get("recommendations", [])
+            if prev_recs:
+                lines.append(f"- Previous recommendations: {'; '.join(prev_recs)}")
+
+    lines.append("")
+    lines.append("## Instructions")
+    lines.append("Return a JSON object with a single key `recommendations` whose value is")
+    lines.append("an array of short, actionable recommendation strings (max 6).")
+    lines.append("Each recommendation should be a single sentence describing one specific")
+    lines.append("adjustment (e.g. 'Grind 2 steps finer', 'Reduce dose by 0.5 g').")
+    lines.append("Consider the full iteration history to track progress and avoid repeating")
+    lines.append("adjustments that did not help. Base your reasoning on extraction science:")
+    lines.append("- Sour → under-extracted → finer grind, higher temp, longer pre-infusion")
+    lines.append("- Bitter → over-extracted → coarser grind, lower temp, shorter contact")
+    lines.append("- Weak → increase dose or decrease yield")
+    lines.append("- Strong → decrease dose or increase yield")
+
+    return "\n".join(lines)

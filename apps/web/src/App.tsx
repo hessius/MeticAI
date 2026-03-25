@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -14,16 +14,21 @@ import { useIsDesktop } from '@/hooks/use-desktop'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { MeticAILogo } from '@/components/MeticAILogo'
-import { HistoryView, ProfileDetailView } from '@/components/HistoryView'
 import { HistoryEntry } from '@/hooks/useHistory'
-import { SettingsView } from '@/components/SettingsView'
-import { RunShotView } from '@/components/RunShotView'
 import { StartView } from '@/views/StartView'
-import { FormView } from '@/views/FormView'
 import { LoadingView, LOADING_MESSAGE_COUNT } from '@/views/LoadingView'
-import { ResultsView } from '@/views/ResultsView'
 import { ErrorView } from '@/views/ErrorView'
+
+// Lazy-loaded views — code-split into separate chunks
+const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })))
+const ProfileDetailView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.ProfileDetailView })))
+const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })))
+const RunShotView = lazy(() => import('./components/RunShotView').then(m => ({ default: m.RunShotView })))
+const FormView = lazy(() => import('./views/FormView').then(m => ({ default: m.FormView })))
+const ResultsView = lazy(() => import('./views/ResultsView').then(m => ({ default: m.ResultsView })))
 import { useGenerationProgress } from '@/hooks/useGenerationProgress'
+import { useReducedMotion } from '@/hooks/a11y/useScreenReader'
+import { SkipNavigation } from '@/components/SkipNavigation'
 
 import { AdvancedCustomizationOptions } from '@/components/AdvancedCustomization'
 import type { APIResponse, ViewState } from '@/types'
@@ -41,13 +46,16 @@ import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { BetaBanner } from '@/components/BetaBanner'
-import { LiveShotView } from '@/components/LiveShotView'
-import { PourOverView } from '@/components/PourOverView'
-import { ShotHistoryView } from '@/components/ShotHistoryView'
-import { ShotAnalysisView } from '@/components/ShotAnalysisView'
-import { ProfileCatalogueView } from '@/components/ProfileCatalogueView'
-import { ProfileBreakdown } from '@/components/ProfileBreakdown'
+import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary'
 import type { ProfileData } from '@/components/ProfileBreakdown'
+
+const LiveShotView = lazy(() => import('./components/LiveShotView').then(m => ({ default: m.LiveShotView })))
+const PourOverView = lazy(() => import('./components/PourOverView').then(m => ({ default: m.PourOverView })))
+const ShotHistoryView = lazy(() => import('./components/ShotHistoryView').then(m => ({ default: m.ShotHistoryView })))
+const ShotAnalysisView = lazy(() => import('./components/ShotAnalysisView').then(m => ({ default: m.ShotAnalysisView })))
+const ProfileCatalogueView = lazy(() => import('./components/ProfileCatalogueView').then(m => ({ default: m.ProfileCatalogueView })))
+const EspressoCompass = lazy(() => import('./components/EspressoCompass').then(m => ({ default: m.EspressoCompass })))
+const ProfileBreakdown = lazy(() => import('./components/ProfileBreakdown').then(m => ({ default: m.ProfileBreakdown })))
 
 function App() {
   const { t } = useTranslation()
@@ -93,7 +101,7 @@ function App() {
   const [isAiConfigured, setIsAiConfigured] = useState(false)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
-  const machineState = useWebSocket(mqttEnabled)
+  const { state: machineState, patchState: patchMachineState } = useWebSocket(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
@@ -154,6 +162,11 @@ function App() {
       fetchMqttSetting()
     }
     prevViewStateRef.current = viewState
+  }, [viewState])
+
+  // Scroll to top on view transitions
+  useEffect(() => {
+    window.scrollTo(0, 0)
   }, [viewState])
 
   useEffect(() => {
@@ -586,6 +599,7 @@ function App() {
       case 'pour-over':
       case 'live-shot':
       case 'shot-analysis':
+      case 'dial-in':
         handleBackToStart()
         break
       case 'shot-history': {
@@ -613,6 +627,21 @@ function App() {
     setSelectedHistoryEntry(entry)
     setSelectedHistoryImageUrl(cachedImageUrl)
     setViewState('history-detail')
+  }
+
+  const handleViewProfileByName = async (profileName: string) => {
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+      if (!response.ok) return
+      const data = await response.json()
+      const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
+      if (match) {
+        handleViewHistoryEntry(match)
+      }
+    } catch {
+      // Silently fail — profile may not exist in history
+    }
   }
 
   const handleDownloadJson = () => {
@@ -729,8 +758,12 @@ function App() {
     viewState !== 'pour-over' &&
     !shotBannerDismissed
 
+  const prefersReducedMotion = useReducedMotion()
+  const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
+
   return (
     <>
+      <SkipNavigation />
       {showBlobs && <AmbientBackground />}
 
       {/* Beta version banner — fixed at top */}
@@ -746,31 +779,35 @@ function App() {
       <div className={`min-h-screen text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-center py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
+        <header>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
           className={isHome ? "text-center mb-10" : "text-center mb-6"}
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative">
             <div 
               className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={handleTitleClick}
-              title="Tap to go home"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
+              aria-label={t('a11y.goHome')}
             >
               <MeticAILogo size={isHome ? 48 : 28} variant={isDark ? 'white' : 'default'} />
               <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-5xl' : 'text-2xl'}`}>
                 Metic<span className="gold-text">AI</span>
               </h1>
             </div>
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
               {themeMounted && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
                   onClick={toggleTheme}
-                  title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
                 >
                   {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
                 </Button>
@@ -781,20 +818,28 @@ function App() {
                   size="icon"
                   className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
                   onClick={() => setQrDialogOpen(true)}
-                  title="Open on mobile"
+                  aria-label={t('a11y.openOnMobile')}
                 >
                   <QrCode size={18} weight="duotone" />
                 </Button>
               )}
-            </div>
+            </nav>
           </div>
 
         </motion.div>
+        </header>
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
         <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
-          <div>
+          <main id="main-content">
+            <Suspense fallback={
+              <Card className="p-6">
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-pulse text-muted-foreground text-sm">{t('app.loading')}</div>
+                </div>
+              </Card>
+            }>
             <AnimatePresence mode="wait">
               {isInitializing && (
                 <motion.div
@@ -802,7 +847,7 @@ function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+                  transition={motionTransition ?? { duration: 0.15 }}
                 >
                   <Card className="p-6">
                     <div className="flex items-center justify-center h-32">
@@ -823,6 +868,7 @@ function App() {
                     setViewState('run-shot')
                   }}
                   onPourOver={() => setViewState('pour-over')}
+                  onDialIn={() => setViewState('dial-in')}
                   onShotAnalysis={() => setViewState('shot-analysis')}
                   onSettings={() => setViewState('settings')}
                   aiConfigured={aiAvailable}
@@ -851,128 +897,159 @@ function App() {
               )}
 
               {!isInitializing && viewState === 'form' && (
-                <FormView
-                  imagePreview={imagePreview}
-                  userPrefs={userPrefs}
-                  selectedTags={selectedTags}
-                  advancedOptions={advancedOptions}
-                  errorMessage={errorMessage}
-                  canSubmit={canSubmit}
-                  profileCount={profileCount}
-                  fileInputRef={fileInputRef}
-                  onFileSelect={handleFileSelect}
-                  onFileDrop={handleFileDrop}
-                  onRemoveImage={handleRemoveImage}
-                  onUserPrefsChange={setUserPrefs}
-                  onToggleTag={toggleTag}
-                  onAdvancedOptionsChange={setAdvancedOptions}
-                  onSubmit={handleSubmit}
-                  onBack={handleBackToStart}
-                  onViewHistory={() => setViewState('history')}
-                />
+                <FeatureErrorBoundary feature="Profile Creator">
+                  <FormView
+                    imagePreview={imagePreview}
+                    userPrefs={userPrefs}
+                    selectedTags={selectedTags}
+                    advancedOptions={advancedOptions}
+                    errorMessage={errorMessage}
+                    canSubmit={canSubmit}
+                    profileCount={profileCount}
+                    fileInputRef={fileInputRef}
+                    onFileSelect={handleFileSelect}
+                    onFileDrop={handleFileDrop}
+                    onRemoveImage={handleRemoveImage}
+                    onUserPrefsChange={setUserPrefs}
+                    onToggleTag={toggleTag}
+                    onAdvancedOptionsChange={setAdvancedOptions}
+                    onSubmit={handleSubmit}
+                    onBack={handleBackToStart}
+                    onViewHistory={() => setViewState('history')}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'history' && (
-                <HistoryView
-                  onBack={handleBackToStart}
-                  onViewProfile={handleViewHistoryEntry}
-                  onGenerateNew={() => setViewState('form')}
-                  onManageMachine={() => setViewState('profile-catalogue')}
-                  aiConfigured={aiAvailable}
-                  hideAiWhenUnavailable={hideAiWhenUnavailable}
-                />
+                <FeatureErrorBoundary feature="History">
+                  <HistoryView
+                    onBack={handleBackToStart}
+                    onViewProfile={handleViewHistoryEntry}
+                    onGenerateNew={() => setViewState('form')}
+                    onManageMachine={() => setViewState('profile-catalogue')}
+                    aiConfigured={aiAvailable}
+                    hideAiWhenUnavailable={hideAiWhenUnavailable}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'history-detail' && selectedHistoryEntry && (
-                <ProfileDetailView
-                  entry={selectedHistoryEntry}
-                  onBack={() => setViewState('history')}
-                  cachedImageUrl={selectedHistoryImageUrl}
-                  aiConfigured={aiAvailable}
-                  hideAiWhenUnavailable={hideAiWhenUnavailable}
-                  onEntryUpdated={(updated) => setSelectedHistoryEntry(updated)}
-                  onRunProfile={(profileId, profileName) => {
-                    setRunShotProfileId(profileId)
-                    setRunShotProfileName(profileName)
-                    setViewState('run-shot')
-                  }}
-                />
+                <FeatureErrorBoundary feature="Profile Detail">
+                  <ProfileDetailView
+                    entry={selectedHistoryEntry}
+                    onBack={() => setViewState('history')}
+                    cachedImageUrl={selectedHistoryImageUrl}
+                    aiConfigured={aiAvailable}
+                    hideAiWhenUnavailable={hideAiWhenUnavailable}
+                    onEntryUpdated={(updated) => setSelectedHistoryEntry(updated)}
+                    onViewProfile={handleViewProfileByName}
+                    onRunProfile={(profileId, profileName) => {
+                      setRunShotProfileId(profileId)
+                      setRunShotProfileName(profileName)
+                      setViewState('run-shot')
+                    }}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'settings' && (
-                <SettingsView
-                  onBack={handleBackToStart}
-                  showBlobs={showBlobs}
-                  onToggleBlobs={toggleBlobs}
-                  isDark={isDark}
-                  isFollowSystem={isFollowSystem}
-                  onToggleTheme={toggleTheme}
-                  onSetFollowSystem={setFollowSystem}
-                />
+                <FeatureErrorBoundary feature="Settings">
+                  <SettingsView
+                    onBack={handleBackToStart}
+                    showBlobs={showBlobs}
+                    onToggleBlobs={toggleBlobs}
+                    isDark={isDark}
+                    isFollowSystem={isFollowSystem}
+                    onToggleTheme={toggleTheme}
+                    onSetFollowSystem={setFollowSystem}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'run-shot' && (
-                <RunShotView
-                  onBack={handleBackToStart}
-                  initialProfileId={runShotProfileId}
-                  initialProfileName={runShotProfileName}
-                />
+                <FeatureErrorBoundary feature="Run Shot">
+                  <RunShotView
+                    onBack={handleBackToStart}
+                    onNavigateToLive={() => setViewState('live-shot')}
+                    onProfileSelected={(name) => patchMachineState({ active_profile: name })}
+                    initialProfileId={runShotProfileId}
+                    initialProfileName={runShotProfileName}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'live-shot' && (
-                <LiveShotView
-                  machineState={machineState}
-                  onBack={handleBackToStart}
-                  onAnalyzeShot={(profileName) => {
-                    setShotHistoryProfileName(profileName)
-                    setShotHistoryInitialDate(undefined)
-                    setShotHistoryInitialFilename(undefined)
-                    previousViewStateRef.current = 'live-shot'
-                    setViewState('shot-history')
-                  }}
-                />
+                <FeatureErrorBoundary feature="Live Shot">
+                  <LiveShotView
+                    machineState={machineState}
+                    onBack={handleBackToStart}
+                    onAnalyzeShot={(profileName) => {
+                      setShotHistoryProfileName(profileName)
+                      setShotHistoryInitialDate(undefined)
+                      setShotHistoryInitialFilename(undefined)
+                      previousViewStateRef.current = 'live-shot'
+                      setViewState('shot-history')
+                    }}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'pour-over' && (
-                <PourOverView
-                  machineState={machineState}
-                  onBack={handleBackToStart}
-                />
+                <FeatureErrorBoundary feature="Pour Over">
+                  <PourOverView
+                    machineState={machineState}
+                    onBack={handleBackToStart}
+                  />
+                </FeatureErrorBoundary>
+              )}
+
+              {viewState === 'dial-in' && (
+                <FeatureErrorBoundary feature="Espresso Compass">
+                  <EspressoCompass
+                    onBack={handleBackToStart}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'shot-history' && shotHistoryProfileName && (
-                <ShotHistoryView
-                  profileName={shotHistoryProfileName}
-                  initialShotDate={shotHistoryInitialDate}
-                  initialShotFilename={shotHistoryInitialFilename}
-                  onBack={() => {
-                    const prev = previousViewStateRef.current
-                    if (prev === 'shot-analysis' || prev === 'history-detail') {
-                      setViewState(prev)
-                    } else {
-                      handleBackToStart()
-                    }
-                  }}
-                  aiConfigured={aiAvailable}
-                  hideAiWhenUnavailable={hideAiWhenUnavailable}
-                />
+                <FeatureErrorBoundary feature="Shot History">
+                  <ShotHistoryView
+                    profileName={shotHistoryProfileName}
+                    initialShotDate={shotHistoryInitialDate}
+                    initialShotFilename={shotHistoryInitialFilename}
+                    onBack={() => {
+                      const prev = previousViewStateRef.current
+                      if (prev === 'shot-analysis' || prev === 'history-detail') {
+                        setViewState(prev)
+                      } else {
+                        handleBackToStart()
+                      }
+                    }}
+                    aiConfigured={aiAvailable}
+                    hideAiWhenUnavailable={hideAiWhenUnavailable}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'shot-analysis' && (
-                <ShotAnalysisView
-                  onBack={handleBackToStart}
-                  onSelectShot={(profileName, date, filename) => {
-                    setShotHistoryProfileName(profileName)
-                    setShotHistoryInitialDate(date)
-                    setShotHistoryInitialFilename(filename)
-                    previousViewStateRef.current = 'shot-analysis'
-                    setViewState('shot-history')
-                  }}
-                />
+                <FeatureErrorBoundary feature="Shot Analysis">
+                  <ShotAnalysisView
+                    onBack={handleBackToStart}
+                    onSelectShot={(profileName, date, filename) => {
+                      setShotHistoryProfileName(profileName)
+                      setShotHistoryInitialDate(date)
+                      setShotHistoryInitialFilename(filename)
+                      previousViewStateRef.current = 'shot-analysis'
+                      setViewState('shot-history')
+                    }}
+                  />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'profile-catalogue' && (
-                <ProfileCatalogueView onBack={() => setViewState('history')} />
+                <FeatureErrorBoundary feature="Profile Catalogue">
+                  <ProfileCatalogueView onBack={() => setViewState('history')} />
+                </FeatureErrorBoundary>
               )}
 
               {viewState === 'loading' && (
@@ -980,24 +1057,26 @@ function App() {
               )}
 
               {viewState === 'results' && apiResponse && (
-                <ResultsView
-                  apiResponse={apiResponse}
-                  currentProfileJson={currentProfileJson}
-                  createdProfileId={createdProfileId}
-                  isCapturing={isCapturing}
-                  resultsCardRef={resultsCardRef}
-                  onBack={handleReset}
-                  onSaveResults={handleSaveResults}
-                  onDownloadJson={handleDownloadJson}
-                  onViewHistory={() => setViewState('history')}
-                  onRunProfile={() => {
-                    if (createdProfileId && currentProfileJson?.name) {
-                      setRunShotProfileId(createdProfileId)
-                      setRunShotProfileName(currentProfileJson.name as string)
-                      setViewState('run-shot')
-                    }
-                  }}
-                />
+                <FeatureErrorBoundary feature="Results">
+                  <ResultsView
+                    apiResponse={apiResponse}
+                    currentProfileJson={currentProfileJson}
+                    createdProfileId={createdProfileId}
+                    isCapturing={isCapturing}
+                    resultsCardRef={resultsCardRef}
+                    onBack={handleReset}
+                    onSaveResults={handleSaveResults}
+                    onDownloadJson={handleDownloadJson}
+                    onViewHistory={() => setViewState('history')}
+                    onRunProfile={() => {
+                      if (createdProfileId && currentProfileJson?.name) {
+                        setRunShotProfileId(createdProfileId)
+                        setRunShotProfileName(currentProfileJson.name as string)
+                        setViewState('run-shot')
+                      }
+                    }}
+                  />
+                </FeatureErrorBoundary>
               )}
 
 
@@ -1009,6 +1088,7 @@ function App() {
                 />
               )}
             </AnimatePresence>
+            </Suspense>
 
             {/* Mobile Control Center — below the main card, StartView only */}
             {showControlCenter && isMobile && viewState === 'start' && (
@@ -1019,7 +1099,7 @@ function App() {
                 />
               </div>
             )}
-          </div>
+          </main>
 
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (
@@ -1060,10 +1140,12 @@ function App() {
                     )}
                     {/* Scrollable stage breakdown — auto-scroll only, no manual scroll */}
                     <div className="auto-scroll-only rounded-xl">
+                      <Suspense fallback={<div className="animate-pulse p-4 text-muted-foreground text-sm">{t('app.loading')}</div>}>
                       <ProfileBreakdown
                         profile={liveProfileData}
                         currentStage={machineState.state ?? null}
                       />
+                      </Suspense>
                       {/* Overscroll padding: allows last stage to scroll to top of container */}
                       <div className="h-[80vh]" />
                     </div>

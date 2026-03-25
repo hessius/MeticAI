@@ -75,8 +75,10 @@ function formatShotTimestamp(shot: RecentShot): string {
   }
 }
 
-// Module-level cache for recent shots (persists across mounts, 5 min TTL)
-const CACHE_TTL_MS = 5 * 60 * 1000
+// Module-level cache for recent shots (persists across mounts)
+// Data is served from cache for up to 24 hours, but background-revalidated after 15 minutes
+const CACHE_STALE_MS = 15 * 60 * 1000
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 interface ShotAnalysisCache {
   recent: { shots: RecentShot[]; fetchedAt: number } | null
   byProfile: { profiles: ProfileGroup[]; fetchedAt: number } | null
@@ -96,11 +98,12 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
   const fetchRecentShots = useCallback(async (force = false) => {
     // Serve from cache immediately (stale-while-revalidate)
     const cached = shotAnalysisCache.recent
-    if (cached) {
+    const age = cached ? Date.now() - cached.fetchedAt : Infinity
+    if (cached && age < CACHE_TTL_MS) {
       setRecentShots(cached.shots)
       setIsLoading(false)
       // If still fresh and not forced, skip revalidation
-      if (!force && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return
+      if (!force && age < CACHE_STALE_MS) return
       // Revalidate in background
       setIsRefreshing(true)
     } else {
@@ -110,7 +113,7 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/shots/recent?limit=50&offset=0`)
-      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`)
+      if (!response.ok) throw new Error(t('shotAnalysis.fetchFailed'))
       const data = await response.json()
       const shots = data.shots || []
       shotAnalysisCache.recent = { shots, fetchedAt: Date.now() }
@@ -118,25 +121,26 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
     } catch (err) {
       // Only set error if we have no cached data to show
       if (!shotAnalysisCache.recent) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+        setError(err instanceof Error ? err.message : t('shotAnalysis.fetchFailed'))
       }
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   const fetchByProfile = useCallback(async (force = false) => {
     // Serve from cache immediately (stale-while-revalidate)
     const cached = shotAnalysisCache.byProfile
-    if (cached) {
+    const age = cached ? Date.now() - cached.fetchedAt : Infinity
+    if (cached && age < CACHE_TTL_MS) {
       setProfileGroups(cached.profiles)
       if (cached.profiles.length > 0) {
         setExpandedProfiles(prev => prev.size > 0 ? prev : new Set([cached.profiles[0].profile_name]))
       }
       setIsLoading(false)
       // If still fresh and not forced, skip revalidation
-      if (!force && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return
+      if (!force && age < CACHE_STALE_MS) return
       // Revalidate in background
       setIsRefreshing(true)
     } else {
@@ -146,7 +150,7 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/shots/recent/by-profile?limit=50&offset=0`)
-      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`)
+      if (!response.ok) throw new Error(t('shotAnalysis.fetchFailed'))
       const data = await response.json()
       const profiles = data.profiles || []
       shotAnalysisCache.byProfile = { profiles, fetchedAt: Date.now() }
@@ -156,13 +160,13 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
       }
     } catch (err) {
       if (!shotAnalysisCache.byProfile) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch shots')
+        setError(err instanceof Error ? err.message : t('shotAnalysis.fetchFailed'))
       }
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (activeTab === 'recent') {
@@ -258,7 +262,7 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
       <Card className="p-6 space-y-5">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
             <CaretLeft size={20} weight="bold" />
           </Button>
           <div className="flex-1 min-w-0">

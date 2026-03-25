@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { 
   CaretLeft, 
@@ -20,10 +21,13 @@ import {
   Repeat,
   Plus,
   Trash,
-  PencilSimple
+  PencilSimple,
+  FloppyDisk,
+  FloppyDiskBack
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { format, addMinutes } from 'date-fns'
+import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
 
 interface MachineProfile {
   id: string
@@ -31,6 +35,8 @@ interface MachineProfile {
   author?: string
   temperature?: number
   final_weight?: number
+  variables?: ProfileVariable[]
+  stages?: Record<string, unknown>[]
 }
 
 interface ScheduledShot {
@@ -59,13 +65,16 @@ interface RecurringSchedule {
 
 interface RunShotViewProps {
   onBack: () => void
+  onNavigateToLive?: () => void
+  /** Called when a profile is loaded on the machine (optimistic update for control center). */
+  onProfileSelected?: (profileName: string) => void
   initialProfileId?: string
   initialProfileName?: string
 }
 
 const PREHEAT_DURATION_MINUTES = 10
 
-export function RunShotView({ onBack, initialProfileId, initialProfileName }: RunShotViewProps) {
+export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initialProfileId, initialProfileName }: RunShotViewProps) {
   const { t } = useTranslation()
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
@@ -101,11 +110,26 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
   // Ref to track preheat timeout for cleanup
   const preheatTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Cleanup preheat timeout on unmount
+  // Variable overrides state
+  const [profileVariables, setProfileVariables] = useState<ProfileVariable[]>([])
+  const [overrides, setOverrides] = useState<Record<string, number>>({})
+  const [saveAsNew, setSaveAsNew] = useState(false)
+  const [saveAsNewName, setSaveAsNewName] = useState('')
+  const [showSaveModeDialog, setShowSaveModeDialog] = useState(false)
+  const [saveModeNewName, setSaveModeNewName] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const saveModeTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Track which profile ID and overrides were used in the last shot
+  const lastShotRef = useRef<{ profileId: string; overrides: Record<string, number> } | null>(null)
+
+  // Cleanup preheat timeout and save-mode timer on unmount
   useEffect(() => {
     return () => {
       if (preheatTimeoutRef.current) {
         clearTimeout(preheatTimeoutRef.current)
+      }
+      if (saveModeTimerRef.current) {
+        clearTimeout(saveModeTimerRef.current)
       }
     }
   }, [])
@@ -122,7 +146,14 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           return
         }
         const data = await response.json()
-        setProfiles(data.profiles || [])
+        const all: MachineProfile[] = data.profiles || []
+        setProfiles(all)
+
+        // Enrich initial profile with full data (variables, temperature, etc.)
+        if (initialProfileId) {
+          const full = all.find((p) => p.id === initialProfileId)
+          if (full) setSelectedProfile(full)
+        }
       } catch (err) {
         console.error('Failed to fetch profiles:', err)
         toast.error(t('runShot.noProfilesFound'))
@@ -132,6 +163,44 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
     }
     fetchProfiles()
   }, [])
+
+  // Derive profile variables from the selected profile data (already fetched
+  // in the profile list). Synthesise final_weight / temperature entries when
+  // they are not present in the explicit variables array so every profile has
+  // at least basic adjustable parameters.
+  useEffect(() => {
+    if (!selectedProfile) {
+      setProfileVariables([])
+      setOverrides({})
+      return
+    }
+
+    const raw: ProfileVariable[] = (selectedProfile.variables || [])
+      .filter((v: ProfileVariable) => v.key && v.name && v.type != null)
+
+    const existingKeys = new Set(raw.map((v) => v.key))
+
+    // Synthesise from top-level fields when missing
+    if (selectedProfile.final_weight != null && !existingKeys.has('final_weight')) {
+      raw.push({
+        key: 'final_weight',
+        name: t('variables.synthesized.finalWeight', 'Final Weight'),
+        type: 'weight',
+        value: selectedProfile.final_weight,
+      })
+    }
+    if (selectedProfile.temperature != null && !existingKeys.has('temperature')) {
+      raw.push({
+        key: 'temperature',
+        name: t('variables.synthesized.temperature', 'Temperature'),
+        type: 'temperature',
+        value: selectedProfile.temperature,
+      })
+    }
+
+    setProfileVariables(raw)
+    setOverrides({})
+  }, [selectedProfile, t])
 
   // Fetch machine status and scheduled shots
   useEffect(() => {
@@ -202,8 +271,14 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
         }
         
         setIsPreheating(true)
+        // Never send profile_id to the preheat endpoint. Loading a profile
+        // before preheat causes the Meticulous machine to auto-start extraction
+        // once it reaches temperature. The scheduled task will load the profile
+        // at the correct time instead.
         const preheatResponse = await fetch(`${serverUrl}/api/machine/preheat`, {
-          method: 'POST'
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
         })
         
         if (!preheatResponse.ok) {
@@ -251,25 +326,92 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
           }
 
           toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
-        }
-      } else if (selectedProfile) {
-        // Run profile immediately
-        const response = await fetch(`${serverUrl}/api/machine/run-profile/${selectedProfile.id}`, {
-          method: 'POST'
-        })
-        
-        if (!response.ok) {
-          let errorMessage = t('runShot.toasts.runFailed')
-          try {
-            const error = await response.json()
-            errorMessage = error?.detail || errorMessage
-          } catch {
-            // Ignore JSON parse errors and fall back to default message
+
+          // Optimistically update the active profile in the control center
+          onProfileSelected?.(selectedProfile.name)
+
+          // Navigate to live view only when a profile is scheduled (preheat + profile)
+          if (onNavigateToLive) {
+            setTimeout(() => onNavigateToLive(), 500)
           }
-          throw new Error(errorMessage)
         }
+        // Preheat-only (no profile): stay on this page — don't navigate to live view
+      } else if (selectedProfile) {
+        const hasOverrides = Object.keys(overrides).length > 0
         
-        toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
+        if (hasOverrides) {
+          // Run profile with variable overrides
+          const formData = new FormData()
+          formData.append('overrides_json', JSON.stringify(overrides))
+          formData.append('save_mode', saveAsNew ? 'save_new' : 'none')
+          if (saveAsNew && saveAsNewName.trim()) {
+            formData.append('new_name', saveAsNewName.trim())
+          }
+          
+          const response = await fetch(
+            `${serverUrl}/api/machine/run-profile-with-overrides/${selectedProfile.id}`,
+            { method: 'POST', body: formData }
+          )
+          
+          if (!response.ok) {
+            let errorMessage = t('runShot.toasts.runFailed')
+            try {
+              const error = await response.json()
+              errorMessage = error?.detail || errorMessage
+            } catch {
+              // Ignore JSON parse errors
+            }
+            throw new Error(errorMessage)
+          }
+          
+          toast.success(t('runShot.toasts.started', { name: saveAsNew && saveAsNewName.trim() ? saveAsNewName.trim() : selectedProfile.name }))
+          
+          // Optimistically update the active profile in the control center
+          onProfileSelected?.(selectedProfile.name)
+
+          // Navigate to live view after successful run (with overrides)
+          if (onNavigateToLive) {
+            setTimeout(() => onNavigateToLive(), 500)
+          }
+          
+          // If not saving as new, show post-shot dialog as a reminder
+          if (!saveAsNew) {
+            // Store shot info for save mode dialog
+            lastShotRef.current = { profileId: selectedProfile.id, overrides: { ...overrides } }
+            setTimeout(() => setShowSaveModeDialog(true), 2000)
+            // Auto-dismiss after 30 seconds
+            saveModeTimerRef.current = setTimeout(() => {
+              setShowSaveModeDialog(false)
+              lastShotRef.current = null
+            }, 32000)
+          }
+        } else {
+          // Run profile immediately (no overrides)
+          const response = await fetch(`${serverUrl}/api/machine/run-profile/${selectedProfile.id}`, {
+            method: 'POST'
+          })
+          
+          if (!response.ok) {
+            let errorMessage = t('runShot.toasts.runFailed')
+            try {
+              const error = await response.json()
+              errorMessage = error?.detail || errorMessage
+            } catch {
+              // Ignore JSON parse errors
+            }
+            throw new Error(errorMessage)
+          }
+          
+          toast.success(t('runShot.toasts.started', { name: selectedProfile.name }))
+
+          // Optimistically update the active profile in the control center
+          onProfileSelected?.(selectedProfile.name)
+
+          // Navigate to live view after successful run (no overrides)
+          if (onNavigateToLive) {
+            setTimeout(() => onNavigateToLive(), 500)
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to run shot:', err)
@@ -285,6 +427,58 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       setIsRunning(false)
     }
   }
+
+  const handleSaveMode = useCallback(async (mode: 'none' | 'save_original' | 'save_new') => {
+    if (!lastShotRef.current) return
+    
+    if (mode === 'none') {
+      // Just dismiss — temp profile will be cleaned up automatically
+      setShowSaveModeDialog(false)
+      lastShotRef.current = null
+      if (saveModeTimerRef.current) {
+        clearTimeout(saveModeTimerRef.current)
+        saveModeTimerRef.current = null
+      }
+      return
+    }
+
+    setIsSaving(true)
+    
+    try {
+      const serverUrl = await getServerUrl()
+      const formData = new FormData()
+      formData.append('overrides_json', JSON.stringify(lastShotRef.current.overrides))
+      formData.append('save_mode', mode)
+      if (mode === 'save_new' && saveModeNewName.trim()) {
+        formData.append('new_name', saveModeNewName.trim())
+      }
+      
+      const response = await fetch(
+        `${serverUrl}/api/machine/run-profile-with-overrides/${lastShotRef.current.profileId}`,
+        { method: 'POST', body: formData }
+      )
+      
+      if (response.ok) {
+        const msg = mode === 'save_original'
+          ? t('variables.savedToOriginal')
+          : t('variables.savedAsNew')
+        toast.success(msg)
+      } else {
+        toast.error(t('variables.saveFailed'))
+      }
+    } catch {
+      toast.error(t('variables.saveFailed'))
+    } finally {
+      setIsSaving(false)
+      setShowSaveModeDialog(false)
+      setSaveModeNewName('')
+      lastShotRef.current = null
+      if (saveModeTimerRef.current) {
+        clearTimeout(saveModeTimerRef.current)
+        saveModeTimerRef.current = null
+      }
+    }
+  }, [saveModeNewName, t])
 
   const handleSchedule = async () => {
     if (!selectedProfile && !preheat) {
@@ -319,7 +513,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.detail || 'Failed to schedule shot')
+        throw new Error(error.detail || t('runShot.scheduleFailed'))
       }
       
       const data = await response.json()
@@ -392,7 +586,7 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.detail || 'Failed to save schedule')
+        throw new Error(error.detail || t('runShot.saveScheduleFailed'))
       }
       
       const data = await response.json()
@@ -640,6 +834,17 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
         </AnimatePresence>
       </Card>
 
+      {/* Variable Adjustments */}
+      {selectedProfile && profileVariables.length > 0 && (
+        <VariableAdjustPanel
+          profileVariables={profileVariables}
+          profileStages={selectedProfile.stages}
+          overrides={overrides}
+          onOverridesChange={setOverrides}
+          onReset={() => setOverrides({})}
+        />
+      )}
+
       {/* Options */}
       <Card className="p-6 space-y-4">
         <h3 className="text-base font-medium">{t('runShot.options')}</h3>
@@ -679,6 +884,46 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
             onCheckedChange={setScheduleMode}
           />
         </div>
+
+        {/* Save as New Profile Toggle (only when overrides exist) */}
+        {Object.keys(overrides).length > 0 && (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="saveAsNew" className="text-sm font-medium flex items-center gap-2">
+                  <FloppyDiskBack size={18} className={saveAsNew ? 'text-primary' : 'text-muted-foreground'} />
+                  {t('runShot.saveAsNew')}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {t('runShot.saveAsNewDescription')}
+                </p>
+              </div>
+              <Switch
+                id="saveAsNew"
+                checked={saveAsNew}
+                onCheckedChange={setSaveAsNew}
+              />
+            </div>
+            <AnimatePresence>
+              {saveAsNew && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <input
+                    type="text"
+                    value={saveAsNewName}
+                    onChange={e => setSaveAsNewName(e.target.value)}
+                    placeholder={t('runShot.newProfileNamePlaceholder')}
+                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
 
         {/* Time Picker (when scheduling) */}
         <AnimatePresence>
@@ -746,7 +991,6 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       {/* Help Text */}
       <p className="text-xs text-muted-foreground text-center">
         {!selectedProfile && preheat && t('runShot.preheatOnlyHelper')}
-        {selectedProfile && !preheat && !scheduleMode && t('runShot.preheatStartsNow')}
         {selectedProfile && preheat && !scheduleMode && t('runShot.preheatStartsNow')}
         {scheduleMode && preheat && t('runShot.preheatStartsBefore')}
       </p>
@@ -1004,6 +1248,68 @@ export function RunShotView({ onBack, initialProfileId, initialProfileName }: Ru
       </Card>
       </div>{/* end right column */}
       </div>{/* end two-column wrapper */}
+
+      {/* Save Mode Dialog */}
+      <Dialog open={showSaveModeDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowSaveModeDialog(false)
+          lastShotRef.current = null
+          if (saveModeTimerRef.current) {
+            clearTimeout(saveModeTimerRef.current)
+            saveModeTimerRef.current = null
+          }
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FloppyDisk size={20} />
+              {t('variables.saveDialogTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('variables.saveDialogDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              disabled={isSaving}
+              onClick={() => handleSaveMode('none')}
+            >
+              <Trash size={18} />
+              {t('variables.discardChanges')}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              disabled={isSaving}
+              onClick={() => handleSaveMode('save_original')}
+            >
+              <FloppyDiskBack size={18} />
+              {t('variables.saveToOriginal')}
+            </Button>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                disabled={isSaving || !saveModeNewName.trim()}
+                onClick={() => handleSaveMode('save_new')}
+              >
+                <Plus size={18} />
+                {t('variables.saveAsNew')}
+              </Button>
+              <input
+                type="text"
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background"
+                placeholder={t('variables.newProfileName')}
+                value={saveModeNewName}
+                onChange={(e) => setSaveModeNewName(e.target.value)}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

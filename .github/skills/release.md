@@ -11,6 +11,7 @@ Before bumping to a release version:
 - CI is green on the version branch
 - All PR review comments addressed (including suppressed threads)
 - No deferred tasks remain
+- **Browser testing protocol passed** (see `.github/skills/browser-testing.md`)
 
 ## 2. Version Bump
 

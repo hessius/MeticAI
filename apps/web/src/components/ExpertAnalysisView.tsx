@@ -1,24 +1,17 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { CaretLeft } from "@phosphor-icons/react";
-import { 
-  Loader2, 
-  Sparkles, 
-  Info, 
-  RefreshCw,
-  Target,
-  Wrench,
-  Lightbulb,
-  TrendingUp,
-  XCircle,
-  AlertCircle
-} from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, XCircle, Info, Wand2 } from "lucide-react";
+import { parseStructuredAnalysis, parseRecommendationsJSON, hasRecommendations } from "@/lib/parseAnalysis";
+import type { Recommendation } from "@/lib/parseAnalysis";
+import { SectionCard } from "@/components/SectionCard";
+import { RecommendationSelectionDialog } from "@/components/RecommendationSelectionDialog";
+import { getServerUrl } from "@/lib/config";
 
 interface ExpertAnalysisViewProps {
   isLoading: boolean;
@@ -27,158 +20,9 @@ interface ExpertAnalysisViewProps {
   onBack: () => void;
   onReAnalyze?: () => void;
   profileName?: string;
+  shotFilename?: string;
   shotDate?: string;
   isCached?: boolean;
-}
-
-// Section configuration with colors and icons
-const SECTION_CONFIG: Record<string, { icon: React.ReactNode; color: string; borderColor: string }> = {
-  "1. Shot Performance": {
-    icon: <Target className="h-5 w-5" />,
-    color: "text-blue-600 dark:text-blue-400",
-    borderColor: "border-blue-500/30"
-  },
-  "2. Root Cause Analysis": {
-    icon: <AlertCircle className="h-5 w-5" />,
-    color: "text-amber-600 dark:text-amber-400",
-    borderColor: "border-amber-500/30"
-  },
-  "3. Setup Recommendations": {
-    icon: <Wrench className="h-5 w-5" />,
-    color: "text-green-600 dark:text-green-400",
-    borderColor: "border-green-500/30"
-  },
-  "4. Profile Recommendations": {
-    icon: <TrendingUp className="h-5 w-5" />,
-    color: "text-purple-600 dark:text-purple-400",
-    borderColor: "border-purple-500/30"
-  },
-  "5. Profile Design Observations": {
-    icon: <Lightbulb className="h-5 w-5" />,
-    color: "text-cyan-600 dark:text-cyan-400",
-    borderColor: "border-cyan-500/30"
-  }
-};
-
-interface ParsedSection {
-  title: string;
-  number: string;
-  content: string;
-  subsections: { title: string; items: string[] }[];
-  assessment?: { status: string; color: string };
-}
-
-function parseStructuredAnalysis(text: string): ParsedSection[] {
-  const sections: ParsedSection[] = [];
-  
-  const sectionRegex = /^## (\d+)\.\s+(.+)$/gm;
-  const matches = [...text.matchAll(sectionRegex)];
-  
-  for (let i = 0; i < matches.length; i++) {
-    const match = matches[i];
-    const number = match[1];
-    const title = `${number}. ${match[2].trim()}`;
-    const startIndex = match.index! + match[0].length;
-    const endIndex = i < matches.length - 1 ? matches[i + 1].index! : text.length;
-    const sectionContent = text.slice(startIndex, endIndex).trim();
-    
-    const subsections: { title: string; items: string[] }[] = [];
-    const subsectionRegex = /\*\*([^*]+):\*\*/g;
-    const subsectionMatches = [...sectionContent.matchAll(subsectionRegex)];
-    
-    for (let j = 0; j < subsectionMatches.length; j++) {
-      const subMatch = subsectionMatches[j];
-      const subTitle = subMatch[1].trim();
-      const subStart = subMatch.index! + subMatch[0].length;
-      const subEnd = j < subsectionMatches.length - 1 ? subsectionMatches[j + 1].index! : sectionContent.length;
-      const subContent = sectionContent.slice(subStart, subEnd).trim();
-      
-      const items = subContent
-        .split('\n')
-        .map(line => line.replace(/^[-•]\s*/, '').trim())
-        .filter(line => line.length > 0 && !line.startsWith('**'));
-      
-      if (items.length > 0) {
-        subsections.push({ title: subTitle, items });
-      }
-    }
-    
-    let assessment: { status: string; color: string } | undefined;
-    const assessmentMatch = sectionContent.match(/\*\*Assessment:\*\*\s*\[?([^\]\n]+)\]?/i);
-    if (assessmentMatch) {
-      const status = assessmentMatch[1].trim();
-      let color = "bg-gray-600 dark:bg-gray-500";
-      if (status.toLowerCase().includes("good")) color = "bg-green-700 dark:bg-green-500";
-      else if (status.toLowerCase().includes("acceptable")) color = "bg-yellow-600 dark:bg-yellow-500";
-      else if (status.toLowerCase().includes("needs improvement")) color = "bg-orange-700 dark:bg-orange-500";
-      else if (status.toLowerCase().includes("problematic")) color = "bg-red-700 dark:bg-red-500";
-      assessment = { status, color };
-    }
-    
-    sections.push({
-      title,
-      number,
-      content: sectionContent,
-      subsections,
-      assessment
-    });
-  }
-  
-  return sections;
-}
-
-// Circled number characters for section numbering
-const CIRCLED_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳'];
-
-function SectionCard({ section }: { section: ParsedSection }) {
-  const config = SECTION_CONFIG[section.title] || {
-    icon: <Info className="h-5 w-5" />,
-    color: "text-gray-600 dark:text-gray-400",
-    borderColor: "border-gray-500/30"
-  };
-  
-  return (
-    <Card className={`${config.borderColor} border-2 overflow-hidden`}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-          <span className={`shrink-0 ${config.color}`}>{config.icon}</span>
-          <span className="text-foreground font-semibold">{section.title}</span>
-          {section.assessment && (
-            <Badge className={`${section.assessment.color} text-white shrink-0`}>
-              {section.assessment.status}
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-4">
-        {section.subsections.map((subsection, idx) => (
-          <div key={idx} className="space-y-2">
-            <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
-              <span className={`text-base shrink-0 ${config.color}`}>{CIRCLED_NUMBERS[idx] || `${idx + 1}.`}</span>
-              <span className="break-words">{subsection.title}</span>
-            </h4>
-            <ul className="space-y-1.5 pl-6">
-              {subsection.items.map((item, itemIdx) => (
-                <li key={itemIdx} className="text-sm text-muted-foreground flex items-start gap-2">
-                  <span className="text-primary shrink-0 leading-relaxed">•</span>
-                  <span className="leading-relaxed">{item}</span>
-                </li>
-              ))}
-            </ul>
-            {idx < section.subsections.length - 1 && (
-              <Separator className="mt-3" />
-            )}
-          </div>
-        ))}
-        
-        {section.subsections.length === 0 && (
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-            {section.content}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
 }
 
 export function ExpertAnalysisView({
@@ -188,6 +32,7 @@ export function ExpertAnalysisView({
   onBack,
   onReAnalyze,
   profileName,
+  shotFilename,
   shotDate,
   isCached,
 }: ExpertAnalysisViewProps) {
@@ -196,6 +41,86 @@ export function ExpertAnalysisView({
     if (!analysisResult) return [];
     return parseStructuredAnalysis(analysisResult);
   }, [analysisResult]);
+
+  const showRecommendations = useMemo(
+    () => !!analysisResult && hasRecommendations(analysisResult),
+    [analysisResult],
+  );
+
+  const localRecommendations: Recommendation[] = useMemo(() => {
+    if (!analysisResult) return [];
+    return parseRecommendationsJSON(analysisResult);
+  }, [analysisResult]);
+
+  const [classifiedRecs, setClassifiedRecs] = useState<Recommendation[] | null>(null);
+
+  // Fetch backend-classified recommendations with proper is_patchable flags
+  useEffect(() => {
+    if (!showRecommendations || !profileName || !shotFilename) {
+      setClassifiedRecs(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchClassified() {
+      try {
+        const serverUrl = await getServerUrl();
+        const form = new FormData();
+        form.append("profile_name", profileName!);
+        form.append("shot_filename", shotFilename!);
+        const res = await fetch(`${serverUrl}/api/shots/analyze-recommendations`, {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) throw new Error("Backend classification failed");
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.recommendations)) {
+          setClassifiedRecs(
+            data.recommendations.map((r: Record<string, unknown>) => ({
+              variable: String(r.variable ?? ""),
+              current_value: Number(r.current_value ?? 0),
+              recommended_value: Number(r.recommended_value ?? 0),
+              stage: String(r.stage ?? ""),
+              confidence: (["high", "medium", "low"].includes(String(r.confidence))
+                ? String(r.confidence)
+                : "low") as "high" | "medium" | "low",
+              reason: String(r.reason ?? ""),
+              is_patchable: Boolean(r.is_patchable),
+            })),
+          );
+        }
+      } catch {
+        // Fallback: use locally-parsed recommendations (is_patchable defaults to true)
+        if (!cancelled) setClassifiedRecs(null);
+      }
+    }
+
+    fetchClassified();
+    return () => { cancelled = true; };
+  }, [showRecommendations, profileName, shotFilename]);
+
+  const recommendations = classifiedRecs ?? localRecommendations;
+
+  const [recDialogOpen, setRecDialogOpen] = useState(false);
+
+  const handleApplyRecommendations = useCallback(
+    async (selected: Recommendation[]) => {
+      if (!profileName) return;
+      const serverUrl = await getServerUrl();
+      const form = new FormData();
+      form.append("recommendations", JSON.stringify(selected));
+      const res = await fetch(
+        `${serverUrl}/api/profile/${encodeURIComponent(profileName)}/apply-recommendations`,
+        { method: "POST", body: form },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail?.message || body.detail || t('recommendations.applyFailed'));
+      }
+    },
+    [profileName, t],
+  );
   
   return (
     <motion.div
@@ -212,6 +137,7 @@ export function ExpertAnalysisView({
             size="icon"
             onClick={onBack}
             className="shrink-0"
+            aria-label={t('a11y.goBack')}
           >
             <CaretLeft size={22} weight="bold" />
           </Button>
@@ -245,7 +171,7 @@ export function ExpertAnalysisView({
         
         {/* Loading State */}
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="flex flex-col items-center justify-center py-16 gap-4" role="status" aria-live="polite" aria-busy="true">
             <div className="relative">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <Sparkles className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
@@ -293,6 +219,32 @@ export function ExpertAnalysisView({
           </div>
         )}
         
+        {/* Apply Recommendations button */}
+        {!isLoading && !error && showRecommendations && profileName && (
+          <div className="flex items-center justify-center pt-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setRecDialogOpen(true)}
+              className="gap-2"
+            >
+              <Wand2 className="h-4 w-4" />
+              {t("recommendations.apply")}
+            </Button>
+          </div>
+        )}
+
+        {/* Recommendation Selection Dialog */}
+        {showRecommendations && profileName && (
+          <RecommendationSelectionDialog
+            open={recDialogOpen}
+            onOpenChange={setRecDialogOpen}
+            recommendations={recommendations}
+            profileName={profileName}
+            onApply={handleApplyRecommendations}
+          />
+        )}
+
         {/* Re-Analyze button */}
         {!isLoading && analysisResult && onReAnalyze && (
           <div className="flex items-center justify-center pt-2">

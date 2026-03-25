@@ -23,7 +23,9 @@ import {
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
+import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
+import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
 import { SyncReport, SyncResults } from './SyncReport'
 
@@ -97,6 +99,27 @@ function SwipeableCard({
   )
 }
 
+function ProfileImage({ imageUrl }: { imageUrl?: string }) {
+  const [error, setError] = useState(false)
+
+  return (
+    <div className="w-10 h-10 rounded-full overflow-hidden border border-border/30 shrink-0 bg-secondary/60">
+      {imageUrl && !error ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setError(true)}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <Coffee size={18} className="text-muted-foreground/40" weight="fill" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
   
@@ -131,6 +154,15 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => getAutoSync())
   const [autoSyncAiDesc, setAutoSyncAiDesc] = useState(() => getAutoSyncAiDescription())
 
+  // Bulk delete dialog state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false)
+
+  // Profile image cache
+  const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
+
   // Detect coarse pointer (touch device)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   useEffect(() => {
@@ -150,13 +182,13 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/profiles`)
       if (!response.ok) {
-        throw new Error('Failed to fetch profiles')
+        throw new Error(t('profileCatalogue.fetchFailed'))
       }
       
       const data = await response.json()
       setProfiles(data.profiles || [])
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load profiles'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.fetchFailed')
       setError(message)
       toast.error(message)
     } finally {
@@ -200,7 +232,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       const response = await fetch(`${serverUrl}/api/profiles/sync`, {
         method: 'POST',
       })
-      if (!response.ok) throw new Error('Sync failed')
+      if (!response.ok) throw new Error(t('profileCatalogue.syncFailed'))
       const data: SyncResults = await response.json()
       setSyncResults(data)
 
@@ -211,7 +243,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       }
       setStaleProfileNames(stale)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sync failed'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.syncFailed')
       toast.error(message)
     } finally {
       setIsSyncing(false)
@@ -223,6 +255,13 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     fetchOrphaned()
     fetchSyncStatus()
   }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
+
+  // Fetch profile images when profile list changes
+  useEffect(() => {
+    if (profiles.length > 0) {
+      fetchImagesForProfiles(profiles.map(p => p.name))
+    }
+  }, [profiles, fetchImagesForProfiles])
 
   // Auto-sync is now handled globally in App.tsx — just refresh data periodically
   // when the catalogue view is visible
@@ -265,7 +304,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       })
       
       if (!response.ok) {
-        throw new Error('Failed to rename profile')
+        throw new Error(t('profileCatalogue.renameFailed'))
       }
       
       const result = await response.json()
@@ -276,7 +315,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       setRenamingId(null)
       setRenameValue('')
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to rename profile'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.renameFailed')
       toast.error(message)
     } finally {
       setIsRenaming(false)
@@ -303,9 +342,9 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const handleExport = async (profile: MachineProfile) => {
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
+      const response = await fetch(`${serverUrl}/api/machine/profile/${encodeURIComponent(profile.id)}/json`)
       if (!response.ok) {
-        throw new Error('Failed to export profile')
+        throw new Error(t('profileCatalogue.exportFailed'))
       }
       
       const data = await response.json()
@@ -322,11 +361,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       
       toast.success(t('profileCatalogue.exported'))
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to export profile'
+      const message = err instanceof Error ? err.message : t('profileCatalogue.exportFailed')
       toast.error(message)
     }
   }
-  
+
   // Start rename
   const startRename = (profile: MachineProfile) => {
     setRenamingId(profile.id)
@@ -347,24 +386,47 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            className="shrink-0"
-          >
-            <CaretLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold">
-              {t('profileCatalogue.title')}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {t('profileCatalogue.description', { count: profiles.length })}
-            </p>
+        <div className="space-y-3">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="shrink-0"
+              aria-label={t('a11y.goBack')}
+            >
+              <CaretLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-xl font-semibold">
+                {t('profileCatalogue.title')}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {t('profileCatalogue.description', { count: profiles.length })}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={isEditing ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setIsEditing(!isEditing)}
+            >
+              <PencilSimple className="w-4 h-4 mr-2" />
+              {isEditing ? t('common.done') : t('profileCatalogue.editMode')}
+            </Button>
+            {isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkDeleteOpen(true)}
+                disabled={isLoading || profiles.filter(p => !p.in_history).length === 0}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash className="w-4 h-4 mr-2" />
+                {t('profileCatalogue.bulkDelete.button')}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -489,10 +551,8 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                 >
                   <Card className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''}`}>
                     <div className="flex items-start gap-4">
-                      {/* Profile icon */}
-                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                        <Coffee className="w-5 h-5 text-muted-foreground" />
-                      </div>
+                      {/* Profile image */}
+                      <ProfileImage imageUrl={getImageUrl(profile.name) ?? undefined} />
                       
                       {/* Profile info */}
                       <div className="flex-1 min-w-0">
@@ -566,13 +626,14 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                       </div>
                       
                       {/* Actions */}
-                      {renamingId !== profile.id && (
+                      {renamingId !== profile.id && isEditing && (
                         <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleExport(profile)}
                             title={t('profileCatalogue.export')}
+                            aria-label={t('profileCatalogue.export')}
                           >
                             <FileJs className="w-4 h-4" />
                           </Button>
@@ -581,6 +642,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => startRename(profile)}
                             title={t('profileCatalogue.rename')}
+                            aria-label={t('profileCatalogue.rename')}
                           >
                             <PencilSimple className="w-4 h-4" />
                           </Button>
@@ -589,6 +651,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                             size="icon"
                             onClick={() => openDeleteDialog(profile)}
                             title={t('profileCatalogue.delete')}
+                            aria-label={t('profileCatalogue.delete')}
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash className="w-4 h-4" />
@@ -648,6 +711,18 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       </div>
 
       {/* Dialogs */}
+      <BulkDeleteDialog
+        isOpen={bulkDeleteOpen}
+        profiles={profiles}
+        onClose={() => setBulkDeleteOpen(false)}
+        onDeleted={() => {
+          setBulkDeleteOpen(false)
+          fetchProfiles()
+          fetchOrphaned()
+          fetchSyncStatus()
+        }}
+      />
+
       <DeleteProfileDialog
         isOpen={!!deleteTarget}
         profileId={deleteTarget?.profileId ?? ''}

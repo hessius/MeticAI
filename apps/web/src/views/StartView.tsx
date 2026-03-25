@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { scaleIn, gentleSpring } from '@/lib/animations'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Coffee, Play, Gear, Drop, ChartLine } from '@phosphor-icons/react'
+import { Plus, Coffee, Play, Gear, Drop, ChartLine, Crosshair } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
 const IGNORED_NAMES = ['meticai', 'metic ai', 'gemini', 'admin', 'user', 'default']
@@ -47,6 +48,7 @@ interface StartViewProps {
   onGenerateNew: () => void
   onViewHistory: () => void
   onRunShot: () => void
+  onDialIn: () => void
   onPourOver: () => void
   onShotAnalysis: () => void
   onSettings: () => void
@@ -60,6 +62,7 @@ export function StartView({
   onGenerateNew,
   onViewHistory,
   onRunShot,
+  onDialIn,
   onPourOver,
   onShotAnalysis,
   onSettings,
@@ -97,10 +100,11 @@ export function StartView({
   return (
     <motion.div
       key="start"
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      variants={scaleIn}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
+      transition={gentleSpring}
     >
       <Card className="p-6 space-y-6">
         <div className="text-center space-y-2">
@@ -155,6 +159,15 @@ export function StartView({
           >
             <Play size={20} className="mr-2" weight="fill" />
             {t('navigation.runSchedule')}
+          </Button>
+
+          <Button
+            onClick={onDialIn}
+            variant="dark-brew"
+            className="w-full h-14 text-base"
+          >
+            <Crosshair size={20} className="mr-2" weight="bold" />
+            {t('dialIn.title')}
           </Button>
 
           <Button

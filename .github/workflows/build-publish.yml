@@ -23,7 +23,6 @@ on:
   pull_request:
     branches:
       - main
-      - version/2.0.0
     paths:
       - 'apps/**'
       - 'docker/**'
@@ -39,6 +38,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
 
     steps:
       - name: Checkout repository

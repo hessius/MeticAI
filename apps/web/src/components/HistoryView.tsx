@@ -29,7 +29,8 @@ import {
   Play,
   PencilSimple,
   FloppyDisk,
-  GearSix
+  MagnifyingGlass,
+  DownloadSimple
 } from '@phosphor-icons/react'
 import { useHistory, HistoryEntry } from '@/hooks/useHistory'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
@@ -42,6 +43,7 @@ import { ImageCropDialog } from '@/components/ImageCropDialog'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
+import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
 import { profileService } from '@/services/profileService'
 
@@ -62,7 +64,11 @@ function extractDescription(reply: string): string | null {
     // Clean up any leading/trailing ** artifacts
     desc = desc.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '')
     // Clean up any trailing headers or code blocks
-    return desc.replace(/```[\s\S]*$/g, '').trim() || null
+    desc = desc.replace(/```[\s\S]*$/g, '').trim()
+    if (!desc) return null
+    // Filter out placeholder/auto-generated descriptions (not real AI analysis)
+    if (desc.includes('summary generated from the profile')) return null
+    return desc
   }
   return null
 }
@@ -252,6 +258,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
             size="icon"
             onClick={onBack}
             className="shrink-0"
+            aria-label={t('a11y.goBack')}
           >
             <CaretLeft size={22} weight="bold" />
           </Button>
@@ -262,14 +269,6 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
             <h2 className="text-lg font-bold tracking-tight">{t('history.title')}</h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Button
-              onClick={() => setShowImportDialog(true)}
-              size="icon"
-              className="h-9 w-9 bg-amber-500 hover:bg-amber-600 text-zinc-900"
-              title={t('history.addProfile')}
-            >
-              <Plus size={18} weight="bold" />
-            </Button>
             {onManageMachine && (
               <Button
                 variant="ghost"
@@ -278,7 +277,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
                 className="relative shrink-0 h-9 w-9"
                 title={t('history.manageMachine')}
               >
-                <GearSix size={18} weight="fill" />
+                <PencilSimple size={18} weight="fill" />
                 {syncBadgeCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] font-bold leading-4 text-white bg-destructive rounded-full">
                     {syncBadgeCount}
@@ -575,12 +574,13 @@ interface ProfileDetailViewProps {
   onBack: () => void
   onRunProfile?: (profileId: string, profileName: string) => void
   onEntryUpdated?: (entry: HistoryEntry) => void
+  onViewProfile?: (profileName: string) => void
   cachedImageUrl?: string
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
 }
 
-export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
+export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated, onViewProfile, cachedImageUrl, aiConfigured = true, hideAiWhenUnavailable = false }: ProfileDetailViewProps) {
   const { t } = useTranslation()
   const { downloadJson } = useHistory()
   const { invalidate: invalidateImageCache } = useProfileImageCache()
@@ -608,9 +608,13 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
   const [showLightbox, setShowLightbox] = useState(false)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const imageSectionRef = useRef<HTMLDivElement>(null)
   
   // Machine profile ID for run/schedule functionality
   const [machineProfileId, setMachineProfileId] = useState<string | null>(null)
+  
+  // Find Similar state
+  const [showFindSimilar, setShowFindSimilar] = useState(false)
   
   // Notes state
   const [notes, setNotes] = useState<string>(entry.notes || '')
@@ -1218,6 +1222,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                   onBack()
                 }}
                 className="shrink-0"
+                aria-label={t('a11y.goBack')}
               >
                 <CaretLeft size={22} weight="bold" />
               </Button>
@@ -1342,6 +1347,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                 {t('results.runScheduleShot')}
               </Button>
             )}
+
+            
           </div>
         )}
 
@@ -1518,6 +1525,17 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               disabled={isSavingEdit}
             />
           )}
+          {/* Find Similar Button — only for profiles with real AI descriptions */}
+          {!isCapturing && extractDescription(currentReply) && (
+            <Button
+              variant="outline"
+              onClick={() => setShowFindSimilar(true)}
+              className="w-full h-11 text-sm font-semibold mt-3"
+            >
+              <MagnifyingGlass size={18} className="mr-2" weight="bold" />
+              {t('profileRecommendations.findSimilar')}
+            </Button>
+          )}
         </div>{/* end right column */}
         </div>{/* end two-column wrapper */}
 
@@ -1525,7 +1543,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         {!isCapturing && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Profile Image Upload */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" ref={imageSectionRef}>
               <Label className="text-xs font-medium text-muted-foreground block text-center">{t('history.profilePicture')}</Label>
               <input
                 ref={imageInputRef}
@@ -1740,6 +1758,21 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               <p className="text-center text-white/80 mt-4 text-sm font-medium">{cleanProfileName(entry.profile_name)}</p>
               {/* Image actions in lightbox */}
               <div className="flex gap-2 mt-4 justify-center">
+                {profileImage && (
+                  <Button
+                    variant="outline"
+                    className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    onClick={() => {
+                      const link = document.createElement('a')
+                      link.href = profileImage
+                      link.download = `${cleanProfileName(entry.profile_name).replace(/\s+/g, '_')}.png`
+                      link.click()
+                    }}
+                  >
+                    <DownloadSimple size={16} className="mr-1.5" weight="bold" />
+                    {t('history.saveImage')}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="h-10 text-sm font-semibold bg-white/10 border-white/20 text-white hover:bg-white/20"
@@ -1747,6 +1780,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                   onClick={() => {
                     setShowLightbox(false)
                     imageInputRef.current?.click()
+                    setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
                   }}
                 >
                   {isUploadingImage ? (
@@ -1764,6 +1798,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                     onClick={() => {
                       setShowLightbox(false)
                       setShowStylePicker(true)
+                      setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
                     }}
                   >
                     {isGeneratingImage ? (
@@ -1837,6 +1872,17 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Find Similar Overlay */}
+      <FindSimilarOverlay
+        open={showFindSimilar}
+        onOpenChange={setShowFindSimilar}
+        profileName={entry.profile_name}
+        onSelectProfile={onViewProfile ? (name) => {
+          setShowFindSimilar(false)
+          onViewProfile(name)
+        } : undefined}
+      />
     </motion.div>
   )
 }

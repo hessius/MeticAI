@@ -111,7 +111,7 @@ export function ReplayChart({
           </Badge>
         )}
       </div>
-      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding}`}>
+      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding}`} role="img" aria-label={t('a11y.chart.extractionReplay')}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 5, right: rightMargin, left: -5, bottom: 5 }}>
@@ -209,7 +209,7 @@ export function CompareChart({
           </Badge>
         )}
       </div>
-      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding}`}>
+      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding}`} role="img" aria-label={t('a11y.chart.extractionComparison')}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
@@ -314,7 +314,7 @@ export function AnalyzeChart({
           <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20">{t('shotCharts.targetOverlay')}</Badge>
         )}
       </div>
-      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding}`}>
+      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding}`} role="img" aria-label={t('a11y.chart.shotVsProfile')}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>

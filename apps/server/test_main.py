@@ -4226,6 +4226,82 @@ class TestMachineProfileJsonEndpoint:
         
         assert response.status_code == 500
 
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_merges_synthesized_variables(self, mock_get_profile, client):
+        """Test that top-level final_weight/temperature are merged with explicit variables."""
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-merge"
+        mock_profile.name = "Yirgacheffe You Going?"
+        mock_profile.author = "MeticAI"
+        mock_profile.temperature = 94.0
+        mock_profile.final_weight = 38.0
+        mock_profile.error = None
+        # Explicit variables that do NOT include final_weight or temperature
+        mock_profile.variables = [
+            {"key": "pressure", "name": "Brew Pressure", "type": "pressure", "value": 9.0},
+        ]
+
+        mock_get_profile.return_value = mock_profile
+
+        response = client.get("/api/machine/profile/profile-merge")
+
+        assert response.status_code == 200
+        data = response.json()
+        variables = data["variables"]
+        keys = [v["key"] for v in variables]
+        assert "pressure" in keys, "Explicit variable should be preserved"
+        assert "final_weight" in keys, "Synthesized final_weight should be merged"
+        assert "temperature" in keys, "Synthesized temperature should be merged"
+        assert len(variables) == 3
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_no_duplicate_variables(self, mock_get_profile, client):
+        """Test that explicit variables are not duplicated by synthesis."""
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-dedup"
+        mock_profile.name = "Dedup Profile"
+        mock_profile.temperature = 94.0
+        mock_profile.final_weight = 38.0
+        mock_profile.error = None
+        # Explicit variables already include temperature
+        mock_profile.variables = [
+            {"key": "temperature", "name": "Brew Temp", "type": "temperature", "value": 92.0},
+        ]
+
+        mock_get_profile.return_value = mock_profile
+
+        response = client.get("/api/machine/profile/profile-dedup")
+
+        assert response.status_code == 200
+        data = response.json()
+        variables = data["variables"]
+        temp_vars = [v for v in variables if v["key"] == "temperature"]
+        assert len(temp_vars) == 1, "Should not duplicate existing temperature variable"
+        assert temp_vars[0]["value"] == 92.0, "Should keep explicit value, not synthesized"
+        fw_vars = [v for v in variables if v["key"] == "final_weight"]
+        assert len(fw_vars) == 1, "Should still add missing final_weight"
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    def test_get_profile_json_synthesizes_when_no_variables(self, mock_get_profile, client):
+        """Test that variables are synthesized when profile has none."""
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-synth"
+        mock_profile.name = "Bare Profile"
+        mock_profile.temperature = 93.0
+        mock_profile.final_weight = 36.0
+        mock_profile.error = None
+
+        mock_get_profile.return_value = mock_profile
+
+        response = client.get("/api/machine/profile/profile-synth")
+
+        assert response.status_code == 200
+        data = response.json()
+        variables = data["variables"]
+        assert len(variables) == 2
+        keys = {v["key"] for v in variables}
+        assert keys == {"final_weight", "temperature"}
+
 
 class TestProfileImportEndpoint:
     """Tests for the /api/profile/import endpoint."""
@@ -6747,6 +6823,26 @@ class TestRunShotEndpoints:
         data = response.json()
         assert "message" in data
         assert "preheat" in data["message"].lower() or "Preheat" in data["message"]
+
+    @patch('api.routes.scheduling.async_load_profile_by_id', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_preheat_with_profile_preselection(self, mock_get_api, mock_execute_action, mock_load, client):
+        """Test POST /api/machine/preheat with profile_id pre-selects the profile."""
+        mock_get_api.return_value = MagicMock()
+        mock_result = MagicMock(spec=[])
+        mock_execute_action.return_value = mock_result
+        mock_load.return_value = MagicMock(spec=[])
+
+        response = client.post(
+            "/api/machine/preheat",
+            json={"profile_id": "my-profile-123"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_preselected"] is True
+        mock_load.assert_called_once_with("my-profile-123")
 
     @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
     @patch('api.routes.scheduling.get_meticulous_api')
@@ -11671,16 +11767,13 @@ class TestTempProfileService:
 class TestPourOverEndpoints:
     """Tests for /api/pour-over/* endpoints."""
 
-    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
-    @patch("services.temp_profile_service.async_create_profile")
-    @patch("services.temp_profile_service.async_load_profile_by_id")
-    def test_prepare_success(self, mock_load, mock_create, mock_list, client):
-        """POST /api/pour-over/prepare creates and loads a temp profile."""
+    @patch("services.temp_profile_service.async_load_profile_from_json")
+    def test_prepare_success(self, mock_load_json, client):
+        """POST /api/pour-over/prepare loads an ephemeral temp profile."""
         import services.temp_profile_service as tps
         tps._set_active(None)
 
-        mock_create.return_value = {"id": "prep-id-123"}
-        mock_load.return_value = None
+        mock_load_json.return_value = {"id": "prep-id-123", "name": "MeticAI Ratio Pour-Over"}
 
         response = client.post("/api/pour-over/prepare", json={
             "target_weight": 250.0,
@@ -11692,18 +11785,16 @@ class TestPourOverEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["profile_id"] == "prep-id-123"
         assert data["profile_name"] == "MeticAI Ratio Pour-Over"
+        mock_load_json.assert_called_once()
 
-    @patch("services.temp_profile_service.async_list_profiles", return_value=[])
-    @patch("services.temp_profile_service.async_create_profile")
-    @patch("services.temp_profile_service.async_load_profile_by_id")
-    def test_prepare_without_bloom(self, mock_load, mock_create, mock_list, client):
+    @patch("services.temp_profile_service.async_load_profile_from_json")
+    def test_prepare_without_bloom(self, mock_load_json, client):
         """POST /api/pour-over/prepare works without bloom."""
         import services.temp_profile_service as tps
         tps._set_active(None)
 
-        mock_create.return_value = {"id": "no-bloom-id"}
+        mock_load_json.return_value = {"id": "no-bloom-id", "name": "MeticAI Ratio Pour-Over"}
 
         response = client.post("/api/pour-over/prepare", json={
             "target_weight": 300.0,
@@ -11712,7 +11803,7 @@ class TestPourOverEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["profile_id"] == "no-bloom-id"
+        assert data["profile_name"] == "MeticAI Ratio Pour-Over"
 
     def test_prepare_invalid_weight(self, client):
         """POST /api/pour-over/prepare rejects non-positive weight."""
@@ -11726,16 +11817,15 @@ class TestPourOverEndpoints:
         response = client.post("/api/pour-over/prepare", json={})
         assert response.status_code == 422
 
-    @patch("services.temp_profile_service.async_delete_profile")
-    def test_cleanup_success(self, mock_delete, client):
-        """POST /api/pour-over/cleanup cleans up the active profile."""
+    def test_cleanup_success(self, client):
+        """POST /api/pour-over/cleanup cleans up the active ephemeral profile."""
         import services.temp_profile_service as tps
         from services.temp_profile_service import ActiveTempProfile
 
         tps._set_active(ActiveTempProfile(
-            profile_id="cleanup-ep-id", profile_name="MeticAI Ratio Pour-Over"
+            profile_id="cleanup-ep-id", profile_name="MeticAI Ratio Pour-Over",
+            ephemeral=True,
         ))
-        mock_delete.return_value = None
 
         with patch("api.routes.commands._get_snapshot", return_value={"brewing": False}), \
              patch("api.routes.commands._do_publish"):
@@ -11753,16 +11843,15 @@ class TestPourOverEndpoints:
         assert response.status_code == 200
         assert response.json()["status"] == "no_active_profile"
 
-    @patch("services.temp_profile_service.async_delete_profile")
-    def test_force_cleanup_success(self, mock_delete, client):
-        """POST /api/pour-over/force-cleanup deletes without purge."""
+    def test_force_cleanup_success(self, client):
+        """POST /api/pour-over/force-cleanup cleans up without purge."""
         import services.temp_profile_service as tps
         from services.temp_profile_service import ActiveTempProfile
 
         tps._set_active(ActiveTempProfile(
-            profile_id="force-ep-id", profile_name="MeticAI Ratio Pour-Over"
+            profile_id="force-ep-id", profile_name="MeticAI Ratio Pour-Over",
+            ephemeral=True,
         ))
-        mock_delete.return_value = None
 
         response = client.post("/api/pour-over/force-cleanup")
         assert response.status_code == 200
@@ -12268,13 +12357,13 @@ class TestPrepareRecipeEndpoint:
         """POST /api/pour-over/prepare-recipe with valid slug returns 200."""
         mock_mqtt_sub.return_value.get_snapshot.return_value = {}
 
-        async def _fake_create_and_load(profile_json, params, previous_profile_name=None):
+        async def _fake_load_ephemeral(profile_json, params, previous_profile_name=None):
             return {
                 "profile_id": "test-uuid-1234",
                 "profile_name": "MeticAI Recipe: Tetsu Kasuya 4:6",
             }
 
-        mock_temp_svc.create_and_load = _fake_create_and_load
+        mock_temp_svc.load_ephemeral = _fake_load_ephemeral
 
         response = client.post(
             "/api/pour-over/prepare-recipe",
@@ -13148,3 +13237,640 @@ class TestMachineDetectEndpoint:
 
         with pytest.raises(Exception, match="Network timeout"):
             client.post("/api/machine/detect")
+
+
+# ============================================================================
+# Recommendation Pipeline Tests (#258)
+# ============================================================================
+
+class TestRecommendationParsing:
+    """Tests for _parse_recommendations_json and _classify_recommendation_patchable."""
+
+    def test_parse_valid_recommendations_json(self):
+        """Valid RECOMMENDATIONS_JSON block is parsed correctly."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """## 1. Shot Performance
+**What Happened:**
+- Test
+
+RECOMMENDATIONS_JSON:
+[
+  {
+    "variable": "pressure",
+    "current_value": 6.0,
+    "recommended_value": 7.0,
+    "stage": "extraction",
+    "confidence": "high",
+    "reason": "Under-extraction detected"
+  },
+  {
+    "variable": "temperature",
+    "current_value": 92,
+    "recommended_value": 94,
+    "stage": "global",
+    "confidence": "medium",
+    "reason": "Higher temp for dark roast"
+  }
+]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 2
+        assert recs[0]["variable"] == "pressure"
+        assert recs[0]["recommended_value"] == 7.0
+        assert recs[1]["confidence"] == "medium"
+
+    def test_parse_empty_recommendations(self):
+        """Empty array block is parsed as empty list."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """Some analysis text
+RECOMMENDATIONS_JSON:
+[]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert recs == []
+
+    def test_parse_missing_block(self):
+        """Missing RECOMMENDATIONS_JSON block returns empty list."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = "## 1. Shot Performance\nJust regular analysis text"
+        recs = _parse_recommendations_json(text)
+        assert recs == []
+
+    def test_parse_malformed_json(self):
+        """Malformed JSON in block returns empty list."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{broken json
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert recs == []
+
+    def test_classify_adjustable_variable(self):
+        """Adjustable variable (no info_ prefix) is patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "flow_main", "stage": "extraction"}
+        variables = [{"key": "flow_main", "name": "Main Flow", "type": "flow", "value": 2.5}]
+        assert _classify_recommendation_patchable(rec, variables) is True
+
+    def test_classify_info_variable(self):
+        """Info variable (info_ prefix) is not patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "info_dose", "stage": "extraction"}
+        variables = [{"key": "info_dose", "name": "☕ Dose", "type": "weight", "value": 18}]
+        assert _classify_recommendation_patchable(rec, variables) is False
+
+    def test_classify_adjustable_false_variable(self):
+        """Variable with adjustable=false is not patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "grind_info", "stage": "extraction"}
+        variables = [{"key": "grind_info", "name": "Grind", "type": "power", "value": 100, "adjustable": False}]
+        assert _classify_recommendation_patchable(rec, variables) is False
+
+    def test_classify_global_temperature(self):
+        """Global temperature setting is always patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "temperature", "stage": "global"}
+        assert _classify_recommendation_patchable(rec, []) is True
+
+    def test_classify_global_final_weight(self):
+        """Global final_weight setting is always patchable."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "final_weight", "stage": "global"}
+        assert _classify_recommendation_patchable(rec, []) is True
+
+    def test_classify_unknown_variable(self):
+        """Unknown variable not in profile is patchable (LLM may use descriptive names)."""
+        from api.routes.shots import _classify_recommendation_patchable
+
+        rec = {"variable": "unknown_var", "stage": "extraction"}
+        variables = [{"key": "flow_main", "name": "Main Flow", "type": "flow", "value": 2.5}]
+        assert _classify_recommendation_patchable(rec, variables) is True
+
+
+class TestApplyRecommendationsEndpoint:
+    """Tests for POST /api/profile/{name}/apply-recommendations."""
+
+    def _make_mock_profile(self, name="TestProfile", profile_id="abc-123",
+                           temperature=93.0, final_weight=36.0):
+        profile = Mock()
+        profile.id = profile_id
+        profile.name = name
+        profile.temperature = temperature
+        profile.final_weight = final_weight
+        profile.stages = []
+        var = SimpleNamespace(key="flow_main", name="Main Flow", value=2.5, type="flow")
+        info_var = SimpleNamespace(key="info_dose", name="☕ Dose", value=18.0, type="weight")
+        profile.variables = [var, info_var]
+        profile.error = None
+        profile.author = "MeticAI"
+        profile.author_id = None
+        profile.display = None
+        profile.isDefault = False
+        profile.source = None
+        profile.beverage_type = None
+        profile.tank_temperature = None
+        profile.previous_authors = None
+        return profile
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_valid_recommendations(self, mock_list, mock_get, mock_save, client):
+        """Applying valid adjustable recommendations succeeds."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps([
+            {"variable": "flow_main", "recommended_value": 3.0, "stage": "extraction"},
+        ])
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert len(data["applied"]) == 1
+        assert data["applied"][0]["variable"] == "flow_main"
+        mock_save.assert_called_once()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_info_only_skipped(self, mock_list, mock_get, mock_save, client):
+        """Info-only variables are skipped when applying recommendations."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps([
+            {"variable": "info_dose", "recommended_value": 20.0, "stage": "extraction"},
+        ])
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "no_changes"
+        assert len(data["skipped"]) == 1
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_save_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_global_temperature(self, mock_list, mock_get, mock_save, client):
+        """Global temperature recommendation is applied correctly."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps([
+            {"variable": "temperature", "recommended_value": 95.0, "stage": "global"},
+        ])
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["applied"][0]["variable"] == "temperature"
+        assert profile.temperature == 95.0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    def test_apply_invalid_json(self, client):
+        """Invalid JSON in recommendations returns 400."""
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": "not json"},
+        )
+        assert response.status_code == 400
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_apply_profile_not_found(self, mock_list, client):
+        """Applying to non-existent profile returns 404."""
+        mock_list.return_value = []
+        recs = json.dumps([{"variable": "flow_main", "recommended_value": 3.0, "stage": "extraction"}])
+        response = client.post(
+            "/api/profile/NonExistent/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 404
+
+
+class TestRunProfileWithOverrides:
+    """Tests for the run-profile-with-overrides endpoint and apply_variable_overrides."""
+
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+
+    # ---- apply_variable_overrides unit tests ----
+
+    def test_apply_variable_overrides_basic(self):
+        """Test basic variable override application."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {
+            "id": "p1",
+            "variables": [
+                {"key": "pressure_main", "name": "Pressure", "type": "pressure", "value": 9.0},
+                {"key": "flow_main", "name": "Flow", "type": "flow", "value": 4.0},
+            ],
+        }
+        result = apply_variable_overrides(profile, {"pressure_main": 7.5})
+        # Original unchanged
+        assert profile["variables"][0]["value"] == 9.0
+        # Result modified
+        assert result["variables"][0]["value"] == 7.5
+        assert result["variables"][1]["value"] == 4.0
+
+    def test_apply_variable_overrides_skips_info_keys(self):
+        """Info_ prefixed variables should be silently skipped."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {
+            "variables": [
+                {"key": "info_beans", "name": "☕ Beans", "type": "pressure", "value": 0},
+                {"key": "pressure_main", "name": "Pressure", "type": "pressure", "value": 9.0},
+            ],
+        }
+        result = apply_variable_overrides(profile, {"info_beans": 99, "pressure_main": 8.0})
+        assert result["variables"][0]["value"] == 0  # unchanged
+        assert result["variables"][1]["value"] == 8.0  # applied
+
+    def test_apply_variable_overrides_empty(self):
+        """Empty overrides should return an identical deep copy."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {"variables": [{"key": "x", "name": "X", "type": "pressure", "value": 1}]}
+        result = apply_variable_overrides(profile, {})
+        assert result == profile
+        assert result is not profile
+
+    def test_apply_variable_overrides_no_variables(self):
+        """Profile without variables key should return a deep copy."""
+        from services.temp_profile_service import apply_variable_overrides
+
+        profile = {"id": "p1", "name": "Simple"}
+        result = apply_variable_overrides(profile, {"x": 1})
+        assert result == profile
+        assert result is not profile
+
+    # ---- endpoint tests ----
+
+    @patch('services.temp_profile_service.load_ephemeral', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_run_with_overrides_none_mode(
+        self, mock_get_api, mock_get_profile, mock_execute, mock_load_ephemeral, client
+    ):
+        """Test run-profile-with-overrides with save_mode=none."""
+        mock_get_api.return_value = MagicMock()
+        mock_get_profile.return_value = {
+            "id": "p1",
+            "name": "Test Profile",
+            "variables": [
+                {"key": "pressure_main", "name": "P", "type": "pressure", "value": 9.0},
+            ],
+        }
+        mock_load_ephemeral.return_value = {"profile_id": "p1", "profile_name": "Test Profile"}
+        mock_result = MagicMock(spec=['status', 'action'])
+        mock_result.status = "ok"
+        mock_execute.return_value = mock_result
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={"overrides_json": '{"pressure_main": 7.5}', "save_mode": "none"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["save_mode"] == "none"
+        assert data["profile_name"] == "Test Profile"
+        mock_get_profile.assert_called_once()
+        mock_load_ephemeral.assert_called_once()
+
+    @patch('api.routes.scheduling.async_save_profile', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.load_ephemeral', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_save_original_mode(
+        self, mock_get_api, mock_get_profile, mock_execute, mock_load_ephemeral, mock_save_profile, client
+    ):
+        """Test save_mode=save_original persists overrides back."""
+        mock_get_api.return_value = MagicMock()
+        mock_get_profile.return_value = {
+            "id": "p1",
+            "name": "Test Profile",
+            "variables": [
+                {"key": "flow_main", "name": "F", "type": "flow", "value": 4.0},
+            ],
+        }
+        mock_load_ephemeral.return_value = {"profile_id": "p1", "profile_name": "Test Profile"}
+        mock_result = MagicMock(spec=['status', 'action'])
+        mock_result.status = "ok"
+        mock_execute.return_value = mock_result
+        mock_save_profile.return_value = MagicMock()
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={"overrides_json": '{"flow_main": 3.0}', "save_mode": "save_original"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["save_mode"] == "save_original"
+        mock_save_profile.assert_called_once()
+
+    @patch('api.routes.scheduling.async_create_profile', new_callable=AsyncMock)
+    @patch('services.temp_profile_service.load_ephemeral', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_execute_action', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_save_new_mode(
+        self, mock_get_api, mock_get_profile, mock_execute, mock_load_ephemeral, mock_create_profile, client
+    ):
+        """Test save_mode=save_new creates a new profile."""
+        mock_get_api.return_value = MagicMock()
+        mock_get_profile.return_value = {
+            "id": "p1",
+            "name": "Original",
+            "variables": [
+                {"key": "weight", "name": "W", "type": "weight", "value": 36.0},
+            ],
+        }
+        mock_load_ephemeral.return_value = {"profile_id": "p1", "profile_name": "Original"}
+        mock_result = MagicMock(spec=['status', 'action'])
+        mock_result.status = "ok"
+        mock_execute.return_value = mock_result
+        mock_create_profile.return_value = MagicMock(id="new-1")
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={
+                "overrides_json": '{"weight": 40.0}',
+                "save_mode": "save_new",
+                "new_name": "My Custom Profile",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["save_mode"] == "save_new"
+        mock_create_profile.assert_called_once()
+
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_no_connection(self, mock_get_api, client):
+        """Test that 503 is returned when machine is not connected."""
+        mock_get_api.return_value = None
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/p1",
+            data={"overrides_json": '{"pressure_main": 7.5}', "save_mode": "none"},
+        )
+
+        assert response.status_code == 503
+
+    @patch('api.routes.scheduling.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.scheduling.get_meticulous_api')
+    def test_endpoint_profile_not_found(self, mock_get_api, mock_get_profile, client):
+        """Test 404 when profile fetch returns error."""
+        mock_get_api.return_value = MagicMock()
+        result = MagicMock()
+        result.error = "Not found"
+        mock_get_profile.return_value = result
+
+        response = client.post(
+            "/api/machine/run-profile-with-overrides/nonexistent",
+            data={"overrides_json": '{}', "save_mode": "none"},
+        )
+
+        assert response.status_code == 404
+
+
+class TestDialInGuide:
+    """Tests for the Dial-In Guide endpoints."""
+
+    def _clear(self):
+        from services import dialin_service
+        dialin_service._sessions.clear()
+
+    def test_create_session(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"},
+            "profile_name": "Test Profile"
+        })
+        assert resp.status_code == 201
+        data = resp.json()
+        assert "id" in data
+        assert data["coffee"]["roast_level"] == "medium"
+        assert data["profile_name"] == "Test Profile"
+        assert data["status"] == "active"
+
+    def test_list_sessions(self):
+        self._clear()
+        client = TestClient(app)
+        client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "light"}
+        })
+        resp = client.get("/api/dialin/sessions")
+        assert resp.status_code == 200
+        assert "sessions" in resp.json()
+        assert len(resp.json()["sessions"]) >= 1
+
+    def test_get_session(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "dark"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.get(f"/api/dialin/sessions/{session_id}")
+        assert resp.status_code == 200
+        assert resp.json()["id"] == session_id
+
+    def test_get_session_not_found(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.get("/api/dialin/sessions/nonexistent")
+        assert resp.status_code == 404
+
+    def test_add_iteration(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": 0.3, "y": -0.2, "descriptors": ["Sour", "Watery"]}
+        })
+        assert resp.status_code == 201
+        assert resp.json()["iteration_number"] == 1
+        assert resp.json()["taste"]["x"] == 0.3
+
+    def test_add_multiple_iterations(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": -0.5, "y": 0.1, "descriptors": ["Sour"]}
+        })
+        resp = client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": -0.2, "y": 0.3, "descriptors": ["Sweet"]}
+        })
+        assert resp.json()["iteration_number"] == 2
+
+    def test_update_recommendations(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        client.post(f"/api/dialin/sessions/{session_id}/iterations", json={
+            "taste": {"x": 0.5, "y": 0.0, "descriptors": []}
+        })
+        resp = client.put(
+            f"/api/dialin/sessions/{session_id}/iterations/1/recommendations",
+            json={"recommendations": ["Grind 2 steps finer", "Reduce temp by 1°C"]}
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()["recommendations"]) == 2
+
+    def test_complete_session(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.post(f"/api/dialin/sessions/{session_id}/complete")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "completed"
+
+    def test_delete_session(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        resp = client.delete(f"/api/dialin/sessions/{session_id}")
+        assert resp.status_code == 200
+        assert resp.json()["deleted"] is True
+        resp = client.get(f"/api/dialin/sessions/{session_id}")
+        assert resp.status_code == 404
+
+    def test_delete_session_not_found(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.delete("/api/dialin/sessions/nonexistent")
+        assert resp.status_code == 404
+
+    def test_dual_registration(self):
+        """Verify both /dialin/... and /api/dialin/... paths work."""
+        self._clear()
+        client = TestClient(app)
+        resp1 = client.post("/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        assert resp1.status_code == 201
+        resp2 = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "light"}
+        })
+        assert resp2.status_code == 201
+
+    def test_create_session_invalid_roast(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "invalid"}
+        })
+        assert resp.status_code == 422
+
+    def test_add_iteration_to_nonexistent_session(self):
+        self._clear()
+        client = TestClient(app)
+        resp = client.post("/api/dialin/sessions/nonexistent/iterations", json={
+            "taste": {"x": 0, "y": 0, "descriptors": []}
+        })
+        assert resp.status_code == 404
+
+    def test_list_sessions_filter_by_status(self):
+        self._clear()
+        client = TestClient(app)
+        create_resp = client.post("/api/dialin/sessions", json={
+            "coffee": {"roast_level": "medium"}
+        })
+        session_id = create_resp.json()["id"]
+        client.post(f"/api/dialin/sessions/{session_id}/complete")
+        resp = client.get("/api/dialin/sessions?status=completed")
+        assert resp.status_code == 200
+        for s in resp.json()["sessions"]:
+            assert s["status"] == "completed"
+
+
+class TestDialInPromptBuilder:
+    """Tests for the dial-in recommendation prompt builder."""
+
+    def test_basic_prompt(self):
+        from prompt_builder import build_dialin_recommendation_prompt
+        prompt = build_dialin_recommendation_prompt(roast_level="medium")
+        assert "medium" in prompt
+        assert "Dial-In" in prompt
+
+    def test_prompt_with_iterations(self):
+        from prompt_builder import build_dialin_recommendation_prompt
+        iterations = [
+            {"iteration_number": 1, "taste": {"x": -0.5, "y": 0.2, "descriptors": ["Sour"]}, "recommendations": []},
+            {"iteration_number": 2, "taste": {"x": -0.1, "y": 0.1, "descriptors": ["Sweet"]}, "recommendations": ["Grind finer"]},
+        ]
+        prompt = build_dialin_recommendation_prompt(
+            roast_level="light",
+            origin="Ethiopia",
+            process="washed",
+            profile_name="Blooming",
+            iterations=iterations,
+        )
+        assert "Ethiopia" in prompt
+        assert "washed" in prompt
+        assert "Blooming" in prompt
+        assert "Iteration 1" in prompt
+        assert "Iteration 2" in prompt
+        assert "Sour" in prompt
+        assert "Grind finer" in prompt
+
+    def test_prompt_empty_iterations(self):
+        from prompt_builder import build_dialin_recommendation_prompt
+        prompt = build_dialin_recommendation_prompt(roast_level="dark", iterations=[])
+        assert "dark" in prompt
+        assert "Iteration" not in prompt

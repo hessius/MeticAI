@@ -66,6 +66,8 @@ _http_client: Optional[httpx.AsyncClient] = None
 _PROFILE_CACHE_TTL = 10  # seconds
 _profile_list_cache: Optional[list] = None
 _profile_list_cache_time: float = 0.0
+_full_profile_cache: Optional[list] = None
+_full_profile_cache_time: float = 0.0
 
 
 def _resolve_meticulous_base_url() -> str:
@@ -268,8 +270,29 @@ async def async_list_profiles():
 def invalidate_profile_list_cache():
     """Clear the profile list cache (call after create / update / delete)."""
     global _profile_list_cache, _profile_list_cache_time
+    global _full_profile_cache, _full_profile_cache_time
     _profile_list_cache = None
     _profile_list_cache_time = 0.0
+    _full_profile_cache = None
+    _full_profile_cache_time = 0.0
+
+
+@_wrap_machine_call
+async def async_fetch_all_profiles():
+    """fetch_all_profiles() offloaded to a thread, with short-lived TTL cache.
+
+    Returns full Profile objects including stages, dynamics, and variables.
+    """
+    global _full_profile_cache, _full_profile_cache_time
+    now = time.monotonic()
+    if _full_profile_cache is not None and (now - _full_profile_cache_time) < _PROFILE_CACHE_TTL:
+        return _full_profile_cache
+    api = get_meticulous_api()
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, api.fetch_all_profiles)
+    _full_profile_cache = result
+    _full_profile_cache_time = now
+    return result
 
 
 @_wrap_machine_call
@@ -470,6 +493,43 @@ async def async_create_profile(profile_json):
         )
     response.raise_for_status()
     invalidate_profile_list_cache()
+    return response.json()
+
+
+@_wrap_machine_call
+async def async_load_profile_from_json(profile_json: Dict[str, Any]):
+    """Load a profile into the machine's memory without persisting to storage.
+
+    POSTs to ``/api/v1/profile/load`` which makes the profile the active
+    selection for the next shot but does **not** save it to the machine's
+    profile catalogue.  This is ideal for temporary variable overrides —
+    the original profile remains untouched on disk.
+
+    Args:
+        profile_json: Full profile dict (will be normalised before sending).
+
+    Returns:
+        The JSON response from the machine.
+    """
+    normalised = _normalize_profile_for_machine(profile_json)
+    base_url = _resolve_meticulous_base_url()
+    client = _get_http_client()
+    response = await client.post(
+        f"{base_url}/api/v1/profile/load",
+        json=normalised,
+        timeout=30.0,
+    )
+    if response.status_code != 200:
+        body = response.text
+        logger.error(
+            "Machine rejected ephemeral profile load: %s",
+            body[:1000],
+            extra={
+                "status": response.status_code,
+                "profile_name": normalised.get("name"),
+            }
+        )
+    response.raise_for_status()
     return response.json()
 
 

@@ -143,7 +143,7 @@ function startsWithEmoji(str: string): boolean {
 
 // Validate variable naming conventions
 interface ValidationWarning {
-  type: 'info-missing-emoji' | 'adjustable-has-emoji' | 'adjustable-unused'
+  type: 'info-missing-emoji' | 'adjustable-unused'
   variableName: string
   messageKey: string
 }
@@ -166,15 +166,12 @@ function validateVariables(
       })
     }
     
-    if (!isInfo && hasEmoji) {
-      warnings.push({
-        type: 'adjustable-has-emoji',
-        variableName: v.name,
-        messageKey: 'profileBreakdown.warningAdjustableHasEmoji',
-      })
-    }
+    // Don't warn about emoji-prefixed adjustable variables — machine profiles
+    // commonly use emoji prefixes (e.g. "ℹ️ Dose") for display-only variables
     
-    if (!isInfo) {
+    // Only warn about unused variables that are NOT emoji-prefixed
+    // Emoji-prefixed variables are often display-only informational variables
+    if (!isInfo && !hasEmoji) {
       const usedIn = variableUsage.get(v.key) || []
       if (usedIn.length === 0) {
         warnings.push({

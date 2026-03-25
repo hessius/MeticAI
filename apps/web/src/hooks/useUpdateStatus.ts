@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getServerUrl } from '@/lib/config'
 
 interface UpdateStatus {
@@ -27,6 +28,7 @@ const CHECK_INTERVAL_MINUTES = 5
 const CHECK_INTERVAL = CHECK_INTERVAL_MINUTES * 60 * 1000
 
 export function useUpdateStatus(): UseUpdateStatusReturn {
+  const { t } = useTranslation()
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,7 +73,7 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to check for updates: ${response.status}`)
+        throw new Error(t('update.checkFailed'))
       }
 
       const data: UpdateStatus = await response.json()
@@ -83,14 +85,14 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
       return { updateAvailable: hasUpdate, error: null }
     } catch (err) {
       console.error('Error checking for updates:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to check for updates'
+      const errorMessage = err instanceof Error ? err.message : t('update.checkFailed')
       setError(errorMessage)
       setUpdateAvailable(false)
       return { updateAvailable: false, error: errorMessage }
     } finally {
       setIsChecking(false)
     }
-  }, [])
+  }, [t])
 
   // Read cached status on mount and periodically
   useEffect(() => {

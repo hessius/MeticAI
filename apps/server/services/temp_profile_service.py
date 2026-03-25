@@ -13,6 +13,7 @@ removed on startup.
 """
 
 import asyncio
+import copy
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
@@ -22,6 +23,7 @@ from services.meticulous_service import (
     async_delete_profile,
     async_list_profiles,
     async_load_profile_by_id,
+    async_load_profile_from_json,
     MachineUnreachableError,
 )
 
@@ -31,8 +33,8 @@ logger = logging.getLogger(__name__)
 # Used by cleanup_stale() to remove orphans on startup.
 TEMP_PROFILE_NAMES = frozenset({"MeticAI Ratio Pour-Over"})
 
-# Prefixes for temporary profile names (e.g. recipe profiles).
-TEMP_PROFILE_PREFIXES = frozenset({"MeticAI Recipe: "})
+# Prefixes for temporary profile names (e.g. recipe profiles, override profiles).
+TEMP_PROFILE_PREFIXES = frozenset({"MeticAI Recipe: ", "MeticAI Override: "})
 
 
 def is_temp_profile(name: str) -> bool:
@@ -69,6 +71,7 @@ class ActiveTempProfile:
     original_params: Dict[str, Any] = field(default_factory=dict)
     previous_profile_id: Optional[str] = None
     previous_profile_name: Optional[str] = None
+    ephemeral: bool = False
 
 
 # Module-level singleton state
@@ -89,6 +92,72 @@ def get_active() -> Optional[Dict[str, Any]]:
         "profile_name": _active.profile_name,
         "original_params": _active.original_params,
     }
+
+
+# Variable types recognised by the Meticulous profile format.
+VARIABLE_TYPES = frozenset({
+    "pressure", "flow", "weight", "power", "time", "piston_position",
+    "temperature",
+})
+
+
+def apply_variable_overrides(
+    profile_data: Dict[str, Any],
+    overrides: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Apply variable value overrides to a deep-copied profile.
+
+    Only adjustable variables (key does NOT start with ``info_``) can be
+    overridden.  Unknown keys or ``info_`` keys are silently skipped so
+    callers don't need to pre-filter.
+
+    When overriding synthesised top-level keys (``final_weight``,
+    ``temperature``) the corresponding top-level profile field is also
+    updated so that the Meticulous machine receives the correct value
+    regardless of whether it reads from ``variables`` or the top-level.
+
+    Returns a new profile dict — the original is not mutated.
+    """
+    profile = copy.deepcopy(profile_data)
+    variables = profile.get("variables")
+
+    # Top-level keys that may be synthesised as variables
+    TOP_LEVEL_KEYS = {"final_weight", "temperature"}
+
+    if not overrides:
+        return profile
+
+    applied: dict[str, Any] = {}
+
+    # Apply overrides to the variables array if present
+    if variables:
+        adjustable_keys: set[str] = set()
+        for var in variables:
+            key = var.get("key", "")
+            if key and not key.startswith("info_"):
+                adjustable_keys.add(key)
+
+        for key, value in overrides.items():
+            if key not in adjustable_keys:
+                if key not in TOP_LEVEL_KEYS:
+                    logger.debug("Skipping override for non-adjustable key: %s", key)
+                continue
+            for var in variables:
+                if var.get("key") == key:
+                    var["value"] = value
+                    applied[key] = value
+                    break
+
+    # Always apply top-level key overrides directly on the profile dict
+    for key in TOP_LEVEL_KEYS:
+        if key in overrides:
+            profile[key] = overrides[key]
+            if key not in applied:
+                applied[key] = overrides[key]
+
+    if applied:
+        logger.info("Applied %d variable override(s): %s", len(applied), list(applied))
+    return profile
 
 
 async def create_and_load(
@@ -183,12 +252,66 @@ async def _create_and_load_locked(
     return {"profile_id": profile_id, "profile_name": name}
 
 
-async def cleanup() -> Dict[str, str]:
-    """Run a purge cycle and then delete the active temp profile.
+async def load_ephemeral(
+    profile_json: Dict[str, Any],
+    params: Optional[Dict[str, Any]] = None,
+    previous_profile_id: Optional[str] = None,
+    previous_profile_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Load a profile into the machine's memory without persisting.
 
-    This is the normal post-shot cleanup path: purge flushes water through
-    the group head, then the temporary profile is removed from the machine
-    and the previously-active profile is restored.
+    Uses ``POST /api/v1/profile/load`` to make the profile the active
+    selection for the next shot.  Nothing is saved to the machine's
+    catalogue, so there is nothing to delete during cleanup — only
+    the previous profile needs to be restored.
+
+    Args:
+        profile_json: Full profile JSON (will be normalised before sending).
+        params: Optional bookkeeping dict (stored in active state).
+        previous_profile_id: ID of the profile to restore after cleanup.
+        previous_profile_name: Name of the profile to restore after cleanup.
+
+    Returns:
+        Dict with ``profile_id`` and ``profile_name``.
+    """
+    async with _get_lock():
+        # Force-cleanup any lingering temp profile
+        if _active is not None:
+            logger.warning(
+                "Replacing already-active temp profile %s", _active.profile_name
+            )
+            if previous_profile_id is None:
+                previous_profile_id = _active.previous_profile_id
+                previous_profile_name = _active.previous_profile_name
+            await _force_cleanup_inner(restore=False)
+
+        name = profile_json.get("name", "Ephemeral Profile")
+        profile_id = profile_json.get("id", "ephemeral")
+
+        # Ephemeral load — the profile is NOT saved to the catalogue
+        await async_load_profile_from_json(profile_json)
+
+        _set_active(ActiveTempProfile(
+            profile_id=profile_id,
+            profile_name=name,
+            original_params=params or {},
+            previous_profile_id=previous_profile_id,
+            previous_profile_name=previous_profile_name,
+            ephemeral=True,
+        ))
+
+        logger.info("Ephemeral profile loaded: %s (%s)", name, profile_id)
+        return {"profile_id": profile_id, "profile_name": name}
+
+
+async def cleanup() -> Dict[str, str]:
+    """Run a purge cycle and clean up the active temp profile.
+
+    For ephemeral profiles (loaded via ``load_ephemeral``), no delete is
+    needed — the profile was never saved to the catalogue.  For persisted
+    temp profiles (created via ``create_and_load``), the profile is deleted.
+
+    In both cases the previously-active profile is restored.
 
     Returns:
         Dict with ``status`` key.
@@ -200,26 +323,28 @@ async def cleanup() -> Dict[str, str]:
         profile_id = _active.profile_id
         profile_name = _active.profile_name
         previous_profile_name = _active.previous_profile_name
+        is_ephemeral = _active.ephemeral
         _set_active(None)
 
-        # Purge first (flush water), then delete the profile
+        # Purge first (flush water)
         try:
-            # Deferred import to avoid circular dependency:
-            # commands → temp_profile_service → commands
-            from api.routes.commands import _do_publish, _get_snapshot, _require_idle
+            from api.routes.commands import _do_publish, _get_snapshot
             snapshot = _get_snapshot()
-            # Only purge if machine is idle (shot already stopped)
             if not snapshot.get("brewing"):
                 _do_publish("purge")
         except Exception as exc:
             logger.warning("Purge before cleanup failed (non-fatal): %s", exc)
 
-        try:
-            await async_delete_profile(profile_id)
-            logger.info("Temp profile deleted: %s (%s)", profile_name, profile_id)
-        except Exception as exc:
-            logger.error("Failed to delete temp profile %s: %s", profile_id, exc)
-            return {"status": "delete_failed", "error": str(exc)}
+        # Only delete from catalogue if the profile was persisted
+        if not is_ephemeral:
+            try:
+                await async_delete_profile(profile_id)
+                logger.info("Temp profile deleted: %s (%s)", profile_name, profile_id)
+            except Exception as exc:
+                logger.error("Failed to delete temp profile %s: %s", profile_id, exc)
+                return {"status": "delete_failed", "error": str(exc)}
+        else:
+            logger.info("Ephemeral profile cleaned up (no delete needed): %s", profile_name)
 
         # Restore the previously-active profile, or deselect if none tracked
         try:
@@ -256,14 +381,19 @@ async def _force_cleanup_inner(restore: bool = True) -> Dict[str, str]:
     profile_id = _active.profile_id
     profile_name = _active.profile_name
     previous_profile_name = _active.previous_profile_name if restore else None
+    is_ephemeral = _active.ephemeral
     _set_active(None)
 
-    try:
-        await async_delete_profile(profile_id)
-        logger.info("Temp profile force-deleted: %s (%s)", profile_name, profile_id)
-    except Exception as exc:
-        logger.error("Failed to force-delete temp profile %s: %s", profile_id, exc)
-        return {"status": "delete_failed", "error": str(exc)}
+    # Only delete from catalogue if the profile was persisted
+    if not is_ephemeral:
+        try:
+            await async_delete_profile(profile_id)
+            logger.info("Temp profile force-deleted: %s (%s)", profile_name, profile_id)
+        except Exception as exc:
+            logger.error("Failed to force-delete temp profile %s: %s", profile_id, exc)
+            return {"status": "delete_failed", "error": str(exc)}
+    else:
+        logger.info("Ephemeral profile force-cleaned (no delete needed): %s", profile_name)
 
     # Restore the previously-active profile, or deselect if none tracked
     if restore:

@@ -21,5 +21,14 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,  // Disabled for production — don't expose source code
+    cssMinify: 'esbuild',  // Workaround: lightningcss can't parse TW 4.2 output (tailwindlabs/tailwindcss#19789)
+    rolldownOptions: {
+      output: {
+        manualChunks: (id: string) => {
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'recharts'
+          if (id.includes('node_modules/framer-motion')) return 'framer-motion'
+        },
+      },
+    },
   },
 });

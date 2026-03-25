@@ -20,7 +20,8 @@ from services.cache_service import (
     _get_cached_shots, _set_cached_shots
 )
 from services.analysis_service import _perform_local_shot_analysis
-from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
+from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE, compute_taste_hash
+from prompt_builder import build_taste_context
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -658,7 +659,10 @@ async def analyze_shot_with_llm(
     shot_date: str = Form(...),
     shot_filename: str = Form(...),
     profile_description: Optional[str] = Form(None),
-    force_refresh: bool = Form(False)
+    force_refresh: bool = Form(False),
+    taste_x: Optional[float] = Form(None),
+    taste_y: Optional[float] = Form(None),
+    taste_descriptors: Optional[str] = Form(None),
 ):
     """Analyze a shot using LLM with expert profiling knowledge.
     
@@ -677,6 +681,29 @@ async def analyze_shot_with_llm(
     4. Any issues found in the profile design itself?
     """
     request_id = request.state.request_id
+
+    # Validate taste coordinate bounds
+    if taste_x is not None and not (-1.0 <= taste_x <= 1.0):
+        raise HTTPException(status_code=422, detail="taste_x must be between -1 and 1")
+    if taste_y is not None and not (-1.0 <= taste_y <= 1.0):
+        raise HTTPException(status_code=422, detail="taste_y must be between -1 and 1")
+
+    # Parse and validate taste descriptors from comma-separated string
+    _VALID_DESCRIPTORS = {
+        "sweet", "clean", "complex", "juicy", "smooth", "balanced", "floral", "fruity",
+        "astringent", "muddy", "flat", "chalky", "harsh", "watery", "burnt", "grassy",
+    }
+    parsed_descriptors: list[str] | None = None
+    if taste_descriptors:
+        parsed_descriptors = [
+            d.strip().lower()
+            for d in taste_descriptors.split(",")
+            if d.strip() and d.strip().lower() in _VALID_DESCRIPTORS
+        ] or None
+
+    # Compute taste hash for cache differentiation
+    taste_hash = compute_taste_hash(taste_x, taste_y, parsed_descriptors)
+    cache_filename = f"{shot_filename}_taste_{taste_hash}" if taste_hash else shot_filename
     
     try:
         logger.info(
@@ -686,13 +713,14 @@ async def analyze_shot_with_llm(
                 "profile_name": profile_name,
                 "shot_date": shot_date,
                 "shot_filename": shot_filename,
-                "force_refresh": force_refresh
+                "force_refresh": force_refresh,
+                "has_taste_data": taste_hash is not None,
             }
         )
         
         # Check cache first (unless force refresh)
         if not force_refresh:
-            cached_analysis = get_cached_llm_analysis(profile_name, shot_date, shot_filename)
+            cached_analysis = get_cached_llm_analysis(profile_name, shot_date, cache_filename)
             if cached_analysis:
                 logger.info(
                     "Returning cached LLM analysis",
@@ -767,6 +795,29 @@ async def analyze_shot_with_llm(
         clean_profile = _prepare_profile_for_llm(profile_data, profile_description)
         
         # Build the LLM prompt with FULL local analysis
+        taste_context = build_taste_context(taste_x, taste_y, parsed_descriptors)
+        has_taste = bool(taste_context)
+
+        # Adjust section count and formatting rules based on taste data
+        section_count = "6" if has_taste else "5"
+        taste_section_template = ""
+        if has_taste:
+            taste_section_template = """
+
+## 6. Taste-Based Recommendations
+
+**Taste-Extraction Correlation:**
+- [How the reported taste aligns with extraction data]
+- [Whether the data supports or contradicts the taste perception]
+
+**Recommended Adjustments:**
+- [Specific changes to address the taste issues — grind, dose, temp, time]
+- [Expected taste impact of each change]
+
+**Coffee Science:**
+- [Brief explanation of why these adjustments should work]
+"""
+
         prompt = f"""You are an expert espresso barista and profiling specialist analyzing a shot from a Meticulous Espresso Machine.
 
 ## Expert Knowledge
@@ -795,13 +846,14 @@ correctly due to reaching the final weight target - this is NORMAL and EXPECTED 
 A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
 
 {json.dumps(local_analysis, indent=2)}
+{taste_context}
 
 ---
 
 Based on this data, provide a detailed expert analysis.
 
 CRITICAL FORMATTING RULES:
-1. You MUST use EXACTLY these 5 section headers with the exact format shown (## followed by number, period, space, then title)
+1. You MUST use EXACTLY these {section_count} section headers with the exact format shown (## followed by number, period, space, then title)
 2. Each section MUST have the subsection headers shown (bold text with colon, like **What Happened:**)
 3. ALL content under subsections MUST be bullet points starting with "- "
 4. Keep bullet points concise (1-2 sentences max per bullet)
@@ -854,6 +906,40 @@ CRITICAL FORMATTING RULES:
 - [Robustness improvements]
 
 Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
+{taste_section_template}
+## Structured Recommendations (MANDATORY)
+
+After your analysis sections, you MUST output a structured JSON block with specific, actionable profile variable recommendations.
+Use EXACTLY this format — the markers are parsed programmatically:
+
+RECOMMENDATIONS_JSON:
+[
+  {{
+    "variable": "<variable key from the profile, e.g. 'pressure', 'temperature'>",
+    "current_value": <current numeric value>,
+    "recommended_value": <suggested numeric value>,
+    "stage": "<stage name this applies to, or 'global' for top-level settings>",
+    "confidence": "<high|medium|low>",
+    "reason": "<one-sentence explanation>"
+  }}
+]
+END_RECOMMENDATIONS_JSON
+
+Rules for recommendations:
+- Only include recommendations where you have a SPECIFIC numeric change to suggest
+- Use actual variable keys from the Profile Variables section above
+- For top-level settings (temperature, final_weight), use stage="global"
+- For stage-specific changes, use the stage name from Profile Stages
+- For exit trigger changes, use these variable keys with the stage name:
+  - "exit_weight" — change the weight exit trigger value
+  - "exit_time" — change the time exit trigger value
+  - "exit_pressure" — change the pressure exit trigger value
+  - "exit_flow" — change the flow exit trigger value
+- For stage limit changes, use these variable keys with the stage name:
+  - "limit_pressure" — change the pressure limit value
+  - "limit_flow" — change the flow limit value
+- confidence: "high" = strong evidence from data, "medium" = likely beneficial, "low" = worth trying
+- If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
 """
         
         # Call LLM
@@ -873,7 +959,7 @@ Focus on actionable insights. Be specific with numbers where possible (e.g., "gr
         llm_analysis = response.text if response else "Analysis generation failed"
         
         # Save to cache
-        save_llm_analysis_to_cache(profile_name, shot_date, shot_filename, llm_analysis)
+        save_llm_analysis_to_cache(profile_name, shot_date, cache_filename, llm_analysis)
         
         logger.info(
             "LLM shot analysis completed and cached",
@@ -1229,3 +1315,174 @@ async def get_all_shot_annotations(request: Request):
         "status": "success",
         "annotations": summaries,
     }
+
+
+# ============================================================================
+# Recommendation Extraction
+# ============================================================================
+
+def _parse_recommendations_json(analysis_text: str) -> list[dict]:
+    """Extract and parse the RECOMMENDATIONS_JSON block from analysis text."""
+    match = re.search(
+        r"RECOMMENDATIONS_JSON:\s*\n\s*(\[.*?\])\s*\n\s*END_RECOMMENDATIONS_JSON",
+        analysis_text,
+        re.DOTALL,
+    )
+    if not match:
+        return []
+    try:
+        recs = json.loads(match.group(1))
+        if not isinstance(recs, list):
+            return []
+        return recs
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict]) -> bool:
+    """Determine if a recommendation targets a patchable (adjustable) variable.
+
+    A variable is patchable when:
+    - Its key does NOT start with 'info_'
+    - It is not marked adjustable=false
+    - OR the recommendation targets a global setting (temperature, final_weight)
+    - OR it targets a stage exit trigger (exit_weight, exit_time, etc.)
+    - OR it targets a stage limit (limit_pressure, limit_flow, etc.)
+    - OR the variable is not found in the profile (LLM may use descriptive names)
+    """
+    variable = rec.get("variable", "")
+    stage = rec.get("stage", "")
+
+    # Global top-level settings are always patchable
+    if stage == "global" and variable in ("temperature", "final_weight"):
+        return True
+
+    # Stage exit triggers and limits are patchable
+    stage_variables = {
+        "exit_weight", "exit_time", "exit_pressure", "exit_flow", "exit_volume",
+        "limit_pressure", "limit_flow", "limit_weight",
+    }
+    if variable in stage_variables and stage and stage != "global":
+        return True
+
+    # Check against profile variables
+    for var in profile_variables:
+        var_key = var.get("key", "")
+        if var_key == variable:
+            if var_key.startswith("info_"):
+                return False
+            if var.get("adjustable") is False:
+                return False
+            return True
+
+    # Variable not found by exact key — try fuzzy match (LLM may use descriptive names)
+    variable_lower = variable.lower().replace("_", " ").replace("-", " ")
+    for var in profile_variables:
+        var_key = var.get("key", "").lower().replace("_", " ").replace("-", " ")
+        var_name = var.get("name", "").lower()
+        if variable_lower in var_key or var_key in variable_lower or variable_lower in var_name:
+            if var.get("key", "").startswith("info_"):
+                return False
+            if var.get("adjustable") is False:
+                return False
+            return True
+
+    # Variable not found in profile at all — consider patchable
+    # The LLM may use descriptive names for stage-level settings
+    return True
+
+
+@router.post("/shots/analyze-recommendations")
+@router.post("/api/shots/analyze-recommendations")
+async def analyze_recommendations(
+    request: Request,
+    profile_name: str = Form(...),
+    shot_filename: str = Form(...),
+    force_refresh: bool = Form(default=False),
+):
+    """Extract structured recommendations from an existing analysis.
+
+    Returns the RECOMMENDATIONS_JSON block parsed as a list of dicts,
+    each annotated with ``is_patchable``.
+    """
+    request_id = request.state.request_id
+
+    try:
+        logger.info(
+            "Extracting recommendations from analysis",
+            extra={"request_id": request_id, "profile_name": profile_name},
+        )
+
+        # Try to find existing cached analysis for any date
+        # We search the cache by profile + filename
+        from services.cache_service import get_cached_llm_analysis
+
+        # Derive shot_date from filename (format: YYYY-MM-DDTHH:MM:SS.json typically)
+        shot_date_match = re.match(r"(\d{4}-\d{2}-\d{2})", shot_filename)
+        shot_date = shot_date_match.group(1) if shot_date_match else ""
+
+        cached_analysis = get_cached_llm_analysis(profile_name, shot_date, shot_filename)
+
+        if not cached_analysis:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "status": "no_analysis",
+                    "message": "No cached analysis found. Run a full analysis first.",
+                },
+            )
+
+        if force_refresh:
+            # Re-parse the cached text to get fresh structured data
+            logger.info(
+                "Force refresh requested, re-parsing cached analysis",
+                extra={"request_id": request_id},
+            )
+
+        # Parse recommendations from analysis text
+        recs = _parse_recommendations_json(cached_analysis)
+
+        # Fetch profile to classify patchability
+        profile_variables: list[dict] = []
+        try:
+            profiles_result = await async_list_profiles()
+            for p in profiles_result:
+                if p.name.lower() == profile_name.lower():
+                    full_profile = await async_get_profile(p.id)
+                    if hasattr(full_profile, "variables") and full_profile.variables:
+                        for var in full_profile.variables:
+                            profile_variables.append({
+                                "key": getattr(var, "key", ""),
+                                "name": getattr(var, "name", ""),
+                                "type": getattr(var, "type", ""),
+                                "value": getattr(var, "value", 0),
+                                "adjustable": getattr(var, "adjustable", None),
+                            })
+                    break
+        except Exception:
+            logger.warning("Could not fetch profile for patchability check", exc_info=True)
+
+        # Annotate each recommendation
+        for rec in recs:
+            rec["is_patchable"] = _classify_recommendation_patchable(rec, profile_variables)
+
+        return {
+            "status": "success",
+            "profile_name": profile_name,
+            "recommendations": recs,
+            "total": len(recs),
+            "patchable_count": sum(1 for r in recs if r.get("is_patchable")),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to extract recommendations: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
