@@ -326,7 +326,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
 
           toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
 
-        // Stay on this view — only navigate to live on actual shot start
+          // Stay on this view — only navigate to live on actual shot start
+        }
       } else if (selectedProfile) {
         const hasOverrides = Object.keys(overrides).length > 0
         
