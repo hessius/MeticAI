@@ -43,3 +43,28 @@ Same as Photo workflow but use endpoint: `http://<SERVER_IP>:3550/api/analyze_co
 - **Connection fails** — Ensure your phone is on the same network. Test `http://<SERVER_IP>:3550/docs` in Safari.
 - **Invalid response** — Check field names are exactly `file` and/or `user_prefs` (case-sensitive).
 - **Photo won't upload** — Ensure the form field key is `file` and value comes from the Take Photo action.
+
+## Import Profile from Share Sheet
+
+Share a profile URL (`.json` or `.met`) from any app to import it directly into MeticAI.
+
+### Setup
+
+| # | Action | Configuration |
+|---|--------|---------------|
+| 1 | **Receive** | URLs from Share Sheet |
+| 2 | **URL** | `http://<SERVER_IP>:3550/?import=` appended with Shortcut Input |
+| 3 | **Open URLs** | Open the URL from step 2 |
+
+### How It Works
+
+MeticAI supports a `?import=<url>` query parameter. When the app loads with this parameter, it automatically opens the import dialog and begins importing the profile from the given URL.
+
+### Alternative: Direct API Import
+
+| # | Action | Configuration |
+|---|--------|---------------|
+| 1 | **Receive** | URLs from Share Sheet |
+| 2 | **Get Contents of URL** | URL: `http://<SERVER_IP>:3550/api/import-from-url`, Method: POST, Body: JSON, `url` = Shortcut Input |
+| 3 | **Get Dictionary Value** | Key: `profile_name` |
+| 4 | **Show Notification** | Text: "Imported: " + Dictionary Value |

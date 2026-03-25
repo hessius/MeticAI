@@ -657,7 +657,17 @@
     "bulkImportFailed": "Bulk import failed",
     "bulkImportStartFailed": "Failed to start bulk import",
     "noResponseStream": "No response stream available",
-    "fetchDetailsFailed": "Failed to fetch profile details"
+    "fetchDetailsFailed": "Failed to fetch profile details",
+    "fromUrl": "From URL",
+    "jsonOrMet": ".json / .met",
+    "importFromUrl": "Import from URL",
+    "urlPlaceholder": "Paste profile URL...",
+    "urlHint": "Supports .json and .met profile URLs",
+    "back": "Back",
+    "importButton": "Import",
+    "fetchingUrl": "Fetching profile from URL...",
+    "importUrlFailed": "Failed to import from URL",
+    "invalidUrl": "Please enter a valid URL"
   },
   "imageCrop": {
     "title": "Crop Profile Image",

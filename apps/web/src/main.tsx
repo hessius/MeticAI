@@ -388,6 +388,24 @@ if (isDirectMode()) {
       }))
     }
 
+
+    // POST /api/import-from-url -> fetch URL, parse profile JSON, save to machine
+    if (url.match(/\/api\/import-from-url/) && method === 'POST') {
+      return (async () => {
+        try {
+          const body = await new Response(init?.body || '{}').json() as { url?: string }
+          const profileUrl = body.url?.trim()
+          let profileResp: Response
+          try { profileResp = await _fetch(profileUrl) } catch { return jsonResponse({ status: 'error', detail: 'Failed to fetch URL' }, 502) }
+          let profileJson: Record<string, unknown>
+          try { profileJson = await profileResp.json() } catch { return jsonResponse({ status: 'error', detail: 'URL did not return valid JSON' }, 400) }
+          const saveResp = await _fetch('/api/v1/profile/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileJson) })
+          if (!saveResp.ok) return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
+          return jsonResponse({ status: 'success', entry_id: 'direct-' + Date.now(), profile_name: profileJson.name as string, has_description: false, uploaded_to_machine: true })
+        } catch { return jsonResponse({ status: 'error', detail: 'Import from URL failed' }, 500) }
+      })()
+    }
+
     // DELETE /api/machine/profile/:id → DELETE /api/v1/profile/delete/:id
     const deleteMatch = url.match(/\/api\/machine\/profile\/([^/?]+)$/)
     if (deleteMatch && method === 'DELETE') {

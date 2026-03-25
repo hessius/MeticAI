@@ -90,6 +90,7 @@ function App() {
   const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
   const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
   const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
+  const [pendingImportUrl, setPendingImportUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -280,6 +281,18 @@ function App() {
       }
     }
     checkProfiles()
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const importParam = params.get('import')
+    if (importParam) {
+      setPendingImportUrl(importParam)
+      setViewState('history')
+      const url = new URL(window.location.href)
+      url.searchParams.delete('import')
+      window.history.replaceState({}, '', url.toString())
+    }
   }, [])
 
   // Update profile count when returning from history view
@@ -984,6 +997,8 @@ function App() {
                     onManageMachine={() => setViewState('profile-catalogue')}
                     aiConfigured={aiAvailable}
                     hideAiWhenUnavailable={hideAiWhenUnavailable}
+                    importUrl={pendingImportUrl}
+                    onImportUrlConsumed={() => setPendingImportUrl(null)}
                   />
                 </FeatureErrorBoundary>
               )}
