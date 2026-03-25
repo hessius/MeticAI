@@ -56,6 +56,7 @@ interface StartViewProps {
   onSettings: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
+  controlCenter?: React.ReactNode
   lastShotBanner?: React.ReactNode
 }
 
@@ -71,6 +72,7 @@ export function StartView({
   onSettings,
   aiConfigured = true,
   hideAiWhenUnavailable = false,
+  controlCenter,
   lastShotBanner,
 }: StartViewProps) {
   const { t } = useTranslation()
@@ -110,7 +112,7 @@ export function StartView({
       exit="hidden"
       transition={gentleSpring}
     >
-      <Card className="p-6 space-y-6">
+      <Card className="p-6 space-y-4 lg:space-y-6">
         <div className="text-center space-y-2">
           <h2 className="text-xl font-bold tracking-tight text-foreground">{greeting}</h2>
           <p className="text-sm text-muted-foreground">
@@ -120,21 +122,24 @@ export function StartView({
           </p>
         </div>
 
+        {/* Control Center — machine status (mobile only, passed from App) */}
+        {controlCenter}
+
         {/* Last-shot analysis prompt */}
         <AnimatePresence>
           {lastShotBanner}
         </AnimatePresence>
 
-        <div className="space-y-3">
-          {/* Dark Brew — deep brown, gold text */}
+        <div className="space-y-2 lg:space-y-3">
+          {/* Generate New — primary action, always full width */}
           {(!hideAiWhenUnavailable || aiConfigured) && (
             <Button
               onClick={onGenerateNew}
               disabled={!aiConfigured}
               variant="dark-brew"
-              className="w-full h-14 text-base"
+              className="w-full h-12 lg:h-14 text-sm lg:text-base"
             >
-              <Plus size={20} className="mr-2" weight="bold" />
+              <Plus size={20} className="mr-1.5 lg:mr-2" weight="bold" />
               {t('navigation.generateNewProfile')}
             </Button>
           )}
@@ -144,63 +149,64 @@ export function StartView({
               {t('navigation.aiUnavailable')}
             </p>
           )}
-          
-          {/* Style 2: Dark Brew — deep brown, gold text */}
-          <Button
-            onClick={onProfileCatalogue ?? onViewHistory}
-            variant="dark-brew"
-            className="w-full h-14 text-base"
-          >
-            <Coffee size={20} className="mr-2" weight="fill" />
-            {t('navigation.profileCatalogue')}
-          </Button>
-          
-          {/* Dark Brew — deep brown, gold text */}
-          <Button
-            onClick={onRunShot}
-            variant="dark-brew"
-            className="w-full h-14 text-base"
-          >
-            <Play size={20} className="mr-2" weight="fill" />
-            {t('navigation.runSchedule')}
-          </Button>
 
-          <Button
-            onClick={onDialIn}
-            variant="dark-brew"
-            className="w-full h-14 text-base"
-          >
-            <Crosshair size={20} className="mr-2" weight="bold" />
-            {t('dialIn.title')}
-          </Button>
+          {/* Core actions — 2-col grid on mobile, stacked on desktop */}
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-3">
+            <Button
+              onClick={onProfileCatalogue ?? onViewHistory}
+              variant="dark-brew"
+              className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+            >
+              <Coffee size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
+              {t('navigation.profileCatalogue')}
+            </Button>
 
-          <Button
-            onClick={onPourOver}
-            variant="dark-brew"
-            className="w-full h-14 text-base"
-          >
-            <Drop size={20} className="mr-2" weight="fill" />
-            {t('pourOver.title')}
-          </Button>
+            <Button
+              onClick={onRunShot}
+              variant="dark-brew"
+              className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+            >
+              <Play size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
+              {t('navigation.runSchedule')}
+            </Button>
 
-          <Button
-            onClick={onShotAnalysis}
-            variant="dark-brew"
-            className="w-full h-14 text-base"
-          >
-            <ChartLine size={20} className="mr-2" weight="bold" />
-            {t('navigation.shotAnalysis')}
-          </Button>
-          
-          {/* Style 4: Ember — warm orange inner glow + border */}
-          <Button
-            onClick={onSettings}
-            variant="ember"
-            className="w-full h-14 text-base"
-          >
-            <Gear size={20} className="mr-2" weight="duotone" />
-            {t('navigation.settings')}
-          </Button>
+            <Button
+              onClick={onDialIn}
+              variant="dark-brew"
+              className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+            >
+              <Crosshair size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
+              {t('dialIn.title')}
+            </Button>
+
+            <Button
+              onClick={onPourOver}
+              variant="dark-brew"
+              className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+            >
+              <Drop size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
+              {t('pourOver.title')}
+            </Button>
+
+            <Button
+              onClick={onShotAnalysis}
+              variant="dark-brew"
+              className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+            >
+              <ChartLine size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
+              {t('navigation.shotAnalysis')}
+            </Button>
+
+            {/* Settings — ember accent, completes the 2×3 grid */}
+            <Button
+              onClick={onSettings}
+              variant="ember"
+              className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+            >
+              <Gear size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="duotone" />
+              {t('navigation.settings')}
+            </Button>
+          </div>
         </div>
       </Card>
     </motion.div>

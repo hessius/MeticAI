@@ -838,7 +838,7 @@ function App() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className={isHome ? "text-center mb-10" : "text-center mb-6"}
+          className={isHome ? "text-center mb-6 lg:mb-10" : "text-center mb-6"}
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative">
             <div 
@@ -849,8 +849,8 @@ function App() {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
               aria-label={t('a11y.goHome')}
             >
-              <MeticAILogo size={isHome ? 48 : 28} variant={isDark ? 'white' : 'default'} />
-              <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-5xl' : 'text-2xl'}`}>
+              <MeticAILogo size={isHome ? (isMobile ? 36 : 48) : 28} variant={isDark ? 'white' : 'default'} />
+              <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-4xl lg:text-5xl' : 'text-2xl'}`}>
                 Metic<span className="gold-text">AI</span>
               </h1>
             </div>
@@ -928,6 +928,14 @@ function App() {
                   onSettings={() => setViewState('settings')}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
+                  controlCenter={
+                    showControlCenter && isMobile ? (
+                      <ControlCenter
+                        machineState={machineState}
+                        onOpenLiveView={() => setViewState('live-shot')}
+                      />
+                    ) : undefined
+                  }
                   lastShotBanner={
                     mqttEnabled ? (
                       <LastShotBanner
@@ -1147,15 +1155,7 @@ function App() {
             </AnimatePresence>
             </Suspense>
 
-            {/* Mobile Control Center — below the main card, StartView only */}
-            {showControlCenter && isMobile && viewState === 'start' && (
-              <div className="mt-4">
-                <ControlCenter
-                  machineState={machineState}
-                  onOpenLiveView={() => setViewState('live-shot')}
-                />
-              </div>
-            )}
+            {/* Mobile Control Center — now rendered inside StartView */}
           </main>
 
           {/* ── Right column — desktop Control Center ─── */}
