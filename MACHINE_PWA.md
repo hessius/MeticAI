@@ -21,7 +21,7 @@ A lightweight version of MeticAI that runs as static files on the Meticulous mac
 ## Requirements
 
 - A Meticulous espresso machine (any model)
-- SSH access to the machine (default: `root` / `***REDACTED***`)
+- SSH access to the machine (see your machine's official documentation for credentials; prefer SSH key-based access)
 - A device on the same network (phone, tablet, laptop)
 
 ## Quick Install
@@ -63,7 +63,7 @@ avahi-browse -art | grep meticulous
 
 ```bash
 ssh root@<machine-ip>
-# Password: ***REDACTED***
+# See your machine's documentation for the default password, or use SSH key auth
 ```
 
 ### 3. Download and run the installer
