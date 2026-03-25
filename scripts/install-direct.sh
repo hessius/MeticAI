@@ -1,18 +1,22 @@
 #!/bin/bash
-# install-meticai.sh — Install MeticAI PWA on a Meticulous machine
+# install-direct.sh — Install MeticAI Direct Mode PWA on a Meticulous machine
+#
+# TODO(release): Before merging to main, update the GitHub download URLs
+#   to point to the release tarball instead of CI artifacts, and remove
+#   the branch pin from raw.githubusercontent URLs.
 #
 # Usage (auto-download from GitHub):
 #   python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
-#     https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/machine/install-meticai.sh | bash
+#     https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install-direct.sh | bash
 #
 # Usage (manual — build locally and SCP):
 #   # On your dev machine:
 #   cd apps/web && bun run build:machine
 #   tar -czf meticai-web.tar.gz -C dist .
 #   scp meticai-web.tar.gz root@<machine-ip>:/tmp/
-#   scp scripts/machine/install-meticai.sh root@<machine-ip>:/tmp/
+#   scp scripts/install-direct.sh root@<machine-ip>:/tmp/
 #   # On the machine:
-#   bash /tmp/install-meticai.sh --local /tmp/meticai-web.tar.gz
+#   bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz
 set -euo pipefail
 
 LOCAL_TARBALL=""

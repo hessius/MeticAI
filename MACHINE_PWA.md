@@ -30,7 +30,7 @@ SSH into your machine and run a single command:
 
 ```bash
 python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
-  https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/machine/install-meticai.sh | bash
+  https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh | bash
 ```
 
 This will:
@@ -70,13 +70,13 @@ ssh root@<machine-ip>
 
 ```bash
 # Download the installer
-python3 -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/machine/install-meticai.sh', '/tmp/install-meticai.sh')"
+python3 -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')"
 
 # Download the pre-built PWA
 python3 -c "import urllib.request; urllib.request.urlretrieve('https://github.com/hessius/MeticAI/releases/download/latest/meticai-web.tar.gz', '/tmp/meticai-web.tar.gz')"
 
 # Run the installer with the local tarball
-bash /tmp/install-meticai.sh --local /tmp/meticai-web.tar.gz
+bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz
 ```
 
 > **Note:** During beta, releases may not be available yet. Download the latest CI build artifact instead — see [Using CI Artifacts](#using-ci-artifacts) below.
@@ -102,13 +102,13 @@ During the beta, the easiest way to get pre-built files without building yoursel
 ```bash
 # From your computer
 scp meticai-web.tar.gz root@<machine-ip>:/tmp/
-ssh root@<machine-ip> 'bash /tmp/install-meticai.sh --local /tmp/meticai-web.tar.gz'
+ssh root@<machine-ip> 'bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz'
 ```
 
 Or as a one-liner (after copying the tarball):
 
 ```bash
-scp meticai-web.tar.gz root@<machine-ip>:/tmp/ && ssh root@<machine-ip> "python3 -c \"import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/machine/install-meticai.sh', '/tmp/install-meticai.sh')\" && bash /tmp/install-meticai.sh --local /tmp/meticai-web.tar.gz"
+scp meticai-web.tar.gz root@<machine-ip>:/tmp/ && ssh root@<machine-ip> "python3 -c \"import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')\" && bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz"
 ```
 
 ## AI Features (Optional)
@@ -126,7 +126,7 @@ Re-run the install command. The installer handles replacing the previous version
 ```bash
 ssh root@<machine-ip>
 python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
-  https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/machine/install-meticai.sh | bash
+  https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh | bash
 ```
 
 ## Uninstalling

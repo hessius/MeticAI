@@ -104,7 +104,7 @@ jobs:
             
             **Machine-Hosted PWA:**
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/machine/install-meticai.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install-direct.sh | bash
             ```
             
             **Upgrading from v1.x:**
