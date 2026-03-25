@@ -303,10 +303,10 @@ function useProxyTelemetry(enabled: boolean): MachineState {
 // ---------------------------------------------------------------------------
 
 export function useMachineTelemetry(enabled: boolean): MachineState {
-  if (isDirectMode()) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useDirectTelemetry(enabled)
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useProxyTelemetry(enabled)
+  const direct = isDirectMode()
+  // Both hooks always run (satisfying rules-of-hooks) but the inactive
+  // one receives enabled=false and immediately returns INITIAL_STATE.
+  const directState = useDirectTelemetry(enabled && direct)
+  const proxyState = useProxyTelemetry(enabled && !direct)
+  return direct ? directState : proxyState
 }

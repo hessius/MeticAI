@@ -43,22 +43,36 @@ function getStoredApiKey(): string | null {
 
 function getClient(): GoogleGenAI {
   const key = getStoredApiKey()
-  if (!key) throw new Error('Gemini API key not configured. Please set your API key in Settings.')
+  if (!key) throw new AIServiceError('API_KEY_MISSING')
   return new GoogleGenAI({ apiKey: key })
 }
 
-/** Map common Gemini SDK errors to user-friendly messages */
+/**
+ * Typed AI service error codes — UI layer translates these via i18n.
+ * This keeps the service layer free of user-facing strings.
+ */
+export type AIErrorCode = 'API_KEY_MISSING' | 'QUOTA_EXCEEDED' | 'API_KEY_INVALID' | 'MODEL_NOT_FOUND' | 'NETWORK_ERROR' | 'UNKNOWN'
+
+export class AIServiceError extends Error {
+  constructor(public readonly code: AIErrorCode, cause?: unknown) {
+    super(code)
+    this.name = 'AIServiceError'
+    if (cause instanceof Error) this.cause = cause
+  }
+}
+
+/** Map common Gemini SDK errors to typed error codes */
 function wrapApiError(err: unknown): never {
   const msg = err instanceof Error ? err.message : String(err)
   if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota'))
-    throw new Error('API quota exceeded. Please check your Gemini billing settings or try again later.')
+    throw new AIServiceError('QUOTA_EXCEEDED', err)
   if (msg.includes('401') || msg.includes('403') || msg.includes('API_KEY_INVALID'))
-    throw new Error('Invalid Gemini API key. Please check your key in Settings.')
+    throw new AIServiceError('API_KEY_INVALID', err)
   if (msg.includes('404') || msg.includes('NOT_FOUND'))
-    throw new Error('AI model not available. Please update MeticAI to the latest version.')
+    throw new AIServiceError('MODEL_NOT_FOUND', err)
   if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch'))
-    throw new Error('Network error. Please check your internet connection.')
-  throw err
+    throw new AIServiceError('NETWORK_ERROR', err)
+  throw new AIServiceError('UNKNOWN', err)
 }
 
 export function createBrowserAIService(): AIService {

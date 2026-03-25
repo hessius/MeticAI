@@ -2,9 +2,9 @@ name: Test Suite
 
 on:
   push:
-    branches: [main, develop, version/2.0.0, "feat/machine-hosted-pwa"]
+    branches: [main, develop, "version/*", "feat/machine-hosted-pwa"]
   pull_request:
-    branches: [main, develop, version/2.0.0]
+    branches: [main, develop, "version/*"]
 
 jobs:
   # ============================================================================
