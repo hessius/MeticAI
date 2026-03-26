@@ -1190,6 +1190,13 @@ async def get_settings(request: Request):
             settings["mqttEnabled"] = mqtt_env.lower() == "true"
         elif "mqttEnabled" not in settings:
             settings["mqttEnabled"] = True
+
+        # Gemini model (env var takes precedence over stored setting)
+        gemini_model_env = os.environ.get("GEMINI_MODEL", "").strip()
+        if gemini_model_env:
+            settings["geminiModel"] = gemini_model_env
+        elif "geminiModel" not in settings:
+            settings["geminiModel"] = "gemini-2.5-flash"
         
         return settings
         
@@ -1249,6 +1256,11 @@ async def save_settings_endpoint(request: Request):
         for bool_key in ("autoSync", "autoSyncAiDescription"):
             if bool_key in body:
                 current_settings[bool_key] = bool(body[bool_key])
+
+        # Gemini model selection
+        if "geminiModel" in body:
+            model_value = str(body["geminiModel"]).strip()
+            current_settings["geminiModel"] = model_value if model_value else "gemini-2.5-flash"
         
         # For IP and API key changes, also update .env file
         env_updated = False
@@ -1424,6 +1436,16 @@ async def save_settings_endpoint(request: Request):
             
             logger.info("MQTT enabled=%s", mqtt_enabled,
                        extra={"request_id": request_id})
+        
+        # Hot-reload Gemini model into process environment
+        if "geminiModel" in body:
+            new_model = str(body["geminiModel"]).strip()
+            if new_model:
+                os.environ["GEMINI_MODEL"] = new_model
+                _update_s6_env("GEMINI_MODEL", new_model, request_id)
+                services_restarted.append("gemini_model")
+                logger.info("Updated GEMINI_MODEL to %s", new_model,
+                           extra={"request_id": request_id})
         
         return {
             "status": "success",

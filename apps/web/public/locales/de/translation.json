@@ -423,6 +423,8 @@
     "authorName": "Autorenname",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Dein Name für das Autorenfeld im generierten Profil-JSON. Standardmäßig \"MeticAI\", wenn leer gelassen.",
+    "geminiModel": "Gemini-Modell",
+    "geminiModelDescription": "Wähle das Gemini-Modell für KI-Funktionen aus.",
     "mqttEnabled": "MQTT-Brücke",
     "mqttEnabledDescription": "Echtzeit-Maschinentelemetrie über MQTT. Betreibt das Live-Dashboard.",
     "saveSettings": "Einstellungen speichern",
@@ -537,7 +539,10 @@
     "runsOn": "Runs on",
     "andCaffeine": "and caffeine ☕",
     "betaChannelFailed": "Fehler beim Wechsel des Betakanals",
-    "feedbackFailed": "Fehler beim Senden des Feedbacks"
+    "feedbackFailed": "Fehler beim Senden des Feedbacks",
+    "geminiModel25Flash": "Gemini 2.5 Flash (Empfohlen)",
+    "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel20Flash": "Gemini 2.0 Flash"
   },
   "profileBreakdown": {
     "title": "Profildetails",
@@ -860,7 +865,13 @@
     "followSystemTheme": "Follow system theme",
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
-    "animationsDescription": "Show animated background effects"
+    "animationsDescription": "Show animated background effects",
+    "platformTheme": "Plattform-Design",
+    "platformThemeDescription": "Visuellen Stil an Ihr Gerät anpassen",
+    "platformThemeAuto": "Automatisch",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Standard"
   },
   "advanced": {
     "detailedKnowledge": "Detailliertes KI-Wissen",

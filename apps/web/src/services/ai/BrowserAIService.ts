@@ -30,8 +30,17 @@ import { buildFullProfilePrompt, validateAndRetryProfile } from './profilePrompt
 
 import { STORAGE_KEYS } from '@/lib/constants'
 
-const GEMINI_MODEL = 'gemini-2.5-flash'
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 const IMAGE_MODEL = 'imagen-3.0-generate-002'
+
+function getGeminiModel(): string {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL)
+    return stored?.trim() || DEFAULT_GEMINI_MODEL
+  } catch {
+    return DEFAULT_GEMINI_MODEL
+  }
+}
 
 function getStoredApiKey(): string | null {
   try {
@@ -124,7 +133,7 @@ export function createBrowserAIService(): AIService {
       let response
       try {
         response = await client.models.generateContent({
-          model: GEMINI_MODEL,
+          model: getGeminiModel(),
           contents: [{ role: 'user', parts }],
         })
       } catch (err) {
@@ -138,7 +147,7 @@ export function createBrowserAIService(): AIService {
       // Validation + retry loop
       const generateFix = async (fixPrompt: string) => {
         const fixResponse = await client.models.generateContent({
-          model: GEMINI_MODEL,
+          model: getGeminiModel(),
           contents: [{ role: 'user', parts: [{ text: fixPrompt }] }],
         })
         return fixResponse.text ?? ''
@@ -168,7 +177,7 @@ export function createBrowserAIService(): AIService {
       let response
       try {
         response = await client.models.generateContent({
-          model: GEMINI_MODEL,
+          model: getGeminiModel(),
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         })
       } catch (err) {
@@ -225,7 +234,7 @@ export function createBrowserAIService(): AIService {
       let response
       try {
         response = await client.models.generateContent({
-          model: GEMINI_MODEL,
+          model: getGeminiModel(),
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         })
       } catch (err) {
@@ -270,7 +279,7 @@ export function createBrowserAIService(): AIService {
       let response
       try {
         response = await client.models.generateContent({
-          model: GEMINI_MODEL,
+          model: getGeminiModel(),
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         })
       } catch (err) {

@@ -14,6 +14,7 @@ _settings_cache: Optional[dict] = None
 
 _DEFAULT_SETTINGS = {
     "geminiApiKey": "",
+    "geminiModel": "gemini-2.5-flash",
     "meticulousIp": "",
     "serverIp": "",
     "authorName": "",
