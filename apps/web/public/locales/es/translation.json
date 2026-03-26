@@ -657,7 +657,17 @@
     "bulkImportFailed": "Importación masiva fallida",
     "fetchDetailsFailed": "Error al obtener detalles del perfil",
     "noResponseStream": "No hay flujo de respuesta disponible",
-    "bulkImportStartFailed": "Error al iniciar la importación masiva"
+    "bulkImportStartFailed": "Error al iniciar la importación masiva",
+    "fromUrl": "Desde URL",
+    "jsonOrMet": ".json / .met",
+    "importFromUrl": "Importar desde URL",
+    "urlPlaceholder": "Pegar URL del perfil...",
+    "urlHint": "Admite URLs de perfiles .json y .met",
+    "back": "Atrás",
+    "importButton": "Importar",
+    "fetchingUrl": "Obteniendo perfil desde URL...",
+    "importUrlFailed": "Error al importar desde URL",
+    "invalidUrl": "Introduce una URL válida"
   },
   "imageCrop": {
     "title": "Recortar imagen de perfil",

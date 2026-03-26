@@ -114,9 +114,11 @@ interface HistoryViewProps {
   onManageMachine?: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
+  importUrl?: string | null
+  onImportUrlConsumed?: () => void
 }
 
-export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMachine, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
+export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMachine, aiConfigured = true, hideAiWhenUnavailable = false, importUrl, onImportUrlConsumed }: HistoryViewProps) {
   const { t } = useTranslation()
   const { 
     entries, 
@@ -142,6 +144,8 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
   useEffect(() => {
     fetchHistory()
   }, [fetchHistory])
+
+  useEffect(() => { if (importUrl) setShowImportDialog(true) }, [importUrl])
 
   // Fetch sync badge count
   useEffect(() => {
@@ -545,15 +549,10 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
         isOpen={showImportDialog}
         aiConfigured={aiConfigured}
         hideAiWhenUnavailable={hideAiWhenUnavailable}
-        onClose={() => setShowImportDialog(false)}
-        onImported={() => {
-          setShowImportDialog(false)
-          fetchHistory()
-        }}
-        onGenerateNew={() => {
-          setShowImportDialog(false)
-          onGenerateNew()
-        }}
+        initialUrl={importUrl || undefined}
+        onClose={() => { setShowImportDialog(false); onImportUrlConsumed?.() }}
+        onImported={() => { setShowImportDialog(false); onImportUrlConsumed?.(); fetchHistory() }}
+        onGenerateNew={() => { setShowImportDialog(false); onImportUrlConsumed?.(); onGenerateNew() }}
       />
     </motion.div>
   )

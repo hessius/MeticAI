@@ -22,6 +22,7 @@ from types import SimpleNamespace
 import time
 import asyncio
 import requests
+import httpx
 
 
 # Import the app and services
@@ -13914,3 +13915,142 @@ class TestDialInPromptBuilder:
         prompt = build_dialin_recommendation_prompt(roast_level="dark", iterations=[])
         assert "dark" in prompt
         assert "Iteration" not in prompt
+
+
+class TestImportFromUrl:
+    """Tests for the /api/import-from-url endpoint."""
+
+    VALID_PROFILE = {"name": "URL Espresso", "temperature": 93.0, "stages": [{"name": "extraction"}]}
+
+    @staticmethod
+    def _mock_httpx_stream(response_bytes=b'{}', raise_for_status_error=None):
+        """Build a mock httpx.AsyncClient that streams response_bytes."""
+        class FakeStream:
+            def __init__(self):
+                self.status_code = 200
+            def raise_for_status(self):
+                if raise_for_status_error:
+                    raise raise_for_status_error
+            async def aiter_bytes(self, chunk_size=8192):
+                yield response_bytes
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                return False
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                pass
+            def stream(self, method, url):
+                return FakeStream()
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                return False
+
+        return FakeClient
+
+    def test_missing_url(self, client):
+        """Returns 400 when URL is missing or empty."""
+        resp = client.post("/api/import-from-url", json={"url": ""})
+        assert resp.status_code == 400
+        assert "No URL" in resp.json()["detail"]
+
+    def test_invalid_scheme(self, client):
+        """Returns 400 for non-http(s) schemes."""
+        resp = client.post("/api/import-from-url", json={"url": "ftp://example.com/profile.json"})
+        assert resp.status_code == 400
+        assert "http" in resp.json()["detail"].lower() or "scheme" in resp.json()["detail"].lower()
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    def test_ssrf_blocked(self, mock_validate, client):
+        """Returns 400 when SSRF validation blocks the URL."""
+        mock_validate.side_effect = ValueError("URL resolves to private/reserved IP: 127.0.0.1")
+        resp = client.post("/api/import-from-url", json={"url": "http://localhost:8080/profile.json"})
+        assert resp.status_code == 400
+        assert "Blocked URL" in resp.json()["detail"]
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_remote_non_200(self, mock_client_class, mock_ssrf, client):
+        """Returns 502 when the remote server returns an error."""
+        mock_ssrf.return_value = None
+        mock_client_class.side_effect = [TestImportFromUrl._mock_httpx_stream(
+            raise_for_status_error=httpx.HTTPStatusError(
+                "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
+            )
+        )]
+        # Replace with direct class substitution
+        fake_cls = TestImportFromUrl._mock_httpx_stream(
+            raise_for_status_error=httpx.HTTPStatusError(
+                "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
+            )
+        )
+        mock_client_class.side_effect = None
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/missing.json"})
+        assert resp.status_code == 502
+        assert "404" in resp.json()["detail"]
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_non_json_body(self, mock_client_class, mock_ssrf, client):
+        """Returns 400 when URL returns non-JSON content."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=b"<html>Not JSON</html>")
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/page.html"})
+        assert resp.status_code == 400
+        assert "valid JSON" in resp.json()["detail"]
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_missing_name_field(self, mock_client_class, mock_ssrf, client):
+        """Returns 400 when profile JSON is missing 'name'."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=json.dumps({"temperature": 93.0}).encode())
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/profile.json"})
+        assert resp.status_code == 400
+        assert "name" in resp.json()["detail"].lower()
+
+    @patch('api.routes.profiles.async_create_profile', new_callable=AsyncMock, return_value={"id": "m-1"})
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history', return_value=[
+        {"id": "old-1", "profile_name": "URL Espresso", "reply": "desc"}
+    ])
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_dedupe_exists(self, mock_client_class, mock_ssrf, mock_load, mock_save, mock_create, client):
+        """Returns 'exists' when a profile with the same name is already in history."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=json.dumps(self.VALID_PROFILE).encode())
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/profile.json"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "exists"
+        assert data["profile_name"] == "URL Espresso"
+        mock_save.assert_not_called()
+
+    @patch('api.routes.profiles.async_create_profile', new_callable=AsyncMock, return_value={"id": "m-2"})
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history', return_value=[])
+    @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock, return_value="Rich espresso")
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_success_path(self, mock_client_class, mock_ssrf, mock_gen_desc, mock_load, mock_save, mock_create, client):
+        """Full success path: fetch, parse, save, upload."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=json.dumps(self.VALID_PROFILE).encode())
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/profile.json"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["profile_name"] == "URL Espresso"
+        assert data["has_description"] is True
+        assert data["uploaded_to_machine"] is True
+        assert "entry_id" in data
+        mock_save.assert_called_once()
+        mock_create.assert_called_once()

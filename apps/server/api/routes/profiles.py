@@ -2265,6 +2265,109 @@ async def import_profile(request: Request):
         )
 
 
+
+def _validate_url_for_ssrf(url: str) -> None:
+    """Reject URLs that could hit internal/private network resources."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported scheme: {parsed.scheme}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("No hostname in URL")
+    blocked = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "metadata.google.internal"}
+    if hostname.lower() in blocked:
+        raise ValueError(f"Blocked hostname: {hostname}")
+    try:
+        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError(f"URL resolves to private/reserved IP: {ip}")
+    except socket.gaierror:
+        pass  # Let httpx handle DNS errors
+
+
+@router.post("/api/import-from-url")
+async def import_from_url(request: Request):
+    """Import a profile from a URL (JSON or .met format)."""
+    request_id = request.state.request_id
+    try:
+        body = await request.json()
+        url = body.get("url", "").strip()
+        generate_description = body.get("generate_description", True)
+        if not url:
+            raise HTTPException(status_code=400, detail="No URL provided")
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise HTTPException(status_code=400, detail="Only http and https URLs are supported")
+        try:
+            _validate_url_for_ssrf(url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Blocked URL: {exc}")
+        logger.info("Importing profile from URL: %s", url, extra={"request_id": request_id})
+        max_size = 5 * 1024 * 1024
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                async with client.stream("GET", url) as resp:
+                    resp.raise_for_status()
+                    chunks: list[bytes] = []
+                    total = 0
+                    async for chunk in resp.aiter_bytes(8192):
+                        total += len(chunk)
+                        if total > max_size:
+                            raise HTTPException(status_code=413, detail="Response too large (max 5 MB)")
+                        chunks.append(chunk)
+                    content = b"".join(chunks)
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=408, detail="Request timed out fetching URL")
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=502, detail=f"Remote server returned {exc.response.status_code}")
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {exc}")
+        try:
+            profile_json = json.loads(content)
+        except Exception:
+            raise HTTPException(status_code=400, detail="URL did not return valid JSON")
+        if not isinstance(profile_json, dict):
+            raise HTTPException(status_code=400, detail="URL did not return a valid profile object")
+        if not profile_json.get("name"):
+            raise HTTPException(status_code=400, detail="Profile is missing a 'name' field")
+        profile_name = profile_json["name"]
+        reply = None
+        if generate_description:
+            try:
+                reply = await _generate_profile_description(profile_json, request_id)
+            except Exception as e:
+                logger.warning("Failed to generate description for URL import: %s", e, extra={"request_id": request_id})
+                from services.analysis_service import _build_static_profile_description
+                reply = _build_static_profile_description(profile_json)
+        else:
+            from services.analysis_service import _build_static_profile_description
+            reply = _build_static_profile_description(profile_json)
+        entry_id = str(uuid.uuid4())
+        created_at = datetime.now(timezone.utc).isoformat()
+        new_entry = {"id": entry_id, "created_at": created_at, "profile_name": profile_name, "user_preferences": f"Imported from URL: {url}", "reply": reply, "profile_json": deep_convert_to_dict(profile_json), "imported": True, "import_source": "url"}
+        with _history_lock:
+            history = load_history()
+            entries = history if isinstance(history, list) else history.get("entries", [])
+            for entry in entries:
+                if entry.get("profile_name") == profile_name:
+                    return {"status": "exists", "message": f"Profile '{profile_name}' already exists", "entry_id": entry.get("id"), "profile_name": profile_name}
+            entries.insert(0, new_entry)
+            save_history(entries)
+        machine_profile_id = None
+        try:
+            result = await async_create_profile(profile_json)
+            machine_profile_id = result.get("id") if isinstance(result, dict) else None
+            logger.info("URL-imported profile uploaded to machine: %s", profile_name, extra={"request_id": request_id, "machine_profile_id": machine_profile_id})
+        except Exception as exc:
+            logger.warning("Profile saved to history but failed to upload to machine: %s", exc, extra={"request_id": request_id, "error_type": type(exc).__name__})
+        logger.info("Profile imported from URL successfully: %s", profile_name, extra={"request_id": request_id, "entry_id": entry_id, "source_url": url})
+        return {"status": "success", "entry_id": entry_id, "profile_name": profile_name, "has_description": reply is not None and "Description generation failed" not in reply, "uploaded_to_machine": machine_profile_id is not None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to import profile from URL: %s", str(e), exc_info=True, extra={"request_id": request_id, "error_type": type(e).__name__})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+
 @router.post("/api/profile/import-all")
 async def import_all_profiles(request: Request):
     """Import all profiles from the Meticulous machine that aren't already in history.

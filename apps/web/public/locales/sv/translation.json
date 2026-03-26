@@ -662,7 +662,17 @@
     "bulkImportFailed": "Bulkimport misslyckades",
     "fetchDetailsFailed": "Kunde inte hämta profildetaljer",
     "noResponseStream": "Ingen svarsström tillgänglig",
-    "bulkImportStartFailed": "Kunde inte starta bulkimport"
+    "bulkImportStartFailed": "Kunde inte starta bulkimport",
+    "fromUrl": "Från URL",
+    "jsonOrMet": ".json / .met",
+    "importFromUrl": "Importera från URL",
+    "urlPlaceholder": "Klistra in profil-URL...",
+    "urlHint": "Stöder .json- och .met-profil-URL:er",
+    "back": "Tillbaka",
+    "importButton": "Importera",
+    "fetchingUrl": "Hämtar profil från URL...",
+    "importUrlFailed": "Kunde inte importera från URL",
+    "invalidUrl": "Ange en giltig URL"
   },
   "imageCrop": {
     "title": "Beskär profilbild",

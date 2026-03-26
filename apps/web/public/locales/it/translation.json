@@ -657,7 +657,17 @@
     "bulkImportFailed": "Importazione di massa fallita",
     "fetchDetailsFailed": "Impossibile recuperare i dettagli del profilo",
     "noResponseStream": "Nessun flusso di risposta disponibile",
-    "bulkImportStartFailed": "Impossibile avviare l'importazione di massa"
+    "bulkImportStartFailed": "Impossibile avviare l'importazione di massa",
+    "fromUrl": "Da URL",
+    "jsonOrMet": ".json / .met",
+    "importFromUrl": "Importa da URL",
+    "urlPlaceholder": "Incolla URL del profilo...",
+    "urlHint": "Supporta URL di profili .json e .met",
+    "back": "Indietro",
+    "importButton": "Importa",
+    "fetchingUrl": "Recupero del profilo dall'URL...",
+    "importUrlFailed": "Importazione da URL non riuscita",
+    "invalidUrl": "Inserisci un URL valido"
   },
   "imageCrop": {
     "title": "Ritaglia immagine profilo",
