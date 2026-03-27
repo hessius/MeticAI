@@ -45,6 +45,9 @@ function DialogOverlay({
   )
 }
 
+// CSS-only adaptation: Konsta Dialog uses a fundamentally different API (imperative
+// title/content/buttons props) that doesn't map to Radix's declarative portal pattern.
+// Instead, we enhance Radix DialogContent with mobile-friendly styling when Konsta is active.
 function DialogContent({
   className,
   children,

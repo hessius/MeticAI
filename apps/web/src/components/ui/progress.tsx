@@ -28,10 +28,19 @@ function Progress({ className, value, ...props }: ComponentProps<typeof Progress
   }
 
   // Konsta Progressbar expects 0-1, shadcn Progress uses 0-100
+  // Forward id, aria-*, and data-* attributes for accessibility
+  const { id, ...rest } = props as Record<string, unknown>
+  const forwardProps: Record<string, unknown> = {}
+  if (id) forwardProps.id = id
+  for (const [key, val] of Object.entries(rest)) {
+    if (key.startsWith('aria-') || key.startsWith('data-')) forwardProps[key] = val
+  }
+
   return (
     <Progressbar
       progress={(value || 0) / 100}
       className={className}
+      {...forwardProps}
     />
   )
 }

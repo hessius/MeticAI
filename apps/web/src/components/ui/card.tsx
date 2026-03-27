@@ -20,7 +20,8 @@ function ShadcnCard({ className, ...props }: ComponentProps<"div">) {
 function Card({ className, ...props }: ComponentProps<"div">) {
   const useKonsta = useKonstaOverride()
   if (!useKonsta) return <ShadcnCard className={className} {...props} />
-  return <KCard outline contentWrap={false} className={className} {...props} />
+  // contentWrap={false} because sub-components (CardHeader, CardContent, etc.) handle their own spacing
+  return <KCard outline contentWrap={false} className={cn("!p-0", className)} {...props} />
 }
 
 function CardHeader({ className, ...props }: ComponentProps<"div">) {

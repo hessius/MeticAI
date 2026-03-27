@@ -68,16 +68,18 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  onValueChange,
+  step,
+  disabled,
   ...props
 }: ComponentProps<typeof SliderPrimitive.Root>) {
   const useKonsta = useKonstaOverride()
 
   if (!useKonsta) {
-    return <ShadcnSlider className={className} defaultValue={defaultValue} value={value} min={min} max={max} {...props} />
+    return <ShadcnSlider className={className} defaultValue={defaultValue} value={value} min={min} max={max} onValueChange={onValueChange} step={step} disabled={disabled} {...props} />
   }
 
   const singleValue = Array.isArray(value) ? value[0] : (Array.isArray(defaultValue) ? defaultValue[0] : min)
-  const { onValueChange, step, disabled } = props as any
 
   return (
     <Range
@@ -86,7 +88,7 @@ function Slider({
       max={max}
       step={step ?? 1}
       disabled={disabled}
-      onChange={(e: any) => onValueChange?.([Number(e.target.value)])}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onValueChange?.([Number(e.target.value)])}
       className={className}
     />
   )
