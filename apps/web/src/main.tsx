@@ -14,9 +14,10 @@ import './i18n/config'
 
 import "./main.css"
 import "./styles/theme.css"
+import "./index.css"
+// Platform themes must load AFTER Tailwind (index.css) to override utilities
 import "./styles/ios-theme.css"
 import "./styles/material-theme.css"
-import "./index.css"
 
 // In direct mode (PWA on machine), intercept MeticAI proxy API calls and either
 // translate them to Meticulous-native /api/v1/ endpoints or return empty responses.
