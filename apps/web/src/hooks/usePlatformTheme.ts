@@ -1,8 +1,9 @@
-import { useState, useLayoutEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { STORAGE_KEYS } from '@/lib/constants'
 
 export type PlatformTheme = 'auto' | 'ios' | 'material' | 'none'
 export type DetectedPlatform = 'ios' | 'android' | 'desktop'
+export type KonstaTheme = 'ios' | 'material'
 
 function detectPlatform(): DetectedPlatform {
   if (typeof navigator === 'undefined') return 'desktop'
@@ -13,13 +14,14 @@ function detectPlatform(): DetectedPlatform {
   return 'desktop'
 }
 
-function resolveThemeClass(pref: PlatformTheme, detected: DetectedPlatform): string | null {
-  if (pref === 'none') return null
-  if (pref === 'ios') return 'ios-theme'
-  if (pref === 'material') return 'material-theme'
-  if (detected === 'ios') return 'ios-theme'
-  if (detected === 'android') return 'material-theme'
-  return null
+/** Resolve which Konsta theme to use based on preference + detected platform. */
+function resolveKonstaTheme(pref: PlatformTheme, detected: DetectedPlatform): KonstaTheme {
+  if (pref === 'ios') return 'ios'
+  if (pref === 'material') return 'material'
+  if (pref === 'none') return 'material' // default fallback
+  // auto
+  if (detected === 'ios') return 'ios'
+  return 'material'
 }
 
 export function usePlatformTheme() {
@@ -37,13 +39,7 @@ export function usePlatformTheme() {
     try { localStorage.setItem(STORAGE_KEYS.PLATFORM_THEME, next) } catch { /* noop */ }
   }, [])
 
-  useLayoutEffect(() => {
-    const root = document.documentElement
-    const cls = resolveThemeClass(theme, platform)
-    root.classList.remove('ios-theme', 'material-theme')
-    if (cls) root.classList.add(cls)
-    return () => { root.classList.remove('ios-theme', 'material-theme') }
-  }, [theme, platform])
+  const konstaTheme = resolveKonstaTheme(theme, platform)
 
-  return { platform, theme, setTheme } as const
+  return { platform, theme, setTheme, konstaTheme } as const
 }
