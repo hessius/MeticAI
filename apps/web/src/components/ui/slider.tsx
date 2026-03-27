@@ -2,10 +2,12 @@
 
 import { ComponentProps, useMemo } from "react"
 import * as SliderPrimitive from "@radix-ui/react-slider"
+import { Range } from 'konsta/react'
 
+import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 import { cn } from "@/lib/utils"
 
-function Slider({
+function ShadcnSlider({
   className,
   defaultValue,
   value,
@@ -57,6 +59,36 @@ function Slider({
         />
       ))}
     </SliderPrimitive.Root>
+  )
+}
+
+function Slider({
+  className,
+  defaultValue,
+  value,
+  min = 0,
+  max = 100,
+  ...props
+}: ComponentProps<typeof SliderPrimitive.Root>) {
+  const useKonsta = useKonstaOverride()
+
+  if (!useKonsta) {
+    return <ShadcnSlider className={className} defaultValue={defaultValue} value={value} min={min} max={max} {...props} />
+  }
+
+  const singleValue = Array.isArray(value) ? value[0] : (Array.isArray(defaultValue) ? defaultValue[0] : min)
+  const { onValueChange, step, disabled } = props as any
+
+  return (
+    <Range
+      value={singleValue}
+      min={min}
+      max={max}
+      step={step ?? 1}
+      disabled={disabled}
+      onChange={(e: any) => onValueChange?.([Number(e.target.value)])}
+      className={className}
+    />
   )
 }
 

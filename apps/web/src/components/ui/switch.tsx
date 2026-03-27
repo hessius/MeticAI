@@ -2,10 +2,12 @@
 
 import { ComponentProps } from "react"
 import * as SwitchPrimitive from "@radix-ui/react-switch"
+import { Toggle } from 'konsta/react'
+import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 
 import { cn } from "@/lib/utils"
 
-function Switch({
+function ShadcnSwitch({
   className,
   ...props
 }: ComponentProps<typeof SwitchPrimitive.Root>) {
@@ -25,6 +27,27 @@ function Switch({
         )}
       />
     </SwitchPrimitive.Root>
+  )
+}
+
+function Switch({
+  className,
+  ...props
+}: ComponentProps<typeof SwitchPrimitive.Root>) {
+  const useKonsta = useKonstaOverride()
+
+  if (!useKonsta) {
+    return <ShadcnSwitch className={className} {...props} />
+  }
+
+  const { checked, onCheckedChange, disabled } = props
+  return (
+    <Toggle
+      checked={checked ?? false}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
+      disabled={disabled}
+      className={className}
+    />
   )
 }
 
