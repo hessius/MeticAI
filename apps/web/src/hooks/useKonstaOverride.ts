@@ -2,6 +2,8 @@ import { useState, useCallback, useSyncExternalStore } from 'react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { STORAGE_KEYS } from '@/lib/constants'
 
+const KONSTA_CHANGED = 'konsta-ui-changed'
+
 function getStoredValue(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEYS.USE_KONSTA_UI) === 'true'
@@ -10,13 +12,17 @@ function getStoredValue(): boolean {
   }
 }
 
-// Subscribe to storage events so multiple tabs stay in sync
+// Subscribe to both cross-tab (StorageEvent) and same-tab (custom event) changes
 function subscribe(callback: () => void) {
-  const handler = (e: StorageEvent) => {
+  const storageHandler = (e: StorageEvent) => {
     if (e.key === STORAGE_KEYS.USE_KONSTA_UI) callback()
   }
-  window.addEventListener('storage', handler)
-  return () => window.removeEventListener('storage', handler)
+  window.addEventListener('storage', storageHandler)
+  window.addEventListener(KONSTA_CHANGED, callback)
+  return () => {
+    window.removeEventListener('storage', storageHandler)
+    window.removeEventListener(KONSTA_CHANGED, callback)
+  }
 }
 
 /**
@@ -39,6 +45,7 @@ export function useKonstaToggle() {
     setEnabledState(value)
     try {
       localStorage.setItem(STORAGE_KEYS.USE_KONSTA_UI, String(value))
+      window.dispatchEvent(new Event(KONSTA_CHANGED))
     } catch { /* noop */ }
   }, [])
 
