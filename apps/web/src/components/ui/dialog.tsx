@@ -1,6 +1,7 @@
 import { ComponentProps } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import XIcon from "lucide-react/dist/esm/icons/x"
+import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 
 import { cn } from "@/lib/utils"
 
@@ -44,18 +45,25 @@ function DialogOverlay({
   )
 }
 
+// CSS-only adaptation: Konsta Dialog uses a fundamentally different API (imperative
+// title/content/buttons props) that doesn't map to Radix's declarative portal pattern.
+// Instead, we enhance Radix DialogContent with mobile-friendly styling when Konsta is active.
 function DialogContent({
   className,
   children,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content>) {
+  const useKonsta = useKonstaOverride()
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          useKonsta
+            ? "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border-0 p-6 shadow-xl duration-200 sm:max-w-lg"
+            : "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
           className
         )}
         {...props}

@@ -1,8 +1,10 @@
 import { ComponentProps } from "react"
+import { Card as KCard } from 'konsta/react'
+import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 
 import { cn } from "@/lib/utils"
 
-function Card({ className, ...props }: ComponentProps<"div">) {
+function ShadcnCard({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
@@ -13,6 +15,13 @@ function Card({ className, ...props }: ComponentProps<"div">) {
       {...props}
     />
   )
+}
+
+function Card({ className, ...props }: ComponentProps<"div">) {
+  const useKonsta = useKonstaOverride()
+  if (!useKonsta) return <ShadcnCard className={className} {...props} />
+  // contentWrap={false} because sub-components (CardHeader, CardContent, etc.) handle their own spacing
+  return <KCard outline contentWrap={false} className={cn("!p-0", className)} {...props} />
 }
 
 function CardHeader({ className, ...props }: ComponentProps<"div">) {

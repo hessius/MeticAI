@@ -2,10 +2,12 @@
 
 import { ComponentProps, useMemo } from "react"
 import * as SliderPrimitive from "@radix-ui/react-slider"
+import { Range } from 'konsta/react'
 
+import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 import { cn } from "@/lib/utils"
 
-function Slider({
+function ShadcnSlider({
   className,
   defaultValue,
   value,
@@ -57,6 +59,49 @@ function Slider({
         />
       ))}
     </SliderPrimitive.Root>
+  )
+}
+
+function Slider({
+  className,
+  defaultValue,
+  value,
+  min = 0,
+  max = 100,
+  onValueChange,
+  onValueCommit,
+  step,
+  disabled,
+  ...rest
+}: ComponentProps<typeof SliderPrimitive.Root>) {
+  const useKonsta = useKonstaOverride()
+
+  if (!useKonsta) {
+    return <ShadcnSlider className={className} defaultValue={defaultValue} value={value} min={min} max={max} onValueChange={onValueChange} onValueCommit={onValueCommit} step={step} disabled={disabled} {...rest} />
+  }
+
+  const singleValue = Array.isArray(value) ? value[0] : (Array.isArray(defaultValue) ? defaultValue[0] : min)
+
+  // Forward id, aria-*, data-* attributes
+  const forwardedProps: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(rest)) {
+    if (key === 'id' || key.startsWith('aria-') || key.startsWith('data-')) {
+      forwardedProps[key] = val
+    }
+  }
+
+  return (
+    <Range
+      value={singleValue}
+      min={min}
+      max={max}
+      step={step ?? 1}
+      disabled={disabled}
+      onInput={(e: React.ChangeEvent<HTMLInputElement>) => onValueChange?.([Number(e.target.value)])}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onValueCommit?.([Number(e.target.value)])}
+      className={className}
+      {...forwardedProps}
+    />
   )
 }
 
