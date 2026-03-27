@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 
 // ── Private helpers ─────────────────────────────────────────────────────────
@@ -18,7 +19,7 @@ export function installDirectModeInterceptor(): void {
 
   // Cache profile list data so /api/profile/{name} and image-proxy lookups work
   const _profileCache = new Map<string, CachedProfile>()
-  const PROFILE_LIST_CACHE_KEY = 'meticai-direct-profile-list'
+  const PROFILE_LIST_CACHE_KEY = STORAGE_KEYS.PROFILE_LIST_CACHE
 
   function _processProfileList(data: CachedProfile[]) {
     _profileCache.clear()
@@ -49,7 +50,7 @@ export function installDirectModeInterceptor(): void {
   // Stores the full "Profile Created / Description / Preparation / …" text
   // keyed by profile ID.  Persisted to localStorage and exposed on window so
   // App.tsx can read descriptions when navigating to profile detail.
-  const DESC_CACHE_KEY = 'meticai-direct-desc-cache'
+  const DESC_CACHE_KEY = STORAGE_KEYS.DESCRIPTION_CACHE
   const _descriptionCache = new Map<string, string>()
   try {
     const stored = localStorage.getItem(DESC_CACHE_KEY)
@@ -436,13 +437,17 @@ export function installDirectModeInterceptor(): void {
         if (!r.ok) {
           // Return cached data if fetch fails
           const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
-          if (cached) return jsonResponse(JSON.parse(cached))
+          if (cached) {
+            try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
+          }
           return jsonResponse({ profiles: [] })
         }
         return r.json().then((data: CachedProfile[]) => jsonResponse(_processProfileList(data)))
       }).catch(() => {
         const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
-        if (cached) return jsonResponse(JSON.parse(cached))
+        if (cached) {
+          try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
+        }
         return jsonResponse({ profiles: [] })
       })
     }
@@ -1286,7 +1291,7 @@ export function installDirectModeInterceptor(): void {
     }
 
     // GET /api/pour-over/preferences → stored preferences
-    const POUR_OVER_PREFS_KEY = 'meticai-direct-pour-over-prefs'
+    const POUR_OVER_PREFS_KEY = STORAGE_KEYS.POUR_OVER_PREFS
     if (url.match(/\/api\/pour-over\/preferences$/) && method === 'GET') {
       const defaultModePrefs = { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false, doseGrams: null, brewRatio: null }
       const defaultPrefs = {
@@ -1305,7 +1310,8 @@ export function installDirectModeInterceptor(): void {
     if (url.match(/\/api\/pour-over\/preferences$/) && method === 'PUT') {
       return (async () => {
         try {
-          const body = typeof input === 'string' ? input : await new Request(input, init).text()
+          const request = input instanceof Request ? input : new Request(input, init)
+          const body = await request.text()
           const prefs = JSON.parse(body)
           localStorage.setItem(POUR_OVER_PREFS_KEY, JSON.stringify(prefs))
           return jsonResponse(prefs)
@@ -1319,7 +1325,8 @@ export function installDirectModeInterceptor(): void {
     if (url.match(/\/api\/pour-over\/prepare$/) && method === 'POST') {
       return (async () => {
         try {
-          const body = typeof input === 'string' ? input : await new Request(input, init).text()
+          const request = input instanceof Request ? input : new Request(input, init)
+          const body = await request.text()
           const req = JSON.parse(body)
           const profile = _adaptPourOverProfile({
             targetWeight: req.target_weight ?? 300,
@@ -1350,7 +1357,8 @@ export function installDirectModeInterceptor(): void {
     if (url.match(/\/api\/pour-over\/prepare-recipe$/) && method === 'POST') {
       return (async () => {
         try {
-          const body = typeof input === 'string' ? input : await new Request(input, init).text()
+          const request = input instanceof Request ? input : new Request(input, init)
+          const body = await request.text()
           const { recipe_slug } = JSON.parse(body)
           // Find recipe in our bundled list
           const recipesResp = await window.fetch(url.replace(/\/pour-over\/prepare-recipe$/, '/recipes'))

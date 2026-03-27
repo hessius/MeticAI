@@ -20,9 +20,9 @@ import "./styles/ios-theme.css"
 import "./styles/material-theme.css"
 
 // In direct mode (PWA on machine), intercept MeticAI proxy API calls and either
-// translate them to Meticulous-native /api/v1/ endpoints or return empty responses.
-// The machine only serves /api/v1/... (via espresso-api/axios). All other /api/
-// paths are MeticAI-specific and don't exist on the machine.
+// translate them to Meticulous-native /api/v1/ endpoints or return 501 for
+// unhandled routes. The machine only serves /api/v1/... (via espresso-api/axios).
+// All other /api/ paths are MeticAI-specific and don't exist on the machine.
 if (isDirectMode()) {
   installDirectModeInterceptor()
 }
