@@ -40,13 +40,24 @@ function Switch({
     return <ShadcnSwitch className={className} {...props} />
   }
 
-  const { checked, onCheckedChange, disabled } = props
+  const { checked, defaultChecked, onCheckedChange, disabled, ...rest } = props
+
+  // Forward id, name, aria-*, data-* for accessibility and label association
+  const forwardedProps: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(rest)) {
+    if (key === 'id' || key === 'name' || key === 'value' || key.startsWith('aria-') || key.startsWith('data-')) {
+      forwardedProps[key] = val
+    }
+  }
+
   return (
     <Toggle
       checked={checked ?? false}
       onChange={(e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
       disabled={disabled}
       className={className}
+      {...(defaultChecked !== undefined ? { defaultChecked } : {})}
+      {...forwardedProps}
     />
   )
 }

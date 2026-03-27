@@ -12,17 +12,25 @@ function getStoredValue(): boolean {
   }
 }
 
-// Subscribe to both cross-tab (StorageEvent) and same-tab (custom event) changes
+// Shared subscription: single pair of global listeners fans out to all subscribers
+const subscribers = new Set<() => void>()
+let listening = false
+
+function ensureListeners() {
+  if (typeof window === 'undefined' || listening) return
+  window.addEventListener('storage', (e: StorageEvent) => {
+    if (e.key === STORAGE_KEYS.USE_KONSTA_UI) subscribers.forEach(cb => cb())
+  })
+  window.addEventListener(KONSTA_CHANGED, () => {
+    subscribers.forEach(cb => cb())
+  })
+  listening = true
+}
+
 function subscribe(callback: () => void) {
-  const storageHandler = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEYS.USE_KONSTA_UI) callback()
-  }
-  window.addEventListener('storage', storageHandler)
-  window.addEventListener(KONSTA_CHANGED, callback)
-  return () => {
-    window.removeEventListener('storage', storageHandler)
-    window.removeEventListener(KONSTA_CHANGED, callback)
-  }
+  subscribers.add(callback)
+  ensureListeners()
+  return () => { subscribers.delete(callback) }
 }
 
 /**

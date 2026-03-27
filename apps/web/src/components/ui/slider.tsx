@@ -69,17 +69,26 @@ function Slider({
   min = 0,
   max = 100,
   onValueChange,
+  onValueCommit,
   step,
   disabled,
-  ...props
+  ...rest
 }: ComponentProps<typeof SliderPrimitive.Root>) {
   const useKonsta = useKonstaOverride()
 
   if (!useKonsta) {
-    return <ShadcnSlider className={className} defaultValue={defaultValue} value={value} min={min} max={max} onValueChange={onValueChange} step={step} disabled={disabled} {...props} />
+    return <ShadcnSlider className={className} defaultValue={defaultValue} value={value} min={min} max={max} onValueChange={onValueChange} onValueCommit={onValueCommit} step={step} disabled={disabled} {...rest} />
   }
 
   const singleValue = Array.isArray(value) ? value[0] : (Array.isArray(defaultValue) ? defaultValue[0] : min)
+
+  // Forward id, aria-*, data-* attributes
+  const forwardedProps: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(rest)) {
+    if (key === 'id' || key.startsWith('aria-') || key.startsWith('data-')) {
+      forwardedProps[key] = val
+    }
+  }
 
   return (
     <Range
@@ -88,8 +97,10 @@ function Slider({
       max={max}
       step={step ?? 1}
       disabled={disabled}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onValueChange?.([Number(e.target.value)])}
+      onInput={(e: React.ChangeEvent<HTMLInputElement>) => onValueChange?.([Number(e.target.value)])}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onValueCommit?.([Number(e.target.value)])}
       className={className}
+      {...forwardedProps}
     />
   )
 }

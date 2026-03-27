@@ -41,7 +41,15 @@ function Checkbox({
     return <ShadcnCheckbox className={className} {...props} />
   }
 
-  const { checked, onCheckedChange, disabled, name } = props
+  const { checked, onCheckedChange, disabled, name, ...rest } = props
+  // Forward id, aria-*, data-* attributes for accessibility
+  const forwardedProps: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(rest)) {
+    if (key === 'id' || key === 'value' || key.startsWith('aria-') || key.startsWith('data-')) {
+      forwardedProps[key] = val
+    }
+  }
+
   return (
     <KCheckbox
       checked={checked === true}
@@ -49,6 +57,7 @@ function Checkbox({
       disabled={disabled}
       name={name}
       className={className}
+      {...forwardedProps}
     />
   )
 }
