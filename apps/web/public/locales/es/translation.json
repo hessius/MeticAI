@@ -881,7 +881,9 @@
     "platformThemeAuto": "Detectar automáticamente",
     "platformThemeIos": "iOS",
     "platformThemeMaterial": "Material (Android)",
-    "platformThemeNone": "Predeterminado"
+    "platformThemeNone": "Predeterminado",
+    "useKonstaUi": "Usar Konsta UI",
+    "useKonstaUiDescription": "Habilitar componentes móviles nativos (Konsta UI) para una apariencia nativa de la plataforma"
   },
   "advanced": {
     "detailedKnowledge": "Conocimiento detallado de IA",

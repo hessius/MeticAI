@@ -881,7 +881,9 @@
     "platformThemeAuto": "Automatisch",
     "platformThemeIos": "iOS",
     "platformThemeMaterial": "Material (Android)",
-    "platformThemeNone": "Standard"
+    "platformThemeNone": "Standard",
+    "useKonstaUi": "Konsta UI verwenden",
+    "useKonstaUiDescription": "Native mobile Komponenten (Konsta UI) für ein plattformnahes Erscheinungsbild aktivieren"
   },
   "advanced": {
     "detailedKnowledge": "Detailliertes KI-Wissen",

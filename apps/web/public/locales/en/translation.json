@@ -886,7 +886,9 @@
     "platformThemeAuto": "Auto-detect",
     "platformThemeIos": "iOS",
     "platformThemeMaterial": "Material (Android)",
-    "platformThemeNone": "Default"
+    "platformThemeNone": "Default",
+    "useKonstaUi": "Use Konsta UI",
+    "useKonstaUiDescription": "Enable native mobile components (Konsta UI) for a platform-native look and feel"
   },
   "pourOver": {
     "title": "Pour-over",
