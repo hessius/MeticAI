@@ -40,7 +40,7 @@ import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { usePlatformTheme } from '@/hooks/usePlatformTheme'
 import { useKonstaOverride } from '@/hooks/useKonstaOverride'
-import { Sun, Moon } from '@phosphor-icons/react'
+import { Sun, Moon, Gear } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
@@ -859,6 +859,20 @@ function App() {
           className={isHome ? "text-center mb-6 lg:mb-10" : "text-center mb-6"}
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative">
+            {/* Settings gear — left side, home screen only */}
+            {isHome && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                  onClick={() => setViewState('settings')}
+                  aria-label={t('navigation.settings')}
+                >
+                  <Gear size={18} weight="duotone" />
+                </Button>
+              </div>
+            )}
             <div 
               className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={handleTitleClick}
@@ -943,7 +957,6 @@ function App() {
                   onPourOver={() => setViewState('pour-over')}
                   onDialIn={() => setViewState('dial-in')}
                   onShotAnalysis={() => setViewState('shot-analysis')}
-                  onSettings={() => setViewState('settings')}
                   aiConfigured={aiAvailable}
                   hideAiWhenUnavailable={hideAiWhenUnavailable}
                   controlCenter={

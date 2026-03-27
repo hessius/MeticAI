@@ -14,7 +14,9 @@ function detectPlatform(): DetectedPlatform {
   return 'desktop'
 }
 
-/** Resolve which Konsta theme to use based on preference + detected platform. */
+/** Resolve which Konsta theme to use based on preference + detected platform.
+ * Note: 'none' maps to 'material' because Konsta always needs a valid theme.
+ * The 'none' option originally disabled custom CSS themes (now removed). */
 function resolveKonstaTheme(pref: PlatformTheme, detected: DetectedPlatform): KonstaTheme {
   if (pref === 'ios') return 'ios'
   if (pref === 'material') return 'material'
