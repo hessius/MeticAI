@@ -12,6 +12,14 @@ function getStoredValue(): boolean {
   }
 }
 
+function getPlatformThemeIsNone(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.PLATFORM_THEME) === 'none'
+  } catch {
+    return false
+  }
+}
+
 // Shared subscription: single pair of global listeners fans out to all subscribers
 const subscribers = new Set<() => void>()
 let listening = false
@@ -19,7 +27,7 @@ let listening = false
 function ensureListeners() {
   if (typeof window === 'undefined' || listening) return
   window.addEventListener('storage', (e: StorageEvent) => {
-    if (e.key === STORAGE_KEYS.USE_KONSTA_UI) subscribers.forEach(cb => cb())
+    if (e.key === STORAGE_KEYS.USE_KONSTA_UI || e.key === STORAGE_KEYS.PLATFORM_THEME) subscribers.forEach(cb => cb())
   })
   window.addEventListener(KONSTA_CHANGED, () => {
     subscribers.forEach(cb => cb())
@@ -35,12 +43,20 @@ function subscribe(callback: () => void) {
 
 /**
  * Returns true if Konsta UI components should render.
- * True when: viewport is mobile OR the settings toggle is forced on.
+ *
+ * TEMPORARILY DISABLED — always returns false while Konsta layout conflicts
+ * are resolved. See https://github.com/hessius/MeticAI/issues/336
+ * Original logic preserved below for when this is re-enabled.
  */
 export function useKonstaOverride() {
-  const isMobile = useIsMobile()
-  const forced = useSyncExternalStore(subscribe, getStoredValue, () => false)
-  return isMobile || forced
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _isMobile = useIsMobile()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _forced = useSyncExternalStore(subscribe, getStoredValue, () => false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _themeIsNone = useSyncExternalStore(subscribe, getPlatformThemeIsNone, () => false)
+  // Original: if (themeIsNone) return false; return isMobile || forced;
+  return false
 }
 
 /**

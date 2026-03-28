@@ -38,7 +38,11 @@ export function usePlatformTheme() {
 
   const setTheme = useCallback((next: PlatformTheme) => {
     setThemeState(next)
-    try { localStorage.setItem(STORAGE_KEYS.PLATFORM_THEME, next) } catch { /* noop */ }
+    try {
+      localStorage.setItem(STORAGE_KEYS.PLATFORM_THEME, next)
+      // Notify useKonstaOverride subscribers so they re-evaluate when switching to/from 'none'
+      window.dispatchEvent(new Event('konsta-ui-changed'))
+    } catch { /* noop */ }
   }, [])
 
   const konstaTheme = resolveKonstaTheme(theme, platform)

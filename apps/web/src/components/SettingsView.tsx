@@ -6,11 +6,13 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+// Konsta UI settings temporarily hidden — uncomment when re-enabling
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { hasFeature } from '@/lib/featureFlags'
-import { useKonstaToggle } from '@/hooks/useKonstaOverride'
+// Konsta UI settings temporarily hidden — uncomment when re-enabling
+// import { useKonstaToggle } from '@/hooks/useKonstaOverride'
 import { 
   CaretLeft, 
   GithubLogo, 
@@ -104,9 +106,11 @@ const PROGRESS_UPDATE_INTERVAL = 500
 const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
 const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
-export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, platformTheme, onSetPlatformTheme }: SettingsViewProps) {
+export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, platformTheme: _platformTheme, onSetPlatformTheme: _onSetPlatformTheme }: SettingsViewProps) {
   const { t } = useTranslation()
-  const { enabled: useKonstaUi, setEnabled: setUseKonstaUi } = useKonstaToggle()
+  // Konsta UI settings temporarily hidden — uncomment when re-enabling
+  // const { enabled: useKonstaUi, setEnabled: setUseKonstaUi } = useKonstaToggle()
+  void _platformTheme; void _onSetPlatformTheme
   
   const [settings, setSettings] = useState<Settings>({
     geminiApiKey: '',
@@ -1144,8 +1148,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   </div>
                 )}
 
-                {/* Platform theme */}
-                {onSetPlatformTheme !== undefined && (
+                {/* Platform theme — temporarily hidden while Konsta UI layout issues are resolved */}
+                {/* {onSetPlatformTheme !== undefined && (
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="platform-theme-select" className="text-sm font-medium">{t('appearance.platformTheme')}</Label>
@@ -1166,10 +1170,10 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                       </SelectContent>
                     </Select>
                   </div>
-                )}
+                )} */}
 
-                {/* Konsta UI toggle */}
-                <div className="flex items-center justify-between">
+                {/* Konsta UI toggle — temporarily hidden while Konsta UI layout issues are resolved */}
+                {/* <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="konsta-ui-toggle" className="text-sm font-medium">{t('appearance.useKonstaUi')}</Label>
                     <p className="text-xs text-muted-foreground">{t('appearance.useKonstaUiDescription')}</p>
@@ -1179,7 +1183,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                     checked={useKonstaUi}
                     onCheckedChange={setUseKonstaUi}
                   />
-                </div>
+                </div> */}
 
               </div>
             )}

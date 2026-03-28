@@ -259,6 +259,17 @@ function App() {
   const { theme: platformTheme, setTheme: setPlatformTheme, konstaTheme } = usePlatformTheme()
   const useKonsta = useKonstaOverride()
 
+  // Toggle konsta-active class on <html> so CSS can scope conflicting styles
+  useEffect(() => {
+    const el = document.documentElement
+    if (useKonsta) {
+      el.classList.add('konsta-active')
+    } else {
+      el.classList.remove('konsta-active')
+    }
+    return () => { el.classList.remove('konsta-active') }
+  }, [useKonsta])
+
   const isHome = viewState === 'start'
 
   // Check for existing profiles on mount
