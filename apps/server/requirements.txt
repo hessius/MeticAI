@@ -7,5 +7,5 @@ python-multipart==0.0.22
 pyMeticulous>=0.3.1
 zstandard>=0.22.0
 httpx==0.28.1
-sse-starlette==3.3.3
+sse-starlette==3.3.4
 zeroconf==0.148.0
