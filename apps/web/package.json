@@ -117,7 +117,7 @@
         "happy-dom": "^20.8.4",
         "storybook": "^10.2.19",
         "tailwindcss": "^4.2.1",
-        "typescript": "~5.9.3",
+        "typescript": "~6.0.2",
         "typescript-eslint": "^8.57.1",
         "vite": "^8.0.0",
         "vitest": "^4.1.0"
