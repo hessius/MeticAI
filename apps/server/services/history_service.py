@@ -172,6 +172,12 @@ def save_to_history(
         "profile_json": profile_json,
         "image_preview": image_preview  # Optional thumbnail
     }
+
+    # Store initial content hash for sync change detection.
+    # This is a best-effort hash from the local profile JSON — it will be
+    # replaced by the machine-consistent hash after upload succeeds.
+    if profile_json and isinstance(profile_json, dict):
+        entry["content_hash"] = compute_content_hash(profile_json)
     
     # Add to beginning of list (most recent first)
     history.insert(0, entry)

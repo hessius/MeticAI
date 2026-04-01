@@ -2244,13 +2244,15 @@ async def import_profile(request: Request):
         entry_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
         
+        profile_dict = deep_convert_to_dict(profile_json)
         new_entry = {
             "id": entry_id,
             "created_at": created_at,
             "profile_name": profile_name,
             "user_preferences": f"Imported from {source}",
             "reply": reply,
-            "profile_json": deep_convert_to_dict(profile_json),
+            "profile_json": profile_dict,
+            "content_hash": compute_content_hash(profile_dict),
             "imported": True,
             "import_source": source
         }
@@ -2801,7 +2803,18 @@ async def sync_profiles(request: Request):
                 })
             else:
                 stored_hash = entry.get("content_hash")
-                if stored_hash and stored_hash != current_hash:
+                if not stored_hash:
+                    # Backfill: first sync after creation — store the machine
+                    # hash as baseline without flagging as "updated".
+                    try:
+                        update_entry_sync_fields(
+                            entry["id"],
+                            content_hash=current_hash,
+                            profile_json=profile_dict,
+                        )
+                    except Exception:
+                        pass
+                elif stored_hash != current_hash:
                     updated_profiles.append({
                         "profile_id": profile_id,
                         "profile_name": profile_name,
@@ -2940,11 +2953,11 @@ async def accept_sync_update(profile_id: str, request: Request, ai_description: 
 @router.get("/profiles/sync/status")
 @router.get("/api/profiles/sync/status")
 async def sync_status(request: Request):
-    """Quick count of pending sync items for badge display.
+    """Count of pending sync items for badge display.
 
-    This is a lightweight version of the full sync endpoint that avoids
-    fetching every full profile — it only checks existence by name and
-    compares stored hashes where available.
+    Fetches full profiles to compute content hashes so that updated profiles
+    are accurately reflected in the badge count.  Also backfills hashes for
+    history entries that were created before hash tracking was added.
     """
     request_id = request.state.request_id
 
@@ -2970,18 +2983,33 @@ async def sync_status(request: Request):
 
         for partial in profiles_result:
             name = getattr(partial, "name", "")
+            profile_id = getattr(partial, "id", "")
             machine_names.add(name)
             entry = history_by_name.get(name)
             if entry is None:
                 new_count += 1
             else:
-                # For updated detection without a full fetch, we rely on
-                # stored hashes. If no hash stored yet, we can't tell.
                 stored_hash = entry.get("content_hash")
-                if stored_hash:
-                    # We need a full fetch to compare — but for status we
-                    # skip this to stay lightweight.  The full sync will
-                    # detect changes.
+                try:
+                    full = await async_get_profile(profile_id)
+                    if hasattr(full, "error") and full.error:
+                        continue
+                    profile_dict = deep_convert_to_dict(full)
+                    current_hash = compute_content_hash(profile_dict)
+
+                    if not stored_hash:
+                        # Backfill baseline hash silently
+                        try:
+                            update_entry_sync_fields(
+                                entry["id"],
+                                content_hash=current_hash,
+                                profile_json=profile_dict,
+                            )
+                        except Exception:
+                            pass
+                    elif stored_hash != current_hash:
+                        updated_count += 1
+                except Exception:
                     pass
 
         orphan_count = sum(
@@ -3093,15 +3121,21 @@ async def auto_sync_profiles(request: Request):
                 # Existing profile — check for updates
                 existing = history_by_name[profile_name]
                 stored_hash = existing.get("content_hash")
-                if not stored_hash:
-                    continue  # No hash to compare — skip
                 try:
                     full_profile = await async_get_profile(profile_id)
                     if hasattr(full_profile, "error") and full_profile.error:
                         continue
                     profile_dict = deep_convert_to_dict(full_profile)
                     current_hash = compute_content_hash(profile_dict)
-                    if current_hash != stored_hash:
+
+                    if not stored_hash:
+                        # Backfill: store machine hash as baseline (not an update)
+                        update_entry_sync_fields(
+                            existing["id"],
+                            content_hash=current_hash,
+                            profile_json=profile_dict,
+                        )
+                    elif current_hash != stored_hash:
                         new_reply = None
                         if ai_description:
                             try:
