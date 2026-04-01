@@ -1206,7 +1206,7 @@ function App() {
 
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (
-            <aside className="hidden lg:block">
+            <aside className="hidden md:block">
               <div className={`sticky top-4 ${viewState === 'live-shot' ? 'mt-10' : 'mt-2'}`}>
                 {/* Hide control center during live shot — profile breakdown takes over */}
                 {viewState !== 'live-shot' && (
