@@ -1228,12 +1228,12 @@ async def analyze_shot(
                         "name": full_profile.name,
                         "temperature": getattr(full_profile, 'temperature', None),
                         "final_weight": getattr(full_profile, 'final_weight', None),
+                        "description": None,
+                        "user_preferences": None,
                         "variables": [],
                         "stages": []
                     }
-                    
-                        "description": None,
-                        "user_preferences": None,
+
                     if hasattr(full_profile, 'variables') and full_profile.variables:
                         for var in full_profile.variables:
                             var_dict = {
