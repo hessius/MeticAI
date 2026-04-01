@@ -45,7 +45,7 @@ export function StartView({
         <Button
           onClick={onProfileCatalogue ?? onViewHistory}
           variant="dark-brew"
-          className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
         >
           <Coffee size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
           {t('navigation.profileCatalogue')}
@@ -56,7 +56,7 @@ export function StartView({
             onClick={onGenerateNew}
             disabled={!aiConfigured}
             variant="dark-brew"
-            className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+            className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
           >
             <Plus size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
             {t('navigation.generateNewProfile')}
@@ -66,7 +66,7 @@ export function StartView({
         <Button
           onClick={onRunShot}
           variant="dark-brew"
-          className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
         >
           <Play size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
           {t('navigation.runSchedule')}
@@ -75,7 +75,7 @@ export function StartView({
         <Button
           onClick={onDialIn}
           variant="dark-brew"
-          className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
         >
           <Crosshair size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
           {t('dialIn.title')}
@@ -84,7 +84,7 @@ export function StartView({
         <Button
           onClick={onPourOver}
           variant="dark-brew"
-          className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
         >
           <Drop size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
           {t('pourOver.title')}
@@ -93,7 +93,7 @@ export function StartView({
         <Button
           onClick={onShotAnalysis}
           variant="dark-brew"
-          className="w-full h-12 lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
         >
           <ChartLine size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
           {t('navigation.shotAnalysis')}

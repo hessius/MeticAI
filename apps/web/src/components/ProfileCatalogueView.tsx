@@ -20,7 +20,8 @@ import {
   CheckCircle,
   SpinnerGap,
   FileJs,
-  X
+  X,
+  UploadSimple
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
@@ -28,6 +29,7 @@ import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
+import { ProfileImportDialog } from './ProfileImportDialog'
 import { SyncReport, SyncResults } from './SyncReport'
 
 interface MachineProfile {
@@ -145,6 +147,8 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   const [profiles, setProfiles] = useState<MachineProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   
   // Rename state
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -204,7 +208,8 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
       }
       
       const data = await response.json()
-      setProfiles(data.profiles || [])
+      setIsOffline(data.offline === true)
+      setProfiles(Array.isArray(data?.profiles) ? data.profiles : [])
     } catch (err) {
       const message = err instanceof Error ? err.message : t('profileCatalogue.fetchFailed')
       setError(message)
@@ -474,6 +479,14 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
               <ArrowsClockwise className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               {t('profileCatalogue.refresh')}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowImportDialog(true)}
+            >
+              <UploadSimple className="w-4 h-4 mr-2" />
+              {t('profileCatalogue.importButton')}
+            </Button>
           </div>
         </div>
 
@@ -517,6 +530,16 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
               {t('profileCatalogue.sync.autoSyncAiDescription')}
             </Label>
           </div>
+        )}
+
+        {/* Offline banner */}
+        {isOffline && (
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <Warning className="w-4 h-4 text-amber-500" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              {t('profileCatalogue.offlineBanner')}
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Orphan warning banner */}
@@ -781,6 +804,13 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           fetchOrphaned()
           fetchSyncStatus()
         }}
+      />
+
+      <ProfileImportDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImported={() => { setShowImportDialog(false); fetchProfiles(); fetchOrphaned() }}
+        onGenerateNew={() => setShowImportDialog(false)}
       />
     </div>
   )

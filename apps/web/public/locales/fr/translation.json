@@ -115,9 +115,9 @@
     }
   },
   "navigation": {
-    "generateNewProfile": "Générer nouveau profil",
-    "profileCatalogue": "Catalogue de profils",
-    "runSchedule": "Exécuter / Programmer",
+    "generateNewProfile": "Nouveau profil",
+    "profileCatalogue": "Profils",
+    "runSchedule": "Lancer shot",
     "pourOver": "Pour-over",
     "shotAnalysis": "Analyse d'extraction",
     "settings": "Paramètres",
@@ -1098,6 +1098,8 @@
       "deleteProfileFailed": "Échec de la suppression du profil"
     },
     "fetchFailed": "Échec du chargement des profils",
+    "offlineBanner": "Machine hors ligne — affichage des profils en cache",
+    "importButton": "Importer",
     "syncFailed": "Échec de la synchronisation",
     "renameFailed": "Échec du renommage du profil",
     "exportFailed": "Échec de l'exportation du profil",

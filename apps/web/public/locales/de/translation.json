@@ -115,9 +115,9 @@
     }
   },
   "navigation": {
-    "generateNewProfile": "Neues Profil generieren",
-    "profileCatalogue": "Profilkatalog",
-    "runSchedule": "Ausführen / Planen",
+    "generateNewProfile": "Neues Profil",
+    "profileCatalogue": "Profile",
+    "runSchedule": "Shot starten",
     "pourOver": "Pour-over",
     "shotAnalysis": "Bezugs-Analyse",
     "settings": "Einstellungen",
@@ -1098,6 +1098,8 @@
       "deleteProfileFailed": "Profil konnte nicht gelöscht werden"
     },
     "fetchFailed": "Fehler beim Laden der Profile",
+    "offlineBanner": "Maschine ist offline — zwischengespeicherte Profile werden angezeigt",
+    "importButton": "Importieren",
     "syncFailed": "Synchronisierung fehlgeschlagen",
     "renameFailed": "Fehler beim Umbenennen des Profils",
     "exportFailed": "Fehler beim Exportieren des Profils",

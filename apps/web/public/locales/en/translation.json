@@ -115,9 +115,9 @@
     }
   },
   "navigation": {
-    "generateNewProfile": "Generate New Profile",
-    "profileCatalogue": "Profile Catalogue",
-    "runSchedule": "Run / Schedule",
+    "generateNewProfile": "New Profile",
+    "profileCatalogue": "Profiles",
+    "runSchedule": "Run Shot",
     "pourOver": "Pour-over",
     "shotAnalysis": "Shot Analysis",
     "settings": "Settings",
@@ -1044,6 +1044,8 @@
       "deleteProfileFailed": "Failed to delete profile"
     },
     "fetchFailed": "Failed to load profiles",
+    "offlineBanner": "Machine is offline — showing cached profiles",
+    "importButton": "Import",
     "syncFailed": "Sync failed",
     "renameFailed": "Failed to rename profile",
     "exportFailed": "Failed to export profile",

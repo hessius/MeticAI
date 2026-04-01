@@ -32,6 +32,7 @@ from services.meticulous_service import (
     async_load_profile_by_id,
     async_execute_action,
     async_delete_profile,
+    MachineUnreachableError,
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
@@ -1752,6 +1753,44 @@ async def list_machine_profiles(request: Request):
             "total": len(profiles)
         }
         
+    except MachineUnreachableError:
+        # Offline fallback — return profiles from history
+        logger.info(
+            "Machine unreachable, returning history-based profiles",
+            extra={"request_id": request_id}
+        )
+        try:
+            history = load_history()
+            entries = history if isinstance(history, list) else history.get("entries", [])
+            profiles = []
+            seen: set[str] = set()
+            for entry in entries:
+                name = entry.get("profile_name")
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                pj = entry.get("profile_json") or {}
+                profiles.append({
+                    "id": entry.get("id", ""),
+                    "name": name,
+                    "author": pj.get("author"),
+                    "temperature": pj.get("temperature"),
+                    "final_weight": pj.get("final_weight"),
+                    "in_history": True,
+                    "has_description": bool(entry.get("reply")),
+                })
+            return {
+                "status": "success",
+                "profiles": profiles,
+                "total": len(profiles),
+                "offline": True,
+            }
+        except Exception as fallback_err:
+            logger.warning(
+                f"Offline fallback also failed: {fallback_err}",
+                extra={"request_id": request_id}
+            )
+            raise MachineUnreachableError() from fallback_err
     except HTTPException:
         raise
     except Exception as e:

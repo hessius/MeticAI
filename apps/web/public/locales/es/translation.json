@@ -115,9 +115,9 @@
     }
   },
   "navigation": {
-    "generateNewProfile": "Generar nuevo perfil",
-    "profileCatalogue": "Catálogo de perfiles",
-    "runSchedule": "Ejecutar / Programar",
+    "generateNewProfile": "Nuevo perfil",
+    "profileCatalogue": "Perfiles",
+    "runSchedule": "Ejecutar shot",
     "pourOver": "Pour-over",
     "shotAnalysis": "Análisis de extracción",
     "settings": "Configuración",
@@ -1098,6 +1098,8 @@
       "deleteProfileFailed": "Error al eliminar el perfil"
     },
     "fetchFailed": "Error al cargar perfiles",
+    "offlineBanner": "Máquina desconectada — mostrando perfiles en caché",
+    "importButton": "Importar",
     "syncFailed": "Error de sincronización",
     "renameFailed": "Error al renombrar perfil",
     "exportFailed": "Error al exportar perfil",
