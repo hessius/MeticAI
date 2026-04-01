@@ -57,6 +57,12 @@ interface OrphanedEntry {
   has_profile_json: boolean
 }
 
+interface HistoryEntrySummary {
+  id: string
+  profile_name: string
+  created_at?: string
+}
+
 interface ProfileCatalogueViewProps {
   onBack: () => void
   onViewProfile?: (profile: MachineProfile) => void
@@ -91,7 +97,7 @@ function SwipeableCard({
     <div className="relative overflow-hidden rounded-lg">
       {/* Delete action revealed behind card */}
       <motion.div
-        className="absolute inset-y-0 right-0 flex items-center justify-center w-20 bg-destructive text-destructive-foreground rounded-r-lg"
+        className="absolute inset-0 flex items-center justify-end pr-6 bg-destructive text-destructive-foreground rounded-lg"
         style={{ opacity: deleteOpacity, scale: deleteScale }}
       >
         <Trash className="w-6 h-6" />
@@ -103,7 +109,7 @@ function SwipeableCard({
         dragElastic={0.1}
         onDragEnd={handleDragEnd}
         style={{ x }}
-        className="relative z-10"
+        className="relative z-10 rounded-lg overflow-hidden"
       >
         {children}
       </motion.div>
@@ -167,6 +173,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   // Orphan state
   const [orphanedEntries, setOrphanedEntries] = useState<OrphanedEntry[]>([])
   const [orphanDialogOpen, setOrphanDialogOpen] = useState(false)
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntrySummary[]>([])
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
@@ -239,6 +246,32 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
     }
   }, [])
 
+  // Fetch history entries for reliable profile-name -> history-id resolution
+  const fetchHistoryEntries = useCallback(async () => {
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+      if (!response.ok) return
+
+      const data = await response.json()
+      const entries = Array.isArray(data?.entries) ? data.entries : []
+
+      setHistoryEntries(
+        entries
+          .filter((entry): entry is HistoryEntrySummary => (
+            typeof entry?.id === 'string' && typeof entry?.profile_name === 'string'
+          ))
+          .map((entry) => ({
+            id: entry.id,
+            profile_name: entry.profile_name,
+            created_at: typeof entry.created_at === 'string' ? entry.created_at : undefined,
+          }))
+      )
+    } catch {
+      // Non-critical — silently ignore
+    }
+  }, [])
+
   // Fetch sync status badge count
   const fetchSyncStatus = useCallback(async () => {
     try {
@@ -283,8 +316,9 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   useEffect(() => {
     fetchProfiles()
     fetchOrphaned()
+    fetchHistoryEntries()
     fetchSyncStatus()
-  }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
+  }, [fetchProfiles, fetchOrphaned, fetchHistoryEntries, fetchSyncStatus])
 
   // Fetch profile images when profile list changes
   useEffect(() => {
@@ -300,20 +334,35 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
     const refreshInterval = setInterval(() => {
       fetchProfiles()
       fetchOrphaned()
+      fetchHistoryEntries()
       fetchSyncStatus()
     }, 5 * 60 * 1000)
     return () => clearInterval(refreshInterval)
-  }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchSyncStatus])
+  }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchHistoryEntries, fetchSyncStatus])
 
   // Find history ID for a profile by name
   const findHistoryId = useCallback(
     (profileName: string): string | undefined => {
-      const orphan = orphanedEntries.find(
-        (e) => e.profile_name === profileName
+      const normalizedProfileName = profileName.trim().toLowerCase()
+      const matches = historyEntries.filter(
+        (entry) => entry.profile_name.trim().toLowerCase() === normalizedProfileName
       )
-      return orphan?.id
+
+      if (matches.length === 0) {
+        return undefined
+      }
+
+      const sortedMatches = [...matches].sort((a, b) => {
+        const aTime = a.created_at ? Date.parse(a.created_at) : Number.NEGATIVE_INFINITY
+        const bTime = b.created_at ? Date.parse(b.created_at) : Number.NEGATIVE_INFINITY
+        const aValid = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY
+        const bValid = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY
+        return bValid - aValid
+      })
+
+      return sortedMatches[0]?.id
     },
-    [orphanedEntries]
+    [historyEntries]
   )
   
   // Rename profile
@@ -366,6 +415,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
     setDeleteTarget(null)
     fetchProfiles()
     fetchOrphaned()
+    fetchHistoryEntries()
   }
   
   // Export profile JSON
@@ -942,6 +992,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           setBulkDeleteOpen(false)
           fetchProfiles()
           fetchOrphaned()
+          fetchHistoryEntries()
           fetchSyncStatus()
         }}
       />
@@ -963,6 +1014,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           setOrphanDialogOpen(false)
           fetchProfiles()
           fetchOrphaned()
+          fetchHistoryEntries()
         }}
       />
 
@@ -974,6 +1026,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           setSyncResults(null)
           fetchProfiles()
           fetchOrphaned()
+          fetchHistoryEntries()
           fetchSyncStatus()
         }}
       />
@@ -981,7 +1034,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
       <ProfileImportDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
-        onImported={() => { setShowImportDialog(false); fetchProfiles(); fetchOrphaned() }}
+        onImported={() => { setShowImportDialog(false); fetchProfiles(); fetchOrphaned(); fetchHistoryEntries() }}
         onGenerateNew={() => setShowImportDialog(false)}
       />
     </div>
