@@ -439,8 +439,6 @@
     },
     "runsOn": "Runs on",
     "andCaffeine": "and caffeine ☕",
-    "saveSettings": "Save Settings",
-    "saving": "Saving...",
     "settingsSaved": "Settings saved successfully!",
     "settingsSaveFailed": "Failed to save settings",
     "changelog": "Changelog",
@@ -543,7 +541,10 @@
     "betaChannelFailed": "Failed to switch beta channel",
     "geminiModel25Flash": "Gemini 2.5 Flash (Recommended)",
     "geminiModel25Pro": "Gemini 2.5 Pro",
-    "geminiModel20Flash": "Gemini 2.0 Flash"
+    "geminiModel20Flash": "Gemini 2.0 Flash",
+    "aiSettings": "AI Settings",
+    "versionAndChangelog": "Version & Changelog",
+    "mqttBridge": "MQTT Bridge"
   },
   "profileBreakdown": {
     "title": "Profile Details",

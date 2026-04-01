@@ -428,8 +428,6 @@
     "geminiModelDescription": "Seleziona quale modello Gemini utilizzare per le funzioni IA.",
     "mqttEnabled": "Bridge MQTT",
     "mqttEnabledDescription": "Telemetria macchina in tempo reale via MQTT. Alimenta la dashboard di controllo dal vivo.",
-    "saveSettings": "Salva impostazioni",
-    "saving": "Salvataggio...",
     "settingsSaved": "Impostazioni salvate con successo!",
     "settingsSaveFailed": "Impossibile salvare le impostazioni",
     "changelog": "Registro modifiche",
@@ -543,7 +541,10 @@
     "feedbackFailed": "Impossibile inviare il feedback",
     "geminiModel25Flash": "Gemini 2.5 Flash (Consigliato)",
     "geminiModel25Pro": "Gemini 2.5 Pro",
-    "geminiModel20Flash": "Gemini 2.0 Flash"
+    "geminiModel20Flash": "Gemini 2.0 Flash",
+    "aiSettings": "Impostazioni IA",
+    "versionAndChangelog": "Versione e registro modifiche",
+    "mqttBridge": "Bridge MQTT"
   },
   "profileBreakdown": {
     "title": "Dettagli profilo",

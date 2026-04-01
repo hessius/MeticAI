@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -10,13 +10,13 @@ import { Switch } from '@/components/ui/switch'
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { hasFeature } from '@/lib/featureFlags'
 // Konsta UI settings temporarily hidden — uncomment when re-enabling
 // import { useKonstaToggle } from '@/hooks/useKonstaOverride'
 import { 
   CaretLeft, 
   GithubLogo, 
-  FloppyDisk, 
   CheckCircle, 
   Warning, 
   ArrowsClockwise,
@@ -119,9 +119,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
     geminiModel: 'gemini-2.5-flash',
     mqttEnabled: true
   })
-  const [isSaving, setIsSaving] = useState(false)
   const [isRestarting, setIsRestarting] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -362,76 +361,68 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
     }
   }, [changelogExpanded, loadReleaseNotes])
 
-  const handleSave = async () => {
-    setIsSaving(true)
-    setSaveStatus('idle')
-    setErrorMessage('')
+  // Debounced auto-save
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSaveFadeRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    try {
-      if (isDirectMode()) {
-        // In direct mode, persist to localStorage
-        if (settings.geminiApiKey && !settings.geminiApiKey.startsWith('*')) {
-          localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, settings.geminiApiKey)
+  const debouncedSave = useCallback((nextSettings: Settings) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        if (isDirectMode()) {
+          if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
+            localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
+          }
+          if (nextSettings.authorName) {
+            localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, nextSettings.authorName)
+          }
+          if (nextSettings.geminiModel) {
+            localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, nextSettings.geminiModel)
+          }
+        } else {
+          const serverUrl = await getServerUrl()
+          const payload: Record<string, string | boolean | undefined> = {
+            authorName: nextSettings.authorName,
+            meticulousIp: nextSettings.meticulousIp,
+            mqttEnabled: nextSettings.mqttEnabled,
+            geminiModel: nextSettings.geminiModel,
+          }
+          if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
+            payload.geminiApiKey = nextSettings.geminiApiKey
+            payload.geminiApiKeyMasked = false
+          }
+          const response = await fetch(`${serverUrl}/api/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (!response.ok) {
+            let errorMsg = t('settings.settingsSaveFailed')
+            try {
+              const error = await response.json()
+              errorMsg = error.detail?.message || error.detail || errorMsg
+            } catch { /* use default */ }
+            throw new Error(errorMsg)
+          }
         }
-        if (settings.authorName) {
-          localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, settings.authorName)
-        }
-        if (settings.geminiModel) {
-          localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, settings.geminiModel)
-        }
-        setSaveStatus('success')
-        setTimeout(() => setSaveStatus('idle'), 3000)
-        return
+        setAutoSaveStatus('saved')
+        if (autoSaveFadeRef.current) clearTimeout(autoSaveFadeRef.current)
+        autoSaveFadeRef.current = setTimeout(() => setAutoSaveStatus('idle'), 2000)
+      } catch (err) {
+        setAutoSaveStatus('error')
+        setErrorMessage(err instanceof Error ? err.message : t('settings.settingsSaveFailed'))
+        if (autoSaveFadeRef.current) clearTimeout(autoSaveFadeRef.current)
+        autoSaveFadeRef.current = setTimeout(() => setAutoSaveStatus('idle'), 4000)
       }
-
-      const serverUrl = await getServerUrl()
-      
-      // Build the payload, only including fields that should be sent
-      const payload: Record<string, string | boolean | undefined> = {
-        authorName: settings.authorName,
-        meticulousIp: settings.meticulousIp,
-        mqttEnabled: settings.mqttEnabled,
-        geminiModel: settings.geminiModel,
-      }
-      
-      // Only send API key if user actually typed a new value (not the masked stars)
-      if (settings.geminiApiKey && !settings.geminiApiKey.startsWith('*')) {
-        payload.geminiApiKey = settings.geminiApiKey
-        payload.geminiApiKeyMasked = false
-      }
-      
-      const response = await fetch(`${serverUrl}/api/settings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (response.ok) {
-        setSaveStatus('success')
-        setTimeout(() => setSaveStatus('idle'), 3000)
-      } else {
-        let errorMsg = t('settings.settingsSaveFailed')
-        try {
-          const error = await response.json()
-          errorMsg = error.detail?.message || error.detail || errorMsg
-        } catch {
-          // Use default message
-        }
-        throw new Error(errorMsg)
-      }
-    } catch (err) {
-      setSaveStatus('error')
-      setErrorMessage(err instanceof Error ? err.message : t('settings.settingsSaveFailed'))
-    } finally {
-      setIsSaving(false)
-    }
-  }
+    }, 800)
+  }, [t])
 
   const handleChange = (field: keyof Settings, value: string) => {
-    setSettings(prev => ({ ...prev, [field]: value }))
-    setSaveStatus('idle')
+    setSettings(prev => {
+      const next = { ...prev, [field]: value }
+      debouncedSave(next)
+      return next
+    })
   }
 
   const handleDetectMachine = async () => {
@@ -720,7 +711,35 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
         >
           <CaretLeft size={22} weight="bold" />
         </Button>
-        <h2 className="text-xl font-bold">{t('settings.title')}</h2>
+        <div>
+          <h2 className="text-xl font-bold">{t('settings.title')}</h2>
+          {versionInfo?.version && (
+            <p className="text-xs text-muted-foreground">v{versionInfo.version.replace(/^v/, '')}</p>
+          )}
+        </div>
+        {/* Auto-save indicator */}
+        <AnimatePresence>
+          {autoSaveStatus === 'saved' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="ml-auto"
+            >
+              <CheckCircle size={18} className="text-success" weight="fill" />
+            </motion.div>
+          )}
+          {autoSaveStatus === 'error' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="ml-auto"
+            >
+              <Warning size={18} className="text-destructive" weight="fill" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* About Section - Collapsible, collapsed by default */}
@@ -821,10 +840,26 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               <LanguageSelector variant="outline" showLabel={true} />
             </div>
 
-            {/* AI Assistant */}
-            <div className="space-y-3 pt-2 border-t border-border">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{t('settings.aiAssistant')}</h3>
+            {/* AI Settings — CollapsibleSection */}
+            <CollapsibleSection title={t('settings.aiSettings')} defaultOpen={false}>
               <p className="text-xs text-muted-foreground">{t('settings.aiAssistantDescription')}</p>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="ai-enabled-toggle" className="text-sm font-medium">{t('settings.enableAiFeatures')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.enableAiFeaturesDescription')}</p>
+                </div>
+                <Switch
+                  id="ai-enabled-toggle"
+                  checked={aiEnabled}
+                  onCheckedChange={(checked) => {
+                    const next = checked as boolean
+                    setAiEnabledState(next)
+                    setAiEnabled(next)
+                  }}
+                  disabled={!hasGeminiKey}
+                />
+              </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -871,21 +906,24 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 </p>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="ai-enabled-toggle" className="text-sm font-medium">{t('settings.enableAiFeatures')}</Label>
-                  <p className="text-xs text-muted-foreground">{t('settings.enableAiFeaturesDescription')}</p>
-                </div>
-                <Switch
-                  id="ai-enabled-toggle"
-                  checked={aiEnabled}
-                  onCheckedChange={(checked) => {
-                    const next = checked as boolean
-                    setAiEnabledState(next)
-                    setAiEnabled(next)
-                  }}
-                  disabled={!hasGeminiKey}
-                />
+              {/* Gemini Model */}
+              <div className="space-y-2">
+                <Label htmlFor="geminiModel" className="text-sm font-medium">
+                  {t('settings.geminiModel')}
+                </Label>
+                <select
+                  id="geminiModel"
+                  value={settings.geminiModel || 'gemini-2.5-flash'}
+                  onChange={(e) => handleChange('geminiModel', e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
+                  <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
+                  <option value="gemini-2.0-flash">{t('settings.geminiModel20Flash')}</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.geminiModelDescription')}
+                </p>
               </div>
 
               <div className="flex items-center justify-between">
@@ -903,9 +941,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   }}
                 />
               </div>
-
-
-            </div>
+            </CollapsibleSection>
 
             {/* Meticulous IP — hidden in direct mode (IP is implicit) */}
             {!isDirectMode() && (
@@ -984,40 +1020,22 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               </p>
             </div>
 
-            {/* Gemini Model */}
-            <div className="space-y-2">
-              <Label htmlFor="geminiModel" className="text-sm font-medium">
-                {t('settings.geminiModel')}
-              </Label>
-              <select
-                id="geminiModel"
-                value={settings.geminiModel || 'gemini-2.5-flash'}
-                onChange={(e) => handleChange('geminiModel', e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
-                <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
-                <option value="gemini-2.0-flash">{t('settings.geminiModel20Flash')}</option>
-              </select>
-              <p className="text-xs text-muted-foreground">
-                {t('settings.geminiModelDescription')}
-              </p>
-            </div>
-
             {/* MQTT Bridge */}
-            {hasFeature('bridgeStatus') && <div className="space-y-3 pt-2 border-t border-border">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Control Center</h3>
+            {hasFeature('bridgeStatus') && <CollapsibleSection
+              title={t('settings.mqttBridge')}
+              trailing={
                 <a
                   href="https://github.com/hessius/MeticAI/blob/main/HOME_ASSISTANT.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-primary transition-colors"
                   title={t('settings.homeAssistantGuide')}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <Question size={14} weight="bold" />
                 </a>
-              </div>
+              }
+            >
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="mqtt-toggle" className="text-sm font-medium">
@@ -1031,8 +1049,11 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   id="mqtt-toggle"
                   checked={settings.mqttEnabled}
                   onCheckedChange={(checked) => {
-                    setSettings(prev => ({ ...prev, mqttEnabled: checked as boolean }))
-                    setSaveStatus('idle')
+                    setSettings(prev => {
+                      const next = { ...prev, mqttEnabled: checked as boolean }
+                      debouncedSave(next)
+                      return next
+                    })
                   }}
                 />
               </div>
@@ -1094,13 +1115,11 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   </Button>
                 </div>
               </div>
-            </div>}
+            </CollapsibleSection>}
 
             {/* Appearance */}
             {(onToggleBlobs !== undefined || onToggleTheme !== undefined || onSetPlatformTheme !== undefined) && (
-              <div className="space-y-3 pt-2 border-t border-border">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">{t('appearance.title')}</h3>
-                
+              <CollapsibleSection title={t('appearance.title')} defaultOpen={false}>
                 {/* Theme toggle */}
                 {onToggleTheme !== undefined && (
                   <div className="flex items-center justify-between">
@@ -1188,351 +1207,395 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               </div>
             )}
 
-            {/* Save Button */}
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              className="w-full"
-            >
-              {isSaving ? (
-                t('settings.saving')
-              ) : (
-                <>
-                  <FloppyDisk size={18} className="mr-2" weight="bold" />
-                  {t('settings.saveSettings')}
-                </>
-              )}
-            </Button>
+            {/* Remote Access (Tailscale) — hidden in direct/PWA mode */}
+            {hasFeature('tailscaleConfig') && (
+              <CollapsibleSection
+                title={t('settings.tailscale.title')}
+                trailing={
+                  <>
+                    {tailscaleStatus?.connected && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="text-xs text-green-600 dark:text-green-400 font-medium">{t('settings.tailscale.connected')}</span>
+                      </div>
+                    )}
+                    <a
+                      href="https://github.com/hessius/MeticAI/blob/main/TAILSCALE.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      title={t('settings.tailscale.setupGuide')}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Question size={14} weight="bold" />
+                    </a>
+                  </>
+                }
+              >
+                {/* External URL — prominent when connected */}
+                {tailscaleStatus?.connected && tailscaleStatus.external_url && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <LinkIcon size={16} className="text-primary" weight="bold" />
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('settings.tailscale.remoteUrl')}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <a 
+                        href={tailscaleStatus.external_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-mono text-primary hover:underline break-all flex-1"
+                      >
+                        {tailscaleStatus.external_url}
+                      </a>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 h-8 w-8"
+                        onClick={() => {
+                          navigator.clipboard.writeText(tailscaleStatus.external_url!)
+                        }}
+                        title={t('settings.tailscale.copyUrl')}
+                      >
+                        <Copy size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-            {/* Status Messages */}
-            {saveStatus === 'success' && (
-              <Alert className="bg-success/10 border-success/20">
-                <CheckCircle size={16} className="text-success" weight="fill" />
-                <AlertDescription className="text-sm text-success">
-                  {t('settings.settingsSaved')}
-                </AlertDescription>
-              </Alert>
+                {/* Enable/disable toggle */}
+                <div className="flex items-center justify-between py-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="tailscale-toggle" className="text-sm font-medium">
+                      {t('settings.tailscale.enableLabel')}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.tailscale.enableDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="tailscale-toggle"
+                    checked={tailscaleStatus?.enabled ?? false}
+                    onCheckedChange={(checked) => handleTailscaleToggle(checked as boolean)}
+                    disabled={tailscaleSaving}
+                  />
+                </div>
+                
+                {/* Auth key input — show when enabled */}
+                {tailscaleStatus?.enabled && (
+                  <div className="space-y-3 pt-2 border-t border-border/50">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="tailscale-auth-key" className="text-sm font-medium">
+                          {t('settings.tailscale.authKeyLabel')}
+                        </Label>
+                        {tailscaleStatus.auth_key_configured && (
+                          <span className="text-xs text-success flex items-center gap-1">
+                            <CheckCircle size={12} weight="fill" />
+                            {t('settings.configured')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="tailscale-auth-key"
+                          type="password"
+                          value={tailscaleAuthKey}
+                          onChange={(e) => setTailscaleAuthKey(e.target.value)}
+                          placeholder={tailscaleStatus.auth_key_configured 
+                            ? t('settings.tailscale.authKeyPlaceholderExisting')
+                            : t('settings.tailscale.authKeyPlaceholder')
+                          }
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={handleTailscaleAuthKeySave}
+                          disabled={tailscaleSaving || !tailscaleAuthKey.trim()}
+                        >
+                          <Key size={16} className="mr-1.5" weight="bold" />
+                          {t('settings.tailscale.saveKey')}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {t('settings.tailscale.authKeyDescription')}{' '}
+                        <a 
+                          href="https://login.tailscale.com/admin/settings/keys"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {t('settings.tailscale.getAuthKey')}
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Connection status details — show when enabled */}
+                {tailscaleStatus?.enabled && (
+                  <div className="space-y-2 pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between py-1.5">
+                      <span className="text-sm text-muted-foreground">{t('settings.tailscale.status')}</span>
+                      <div className="flex items-center gap-2">
+                        {tailscaleStatus.connected ? (
+                          <WifiHigh size={16} className="text-green-500" weight="bold" />
+                        ) : tailscaleStatus.installed ? (
+                          <WifiSlash size={16} className="text-yellow-500" weight="bold" />
+                        ) : (
+                          <WifiSlash size={16} className="text-muted-foreground" weight="bold" />
+                        )}
+                        <span className="text-sm">
+                          {tailscaleStatus.connected 
+                            ? t('settings.tailscale.connected')
+                            : tailscaleStatus.installed
+                              ? t('settings.tailscale.disconnected')
+                              : t('settings.tailscale.notRunning')
+                          }
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {tailscaleStatus.hostname && (
+                      <div className="flex justify-between items-center py-1.5">
+                        <span className="text-sm text-muted-foreground">{t('settings.tailscale.hostname')}</span>
+                        <span className="text-sm font-mono">{tailscaleStatus.hostname}</span>
+                      </div>
+                    )}
+                    
+                    {tailscaleStatus.ip && (
+                      <div className="flex justify-between items-center py-1.5">
+                        <span className="text-sm text-muted-foreground">{t('settings.tailscale.ip')}</span>
+                        <span className="text-sm font-mono">{tailscaleStatus.ip}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Auth key expired warning */}
+                {tailscaleStatus?.auth_key_expired && (
+                  <>
+                    <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                      <Warning size={16} className="text-yellow-600" weight="fill" />
+                      <AlertDescription className="text-sm text-yellow-700 dark:text-yellow-400">
+                        {t('settings.tailscale.authKeyExpired')}
+                      </AlertDescription>
+                    </Alert>
+                    {tailscaleStatus.login_url && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => window.open(tailscaleStatus.login_url!, '_blank')}
+                      >
+                        <Globe size={18} className="mr-2" />
+                        {t('settings.tailscale.renewKey')}
+                      </Button>
+                    )}
+                  </>
+                )}
+                
+                {/* Setup guide — show when enabled but not connected */}
+                {tailscaleStatus?.enabled && !tailscaleStatus?.connected && !tailscaleStatus?.auth_key_expired && (
+                  <div className="rounded-md bg-muted/50 p-3 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.setupTitle')}</p>
+                    <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
+                      <li>{t('settings.tailscale.setupStep1')}</li>
+                      <li>{t('settings.tailscale.setupStep2')}</li>
+                      <li>{t('settings.tailscale.setupStep3')}</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* Remote access guide — show when connected */}
+                {tailscaleStatus?.connected && (
+                  <div className="rounded-md bg-muted/50 p-3 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.guideTitle')}</p>
+                    <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
+                      <li>{t('settings.tailscale.guideStep1')}</li>
+                      <li>{t('settings.tailscale.guideStep2')}</li>
+                      <li>
+                        {t('settings.tailscale.guideStep3')}{' '}
+                        {tailscaleStatus.external_url && (
+                          <a 
+                            href={tailscaleStatus.external_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-primary hover:underline"
+                          >
+                            {tailscaleStatus.external_url}
+                          </a>
+                        )}
+                      </li>
+                    </ol>
+                  </div>
+                )}
+                
+                {/* Save status messages */}
+                {tailscaleSaveStatus === 'success' && (
+                  <Alert className="bg-success/10 border-success/20">
+                    <CheckCircle size={16} className="text-success" weight="fill" />
+                    <AlertDescription className="text-sm text-success">
+                      {tailscaleMessage}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {tailscaleSaveStatus === 'error' && (
+                  <Alert variant="destructive">
+                    <Warning size={16} weight="fill" />
+                    <AlertDescription className="text-sm">
+                      {tailscaleMessage}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CollapsibleSection>
             )}
 
-            {saveStatus === 'error' && (
-              <Alert variant="destructive">
-                <Warning size={16} weight="fill" />
-                <AlertDescription className="text-sm">
-                  {errorMessage}
-                </AlertDescription>
-              </Alert>
+            {/* Beta Testing */}
+            {hasFeature('watchtowerUpdate') && (
+              <CollapsibleSection title={t('settings.beta.title')} defaultOpen={false}>
+                {/* Beta channel toggle */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <label htmlFor="beta-channel-switch" className="font-medium cursor-pointer">{t('settings.beta.enableUpdates')}</label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.beta.enableDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="beta-channel-switch"
+                    checked={betaChannelEnabled}
+                    onCheckedChange={handleBetaChannelToggle}
+                    disabled={betaSwitching}
+                    aria-label={t('settings.beta.enableUpdates')}
+                  />
+                </div>
+
+                {/* Warning about beta versions */}
+                <Alert className="bg-yellow-500/10 border-yellow-500/30">
+                  <Warning size={16} className="text-yellow-500" />
+                  <AlertDescription className="text-sm">
+                    {t('settings.beta.warning')}
+                  </AlertDescription>
+                </Alert>
+
+                {/* Current channel indicator */}
+                <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/50">
+                  <div className={`w-2 h-2 rounded-full ${betaChannelEnabled ? 'bg-yellow-500' : 'bg-green-500'}`} />
+                  <span className="text-sm">
+                    {t('settings.beta.currentChannel')}: <strong>{betaChannelEnabled ? 'Beta' : 'Stable'}</strong>
+                  </span>
+                </div>
+
+                {/* Cross-channel notifications */}
+                {showBetaAvailable && (
+                  <Alert className="bg-blue-500/10 border-blue-500/30">
+                    <Info size={16} className="text-blue-500" />
+                    <AlertDescription className="text-sm">
+                      {t('settings.beta.betaAvailable', { version: latestBetaVersion })}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {showStableCaughtUp && (
+                  <Alert className="bg-green-500/10 border-green-500/30">
+                    <CheckCircle size={16} className="text-green-500" />
+                    <AlertDescription className="text-sm">
+                      {t('settings.beta.stableCaughtUp', { version: latestStableVersion })}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Feedback section - only visible in beta mode */}
+                {betaChannelEnabled && (
+                  <div className="space-y-3 pt-2 border-t border-border/40">
+                    <h4 className="font-medium">{t('settings.beta.sendFeedback')}</h4>
+                    
+                    {/* Feedback type selector */}
+                    <div className="flex gap-2 flex-wrap">
+                      {(['bug', 'feature', 'question', 'general'] as const).map((type) => (
+                        <Button
+                          key={type}
+                          variant={feedbackType === type ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setFeedbackType(type)}
+                        >
+                          {t(`settings.beta.feedbackType.${type}`)}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Feedback form */}
+                    <div className="space-y-2">
+                      <Label htmlFor="feedback-title">{t('settings.beta.feedbackTitle')}</Label>
+                      <Input
+                        id="feedback-title"
+                        value={feedbackTitle}
+                        onChange={(e) => setFeedbackTitle(e.target.value)}
+                        placeholder={t('settings.beta.feedbackTitlePlaceholder')}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="feedback-description">{t('settings.beta.feedbackDescription')}</Label>
+                      <textarea
+                        id="feedback-description"
+                        value={feedbackDescription}
+                        onChange={(e) => setFeedbackDescription(e.target.value)}
+                        placeholder={t('settings.beta.feedbackDescriptionPlaceholder')}
+                        className="w-full h-24 px-3 py-2 rounded-md border border-input bg-background text-sm resize-none"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleFeedbackSubmit}
+                      disabled={feedbackSubmitting || !feedbackTitle.trim() || !feedbackDescription.trim()}
+                      className="w-full"
+                    >
+                      {feedbackSubmitting ? (
+                        <ArrowClockwise size={18} className="animate-spin mr-2" />
+                      ) : null}
+                      {t('settings.beta.submitFeedback')}
+                    </Button>
+
+                    {/* Feedback result */}
+                    {feedbackResult && (
+                      <Alert className={feedbackResult.status === 'success' ? 'bg-green-500/10 border-green-500/30' : feedbackResult.status === 'error' ? 'bg-red-500/10 border-red-500/30' : 'bg-blue-500/10 border-blue-500/30'}>
+                        {feedbackResult.status === 'success' ? (
+                          <CheckCircle size={16} className="text-green-500" />
+                        ) : feedbackResult.status === 'error' ? (
+                          <Warning size={16} className="text-red-500" />
+                        ) : null}
+                        <AlertDescription className="text-sm">
+                          {feedbackResult.message}
+                          {feedbackResult.url && (
+                            <a
+                              href={feedbackResult.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block mt-1 text-primary hover:underline"
+                            >
+                              {t('settings.beta.viewOnGitHub')}
+                            </a>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
+              </CollapsibleSection>
             )}
+
           </div>
         )}
       </Card>
 
-      {/* Changelog Section */}
+      {/* Version & Changelog */}
       <Card className="p-6 space-y-4">
-        <button
-          onClick={() => setChangelogExpanded(!changelogExpanded)}
-          className="w-full flex items-center justify-between text-left"
-          aria-expanded={changelogExpanded}
-          aria-controls="changelog-content"
-        >
-          <h3 className="text-lg font-semibold text-primary">{t('settings.changelog')}</h3>
-          {changelogExpanded ? (
-            <CaretUp size={20} className="text-muted-foreground" />
-          ) : (
-            <CaretDown size={20} className="text-muted-foreground" />
-          )}
-        </button>
-        
-        <AnimatePresence>
-          {changelogExpanded && (
-            <motion.div
-              id="changelog-content"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              {changelogLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <ArrowClockwise size={24} className="animate-spin text-muted-foreground" />
-                </div>
-              ) : releaseNotes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t('settings.noReleaseNotes')}
-                </p>
-              ) : (
-                <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
-                  {releaseNotes.map((note, index) => (
-                    <div key={note.version} className="space-y-2">
-                      {index > 0 && <div className="border-t border-border/50 pt-4" />}
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm">{note.version}</span>
-                        <span className="text-xs text-muted-foreground">{note.date}</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        <MarkdownText>
-                          {note.body.length > 500 
-                            ? note.body.substring(0, 500) + '...' 
-                            : note.body}
-                        </MarkdownText>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Card>
+        <h3 className="text-lg font-semibold text-primary">
+          {t('settings.versionAndChangelog')} — v{(versionInfo?.version || '...').replace(/^v/, '')}
+        </h3>
 
-      {/* Remote Access (Tailscale) Section — hidden in direct/PWA mode */}
-      {hasFeature('tailscaleConfig') && (
-      <Card className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-primary">{t('settings.tailscale.title')}</h3>
-            <a
-              href="https://github.com/hessius/MeticAI/blob/main/TAILSCALE.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-primary transition-colors"
-              title={t('settings.tailscale.setupGuide')}
-            >
-              <Question size={18} weight="bold" />
-            </a>
-          </div>
-          {tailscaleStatus?.connected && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-xs text-green-600 dark:text-green-400 font-medium">{t('settings.tailscale.connected')}</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="space-y-4">
-          {/* External URL — prominent when connected */}
-          {tailscaleStatus?.connected && tailscaleStatus.external_url && (
-            <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <LinkIcon size={16} className="text-primary" weight="bold" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('settings.tailscale.remoteUrl')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <a 
-                  href={tailscaleStatus.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-mono text-primary hover:underline break-all flex-1"
-                >
-                  {tailscaleStatus.external_url}
-                </a>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 h-8 w-8"
-                  onClick={() => {
-                    navigator.clipboard.writeText(tailscaleStatus.external_url!)
-                  }}
-                  title={t('settings.tailscale.copyUrl')}
-                >
-                  <Copy size={14} />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Enable/disable toggle */}
-          <div className="flex items-center justify-between py-2">
-            <div className="space-y-0.5">
-              <Label htmlFor="tailscale-toggle" className="text-sm font-medium">
-                {t('settings.tailscale.enableLabel')}
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                {t('settings.tailscale.enableDescription')}
-              </p>
-            </div>
-            <Switch
-              id="tailscale-toggle"
-              checked={tailscaleStatus?.enabled ?? false}
-              onCheckedChange={(checked) => handleTailscaleToggle(checked as boolean)}
-              disabled={tailscaleSaving}
-            />
-          </div>
-          
-          {/* Auth key input — show when enabled */}
-          {tailscaleStatus?.enabled && (
-            <div className="space-y-3 pt-2 border-t border-border/50">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="tailscale-auth-key" className="text-sm font-medium">
-                    {t('settings.tailscale.authKeyLabel')}
-                  </Label>
-                  {tailscaleStatus.auth_key_configured && (
-                    <span className="text-xs text-success flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" />
-                      {t('settings.configured')}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    id="tailscale-auth-key"
-                    type="password"
-                    value={tailscaleAuthKey}
-                    onChange={(e) => setTailscaleAuthKey(e.target.value)}
-                    placeholder={tailscaleStatus.auth_key_configured 
-                      ? t('settings.tailscale.authKeyPlaceholderExisting')
-                      : t('settings.tailscale.authKeyPlaceholder')
-                    }
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={handleTailscaleAuthKeySave}
-                    disabled={tailscaleSaving || !tailscaleAuthKey.trim()}
-                  >
-                    <Key size={16} className="mr-1.5" weight="bold" />
-                    {t('settings.tailscale.saveKey')}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.tailscale.authKeyDescription')}{' '}
-                  <a 
-                    href="https://login.tailscale.com/admin/settings/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {t('settings.tailscale.getAuthKey')}
-                  </a>
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Connection status details — show when enabled */}
-          {tailscaleStatus?.enabled && (
-            <div className="space-y-2 pt-2 border-t border-border/50">
-              <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-muted-foreground">{t('settings.tailscale.status')}</span>
-                <div className="flex items-center gap-2">
-                  {tailscaleStatus.connected ? (
-                    <WifiHigh size={16} className="text-green-500" weight="bold" />
-                  ) : tailscaleStatus.installed ? (
-                    <WifiSlash size={16} className="text-yellow-500" weight="bold" />
-                  ) : (
-                    <WifiSlash size={16} className="text-muted-foreground" weight="bold" />
-                  )}
-                  <span className="text-sm">
-                    {tailscaleStatus.connected 
-                      ? t('settings.tailscale.connected')
-                      : tailscaleStatus.installed
-                        ? t('settings.tailscale.disconnected')
-                        : t('settings.tailscale.notRunning')
-                    }
-                  </span>
-                </div>
-              </div>
-              
-              {tailscaleStatus.hostname && (
-                <div className="flex justify-between items-center py-1.5">
-                  <span className="text-sm text-muted-foreground">{t('settings.tailscale.hostname')}</span>
-                  <span className="text-sm font-mono">{tailscaleStatus.hostname}</span>
-                </div>
-              )}
-              
-              {tailscaleStatus.ip && (
-                <div className="flex justify-between items-center py-1.5">
-                  <span className="text-sm text-muted-foreground">{t('settings.tailscale.ip')}</span>
-                  <span className="text-sm font-mono">{tailscaleStatus.ip}</span>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Auth key expired warning */}
-          {tailscaleStatus?.auth_key_expired && (
-            <>
-              <Alert className="bg-yellow-500/10 border-yellow-500/20">
-                <Warning size={16} className="text-yellow-600" weight="fill" />
-                <AlertDescription className="text-sm text-yellow-700 dark:text-yellow-400">
-                  {t('settings.tailscale.authKeyExpired')}
-                </AlertDescription>
-              </Alert>
-              {tailscaleStatus.login_url && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => window.open(tailscaleStatus.login_url!, '_blank')}
-                >
-                  <Globe size={18} className="mr-2" />
-                  {t('settings.tailscale.renewKey')}
-                </Button>
-              )}
-            </>
-          )}
-          
-          {/* Setup guide — show when enabled but not connected */}
-          {tailscaleStatus?.enabled && !tailscaleStatus?.connected && !tailscaleStatus?.auth_key_expired && (
-            <div className="rounded-md bg-muted/50 p-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.setupTitle')}</p>
-              <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
-                <li>{t('settings.tailscale.setupStep1')}</li>
-                <li>{t('settings.tailscale.setupStep2')}</li>
-                <li>{t('settings.tailscale.setupStep3')}</li>
-              </ol>
-            </div>
-          )}
-
-          {/* Remote access guide — show when connected */}
-          {tailscaleStatus?.connected && (
-            <div className="rounded-md bg-muted/50 p-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">{t('settings.tailscale.guideTitle')}</p>
-              <ol className="text-xs text-muted-foreground/80 space-y-1 list-decimal list-inside">
-                <li>{t('settings.tailscale.guideStep1')}</li>
-                <li>{t('settings.tailscale.guideStep2')}</li>
-                <li>
-                  {t('settings.tailscale.guideStep3')}{' '}
-                  {tailscaleStatus.external_url && (
-                    <a 
-                      href={tailscaleStatus.external_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-primary hover:underline"
-                    >
-                      {tailscaleStatus.external_url}
-                    </a>
-                  )}
-                </li>
-              </ol>
-            </div>
-          )}
-          
-          {/* Save status messages */}
-          {tailscaleSaveStatus === 'success' && (
-            <Alert className="bg-success/10 border-success/20">
-              <CheckCircle size={16} className="text-success" weight="fill" />
-              <AlertDescription className="text-sm text-success">
-                {tailscaleMessage}
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {tailscaleSaveStatus === 'error' && (
-            <Alert variant="destructive">
-              <Warning size={16} weight="fill" />
-              <AlertDescription className="text-sm">
-                {tailscaleMessage}
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-      </Card>
-      )}
-
-      {/* Version Info Section - Unified */}
-      <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-primary">{t('settings.versionInfo')}</h3>
-        
         <div className="space-y-3">
           <div className="flex justify-between items-center py-2">
             <span className="text-sm text-muted-foreground">{t('settings.version')}</span>
@@ -1544,225 +1607,146 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
             </div>
           </div>
         </div>
-      </Card>
 
-      {/* Updates Section — hidden in direct/PWA mode (no Watchtower) */}
-      {hasFeature('watchtowerUpdate') && (
-      <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-primary">{t('settings.updates')}</h3>
-        
-        {/* Update method indicator */}
-        {updateMethod && (
-          <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/50">
-            <div className={`w-2 h-2 rounded-full ${updateMethod.can_trigger_update ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            <div className="flex-1">
-              <span className="text-xs font-medium">
-                {t(`settings.updateMethod.${updateMethod.method}`)}
-              </span>
-              <p className="text-xs text-muted-foreground">
-                {t(`settings.updateMethod.${updateMethod.method}Description`)}
-              </p>
-              {updateMethod.watchtower_error && (
-                <p className="text-xs text-muted-foreground break-words mt-1">
-                  {t('settings.updateMethod.watchtowerStatus')}: {updateMethod.watchtower_error}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {isUpdating ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <ArrowClockwise size={18} className="animate-spin text-primary" />
-              <span className="text-sm font-medium">{t('settings.updatingMeticAI')}</span>
-            </div>
-            <Progress value={updateProgress} className="h-2" />
-            <p className="text-xs text-muted-foreground">
-              {updateProgress < 30 && t('settings.startingUpdate')}
-              {updateProgress >= 30 && updateProgress < 60 && t('settings.pullingUpdates')}
-              {updateProgress >= 60 && updateProgress < 80 && t('settings.rebuildingContainers')}
-              {updateProgress >= 80 && t('settings.restartingServices')}
-            </p>
-          </div>
-        ) : updateError ? (
-          <Alert variant="destructive">
-            <Warning size={16} weight="fill" />
-            <AlertDescription className="text-sm">
-              {t('settings.updateFailed', { error: updateError })}
-            </AlertDescription>
-          </Alert>
-        ) : updateAvailable ? (
-          <Alert className="bg-primary/10 border-primary/30">
-            <DownloadSimple size={16} className="text-primary" />
-            <AlertDescription className="text-sm">
-              {t('settings.updateAvailable')}
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {t('settings.latestVersion')}
-          </p>
-        )}
-        
-        <div className="flex gap-2">
-          <Button
-            onClick={handleUpdate}
-            disabled={isUpdating || !updateAvailable || !canTriggerUpdate}
-            variant="dark-brew"
-            className="flex-1"
+        {/* Changelog (collapsible) */}
+        <div className="space-y-3 pt-2 border-t border-border/50">
+          <button
+            onClick={() => setChangelogExpanded(!changelogExpanded)}
+            className="w-full flex items-center justify-between text-left"
+            aria-expanded={changelogExpanded}
+            aria-controls="changelog-content"
           >
-            <DownloadSimple size={18} className="mr-2" />
-            {updateAvailable ? t('settings.updateNow') : t('settings.noUpdatesAvailable')}
-          </Button>
-          <Button
-            onClick={() => checkForUpdates()}
-            disabled={isChecking || isUpdating}
-            variant="outline"
-            aria-label={t('settings.checkForUpdates')}
-          >
-            <ArrowClockwise size={18} className={isChecking ? 'animate-spin' : ''} />
-          </Button>
-        </div>
-      </Card>
-      )}
-
-      {/* Beta Testing Section */}
-      {hasFeature('watchtowerUpdate') && <Card className="p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-primary">{t('settings.beta.title')}</h3>
-        
-        <div className="space-y-4">
-          {/* Beta channel toggle */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1">
-              <label htmlFor="beta-channel-switch" className="font-medium cursor-pointer">{t('settings.beta.enableUpdates')}</label>
-              <p className="text-sm text-muted-foreground">
-                {t('settings.beta.enableDescription')}
-              </p>
-            </div>
-            <Switch
-              id="beta-channel-switch"
-              checked={betaChannelEnabled}
-              onCheckedChange={handleBetaChannelToggle}
-              disabled={betaSwitching}
-              aria-label={t('settings.beta.enableUpdates')}
-            />
-          </div>
-
-          {/* Warning about beta versions */}
-          <Alert className="bg-yellow-500/10 border-yellow-500/30">
-            <Warning size={16} className="text-yellow-500" />
-            <AlertDescription className="text-sm">
-              {t('settings.beta.warning')}
-            </AlertDescription>
-          </Alert>
-
-          {/* Current channel indicator */}
-          <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/50">
-            <div className={`w-2 h-2 rounded-full ${betaChannelEnabled ? 'bg-yellow-500' : 'bg-green-500'}`} />
-            <span className="text-sm">
-              {t('settings.beta.currentChannel')}: <strong>{betaChannelEnabled ? 'Beta' : 'Stable'}</strong>
-            </span>
-          </div>
-
-          {/* Cross-channel notifications */}
-          {showBetaAvailable && (
-            <Alert className="bg-blue-500/10 border-blue-500/30">
-              <Info size={16} className="text-blue-500" />
-              <AlertDescription className="text-sm">
-                {t('settings.beta.betaAvailable', { version: latestBetaVersion })}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {showStableCaughtUp && (
-            <Alert className="bg-green-500/10 border-green-500/30">
-              <CheckCircle size={16} className="text-green-500" />
-              <AlertDescription className="text-sm">
-                {t('settings.beta.stableCaughtUp', { version: latestStableVersion })}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Feedback section - only visible in beta mode */}
-          {betaChannelEnabled && (
-            <div className="space-y-3 pt-2 border-t border-border/40">
-              <h4 className="font-medium">{t('settings.beta.sendFeedback')}</h4>
-              
-              {/* Feedback type selector */}
-              <div className="flex gap-2 flex-wrap">
-                {(['bug', 'feature', 'question', 'general'] as const).map((type) => (
-                  <Button
-                    key={type}
-                    variant={feedbackType === type ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFeedbackType(type)}
-                  >
-                    {t(`settings.beta.feedbackType.${type}`)}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Feedback form */}
-              <div className="space-y-2">
-                <Label htmlFor="feedback-title">{t('settings.beta.feedbackTitle')}</Label>
-                <Input
-                  id="feedback-title"
-                  value={feedbackTitle}
-                  onChange={(e) => setFeedbackTitle(e.target.value)}
-                  placeholder={t('settings.beta.feedbackTitlePlaceholder')}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="feedback-description">{t('settings.beta.feedbackDescription')}</Label>
-                <textarea
-                  id="feedback-description"
-                  value={feedbackDescription}
-                  onChange={(e) => setFeedbackDescription(e.target.value)}
-                  placeholder={t('settings.beta.feedbackDescriptionPlaceholder')}
-                  className="w-full h-24 px-3 py-2 rounded-md border border-input bg-background text-sm resize-none"
-                />
-              </div>
-
-              <Button
-                onClick={handleFeedbackSubmit}
-                disabled={feedbackSubmitting || !feedbackTitle.trim() || !feedbackDescription.trim()}
-                className="w-full"
+            <span className="text-sm font-semibold text-muted-foreground">{t('settings.changelog')}</span>
+            {changelogExpanded ? (
+              <CaretUp size={16} className="text-muted-foreground" />
+            ) : (
+              <CaretDown size={16} className="text-muted-foreground" />
+            )}
+          </button>
+          
+          <AnimatePresence>
+            {changelogExpanded && (
+              <motion.div
+                id="changelog-content"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
               >
-                {feedbackSubmitting ? (
-                  <ArrowClockwise size={18} className="animate-spin mr-2" />
-                ) : null}
-                {t('settings.beta.submitFeedback')}
-              </Button>
-
-              {/* Feedback result */}
-              {feedbackResult && (
-                <Alert className={feedbackResult.status === 'success' ? 'bg-green-500/10 border-green-500/30' : feedbackResult.status === 'error' ? 'bg-red-500/10 border-red-500/30' : 'bg-blue-500/10 border-blue-500/30'}>
-                  {feedbackResult.status === 'success' ? (
-                    <CheckCircle size={16} className="text-green-500" />
-                  ) : feedbackResult.status === 'error' ? (
-                    <Warning size={16} className="text-red-500" />
-                  ) : null}
-                  <AlertDescription className="text-sm">
-                    {feedbackResult.message}
-                    {feedbackResult.url && (
-                      <a
-                        href={feedbackResult.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block mt-1 text-primary hover:underline"
-                      >
-                        {t('settings.beta.viewOnGitHub')}
-                      </a>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
+                {changelogLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <ArrowClockwise size={24} className="animate-spin text-muted-foreground" />
+                  </div>
+                ) : releaseNotes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.noReleaseNotes')}
+                  </p>
+                ) : (
+                  <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                    {releaseNotes.map((note, index) => (
+                      <div key={note.version} className="space-y-2">
+                        {index > 0 && <div className="border-t border-border/50 pt-4" />}
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm">{note.version}</span>
+                          <span className="text-xs text-muted-foreground">{note.date}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          <MarkdownText>
+                            {note.body.length > 500 
+                              ? note.body.substring(0, 500) + '...' 
+                              : note.body}
+                          </MarkdownText>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </Card>}
+
+        {/* Updates — hidden in direct/PWA mode (no Watchtower) */}
+        {hasFeature('watchtowerUpdate') && (
+          <div className="space-y-4 pt-2 border-t border-border/50">
+            <h4 className="text-sm font-semibold text-muted-foreground">{t('settings.updates')}</h4>
+            
+            {/* Update method indicator */}
+            {updateMethod && (
+              <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/50">
+                <div className={`w-2 h-2 rounded-full ${updateMethod.can_trigger_update ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <div className="flex-1">
+                  <span className="text-xs font-medium">
+                    {t(`settings.updateMethod.${updateMethod.method}`)}
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    {t(`settings.updateMethod.${updateMethod.method}Description`)}
+                  </p>
+                  {updateMethod.watchtower_error && (
+                    <p className="text-xs text-muted-foreground break-words mt-1">
+                      {t('settings.updateMethod.watchtowerStatus')}: {updateMethod.watchtower_error}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {isUpdating ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ArrowClockwise size={18} className="animate-spin text-primary" />
+                  <span className="text-sm font-medium">{t('settings.updatingMeticAI')}</span>
+                </div>
+                <Progress value={updateProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  {updateProgress < 30 && t('settings.startingUpdate')}
+                  {updateProgress >= 30 && updateProgress < 60 && t('settings.pullingUpdates')}
+                  {updateProgress >= 60 && updateProgress < 80 && t('settings.rebuildingContainers')}
+                  {updateProgress >= 80 && t('settings.restartingServices')}
+                </p>
+              </div>
+            ) : updateError ? (
+              <Alert variant="destructive">
+                <Warning size={16} weight="fill" />
+                <AlertDescription className="text-sm">
+                  {t('settings.updateFailed', { error: updateError })}
+                </AlertDescription>
+              </Alert>
+            ) : updateAvailable ? (
+              <Alert className="bg-primary/10 border-primary/30">
+                <DownloadSimple size={16} className="text-primary" />
+                <AlertDescription className="text-sm">
+                  {t('settings.updateAvailable')}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t('settings.latestVersion')}
+              </p>
+            )}
+            
+            <div className="flex gap-2">
+              <Button
+                onClick={handleUpdate}
+                disabled={isUpdating || !updateAvailable || !canTriggerUpdate}
+                variant="dark-brew"
+                className="flex-1"
+              >
+                <DownloadSimple size={18} className="mr-2" />
+                {updateAvailable ? t('settings.updateNow') : t('settings.noUpdatesAvailable')}
+              </Button>
+              <Button
+                onClick={() => checkForUpdates()}
+                disabled={isChecking || isUpdating}
+                variant="outline"
+                aria-label={t('settings.checkForUpdates')}
+              >
+                <ArrowClockwise size={18} className={isChecking ? 'animate-spin' : ''} />
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* System Section */}
       {hasFeature('systemManagement') && <Card className="p-6 space-y-4">

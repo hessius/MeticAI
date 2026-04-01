@@ -428,8 +428,6 @@
     "geminiModelDescription": "Välj vilken Gemini-modell som ska användas för AI-funktioner.",
     "mqttEnabled": "MQTT-brygga",
     "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
-    "saveSettings": "Spara inställningar",
-    "saving": "Sparar...",
     "settingsSaved": "Inställningar sparade framgångsrikt!",
     "settingsSaveFailed": "Misslyckades spara inställningar",
     "changelog": "Ändringslogg",
@@ -543,7 +541,10 @@
     "feedbackFailed": "Kunde inte skicka feedback",
     "geminiModel25Flash": "Gemini 2.5 Flash (Rekommenderad)",
     "geminiModel25Pro": "Gemini 2.5 Pro",
-    "geminiModel20Flash": "Gemini 2.0 Flash"
+    "geminiModel20Flash": "Gemini 2.0 Flash",
+    "aiSettings": "AI-inställningar",
+    "versionAndChangelog": "Version och ändringslogg",
+    "mqttBridge": "MQTT-brygga"
   },
   "profileBreakdown": {
     "title": "Profildetaljer",

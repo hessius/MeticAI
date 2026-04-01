@@ -428,8 +428,6 @@
     "geminiModelDescription": "Wähle das Gemini-Modell für KI-Funktionen aus.",
     "mqttEnabled": "MQTT-Brücke",
     "mqttEnabledDescription": "Echtzeit-Maschinentelemetrie über MQTT. Betreibt das Live-Dashboard.",
-    "saveSettings": "Einstellungen speichern",
-    "saving": "Speichern...",
     "settingsSaved": "Einstellungen erfolgreich gespeichert!",
     "settingsSaveFailed": "Einstellungen konnten nicht gespeichert werden",
     "changelog": "Änderungsprotokoll",
@@ -543,7 +541,10 @@
     "feedbackFailed": "Fehler beim Senden des Feedbacks",
     "geminiModel25Flash": "Gemini 2.5 Flash (Empfohlen)",
     "geminiModel25Pro": "Gemini 2.5 Pro",
-    "geminiModel20Flash": "Gemini 2.0 Flash"
+    "geminiModel20Flash": "Gemini 2.0 Flash",
+    "aiSettings": "KI-Einstellungen",
+    "versionAndChangelog": "Version & Änderungsprotokoll",
+    "mqttBridge": "MQTT-Bridge"
   },
   "profileBreakdown": {
     "title": "Profildetails",
@@ -1291,7 +1292,7 @@
     "under": "Unter",
     "over": "Über",
     "goldenRulesTitle": "Goldene Regeln für die Meticulous",
-    "ruleStartSimple": "<strong>Fangen Sie einfach an.</strong> Beginnen Sie mit einem eingebauten Meticulous-Profil (z.\u00a0B. \"Italian\"). Beherrschen Sie zuerst Dosis, Ertrag und Temperatur — das sind die größten Stellschrauben. Fortgeschrittene Fluss- und Druckkontrolle ist mächtig, funktioniert aber am besten, wenn die Grundlagen stimmen.",
+    "ruleStartSimple": "<strong>Fangen Sie einfach an.</strong> Beginnen Sie mit einem eingebauten Meticulous-Profil (z. B. \"Italian\"). Beherrschen Sie zuerst Dosis, Ertrag und Temperatur — das sind die größten Stellschrauben. Fortgeschrittene Fluss- und Druckkontrolle ist mächtig, funktioniert aber am besten, wenn die Grundlagen stimmen.",
     "ruleDontChangeDose": "Wenn Sie den Ertrag (Endgewicht) anpassen, <strong>ändern Sie nicht die Dosis</strong> in Ihrem Siebträger; ändern Sie nur das Profil.",
     "ruleYieldTime": "Eine Änderung des Ertrags wird die Schusszeit verändern. Passen Sie den Mahlgrad nur an, wenn die Schusszeit weit vom Ziel abweicht. Für Geschmacksänderungen sind Profilanpassungen wirksamer als Mahlgrad allein.",
     "ruleEvenExtraction": "Eine perfekt gleichmäßige Extraktion schafft einen größeren \"Sweet Spot\": konzentrieren Sie sich zuerst auf die Puck-Vorbereitung.",
