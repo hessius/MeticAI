@@ -1028,16 +1028,59 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
     setIsRegeneratingDescription(true)
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(
-        `${serverUrl}/api/profile/${encodeURIComponent(entry.id)}/regenerate-description`,
-        { method: 'POST' }
-      )
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to generate AI description')
+
+      const regenerateByEntryId = async (targetEntryId: string) => {
+        const response = await fetch(
+          `${serverUrl}/api/profile/${encodeURIComponent(targetEntryId)}/regenerate-description`,
+          { method: 'POST' },
+        )
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({} as { detail?: string }))
+          return {
+            ok: false as const,
+            status: response.status,
+            detail: data.detail || 'Failed to generate AI description',
+          }
+        }
+
+        const data = await response.json()
+        return {
+          ok: true as const,
+          description: data.description as string,
+        }
       }
-      const data = await response.json()
-      setCurrentReply(data.description)
+
+      let regenerated = await regenerateByEntryId(entry.id)
+
+      const shouldResolveByName =
+        !regenerated.ok &&
+        regenerated.status === 404 &&
+        /history entry not found/i.test(regenerated.detail)
+
+      if (shouldResolveByName) {
+        const historyResponse = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+        if (historyResponse.ok) {
+          const historyData = await historyResponse.json()
+          const normalizedName = entry.profile_name.trim().toLowerCase()
+          const matchingEntry = historyData.entries?.find(
+            (historyEntry: { id?: string; profile_name?: string }) =>
+              typeof historyEntry.id === 'string' &&
+              typeof historyEntry.profile_name === 'string' &&
+              historyEntry.profile_name.trim().toLowerCase() === normalizedName,
+          )
+
+          if (matchingEntry?.id) {
+            regenerated = await regenerateByEntryId(matchingEntry.id)
+          }
+        }
+      }
+
+      if (!regenerated.ok) {
+        throw new Error(regenerated.detail || 'Failed to generate AI description')
+      }
+
+      setCurrentReply(regenerated.description)
       toast.success(t('history.aiDescriptionGenerated'))
     } catch (err) {
       console.error('Failed to regenerate description:', err)
@@ -1202,11 +1245,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           <div className="text-center mb-6">
             <div className="flex items-center justify-center gap-3 mb-2">
               <MeticAILogo size={40} variant="white" />
-              <h1 className="text-4xl font-bold tracking-tight">
-                Metic<span className="text-primary">AI</span>
+              <h1 className="text-4xl font-bold tracking-tight text-white">
+                Metic<span className="text-orange-400">AI</span>
               </h1>
             </div>
-            <p className="text-muted-foreground text-sm">{t('history.captureSubtitle')}</p>
           </div>
         )}
         <Card className={`p-6 ${isCapturing ? 'space-y-4' : 'space-y-5'}`}>

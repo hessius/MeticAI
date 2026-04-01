@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { isDirectMode } from '@/lib/machineMode'
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -21,11 +20,13 @@ import {
   SpinnerGap,
   FileJs,
   X,
-  UploadSimple
+  Plus,
+  Funnel
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { extractTagsFromPreferences, getAllTagsFromEntries, getTagColorClass } from '@/lib/tags'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
@@ -40,6 +41,7 @@ interface MachineProfile {
   final_weight?: number
   in_history: boolean
   has_description: boolean
+  user_preferences?: string | null
   display?: {
     description?: string
     shortDescription?: string
@@ -178,6 +180,11 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
   // Bulk delete dialog state
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+
+  // Filter state
+  const [selectedFilterTags, setSelectedFilterTags] = useState<string[]>([])
+  const [filterMode, setFilterMode] = useState<'AND' | 'OR'>('OR')
+  const [showFilters, setShowFilters] = useState(false)
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
@@ -405,11 +412,37 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   const isOrphaned = (profileName: string): boolean =>
     orphanedEntries.some((e) => e.profile_name === profileName)
 
+  const availableTags = useMemo(() => {
+    return getAllTagsFromEntries(profiles)
+  }, [profiles])
+
+  const filteredProfiles = useMemo(() => {
+    if (selectedFilterTags.length === 0) return profiles
+
+    return profiles.filter((profile) => {
+      const entryTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+      if (filterMode === 'AND') {
+        return selectedFilterTags.every((tag) => entryTags.includes(tag))
+      }
+      return selectedFilterTags.some((tag) => entryTags.includes(tag))
+    })
+  }, [profiles, selectedFilterTags, filterMode])
+
+  const toggleFilterTag = (tag: string) => {
+    setSelectedFilterTags((prev) =>
+      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
+    )
+  }
+
+  const clearFilters = () => {
+    setSelectedFilterTags([])
+  }
+
 
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <Card className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="space-y-3">
           <div className="flex items-center gap-4">
@@ -484,11 +517,101 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
               size="sm"
               onClick={() => setShowImportDialog(true)}
             >
-              <UploadSimple className="w-4 h-4 mr-2" />
-              {t('profileCatalogue.importButton')}
+              <Plus className="w-4 h-4 mr-2" />
+              {t('profileCatalogue.addButton')}
+            </Button>
+            <Button
+              variant={showFilters ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setShowFilters((v) => !v)}
+              className={selectedFilterTags.length > 0 ? 'text-primary' : ''}
+            >
+              <Funnel className="w-4 h-4 mr-2" weight={showFilters || selectedFilterTags.length > 0 ? 'fill' : 'regular'} />
+              {t('history.filterByTags')}
+              {selectedFilterTags.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1 text-xs">
+                  {filteredProfiles.length}/{profiles.length}
+                </Badge>
+              )}
             </Button>
           </div>
         </div>
+
+        {/* Filter Section */}
+        <AnimatePresence>
+          {showFilters && availableTags.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="p-4 bg-secondary/40 rounded-xl border border-border/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground/80">{t('history.filterByTags')}</Label>
+                  <div className="flex items-center gap-2">
+                    {selectedFilterTags.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilters}
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        {t('common.clear')}
+                      </Button>
+                    )}
+                    <div className="flex items-center bg-secondary rounded-lg p-0.5 border border-border/30">
+                      <button
+                        onClick={() => setFilterMode('OR')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                          filterMode === 'OR'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        OR
+                      </button>
+                      <button
+                        onClick={() => setFilterMode('AND')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                          filterMode === 'AND'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        AND
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableTags.map((tag) => {
+                    const isSelected = selectedFilterTags.includes(tag)
+                    return (
+                      <Badge
+                        key={tag}
+                        onClick={() => toggleFilterTag(tag)}
+                        className={`
+                          px-2.5 py-1 text-xs font-medium cursor-pointer transition-all duration-200 border
+                          ${getTagColorClass(tag, isSelected)}
+                        `}
+                      >
+                        {tag}
+                      </Badge>
+                    )
+                  })}
+                </div>
+                {selectedFilterTags.length > 0 && (
+                  <p className="text-xs text-muted-foreground/70">
+                    {filterMode === 'OR' ? t('history.filterHintOr') : t('history.filterHintAnd')}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Auto-sync toggle */}
         <div className="flex items-center gap-2 px-1">
@@ -577,9 +700,28 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           </Card>
         )}
         
+        {!isLoading && profiles.length > 0 && filteredProfiles.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="p-4 rounded-2xl bg-secondary/40 inline-block mb-4">
+              <Funnel className="w-10 h-10 text-muted-foreground/40" weight="duotone" />
+            </div>
+            <p className="text-foreground/80 font-medium">{t('history.noMatchingProfiles')}</p>
+            <p className="text-sm text-muted-foreground/60 mt-1.5">
+              {t('history.noMatchingDescription')}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="mt-4"
+            >
+              {t('history.clearFilters')}
+            </Button>
+          </div>
+        ) : (
         <div className="space-y-3">
           <AnimatePresence mode="popLayout">
-            {profiles.map((profile) => (
+            {filteredProfiles.map((profile) => (
               <motion.div
                 key={profile.id}
                 layout
@@ -666,12 +808,40 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                                 {getShortDescription(profile)}
                               </p>
                             )}
-                            {profile.in_history && !isDirectMode() && (
-                              <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                {t('profileCatalogue.inHistory')}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-3 mt-1">
+                              {!isOrphaned(profile.name) && (
+                                <span className="inline-flex items-center text-xs text-blue-600 dark:text-blue-400">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  {t('profileCatalogue.onMachine')}
+                                </span>
+                              )}
+                              {profile.in_history && (
+                                <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  {t('profileCatalogue.inHistory')}
+                                </span>
+                              )}
+                            </div>
+                            {(() => {
+                              const entryTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+                              return entryTags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {entryTags.slice(0, 4).map((tag) => (
+                                    <Badge
+                                      key={tag}
+                                      className={`px-1.5 py-0.5 text-[10px] font-medium border ${getTagColorClass(tag, false)}`}
+                                    >
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                  {entryTags.length > 4 && (
+                                    <Badge className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 border-transparent text-muted-foreground">
+                                      +{entryTags.length - 4}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : null
+                            })()}
                           </>
                         )}
                       </div>
@@ -716,6 +886,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
             ))}
           </AnimatePresence>
         </div>
+        )}
 
         {/* Orphaned entries section */}
         {orphanedEntries.length > 0 && (
@@ -759,12 +930,13 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
             </AnimatePresence>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Dialogs */}
       <BulkDeleteDialog
         isOpen={bulkDeleteOpen}
         profiles={profiles}
+        resolveHistoryId={findHistoryId}
         onClose={() => setBulkDeleteOpen(false)}
         onDeleted={() => {
           setBulkDeleteOpen(false)

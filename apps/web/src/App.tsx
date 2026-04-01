@@ -51,6 +51,7 @@ import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { BetaBanner } from '@/components/BetaBanner'
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary'
+import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
 const LiveShotView = lazy(() => import('./components/LiveShotView').then(m => ({ default: m.LiveShotView })))
@@ -94,6 +95,7 @@ function App() {
   const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
   const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
   const [pendingImportUrl, setPendingImportUrl] = useState<string | null>(null)
+  const [showAddProfileDialog, setShowAddProfileDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -957,7 +959,7 @@ function App() {
               {!isInitializing && viewState === 'start' && (
                 <StartView
                   profileCount={profileCount}
-                  onGenerateNew={() => setViewState('form')}
+                  onAddProfile={() => setShowAddProfileDialog(true)}
                   onViewHistory={() => setViewState('history')}
                   onProfileCatalogue={() => setViewState('profile-catalogue')}
                   onRunShot={() => {
@@ -968,8 +970,6 @@ function App() {
                   onPourOver={() => setViewState('pour-over')}
                   onDialIn={() => setViewState('dial-in')}
                   onShotAnalysis={() => setViewState('shot-analysis')}
-                  aiConfigured={aiAvailable}
-                  hideAiWhenUnavailable={hideAiWhenUnavailable}
                   controlCenter={
                     showControlCenter && isMobile ? (
                       <ControlCenter
@@ -1159,7 +1159,7 @@ function App() {
 
               {viewState === 'profile-catalogue' && (
                 <FeatureErrorBoundary feature="Profile Catalogue">
-                  <ProfileCatalogueView onBack={() => setViewState(isDirectMode() ? 'start' : 'history')} onViewProfile={handleViewMachineProfile} />
+                  <ProfileCatalogueView onBack={() => setViewState('start')} onViewProfile={handleViewMachineProfile} />
                 </FeatureErrorBoundary>
               )}
 
@@ -1260,6 +1260,26 @@ function App() {
         </div>
         
         <QRCodeDialog open={qrDialogOpen} onOpenChange={setQrDialogOpen} />
+        <ProfileImportDialog
+          isOpen={showAddProfileDialog}
+          aiConfigured={aiAvailable}
+          hideAiWhenUnavailable={hideAiWhenUnavailable}
+          initialUrl={pendingImportUrl ?? undefined}
+          onClose={() => {
+            setShowAddProfileDialog(false)
+            setPendingImportUrl(null)
+          }}
+          onImported={() => {
+            setShowAddProfileDialog(false)
+            setPendingImportUrl(null)
+            setViewState('profile-catalogue')
+          }}
+          onGenerateNew={() => {
+            setShowAddProfileDialog(false)
+            setPendingImportUrl(null)
+            setViewState('form')
+          }}
+        />
       </div>
     </div>
     </>

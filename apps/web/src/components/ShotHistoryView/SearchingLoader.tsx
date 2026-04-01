@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress'
 // i18n exemption: These quotes are well-known cultural references and should remain
 // in their original language regardless of the user's locale setting.
 const SHOT_QUOTES = [
-  { quote: "You Miss 100% of the Shots You Don't Take", author: "Wayne Gretzky", meta: "— Michael Scott" },
+  { quote: "You Miss 100% of the Shots You Don't Take - Wayne Gretsky", author: "Michael Scott" },
   { quote: "I'm not throwing away my shot", author: "Lin-Manuel Miranda" },
   { quote: "Take your best shot", author: "Common saying" },
   { quote: "Give it your best shot", author: "English proverb" },

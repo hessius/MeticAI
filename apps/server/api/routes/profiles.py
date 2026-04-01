@@ -1232,7 +1232,8 @@ async def analyze_shot(
                         "stages": []
                     }
                     
-                    # Extract variables if present
+                        "description": None,
+                        "user_preferences": None,
                     if hasattr(full_profile, 'variables') and full_profile.variables:
                         for var in full_profile.variables:
                             var_dict = {
@@ -1716,6 +1717,7 @@ async def list_machine_profiles(request: Request):
                     try:
                         for entry in entries:
                             if entry.get("profile_name") == profile_dict["name"]:
+                                profile_dict["user_preferences"] = entry.get("user_preferences")
                                 if entry.get("reply"):
                                     profile_dict["has_description"] = True
                                 break
@@ -1738,7 +1740,8 @@ async def list_machine_profiles(request: Request):
                     "final_weight": getattr(partial_profile, 'final_weight', None),
                     "in_history": False,
                     "has_description": False,
-                    "description": None
+                    "description": None,
+                    "user_preferences": None,
                 }
                 profiles.append(profile_dict)
         
@@ -1778,6 +1781,7 @@ async def list_machine_profiles(request: Request):
                     "final_weight": pj.get("final_weight"),
                     "in_history": True,
                     "has_description": bool(entry.get("reply")),
+                    "user_preferences": entry.get("user_preferences"),
                 })
             return {
                 "status": "success",

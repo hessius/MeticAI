@@ -8,29 +8,25 @@ import { useIsMobile } from '@/hooks/use-mobile'
 
 interface StartViewProps {
   profileCount: number | null
-  onGenerateNew: () => void
+  onAddProfile: () => void
   onViewHistory: () => void
   onProfileCatalogue?: () => void
   onRunShot: () => void
   onDialIn: () => void
   onPourOver: () => void
   onShotAnalysis: () => void
-  aiConfigured?: boolean
-  hideAiWhenUnavailable?: boolean
   controlCenter?: React.ReactNode
   lastShotBanner?: React.ReactNode
 }
 
 export function StartView({
-  onGenerateNew,
+  onAddProfile,
   onViewHistory,
   onProfileCatalogue,
   onRunShot,
   onDialIn,
   onPourOver,
   onShotAnalysis,
-  aiConfigured = true,
-  hideAiWhenUnavailable = false,
   controlCenter,
   lastShotBanner,
 }: StartViewProps) {
@@ -51,17 +47,14 @@ export function StartView({
           {t('navigation.profileCatalogue')}
         </Button>
 
-        {(!hideAiWhenUnavailable || aiConfigured) && (
-          <Button
-            onClick={onGenerateNew}
-            disabled={!aiConfigured}
-            variant="dark-brew"
-            className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
-          >
-            <Plus size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
-            {t('navigation.generateNewProfile')}
-          </Button>
-        )}
+        <Button
+          onClick={onAddProfile}
+          variant="dark-brew"
+          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+        >
+          <Plus size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
+          {t('navigation.addProfile')}
+        </Button>
 
         <Button
           onClick={onRunShot}
