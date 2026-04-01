@@ -153,4 +153,87 @@ describe('featureFlags', () => {
       }
     })
   })
+
+  // -------------------------------------------------------------------
+  // Snapshot tests — detect accidental flag changes
+  // -------------------------------------------------------------------
+  describe('flag value snapshots', () => {
+    it('PROXY_FLAGS should match snapshot', () => {
+      mockedIsDirectMode.mockReturnValue(false)
+      resetFeatureFlags()
+      expect(getFeatureFlags()).toMatchInlineSnapshot(`
+        {
+          "aiFeatures": true,
+          "bridgeStatus": true,
+          "cloudSync": true,
+          "dialIn": true,
+          "liveTelemetry": true,
+          "machineDiscovery": true,
+          "mcpServer": true,
+          "pourOver": true,
+          "profileManagement": true,
+          "pwaInstall": false,
+          "recommendations": true,
+          "scheduledShots": true,
+          "shotHistory": true,
+          "systemManagement": true,
+          "tailscaleConfig": true,
+          "watchtowerUpdate": true,
+        }
+      `)
+    })
+
+    it('DIRECT_FLAGS should match snapshot', () => {
+      mockedIsDirectMode.mockReturnValue(true)
+      resetFeatureFlags()
+      expect(getFeatureFlags()).toMatchInlineSnapshot(`
+        {
+          "aiFeatures": true,
+          "bridgeStatus": false,
+          "cloudSync": false,
+          "dialIn": true,
+          "liveTelemetry": true,
+          "machineDiscovery": false,
+          "mcpServer": false,
+          "pourOver": true,
+          "profileManagement": true,
+          "pwaInstall": true,
+          "recommendations": true,
+          "scheduledShots": false,
+          "shotHistory": true,
+          "systemManagement": false,
+          "tailscaleConfig": false,
+          "watchtowerUpdate": false,
+        }
+      `)
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // hasFeature edge cases
+  // -------------------------------------------------------------------
+  describe('hasFeature edge cases', () => {
+    it('unknown feature name returns false', () => {
+      // Cast to bypass TypeScript — simulates runtime misuse
+      expect(hasFeature('nonExistentFeature' as keyof import('@/lib/featureFlags').FeatureFlags)).toBe(undefined)
+    })
+
+    it('returns correct value for every flag in proxy mode', () => {
+      mockedIsDirectMode.mockReturnValue(false)
+      resetFeatureFlags()
+      const flags = getFeatureFlags()
+      for (const key of Object.keys(flags) as (keyof typeof flags)[]) {
+        expect(hasFeature(key)).toBe(flags[key])
+      }
+    })
+
+    it('returns correct value for every flag in direct mode', () => {
+      mockedIsDirectMode.mockReturnValue(true)
+      resetFeatureFlags()
+      const flags = getFeatureFlags()
+      for (const key of Object.keys(flags) as (keyof typeof flags)[]) {
+        expect(hasFeature(key)).toBe(flags[key])
+      }
+    })
+  })
 })
