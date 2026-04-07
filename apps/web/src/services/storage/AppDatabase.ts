@@ -171,14 +171,16 @@ export async function setAnnotation(
   data: { rating?: number | null; notes?: string; tags?: string[] },
 ) {
   const db = await getDB()
-  const existing = await db.get('shot-annotations', shotKey)
-  await db.put('shot-annotations', {
+  const tx = db.transaction('shot-annotations', 'readwrite')
+  const existing = await tx.store.get(shotKey)
+  await tx.store.put({
     shotKey,
     rating: data.rating ?? existing?.rating ?? null,
     notes: data.notes ?? existing?.notes ?? '',
     tags: data.tags ?? existing?.tags ?? [],
     updatedAt: Date.now(),
   })
+  await tx.done
 }
 
 export async function getAllAnnotations() {
@@ -293,12 +295,19 @@ const MAX_IMAGE_CACHE_BYTES = 50 * 1024 * 1024 // 50 MB
 
 export async function getProfileImage(profileId: string): Promise<Blob | null> {
   const db = await getDB()
-  const entry = await db.get('profile-images', profileId)
-  if (!entry) return null
-  // Touch timestamp for true LRU semantics
-  await db.put('profile-images', { ...entry, updatedAt: Date.now() })
+  const tx = db.transaction('profile-images', 'readwrite')
+  const entry = await tx.store.get(profileId)
+  if (!entry) {
+    await tx.done
+    return null
+  }
+  // Touch timestamp for true LRU semantics (atomic with read)
+  await tx.store.put({ ...entry, updatedAt: Date.now() })
+  await tx.done
   return entry.imageBlob
 }
+
+let evictionPending = false
 
 export async function setProfileImage(profileId: string, imageBlob: Blob): Promise<void> {
   const db = await getDB()
@@ -307,8 +316,14 @@ export async function setProfileImage(profileId: string, imageBlob: Blob): Promi
     imageBlob,
     updatedAt: Date.now(),
   })
-  // LRU eviction
-  await evictProfileImages()
+  // Debounced LRU eviction — coalesces rapid writes (e.g. bulk import)
+  if (!evictionPending) {
+    evictionPending = true
+    queueMicrotask(async () => {
+      evictionPending = false
+      await evictProfileImages()
+    })
+  }
 }
 
 async function evictProfileImages(): Promise<void> {
