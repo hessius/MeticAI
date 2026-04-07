@@ -32,18 +32,19 @@ async function postCommand(
   body?: Record<string, unknown>,
 ): Promise<CommandResult> {
   const base = await getServerUrl()
-  const res = await fetch(`${base}/api/machine/command${path}`, {
-    method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    return { success: false, message: (err as Record<string, string>).detail ?? res.statusText }
+  try {
+    const data = await apiFetch<{ success?: boolean; status?: string; message?: string }>(
+      `${base}/api/machine/command${path}`,
+      {
+        method: 'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      },
+    )
+    return { success: data.success ?? data.status === 'ok', message: data.message }
+  } catch (err) {
+    return { success: false, message: err instanceof Error ? err.message : 'Command failed' }
   }
-  const data = await res.json()
-  return { success: data.success ?? data.status === 'ok', message: data.message }
 }
 
 // ---------------------------------------------------------------------------
@@ -78,13 +79,16 @@ export function createMeticAIAdapter(): MachineService {
     loadProfile: (name: string) => postCommand('/load-profile', { name }),
     loadProfileFromJSON: async (profile: Profile) => {
       const base = await getServerUrl()
-      const res = await fetch(`${base}/api/machine/run-profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile),
-      })
-      if (!res.ok) return { success: false, message: res.statusText }
-      return { success: true }
+      try {
+        await apiFetch(`${base}/api/machine/run-profile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profile),
+        })
+        return { success: true }
+      } catch (err) {
+        return { success: false, message: err instanceof Error ? err.message : 'Load failed' }
+      }
     },
     setBrightness: (value: number) => postCommand('/brightness', { value }),
     enableSounds: (enabled: boolean) => postCommand('/sounds', { enabled }),

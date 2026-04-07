@@ -54,6 +54,17 @@ export function createDirectAdapter(baseUrl: string): MachineService {
   const heaterStatusCallbacks = new Set<(countdown: number) => void>()
   const profileUpdateCallbacks = new Set<ProfileUpdateCallback>()
 
+  /** Direct REST call for actions not in espresso-api's ActionType enum */
+  async function executeRawAction(action: string): Promise<CommandResult> {
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/action/${action}`, { method: 'POST' })
+      if (!res.ok) return wrapResult(false, `${action} failed: ${res.statusText}`)
+      return wrapResult(true)
+    } catch (e) {
+      return wrapResult(false, (e as Error).message)
+    }
+  }
+
   function setConnected(value: boolean) {
     if (connected !== value) {
       connected = value
@@ -115,14 +126,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
         return wrapResult(false, (e as Error).message)
       }
     },
-    abortShot: async () => {
-      try {
-        await api.executeAction('reset')
-        return wrapResult(true)
-      } catch (e) {
-        return wrapResult(false, (e as Error).message)
-      }
-    },
+    abortShot: async () => executeRawAction('abort'),
     continueShot: async () => {
       try {
         await api.executeAction('continue')
@@ -149,20 +153,8 @@ export function createDirectAdapter(baseUrl: string): MachineService {
         return wrapResult(false, (e as Error).message)
       }
     },
-    homePlunger: async () => {
-      // espresso-api doesn't have a dedicated home action — use reset
-      try {
-        await api.executeAction('reset')
-        return wrapResult(true)
-      } catch (e) {
-        return wrapResult(false, (e as Error).message)
-      }
-    },
-    purge: async () => {
-      // No direct purge action in espresso-api; use start which triggers
-      // the purge cycle if the machine state permits
-      return wrapResult(false, 'Purge not available in direct mode')
-    },
+    homePlunger: async () => executeRawAction('home'),
+    purge: async () => executeRawAction('purge'),
 
     // -- Configuration commands ---------------------------------------------
     loadProfile: async (name: string) => {
