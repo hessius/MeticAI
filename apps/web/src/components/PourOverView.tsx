@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Stop, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
@@ -549,13 +549,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const flowStartTimestampRef = useRef<number | null>(null)
   // Track weight when continuous flow started (for weight-based escape hatch)
   const flowStartWeightRef = useRef<number | null>(null)
-  // Require 800ms of continuous valid flow to trigger auto-start
-  // Filters momentary disturbances while remaining responsive to quick pours
-  const FLOW_CONFIRMATION_MS = 800
+  // Require 1500ms of continuous valid flow to trigger auto-start
+  // Filters grounds settling and momentary disturbances
+  const FLOW_CONFIRMATION_MS = 1500
   // If total weight gain since flow started exceeds this threshold,
   // trigger auto-start immediately regardless of elapsed time.
-  // 3g is unambiguously a pour, not grounds settling or scale drift.
-  const FLOW_WEIGHT_ESCAPE_G = 3
+  // 8g is unambiguously a pour, not grounds settling or scale drift.
+  const FLOW_WEIGHT_ESCAPE_G = 8
 
   const { cmd, isBrewing, isConnected, canStart, isClickToPurge } = useMachineActions(machineState)
   const machine = useMachineService()
@@ -670,7 +670,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const parsedDose = parsePositiveNumber(doseGrams)
   const parsedRatio = parsePositiveNumber(brewRatio)
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
-  const bloomWeightTarget = parsedDose !== null && bloomEnabled
+  const bloomWeightTarget = parsedDose !== null && bloomEnabled && mode !== 'free'
     ? parsedDose * (parsePositiveNumber(bloomWeightMultiplier) ?? 2)
     : null
   const remainingWeight = targetWeight !== null ? Math.max(targetWeight - weight, 0) : null
@@ -1358,7 +1358,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     className="w-full h-11 rounded-xl"
                     disabled={machineLifecycle === 'purging'}
                   >
-                    <Pause size={18} weight="fill" className="mr-1.5" />
+                    <Stop size={18} weight="fill" className="mr-1.5" />
                     {t('pourOver.integration.stop')}
                   </Button>
                 )}
@@ -1646,7 +1646,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 </div>
               )}
 
-              {mode !== 'recipe' && bloomEnabled && parsedDose !== null && (
+              {mode !== 'recipe' && mode !== 'free' && bloomEnabled && parsedDose !== null && (
                 <div className="space-y-1.5">
                   <Label>{t('pourOver.bloomWeightMultiplier')}</Label>
                   <p className="text-xs text-muted-foreground">{t('pourOver.bloomWeightMultiplierDescription')}</p>
