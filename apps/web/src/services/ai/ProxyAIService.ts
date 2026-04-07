@@ -47,11 +47,11 @@ export function createProxyAIService(): AIService {
 
       try {
         const formData = new FormData()
-        if (request.image) formData.append('image', request.image)
-        if (request.preferences) formData.append('preferences', request.preferences)
+        if (request.image) formData.append('file', request.image)
+        if (request.preferences) formData.append('user_prefs', request.preferences)
         if (request.tags.length) formData.append('tags', JSON.stringify(request.tags))
         if (request.advancedOptions) {
-          formData.append('advanced_options', JSON.stringify(request.advancedOptions))
+          formData.append('advanced_customization', JSON.stringify(request.advancedOptions))
         }
 
         const response = await fetch(`${serverUrl}/api/analyze_and_profile`, {

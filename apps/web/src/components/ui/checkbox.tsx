@@ -1,6 +1,6 @@
 "use client"
 
-import { ComponentProps } from "react"
+import { ComponentProps, type ChangeEvent } from "react"
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
 import { Checkbox as KCheckbox } from 'konsta/react'
 import { Check as CheckIcon } from "lucide-react"
@@ -53,7 +53,7 @@ function Checkbox({
   return (
     <KCheckbox
       checked={checked === true}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
       disabled={disabled}
       name={name}
       className={className}

@@ -21,16 +21,18 @@ describe('useKonstaOverride', () => {
     expect(result.current).toBe(false)
   })
 
-  it('returns true when mobile', () => {
+  // Konsta UI is temporarily disabled (always false) per issue #336.
+  // When re-enabled, these should expect true again.
+  it('returns false even when mobile (Konsta disabled per #336)', () => {
     vi.mocked(useIsMobile).mockReturnValue(true)
     const { result } = renderHook(() => useKonstaOverride())
-    expect(result.current).toBe(true)
+    expect(result.current).toBe(false)
   })
 
-  it('returns true when forced via localStorage', () => {
+  it('returns false even when forced via localStorage (Konsta disabled per #336)', () => {
     localStorage.setItem(STORAGE_KEYS.USE_KONSTA_UI, 'true')
     const { result } = renderHook(() => useKonstaOverride())
-    expect(result.current).toBe(true)
+    expect(result.current).toBe(false)
   })
 })
 
@@ -57,13 +59,13 @@ describe('useKonstaToggle', () => {
     expect(localStorage.getItem(STORAGE_KEYS.USE_KONSTA_UI)).toBe('true')
   })
 
-  it('same-tab toggle updates useKonstaOverride immediately', () => {
+  it('same-tab toggle updates useKonstaOverride (returns false while disabled per #336)', () => {
     const { result: overrideResult } = renderHook(() => useKonstaOverride())
     const { result: toggleResult } = renderHook(() => useKonstaToggle())
 
     expect(overrideResult.current).toBe(false)
     act(() => toggleResult.current.setEnabled(true))
-    // After dispatching the custom event, the override should pick it up
-    expect(overrideResult.current).toBe(true)
+    // Konsta is disabled per #336 — override still returns false even after toggle
+    expect(overrideResult.current).toBe(false)
   })
 })

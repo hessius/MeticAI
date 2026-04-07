@@ -1,6 +1,6 @@
 "use client"
 
-import { ComponentProps } from "react"
+import { ComponentProps, type ChangeEvent } from "react"
 import * as SwitchPrimitive from "@radix-ui/react-switch"
 import { Toggle } from 'konsta/react'
 import { useKonstaOverride } from '@/hooks/useKonstaOverride'
@@ -53,7 +53,7 @@ function Switch({
   return (
     <Toggle
       checked={checked ?? false}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
       disabled={disabled}
       className={className}
       {...(defaultChecked !== undefined ? { defaultChecked } : {})}

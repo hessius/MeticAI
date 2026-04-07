@@ -96,12 +96,13 @@ export function createMeticAIAdapter(): MachineService {
     // -- Profiles (via backend proxy) ---------------------------------------
     listProfiles: async () => {
       const base = await getServerUrl()
-      return apiFetch<ProfileIdent[]>(`${base}/api/machine/profiles`)
+      const resp = await apiFetch<{ profiles: ProfileIdent[] }>(`${base}/api/machine/profiles`)
+      return resp.profiles ?? []
     },
     fetchAllProfiles: async () => {
       const base = await getServerUrl()
-      const idents = await apiFetch<ProfileIdent[]>(`${base}/api/machine/profiles`)
-      return idents.map(pi => pi.profile)
+      const resp = await apiFetch<{ profiles: ProfileIdent[] }>(`${base}/api/machine/profiles`)
+      return (resp.profiles ?? []).map(pi => pi.profile)
     },
     getProfile: async (id: string) => {
       const base = await getServerUrl()
@@ -109,7 +110,7 @@ export function createMeticAIAdapter(): MachineService {
     },
     saveProfile: async (profile: Profile) => {
       const base = await getServerUrl()
-      return apiFetch<ProfileIdent>(`${base}/api/machine/profiles`, {
+      return apiFetch<ProfileIdent>(`${base}/api/profile/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profile),
@@ -117,7 +118,7 @@ export function createMeticAIAdapter(): MachineService {
     },
     deleteProfile: async (id: string) => {
       const base = await getServerUrl()
-      await apiFetch(`${base}/api/machine/profiles/${encodeURIComponent(id)}`, {
+      await apiFetch(`${base}/api/machine/profile/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       })
     },
@@ -132,21 +133,26 @@ export function createMeticAIAdapter(): MachineService {
     // -- History (via backend proxy) ----------------------------------------
     getHistoryListing: async () => {
       const base = await getServerUrl()
-      const resp = await apiFetch<{ history: HistoryListingEntry[] }>(
+      const resp = await apiFetch<{ dates: string[] }>(
         `${base}/api/shots/dates`
       )
-      return resp.history ?? []
+      // Backend returns date strings; map to minimal HistoryListingEntry shape
+      return (resp.dates ?? []).map(d => ({ date: d }) as HistoryListingEntry)
     },
     getLastShot: async () => {
       const base = await getServerUrl()
       try {
-        return await apiFetch<HistoryListingEntry>(`${base}/api/shots/recent`)
+        const resp = await apiFetch<{ shots: HistoryListingEntry[] }>(`${base}/api/shots/recent`)
+        return resp.shots?.[0] ?? null
       } catch {
         return null
       }
     },
 
     // -- Settings / Device --------------------------------------------------
+    // NOTE: /api/settings returns app-level settings, not machine settings.
+    // Machine settings require direct machine access. In proxy mode we return
+    // what the backend provides and let the UI handle the mismatch gracefully.
     getSettings: async () => {
       const base = await getServerUrl()
       return apiFetch<MachineSettings>(`${base}/api/settings`)
@@ -160,8 +166,9 @@ export function createMeticAIAdapter(): MachineService {
       })
     },
     getDeviceInfo: async () => {
-      const base = await getServerUrl()
-      return apiFetch<DeviceInfo>(`${base}/api/machine/device-info`)
+      // No dedicated device-info endpoint in proxy mode;
+      // return minimal stub so callers degrade gracefully.
+      return {} as DeviceInfo
     },
   }
 }

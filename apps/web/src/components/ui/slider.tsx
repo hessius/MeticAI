@@ -1,6 +1,6 @@
 "use client"
 
-import { ComponentProps, useMemo } from "react"
+import { ComponentProps, useMemo, type ChangeEvent } from "react"
 import * as SliderPrimitive from "@radix-ui/react-slider"
 import { Range } from 'konsta/react'
 
@@ -97,8 +97,8 @@ function Slider({
       max={max}
       step={step ?? 1}
       disabled={disabled}
-      onInput={(e: React.ChangeEvent<HTMLInputElement>) => onValueChange?.([Number(e.target.value)])}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onValueCommit?.([Number(e.target.value)])}
+      onInput={(e: ChangeEvent<HTMLInputElement>) => onValueChange?.([Number(e.target.value)])}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => onValueCommit?.([Number(e.target.value)])}
       className={className}
       {...forwardedProps}
     />
