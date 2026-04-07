@@ -1,11 +1,11 @@
-fastapi==0.135.2
-uvicorn==0.42.0
+fastapi==0.135.3
+uvicorn==0.44.0
 google-genai>=1.0.0
 pillow>=10.3.0
 pillow-heif>=0.18.0
-python-multipart==0.0.22
+python-multipart==0.0.24
 pyMeticulous>=0.3.1
 zstandard>=0.22.0
 httpx==0.28.1
-sse-starlette==3.3.3
+sse-starlette==3.3.4
 zeroconf==0.148.0

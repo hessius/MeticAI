@@ -3,7 +3,7 @@
 import { ComponentProps } from "react"
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
 import { Checkbox as KCheckbox } from 'konsta/react'
-import CheckIcon from "lucide-react/dist/esm/icons/check"
+import { Check as CheckIcon } from "lucide-react"
 
 import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 import { cn } from "@/lib/utils"
