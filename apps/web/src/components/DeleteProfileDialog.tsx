@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { SpinnerGap, Trash, Archive } from '@phosphor-icons/react'
+import { SpinnerGap, Trash, Archive, Desktop } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
 
@@ -85,7 +85,7 @@ export function DeleteProfileDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{t('profileCatalogue.deleteTitle')}</DialogTitle>
           <DialogDescription>
@@ -93,68 +93,53 @@ export function DeleteProfileDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3 py-2">
-          {historyId && (
-            <Button
-              variant="destructive"
-              className="justify-start gap-2 h-auto py-3 px-4"
-              onClick={() => handleDelete('both')}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <SpinnerGap className="w-5 h-5 animate-spin shrink-0" />
-              ) : (
-                <Trash className="w-5 h-5 shrink-0" />
-              )}
-              <div className="text-left">
-                <div className="font-medium">{t('profileCatalogue.deleteFromBoth')}</div>
-                <div className="text-xs text-destructive-foreground/70">
-                  {t('profileCatalogue.deleteFromBothHint')}
-                </div>
-              </div>
-            </Button>
-          )}
-
+        <div className="flex flex-col gap-2 py-1">
           <Button
-            variant="destructive"
-            className="justify-start gap-2 h-auto py-3 px-4"
+            variant="outline"
+            className="justify-start gap-3 h-auto py-2.5 px-3 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
             onClick={() => handleDelete('machine-only')}
             disabled={isDeleting}
           >
             {isDeleting ? (
-              <SpinnerGap className="w-5 h-5 animate-spin shrink-0" />
+              <SpinnerGap className="w-4 h-4 animate-spin shrink-0" />
             ) : (
-              <Trash className="w-5 h-5 shrink-0" />
+              <Desktop className="w-4 h-4 shrink-0" />
             )}
-            <div className="text-left">
-              <div className="font-medium">{t('profileCatalogue.deleteFromMachine')}</div>
-              <div className="text-xs text-destructive-foreground/70">
-                {t('profileCatalogue.deleteFromMachineHint')}
-              </div>
-            </div>
+            <span className="text-sm font-medium">{t('profileCatalogue.deleteFromMachine')}</span>
           </Button>
 
           {historyId && (
-            <Button
-              variant="outline"
-              className="justify-start gap-2 h-auto py-3 px-4"
-              onClick={() => handleDelete('meticai-only')}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <SpinnerGap className="w-5 h-5 animate-spin shrink-0" />
-              ) : (
-                <Archive className="w-5 h-5 shrink-0" />
-              )}
-              <div className="text-left">
-                <div className="font-medium">
-                  {t('profileCatalogue.removeFromHistoryOnly')}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {t('profileCatalogue.removeFromHistoryHint')}
-                </div>
-              </div>
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                className="justify-start gap-3 h-auto py-2.5 px-3"
+                onClick={() => handleDelete('meticai-only')}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <SpinnerGap className="w-4 h-4 animate-spin shrink-0" />
+                ) : (
+                  <Archive className="w-4 h-4 shrink-0" />
+                )}
+                <span className="text-sm font-medium">{t('profileCatalogue.removeFromHistoryOnly')}</span>
+              </Button>
+
+              <div className="border-t my-1" />
+
+              <Button
+                variant="destructive"
+                className="justify-start gap-3 h-auto py-2.5 px-3"
+                onClick={() => handleDelete('both')}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <SpinnerGap className="w-4 h-4 animate-spin shrink-0" />
+                ) : (
+                  <Trash className="w-4 h-4 shrink-0" />
+                )}
+                <span className="text-sm font-medium">{t('profileCatalogue.deleteFromBoth')}</span>
+              </Button>
+            </>
           )}
         </div>
 

@@ -491,7 +491,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Card className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="space-y-3">

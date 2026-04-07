@@ -33,6 +33,7 @@ from services.meticulous_service import (
     async_execute_action,
     async_delete_profile,
     MachineUnreachableError,
+    invalidate_profile_list_cache,
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
@@ -3179,13 +3180,39 @@ async def restore_profile_from_history(history_id: str, request: Request):
             extra={"request_id": request_id, "history_id": history_id},
         )
 
-        result = await async_save_profile(profile_json)
+        # Send profile dict directly to the machine API.
+        # We bypass async_save_profile / Profile model because the stored
+        # JSON may lack fields the Pydantic model requires (e.g. author_id).
+        import httpx
+        import os
 
-        if hasattr(result, "error") and result.error:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Machine API error: {result.error}",
+        meticulous_ip = os.environ.get("METICULOUS_IP", "").strip()
+        if not meticulous_ip:
+            raise HTTPException(status_code=503, detail="METICULOUS_IP not configured")
+
+        # Ensure author_id is present — machine API may require it
+        if "author_id" not in profile_json:
+            profile_json["author_id"] = profile_json.get("author", "MeticAI")
+
+        # Strip None values (machine API rejects them)
+        clean_json = {k: v for k, v in profile_json.items() if v is not None}
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"http://{meticulous_ip}/api/v1/profile/save",
+                json=clean_json,
             )
+            if resp.status_code != 200:
+                logger.error(
+                    f"Machine API rejected profile save: {resp.status_code} - {resp.text}",
+                    extra={"request_id": request_id},
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Machine API error: {resp.text}",
+                )
+
+        invalidate_profile_list_cache()
 
         logger.info(
             f"Successfully restored profile '{profile_name}' to machine",
