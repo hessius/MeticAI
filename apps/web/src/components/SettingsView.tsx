@@ -1204,7 +1204,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                   />
                 </div> */}
 
-              </div>
+              </CollapsibleSection>
             )}
 
             {/* Remote Access (Tailscale) — hidden in direct/PWA mode */}
