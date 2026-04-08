@@ -22,10 +22,10 @@
         "e2e:ui": "playwright test --ui",
         "e2e:headed": "playwright test --headed",
         "storybook": "storybook dev -p 6006",
-        "build-storybook": "storybook build"
+        "build-storybook": "storybook build",
+        "postinstall": "bash scripts/patch-capacitor-spm.sh"
     },
     "dependencies": {
-        "@capacitor/camera": "^8.0.2",
         "@capacitor/core": "^8.3.0",
         "@capacitor/ios": "^8.3.0",
         "@capacitor/preferences": "^8.0.1",
