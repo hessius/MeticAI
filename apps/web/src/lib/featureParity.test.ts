@@ -10,21 +10,25 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.mock('@/lib/machineMode', () => ({
   isDirectMode: vi.fn(() => false),
+  isNativePlatform: vi.fn(() => false),
 }))
 
-import { isDirectMode } from '@/lib/machineMode'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { getFeatureFlags, resetFeatureFlags, type FeatureFlags } from '@/lib/featureFlags'
 
 const mockedIsDirectMode = vi.mocked(isDirectMode)
+const mockedIsNativePlatform = vi.mocked(isNativePlatform)
 
 function getProxyFlags(): FeatureFlags {
   mockedIsDirectMode.mockReturnValue(false)
+  mockedIsNativePlatform.mockReturnValue(false)
   resetFeatureFlags()
   return getFeatureFlags()
 }
 
 function getDirectFlags(): FeatureFlags {
   mockedIsDirectMode.mockReturnValue(true)
+  mockedIsNativePlatform.mockReturnValue(false)
   resetFeatureFlags()
   return getFeatureFlags()
 }
@@ -33,6 +37,7 @@ describe('feature parity between proxy and direct modes', () => {
   beforeEach(() => {
     resetFeatureFlags()
     mockedIsDirectMode.mockReturnValue(false)
+    mockedIsNativePlatform.mockReturnValue(false)
   })
 
   // -------------------------------------------------------------------

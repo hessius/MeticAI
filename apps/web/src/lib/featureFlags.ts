@@ -6,6 +6,7 @@
  */
 
 import { isDirectMode } from '@/lib/machineMode'
+import { isNativePlatform } from '@/lib/machineMode'
 
 export interface FeatureFlags {
   /** mDNS auto-discovery of machine on local network */
@@ -80,11 +81,24 @@ const DIRECT_FLAGS: FeatureFlags = {
   watchtowerUpdate: false,   // No watchtower in direct mode
 }
 
+/** Capacitor native extends direct flags with native-specific capabilities */
+const CAPACITOR_FLAGS: FeatureFlags = {
+  ...DIRECT_FLAGS,
+  machineDiscovery: true,    // mDNS/Bonjour via native plugin
+  pwaInstall: false,         // Already a native app
+}
+
 let cachedFlags: FeatureFlags | null = null
 
 export function getFeatureFlags(): FeatureFlags {
   if (!cachedFlags) {
-    cachedFlags = isDirectMode() ? { ...DIRECT_FLAGS } : { ...PROXY_FLAGS }
+    if (isNativePlatform()) {
+      cachedFlags = { ...CAPACITOR_FLAGS }
+    } else if (isDirectMode()) {
+      cachedFlags = { ...DIRECT_FLAGS }
+    } else {
+      cachedFlags = { ...PROXY_FLAGS }
+    }
   }
   return cachedFlags
 }

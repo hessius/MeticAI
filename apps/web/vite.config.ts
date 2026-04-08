@@ -6,6 +6,10 @@ import { resolve } from 'path'
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
 const machineMode = process.env.VITE_MACHINE_MODE || 'proxy'
 
+// Capacitor builds use direct transport but different base path than machine-hosted
+const isCapacitor = machineMode === 'capacitor'
+const isDirect = machineMode === 'direct' || isCapacitor
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -22,7 +26,9 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
-  // Machine builds set base path for Tornado's /meticai/ static handler
+  // Machine-hosted builds: /meticai/ for Tornado static handler
+  // Capacitor builds: / (served from local bundle)
+  // Proxy builds: /
   base: machineMode === 'direct' ? '/meticai/' : '/',
   build: {
     sourcemap: false,
@@ -32,8 +38,8 @@ export default defineConfig({
         manualChunks: (id: string) => {
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'recharts'
           if (id.includes('node_modules/framer-motion')) return 'framer-motion'
-          // In direct mode, bundle espresso-api + genai together
-          if (machineMode === 'direct') {
+          // In direct/capacitor mode, bundle espresso-api + genai together
+          if (isDirect) {
             if (id.includes('@meticulous-home/espresso-api') || id.includes('@meticulous-home/espresso-profile')) return 'machine-api'
             if (id.includes('@google/genai')) return 'genai'
           }

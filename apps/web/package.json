@@ -9,6 +9,7 @@
         "build": "tsc -b --noCheck && vite build",
         "build:docker": "VITE_MACHINE_MODE=proxy tsc -b --noCheck && VITE_MACHINE_MODE=proxy vite build",
         "build:machine": "VITE_MACHINE_MODE=direct tsc -b --noCheck && VITE_MACHINE_MODE=direct vite build",
+        "build:ios": "VITE_MACHINE_MODE=capacitor tsc -b --noCheck && VITE_MACHINE_MODE=capacitor vite build && npx cap sync ios",
         "lint": "eslint .",
         "optimize": "vite optimize",
         "preview": "vite preview",
@@ -24,6 +25,10 @@
         "build-storybook": "storybook build"
     },
     "dependencies": {
+        "@capacitor/camera": "^8.0.2",
+        "@capacitor/core": "^8.3.0",
+        "@capacitor/ios": "^8.3.0",
+        "@capacitor/preferences": "^8.0.1",
         "@google/genai": "^1.46.0",
         "@heroicons/react": "^2.2.0",
         "@hookform/resolvers": "^5.2.2",
@@ -100,6 +105,7 @@
     },
     "devDependencies": {
         "@axe-core/playwright": "^4.11.1",
+        "@capacitor/cli": "^8.3.0",
         "@chromatic-com/storybook": "5.1.1",
         "@eslint/js": "^10.0.1",
         "@playwright/test": "1.59.1",

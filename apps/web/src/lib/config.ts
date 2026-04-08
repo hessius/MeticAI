@@ -1,4 +1,4 @@
-import { isDirectMode } from './machineMode';
+import { isDirectMode, isNativePlatform, getDefaultMachineUrl } from './machineMode';
 
 /**
  * Configuration loader for application settings
@@ -21,7 +21,9 @@ export async function loadConfig(): Promise<AppConfig> {
     return cachedConfig;
   }
 
-  // In direct mode, no config.json exists — use defaults immediately
+  // In direct/native mode, no config.json exists — use defaults immediately.
+  // For native (Capacitor), serverUrl is the stored machine URL so that
+  // hooks using getServerUrl() make requests to the machine, not the WebView.
   if (isDirectMode()) {
     cachedConfig = getDefaultConfig();
     return cachedConfig;
@@ -55,13 +57,20 @@ export async function loadConfig(): Promise<AppConfig> {
 }
 
 /**
- * Returns the default configuration
- * @returns AppConfig The default configuration
+ * Returns the default configuration.
+ *
+ * In native mode (Capacitor), serverUrl is set to the machine URL
+ * so that hooks making API calls (useShotHistory, useMachineTelemetry, etc.)
+ * route to the machine instead of the WebView origin.
+ *
+ * In machine-hosted direct mode (PWA on port 8080), serverUrl stays empty
+ * because relative URLs already resolve to the machine.
  */
 function getDefaultConfig(): AppConfig {
-  return {
-    serverUrl: ''
-  };
+  if (isNativePlatform()) {
+    return { serverUrl: getDefaultMachineUrl() };
+  }
+  return { serverUrl: '' };
 }
 
 /**
@@ -71,4 +80,11 @@ function getDefaultConfig(): AppConfig {
 export async function getServerUrl(): Promise<string> {
   const config = await loadConfig();
   return config.serverUrl ?? '';
+}
+
+/**
+ * Invalidate cached config (e.g., when machine URL changes in native mode).
+ */
+export function resetConfig(): void {
+  cachedConfig = null;
 }

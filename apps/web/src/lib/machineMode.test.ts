@@ -5,6 +5,8 @@ describe('machineMode', () => {
 
   beforeEach(() => {
     vi.resetModules()
+    // Clear any lingering Capacitor stub
+    delete (window as Record<string, unknown>).Capacitor
   })
 
   afterEach(() => {
@@ -14,6 +16,8 @@ describe('machineMode', () => {
       writable: true,
       configurable: true,
     })
+    delete (window as Record<string, unknown>).Capacitor
+    localStorage.clear()
   })
 
   function stubLocation(port: string, protocol = 'http:', host?: string) {
@@ -35,6 +39,12 @@ describe('machineMode', () => {
     vi.stubEnv('VITE_MACHINE_MODE', '')
   }
 
+  function stubCapacitor() {
+    ;(window as Record<string, unknown>).Capacitor = {
+      isNativePlatform: () => true,
+    }
+  }
+
   // -------------------------------------------------------------------
   // getMachineMode
   // -------------------------------------------------------------------
@@ -49,6 +59,12 @@ describe('machineMode', () => {
       vi.stubEnv('VITE_MACHINE_MODE', 'proxy')
       const { getMachineMode } = await import('@/lib/machineMode')
       expect(getMachineMode()).toBe('proxy')
+    })
+
+    it('should return "direct" when VITE_MACHINE_MODE=capacitor', async () => {
+      vi.stubEnv('VITE_MACHINE_MODE', 'capacitor')
+      const { getMachineMode } = await import('@/lib/machineMode')
+      expect(getMachineMode()).toBe('direct')
     })
 
     it('should detect direct mode from port 8080 at runtime', async () => {
@@ -84,6 +100,14 @@ describe('machineMode', () => {
       const { getMachineMode } = await import('@/lib/machineMode')
       expect(getMachineMode()).toBe('proxy')
     })
+
+    it('should return "direct" when Capacitor native is detected', async () => {
+      stubCapacitor()
+      clearMachineMode()
+      stubLocation('3550')
+      const { getMachineMode } = await import('@/lib/machineMode')
+      expect(getMachineMode()).toBe('direct')
+    })
   })
 
   // -------------------------------------------------------------------
@@ -114,6 +138,68 @@ describe('machineMode', () => {
       const { isDirectMode } = await import('@/lib/machineMode')
       expect(isDirectMode()).toBe(false)
     })
+
+    it('should return true when Capacitor native is detected', async () => {
+      stubCapacitor()
+      clearMachineMode()
+      stubLocation('3550')
+      const { isDirectMode } = await import('@/lib/machineMode')
+      expect(isDirectMode()).toBe(true)
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // isNativePlatform
+  // -------------------------------------------------------------------
+  describe('isNativePlatform', () => {
+    it('should return false when Capacitor is not present', async () => {
+      const { isNativePlatform } = await import('@/lib/machineMode')
+      expect(isNativePlatform()).toBe(false)
+    })
+
+    it('should return true when Capacitor.isNativePlatform() returns true', async () => {
+      stubCapacitor()
+      const { isNativePlatform } = await import('@/lib/machineMode')
+      expect(isNativePlatform()).toBe(true)
+    })
+
+    it('should return false when Capacitor exists but isNativePlatform returns false', async () => {
+      ;(window as Record<string, unknown>).Capacitor = {
+        isNativePlatform: () => false,
+      }
+      const { isNativePlatform } = await import('@/lib/machineMode')
+      expect(isNativePlatform()).toBe(false)
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // getRuntimePlatform
+  // -------------------------------------------------------------------
+  describe('getRuntimePlatform', () => {
+    it('should return "native" when Capacitor is detected', async () => {
+      stubCapacitor()
+      const { getRuntimePlatform } = await import('@/lib/machineMode')
+      expect(getRuntimePlatform()).toBe('native')
+    })
+
+    it('should return "machine-hosted" when on port 8080', async () => {
+      stubLocation('8080')
+      const { getRuntimePlatform } = await import('@/lib/machineMode')
+      expect(getRuntimePlatform()).toBe('machine-hosted')
+    })
+
+    it('should return "web" for standard browser', async () => {
+      stubLocation('3550')
+      const { getRuntimePlatform } = await import('@/lib/machineMode')
+      expect(getRuntimePlatform()).toBe('web')
+    })
+
+    it('should prioritise native over port detection', async () => {
+      stubCapacitor()
+      stubLocation('8080')
+      const { getRuntimePlatform } = await import('@/lib/machineMode')
+      expect(getRuntimePlatform()).toBe('native')
+    })
   })
 
   // -------------------------------------------------------------------
@@ -136,6 +222,31 @@ describe('machineMode', () => {
       stubLocation('3550')
       const { getDefaultMachineUrl } = await import('@/lib/machineMode')
       expect(getDefaultMachineUrl()).toBe('http://meticulous.local:8080')
+    })
+
+    it('should return stored machine URL when set', async () => {
+      localStorage.setItem('meticai-machine-url', 'http://192.168.1.50:8080')
+      stubLocation('3550')
+      const { getDefaultMachineUrl } = await import('@/lib/machineMode')
+      expect(getDefaultMachineUrl()).toBe('http://192.168.1.50:8080')
+    })
+
+    it('should prefer env var over stored URL', async () => {
+      vi.stubEnv('VITE_DEFAULT_MACHINE_URL', 'http://env-machine:8080')
+      localStorage.setItem('meticai-machine-url', 'http://stored:8080')
+      const { getDefaultMachineUrl } = await import('@/lib/machineMode')
+      expect(getDefaultMachineUrl()).toBe('http://env-machine:8080')
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // setMachineUrl
+  // -------------------------------------------------------------------
+  describe('setMachineUrl', () => {
+    it('should persist URL to localStorage', async () => {
+      const { setMachineUrl } = await import('@/lib/machineMode')
+      setMachineUrl('http://192.168.1.100:8080')
+      expect(localStorage.getItem('meticai-machine-url')).toBe('http://192.168.1.100:8080')
     })
   })
 })

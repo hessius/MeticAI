@@ -44,3 +44,11 @@ test-results
 *storybook.log
 storybook-static
 meticai-web.tar.gz
+
+# iOS / Capacitor build artifacts
+ios/App/Pods/
+ios/App/App/public/
+ios/App/DerivedData/
+ios/App/*.xcworkspace/xcuserdata/
+ios/App/*.xcodeproj/xcuserdata/
+*.ipa

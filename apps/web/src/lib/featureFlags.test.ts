@@ -1,19 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-// Mock machineMode so we can toggle direct/proxy per test
+// Mock machineMode so we can toggle direct/proxy/native per test
 vi.mock('@/lib/machineMode', () => ({
   isDirectMode: vi.fn(() => false),
+  isNativePlatform: vi.fn(() => false),
 }))
 
-import { isDirectMode } from '@/lib/machineMode'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { getFeatureFlags, hasFeature, resetFeatureFlags } from '@/lib/featureFlags'
 
 const mockedIsDirectMode = vi.mocked(isDirectMode)
+const mockedIsNativePlatform = vi.mocked(isNativePlatform)
 
 describe('featureFlags', () => {
   beforeEach(() => {
     resetFeatureFlags()
     mockedIsDirectMode.mockReturnValue(false)
+    mockedIsNativePlatform.mockReturnValue(false)
   })
 
   // -------------------------------------------------------------------
@@ -85,6 +88,52 @@ describe('featureFlags', () => {
   })
 
   // -------------------------------------------------------------------
+  // Capacitor (native) mode
+  // -------------------------------------------------------------------
+  describe('capacitor mode', () => {
+    beforeEach(() => {
+      mockedIsNativePlatform.mockReturnValue(true)
+      mockedIsDirectMode.mockReturnValue(true)
+    })
+
+    it('should enable machineDiscovery (mDNS via native plugin)', () => {
+      expect(getFeatureFlags().machineDiscovery).toBe(true)
+    })
+
+    it('should disable pwaInstall (already native)', () => {
+      expect(getFeatureFlags().pwaInstall).toBe(false)
+    })
+
+    it('should inherit direct-mode browser features', () => {
+      const flags = getFeatureFlags()
+      expect(flags.aiFeatures).toBe(true)
+      expect(flags.liveTelemetry).toBe(true)
+      expect(flags.shotHistory).toBe(true)
+      expect(flags.profileManagement).toBe(true)
+    })
+
+    it('should disable server-dependent features', () => {
+      const flags = getFeatureFlags()
+      expect(flags.scheduledShots).toBe(false)
+      expect(flags.systemManagement).toBe(false)
+      expect(flags.tailscaleConfig).toBe(false)
+      expect(flags.mcpServer).toBe(false)
+      expect(flags.cloudSync).toBe(false)
+      expect(flags.bridgeStatus).toBe(false)
+      expect(flags.watchtowerUpdate).toBe(false)
+    })
+
+    it('should take precedence over direct mode', () => {
+      // Both native and direct are true — native should win
+      const flags = getFeatureFlags()
+      // Native enables machineDiscovery; direct disables it
+      expect(flags.machineDiscovery).toBe(true)
+      // Native disables pwaInstall; direct enables it
+      expect(flags.pwaInstall).toBe(false)
+    })
+  })
+
+  // -------------------------------------------------------------------
   // hasFeature helper
   // -------------------------------------------------------------------
   describe('hasFeature', () => {
@@ -132,18 +181,27 @@ describe('featureFlags', () => {
   // Exhaustive flag coverage
   // -------------------------------------------------------------------
   describe('exhaustive flag coverage', () => {
-    it('proxy and direct flags should have the same keys', () => {
+    it('proxy, direct, and capacitor flags should have the same keys', () => {
       // Proxy
       mockedIsDirectMode.mockReturnValue(false)
+      mockedIsNativePlatform.mockReturnValue(false)
       resetFeatureFlags()
       const proxyKeys = Object.keys(getFeatureFlags()).sort()
 
       // Direct
       mockedIsDirectMode.mockReturnValue(true)
+      mockedIsNativePlatform.mockReturnValue(false)
       resetFeatureFlags()
       const directKeys = Object.keys(getFeatureFlags()).sort()
 
+      // Capacitor
+      mockedIsDirectMode.mockReturnValue(true)
+      mockedIsNativePlatform.mockReturnValue(true)
+      resetFeatureFlags()
+      const capacitorKeys = Object.keys(getFeatureFlags()).sort()
+
       expect(proxyKeys).toEqual(directKeys)
+      expect(proxyKeys).toEqual(capacitorKeys)
     })
 
     it('every FeatureFlags key should be a boolean', () => {
@@ -198,6 +256,32 @@ describe('featureFlags', () => {
           "pourOver": true,
           "profileManagement": true,
           "pwaInstall": true,
+          "recommendations": true,
+          "scheduledShots": false,
+          "shotHistory": true,
+          "systemManagement": false,
+          "tailscaleConfig": false,
+          "watchtowerUpdate": false,
+        }
+      `)
+    })
+
+    it('CAPACITOR_FLAGS should match snapshot', () => {
+      mockedIsNativePlatform.mockReturnValue(true)
+      mockedIsDirectMode.mockReturnValue(true)
+      resetFeatureFlags()
+      expect(getFeatureFlags()).toMatchInlineSnapshot(`
+        {
+          "aiFeatures": true,
+          "bridgeStatus": false,
+          "cloudSync": false,
+          "dialIn": true,
+          "liveTelemetry": true,
+          "machineDiscovery": true,
+          "mcpServer": false,
+          "pourOver": true,
+          "profileManagement": true,
+          "pwaInstall": false,
           "recommendations": true,
           "scheduledShots": false,
           "shotHistory": true,

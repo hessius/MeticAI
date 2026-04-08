@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 
 // ── Private helpers ─────────────────────────────────────────────────────────
 
@@ -15,7 +16,19 @@ interface CachedProfile { id: string; name: string; display?: { image?: string; 
 // ── Exported installer ──────────────────────────────────────────────────────
 
 export function installDirectModeInterceptor(): void {
-  const _fetch = window.fetch
+  const _originalFetch = window.fetch
+
+  // In native mode (Capacitor), relative /api/... URLs must be prefixed with
+  // the machine base URL since same-origin is the WebView, not the machine.
+  const _isNative = isNativePlatform()
+  const _machineBase = _isNative ? getDefaultMachineUrl() : ''
+
+  function _fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    if (_isNative && typeof input === 'string' && input.startsWith('/')) {
+      return _originalFetch(`${_machineBase}${input}`, init)
+    }
+    return _originalFetch(input, init)
+  }
 
   // Cache profile list data so /api/profile/{name} and image-proxy lookups work
   const _profileCache = new Map<string, CachedProfile>()
