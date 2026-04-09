@@ -18,3 +18,4 @@ export type {
 export { MachineServiceProvider, MachineServiceContext, useMachineService } from './MachineServiceContext'
 export { createMeticAIAdapter, meticAIAdapter } from './MeticAIAdapter'
 export { createDirectAdapter } from './DirectAdapter'
+export { getMachineApi, clearMachineApiCache } from './machineApi'

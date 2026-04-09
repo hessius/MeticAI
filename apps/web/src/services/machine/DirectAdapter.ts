@@ -6,11 +6,9 @@
  * Communicates via HTTP (axios) + Socket.IO (socket.io-client).
  */
 
-import ApiModule from '@meticulous-home/espresso-api'
 import type { Profile } from '@meticulous-home/espresso-profile'
+import { getMachineApi } from './machineApi'
 
-// CJS default export interop — Rolldown may wrap the default export
-const Api = typeof ApiModule === 'function' ? ApiModule : (ApiModule as { default: typeof ApiModule }).default
 import type {
   MachineService,
   CommandResult,
@@ -45,7 +43,7 @@ function wrapResult(success: boolean, message?: string): CommandResult {
 // ---------------------------------------------------------------------------
 
 export function createDirectAdapter(baseUrl: string): MachineService {
-  const api = new Api(undefined, baseUrl)
+  const api = getMachineApi(baseUrl)
   let connected = false
   const connectionCallbacks = new Set<ConnectionCallback>()
   const statusCallbacks = new Set<StatusCallback>()
