@@ -23,4 +23,7 @@ export const STORAGE_KEYS = {
 
   // -- Machine connection --
   MACHINE_URL: 'meticai-machine-url',
+
+  // -- Onboarding --
+  ONBOARDING_COMPLETE: 'meticai-onboarding-complete',
 } as const

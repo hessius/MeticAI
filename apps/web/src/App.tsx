@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode } from '@/lib/machineMode'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { STORAGE_KEYS } from '@/lib/constants'
 import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
 import { Toaster } from '@/components/ui/sonner'
@@ -61,6 +62,7 @@ const ShotAnalysisView = lazy(() => import('./components/ShotAnalysisView').then
 const ProfileCatalogueView = lazy(() => import('./components/ProfileCatalogueView').then(m => ({ default: m.ProfileCatalogueView })))
 const EspressoCompass = lazy(() => import('./components/EspressoCompass').then(m => ({ default: m.EspressoCompass })))
 const ProfileBreakdown = lazy(() => import('./components/ProfileBreakdown').then(m => ({ default: m.ProfileBreakdown })))
+const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then(m => ({ default: m.OnboardingWizard })))
 
 // Storage migration — initialises IndexedDB in direct/PWA mode
 import { useStorageMigration } from '@/services/storage'
@@ -69,7 +71,13 @@ function App() {
   const { t } = useTranslation()
   useStorageMigration()
   const [isInitializing, setIsInitializing] = useState(true)
-  const [viewState, setViewState] = useState<ViewState>('start')
+  const [viewState, setViewState] = useState<ViewState>(() => {
+    // Show onboarding on first launch in native/direct mode
+    if ((isNativePlatform() || isDirectMode()) && !localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
+      return 'onboarding'
+    }
+    return 'start'
+  })
   const previousViewStateRef = useRef<ViewState>('start')
   const [profileCount, setProfileCount] = useState<number | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -940,7 +948,7 @@ function App() {
               </Card>
             }>
             <AnimatePresence mode="wait">
-              {isInitializing && (
+              {isInitializing && viewState !== 'onboarding' && (
                 <motion.div
                   key="initializing"
                   initial={{ opacity: 0 }}
@@ -956,6 +964,21 @@ function App() {
                 </motion.div>
               )}
               
+              {viewState === 'onboarding' && (
+                <motion.div
+                  key="onboarding"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={motionTransition ?? { duration: 0.15 }}
+                >
+                  <OnboardingWizard onComplete={() => {
+                    setViewState('start')
+                    setIsInitializing(false)
+                  }} />
+                </motion.div>
+              )}
+
               {!isInitializing && viewState === 'start' && (
                 <StartView
                   profileCount={profileCount}

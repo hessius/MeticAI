@@ -24,7 +24,9 @@
     "fri": "Fr",
     "sat": "Sa",
     "sun": "So",
-    "done": "Fertig"
+    "done": "Fertig",
+    "next": "Weiter",
+    "skip": "Überspringen"
   },
   "greetings": {
     "morning": [
@@ -1502,6 +1504,77 @@
       "generatingProfile": "Profil wird generiert...",
       "validatingProfile": "Profil wird validiert...",
       "profileGenerated": "Profil erfolgreich generiert"
+    }
+  },
+  "onboarding": {
+    "stepProgress": "Schritt {{current}} von {{total}}: {{step}}",
+    "stepOf": "Schritt {{current}} von {{total}}",
+    "steps": {
+      "welcome": "Willkommen",
+      "machine": "Maschinenverbindung",
+      "name": "Dein Name",
+      "ai": "KI-Einrichtung",
+      "language": "Sprache",
+      "theme": "Aussehen",
+      "complete": "Fertig"
+    },
+    "welcome": {
+      "title": "Willkommen bei MeticAI",
+      "description": "Dein KI-gestützter Espresso-Begleiter. Lass uns in wenigen Schritten alles einrichten.",
+      "getStarted": "Los geht's"
+    },
+    "machine": {
+      "title": "Verbinde deine Maschine",
+      "description": "Gib die IP-Adresse deiner Meticulous-Maschine ein.",
+      "ipLabel": "IP-Adresse der Maschine",
+      "ipPlaceholder": "192.168.1.42",
+      "testButton": "Testen",
+      "invalidIp": "Bitte gib eine gültige IP-Adresse oder einen Hostnamen ein",
+      "connected": "Maschine erfolgreich verbunden!",
+      "unreachable": "Maschine nicht erreichbar. Überprüfe die IP und stelle sicher, dass du im selben Netzwerk bist.",
+      "successMessage": "Verbunden mit {{name}}",
+      "errorMessage": "Maschine nicht erreichbar. Überprüfe IP und Netzwerk.",
+      "hint": "Finde die IP deiner Maschine in den Maschineneinstellungen unter WLAN. Sie sieht normalerweise aus wie 192.168.x.x"
+    },
+    "name": {
+      "title": "Wie heißt du?",
+      "description": "Wird als Autorenname für Profile verwendet, die du erstellst.",
+      "label": "Dein Name",
+      "placeholder": "Barista extraordinär"
+    },
+    "ai": {
+      "title": "KI-Funktionen",
+      "description": "MeticAI nutzt Google Gemini um Profile zu erstellen, Shots zu analysieren und Empfehlungen zu geben.",
+      "keyLabel": "Gemini API-Schlüssel",
+      "keyPlaceholder": "AIza...",
+      "keyHint": "Hol dir einen kostenlosen API-Schlüssel auf aistudio.google.com. Du kannst ihn später in den Einstellungen hinzufügen.",
+      "whatItDoes": "Was KI ermöglicht:",
+      "feature1": "Individuelle Espresso-Profile aus Beschreibungen erstellen",
+      "feature2": "Deine Shots mit Experten-Feedback analysieren",
+      "feature3": "Dial-in-Empfehlungen basierend auf Geschmack erhalten"
+    },
+    "language": {
+      "title": "Sprache",
+      "description": "Wähle deine bevorzugte Sprache. Du kannst sie jederzeit in den Einstellungen ändern."
+    },
+    "theme": {
+      "title": "Aussehen",
+      "description": "Wähle wie MeticAI aussehen soll.",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "complete": {
+      "title": "Alles bereit!",
+      "description": "Alles ist konfiguriert. Zeit, etwas Großartiges zu brühen.",
+      "machine": "Maschine",
+      "name": "Name",
+      "ai": "KI",
+      "aiConfigured": "Konfiguriert",
+      "aiSkipped": "Nicht konfiguriert",
+      "language": "Sprache",
+      "startBrewing": "Loslegen",
+      "settingsHint": "Alle Einstellungen können später in den Einstellungen geändert werden."
     }
   }
 }

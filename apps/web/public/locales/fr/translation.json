@@ -24,7 +24,9 @@
     "fri": "Ven",
     "sat": "Sam",
     "sun": "Dim",
-    "done": "Terminé"
+    "done": "Terminé",
+    "next": "Suivant",
+    "skip": "Passer"
   },
   "greetings": {
     "morning": [
@@ -1502,6 +1504,77 @@
       "generatingProfile": "Génération du profil...",
       "validatingProfile": "Validation du profil...",
       "profileGenerated": "Profil généré avec succès"
+    }
+  },
+  "onboarding": {
+    "stepProgress": "Étape {{current}} sur {{total}} : {{step}}",
+    "stepOf": "Étape {{current}} sur {{total}}",
+    "steps": {
+      "welcome": "Bienvenue",
+      "machine": "Connexion machine",
+      "name": "Votre nom",
+      "ai": "Configuration IA",
+      "language": "Langue",
+      "theme": "Apparence",
+      "complete": "Terminé"
+    },
+    "welcome": {
+      "title": "Bienvenue dans MeticAI",
+      "description": "Votre compagnon espresso propulsé par l'IA. Configurons tout en quelques étapes.",
+      "getStarted": "Commencer"
+    },
+    "machine": {
+      "title": "Connectez votre machine",
+      "description": "Entrez l'adresse IP de votre machine Meticulous.",
+      "ipLabel": "Adresse IP de la machine",
+      "ipPlaceholder": "192.168.1.42",
+      "testButton": "Tester",
+      "invalidIp": "Entrez une adresse IP ou un nom d'hôte valide",
+      "connected": "Machine connectée avec succès !",
+      "unreachable": "Impossible d'atteindre la machine. Vérifiez l'IP et assurez-vous d'être sur le même réseau.",
+      "successMessage": "Connecté à {{name}}",
+      "errorMessage": "Machine inaccessible. Vérifiez l'IP et le réseau.",
+      "hint": "Trouvez l'IP de votre machine dans les paramètres machine sous Wi-Fi. C'est généralement 192.168.x.x"
+    },
+    "name": {
+      "title": "Comment vous appelez-vous ?",
+      "description": "Utilisé comme nom d'auteur pour les profils que vous créez.",
+      "label": "Votre nom",
+      "placeholder": "Barista extraordinaire"
+    },
+    "ai": {
+      "title": "Fonctionnalités IA",
+      "description": "MeticAI utilise Google Gemini pour générer des profils, analyser des shots et donner des recommandations.",
+      "keyLabel": "Clé API Gemini",
+      "keyPlaceholder": "AIza...",
+      "keyHint": "Obtenez une clé API gratuite sur aistudio.google.com. Vous pouvez l'ajouter plus tard dans les Paramètres.",
+      "whatItDoes": "Ce que l'IA permet :",
+      "feature1": "Générer des profils espresso personnalisés à partir de descriptions",
+      "feature2": "Analyser vos shots avec un retour de niveau expert",
+      "feature3": "Obtenir des recommandations de dial-in basées sur le goût"
+    },
+    "language": {
+      "title": "Langue",
+      "description": "Choisissez votre langue préférée. Vous pouvez la changer à tout moment dans les Paramètres."
+    },
+    "theme": {
+      "title": "Apparence",
+      "description": "Choisissez l'apparence de MeticAI.",
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Système"
+    },
+    "complete": {
+      "title": "Tout est prêt !",
+      "description": "Tout est configuré. Il est temps de préparer quelque chose d'incroyable.",
+      "machine": "Machine",
+      "name": "Nom",
+      "ai": "IA",
+      "aiConfigured": "Configurée",
+      "aiSkipped": "Non configurée",
+      "language": "Langue",
+      "startBrewing": "Commencer à préparer",
+      "settingsHint": "Tous les paramètres peuvent être modifiés plus tard dans les Paramètres."
     }
   }
 }

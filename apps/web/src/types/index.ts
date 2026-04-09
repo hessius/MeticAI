@@ -124,7 +124,8 @@ export type ViewState =
   | 'shot-history'
   | 'shot-analysis'
   | 'profile-catalogue'
-  | 'dial-in';
+  | 'dial-in'
+  | 'onboarding';
 
 // ============================================================================
 // Tag Types

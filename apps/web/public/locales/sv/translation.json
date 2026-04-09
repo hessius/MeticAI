@@ -24,7 +24,9 @@
     "sat": "Lör",
     "sun": "Sön",
     "tryAgain": "Försök igen",
-    "done": "Klar"
+    "done": "Klar",
+    "next": "Nästa",
+    "skip": "Hoppa över"
   },
   "greetings": {
     "morning": [
@@ -1502,6 +1504,77 @@
       "generatingProfile": "Genererar profil...",
       "validatingProfile": "Validerar profil...",
       "profileGenerated": "Profilen genererades framgångsrikt"
+    }
+  },
+  "onboarding": {
+    "stepProgress": "Steg {{current}} av {{total}}: {{step}}",
+    "stepOf": "Steg {{current}} av {{total}}",
+    "steps": {
+      "welcome": "Välkommen",
+      "machine": "Maskinanslutning",
+      "name": "Ditt namn",
+      "ai": "AI-inställning",
+      "language": "Språk",
+      "theme": "Utseende",
+      "complete": "Klart"
+    },
+    "welcome": {
+      "title": "Välkommen till MeticAI",
+      "description": "Din AI-drivna espressokompanjon. Låt oss komma igång med några enkla steg.",
+      "getStarted": "Kom igång"
+    },
+    "machine": {
+      "title": "Anslut din maskin",
+      "description": "Ange IP-adressen till din Meticulous-maskin.",
+      "ipLabel": "Maskinens IP-adress",
+      "ipPlaceholder": "192.168.1.42",
+      "testButton": "Testa",
+      "invalidIp": "Ange en giltig IP-adress eller värdnamn",
+      "connected": "Maskinen ansluten!",
+      "unreachable": "Kunde inte nå maskinen. Kontrollera IP-adressen och att du är på samma nätverk.",
+      "successMessage": "Ansluten till {{name}}",
+      "errorMessage": "Maskinen kan inte nås. Kontrollera IP och nätverk.",
+      "hint": "Hitta maskinens IP i maskinens inställningar under Wi-Fi. Det ser vanligtvis ut som 192.168.x.x"
+    },
+    "name": {
+      "title": "Vad heter du?",
+      "description": "Används som författarnamn för profiler du skapar.",
+      "label": "Ditt namn",
+      "placeholder": "Barista extraordinär"
+    },
+    "ai": {
+      "title": "AI-funktioner",
+      "description": "MeticAI använder Google Gemini för att skapa profiler, analysera shots och ge rekommendationer.",
+      "keyLabel": "Gemini API-nyckel",
+      "keyPlaceholder": "AIza...",
+      "keyHint": "Skaffa en gratis API-nyckel på aistudio.google.com. Du kan lägga till detta senare i Inställningar.",
+      "whatItDoes": "Vad AI möjliggör:",
+      "feature1": "Skapa anpassade espressoprofiler från beskrivningar",
+      "feature2": "Analysera dina shots med expertfeedback",
+      "feature3": "Få dial-in-rekommendationer baserat på smak"
+    },
+    "language": {
+      "title": "Språk",
+      "description": "Välj ditt föredragna språk. Du kan ändra detta när som helst i Inställningar."
+    },
+    "theme": {
+      "title": "Utseende",
+      "description": "Välj hur MeticAI ska se ut.",
+      "light": "Ljust",
+      "dark": "Mörkt",
+      "system": "System"
+    },
+    "complete": {
+      "title": "Allt klart!",
+      "description": "Allt är konfigurerat. Dags att brygga något fantastiskt.",
+      "machine": "Maskin",
+      "name": "Namn",
+      "ai": "AI",
+      "aiConfigured": "Konfigurerad",
+      "aiSkipped": "Ej konfigurerad",
+      "language": "Språk",
+      "startBrewing": "Börja brygga",
+      "settingsHint": "Alla inställningar kan ändras senare i Inställningar."
     }
   }
 }
