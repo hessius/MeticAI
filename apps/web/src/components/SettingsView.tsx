@@ -36,7 +36,7 @@ import {
   Info
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode } from '@/lib/machineMode'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -943,8 +943,8 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
               </div>
             </CollapsibleSection>
 
-            {/* Meticulous IP — hidden in direct mode (IP is implicit) */}
-            {!isDirectMode() && (
+            {/* Meticulous IP — hidden in direct mode (IP is implicit), but shown in native mode */}
+            {(!isDirectMode() || isNativePlatform()) && (
             <div className="space-y-2">
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
                 {t('settings.meticulousIp')}

@@ -18,6 +18,8 @@
     max-width: 100vw;
     width: 100%;
     position: relative;
+    background-color: var(--background);
+    color: var(--foreground);
   }
   
   /* iOS PWA safe area handling — let background show through the notch

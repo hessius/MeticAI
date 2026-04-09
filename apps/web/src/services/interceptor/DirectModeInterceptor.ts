@@ -24,7 +24,7 @@ export function installDirectModeInterceptor(): void {
   const _machineBase = _isNative ? getDefaultMachineUrl() : ''
 
   function _fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    if (_isNative && typeof input === 'string' && input.startsWith('/')) {
+    if (_isNative && typeof input === 'string' && input.startsWith('/api/')) {
       return _originalFetch(`${_machineBase}${input}`, init)
     }
     return _originalFetch(input, init)

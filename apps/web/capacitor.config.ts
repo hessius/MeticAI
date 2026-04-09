@@ -8,6 +8,8 @@ const config: CapacitorConfig = {
     // Allow mixed content for local network HTTP connections to the machine
     androidScheme: 'https',
     iosScheme: 'https',
+    // Enable Safari Web Inspector for debugging (Develop → Simulator → MeticAI)
+    webContentsDebuggingEnabled: true,
   },
   ios: {
     // Allow clear-text HTTP to local network (machine API on port 8080)
