@@ -366,7 +366,7 @@ export function EspressoCompass({ onBack }: EspressoCompassProps) {
           <li dangerouslySetInnerHTML={{ __html: t('espressoCompass.ruleDontChangeDose') }} />
           <li>{t('espressoCompass.ruleYieldTime')}</li>
           <li>{t('espressoCompass.ruleEvenExtraction')}</li>
-          <li>{t('espressoCompass.rulePreciseControl')}</li>
+          <li dangerouslySetInnerHTML={{ __html: t('espressoCompass.rulePreciseControl') }} />
         </ul>
       </Card>
 

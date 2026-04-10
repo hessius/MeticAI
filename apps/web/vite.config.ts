@@ -1,5 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
+import { readFileSync } from 'fs';
 import { defineConfig } from "vite";
 import { resolve } from 'path'
 
@@ -19,7 +20,9 @@ export default defineConfig({
     // TODO: re-enable once vite-plugin-pwa fixes LRUCache constructor error
   ],
   define: {
-    __APP_VERSION__: JSON.stringify(Date.now().toString()),
+    __APP_VERSION__: JSON.stringify(
+      readFileSync(resolve(import.meta.dirname, '../../VERSION'), 'utf-8').trim()
+    ),
   },
   resolve: {
     alias: {

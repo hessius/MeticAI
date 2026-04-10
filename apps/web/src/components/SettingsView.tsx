@@ -832,6 +832,83 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Meticulous IP — hidden in direct mode (IP is implicit), but shown in native mode */}
+            {(!isDirectMode() || isNativePlatform()) && (
+            <div className="space-y-2">
+              <Label htmlFor="meticulousIp" className="text-sm font-medium">
+                {t('settings.meticulousIp')}
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="meticulousIp"
+                  type="text"
+                  value={settings.meticulousIp}
+                  onChange={(e) => handleChange('meticulousIp', e.target.value)}
+                  placeholder={t('settings.meticulousIpPlaceholder')}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  onClick={handleDetectMachine}
+                  disabled={isDetecting}
+                  className="shrink-0"
+                >
+                  {isDetecting ? (
+                    <ArrowsClockwise className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <WifiHigh className="w-4 h-4 mr-1" />
+                      {t('settings.detect')}
+                    </>
+                  )}
+                </Button>
+              </div>
+              {detectResult && (
+                <div className={`text-xs p-2 rounded ${detectResult.found ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200'}`}>
+                  {detectResult.found ? (
+                    <span>
+                      <CheckCircle className="w-3 h-3 inline mr-1" />
+                      {t('settings.machineFound', { hostname: detectResult.hostname || detectResult.ip })}
+                    </span>
+                  ) : (
+                    <div className="space-y-1">
+                      <span className="font-medium">{t(`settings.discovery.${detectResult.guidance_key || 'notFound'}`)}</span>
+                      {detectResult.guidance_hints && detectResult.guidance_hints.length > 0 && (
+                        <ul className="list-disc list-inside text-[11px] space-y-0.5 ml-1">
+                          {detectResult.guidance_hints.map((hint) => (
+                            <li key={hint}>{t(`settings.discovery.${hint}`)}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {t('settings.meticulousIpDescription')}
+              </p>
+            </div>
+            )}
+
+            {/* Author Name */}
+            <div className="space-y-2">
+              <Label htmlFor="authorName" className="text-sm font-medium">
+                {t('settings.authorName')}
+              </Label>
+              <Input
+                id="authorName"
+                type="text"
+                value={settings.authorName}
+                onChange={(e) => handleChange('authorName', e.target.value)}
+                placeholder={t('settings.authorNamePlaceholder')}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('settings.authorNameDescription')}
+              </p>
+            </div>
+
             {/* Language Selector */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
@@ -942,83 +1019,6 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
                 />
               </div>
             </CollapsibleSection>
-
-            {/* Meticulous IP — hidden in direct mode (IP is implicit), but shown in native mode */}
-            {(!isDirectMode() || isNativePlatform()) && (
-            <div className="space-y-2">
-              <Label htmlFor="meticulousIp" className="text-sm font-medium">
-                {t('settings.meticulousIp')}
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="meticulousIp"
-                  type="text"
-                  value={settings.meticulousIp}
-                  onChange={(e) => handleChange('meticulousIp', e.target.value)}
-                  placeholder={t('settings.meticulousIpPlaceholder')}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={handleDetectMachine}
-                  disabled={isDetecting}
-                  className="shrink-0"
-                >
-                  {isDetecting ? (
-                    <ArrowsClockwise className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <WifiHigh className="w-4 h-4 mr-1" />
-                      {t('settings.detect')}
-                    </>
-                  )}
-                </Button>
-              </div>
-              {detectResult && (
-                <div className={`text-xs p-2 rounded ${detectResult.found ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200'}`}>
-                  {detectResult.found ? (
-                    <span>
-                      <CheckCircle className="w-3 h-3 inline mr-1" />
-                      {t('settings.machineFound', { hostname: detectResult.hostname || detectResult.ip })}
-                    </span>
-                  ) : (
-                    <div className="space-y-1">
-                      <span className="font-medium">{t(`settings.discovery.${detectResult.guidance_key || 'notFound'}`)}</span>
-                      {detectResult.guidance_hints && detectResult.guidance_hints.length > 0 && (
-                        <ul className="list-disc list-inside text-[11px] space-y-0.5 ml-1">
-                          {detectResult.guidance_hints.map((hint) => (
-                            <li key={hint}>{t(`settings.discovery.${hint}`)}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {t('settings.meticulousIpDescription')}
-              </p>
-            </div>
-            )}
-
-            {/* Author Name */}
-            <div className="space-y-2">
-              <Label htmlFor="authorName" className="text-sm font-medium">
-                {t('settings.authorName')}
-              </Label>
-              <Input
-                id="authorName"
-                type="text"
-                value={settings.authorName}
-                onChange={(e) => handleChange('authorName', e.target.value)}
-                placeholder={t('settings.authorNamePlaceholder')}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t('settings.authorNameDescription')}
-              </p>
-            </div>
 
             {/* MQTT Bridge */}
             {hasFeature('bridgeStatus') && <CollapsibleSection
@@ -1591,9 +1591,9 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
       </Card>
 
       {/* Version & Changelog */}
-      <Card className="p-6 space-y-4">
+      <Card className="p-4 space-y-3">
         <h3 className="text-lg font-semibold text-primary">
-          {t('settings.versionAndChangelog')} — v{(versionInfo?.version || '...').replace(/^v/, '')}
+          {t('settings.versionInfo')} — v{(versionInfo?.version || '...').replace(/^v/, '')}
         </h3>
 
         <div className="space-y-3">

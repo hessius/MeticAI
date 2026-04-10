@@ -1310,20 +1310,20 @@
       "lackingBody": "Saknar kropp",
       "sweetSpotDesc": "Du är mitt i sweet spot! Extraktion och styrka är välbalanserade.",
       "sweetSpotAdvice": "Ytterligare ändringar är en fråga om personlig preferens. Prova små justeringar: ±0,5°C temperatur eller ±1g utbyte - för att utforska kaffets smaker.",
-      "underDesc": "Skottet är underextraherat: för mycket syra kommer igenom innan de söta och balanserade föreningarna hinner lösa upp sig.",
+      "underDesc": "Shoten är underextraherad: för mycket syra kommer igenom innan de söta och balanserade föreningarna hinner lösa upp sig.",
       "underAdvice": "Öka slutvikten/utbytet i din profil för att låta mer vatten passera genom pucken. Du kan också prova att höja temperaturen med 1–2°C. Om extraktionen är mycket låg, mal finare.",
       "overDesc": "Espressen är överextraherad: beska, torra och sträva föreningar från sent i extraktionen dominerar.",
       "overAdvice": "Minska slutvikten/utbytet i din profil så att shoten avslutas tidigare. Du kan också prova att sänka temperaturen med 1–2°C. Om kraftigt överextraherat, mal grövre.",
-      "strongDesc": "Skottet är mycket tätt och intensivt: koncentrationen är hög.",
+      "strongDesc": "Shoten är mycket tät och intensiv: koncentrationen är hög.",
       "strongAdvice": "Öka slutvikten i din profil så att mer vatten passerar igenom och späder ut koncentrationen. Detta skiftar bryggkvoten mot ett längre shot.",
-      "weakDesc": "Skottet känns tunt eller vattnigt: det saknar den sirapslika kropp som förväntas av espresso.",
+      "weakDesc": "Shoten känns tunn eller vattnig: den saknar den sirapslika kropp som förväntas av espresso.",
       "weakAdvice": "Minska slutvikten i din profil så att mindre vatten passerar igenom och koncentrerar smakerna. Du kan också öka dosen något.",
       "unevenDesc": "Du smakar både syrlighet och bitterhet samtidigt: ett klassiskt tecken på channeling (vattnet hittar minsta motståndets väg genom pucken).",
       "unevenAdvice": "Fokusera på puckprep innan du ändrar profilen. Använd ett WDT-verktyg för att fördela malet jämnt och se till att tampen är perfekt plan. På Meticulous, verifiera även att förinfusionssteget har tillräckligt med tid för att mätta pucken jämnt."
     }
   },
   "dialIn": {
-    "title": "Inställningsguide",
+    "title": "Justera in",
     "stepOf": "Steg {{current}} av {{total}}",
     "sessionCompleted": "Inställningssession klar!",
     "steps": {
