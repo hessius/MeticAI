@@ -12,6 +12,7 @@
  */
 import { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useWakeLock } from '@/hooks/useWakeLock'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -106,6 +107,10 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
   const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+
+  // Keep screen awake during live shot view
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
+  useEffect(() => { requestWakeLock(); return () => { releaseWakeLock() } }, [requestWakeLock, releaseWakeLock])
 
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
   const [summary, setSummary] = useState<{
