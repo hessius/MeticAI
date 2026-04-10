@@ -1387,6 +1387,143 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
+    // GET/POST /api/settings → read/write from localStorage in direct mode
+    if (url.match(/\/api\/settings$/) && method === 'GET') {
+      return Promise.resolve(jsonResponse({
+        geminiApiKey: localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || '',
+        geminiApiKeyConfigured: Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()),
+        meticulousIp: _machineBase || '',
+        authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
+        geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || '',
+        mqttEnabled: true, // Socket.IO always available on machine
+      }))
+    }
+    if (url.match(/\/api\/settings$/) && method === 'POST') {
+      return (async () => {
+        try {
+          const request = input instanceof Request ? input : new Request(input, init)
+          const body = JSON.parse(await request.text())
+          if (body.geminiApiKey !== undefined) localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, body.geminiApiKey)
+          if (body.authorName !== undefined) localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, body.authorName)
+          if (body.geminiModel !== undefined) localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, body.geminiModel)
+          return jsonResponse({ status: 'ok' })
+        } catch (e) {
+          return jsonResponse({ status: 'error', detail: (e as Error).message }, 500)
+        }
+      })()
+    }
+
+    // ── Dial-in sessions (IndexedDB-backed) ─────────────────────────────
+
+    // POST /api/dialin/sessions → create new session
+    if (url.match(/\/api\/dialin\/sessions$/) && method === 'POST') {
+      return (async () => {
+        try {
+          const { saveDialInSession } = await import('@/services/storage/AppDatabase')
+          const request = input instanceof Request ? input : new Request(input, init)
+          const body = JSON.parse(await request.text())
+          const id = `dialin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          const session = {
+            id,
+            coffee: body.coffee || {},
+            profile_name: body.profile_name || null,
+            iterations: [],
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          await saveDialInSession({ id, coffee: session.coffee, steps: [] })
+          return jsonResponse(session)
+        } catch (e) {
+          return jsonResponse({ detail: (e as Error).message }, 500)
+        }
+      })()
+    }
+
+    // GET /api/dialin/sessions/:id → get session
+    const dialinGetMatch = url.match(/\/api\/dialin\/sessions\/([^/]+)$/)
+    if (dialinGetMatch && method === 'GET') {
+      return (async () => {
+        try {
+          const { getDialInSession } = await import('@/services/storage/AppDatabase')
+          const session = await getDialInSession(dialinGetMatch[1])
+          if (!session) return jsonResponse({ detail: 'Session not found' }, 404)
+          return jsonResponse({
+            id: session.id,
+            coffee: session.coffee,
+            iterations: session.steps || [],
+            status: 'active',
+            created_at: new Date(session.createdAt).toISOString(),
+            updated_at: new Date(session.createdAt).toISOString(),
+          })
+        } catch (e) {
+          return jsonResponse({ detail: (e as Error).message }, 500)
+        }
+      })()
+    }
+
+    // POST /api/dialin/sessions/:id/iterations → add taste iteration
+    const dialinIterMatch = url.match(/\/api\/dialin\/sessions\/([^/]+)\/iterations$/)
+    if (dialinIterMatch && method === 'POST') {
+      return (async () => {
+        try {
+          const { getDialInSession, saveDialInSession } = await import('@/services/storage/AppDatabase')
+          const request = input instanceof Request ? input : new Request(input, init)
+          const body = JSON.parse(await request.text())
+          const session = await getDialInSession(dialinIterMatch[1])
+          if (!session) return jsonResponse({ detail: 'Session not found' }, 404)
+          const steps = [...(session.steps || []), { ...body, timestamp: new Date().toISOString() }]
+          await saveDialInSession({ ...session, steps })
+          return jsonResponse({ status: 'ok', iteration_number: steps.length })
+        } catch (e) {
+          return jsonResponse({ detail: (e as Error).message }, 500)
+        }
+      })()
+    }
+
+    // POST /api/dialin/sessions/:id/recommend → AI recommendations (falls back client-side)
+    if (url.match(/\/api\/dialin\/sessions\/[^/]+\/recommend$/) && method === 'POST') {
+      // Return 501 so the client-side fallback in DialInRecommendStep kicks in
+      return Promise.resolve(jsonResponse({ detail: 'AI recommendations use client-side fallback in direct mode' }, 501))
+    }
+
+    // POST /api/dialin/sessions/:id/complete → mark session complete
+    if (url.match(/\/api\/dialin\/sessions\/[^/]+\/complete$/) && method === 'POST') {
+      return Promise.resolve(jsonResponse({ status: 'completed' }))
+    }
+
+    // ── Profile recommendations (not available without backend) ──────────
+
+    // POST /api/profiles/find-similar → return empty (no backend ranking engine)
+    if (url.match(/\/api\/profiles\/find-similar/) && method === 'POST') {
+      return Promise.resolve(jsonResponse({ recommendations: [] }))
+    }
+
+    // POST /api/profiles/recommend → return empty
+    if (url.match(/\/api\/profiles\/recommend/) && method === 'POST') {
+      return Promise.resolve(jsonResponse({ recommendations: [] }))
+    }
+
+    // ── Status/health endpoints ─────────────────────────────────────────
+
+    // GET /api/health → always healthy in direct mode
+    if (url.match(/\/api\/health$/)) {
+      return Promise.resolve(jsonResponse({ status: 'ok', mode: 'direct' }))
+    }
+
+    // GET /api/version → return app version
+    if (url.match(/\/api\/version$/)) {
+      return Promise.resolve(jsonResponse({
+        version: (globalThis as Record<string, unknown>).__APP_VERSION__ || 'unknown',
+        mode: 'direct',
+      }))
+    }
+
+    // GET /api/machine/detect → not needed in direct mode (user configures IP manually)
+    if (url.match(/\/api\/machine\/detect/)) {
+      return Promise.resolve(jsonResponse({ detail: 'Machine detection not available in direct mode' }, 501))
+    }
+
     // Unknown route — return 501 Not Implemented instead of silent empty response
     console.warn('[DirectMode] Unhandled route:', pathname)
     return Promise.resolve(jsonResponse({ error: 'Not implemented in direct mode', path: pathname }, 501))
