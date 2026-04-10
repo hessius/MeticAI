@@ -96,10 +96,9 @@ export function createMeticAIAdapter(): MachineService {
     // -- Profiles (via backend proxy) ---------------------------------------
     listProfiles: async () => {
       const base = await getServerUrl()
-      // Backend returns enriched profile dicts (id, name, author, temperature, etc.)
-      // which are a superset of ProfileIdent fields — safe to cast
-      const resp = await apiFetch<{ profiles: ProfileIdent[] }>(`${base}/api/machine/profiles`)
-      return resp.profiles ?? []
+      // Backend returns flat profile dicts; wrap as ProfileIdent for interface
+      const resp = await apiFetch<{ profiles: Profile[] }>(`${base}/api/machine/profiles`)
+      return (resp.profiles ?? []).map(p => ({ change_id: p.id, profile: p }))
     },
     fetchAllProfiles: async () => {
       const base = await getServerUrl()
