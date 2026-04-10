@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 vi.mock('@/lib/machineMode', () => ({
   isDirectMode: vi.fn(() => false),
   isNativePlatform: vi.fn(() => false),
+  isDemoMode: vi.fn(() => false),
 }))
 
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'

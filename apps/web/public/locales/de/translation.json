@@ -1576,5 +1576,14 @@
       "startBrewing": "Loslegen",
       "settingsHint": "Alle Einstellungen können später in den Einstellungen geändert werden."
     }
+  },
+  "demo": {
+    "banner": "Demo-Modus",
+    "bannerHint": "Simulierte Daten, keine echte Maschine",
+    "exit": "Beenden",
+    "machineConnected": "Demo-Maschine verbunden",
+    "brewStarted": "Demo-Brühvorgang gestartet",
+    "brewComplete": "Demo-Brühvorgang abgeschlossen",
+    "noRealConnection": "Keine echte Maschinenverbindung im Demo-Modus"
   }
 }

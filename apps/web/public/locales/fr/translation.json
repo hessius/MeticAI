@@ -1576,5 +1576,14 @@
       "startBrewing": "Commencer à préparer",
       "settingsHint": "Tous les paramètres peuvent être modifiés plus tard dans les Paramètres."
     }
+  },
+  "demo": {
+    "banner": "Mode démo",
+    "bannerHint": "Données simulées, pas de vraie machine",
+    "exit": "Quitter",
+    "machineConnected": "Machine démo connectée",
+    "brewStarted": "Extraction démo démarrée",
+    "brewComplete": "Extraction démo terminée",
+    "noRealConnection": "Pas de connexion machine réelle en mode démo"
   }
 }

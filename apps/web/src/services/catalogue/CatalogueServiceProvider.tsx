@@ -9,6 +9,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { CatalogueService } from './CatalogueService'
 import { createProxyCatalogueService } from './ProxyCatalogueService'
 import { createDirectCatalogueService } from './DirectCatalogueService'
+import { createDemoCatalogueService } from './DemoCatalogueService'
 import { getMachineMode, getDefaultMachineUrl } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { MACHINE_URL_CHANGED } from '@/services/machine/MachineServiceContext'
@@ -49,7 +50,9 @@ export function CatalogueServiceProvider({ children, service }: CatalogueService
 
   const value = useMemo(() => {
     if (service) return service
-    return getMachineMode() === 'direct'
+    const mode = getMachineMode()
+    if (mode === 'demo') return createDemoCatalogueService()
+    return mode === 'direct'
       ? createDirectCatalogueService(machineUrl)
       : createProxyCatalogueService()
   }, [service, machineUrl])

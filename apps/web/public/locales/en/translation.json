@@ -1578,5 +1578,14 @@
       "startBrewing": "Start Brewing",
       "settingsHint": "All settings can be changed later in Settings."
     }
+  },
+  "demo": {
+    "banner": "Demo Mode",
+    "bannerHint": "Simulated data, no real machine",
+    "exit": "Exit",
+    "machineConnected": "Demo machine connected",
+    "brewStarted": "Demo brew started",
+    "brewComplete": "Demo brew complete",
+    "noRealConnection": "No real machine connection in demo mode"
   }
 }
