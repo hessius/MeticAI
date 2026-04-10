@@ -23,7 +23,7 @@
         "e2e:headed": "playwright test --headed",
         "storybook": "storybook dev -p 6006",
         "build-storybook": "storybook build",
-        "postinstall": "sh scripts/patch-capacitor-spm.sh"
+        "postinstall": "test -f scripts/patch-capacitor-spm.sh && sh scripts/patch-capacitor-spm.sh || true"
     },
     "dependencies": {
         "@capacitor/core": "^8.3.0",
