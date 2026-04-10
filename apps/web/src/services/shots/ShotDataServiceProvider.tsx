@@ -36,6 +36,7 @@ export function ShotDataServiceProvider({ children, service }: ShotDataServicePr
       try {
         const stored = localStorage.getItem(STORAGE_KEYS.MACHINE_URL)
         if (stored && stored !== machineUrl) setMachineUrl(stored)
+        else if (stored === null && machineUrl !== getDefaultMachineUrl()) setMachineUrl(getDefaultMachineUrl())
       } catch { /* noop */ }
     }
     const storageHandler = (e: StorageEvent) => {

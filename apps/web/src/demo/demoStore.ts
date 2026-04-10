@@ -44,7 +44,7 @@ function generateSeedShots(): DemoShotMeta[] {
     shots.push({
       id: `demo-shot-${String(i + 1).padStart(3, '0')}`,
       dbKey: 1000 + i,
-      time: now - daysAgo * day + hourOffset * 3_600_000 - now % day,
+      time: Math.floor((now - daysAgo * day + hourOffset * 3_600_000 - now % day) / 1000),
       profileId: profile.id,
       profileName: profile.name,
       rating: i === 0 ? 'like' : i === 3 ? 'dislike' : null,

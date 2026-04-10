@@ -31,11 +31,11 @@ export function createDemoShotDataService(): ShotDataService {
         listing = listing.filter((s) => s.name === options.profileName)
       }
       if (options.startDate) {
-        const start = new Date(options.startDate).getTime()
+        const start = Math.floor(new Date(options.startDate).getTime() / 1000)
         listing = listing.filter((s) => s.time >= start)
       }
       if (options.endDate) {
-        const end = new Date(options.endDate).getTime()
+        const end = Math.floor(new Date(options.endDate).getTime() / 1000)
         listing = listing.filter((s) => s.time <= end)
       }
       if (options.sort === 'asc') {
@@ -104,7 +104,7 @@ export function createDemoShotDataService(): ShotDataService {
       return store.getAllAnnotations()
     },
 
-    async rateShot() {
+    async rateShot(/* shotId, rating */): Promise<void> {
       // No-op in demo — machine rating doesn't persist
     },
   }

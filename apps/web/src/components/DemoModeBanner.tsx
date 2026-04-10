@@ -22,6 +22,7 @@ export function DemoModeBanner() {
       <span className="opacity-60">—</span>
       <span className="opacity-80">{t('demo.bannerHint', 'Simulated data, no real machine')}</span>
       <button
+        type="button"
         onClick={handleExit}
         className="ml-2 rounded bg-amber-950/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:bg-amber-950/30 transition-colors"
       >

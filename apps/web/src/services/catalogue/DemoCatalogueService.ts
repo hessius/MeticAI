@@ -73,7 +73,7 @@ export function createDemoCatalogueService(): CatalogueService {
       return new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' })
     },
 
-    getProfileImageUrl(): string | null {
+    getProfileImageUrl(/* id */): string | null {
       return null
     },
 
@@ -81,7 +81,7 @@ export function createDemoCatalogueService(): CatalogueService {
       return null
     },
 
-    async syncProfiles(): Promise<SyncResults | null> {
+    async syncProfiles(/* force */): Promise<SyncResults | null> {
       return null
     },
 

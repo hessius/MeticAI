@@ -37,6 +37,7 @@ import { getDemoStore, generateSensorData } from '@/demo/demoStore'
 interface BrewState {
   timer: ReturnType<typeof setInterval>
   profile: Profile
+  shotId: string
   startTime: number
   dataPoints: ReturnType<typeof generateSensorData>
   tick: number
@@ -119,10 +120,12 @@ export function createDemoAdapter(): MachineService {
 
   function startBrew(profile: Profile) {
     stopBrew()
-    const dataPoints = generateSensorData(`brew-${Date.now()}`, 30)
+    const shotId = `demo-shot-${Date.now()}`
+    const dataPoints = generateSensorData(shotId, 30)
     const state: BrewState = {
       timer: setInterval(() => tickBrew(state), 100),
       profile,
+      shotId,
       startTime: Date.now(),
       dataPoints,
       tick: 0,
@@ -176,12 +179,11 @@ export function createDemoAdapter(): MachineService {
   function completeBrew(state: BrewState) {
     clearInterval(state.timer)
 
-    // Add to demo history
-    const shotId = `demo-shot-${Date.now()}`
+    // Add to demo history — reuse the same shotId as telemetry
     store.addShot({
-      id: shotId,
+      id: state.shotId,
       dbKey: Date.now(),
-      time: Date.now(),
+      time: Math.floor(Date.now() / 1000),
       profileId: state.profile.id,
       profileName: state.profile.name,
       rating: null,
