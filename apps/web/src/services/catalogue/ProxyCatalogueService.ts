@@ -66,9 +66,10 @@ export function createProxyCatalogueService(): CatalogueService {
 
     getProfileJson: async (id: string): Promise<Profile> => {
       const base = await getServerUrl()
-      return apiFetch<Profile>(
+      const resp = await apiFetch<{ profile: Profile }>(
         `${base}/api/machine/profile/${encodeURIComponent(id)}/json`,
       )
+      return resp.profile
     },
 
     deleteProfile: async (id: string): Promise<void> => {

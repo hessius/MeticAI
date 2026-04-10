@@ -96,17 +96,31 @@ export function createMeticAIAdapter(): MachineService {
     // -- Profiles (via backend proxy) ---------------------------------------
     listProfiles: async () => {
       const base = await getServerUrl()
+      // Backend returns enriched profile dicts (id, name, author, temperature, etc.)
+      // which are a superset of ProfileIdent fields — safe to cast
       const resp = await apiFetch<{ profiles: ProfileIdent[] }>(`${base}/api/machine/profiles`)
       return resp.profiles ?? []
     },
     fetchAllProfiles: async () => {
       const base = await getServerUrl()
-      const resp = await apiFetch<{ profiles: ProfileIdent[] }>(`${base}/api/machine/profiles`)
-      return (resp.profiles ?? []).map(pi => pi.profile)
+      const listing = await apiFetch<{ profiles: Array<{ id: string }> }>(`${base}/api/machine/profiles`)
+      const ids = (listing.profiles ?? []).map(p => p.id)
+      const profiles = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const resp = await apiFetch<{ profile: Profile }>(`${base}/api/machine/profile/${encodeURIComponent(id)}/json`)
+            return resp.profile
+          } catch {
+            return null
+          }
+        })
+      )
+      return profiles.filter((p): p is Profile => p !== null)
     },
     getProfile: async (id: string) => {
       const base = await getServerUrl()
-      return apiFetch<Profile>(`${base}/api/machine/profile/${encodeURIComponent(id)}`)
+      const resp = await apiFetch<{ profile: Profile }>(`${base}/api/machine/profile/${encodeURIComponent(id)}`)
+      return resp.profile
     },
     saveProfile: async (profile: Profile) => {
       const base = await getServerUrl()

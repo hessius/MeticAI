@@ -1,6 +1,6 @@
 /**
  * useStorageMigration — runs on first mount to initialize IndexedDB
- * and clean up stale caches. Only runs in direct (PWA) mode.
+ * and clean up stale caches. Runs in direct mode (machine-hosted PWA and Capacitor/native).
  */
 
 import { useEffect, useRef } from 'react'

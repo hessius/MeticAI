@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Patches Capacitor plugin Swift source files for Xcode 16.2 (Swift 6.0.3)
 # compatibility with Capacitor 8.x xcframeworks.
 #
@@ -12,7 +12,16 @@
 #
 # Safe to run multiple times (idempotent).
 
-set -euo pipefail
+set -eu
+
+# Cross-platform in-place sed (BSD on macOS, GNU on Linux/Docker)
+sedi() {
+    if sed --version >/dev/null 2>&1; then
+        sed -i "$@"
+    else
+        sed -i '' "$@"
+    fi
+}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$(dirname "$SCRIPT_DIR")"
@@ -23,10 +32,10 @@ PREFS="$NODE_MODULES/@capacitor/preferences/ios/Sources/PreferencesPlugin/Prefer
 if [ -f "$PREFS" ]; then
     if grep -q 'call\.reject' "$PREFS" 2>/dev/null; then
         # Replace single-arg getString used in guard/if-let with direct options access
-        sed -i '' 's/call\.getString("group")/call.options["group"] as? String/g' "$PREFS"
-        sed -i '' 's/call\.getString("key")/call.options["key"] as? String/g' "$PREFS"
+        sedi 's/call\.getString("group")/call.options["group"] as? String/g' "$PREFS"
+        sedi 's/call\.getString("key")/call.options["key"] as? String/g' "$PREFS"
         # Replace reject() with unimplemented() (available without NonescapableTypes)
-        sed -i '' 's/call\.reject(\(.*\))/call.unimplemented(\1)/g' "$PREFS"
+        sedi 's/call\.reject(\(.*\))/call.unimplemented(\1)/g' "$PREFS"
         echo "Patched: PreferencesPlugin.swift"
     else
         echo "Already patched: PreferencesPlugin.swift"

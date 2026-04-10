@@ -36,12 +36,14 @@ export function CatalogueServiceProvider({ children, service }: CatalogueService
         if (stored && stored !== machineUrl) setMachineUrl(stored)
       } catch { /* noop */ }
     }
-    window.addEventListener(MACHINE_URL_CHANGED, handler)
-    window.addEventListener('storage', (e: StorageEvent) => {
+    const storageHandler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEYS.MACHINE_URL) handler()
-    })
+    }
+    window.addEventListener(MACHINE_URL_CHANGED, handler)
+    window.addEventListener('storage', storageHandler)
     return () => {
       window.removeEventListener(MACHINE_URL_CHANGED, handler)
+      window.removeEventListener('storage', storageHandler)
     }
   }, [machineUrl])
 
