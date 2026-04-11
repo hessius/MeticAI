@@ -6,14 +6,10 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-// Konsta UI settings temporarily hidden — uncomment when re-enabling
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { hasFeature } from '@/lib/featureFlags'
-// Konsta UI settings temporarily hidden — uncomment when re-enabling
-// import { useKonstaToggle } from '@/hooks/useKonstaOverride'
 import { 
   CaretLeft, 
   GithubLogo, 
@@ -44,7 +40,7 @@ import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
 import { LanguageSelector } from '@/components/LanguageSelector'
-import type { PlatformTheme } from '@/hooks/usePlatformTheme'
+
 
 interface SettingsViewProps {
   onBack: () => void
@@ -55,8 +51,6 @@ interface SettingsViewProps {
   isFollowSystem?: boolean
   onToggleTheme?: () => void
   onSetFollowSystem?: (follow: boolean) => void
-  platformTheme?: PlatformTheme
-  onSetPlatformTheme?: (theme: PlatformTheme) => void
 }
 
 interface Settings {
@@ -108,11 +102,8 @@ const PROGRESS_UPDATE_INTERVAL = 500
 const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
 const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
-export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, platformTheme: _platformTheme, onSetPlatformTheme: _onSetPlatformTheme }: SettingsViewProps) {
+export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
-  // Konsta UI settings temporarily hidden — uncomment when re-enabling
-  // const { enabled: useKonstaUi, setEnabled: setUseKonstaUi } = useKonstaToggle()
-  void _platformTheme; void _onSetPlatformTheme
   
   const [settings, setSettings] = useState<Settings>({
     geminiApiKey: '',
@@ -1120,7 +1111,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             </CollapsibleSection>}
 
             {/* Appearance */}
-            {(onToggleBlobs !== undefined || onToggleTheme !== undefined || onSetPlatformTheme !== undefined) && (
+            {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (
               <CollapsibleSection title={t('appearance.title')} defaultOpen={false}>
                 {/* Theme toggle */}
                 {onToggleTheme !== undefined && (
@@ -1168,43 +1159,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     />
                   </div>
                 )}
-
-                {/* Platform theme — temporarily hidden while Konsta UI layout issues are resolved */}
-                {/* {onSetPlatformTheme !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="platform-theme-select" className="text-sm font-medium">{t('appearance.platformTheme')}</Label>
-                      <p className="text-xs text-muted-foreground">{t('appearance.platformThemeDescription')}</p>
-                    </div>
-                    <Select
-                      value={platformTheme ?? 'auto'}
-                      onValueChange={(value) => onSetPlatformTheme(value as PlatformTheme)}
-                    >
-                      <SelectTrigger id="platform-theme-select" className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">{t('appearance.platformThemeAuto')}</SelectItem>
-                        <SelectItem value="ios">{t('appearance.platformThemeIos')}</SelectItem>
-                        <SelectItem value="material">{t('appearance.platformThemeMaterial')}</SelectItem>
-                        <SelectItem value="none">{t('appearance.platformThemeNone')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )} */}
-
-                {/* Konsta UI toggle — temporarily hidden while Konsta UI layout issues are resolved */}
-                {/* <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="konsta-ui-toggle" className="text-sm font-medium">{t('appearance.useKonstaUi')}</Label>
-                    <p className="text-xs text-muted-foreground">{t('appearance.useKonstaUiDescription')}</p>
-                  </div>
-                  <Switch
-                    id="konsta-ui-toggle"
-                    checked={useKonstaUi}
-                    onCheckedChange={setUseKonstaUi}
-                  />
-                </div> */}
 
               </CollapsibleSection>
             )}

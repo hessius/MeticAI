@@ -1,14 +1,12 @@
 "use client"
 
-import { ComponentProps, type ChangeEvent } from "react"
+import { ComponentProps } from "react"
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
-import { Checkbox as KCheckbox } from 'konsta/react'
 import { Check as CheckIcon } from "lucide-react"
 
-import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 import { cn } from "@/lib/utils"
 
-function ShadcnCheckbox({
+function Checkbox({
   className,
   ...props
 }: ComponentProps<typeof CheckboxPrimitive.Root>) {
@@ -28,37 +26,6 @@ function ShadcnCheckbox({
         <CheckIcon className="size-3.5" />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
-  )
-}
-
-function Checkbox({
-  className,
-  ...props
-}: ComponentProps<typeof CheckboxPrimitive.Root>) {
-  const useKonsta = useKonstaOverride()
-
-  if (!useKonsta) {
-    return <ShadcnCheckbox className={className} {...props} />
-  }
-
-  const { checked, onCheckedChange, disabled, name, ...rest } = props
-  // Forward id, aria-*, data-* attributes for accessibility
-  const forwardedProps: Record<string, unknown> = {}
-  for (const [key, val] of Object.entries(rest)) {
-    if (key === 'id' || key === 'value' || key.startsWith('aria-') || key.startsWith('data-')) {
-      forwardedProps[key] = val
-    }
-  }
-
-  return (
-    <KCheckbox
-      checked={checked === true}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
-      disabled={disabled}
-      name={name}
-      className={className}
-      {...forwardedProps}
-    />
   )
 }
 

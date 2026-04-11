@@ -19,7 +19,6 @@ export const STORAGE_KEYS = {
 
   // -- Appearance --
   PLATFORM_THEME: 'meticai-platform-theme',
-  USE_KONSTA_UI: 'meticai-use-konsta-ui',
 
   // -- Machine connection --
   MACHINE_URL: 'meticai-machine-url',

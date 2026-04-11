@@ -58,7 +58,6 @@
         "i18next-http-backend": "3.0.4",
         "idb": "^8.0.3",
         "input-otp": "^1.4.2",
-        "konsta": "^5.0.8",
         "lucide-react": "1.7.0",
         "marked": "17.0.6",
         "modern-screenshot": "^4.6.8",
@@ -1532,8 +1531,6 @@
     "keyv": ["keyv@4.5.4", "", { "dependencies": { "json-buffer": "3.0.1" } }, ""],
 
     "kleur": ["kleur@4.1.5", "", {}, "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ=="],
-
-    "konsta": ["konsta@5.0.8", "", { "dependencies": { "tailwind-merge": "^3.3.1" } }, "sha512-A0Z3XMoiTLNW5aGNbnuCoZLUxmcXEuWmAsVMQxoej/e7RUhYTluO6BTBg0IOUUHKjuSiNrCGYjGn6FqYNU4uOQ=="],
 
     "leven": ["leven@3.1.0", "", {}, "sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A=="],
 

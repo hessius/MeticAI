@@ -1,13 +1,11 @@
 "use client"
 
-import { ComponentProps, type ChangeEvent } from "react"
+import { ComponentProps } from "react"
 import * as SwitchPrimitive from "@radix-ui/react-switch"
-import { Toggle } from 'konsta/react'
-import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 
 import { cn } from "@/lib/utils"
 
-function ShadcnSwitch({
+function Switch({
   className,
   ...props
 }: ComponentProps<typeof SwitchPrimitive.Root>) {
@@ -27,38 +25,6 @@ function ShadcnSwitch({
         )}
       />
     </SwitchPrimitive.Root>
-  )
-}
-
-function Switch({
-  className,
-  ...props
-}: ComponentProps<typeof SwitchPrimitive.Root>) {
-  const useKonsta = useKonstaOverride()
-
-  if (!useKonsta) {
-    return <ShadcnSwitch className={className} {...props} />
-  }
-
-  const { checked, defaultChecked, onCheckedChange, disabled, ...rest } = props
-
-  // Forward id, name, aria-*, data-* for accessibility and label association
-  const forwardedProps: Record<string, unknown> = {}
-  for (const [key, val] of Object.entries(rest)) {
-    if (key === 'id' || key === 'name' || key === 'value' || key.startsWith('aria-') || key.startsWith('data-')) {
-      forwardedProps[key] = val
-    }
-  }
-
-  return (
-    <Toggle
-      checked={checked ?? false}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => onCheckedChange?.(e.target.checked)}
-      disabled={disabled}
-      className={className}
-      {...(defaultChecked !== undefined ? { defaultChecked } : {})}
-      {...forwardedProps}
-    />
   )
 }
 

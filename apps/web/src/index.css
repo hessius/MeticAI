@@ -1,15 +1,10 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
-@import 'konsta/react/theme.css';
-
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
-  :root:not(.konsta-active) * {
+  * {
     @apply border-border;
-  }
-  .konsta-active * {
-    border-color: inherit;
   }
   
   /* Prevent horizontal overflow on mobile, especially iOS PWA mode */
@@ -84,18 +79,6 @@
     background: rgba(255, 255, 255, 0.25);
   }
 
-  /* When Konsta is active, let it own layout — reset conflicting base styles */
-  .konsta-active body {
-    font-family: inherit;
-    letter-spacing: normal;
-  }
-  .konsta-active h1,
-  .konsta-active h2,
-  .konsta-active h3,
-  .konsta-active h4 {
-    font-family: inherit;
-    letter-spacing: normal;
-  }
 }
 
 /* Golden Extraction — shared tokens (not theme-dependent) */
@@ -123,7 +106,7 @@
   --glass-blur: 16px;
   --glass-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
   
-  /* Border radius - Premium rounded corners (shadcn only, Konsta uses its own) */
+  /* Border radius - Premium rounded corners */
   --radius: 1.25rem;
 
   /* Light mode palette (warm espresso light theme) */
@@ -156,10 +139,6 @@
   --ring: oklch(0.65 0.18 65);
 }
 
-/* When Konsta owns layout, tighten radius to match native components */
-.konsta-active:root {
-  --radius: 0.5rem;
-}
 
 .dark {
   /* Dark-mode overrides for glass */

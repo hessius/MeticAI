@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react'
-import { App as KonstaApp } from 'konsta/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -39,8 +38,6 @@ import type { APIResponse, ViewState } from '@/types'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
-import { usePlatformTheme } from '@/hooks/usePlatformTheme'
-import { useKonstaOverride } from '@/hooks/useKonstaOverride'
 import { Sun, Moon, Gear } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
@@ -267,19 +264,6 @@ function App() {
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
-  const { theme: platformTheme, setTheme: setPlatformTheme, konstaTheme } = usePlatformTheme()
-  const useKonsta = useKonstaOverride()
-
-  // Toggle konsta-active class on <html> so CSS can scope conflicting styles
-  useEffect(() => {
-    const el = document.documentElement
-    if (useKonsta) {
-      el.classList.add('konsta-active')
-    } else {
-      el.classList.remove('konsta-active')
-    }
-    return () => { el.classList.remove('konsta-active') }
-  }, [useKonsta])
 
   const isHome = viewState === 'start'
 
@@ -1103,8 +1087,6 @@ function App() {
                     isFollowSystem={isFollowSystem}
                     onToggleTheme={toggleTheme}
                     onSetFollowSystem={setFollowSystem}
-                    platformTheme={platformTheme}
-                    onSetPlatformTheme={setPlatformTheme}
                   />
                 </FeatureErrorBoundary>
               )}
@@ -1315,14 +1297,6 @@ function App() {
     </div>
     </>
   )
-
-  if (useKonsta) {
-    return (
-      <KonstaApp theme={konstaTheme} dark={isDark} touchRipple={konstaTheme === 'material'} className="k-no-safe-areas">
-        {appContent}
-      </KonstaApp>
-    )
-  }
 
   return appContent
 }

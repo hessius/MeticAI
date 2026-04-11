@@ -79,7 +79,6 @@
         "i18next-http-backend": "3.0.4",
         "idb": "^8.0.3",
         "input-otp": "^1.4.2",
-        "konsta": "^5.0.8",
         "lucide-react": "1.7.0",
         "marked": "17.0.6",
         "modern-screenshot": "^4.6.8",

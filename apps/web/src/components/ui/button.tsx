@@ -1,9 +1,6 @@
 import { ComponentProps } from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { Button as KButton } from 'konsta/react'
-import { useKonstaOverride } from '@/hooks/useKonstaOverride'
-
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -45,7 +42,7 @@ const buttonVariants = cva(
   }
 )
 
-function ShadcnButton({
+function Button({
   className,
   variant,
   size,
@@ -63,37 +60,6 @@ function ShadcnButton({
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
-  )
-}
-
-function Button(props: ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
-  const useKonsta = useKonstaOverride()
-  const { variant, size, asChild = false, className, children, ...rest } = props
-
-  if (!useKonsta || size === 'icon' || asChild) {
-    return <ShadcnButton {...props} />
-  }
-
-  const isOutline = variant === 'outline'
-  const isClear = variant === 'ghost' || variant === 'link'
-  const isTonal = variant === 'ember' || variant === 'secondary'
-  const isRounded = variant === 'liquid' || variant === 'dark-brew' || variant === 'frosted' || variant === 'ember'
-  const isSmall = size === 'sm'
-  const isLarge = size === 'lg'
-
-  return (
-    <KButton
-      outline={isOutline}
-      clear={isClear}
-      tonal={isTonal}
-      rounded={isRounded}
-      small={isSmall}
-      large={isLarge}
-      className={className}
-      {...rest}
-    >
-      {children}
-    </KButton>
   )
 }
 
