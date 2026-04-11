@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { isDirectMode } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode } from '@/lib/machineMode'
 import { useMachineService } from '@/hooks/useMachineService'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { getServerUrl } from '@/lib/config'
@@ -303,10 +303,10 @@ function useProxyTelemetry(enabled: boolean): MachineState {
 // ---------------------------------------------------------------------------
 
 export function useMachineTelemetry(enabled: boolean): MachineState {
-  const direct = isDirectMode()
+  const useService = isDemoMode() || isDirectMode()
   // Both hooks always run (satisfying rules-of-hooks) but the inactive
   // one receives enabled=false and immediately returns INITIAL_STATE.
-  const directState = useDirectTelemetry(enabled && direct)
-  const proxyState = useProxyTelemetry(enabled && !direct)
-  return direct ? directState : proxyState
+  const directState = useDirectTelemetry(enabled && useService)
+  const proxyState = useProxyTelemetry(enabled && !useService)
+  return useService ? directState : proxyState
 }

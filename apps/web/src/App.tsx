@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
@@ -153,8 +153,8 @@ function App() {
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
         }
-        // Build image URL (not available in direct mode — no AI-generated images)
-        if (!isDirectMode()) {
+        // Build image URL (not available in direct or demo mode — no AI-generated images)
+        if (!isDirectMode() && !isDemoMode()) {
           setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
         }
       } catch { /* non-critical */ }
@@ -165,9 +165,9 @@ function App() {
   const prevViewStateRef = useRef<ViewState | null>(null)
   useEffect(() => {
     const fetchMqttSetting = async () => {
-      // In direct mode, no MeticAI backend — use sensible defaults
-      if (isDirectMode()) {
-        setMqttEnabled(true) // Socket.IO is always available on machine
+      // In direct or demo mode, no MeticAI backend — use sensible defaults
+      if (isDemoMode() || isDirectMode()) {
+        setMqttEnabled(true) // DemoAdapter / Socket.IO provides telemetry
         setIsAiConfigured(Boolean(localStorage.getItem('meticai-gemini-key')?.trim()))
         return
       }
@@ -286,8 +286,8 @@ function App() {
   // Check for existing profiles on mount
   useEffect(() => {
     const checkProfiles = async () => {
-      // In direct mode, skip proxy API — default to form view
-      if (isDirectMode()) {
+      // In direct or demo mode, skip proxy API — default to form view
+      if (isDemoMode() || isDirectMode()) {
         setProfileCount(0)
         setIsInitializing(false)
         return
@@ -324,7 +324,7 @@ function App() {
 
   // Update profile count when returning from history view
   const refreshProfileCount = useCallback(async () => {
-    if (isDirectMode()) return
+    if (isDemoMode() || isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
@@ -690,7 +690,7 @@ function App() {
   }
 
   const handleViewProfileByName = async (profileName: string) => {
-    if (isDirectMode()) return
+    if (isDemoMode() || isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
