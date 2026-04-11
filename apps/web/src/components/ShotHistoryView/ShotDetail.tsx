@@ -36,12 +36,14 @@ import {
   X,
   DownloadSimple,
   Brain,
+  ShareNetwork,
 } from '@phosphor-icons/react'
 import { domToPng } from 'modern-screenshot'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
+import { useNativeShare } from '@/hooks/useNativeShare'
 
 import type { ShotInfo, ShotData, LocalAnalysisResult } from './types'
 import { SPEED_OPTIONS } from './types'
@@ -134,6 +136,7 @@ export function ShotDetail({
   setAnnotationSummaries,
 }: ShotDetailProps) {
   const { t } = useTranslation()
+  const { share, canShare } = useNativeShare()
 
   // ---- Tab state ----------------------------------------------------------
   const [activeAction, setActiveAction] = useState<'replay' | 'compare' | 'analyze'>('replay')
@@ -642,6 +645,26 @@ export function ShotDetail({
                     <h2 className="text-lg font-bold text-foreground truncate">{t('shotHistory.shotDetails')}</h2>
                     <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
                   </div>
+                  {canShare && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      aria-label={t('common.share')}
+                      onClick={() => {
+                        const metrics = [
+                          selectedShot.total_time != null ? `${selectedShot.total_time.toFixed(1)}s` : null,
+                          selectedShot.final_weight != null ? `${selectedShot.final_weight.toFixed(1)}g` : null,
+                        ].filter(Boolean).join(' · ')
+                        share({
+                          title: profileName,
+                          text: `${profileName} — ${formatShotTime(selectedShot)}${metrics ? `\n${metrics}` : ''}`,
+                        })
+                      }}
+                    >
+                      <ShareNetwork size={20} weight="bold" />
+                    </Button>
+                  )}
                 </div>
 
                 {/* Shot Summary Stats */}

@@ -65,6 +65,10 @@ const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then
 // Storage migration — initialises IndexedDB in direct/PWA mode
 import { useStorageMigration } from '@/services/storage'
 
+// Capacitor plugin hooks
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
+
 function App() {
   const { t } = useTranslation()
   useStorageMigration()
@@ -122,6 +126,11 @@ function App() {
   const lastShotHook = useLastShot(mqttEnabled)
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
+  const prevMachineStateRef = useRef<string | null>(null)
+
+  // Capacitor plugin hooks
+  const { isConnected } = useNetworkStatus()
+  const { notifyPreheatComplete } = useBrewNotifications()
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
@@ -261,6 +270,21 @@ function App() {
     }
     prevBrewingRef.current = machineState.brewing
   }, [machineState.brewing])
+
+  // Notify when preheat completes (state transitions from preheating/heating → ready)
+  useEffect(() => {
+    const currentState = machineState.state?.toLowerCase() ?? null
+    const prevState = prevMachineStateRef.current
+    prevMachineStateRef.current = currentState
+
+    if (
+      prevState &&
+      (prevState === 'preheating' || prevState === 'heating') &&
+      currentState?.startsWith('click to start')
+    ) {
+      notifyPreheatComplete()
+    }
+  }, [machineState.state, notifyPreheatComplete])
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
@@ -846,6 +870,13 @@ function App() {
 
       {/* Beta version banner — fixed at top */}
       <BetaBanner />
+
+      {/* Network status banner */}
+      {!isConnected && (
+        <div className="bg-destructive/90 text-destructive-foreground text-center py-1 text-xs font-medium">
+          {t('common.noInternetConnection')}
+        </div>
+      )}
 
       {/* Demo mode indicator */}
       <DemoModeBanner />

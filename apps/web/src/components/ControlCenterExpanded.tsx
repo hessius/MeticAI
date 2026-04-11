@@ -50,6 +50,7 @@ import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode } from '@/lib/machineMode'
 import { relativeTime } from '@/lib/timeUtils'
+import { useHaptics } from '@/hooks/useHaptics'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -66,6 +67,7 @@ interface ControlCenterExpandedProps {
 
 export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCenterExpandedProps) {
   const { t } = useTranslation()
+  const { impact } = useHaptics()
   const [brightnessValue, setBrightnessValue] = useState<number>(
     machineState.brightness ?? 75,
   )
@@ -307,7 +309,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             icon={<Play size={14} weight="fill" />}
             label={t('controlCenter.actions.start')}
             disabled={!canStart}
-            onClick={() => cmd(() => machine.startShot(), 'startingShot')}
+            onClick={() => { impact('medium'); cmd(() => machine.startShot(), 'startingShot') }}
           />
 
           {/* Stop — destructive confirmation */}
@@ -317,7 +319,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             disabled={!isBrewing}
             title={t('controlCenter.confirm.stopTitle')}
             description={t('controlCenter.confirm.stopDesc')}
-            onConfirm={() => cmd(() => machine.stopShot(), 'stopping')}
+            onConfirm={() => { impact('heavy'); cmd(() => machine.stopShot(), 'stopping') }}
             t={t}
           />
 
@@ -327,7 +329,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
               icon={<XCircle size={14} weight="fill" />}
               label={t('controlCenter.actions.abortPreheat')}
               disabled={!isConnected}
-              onClick={() => cmd(() => machine.abortShot(), 'preheatCancelled')}
+              onClick={() => { impact('medium'); cmd(() => machine.abortShot(), 'preheatCancelled') }}
             />
           )}
 
@@ -335,25 +337,25 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             icon={<ArrowRight size={14} weight="bold" />}
             label={t('controlCenter.actions.continue')}
             disabled={machineState.state?.toLowerCase() !== 'paused'}
-            onClick={() => cmd(() => machine.continueShot(), 'continuing')}
+            onClick={() => { impact('medium'); cmd(() => machine.continueShot(), 'continuing') }}
           />
           <ActionButton
             icon={<Fire size={14} weight="fill" />}
             label={t('controlCenter.actions.preheat')}
             disabled={(!isIdle && !isReady) || !isConnected}
-            onClick={() => cmd(() => machine.preheat(), 'preheating')}
+            onClick={() => { impact('medium'); cmd(() => machine.preheat(), 'preheating') }}
           />
           <ActionButton
             icon={<Scales size={14} weight="fill" />}
             label={t('controlCenter.actions.tare')}
             disabled={!isConnected}
-            onClick={() => cmd(() => machine.tareScale(), 'tared')}
+            onClick={() => { impact('light'); cmd(() => machine.tareScale(), 'tared') }}
           />
           <ActionButton
             icon={<House size={14} weight="fill" />}
             label={t('controlCenter.actions.home')}
             disabled={(!isIdle && !isReady) || !isConnected}
-            onClick={() => cmd(() => machine.homePlunger(), 'homed')}
+            onClick={() => { impact('light'); cmd(() => machine.homePlunger(), 'homed') }}
           />
 
           {/* Purge — destructive confirmation */}
@@ -363,7 +365,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
             disabled={(!isIdle && !isReady) || !isConnected}
             title={t('controlCenter.confirm.purgeTitle')}
             description={t('controlCenter.confirm.purgeDesc')}
-            onConfirm={() => cmd(() => machine.purge(), 'purging')}
+            onConfirm={() => { impact('medium'); cmd(() => machine.purge(), 'purging') }}
             t={t}
           />
         </div>

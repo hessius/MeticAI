@@ -36,6 +36,8 @@ import { parseMachineInput, testMachineConnection } from '@/services/machine/dis
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
+import { useHaptics } from '@/hooks/useHaptics'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { toast } from 'sonner'
 
 // ---------------------------------------------------------------------------
@@ -74,6 +76,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const { t, i18n } = useTranslation()
   const { preference, isDark, setTheme } = useThemePreference()
   const announce = useScreenReaderAnnouncement()
+  const { impact } = useHaptics()
+  const { requestPermission } = useBrewNotifications()
 
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [direction, setDirection] = useState(1) // 1 = forward, -1 = back
@@ -123,9 +127,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // ── Navigation ──────────────────────────────────────────────────────────
 
   const goTo = useCallback((target: OnboardingStep, dir: 1 | -1 = 1) => {
+    impact('light')
     setDirection(dir)
     setStep(target)
-  }, [])
+  }, [impact])
 
   const next = useCallback(() => {
     const idx = STEPS.indexOf(step)
@@ -177,11 +182,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     // Theme already applied via useThemePreference
     // Machine URL already set via setMachineUrl on connection test
 
+    // Request notification permission (non-blocking)
+    requestPermission()
+
     // Mark onboarding complete
     localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETE, 'true')
 
     onComplete()
-  }, [authorName, geminiKey, onComplete])
+  }, [authorName, geminiKey, onComplete, requestPermission])
 
   // ── Step renderers ──────────────────────────────────────────────────────
 

@@ -26,7 +26,9 @@
     "sun": "Dom",
     "done": "Hecho",
     "next": "Siguiente",
-    "skip": "Omitir"
+    "skip": "Omitir",
+    "noInternetConnection": "Sin conexión a Internet",
+    "share": "Compartir"
   },
   "greetings": {
     "morning": [

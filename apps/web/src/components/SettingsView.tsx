@@ -40,6 +40,7 @@ import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
 import { LanguageSelector } from '@/components/LanguageSelector'
+import { useSecureStorage } from '@/hooks/useSecureStorage'
 
 
 interface SettingsViewProps {
@@ -104,6 +105,7 @@ const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /a
 
 export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
+  const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
   
   const [settings, setSettings] = useState<Settings>({
     geminiApiKey: '',
@@ -200,15 +202,16 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   useEffect(() => {
     const loadSettings = async () => {
       if (isDirectMode()) {
-        // In direct mode, load from localStorage
+        // In direct mode, load API key from secure storage (Keychain on native, localStorage on web)
+        const storedKey = await secureGetItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
         setSettings({
-          geminiApiKey: localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || '',
+          geminiApiKey: storedKey,
           meticulousIp: window.location.hostname,
           authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
           geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
           mqttEnabled: true,
           geminiApiKeyMasked: false,
-          geminiApiKeyConfigured: Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()),
+          geminiApiKeyConfigured: Boolean(storedKey.trim()),
         })
         setIsLoading(false)
         return
@@ -264,7 +267,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     loadSettings()
     loadUpdateMethod()
     loadTailscaleStatus()
-  }, [])
+  }, [secureGetItem])
 
   // Load version info
   useEffect(() => {
@@ -364,7 +367,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       try {
         if (isDirectMode()) {
           if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
-            localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
+            await secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
           }
           if (nextSettings.authorName) {
             localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, nextSettings.authorName)
@@ -408,7 +411,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         autoSaveFadeRef.current = setTimeout(() => setAutoSaveStatus('idle'), 4000)
       }
     }, 800)
-  }, [t])
+  }, [t, secureSetItem])
 
   const handleChange = (field: keyof Settings, value: string) => {
     setSettings(prev => {

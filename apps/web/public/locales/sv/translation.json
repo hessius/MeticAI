@@ -26,7 +26,9 @@
     "tryAgain": "Försök igen",
     "done": "Klar",
     "next": "Nästa",
-    "skip": "Hoppa över"
+    "skip": "Hoppa över",
+    "noInternetConnection": "Ingen internetanslutning",
+    "share": "Dela"
   },
   "greetings": {
     "morning": [

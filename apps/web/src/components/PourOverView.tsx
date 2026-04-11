@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useWakeLock } from '@/hooks/useWakeLock'
+import { useHaptics } from '@/hooks/useHaptics'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -381,6 +383,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
   // Keep screen awake while pour over is active
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
+  const { notification: hapticsNotification } = useHaptics()
+  const { notifyPourOverComplete } = useBrewNotifications()
+  const prevTargetReachedRef = useRef(false)
   useEffect(() => {
     if (isRunning) requestWakeLock()
     else releaseWakeLock()
@@ -686,6 +691,15 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const targetReached =
     (mode === 'ratio' && isRunning && targetWeight !== null && targetWeight > 0 && weight >= targetWeight) ||
     (mode === 'recipe' && isRunning && selectedRecipe !== null && weight >= selectedRecipe.ingredients.water_g)
+
+  // Haptic + notification when pour-over target is reached
+  useEffect(() => {
+    if (targetReached && !prevTargetReachedRef.current) {
+      hapticsNotification('success')
+      notifyPourOverComplete()
+    }
+    prevTargetReachedRef.current = targetReached
+  }, [targetReached, hapticsNotification, notifyPourOverComplete])
 
   const recipeTimings = useMemo((): RecipeStepTiming[] => {
     if (!selectedRecipe) return []

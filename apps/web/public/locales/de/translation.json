@@ -26,7 +26,9 @@
     "sun": "So",
     "done": "Fertig",
     "next": "Weiter",
-    "skip": "Überspringen"
+    "skip": "Überspringen",
+    "noInternetConnection": "Keine Internetverbindung",
+    "share": "Teilen"
   },
   "greetings": {
     "morning": [

@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CaretLeft } from "@phosphor-icons/react";
-import { Loader2, Sparkles, RefreshCw, XCircle, Info, Wand2 } from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, XCircle, Info, Wand2, Share2 } from "lucide-react";
 import { parseStructuredAnalysis, parseRecommendationsJSON, hasRecommendations } from "@/lib/parseAnalysis";
 import type { Recommendation } from "@/lib/parseAnalysis";
 import { SectionCard } from "@/components/SectionCard";
 import { RecommendationSelectionDialog } from "@/components/RecommendationSelectionDialog";
 import { getServerUrl } from "@/lib/config";
+import { useNativeShare } from "@/hooks/useNativeShare";
 
 interface ExpertAnalysisViewProps {
   isLoading: boolean;
@@ -37,6 +38,7 @@ export function ExpertAnalysisView({
   isCached,
 }: ExpertAnalysisViewProps) {
   const { t } = useTranslation();
+  const { share, canShare } = useNativeShare();
   const sections = useMemo(() => {
     if (!analysisResult) return [];
     return parseStructuredAnalysis(analysisResult);
@@ -256,6 +258,27 @@ export function ExpertAnalysisView({
             >
               <RefreshCw className="h-4 w-4" />
               {t('expertAnalysis.reAnalyze')}{isCached ? ` ${t('expertAnalysis.forFreshInsights')}` : ''}
+            </Button>
+          </div>
+        )}
+
+        {/* Share button */}
+        {!isLoading && analysisResult && canShare && (
+          <div className="flex items-center justify-center pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const text = sections.map((s) => `${s.title}\n${s.content}`).join("\n\n");
+                share({
+                  title: profileName ? `${t("expertAnalysis.title")} — ${profileName}` : t("expertAnalysis.title"),
+                  text,
+                });
+              }}
+              className="gap-2"
+            >
+              <Share2 className="h-4 w-4" />
+              {t("common.share")}
             </Button>
           </div>
         )}

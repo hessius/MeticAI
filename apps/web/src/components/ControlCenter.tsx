@@ -34,6 +34,7 @@ import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode } from '@/lib/machineMode'
+import { useHaptics } from '@/hooks/useHaptics'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
+  const { impact } = useHaptics()
 
   // Shared state derivation + command executor
   const {
@@ -321,7 +323,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!canStart}
-              onClick={() => cmd(() => isReady ? machine.continueShot() : machine.startShot(), 'startingShot')}
+              onClick={() => { impact('medium'); cmd(() => isReady ? machine.continueShot() : machine.startShot(), 'startingShot') }}
             >
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
@@ -333,7 +335,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!machineState.connected}
-                onClick={() => cmd(() => machine.abortShot(), isPreheating ? 'preheatCancelled' : 'warmupCancelled')}
+                onClick={() => { impact('medium'); cmd(() => machine.abortShot(), isPreheating ? 'preheatCancelled' : 'warmupCancelled') }}
               >
                 <XCircle size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.abortPreheat')}
@@ -344,7 +346,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!isIdle || !machineState.connected}
-                onClick={() => cmd(() => machine.preheat(), 'preheating')}
+                onClick={() => { impact('medium'); cmd(() => machine.preheat(), 'preheating') }}
               >
                 <Fire size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.preheat')}
@@ -355,7 +357,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!machineState.connected}
-              onClick={() => cmd(() => machine.tareScale(), 'tared')}
+              onClick={() => { impact('light'); cmd(() => machine.tareScale(), 'tared') }}
             >
               <Scales size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.tare')}
@@ -431,7 +433,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               variant="destructive"
               size="sm"
               className="h-9 text-xs"
-              onClick={() => cmd(() => machine.stopShot(), 'stopping')}
+              onClick={() => { impact('heavy'); cmd(() => machine.stopShot(), 'stopping') }}
             >
               <Stop size={14} weight="fill" className="mr-1" />
               {t('controlCenter.actions.stop')}

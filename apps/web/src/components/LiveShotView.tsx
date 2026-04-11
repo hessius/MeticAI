@@ -13,6 +13,8 @@
 import { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWakeLock } from '@/hooks/useWakeLock'
+import { useHaptics } from '@/hooks/useHaptics'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -112,6 +114,10 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
   useEffect(() => { requestWakeLock(); return () => { releaseWakeLock() } }, [requestWakeLock, releaseWakeLock])
 
+  // Haptic + notification hooks
+  const { notification: hapticsNotification } = useHaptics()
+  const { notifyBrewComplete } = useBrewNotifications()
+
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
   const [summary, setSummary] = useState<{
     totalTime: number
@@ -184,6 +190,13 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
       }
     }
   }, [ms.brewing])
+
+  // Haptic + notification on brew completion
+  useEffect(() => {
+    if (!shotComplete) return
+    hapticsNotification('success')
+    notifyBrewComplete(ms.active_profile ?? 'Espresso')
+  }, [shotComplete, hapticsNotification, notifyBrewComplete, ms.active_profile])
 
   // Accumulate data from WebSocket frames — push + rAF for O(1) per frame
   useEffect(() => {

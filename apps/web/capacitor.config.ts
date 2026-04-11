@@ -16,6 +16,8 @@ const config: CapacitorConfig = {
     allowsLinkPreview: false,
     contentInset: 'automatic',
     limitsNavigationsToAppBoundDomains: false,
+    // Scroll content when keyboard appears (prevents input fields from being hidden)
+    scrollEnabled: true,
   },
   plugins: {
     Camera: {
@@ -23,6 +25,12 @@ const config: CapacitorConfig = {
     },
     Preferences: {
       // Uses UserDefaults on iOS — no configuration needed
+    },
+    Keyboard: {
+      // Resize viewport when keyboard appears — prevents content from being hidden
+      resize: 'body',
+      // Show accessory bar with Done button above keyboard
+      resizeOnFullScreen: true,
     },
   },
 }
