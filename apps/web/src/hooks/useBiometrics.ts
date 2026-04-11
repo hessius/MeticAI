@@ -3,50 +3,74 @@
  *
  * Wraps @aparajita/capacitor-biometric-auth with silent error handling.
  * On web: authenticate() always resolves true (no gating).
+ * Uses dynamic import to avoid crashing the host chunk if the plugin fails to load.
  */
 
-import { useCallback, useEffect, useState } from 'react'
-import {
-  BiometricAuth,
-  BiometryError,
-  BiometryErrorType,
-  BiometryType,
-  type CheckBiometryResult,
-} from '@aparajita/capacitor-biometric-auth'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 
 export interface BiometryInfo {
   isAvailable: boolean
-  biometryType: BiometryType
+  biometryType: number
+}
+
+// Lazy-load the plugin to prevent module-level errors from crashing the host chunk
+let _pluginPromise: Promise<typeof import('@aparajita/capacitor-biometric-auth')> | null = null
+function getPlugin() {
+  if (!_pluginPromise) {
+    _pluginPromise = import('@aparajita/capacitor-biometric-auth').catch(() => null)
+  }
+  return _pluginPromise
 }
 
 export function useBiometrics() {
   const isNative = Capacitor.isNativePlatform()
   const [biometry, setBiometry] = useState<BiometryInfo>({
     isAvailable: false,
-    biometryType: BiometryType.none,
+    biometryType: 0,
   })
+  const listenerRef = useRef<{ remove: () => void } | null>(null)
 
   useEffect(() => {
     if (!isNative) return
 
-    let listenerHandle: Awaited<ReturnType<typeof BiometricAuth.addResumeListener>> | null = null
+    let cancelled = false
 
-    const update = (result: CheckBiometryResult) => {
-      setBiometry({
-        isAvailable: result.isAvailable,
-        biometryType: result.biometryType,
-      })
-    }
+    ;(async () => {
+      try {
+        const plugin = await getPlugin()
+        if (!plugin || cancelled) return
 
-    BiometricAuth.checkBiometry().then(update).catch(() => {})
+        const result = await plugin.BiometricAuth.checkBiometry()
+        if (!cancelled) {
+          setBiometry({
+            isAvailable: result.isAvailable,
+            biometryType: result.biometryType,
+          })
+        }
 
-    BiometricAuth.addResumeListener(update)
-      .then((handle) => { listenerHandle = handle })
-      .catch(() => {})
+        const handle = await plugin.BiometricAuth.addResumeListener((info) => {
+          if (!cancelled) {
+            setBiometry({
+              isAvailable: info.isAvailable,
+              biometryType: info.biometryType,
+            })
+          }
+        })
+        if (!cancelled) {
+          listenerRef.current = handle
+        } else {
+          handle.remove()
+        }
+      } catch {
+        // Plugin failed to initialize — biometrics simply won't be available
+      }
+    })()
 
     return () => {
-      listenerHandle?.remove()
+      cancelled = true
+      listenerRef.current?.remove()
+      listenerRef.current = null
     }
   }, [isNative])
 
@@ -55,7 +79,10 @@ export function useBiometrics() {
       if (!isNative) return true
 
       try {
-        await BiometricAuth.authenticate({
+        const plugin = await getPlugin()
+        if (!plugin) return true // fail open if plugin unavailable
+
+        await plugin.BiometricAuth.authenticate({
           reason,
           cancelTitle: 'Cancel',
           allowDeviceCredential: true,
@@ -65,11 +92,8 @@ export function useBiometrics() {
           androidConfirmationRequired: false,
         })
         return true
-      } catch (error) {
-        if (error instanceof BiometryError && error.code === BiometryErrorType.userCancel) {
-          return false
-        }
-        // Biometry unavailable or other error — fail open on non-critical path
+      } catch {
+        // Biometry unavailable, user cancelled, or plugin error — fail open
         return false
       }
     },

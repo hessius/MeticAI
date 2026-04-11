@@ -207,16 +207,30 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     const loadSettings = async () => {
       if (isDirectMode()) {
         // In direct mode, load API key from secure storage (Keychain on native, localStorage on web)
-        const storedKey = await secureGetItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
-        setSettings({
-          geminiApiKey: storedKey,
-          meticulousIp: window.location.hostname,
-          authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
-          geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
-          mqttEnabled: true,
-          geminiApiKeyMasked: false,
-          geminiApiKeyConfigured: Boolean(storedKey.trim()),
-        })
+        try {
+          const storedKey = await secureGetItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
+          setSettings({
+            geminiApiKey: storedKey,
+            meticulousIp: window.location.hostname,
+            authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
+            geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
+            mqttEnabled: true,
+            geminiApiKeyMasked: false,
+            geminiApiKeyConfigured: Boolean(storedKey.trim()),
+          })
+        } catch (err) {
+          console.error('Failed to load secure settings, falling back to localStorage:', err)
+          const fallbackKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
+          setSettings({
+            geminiApiKey: fallbackKey,
+            meticulousIp: window.location.hostname,
+            authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
+            geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
+            mqttEnabled: true,
+            geminiApiKeyMasked: false,
+            geminiApiKeyConfigured: Boolean(fallbackKey.trim()),
+          })
+        }
         setIsLoading(false)
         return
       }
@@ -371,7 +385,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       try {
         if (isDirectMode()) {
           if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
-            await secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
+            try {
+              await secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
+            } catch {
+              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
+            }
           }
           if (nextSettings.authorName) {
             localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, nextSettings.authorName)
