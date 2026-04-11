@@ -1541,7 +1541,10 @@
       "unreachable": "Impossibile raggiungere la macchina. Controlla l'IP e assicurati di essere sulla stessa rete.",
       "successMessage": "Connesso a {{name}}",
       "errorMessage": "Macchina non raggiungibile. Controlla IP e rete.",
-      "hint": "Trova l'IP della macchina nelle impostazioni della macchina sotto Wi-Fi. Di solito è 192.168.x.x"
+      "hint": "Trova l'IP della macchina nelle impostazioni della macchina sotto Wi-Fi. Di solito è 192.168.x.x",
+      "searching": "Ricerca di macchine nella tua rete...",
+      "foundMachines": "Macchine trovate nella tua rete",
+      "autoDiscovered": "Macchina trovata automaticamente!"
     },
     "name": {
       "title": "Come ti chiami?",

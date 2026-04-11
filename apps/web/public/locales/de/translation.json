@@ -1541,7 +1541,10 @@
       "unreachable": "Maschine nicht erreichbar. Überprüfe die IP und stelle sicher, dass du im selben Netzwerk bist.",
       "successMessage": "Verbunden mit {{name}}",
       "errorMessage": "Maschine nicht erreichbar. Überprüfe IP und Netzwerk.",
-      "hint": "Finde die IP deiner Maschine in den Maschineneinstellungen unter WLAN. Sie sieht normalerweise aus wie 192.168.x.x"
+      "hint": "Finde die IP deiner Maschine in den Maschineneinstellungen unter WLAN. Sie sieht normalerweise aus wie 192.168.x.x",
+      "searching": "Suche nach Maschinen in Ihrem Netzwerk...",
+      "foundMachines": "Maschinen in Ihrem Netzwerk gefunden",
+      "autoDiscovered": "Maschine automatisch gefunden!"
     },
     "name": {
       "title": "Wie heißt du?",

@@ -1543,7 +1543,10 @@
       "unreachable": "Could not reach the machine. Check the IP and make sure you're on the same network.",
       "successMessage": "Connected to {{name}}",
       "errorMessage": "Machine not reachable. Check IP and network.",
-      "hint": "Find your machine's IP in the machine settings under Wi-Fi. It usually looks like 192.168.x.x"
+      "hint": "Find your machine's IP in the machine settings under Wi-Fi. It usually looks like 192.168.x.x",
+      "searching": "Searching for machines on your network...",
+      "foundMachines": "Machines found on your network",
+      "autoDiscovered": "Machine found automatically!"
     },
     "name": {
       "title": "What's Your Name?",

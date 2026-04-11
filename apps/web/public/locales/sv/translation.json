@@ -1541,7 +1541,10 @@
       "unreachable": "Kunde inte nå maskinen. Kontrollera IP-adressen och att du är på samma nätverk.",
       "successMessage": "Ansluten till {{name}}",
       "errorMessage": "Maskinen kan inte nås. Kontrollera IP och nätverk.",
-      "hint": "Hitta maskinens IP i maskinens inställningar under Wi-Fi. Det ser vanligtvis ut som 192.168.x.x"
+      "hint": "Hitta maskinens IP i maskinens inställningar under Wi-Fi. Det ser vanligtvis ut som 192.168.x.x",
+      "searching": "Söker efter maskiner på ditt nätverk...",
+      "foundMachines": "Maskiner hittade på ditt nätverk",
+      "autoDiscovered": "Maskin hittad automatiskt!"
     },
     "name": {
       "title": "Vad heter du?",

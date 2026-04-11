@@ -32,7 +32,7 @@ import {
 import { MeticAILogo } from '@/components/MeticAILogo'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { setMachineUrl } from '@/lib/machineMode'
-import { parseMachineInput, testMachineConnection } from '@/services/machine/discovery'
+import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
@@ -86,6 +86,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [machineIp, setMachineIp] = useState('')
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [machineName, setMachineName] = useState('')
+  const [discoveredMachines, setDiscoveredMachines] = useState<DiscoveredMachine[]>([])
+  const [discovering, setDiscovering] = useState(false)
 
   // User identity
   const [authorName, setAuthorName] = useState(
@@ -122,6 +124,40 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (step === 'machine') {
       setTimeout(() => ipInputRef.current?.focus(), 200)
     }
+  }, [step])
+
+  // Auto-discover machines when machine step appears
+  useEffect(() => {
+    if (step !== 'machine' || connectionStatus === 'success') return
+    let cancelled = false
+    setDiscovering(true)
+    discoverMachines().then((machines) => {
+      if (cancelled) return
+      setDiscoveredMachines(machines)
+      setDiscovering(false)
+      // Auto-fill if exactly one machine found and user hasn't typed anything
+      if (machines.length === 1 && !machineIp.trim()) {
+        setMachineIp(machines[0].host)
+        setMachineName(machines[0].name)
+        // Auto-test the discovered machine
+        setConnectionStatus('testing')
+        testMachineConnection(machines[0].url).then((ok) => {
+          if (cancelled) return
+          if (ok) {
+            setConnectionStatus('success')
+            setMachineUrl(machines[0].url)
+            toast.success(t('onboarding.machine.autoDiscovered'))
+          } else {
+            setConnectionStatus('idle')
+          }
+        })
+      }
+    }).catch(() => {
+      if (!cancelled) setDiscovering(false)
+    })
+    return () => { cancelled = true }
+  // Only run once when entering the machine step
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
   // ── Navigation ──────────────────────────────────────────────────────────
@@ -218,6 +254,43 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           <p className="text-sm text-muted-foreground">{t('onboarding.machine.description')}</p>
         </div>
       </div>
+
+      {/* Auto-discovery results */}
+      {discovering && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <CircleNotch size={16} className="animate-spin" />
+          {t('onboarding.machine.searching')}
+        </div>
+      )}
+      {!discovering && discoveredMachines.length > 0 && connectionStatus !== 'success' && (
+        <div className="space-y-2">
+          <Label className="text-sm">{t('onboarding.machine.foundMachines')}</Label>
+          {discoveredMachines.map((m) => (
+            <Button
+              key={m.url}
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={() => {
+                setMachineIp(m.host)
+                setMachineName(m.name)
+                setConnectionStatus('testing')
+                testMachineConnection(m.url).then((ok) => {
+                  if (ok) {
+                    setConnectionStatus('success')
+                    setMachineUrl(m.url)
+                    toast.success(t('onboarding.machine.connected'))
+                  } else {
+                    setConnectionStatus('error')
+                  }
+                })
+              }}
+            >
+              <WifiHigh size={16} weight="duotone" className="text-green-500" />
+              {m.name} ({m.host}:{m.port})
+            </Button>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="machine-ip">{t('onboarding.machine.ipLabel')}</Label>

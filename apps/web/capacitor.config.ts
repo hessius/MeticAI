@@ -5,9 +5,7 @@ const config: CapacitorConfig = {
   appName: 'MeticAI',
   webDir: 'dist',
   server: {
-    // Allow mixed content for local network HTTP connections to the machine
     androidScheme: 'https',
-    iosScheme: 'https',
     // Enable Safari Web Inspector for debugging (Develop → Simulator → MeticAI)
     webContentsDebuggingEnabled: true,
   },

@@ -100,12 +100,35 @@ describe('discovery', () => {
   // discoverMachines
   // -------------------------------------------------------------------
   describe('discoverMachines', () => {
-    it('should return empty array on web', async () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('should return empty array when probe fails', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
       expect(await discoverMachines()).toEqual([])
     })
 
-    it('should return empty array on native (placeholder)', async () => {
-      mockedIsNative.mockReturnValue(true)
+    it('should return machine when probe succeeds with valid JSON array', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify([{ name: 'Test', id: '1' }]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      const machines = await discoverMachines()
+      expect(machines).toHaveLength(1)
+      expect(machines[0].host).toBe('meticulous.local')
+      expect(machines[0].port).toBe(8080)
+    })
+
+    it('should return empty array when probe returns non-array JSON', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: 'not found' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
       expect(await discoverMachines()).toEqual([])
     })
   })
@@ -132,11 +155,24 @@ describe('discovery', () => {
       vi.restoreAllMocks()
     })
 
-    it('should return true when machine responds OK', async () => {
+    it('should return true when machine responds with JSON array', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response('{}', { status: 200 }),
+        new Response(JSON.stringify([{ name: 'Default', id: '1' }]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
       )
       expect(await testMachineConnection('http://192.168.1.42:8080')).toBe(true)
+    })
+
+    it('should return false when machine responds with non-array JSON', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: 'not a machine' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      expect(await testMachineConnection('http://192.168.1.42:8080')).toBe(false)
     })
 
     it('should return false when machine responds with error', async () => {
@@ -149,6 +185,12 @@ describe('discovery', () => {
     it('should return false when fetch throws (network error)', async () => {
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
       expect(await testMachineConnection('http://192.168.1.42:8080')).toBe(false)
+    })
+
+    it('should return true for demo mode without fetching', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      expect(await testMachineConnection('demo')).toBe(true)
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 })

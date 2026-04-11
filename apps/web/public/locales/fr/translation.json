@@ -1541,7 +1541,10 @@
       "unreachable": "Impossible d'atteindre la machine. Vérifiez l'IP et assurez-vous d'être sur le même réseau.",
       "successMessage": "Connecté à {{name}}",
       "errorMessage": "Machine inaccessible. Vérifiez l'IP et le réseau.",
-      "hint": "Trouvez l'IP de votre machine dans les paramètres machine sous Wi-Fi. C'est généralement 192.168.x.x"
+      "hint": "Trouvez l'IP de votre machine dans les paramètres machine sous Wi-Fi. C'est généralement 192.168.x.x",
+      "searching": "Recherche de machines sur votre réseau...",
+      "foundMachines": "Machines trouvées sur votre réseau",
+      "autoDiscovered": "Machine trouvée automatiquement !"
     },
     "name": {
       "title": "Comment vous appelez-vous ?",

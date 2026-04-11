@@ -1541,7 +1541,10 @@
       "unreachable": "No se pudo alcanzar la máquina. Verifica la IP y asegúrate de estar en la misma red.",
       "successMessage": "Conectado a {{name}}",
       "errorMessage": "Máquina no accesible. Verifica IP y red.",
-      "hint": "Encuentra la IP de tu máquina en la configuración de la máquina bajo Wi-Fi. Generalmente es 192.168.x.x"
+      "hint": "Encuentra la IP de tu máquina en la configuración de la máquina bajo Wi-Fi. Generalmente es 192.168.x.x",
+      "searching": "Buscando máquinas en tu red...",
+      "foundMachines": "Máquinas encontradas en tu red",
+      "autoDiscovered": "¡Máquina encontrada automáticamente!"
     },
     "name": {
       "title": "¿Cómo te llamas?",

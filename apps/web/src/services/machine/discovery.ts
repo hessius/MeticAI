@@ -2,13 +2,11 @@
  * Machine discovery — find Meticulous espresso machines on the local network.
  *
  * Discovery methods (tried in order):
- *  1. mDNS/Bonjour browse for _meticulous._tcp (native only)
+ *  1. mDNS probe — try meticulous.local:8080 (iOS resolves .local via Bonjour)
  *  2. QR code scan (native only — machine exposes /api/v1/wifi/config/qr.png)
  *  3. Manual IP entry (all platforms)
  *
- * On web/PWA, only manual entry is available. mDNS and QR require native
- * Capacitor plugins that are not yet installed — this module provides the
- * interface and graceful web fallbacks.
+ * On web/PWA, only manual entry is available unless the browser resolves .local.
  */
 
 import { isNativePlatform } from '@/lib/machineMode'
@@ -28,23 +26,43 @@ export interface DiscoveredMachine {
 // mDNS / Bonjour discovery
 // ---------------------------------------------------------------------------
 
+/** Well-known addresses to probe for a Meticulous machine */
+const PROBE_ADDRESSES = [
+  'http://meticulous.local:8080',
+]
+
 /**
- * Browse the local network for Meticulous machines via mDNS.
+ * Probe a single address to check if a Meticulous machine lives there.
+ * Returns a DiscoveredMachine if reachable, null otherwise.
+ */
+async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> {
+  try {
+    const resp = await fetch(`${baseUrl}/api/v1/profile/list`, {
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!resp.ok) return null
+    const data = await resp.json()
+    if (!Array.isArray(data)) return null
+    const url = new URL(baseUrl)
+    return {
+      name: url.hostname,
+      host: url.hostname,
+      port: parseInt(url.port, 10) || 8080,
+      url: baseUrl,
+    }
+  } catch { /* unreachable */ }
+  return null
+}
+
+/**
+ * Browse the local network for Meticulous machines.
  *
- * Requires a native Capacitor plugin for Bonjour browsing.
- * Returns an empty array on web where mDNS is not available.
- *
- * TODO: Integrate a Bonjour/mDNS Capacitor plugin when available.
- * Candidates: custom native Swift plugin using NWBrowser (iOS 13+).
+ * Probes meticulous.local:8080 which iOS resolves natively via Bonjour
+ * (the machine advertises _meticulous._tcp). Returns found machines.
  */
 export async function discoverMachines(): Promise<DiscoveredMachine[]> {
-  if (!isNativePlatform()) return []
-
-  // Native mDNS discovery placeholder — requires Capacitor plugin
-  // The machine advertises _meticulous._tcp on the local network.
-  // NWBrowser (iOS) or NsdManager (Android) can browse for this service.
-  console.info('[Discovery] mDNS discovery not yet implemented — use manual IP or QR')
-  return []
+  const results = await Promise.all(PROBE_ADDRESSES.map(probeMachine))
+  return results.filter((m): m is DiscoveredMachine => m !== null)
 }
 
 // ---------------------------------------------------------------------------
@@ -120,10 +138,13 @@ export function parseMachineInput(input: string): DiscoveredMachine | null {
 export async function testMachineConnection(url: string): Promise<boolean> {
   if (url.toLowerCase() === 'demo') return true
   try {
-    const resp = await fetch(`${url}/api/v1/system/info`, {
+    const resp = await fetch(`${url}/api/v1/profile/list`, {
       signal: AbortSignal.timeout(5000),
     })
-    return resp.ok
+    if (!resp.ok) return false
+    // Validate response is a JSON array (Meticulous machine signature)
+    const data = await resp.json()
+    return Array.isArray(data)
   } catch {
     return false
   }
