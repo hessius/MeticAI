@@ -1,4 +1,4 @@
-import { isDirectMode, isNativePlatform, getDefaultMachineUrl } from './machineMode';
+import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from './machineMode';
 
 /**
  * Configuration loader for application settings
@@ -24,7 +24,7 @@ export async function loadConfig(): Promise<AppConfig> {
   // In direct/native mode, no config.json exists — use defaults immediately.
   // For native (Capacitor), serverUrl is the stored machine URL so that
   // hooks using getServerUrl() make requests to the machine, not the WebView.
-  if (isDirectMode()) {
+  if (isDirectMode() || isDemoMode()) {
     cachedConfig = getDefaultConfig();
     return cachedConfig;
   }

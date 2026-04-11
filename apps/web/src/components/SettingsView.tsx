@@ -33,7 +33,7 @@ import {
   Rocket
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -110,6 +110,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
   const { authenticate: biometricAuth } = useBiometrics()
   const { copyToClipboard } = useClipboard()
+
+  // Direct and demo modes both use local storage for settings (no backend server)
+  const isLocalMode = () => isDirectMode() || isDemoMode()
   
   const [settings, setSettings] = useState<Settings>({
     geminiApiKey: '',
@@ -205,8 +208,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   // Load current settings on mount
   useEffect(() => {
     const loadSettings = async () => {
-      if (isDirectMode()) {
-        // In direct mode, load API key from secure storage (Keychain on native, localStorage on web)
+      if (isLocalMode()) {
         try {
           const storedKey = await secureGetItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
           setSettings({
@@ -290,7 +292,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   // Load version info
   useEffect(() => {
     const loadVersionInfo = async () => {
-      if (isDirectMode()) {
+      if (isLocalMode()) {
         setVersionInfo({ version: __APP_VERSION__ || 'PWA', repoUrl: 'https://github.com/hessius/MeticAI' })
         return
       }
@@ -383,7 +385,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
       try {
-        if (isDirectMode()) {
+        if (isLocalMode()) {
           if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
             try {
               await secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
@@ -851,7 +853,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         ) : (
           <div className="space-y-4">
             {/* Meticulous IP — hidden in direct mode (IP is implicit), but shown in native mode */}
-            {(!isDirectMode() || isNativePlatform()) && (
+            {(!isLocalMode() || isNativePlatform()) && (
             <div className="space-y-2">
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
                 {t('settings.meticulousIp')}
