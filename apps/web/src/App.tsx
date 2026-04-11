@@ -51,6 +51,7 @@ import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { BetaBanner } from '@/components/BetaBanner'
+import { DemoModeBanner } from '@/components/DemoModeBanner'
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import type { ProfileData } from '@/components/ProfileBreakdown'
@@ -861,6 +862,9 @@ function App() {
 
       {/* Beta version banner — fixed at top */}
       <BetaBanner />
+
+      {/* Demo mode indicator */}
+      <DemoModeBanner />
 
       {/* Shot detection banner — fixed at top, across all views */}
       <ShotDetectionBanner

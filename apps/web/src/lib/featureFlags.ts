@@ -5,7 +5,7 @@
  * In direct mode (PWA): some features removed or degraded
  */
 
-import { isDirectMode } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode } from '@/lib/machineMode'
 import { isNativePlatform } from '@/lib/machineMode'
 
 export interface FeatureFlags {
@@ -88,18 +88,42 @@ const CAPACITOR_FLAGS: FeatureFlags = {
   pwaInstall: false,         // Already a native app
 }
 
+/** Demo mode — simulated machine, most features enabled client-side */
+const DEMO_FLAGS: FeatureFlags = {
+  machineDiscovery: false,   // No real machine to discover
+  scheduledShots: false,     // No persistent scheduler
+  systemManagement: false,   // No real system
+  tailscaleConfig: false,    // Not applicable
+  mcpServer: false,          // Server-side integration
+  cloudSync: false,          // No server-side storage
+  aiFeatures: true,          // Via @google/genai in browser
+  liveTelemetry: true,       // Simulated telemetry
+  shotHistory: true,         // Demo shot data
+  profileManagement: true,   // Demo profile CRUD
+  pourOver: true,            // Simulated timer
+  dialIn: true,              // Client-side + optional AI
+  recommendations: true,     // Token-free engine + optional AI
+  pwaInstall: false,         // Not relevant in demo
+  bridgeStatus: false,       // No backend bridge
+  watchtowerUpdate: false,   // No watchtower
+}
+
 let cachedFlags: FeatureFlags | null = null
+let cachedMode: string | null = null
 
 export function getFeatureFlags(): FeatureFlags {
-  if (!cachedFlags) {
-    if (isNativePlatform()) {
-      cachedFlags = { ...CAPACITOR_FLAGS }
-    } else if (isDirectMode()) {
-      cachedFlags = { ...DIRECT_FLAGS }
-    } else {
-      cachedFlags = { ...PROXY_FLAGS }
-    }
-  }
+  const mode = isDemoMode() ? 'demo'
+    : isNativePlatform() ? 'capacitor'
+    : isDirectMode() ? 'direct'
+    : 'proxy'
+
+  if (cachedFlags && cachedMode === mode) return cachedFlags
+
+  cachedMode = mode
+  cachedFlags = mode === 'demo' ? { ...DEMO_FLAGS }
+    : mode === 'capacitor' ? { ...CAPACITOR_FLAGS }
+    : mode === 'direct' ? { ...DIRECT_FLAGS }
+    : { ...PROXY_FLAGS }
   return cachedFlags
 }
 
@@ -107,7 +131,8 @@ export function hasFeature(feature: keyof FeatureFlags): boolean {
   return getFeatureFlags()[feature]
 }
 
-/** Reset cached flags (useful for testing) */
+/** Reset cached flags — call after mode changes (e.g. demo toggle) */
 export function resetFeatureFlags(): void {
   cachedFlags = null
+  cachedMode = null
 }

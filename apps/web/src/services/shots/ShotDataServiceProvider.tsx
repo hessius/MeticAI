@@ -9,6 +9,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { ShotDataService } from './ShotDataService'
 import { createProxyShotDataService } from './ProxyShotDataService'
 import { createDirectShotDataService } from './DirectShotDataService'
+import { createDemoShotDataService } from './DemoShotDataService'
 import { getMachineMode, getDefaultMachineUrl } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { MACHINE_URL_CHANGED } from '@/services/machine/MachineServiceContext'
@@ -35,6 +36,7 @@ export function ShotDataServiceProvider({ children, service }: ShotDataServicePr
       try {
         const stored = localStorage.getItem(STORAGE_KEYS.MACHINE_URL)
         if (stored && stored !== machineUrl) setMachineUrl(stored)
+        else if (stored === null && machineUrl !== getDefaultMachineUrl()) setMachineUrl(getDefaultMachineUrl())
       } catch { /* noop */ }
     }
     const storageHandler = (e: StorageEvent) => {
@@ -50,7 +52,9 @@ export function ShotDataServiceProvider({ children, service }: ShotDataServicePr
 
   const value = useMemo(() => {
     if (service) return service
-    return getMachineMode() === 'direct'
+    const mode = getMachineMode()
+    if (mode === 'demo') return createDemoShotDataService()
+    return mode === 'direct'
       ? createDirectShotDataService(machineUrl)
       : createProxyShotDataService()
   }, [service, machineUrl])

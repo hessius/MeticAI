@@ -16,6 +16,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { MachineService } from './MachineService'
 import { meticAIAdapter } from './MeticAIAdapter'
 import { createDirectAdapter } from './DirectAdapter'
+import { createDemoAdapter } from './DemoAdapter'
 import { getMachineMode, getDefaultMachineUrl } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 
@@ -79,6 +80,9 @@ export function MachineServiceProvider({
   const value = useMemo(() => {
     if (service) return service
     const mode = getMachineMode()
+    if (mode === 'demo') {
+      return createDemoAdapter()
+    }
     if (mode === 'direct') {
       return createDirectAdapter(machineUrl)
     }

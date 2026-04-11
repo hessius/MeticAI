@@ -26,4 +26,10 @@ export const STORAGE_KEYS = {
 
   // -- Onboarding --
   ONBOARDING_COMPLETE: 'meticai-onboarding-complete',
+
+  // -- Demo mode --
+  DEMO_PREV_URL: 'meticai-demo-prev-url',
+  DEMO_PROFILES: 'meticai-demo-profiles',
+  DEMO_SHOTS: 'meticai-demo-shots',
+  DEMO_ANNOTATIONS: 'meticai-demo-annotations',
 } as const

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useWakeLock } from '@/hooks/useWakeLock'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -377,6 +378,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<'free' | 'ratio' | 'recipe'>('free')
   const [isRunning, setIsRunning] = useState(false)
+
+  // Keep screen awake while pour over is active
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
+  useEffect(() => {
+    if (isRunning) requestWakeLock()
+    else releaseWakeLock()
+  }, [isRunning, requestWakeLock, releaseWakeLock])
   const [baseElapsedMs, setBaseElapsedMs] = useState(0)
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(baseElapsedMs)

@@ -8,7 +8,7 @@ import { MachineServiceProvider } from '@/services/machine'
 import { AIServiceProvider } from '@/services/ai'
 import { ShotDataServiceProvider } from '@/services/shots'
 import { CatalogueServiceProvider } from '@/services/catalogue'
-import { isDirectMode } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode } from '@/lib/machineMode'
 import { installDirectModeInterceptor } from '@/services/interceptor/DirectModeInterceptor'
 
 // Initialize i18n
@@ -20,9 +20,8 @@ import "./index.css"
 
 // In direct mode (PWA on machine), intercept MeticAI proxy API calls and either
 // translate them to Meticulous-native /api/v1/ endpoints or return 501 for
-// unhandled routes. The machine only serves /api/v1/... (via espresso-api/axios).
-// All other /api/ paths are MeticAI-specific and don't exist on the machine.
-if (isDirectMode()) {
+// unhandled routes. Skip in demo mode — DemoAdapter handles everything.
+if (isDirectMode() && !isDemoMode()) {
   installDirectModeInterceptor()
 }
 

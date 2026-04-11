@@ -20,7 +20,7 @@
 
 import { STORAGE_KEYS } from '@/lib/constants'
 
-export type MachineMode = 'direct' | 'proxy'
+export type MachineMode = 'direct' | 'proxy' | 'demo'
 export type RuntimePlatform = 'web' | 'machine-hosted' | 'native'
 
 // ---------------------------------------------------------------------------
@@ -48,6 +48,9 @@ export function getRuntimePlatform(): RuntimePlatform {
 // ---------------------------------------------------------------------------
 
 export function getMachineMode(): MachineMode {
+  // Demo mode — check stored URL before anything else
+  if (isDemoMode()) return 'demo'
+
   // Build-time override
   const envMode = import.meta.env.VITE_MACHINE_MODE
   if (envMode === 'direct' || envMode === 'capacitor') return 'direct'
@@ -62,6 +65,18 @@ export function getMachineMode(): MachineMode {
   }
 
   return 'proxy'
+}
+
+/**
+ * Check whether demo mode is active.
+ * Demo mode is triggered by entering "demo" as the machine URL.
+ */
+export function isDemoMode(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const url = localStorage.getItem(STORAGE_KEYS.MACHINE_URL)
+    return !!url && url.toLowerCase() === 'demo'
+  } catch { return false }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,4 +128,32 @@ export function setMachineUrl(url: string): void {
 
 export function isDirectMode(): boolean {
   return getMachineMode() === 'direct'
+}
+
+/**
+ * Activate demo mode — saves the current machine URL and sets "demo".
+ */
+export function activateDemoMode(): void {
+  try {
+    const current = localStorage.getItem(STORAGE_KEYS.MACHINE_URL)
+    if (current && current.toLowerCase() !== 'demo') {
+      localStorage.setItem(STORAGE_KEYS.DEMO_PREV_URL, current)
+    }
+    localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'demo')
+  } catch { /* noop */ }
+}
+
+/**
+ * Deactivate demo mode — restores the previous machine URL.
+ */
+export function deactivateDemoMode(): void {
+  try {
+    const prev = localStorage.getItem(STORAGE_KEYS.DEMO_PREV_URL)
+    if (prev) {
+      localStorage.setItem(STORAGE_KEYS.MACHINE_URL, prev)
+      localStorage.removeItem(STORAGE_KEYS.DEMO_PREV_URL)
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.MACHINE_URL)
+    }
+  } catch { /* noop */ }
 }

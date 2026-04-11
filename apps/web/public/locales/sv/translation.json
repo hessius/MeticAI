@@ -1576,5 +1576,14 @@
       "startBrewing": "Börja brygga",
       "settingsHint": "Alla inställningar kan ändras senare i Inställningar."
     }
+  },
+  "demo": {
+    "banner": "Demoläge",
+    "bannerHint": "Simulerad data, ingen riktig maskin",
+    "exit": "Avsluta",
+    "machineConnected": "Demomaskin ansluten",
+    "brewStarted": "Demobryggning startad",
+    "brewComplete": "Demobryggning klar",
+    "noRealConnection": "Ingen riktig maskinanslutning i demoläge"
   }
 }
