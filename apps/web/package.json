@@ -26,9 +26,17 @@
         "postinstall": "test -f scripts/patch-capacitor-spm.sh && sh scripts/patch-capacitor-spm.sh || true"
     },
     "dependencies": {
+        "@aparajita/capacitor-secure-storage": "^8.0.0",
+        "@capacitor-community/keep-awake": "^8.0.0",
+        "@capacitor/action-sheet": "^8.1.1",
+        "@capacitor/clipboard": "^8.0.1",
         "@capacitor/core": "^8.3.0",
+        "@capacitor/haptics": "^8.0.2",
         "@capacitor/ios": "^8.3.0",
+        "@capacitor/local-notifications": "^8.0.2",
+        "@capacitor/network": "^8.0.1",
         "@capacitor/preferences": "^8.0.1",
+        "@capacitor/share": "^8.0.1",
         "@google/genai": "^1.46.0",
         "@heroicons/react": "^2.2.0",
         "@hookform/resolvers": "^5.2.2",

@@ -30,5 +30,18 @@ export { useSwipeNavigation } from './use-swipe-navigation';
 export { usePlatformTheme } from './usePlatformTheme';
 export type { PlatformTheme, DetectedPlatform } from './usePlatformTheme';
 
+// Platform / Capacitor Hooks
+export { useWakeLock } from './useWakeLock';
+
+export { useHaptics } from './useHaptics';
+
+export { useBrewNotifications } from './useBrewNotifications';
+
+export { useSecureStorage } from './useSecureStorage';
+
+export { useNetworkStatus } from './useNetworkStatus';
+
+export { useNativeShare } from './useNativeShare';
+
 // Accessibility Hooks
 export * from './a11y';

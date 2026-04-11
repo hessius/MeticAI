@@ -1,9 +1,8 @@
 /**
  * useWakeLock — prevents screen dimming during active brewing or pour over.
  *
- * Uses the Web Wake Lock API (supported on modern browsers and WKWebView).
- * When the Capacitor @capacitor-community/keep-awake plugin is installed,
- * it will be used as a native fallback.
+ * Uses @capacitor-community/keep-awake on native platforms,
+ * falls back to the Web Wake Lock API on web.
  *
  * Usage:
  *   const { request, release, isActive } = useWakeLock()
@@ -11,7 +10,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isNativePlatform } from '@/lib/machineMode'
+import { KeepAwake } from '@capacitor-community/keep-awake'
+import { Capacitor } from '@capacitor/core'
 
 interface WakeLockHandle {
   request: () => Promise<void>
@@ -19,36 +19,23 @@ interface WakeLockHandle {
   isActive: boolean
 }
 
-async function tryCapacitorKeepAwake(action: 'keepAwake' | 'allowSleep'): Promise<boolean> {
-  if (!isNativePlatform()) return false
-  try {
-    // Use globalThis to access the plugin — avoids import resolution errors
-    // when @capacitor-community/keep-awake isn't installed
-    const cap = (globalThis as Record<string, unknown>).Capacitor as
-      | { Plugins?: Record<string, { keepAwake?: () => Promise<void>; allowSleep?: () => Promise<void> }> }
-      | undefined
-    const plugin = cap?.Plugins?.KeepAwake
-    if (!plugin) return false
-    if (action === 'keepAwake') await plugin.keepAwake?.()
-    else await plugin.allowSleep?.()
-    return true
-  } catch {
-    return false
-  }
-}
-
 export function useWakeLock(): WakeLockHandle {
   const [isActive, setIsActive] = useState(false)
   const sentinelRef = useRef<WakeLockSentinel | null>(null)
+  const isNative = Capacitor.isNativePlatform()
 
   const request = useCallback(async () => {
-    // Try Capacitor plugin first (native)
-    if (await tryCapacitorKeepAwake('keepAwake')) {
-      setIsActive(true)
+    if (isNative) {
+      try {
+        await KeepAwake.keepAwake()
+        setIsActive(true)
+      } catch {
+        // Plugin call failed — fall through
+      }
       return
     }
 
-    // Fall back to Web Wake Lock API
+    // Web Wake Lock API fallback
     if ('wakeLock' in navigator) {
       try {
         sentinelRef.current = await navigator.wakeLock.request('screen')
@@ -58,11 +45,15 @@ export function useWakeLock(): WakeLockHandle {
         // Wake lock request can fail (e.g. low battery, background tab)
       }
     }
-  }, [])
+  }, [isNative])
 
   const release = useCallback(async () => {
-    // Try Capacitor plugin first
-    if (await tryCapacitorKeepAwake('allowSleep')) {
+    if (isNative) {
+      try {
+        await KeepAwake.allowSleep()
+      } catch {
+        // Plugin call failed
+      }
       setIsActive(false)
       return
     }
@@ -75,7 +66,7 @@ export function useWakeLock(): WakeLockHandle {
       sentinelRef.current = null
       setIsActive(false)
     }
-  }, [])
+  }, [isNative])
 
   // Re-acquire wake lock on visibility change (browser releases on tab hide)
   useEffect(() => {

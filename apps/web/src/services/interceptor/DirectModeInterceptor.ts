@@ -523,6 +523,65 @@ export function installDirectModeInterceptor(): void {
       }).catch(() => jsonResponse({}))
     }
 
+    // /api/history/:id — single history entry operations (must come before broad /api/history)
+    const historyIdMatch = pathname.match(/^\/api\/history\/([^/]+)$/)
+    if (historyIdMatch) {
+      const entryId = decodeURIComponent(historyIdMatch[1])
+
+      // DELETE /api/history/:id → delete shot from machine history
+      if (method === 'DELETE') {
+        return _fetch(`/api/v1/history/${encodeURIComponent(entryId)}`, { method: 'DELETE' }).then(r =>
+          r.ok
+            ? jsonResponse({ status: 'ok' })
+            : jsonResponse({ detail: 'Failed to delete history entry' }, 502)
+        ).catch(() => jsonResponse({ detail: 'Failed to delete history entry' }, 502))
+      }
+
+      // GET /api/history/:id → look up single entry from full history
+      return _fetch('/api/v1/history').then(r => {
+        if (!r.ok) return jsonResponse({ detail: 'Not found' }, 404)
+        return r.json().then((raw: unknown) => {
+          type MachineHistEntry = {
+            id: string; time: number; name: string;
+            profile?: {name?: string; final_weight?: number; temperature?: number};
+            data?: {shot?: {weight?: number}; time?: number}[];
+          }
+          const list: MachineHistEntry[] = Array.isArray(raw) ? raw : ((raw as {history?: MachineHistEntry[]}).history ?? [])
+          const entry = list.find(e => e.id === entryId)
+          if (!entry) return jsonResponse({ detail: 'Not found' }, 404)
+          return jsonResponse({
+            id: entry.id,
+            created_at: new Date(entry.time * 1000).toISOString(),
+            profile_name: entry.profile?.name ?? entry.name ?? 'Unknown',
+            coffee_analysis: null,
+            user_preferences: null,
+            reply: '',
+            profile_json: entry.profile ?? null,
+            notes: null,
+          })
+        })
+      }).catch(() => jsonResponse({ detail: 'Not found' }, 404))
+    }
+
+    // PUT /api/history/:id/notes → store notes in localStorage
+    const historyNotesMatch = pathname.match(/^\/api\/history\/([^/]+)\/notes$/)
+    if (historyNotesMatch && method === 'PUT') {
+      return (async () => {
+        try {
+          const body = await new Response(init?.body).json() as { notes?: string }
+          const noteKey = `meticai-note-${decodeURIComponent(historyNotesMatch[1])}`
+          if (body.notes) {
+            localStorage.setItem(noteKey, body.notes)
+          } else {
+            localStorage.removeItem(noteKey)
+          }
+          return jsonResponse({ status: 'ok' })
+        } catch {
+          return jsonResponse({ detail: 'Invalid request' }, 400)
+        }
+      })()
+    }
+
     // /api/history → /api/v1/history (translate machine history to MeticAI format)
     if (url.match(/\/api\/history/)) {
       return _fetch('/api/v1/history').then(r => {
@@ -728,9 +787,50 @@ export function installDirectModeInterceptor(): void {
       }).catch(() => jsonResponse({ detail: 'Failed to load shot data' }, 500))
     }
 
-    // GET /api/shots/annotations → return empty in direct mode
-    if (url.match(/\/api\/shots\/annotations/)) {
-      return Promise.resolve(jsonResponse({ annotations: {} }))
+    // GET/PUT/DELETE /api/shots/:date/:filename/annotation → localStorage-backed annotation CRUD
+    const annotationMatch = pathname.match(/^\/api\/shots\/([^/]+)\/([^/]+)\/annotation$/)
+    if (annotationMatch) {
+      const annotKey = `meticai-annotation-${decodeURIComponent(annotationMatch[1])}-${decodeURIComponent(annotationMatch[2])}`
+
+      if (method === 'GET') {
+        const stored = localStorage.getItem(annotKey)
+        if (stored) {
+          try { return Promise.resolve(jsonResponse(JSON.parse(stored))) }
+          catch { /* fall through to empty */ }
+        }
+        return Promise.resolve(jsonResponse({ taste_notes: null, rating: null, notes: null }))
+      }
+
+      if (method === 'PUT' || method === 'POST') {
+        return (async () => {
+          try {
+            const body = await new Response(init?.body).json()
+            localStorage.setItem(annotKey, JSON.stringify(body))
+            return jsonResponse({ status: 'ok', ...body })
+          } catch {
+            return jsonResponse({ detail: 'Invalid annotation data' }, 400)
+          }
+        })()
+      }
+
+      if (method === 'DELETE') {
+        localStorage.removeItem(annotKey)
+        return Promise.resolve(jsonResponse({ status: 'ok' }))
+      }
+    }
+
+    // GET /api/shots/annotations → return all annotations from localStorage
+    const annotationsAllMatch = url.match(/\/api\/shots\/annotations/)
+    if (annotationsAllMatch) {
+      const annotations: Record<string, unknown> = {}
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key?.startsWith('meticai-annotation-')) {
+          try { annotations[key.replace('meticai-annotation-', '')] = JSON.parse(localStorage.getItem(key)!) }
+          catch { /* skip corrupted entries */ }
+        }
+      }
+      return Promise.resolve(jsonResponse({ annotations }))
     }
 
     // GET /api/shots/llm-analysis-cache → no cache in direct mode
@@ -1519,9 +1619,21 @@ export function installDirectModeInterceptor(): void {
       }))
     }
 
+    // GET /api/network-ip → return configured machine IP
+    if (url.match(/\/api\/network-ip$/)) {
+      const machineIp = localStorage.getItem(STORAGE_KEYS.MACHINE_IP) || ''
+      return Promise.resolve(jsonResponse({ ip: machineIp }))
+    }
+
     // GET /api/machine/detect → not needed in direct mode (user configures IP manually)
     if (url.match(/\/api\/machine\/detect/)) {
       return Promise.resolve(jsonResponse({ detail: 'Machine detection not available in direct mode' }, 501))
+    }
+
+    // ── Backend-only admin routes (explicit 501) ─────────────────────────
+
+    if (url.match(/\/api\/(update-method|check-updates|restart|tailscale|beta-channel|feedback)/)) {
+      return Promise.resolve(jsonResponse({ detail: 'Server administration not available in direct/app mode' }, 501))
     }
 
     // Unknown route — return 501 Not Implemented instead of silent empty response
