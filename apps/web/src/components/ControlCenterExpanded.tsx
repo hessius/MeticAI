@@ -51,6 +51,8 @@ import { getServerUrl } from '@/lib/config'
 import { isDirectMode } from '@/lib/machineMode'
 import { relativeTime } from '@/lib/timeUtils'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useActionSheet } from '@/hooks/useActionSheet'
+import { Capacitor } from '@capacitor/core'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -68,6 +70,8 @@ interface ControlCenterExpandedProps {
 export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCenterExpandedProps) {
   const { t } = useTranslation()
   const { impact } = useHaptics()
+  const { showActionSheet } = useActionSheet()
+  const isNativePlatform = Capacitor.isNativePlatform()
   const [brightnessValue, setBrightnessValue] = useState<number>(
     machineState.brightness ?? 75,
   )
@@ -210,29 +214,56 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           {/* Profile selector */}
           {profilesLoaded && machineProfiles.length > 0 && (isIdle || isPreheating || isReady) && (
             <div>
-              <Select
-                value={activeProfile ?? ''}
-                onValueChange={async (name) => {
-                  const res = await machine.loadProfile(name)
-                  if (res.success) {
-                    toast.success(t('controlCenter.toasts.profileSelected', { name }))
-                  } else {
-                    toast.error(res.message ?? t('controlCenter.toasts.error'))
-                  }
-                }}
-                disabled={!isConnected}
-              >
-                <SelectTrigger className="h-8 text-xs dark:border-white/20">
-                  <SelectValue placeholder={t('controlCenter.profileSelector.placeholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {machineProfiles.map(p => (
-                    <SelectItem key={p.id} value={p.name} className="text-xs">
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isNativePlatform ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs w-full dark:border-white/20 justify-between"
+                  disabled={!isConnected}
+                  onClick={async () => {
+                    const names = machineProfiles.map(p => p.name)
+                    const index = await showActionSheet({
+                      title: t('controlCenter.profileSelector.placeholder'),
+                      options: names,
+                    })
+                    if (index >= 0 && index < names.length) {
+                      const name = names[index]
+                      const res = await machine.loadProfile(name)
+                      if (res.success) {
+                        toast.success(t('controlCenter.toasts.profileSelected', { name }))
+                      } else {
+                        toast.error(res.message ?? t('controlCenter.toasts.error'))
+                      }
+                    }
+                  }}
+                >
+                  {activeProfile ?? t('controlCenter.profileSelector.placeholder')}
+                </Button>
+              ) : (
+                <Select
+                  value={activeProfile ?? ''}
+                  onValueChange={async (name) => {
+                    const res = await machine.loadProfile(name)
+                    if (res.success) {
+                      toast.success(t('controlCenter.toasts.profileSelected', { name }))
+                    } else {
+                      toast.error(res.message ?? t('controlCenter.toasts.error'))
+                    }
+                  }}
+                  disabled={!isConnected}
+                >
+                  <SelectTrigger className="h-8 text-xs dark:border-white/20">
+                    <SelectValue placeholder={t('controlCenter.profileSelector.placeholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {machineProfiles.map(p => (
+                      <SelectItem key={p.id} value={p.name} className="text-xs">
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
         </div>

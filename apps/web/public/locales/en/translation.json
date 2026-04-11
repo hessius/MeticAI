@@ -28,7 +28,9 @@
     "next": "Next",
     "skip": "Skip",
     "noInternetConnection": "No internet connection",
-    "share": "Share"
+    "share": "Share",
+    "copied": "Copied!",
+    "copy": "Copy"
   },
   "greetings": {
     "morning": [
@@ -404,6 +406,7 @@
     "apiKeyPlaceholderNew": "Enter new key to change",
     "apiKeyConfigured": "API key is configured. Click the field to enter a new key.",
     "apiKeyConfiguredExtended": "API key is configured. Click the field to enter a new key. You can keep the key saved and disable AI features below.",
+    "biometricReasonApiKey": "Authenticate to reveal your API key",
     "aiAssistant": "AI Assistant",
     "aiAssistantDescription": "Gemini API key is optional. Add one only if you want AI-powered profile and analysis features.",
     "aiAssistantOptional": "Optional.",

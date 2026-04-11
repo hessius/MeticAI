@@ -28,7 +28,9 @@
     "next": "Nästa",
     "skip": "Hoppa över",
     "noInternetConnection": "Ingen internetanslutning",
-    "share": "Dela"
+    "share": "Dela",
+    "copied": "Kopierat!",
+    "copy": "Kopiera"
   },
   "greetings": {
     "morning": [
@@ -404,6 +406,7 @@
     "apiKeyPlaceholderNew": "Ange ny nyckel för att ändra",
     "apiKeyConfigured": "API-nyckel är konfigurerad. Klicka på fältet för att ange en ny nyckel.",
     "apiKeyConfiguredExtended": "API-nyckel är konfigurerad. Klicka på fältet för att ange en ny nyckel. Du kan behålla nyckeln sparad och inaktivera AI-funktioner nedan.",
+    "biometricReasonApiKey": "Autentisera för att visa din API-nyckel",
     "aiAssistant": "AI-assistent",
     "aiAssistantDescription": "Gemini API-nyckel är valfri. Lägg bara till en om du vill ha AI-drivna profil- och analysfunktioner.",
     "aiAssistantOptional": "Valfritt.",

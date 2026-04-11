@@ -5,6 +5,7 @@
     "": {
       "name": "meticai-espresso-pro",
       "dependencies": {
+        "@aparajita/capacitor-biometric-auth": "^10.0.0",
         "@aparajita/capacitor-secure-storage": "^8.0.0",
         "@capacitor-community/keep-awake": "^8.0.0",
         "@capacitor/action-sheet": "^8.1.1",
@@ -131,6 +132,8 @@
     "@adobe/css-tools": ["@adobe/css-tools@4.4.4", "", {}, ""],
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, ""],
+
+    "@aparajita/capacitor-biometric-auth": ["@aparajita/capacitor-biometric-auth@10.0.0", "", { "dependencies": { "@capacitor/android": "^8.0.2", "@capacitor/app": "^8.0.0", "@capacitor/core": "^8.0.2", "@capacitor/ios": "^8.0.2" } }, "sha512-azjWaRucB8x1/gSzSTp/NxelaOZyg+m765gSzjwUkSQgg30RrZPmPq6pyLeeXVSZNDY3Rxf5Hj8obgZaXirCFQ=="],
 
     "@aparajita/capacitor-secure-storage": ["@aparajita/capacitor-secure-storage@8.0.0", "", { "dependencies": { "@capacitor/android": "^8.0.2", "@capacitor/app": "^8.0.0", "@capacitor/core": "^8.0.2", "@capacitor/ios": "^8.0.2", "@capacitor/keyboard": "^8.0.0" } }, "sha512-oYnwSjdIh23aRNgz8982+TmFvQH/2yZkEdw1iIg+H2ziFJoOVELPTc7u6Ez2HwOuDIW5AGqBX75GvrzQ+D70Qg=="],
 

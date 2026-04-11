@@ -28,7 +28,9 @@
     "next": "Weiter",
     "skip": "Überspringen",
     "noInternetConnection": "Keine Internetverbindung",
-    "share": "Teilen"
+    "share": "Teilen",
+    "copied": "Kopiert!",
+    "copy": "Kopieren"
   },
   "greetings": {
     "morning": [
@@ -404,6 +406,7 @@
     "apiKeyPlaceholderNew": "Gib neuen Schlüssel ein, um zu ändern",
     "apiKeyConfigured": "API-Schlüssel ist konfiguriert. Klicke auf das Feld, um einen neuen Schlüssel einzugeben.",
     "apiKeyConfiguredExtended": "API-Schlüssel ist konfiguriert. Klicke auf das Feld, um einen neuen Schlüssel einzugeben. Du kannst den Schlüssel gespeichert lassen und die KI-Funktionen unten deaktivieren.",
+    "biometricReasonApiKey": "Authentifiziere dich, um deinen API-Schlüssel anzuzeigen",
     "aiAssistant": "KI-Assistent",
     "aiAssistantDescription": "Gemini API-Schlüssel ist optional. Füge nur einen hinzu, wenn du KI-gestützte Profil- und Analysefunktionen möchtest.",
     "aiAssistantOptional": "Optional.",

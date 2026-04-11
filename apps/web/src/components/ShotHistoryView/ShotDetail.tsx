@@ -37,6 +37,8 @@ import {
   DownloadSimple,
   Brain,
   ShareNetwork,
+  Copy,
+  DotsThreeVertical,
 } from '@phosphor-icons/react'
 import { domToPng } from 'modern-screenshot'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
@@ -44,6 +46,9 @@ import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
 import { useNativeShare } from '@/hooks/useNativeShare'
+import { useClipboard } from '@/hooks/useClipboard'
+import { useActionSheet } from '@/hooks/useActionSheet'
+import { Capacitor } from '@capacitor/core'
 
 import type { ShotInfo, ShotData, LocalAnalysisResult } from './types'
 import { SPEED_OPTIONS } from './types'
@@ -137,6 +142,9 @@ export function ShotDetail({
 }: ShotDetailProps) {
   const { t } = useTranslation()
   const { share, canShare } = useNativeShare()
+  const { copyToClipboard } = useClipboard()
+  const { showActionSheet } = useActionSheet()
+  const isNativePlatform = Capacitor.isNativePlatform()
 
   // ---- Tab state ----------------------------------------------------------
   const [activeAction, setActiveAction] = useState<'replay' | 'compare' | 'analyze'>('replay')
@@ -663,6 +671,59 @@ export function ShotDetail({
                       }}
                     >
                       <ShareNetwork size={20} weight="bold" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label={t('common.copy')}
+                    onClick={() => {
+                      const metrics = [
+                        selectedShot.total_time != null ? `Time: ${selectedShot.total_time.toFixed(1)}s` : null,
+                        selectedShot.final_weight != null ? `Weight: ${selectedShot.final_weight.toFixed(1)}g` : null,
+                      ].filter(Boolean).join(', ')
+                      copyToClipboard(`${profileName} — ${formatShotTime(selectedShot)}${metrics ? `\n${metrics}` : ''}`)
+                    }}
+                  >
+                    <Copy size={20} weight="bold" />
+                  </Button>
+                  {isNativePlatform && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      aria-label={t('shotHistory.moreActions', 'More actions')}
+                      onClick={async () => {
+                        const options = [
+                          t('shotHistory.replay'),
+                          t('shotHistory.compare'),
+                          t('shotHistory.analyze'),
+                          t('common.share'),
+                          t('shotHistory.exportAnalysis', 'Export Analysis'),
+                        ]
+                        const index = await showActionSheet({
+                          title: t('shotHistory.shotActions', 'Shot Actions'),
+                          options,
+                        })
+                        if (index === 0) setActiveAction('replay')
+                        else if (index === 1) setActiveAction('compare')
+                        else if (index === 2) setActiveAction('analyze')
+                        else if (index === 3 && canShare) {
+                          const metrics = [
+                            selectedShot.total_time != null ? `${selectedShot.total_time.toFixed(1)}s` : null,
+                            selectedShot.final_weight != null ? `${selectedShot.final_weight.toFixed(1)}g` : null,
+                          ].filter(Boolean).join(' · ')
+                          share({
+                            title: profileName,
+                            text: `${profileName} — ${formatShotTime(selectedShot)}${metrics ? `\n${metrics}` : ''}`,
+                          })
+                        } else if (index === 4 && analysisResult) {
+                          handleExportAnalysis()
+                        }
+                      }}
+                    >
+                      <DotsThreeVertical size={20} weight="bold" />
                     </Button>
                   )}
                 </div>

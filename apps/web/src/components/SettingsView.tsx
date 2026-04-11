@@ -41,6 +41,8 @@ import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
 import { LanguageSelector } from '@/components/LanguageSelector'
 import { useSecureStorage } from '@/hooks/useSecureStorage'
+import { useBiometrics } from '@/hooks/useBiometrics'
+import { useClipboard } from '@/hooks/useClipboard'
 
 
 interface SettingsViewProps {
@@ -106,6 +108,8 @@ const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /a
 export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
   const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
+  const { authenticate: biometricAuth } = useBiometrics()
+  const { copyToClipboard } = useClipboard()
   
   const [settings, setSettings] = useState<Settings>({
     geminiApiKey: '',
@@ -860,6 +864,18 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     </>
                   )}
                 </Button>
+                {settings.meticulousIp && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(settings.meticulousIp)}
+                    className="shrink-0"
+                    aria-label={t('common.copy')}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
               {detectResult && (
                 <div className={`text-xs p-2 rounded ${detectResult.found ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200'}`}>
@@ -955,8 +971,10 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     placeholder={hasGeminiKey ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
                     className="pr-10"
                     readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
-                    onClick={() => {
+                    onClick={async () => {
                       if (settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')) {
+                        const ok = await biometricAuth(t('settings.biometricReasonApiKey'))
+                        if (!ok) return
                         handleChange('geminiApiKey', '')
                       }
                     }}

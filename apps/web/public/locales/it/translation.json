@@ -28,7 +28,9 @@
     "next": "Avanti",
     "skip": "Salta",
     "noInternetConnection": "Nessuna connessione Internet",
-    "share": "Condividi"
+    "share": "Condividi",
+    "copied": "Copiato!",
+    "copy": "Copia"
   },
   "greetings": {
     "morning": [
@@ -404,6 +406,7 @@
     "apiKeyPlaceholderNew": "Inserisci nuova chiave per modificare",
     "apiKeyConfigured": "Chiave API configurata. Clicca sul campo per inserire una nuova chiave.",
     "apiKeyConfiguredExtended": "Chiave API configurata. Clicca sul campo per inserire una nuova chiave. Puoi mantenere la chiave salvata e disabilitare le funzionalità AI qui sotto.",
+    "biometricReasonApiKey": "Autenticati per rivelare la tua chiave API",
     "aiAssistant": "Assistente AI",
     "aiAssistantDescription": "La chiave API Gemini è opzionale. Aggiungine una solo se desideri funzionalità di profilo e analisi basate su AI.",
     "aiAssistantOptional": "Opzionale.",
