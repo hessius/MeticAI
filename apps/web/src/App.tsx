@@ -1093,6 +1093,10 @@ function App() {
                 <FeatureErrorBoundary feature="Settings">
                   <SettingsView
                     onBack={handleBackToStart}
+                    onRestartOnboarding={() => {
+                      localStorage.removeItem(STORAGE_KEYS.ONBOARDING_COMPLETE)
+                      setViewState('onboarding')
+                    }}
                     showBlobs={showBlobs}
                     onToggleBlobs={toggleBlobs}
                     isDark={isDark}

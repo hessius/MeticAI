@@ -458,6 +458,8 @@
     "restartTriggered": "Riavvio attivato! Il sistema si riavvierà a breve.",
     "restartFailed": "Impossibile attivare il riavvio",
     "apiDocs": "Documentazione API",
+    "restartOnboarding": "Riavvia procedura guidata",
+    "restartOnboardingDescription": "Esegui nuovamente la configurazione iniziale per riconfigurare IP della macchina, nome e preferenze.",
     "language": {
       "select": "Seleziona lingua",
       "label": "Lingua"

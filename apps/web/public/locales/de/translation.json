@@ -458,6 +458,8 @@
     "restartTriggered": "Neustart ausgelöst! Das System wird in Kürze neu gestartet.",
     "restartFailed": "Neustart konnte nicht ausgelöst werden",
     "apiDocs": "API-Dokumentation",
+    "restartOnboarding": "Einrichtungsassistent neu starten",
+    "restartOnboardingDescription": "Führen Sie die Ersteinrichtung erneut durch, um Maschinen-IP, Name und Einstellungen zu konfigurieren.",
     "language": {
       "select": "Sprache auswählen",
       "label": "Sprache"

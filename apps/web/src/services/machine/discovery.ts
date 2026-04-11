@@ -80,6 +80,11 @@ export function parseMachineInput(input: string): DiscoveredMachine | null {
   const trimmed = input.trim()
   if (!trimmed) return null
 
+  // "demo" activates demo mode — no real machine needed
+  if (trimmed.toLowerCase() === 'demo') {
+    return { name: 'Demo Machine', host: 'demo', port: 0, url: 'demo' }
+  }
+
   try {
     // If it looks like a full URL, parse it
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
@@ -111,8 +116,9 @@ export function parseMachineInput(input: string): DiscoveredMachine | null {
 // Connection test
 // ---------------------------------------------------------------------------
 
-/** Ping a machine to verify it's reachable */
+/** Ping a machine to verify it's reachable. Demo mode always succeeds. */
 export async function testMachineConnection(url: string): Promise<boolean> {
+  if (url.toLowerCase() === 'demo') return true
   try {
     const resp = await fetch(`${url}/api/v1/system/info`, {
       signal: AbortSignal.timeout(5000),

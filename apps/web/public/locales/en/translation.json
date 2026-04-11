@@ -469,6 +469,8 @@
     "restartTriggered": "Restart triggered! The system will restart momentarily.",
     "restartFailed": "Failed to trigger restart",
     "apiDocs": "API Documentation",
+    "restartOnboarding": "Restart Setup Wizard",
+    "restartOnboardingDescription": "Run the first-launch setup again to reconfigure machine IP, name, and preferences.",
     "language": {
       "select": "Select language",
       "label": "Language"

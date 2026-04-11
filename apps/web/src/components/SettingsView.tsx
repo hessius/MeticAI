@@ -33,7 +33,8 @@ import {
   Copy,
   Question,
   Code,
-  Info
+  Info,
+  Rocket
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
@@ -47,6 +48,7 @@ import type { PlatformTheme } from '@/hooks/usePlatformTheme'
 
 interface SettingsViewProps {
   onBack: () => void
+  onRestartOnboarding?: () => void
   showBlobs?: boolean
   onToggleBlobs?: () => void
   isDark?: boolean
@@ -106,7 +108,7 @@ const PROGRESS_UPDATE_INTERVAL = 500
 const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
 const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
-export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, platformTheme: _platformTheme, onSetPlatformTheme: _onSetPlatformTheme }: SettingsViewProps) {
+export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, platformTheme: _platformTheme, onSetPlatformTheme: _onSetPlatformTheme }: SettingsViewProps) {
   const { t } = useTranslation()
   // Konsta UI settings temporarily hidden — uncomment when re-enabling
   // const { enabled: useKonstaUi, setEnabled: setUseKonstaUi } = useKonstaToggle()
@@ -1801,6 +1803,23 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
           )}
         </div>
       </Card>}
+
+      {/* Restart Onboarding */}
+      {onRestartOnboarding && (
+        <Card className="p-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={onRestartOnboarding}
+          >
+            <Rocket size={18} className="mr-2" weight="duotone" />
+            {t('settings.restartOnboarding', 'Restart Setup Wizard')}
+          </Button>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            {t('settings.restartOnboardingDescription', 'Run the first-launch setup again to reconfigure machine IP, name, and preferences.')}
+          </p>
+        </Card>
+      )}
 
       {/* Footer */}
       <div className="text-center text-xs text-muted-foreground/50 pb-4 space-y-1">

@@ -458,6 +458,8 @@
     "restartTriggered": "¡Reinicio activado! El sistema se reiniciará momentáneamente.",
     "restartFailed": "Error al activar reinicio",
     "apiDocs": "Documentación de API",
+    "restartOnboarding": "Reiniciar asistente de configuración",
+    "restartOnboardingDescription": "Ejecute la configuración inicial nuevamente para reconfigurar la IP de la máquina, el nombre y las preferencias.",
     "language": {
       "select": "Seleccionar idioma",
       "label": "Idioma"

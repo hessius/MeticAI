@@ -458,6 +458,8 @@
     "restartTriggered": "Redémarrage déclenché ! Le système redémarrera dans un instant.",
     "restartFailed": "Échec du déclenchement du redémarrage",
     "apiDocs": "Documentation API",
+    "restartOnboarding": "Relancer l'assistant de configuration",
+    "restartOnboardingDescription": "Relancez la configuration initiale pour reconfigurer l'IP de la machine, le nom et les préférences.",
     "language": {
       "select": "Sélectionner la langue",
       "label": "Langue"

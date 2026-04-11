@@ -458,6 +458,8 @@
     "restartTriggered": "Omstart utlöst! Systemet kommer att starta om omedelbart.",
     "restartFailed": "Misslyckades utlösa omstart",
     "apiDocs": "API-dokumentation",
+    "restartOnboarding": "Starta om installationsguiden",
+    "restartOnboardingDescription": "Kör den första installationen igen för att konfigurera maskin-IP, namn och inställningar.",
     "language": {
       "select": "Välj språk",
       "label": "Språk"
