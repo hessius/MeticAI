@@ -49,13 +49,15 @@ async function getZeroConf() {
 /**
  * Probe a single address to check if a Meticulous machine lives there.
  * Uses CapacitorHttp on native to bypass CORS, regular fetch on web.
- * Verifies via /api/getLastShotProfileJSON — same as backend's verify_machine().
+ * Verifies via /api/v1/settings — the machine's liveness endpoint.
  */
 async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> {
-  const probeUrl = `${baseUrl}/api/getLastShotProfileJSON`
+  const probeUrl = `${baseUrl}/api/v1/settings`
 
   try {
     let status: number
+
+    console.info(`[Discovery] Probing machine at ${probeUrl}`)
 
     if (isNativePlatform()) {
       const resp = await CapacitorHttp.get({
@@ -71,8 +73,11 @@ async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> 
       status = resp.status
     }
 
-    // 200 = has data, 404 = API responding but no shot yet — both valid
-    if (status === 200 || status === 404) {
+    console.info(`[Discovery] Probe ${probeUrl} → status ${status}`)
+
+    // Any 2xx means the machine is responding; 404 also accepted for
+    // backward compatibility (old probe endpoint returned 404 when no data)
+    if ((status >= 200 && status < 300) || status === 404) {
       const url = new URL(baseUrl)
       return {
         name: url.hostname,
@@ -81,8 +86,8 @@ async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> 
         url: baseUrl,
       }
     }
-  } catch {
-    // Network error or timeout — machine not there
+  } catch (e) {
+    console.warn(`[Discovery] Probe failed for ${probeUrl}:`, e)
   }
   return null
 }
@@ -100,6 +105,9 @@ async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> 
  * Falls back to hostname probing if the plugin isn't available.
  */
 export async function discoverMachines(): Promise<DiscoveredMachine[]> {
+  const startTime = Date.now()
+  console.info('[Discovery] discoverMachines() started')
+
   // Step 1: Try Zeroconf mDNS service browsing (native only)
   if (isNativePlatform()) {
     try {
@@ -114,29 +122,37 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
       })
 
       await ZeroConf.watch(
-        { type: '_meticulous._tcp.', domain: 'local.' },
+        { type: '_meticulous._tcp', domain: 'local.' },
         (result) => {
-          if (result.action === 'resolved' && result.service) {
+          if (result.service && (result.action === 'added' || result.action === 'resolved')) {
             const svc = result.service
             const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
             const port = svc.port || 8080
-            discovered.push({
+            // Update existing entry if we already have this service (added→resolved)
+            const existing = discovered.findIndex(d => d.name === svc.name)
+            const machine = {
               name: svc.name,
               host,
               port,
               url: `http://${host}:${port}`,
-            })
+            }
+            if (existing >= 0) {
+              discovered[existing] = machine
+            } else {
+              discovered.push(machine)
+            }
+            console.info(`[Discovery] Zeroconf ${result.action}: ${svc.name} → ${host}:${port}`)
           }
         },
       )
 
-      // Browse for a few seconds then stop
-      const timer = setTimeout(() => resolveWatch(), 5000)
+      // Browse for up to 10s — mDNS resolution can take several seconds per service
+      const timer = setTimeout(() => resolveWatch(), 10000)
       await watchDone
       clearTimeout(timer)
 
       try {
-        await ZeroConf.unwatch({ type: '_meticulous._tcp.', domain: 'local.' })
+        await ZeroConf.unwatch({ type: '_meticulous._tcp', domain: 'local.' })
         await ZeroConf.close()
       } catch {
         // cleanup errors are non-fatal
@@ -144,13 +160,13 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
       if (discovered.length > 0) {
         console.info(
-          `[Discovery] Zeroconf found ${discovered.length} machine(s):`,
+          `[Discovery] Zeroconf found ${discovered.length} machine(s) in ${Date.now() - startTime}ms:`,
           discovered.map((m) => m.name).join(', '),
         )
         return discovered
       }
 
-      console.info('[Discovery] Zeroconf browse found no machines')
+      console.info(`[Discovery] Zeroconf browse found no machines after ${Date.now() - startTime}ms`)
     } catch (e) {
       console.warn('[Discovery] Zeroconf plugin not available, falling back to hostname probe:', e)
     }
@@ -162,11 +178,14 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
   const results = await Promise.all(probeUrls.map(probeMachine))
   const seen = new Set<string>()
-  return results.filter((m): m is DiscoveredMachine => {
+  const machines = results.filter((m): m is DiscoveredMachine => {
     if (!m || seen.has(m.url)) return false
     seen.add(m.url)
     return true
   })
+
+  console.info(`[Discovery] discoverMachines() finished in ${Date.now() - startTime}ms — found ${machines.length} machine(s)`)
+  return machines
 }
 
 // ---------------------------------------------------------------------------
@@ -241,8 +260,10 @@ export function parseMachineInput(input: string): DiscoveredMachine | null {
  */
 export async function testMachineConnection(url: string): Promise<boolean> {
   if (url.toLowerCase() === 'demo') return true
+  const probeUrl = `${url}/api/v1/settings`
+  console.info(`[Discovery] Testing connection to ${probeUrl}`)
   try {
-    const probeUrl = `${url}/api/getLastShotProfileJSON`
+    let status: number
 
     if (isNativePlatform()) {
       const resp = await CapacitorHttp.get({
@@ -250,14 +271,19 @@ export async function testMachineConnection(url: string): Promise<boolean> {
         connectTimeout: 5000,
         readTimeout: 5000,
       })
-      return resp.status === 200 || resp.status === 404
+      status = resp.status
+    } else {
+      const resp = await fetch(probeUrl, {
+        signal: AbortSignal.timeout(5000),
+      })
+      status = resp.status
     }
 
-    const resp = await fetch(probeUrl, {
-      signal: AbortSignal.timeout(5000),
-    })
-    return resp.status === 200 || resp.status === 404
-  } catch {
+    const ok = (status >= 200 && status < 300) || status === 404
+    console.info(`[Discovery] Connection test ${probeUrl} → status ${status}, ok=${ok}`)
+    return ok
+  } catch (e) {
+    console.warn(`[Discovery] Connection test failed for ${probeUrl}:`, e)
     return false
   }
 }
