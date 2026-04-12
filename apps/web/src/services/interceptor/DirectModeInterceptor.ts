@@ -257,7 +257,9 @@ export function installDirectModeInterceptor(): void {
         : input instanceof Request ? input.url : ''
 
     // Allow Meticulous machine API (/api/v1/...) and external/non-api URLs
-    if (!url.match(/\/api\/(?!v\d)/)) {
+    // Only intercept relative URLs or same-origin — let external hosts pass through
+    const isExternal = url.startsWith('http://') || url.startsWith('https://')
+    if (isExternal || !url.match(/\/api\/(?!v\d)/)) {
       return _fetch(input, init)
     }
 
