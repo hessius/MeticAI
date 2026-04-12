@@ -1594,6 +1594,7 @@
     "machineConnected": "Demomaskin ansluten",
     "brewStarted": "Demobryggning startad",
     "brewComplete": "Demobryggning klar",
-    "noRealConnection": "Ingen riktig maskinanslutning i demoläge"
+    "noRealConnection": "Ingen riktig maskinanslutning i demoläge",
+    "setupMachine": "Anslut maskin"
   }
 }

@@ -109,12 +109,9 @@ describe('discovery', () => {
       expect(await discoverMachines()).toEqual([])
     })
 
-    it('should return machine when probe succeeds with valid JSON array', async () => {
+    it('should return machine when probe gets 200 from machine API', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify([{ name: 'Test', id: '1' }]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
+        new Response('{}', { status: 200 }),
       )
       const machines = await discoverMachines()
       expect(machines).toHaveLength(1)
@@ -122,12 +119,18 @@ describe('discovery', () => {
       expect(machines[0].port).toBe(8080)
     })
 
-    it('should return empty array when probe returns non-array JSON', async () => {
+    it('should return machine when probe gets 404 (API responding, no shot data)', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: 'not found' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
+        new Response('', { status: 404 }),
+      )
+      const machines = await discoverMachines()
+      expect(machines).toHaveLength(1)
+      expect(machines[0].host).toBe('meticulous.local')
+    })
+
+    it('should return empty array when probe gets 500', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('', { status: 500 }),
       )
       expect(await discoverMachines()).toEqual([])
     })
@@ -155,24 +158,18 @@ describe('discovery', () => {
       vi.restoreAllMocks()
     })
 
-    it('should return true when machine responds with JSON array', async () => {
+    it('should return true when machine responds with 200', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify([{ name: 'Default', id: '1' }]), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
+        new Response('{}', { status: 200 }),
       )
       expect(await testMachineConnection('http://192.168.1.42:8080')).toBe(true)
     })
 
-    it('should return false when machine responds with non-array JSON', async () => {
+    it('should return true when machine responds with 404 (API alive, no data)', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: 'not a machine' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
+        new Response('', { status: 404 }),
       )
-      expect(await testMachineConnection('http://192.168.1.42:8080')).toBe(false)
+      expect(await testMachineConnection('http://192.168.1.42:8080')).toBe(true)
     })
 
     it('should return false when machine responds with error', async () => {

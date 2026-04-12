@@ -11,7 +11,7 @@
     "edit": "Modifier",
     "update": "Mettre à jour",
     "confirm": "Confirmer",
-    "dismiss": "Ignorer",
+    "dismiss": "Fermer",
     "retry": "Réessayer",
     "or": "OU",
     "and": "ET",
@@ -1594,6 +1594,7 @@
     "machineConnected": "Machine démo connectée",
     "brewStarted": "Extraction démo démarrée",
     "brewComplete": "Extraction démo terminée",
-    "noRealConnection": "Pas de connexion machine réelle en mode démo"
+    "noRealConnection": "Pas de connexion machine réelle en mode démo",
+    "setupMachine": "Configurer machine"
   }
 }

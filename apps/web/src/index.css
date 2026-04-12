@@ -15,6 +15,8 @@
     position: relative;
     background-color: var(--background);
     color: var(--foreground);
+    /* Allow native rubber-band bounce on iOS Capacitor */
+    -webkit-overflow-scrolling: touch;
   }
   
   /* iOS PWA safe area handling — let background show through the notch
@@ -25,8 +27,10 @@
     padding-right: env(safe-area-inset-right);
   }
   
+  /* Use margin instead of padding for safe-area-top so the background
+     extends behind the status bar (no white gap on overscroll) */
   #root {
-    padding-top: env(safe-area-inset-top);
+    margin-top: env(safe-area-inset-top);
   }
   
   /* Prevent scroll jump when Radix UI dialogs/selects open */

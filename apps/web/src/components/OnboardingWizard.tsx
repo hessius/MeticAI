@@ -99,10 +99,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     () => localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
   )
 
-  // Language
-  const [selectedLang, setSelectedLang] = useState<SupportedLanguage>(
-    () => (i18n.language?.split('-')[0] as SupportedLanguage) || 'en'
-  )
+  // Language — default to English for onboarding regardless of browser locale
+  const [selectedLang, setSelectedLang] = useState<SupportedLanguage>('en')
 
   // Ref for IP input auto-focus
   const ipInputRef = useRef<HTMLInputElement>(null)
@@ -126,39 +124,44 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
   }, [step])
 
-  // Auto-discover machines when machine step appears
+  // Start machine discovery immediately on mount so results are ready
+  // by the time user reaches the machine step
   useEffect(() => {
-    if (step !== 'machine' || connectionStatus === 'success') return
     let cancelled = false
     setDiscovering(true)
     discoverMachines().then((machines) => {
       if (cancelled) return
       setDiscoveredMachines(machines)
       setDiscovering(false)
-      // Auto-fill if exactly one machine found and user hasn't typed anything
-      if (machines.length === 1 && !machineIp.trim()) {
-        setMachineIp(machines[0].host)
-        setMachineName(machines[0].name)
-        // Auto-test the discovered machine
-        setConnectionStatus('testing')
-        testMachineConnection(machines[0].url).then((ok) => {
-          if (cancelled) return
-          if (ok) {
-            setConnectionStatus('success')
-            setMachineUrl(machines[0].url)
-            toast.success(t('onboarding.machine.autoDiscovered'))
-          } else {
-            setConnectionStatus('idle')
-          }
-        })
-      }
     }).catch(() => {
       if (!cancelled) setDiscovering(false)
     })
     return () => { cancelled = true }
-  // Only run once when entering the machine step
+  }, [])
+
+  // Auto-fill and test when discovery completes and user reaches machine step
+  useEffect(() => {
+    if (step !== 'machine' || discovering || connectionStatus === 'success') return
+    if (discoveredMachines.length === 1 && !machineIp.trim()) {
+      const machine = discoveredMachines[0]
+      setMachineIp(machine.host)
+      setMachineName(machine.name)
+      setConnectionStatus('testing')
+      let cancelled = false
+      testMachineConnection(machine.url).then((ok) => {
+        if (cancelled) return
+        if (ok) {
+          setConnectionStatus('success')
+          setMachineUrl(machine.url)
+          toast.success(t('onboarding.machine.autoDiscovered'))
+        } else {
+          setConnectionStatus('idle')
+        }
+      })
+      return () => { cancelled = true }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step])
+  }, [step, discovering, discoveredMachines])
 
   // ── Navigation ──────────────────────────────────────────────────────────
 

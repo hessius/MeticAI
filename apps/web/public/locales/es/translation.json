@@ -1594,6 +1594,7 @@
     "machineConnected": "Máquina demo conectada",
     "brewStarted": "Extracción demo iniciada",
     "brewComplete": "Extracción demo completada",
-    "noRealConnection": "Sin conexión a máquina real en modo demo"
+    "noRealConnection": "Sin conexión a máquina real en modo demo",
+    "setupMachine": "Configurar máquina"
   }
 }

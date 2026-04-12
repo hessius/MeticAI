@@ -11,7 +11,7 @@
     "edit": "Bearbeiten",
     "update": "Aktualisieren",
     "confirm": "Bestätigen",
-    "dismiss": "Verwerfen",
+    "dismiss": "Schließen",
     "retry": "Wiederholen",
     "or": "ODER",
     "and": "UND",
@@ -1594,6 +1594,7 @@
     "machineConnected": "Demo-Maschine verbunden",
     "brewStarted": "Demo-Brühvorgang gestartet",
     "brewComplete": "Demo-Brühvorgang abgeschlossen",
-    "noRealConnection": "Keine echte Maschinenverbindung im Demo-Modus"
+    "noRealConnection": "Keine echte Maschinenverbindung im Demo-Modus",
+    "setupMachine": "Maschine einrichten"
   }
 }

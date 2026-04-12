@@ -1596,6 +1596,7 @@
     "machineConnected": "Demo machine connected",
     "brewStarted": "Demo brew started",
     "brewComplete": "Demo brew complete",
-    "noRealConnection": "No real machine connection in demo mode"
+    "noRealConnection": "No real machine connection in demo mode",
+    "setupMachine": "Setup Machine"
   }
 }

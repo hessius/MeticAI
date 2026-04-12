@@ -10,7 +10,8 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: true,
   },
   ios: {
-    // Allow clear-text HTTP to local network (machine API on port 8080)
+    // Match the dark theme background so overscroll bounce doesn't show white
+    backgroundColor: '#151413',
     allowsLinkPreview: false,
     contentInset: 'automatic',
     limitsNavigationsToAppBoundDomains: false,
