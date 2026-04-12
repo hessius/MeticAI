@@ -21,11 +21,12 @@ export function installDirectModeInterceptor(): void {
   // In native mode (Capacitor), relative /api/... URLs must be prefixed with
   // the machine base URL since same-origin is the WebView, not the machine.
   const _isNative = isNativePlatform()
-  const _machineBase = _isNative ? getDefaultMachineUrl() : ''
 
   function _fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     if (_isNative && typeof input === 'string' && input.startsWith('/api/')) {
-      return _originalFetch(`${_machineBase}${input}`, init)
+      const machineBase = getDefaultMachineUrl()
+      console.debug(`[DirectMode] ${init?.method || 'GET'} ${machineBase}${input}`)
+      return _originalFetch(`${machineBase}${input}`, init)
     }
     return _originalFetch(input, init)
   }
@@ -1494,7 +1495,7 @@ export function installDirectModeInterceptor(): void {
       return Promise.resolve(jsonResponse({
         geminiApiKey: localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || '',
         geminiApiKeyConfigured: Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()),
-        meticulousIp: _machineBase || '',
+        meticulousIp: getDefaultMachineUrl() || '',
         authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
         geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || '',
         mqttEnabled: true, // Socket.IO always available on machine

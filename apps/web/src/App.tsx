@@ -191,8 +191,11 @@ function App() {
         // default false if unreachable
       }
     }
-    // Fetch on mount or when leaving the settings view
-    if (prevViewStateRef.current === null || (prevViewStateRef.current === 'settings' && viewState !== 'settings')) {
+    // Fetch on mount, when leaving settings, or after onboarding completes
+    if (prevViewStateRef.current === null ||
+        (prevViewStateRef.current === 'settings' && viewState !== 'settings') ||
+        (prevViewStateRef.current === 'onboarding' && viewState !== 'onboarding')) {
+      console.info('[App] fetchMqttSetting triggered, prevView:', prevViewStateRef.current, '→', viewState)
       fetchMqttSetting()
     }
     prevViewStateRef.current = viewState
