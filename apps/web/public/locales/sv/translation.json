@@ -1532,19 +1532,20 @@
     },
     "machine": {
       "title": "Anslut din maskin",
-      "description": "Ange IP-adressen till din Meticulous-maskin.",
-      "ipLabel": "Maskinens IP-adress",
+      "description": "Vi söker ditt nätverk automatiskt. Du kan också ange adressen manuellt.",
+      "ipLabel": "IP-adress eller värdnamn",
       "ipPlaceholder": "192.168.1.42",
-      "testButton": "Testa",
       "invalidIp": "Ange en giltig IP-adress eller värdnamn",
       "connected": "Maskinen ansluten!",
       "unreachable": "Kunde inte nå maskinen. Kontrollera IP-adressen och att du är på samma nätverk.",
       "successMessage": "Ansluten till {{name}}",
-      "errorMessage": "Maskinen kan inte nås. Kontrollera IP och nätverk.",
-      "hint": "Hitta maskinens IP i maskinens inställningar under Wi-Fi. Det ser vanligtvis ut som 192.168.x.x",
+      "errorMessage": "Kunde inte nå maskinen. Kontrollera adressen och att du är på samma Wi-Fi-nätverk.",
+      "hint": "Tips: hitta IP-adressen i maskinens Wi-Fi-inställningar, eller kolla routerns DHCP-lista. Skriv \"demo\" för att prova utan maskin.",
       "searching": "Söker efter maskiner på ditt nätverk...",
       "foundMachines": "Maskiner hittade på ditt nätverk",
-      "autoDiscovered": "Maskin hittad automatiskt!"
+      "autoDiscovered": "Maskin hittad automatiskt!",
+      "connectButton": "Anslut",
+      "ipDescription": "Ange en IP-adress (t.ex. 192.168.1.42) eller värdnamn. Värdnamnet är slumpmässigt men innehåller alltid \"meticulous\" (t.ex. meticulous-a3f7.local)."
     },
     "name": {
       "title": "Vad heter du?",

@@ -1532,19 +1532,20 @@
     },
     "machine": {
       "title": "Verbinde deine Maschine",
-      "description": "Gib die IP-Adresse deiner Meticulous-Maschine ein.",
-      "ipLabel": "IP-Adresse der Maschine",
+      "description": "Wir durchsuchen Ihr Netzwerk automatisch. Sie können die Adresse auch manuell eingeben.",
+      "ipLabel": "IP-Adresse oder Hostname",
       "ipPlaceholder": "192.168.1.42",
-      "testButton": "Testen",
       "invalidIp": "Bitte gib eine gültige IP-Adresse oder einen Hostnamen ein",
       "connected": "Maschine erfolgreich verbunden!",
       "unreachable": "Maschine nicht erreichbar. Überprüfe die IP und stelle sicher, dass du im selben Netzwerk bist.",
       "successMessage": "Verbunden mit {{name}}",
-      "errorMessage": "Maschine nicht erreichbar. Überprüfe IP und Netzwerk.",
-      "hint": "Finde die IP deiner Maschine in den Maschineneinstellungen unter WLAN. Sie sieht normalerweise aus wie 192.168.x.x",
+      "errorMessage": "Maschine nicht erreichbar. Überprüfen Sie die Adresse und stellen Sie sicher, dass Sie im selben WLAN sind.",
+      "hint": "Tipp: Die IP finden Sie in den WLAN-Einstellungen der Maschine oder in der DHCP-Liste Ihres Routers. Geben Sie „demo\" ein, um ohne Maschine zu testen.",
       "searching": "Suche nach Maschinen in Ihrem Netzwerk...",
       "foundMachines": "Maschinen in Ihrem Netzwerk gefunden",
-      "autoDiscovered": "Maschine automatisch gefunden!"
+      "autoDiscovered": "Maschine automatisch gefunden!",
+      "connectButton": "Verbinden",
+      "ipDescription": "Geben Sie eine IP-Adresse (z.B. 192.168.1.42) oder einen Hostnamen ein. Der Hostname ist zufällig, enthält aber immer „meticulous\" (z.B. meticulous-a3f7.local)."
     },
     "name": {
       "title": "Wie heißt du?",

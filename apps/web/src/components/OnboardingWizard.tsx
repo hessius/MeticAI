@@ -297,6 +297,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
       <div className="space-y-2">
         <Label htmlFor="machine-ip">{t('onboarding.machine.ipLabel')}</Label>
+        <p className="text-xs text-muted-foreground">
+          {t('onboarding.machine.ipDescription')}
+        </p>
         <div className="flex gap-2">
           <Input
             ref={ipInputRef}
@@ -318,7 +321,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {connectionStatus === 'testing' ? (
               <CircleNotch size={18} className="animate-spin" />
             ) : (
-              t('onboarding.machine.testButton')
+              t('onboarding.machine.connectButton')
             )}
           </Button>
         </div>

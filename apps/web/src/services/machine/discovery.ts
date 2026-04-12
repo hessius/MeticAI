@@ -2,14 +2,20 @@
  * Machine discovery — find Meticulous espresso machines on the local network.
  *
  * Discovery methods (tried in order):
- *  1. Probe known Meticulous hostnames/IPs via HTTP
- *  2. QR code scan (native only — future)
- *  3. Manual IP entry (all platforms)
+ *  1. Native mDNS/Bonjour service browsing (_meticulous._tcp) — iOS only
+ *  2. HTTP probe of known hostnames (meticulous.local)
+ *  3. Manual IP/hostname entry (all platforms)
  *
  * The machine advertises _meticulous._tcp on the local network.
- * On iOS, mDNS resolution happens natively so we can probe hostnames.
+ * Its hostname is randomized but always contains "meticulous"
+ * (e.g. meticulous-a3f7.local).
+ *
+ * On native (Capacitor), CapacitorHttp is used for HTTP probes to
+ * bypass WKWebView CORS restrictions.
  */
 
+import { CapacitorHttp } from '@capacitor/core'
+import { registerPlugin } from '@capacitor/core'
 import { isNativePlatform } from '@/lib/machineMode'
 
 export interface DiscoveredMachine {
@@ -24,22 +30,50 @@ export interface DiscoveredMachine {
 }
 
 // ---------------------------------------------------------------------------
-// Network discovery
+// Native mDNS discovery plugin (iOS — registered in MeticulousViewController)
+// ---------------------------------------------------------------------------
+
+interface MeticulousDiscoveryPlugin {
+  browse(options?: { timeout?: number }): Promise<{
+    machines: Array<{ name: string; host: string; type: string; domain: string }>
+    error?: string
+  }>
+}
+
+const MeticulousDiscovery = registerPlugin<MeticulousDiscoveryPlugin>('MeticulousDiscovery')
+
+// ---------------------------------------------------------------------------
+// HTTP probe helpers
 // ---------------------------------------------------------------------------
 
 /**
  * Probe a single address to check if a Meticulous machine lives there.
- * Verifies via /api/getLastShotProfileJSON — the same endpoint used by
- * the backend's machine_discovery_service.py verify_machine().
- * A 200 or 404 means the Meticulous API is responding.
+ * Uses CapacitorHttp on native to bypass CORS, regular fetch on web.
+ * Verifies via /api/getLastShotProfileJSON — same as backend's verify_machine().
  */
 async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> {
+  const probeUrl = `${baseUrl}/api/getLastShotProfileJSON`
+
   try {
-    const resp = await fetch(`${baseUrl}/api/getLastShotProfileJSON`, {
-      signal: AbortSignal.timeout(3000),
-    })
+    let status: number
+
+    if (isNativePlatform()) {
+      // Native HTTP bypasses CORS
+      const resp = await CapacitorHttp.get({
+        url: probeUrl,
+        connectTimeout: 4000,
+        readTimeout: 4000,
+      })
+      status = resp.status
+    } else {
+      const resp = await fetch(probeUrl, {
+        signal: AbortSignal.timeout(4000),
+      })
+      status = resp.status
+    }
+
     // 200 = has data, 404 = API responding but no shot yet — both valid
-    if (resp.status === 200 || resp.status === 404) {
+    if (status === 200 || status === 404) {
       const url = new URL(baseUrl)
       return {
         name: url.hostname,
@@ -48,36 +82,67 @@ async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> 
         url: baseUrl,
       }
     }
-  } catch { /* unreachable */ }
+  } catch {
+    // Network error or timeout — machine not there
+  }
   return null
 }
+
+// ---------------------------------------------------------------------------
+// Network discovery
+// ---------------------------------------------------------------------------
 
 /**
  * Browse the local network for Meticulous machines.
  *
- * Probes known Meticulous hostnames that iOS resolves natively via
- * Bonjour (the machine advertises _meticulous._tcp).
- * The backend uses the same approach: mDNS → hostname → env fallback.
+ * On iOS (Capacitor), uses a native NWBrowser plugin to do real mDNS
+ * service discovery for _meticulous._tcp.local. — matching the backend's
+ * zeroconf-based discovery in machine_discovery_service.py.
  *
- * Unlike the Python backend which has zeroconf, the WebView can't do
- * raw mDNS service browsing. Instead we probe common hostnames that
- * the OS mDNS resolver handles transparently.
+ * Falls back to hostname probing if the native plugin isn't available.
  */
 export async function discoverMachines(): Promise<DiscoveredMachine[]> {
-  // Probe common Meticulous hostnames in parallel.
-  // The machine's mDNS hostname varies (e.g. meticulous-XXXX.local)
-  // but most resolve as "meticulous.local" or the hostname set by the user.
-  const probeUrls = [
-    'http://meticulous.local:8080',
-  ]
-
-  // On native, also try the .local variant without subdomain
+  // Step 1: Try native mDNS service browsing (iOS)
   if (isNativePlatform()) {
-    probeUrls.push('http://meticulous:8080')
+    try {
+      console.info('[Discovery] Starting native mDNS browse for _meticulous._tcp...')
+      const result = await MeticulousDiscovery.browse({ timeout: 5 })
+
+      if (result.error) {
+        console.warn('[Discovery] mDNS browse error (local network permission may be denied):', result.error)
+      }
+
+      if (result.machines.length > 0) {
+        console.info(`[Discovery] mDNS found ${result.machines.length} machine(s):`,
+          result.machines.map(m => m.name).join(', '))
+
+        // Probe each discovered host to verify it's responsive
+        const probes = result.machines.map(async (m) => {
+          const machine = await probeMachine(`http://${m.host}:8080`)
+          if (machine) {
+            machine.name = m.name // Use the friendly mDNS service name
+          }
+          return machine
+        })
+
+        const results = await Promise.all(probes)
+        const verified = results.filter((m): m is DiscoveredMachine => m !== null)
+        if (verified.length > 0) return verified
+      }
+
+      if (result.error) {
+        console.warn('[Discovery] mDNS browse error:', result.error)
+      }
+    } catch (e) {
+      console.warn('[Discovery] Native mDNS plugin not available, falling back to hostname probe:', e)
+    }
   }
 
+  // Step 2: Fallback — probe known hostnames
+  console.info('[Discovery] Probing known hostnames...')
+  const probeUrls = ['http://meticulous.local:8080']
+
   const results = await Promise.all(probeUrls.map(probeMachine))
-  // Deduplicate by URL
   const seen = new Set<string>()
   return results.filter((m): m is DiscoveredMachine => {
     if (!m || seen.has(m.url)) return false
@@ -93,16 +158,12 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 /**
  * Scan a QR code to discover a machine's IP address.
  *
- * The machine exposes GET /api/v1/wifi/config/qr.png containing connection
- * info. This method opens the camera, scans the QR, and parses the result.
- *
  * TODO: Integrate a barcode scanner plugin (e.g. @capacitor-mlkit/barcode-scanning
  * or a JS-based decoder with @capacitor/camera capture).
  */
 export async function scanMachineQR(): Promise<DiscoveredMachine | null> {
   if (!isNativePlatform()) return null
 
-  // QR scanning placeholder — requires barcode scanner plugin
   console.info('[Discovery] QR scanning not yet implemented')
   return null
 }
@@ -156,17 +217,27 @@ export function parseMachineInput(input: string): DiscoveredMachine | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Ping a machine to verify it's reachable. Uses the same endpoint as
- * the backend's verify_machine() — /api/getLastShotProfileJSON.
+ * Test if a machine is reachable at the given URL. Uses CapacitorHttp on
+ * native to bypass CORS. Same verification as backend's verify_machine().
  * Demo mode always succeeds.
  */
 export async function testMachineConnection(url: string): Promise<boolean> {
   if (url.toLowerCase() === 'demo') return true
   try {
-    const resp = await fetch(`${url}/api/getLastShotProfileJSON`, {
+    const probeUrl = `${url}/api/getLastShotProfileJSON`
+
+    if (isNativePlatform()) {
+      const resp = await CapacitorHttp.get({
+        url: probeUrl,
+        connectTimeout: 5000,
+        readTimeout: 5000,
+      })
+      return resp.status === 200 || resp.status === 404
+    }
+
+    const resp = await fetch(probeUrl, {
       signal: AbortSignal.timeout(5000),
     })
-    // 200 = has shot data, 404 = API responding but no shot — both valid
     return resp.status === 200 || resp.status === 404
   } catch {
     return false

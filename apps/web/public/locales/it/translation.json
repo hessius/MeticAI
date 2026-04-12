@@ -1532,19 +1532,20 @@
     },
     "machine": {
       "title": "Connetti la tua macchina",
-      "description": "Inserisci l'indirizzo IP della tua macchina Meticulous.",
-      "ipLabel": "Indirizzo IP della macchina",
+      "description": "Cercheremo automaticamente nella tua rete. Puoi anche inserire l'indirizzo manualmente.",
+      "ipLabel": "Indirizzo IP o nome host",
       "ipPlaceholder": "192.168.1.42",
-      "testButton": "Testa",
       "invalidIp": "Inserisci un indirizzo IP o hostname valido",
       "connected": "Macchina connessa con successo!",
       "unreachable": "Impossibile raggiungere la macchina. Controlla l'IP e assicurati di essere sulla stessa rete.",
       "successMessage": "Connesso a {{name}}",
-      "errorMessage": "Macchina non raggiungibile. Controlla IP e rete.",
-      "hint": "Trova l'IP della macchina nelle impostazioni della macchina sotto Wi-Fi. Di solito è 192.168.x.x",
+      "errorMessage": "Impossibile raggiungere la macchina. Controlla l'indirizzo e assicurati di essere sulla stessa rete Wi-Fi.",
+      "hint": "Suggerimento: trova l'IP nelle impostazioni Wi-Fi della macchina o nella lista DHCP del router. Scrivi \"demo\" per provare senza macchina.",
       "searching": "Ricerca di macchine nella tua rete...",
       "foundMachines": "Macchine trovate nella tua rete",
-      "autoDiscovered": "Macchina trovata automaticamente!"
+      "autoDiscovered": "Macchina trovata automaticamente!",
+      "connectButton": "Connetti",
+      "ipDescription": "Inserisci un indirizzo IP (es. 192.168.1.42) o nome host. Il nome host è casuale ma contiene sempre \"meticulous\" (es. meticulous-a3f7.local)."
     },
     "name": {
       "title": "Come ti chiami?",

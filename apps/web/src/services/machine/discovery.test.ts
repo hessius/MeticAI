@@ -5,6 +5,16 @@ vi.mock('@/lib/machineMode', () => ({
   isNativePlatform: vi.fn(() => false),
 }))
 
+// Mock @capacitor/core — tests run as web (non-native) so CapacitorHttp isn't used
+vi.mock('@capacitor/core', () => ({
+  CapacitorHttp: {
+    get: vi.fn(),
+  },
+  registerPlugin: vi.fn(() => ({
+    browse: vi.fn().mockResolvedValue({ machines: [] }),
+  })),
+}))
+
 import { isNativePlatform } from '@/lib/machineMode'
 import {
   parseMachineInput,
