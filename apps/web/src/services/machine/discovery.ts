@@ -2,7 +2,7 @@
  * Machine discovery — find Meticulous espresso machines on the local network.
  *
  * Discovery methods (tried in order):
- *  1. Native mDNS/Bonjour service browsing (_meticulous._tcp) — iOS only
+ *  1. Zeroconf/Bonjour service browsing (_meticulous._tcp) — iOS via capacitor-zeroconf
  *  2. HTTP probe of known hostnames (meticulous.local)
  *  3. Manual IP/hostname entry (all platforms)
  *
@@ -15,7 +15,6 @@
  */
 
 import { CapacitorHttp } from '@capacitor/core'
-import { registerPlugin } from '@capacitor/core'
 import { isNativePlatform } from '@/lib/machineMode'
 
 export interface DiscoveredMachine {
@@ -30,17 +29,18 @@ export interface DiscoveredMachine {
 }
 
 // ---------------------------------------------------------------------------
-// Native mDNS discovery plugin (iOS — registered in MeticulousViewController)
+// Zeroconf mDNS discovery (capacitor-zeroconf plugin)
 // ---------------------------------------------------------------------------
 
-interface MeticulousDiscoveryPlugin {
-  browse(options?: { timeout?: number }): Promise<{
-    machines: Array<{ name: string; host: string; type: string; domain: string }>
-    error?: string
-  }>
-}
+let _zeroconfModule: typeof import('capacitor-zeroconf') | null = null
 
-const MeticulousDiscovery = registerPlugin<MeticulousDiscoveryPlugin>('MeticulousDiscovery')
+/** Lazy-load capacitor-zeroconf to avoid import errors on web. */
+async function getZeroConf() {
+  if (!_zeroconfModule) {
+    _zeroconfModule = await import('capacitor-zeroconf')
+  }
+  return _zeroconfModule.ZeroConf
+}
 
 // ---------------------------------------------------------------------------
 // HTTP probe helpers
@@ -58,7 +58,6 @@ async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> 
     let status: number
 
     if (isNativePlatform()) {
-      // Native HTTP bypasses CORS
       const resp = await CapacitorHttp.get({
         url: probeUrl,
         connectTimeout: 4000,
@@ -95,46 +94,65 @@ async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> 
 /**
  * Browse the local network for Meticulous machines.
  *
- * On iOS (Capacitor), uses a native NWBrowser plugin to do real mDNS
- * service discovery for _meticulous._tcp.local. — matching the backend's
- * zeroconf-based discovery in machine_discovery_service.py.
+ * On iOS (Capacitor), uses the capacitor-zeroconf plugin for real
+ * Bonjour/mDNS service discovery of _meticulous._tcp.local.
  *
- * Falls back to hostname probing if the native plugin isn't available.
+ * Falls back to hostname probing if the plugin isn't available.
  */
 export async function discoverMachines(): Promise<DiscoveredMachine[]> {
-  // Step 1: Try native mDNS service browsing (iOS)
+  // Step 1: Try Zeroconf mDNS service browsing (native only)
   if (isNativePlatform()) {
     try {
-      console.info('[Discovery] Starting native mDNS browse for _meticulous._tcp...')
-      const result = await MeticulousDiscovery.browse({ timeout: 5 })
+      console.info('[Discovery] Starting Zeroconf browse for _meticulous._tcp...')
+      const ZeroConf = await getZeroConf()
 
-      if (result.error) {
-        console.warn('[Discovery] mDNS browse error (local network permission may be denied):', result.error)
-      }
+      const discovered: DiscoveredMachine[] = []
+      let resolveWatch: () => void
 
-      if (result.machines.length > 0) {
-        console.info(`[Discovery] mDNS found ${result.machines.length} machine(s):`,
-          result.machines.map(m => m.name).join(', '))
+      const watchDone = new Promise<void>((resolve) => {
+        resolveWatch = resolve
+      })
 
-        // Probe each discovered host to verify it's responsive
-        const probes = result.machines.map(async (m) => {
-          const machine = await probeMachine(`http://${m.host}:8080`)
-          if (machine) {
-            machine.name = m.name // Use the friendly mDNS service name
+      await ZeroConf.watch(
+        { type: '_meticulous._tcp.', domain: 'local.' },
+        (result) => {
+          if (result.action === 'resolved' && result.service) {
+            const svc = result.service
+            const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
+            const port = svc.port || 8080
+            discovered.push({
+              name: svc.name,
+              host,
+              port,
+              url: `http://${host}:${port}`,
+            })
           }
-          return machine
-        })
+        },
+      )
 
-        const results = await Promise.all(probes)
-        const verified = results.filter((m): m is DiscoveredMachine => m !== null)
-        if (verified.length > 0) return verified
+      // Browse for a few seconds then stop
+      const timer = setTimeout(() => resolveWatch(), 5000)
+      await watchDone
+      clearTimeout(timer)
+
+      try {
+        await ZeroConf.unwatch({ type: '_meticulous._tcp.', domain: 'local.' })
+        await ZeroConf.close()
+      } catch {
+        // cleanup errors are non-fatal
       }
 
-      if (result.error) {
-        console.warn('[Discovery] mDNS browse error:', result.error)
+      if (discovered.length > 0) {
+        console.info(
+          `[Discovery] Zeroconf found ${discovered.length} machine(s):`,
+          discovered.map((m) => m.name).join(', '),
+        )
+        return discovered
       }
+
+      console.info('[Discovery] Zeroconf browse found no machines')
     } catch (e) {
-      console.warn('[Discovery] Native mDNS plugin not available, falling back to hostname probe:', e)
+      console.warn('[Discovery] Zeroconf plugin not available, falling back to hostname probe:', e)
     }
   }
 

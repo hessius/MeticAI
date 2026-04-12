@@ -10,9 +10,15 @@ vi.mock('@capacitor/core', () => ({
   CapacitorHttp: {
     get: vi.fn(),
   },
-  registerPlugin: vi.fn(() => ({
-    browse: vi.fn().mockResolvedValue({ machines: [] }),
-  })),
+}))
+
+// Mock capacitor-zeroconf — only used on native
+vi.mock('capacitor-zeroconf', () => ({
+  ZeroConf: {
+    watch: vi.fn(),
+    unwatch: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+  },
 }))
 
 import { isNativePlatform } from '@/lib/machineMode'
