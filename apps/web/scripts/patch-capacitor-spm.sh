@@ -68,9 +68,9 @@ for method, swift_type in [
         r'(call.options["\1"] as? ' + swift_type + ')',
         content
     )
-    # Constant arg: call.method(kConst) -> call.options[kConst] as? Type
+    # Constant arg: call.method(kConst) or call.method(Enum.case) -> call.options[kConst] as? Type
     content = re.sub(
-        r'call\.' + method + r'\(([a-zA-Z_]\w*)\)',
+        r'call\.' + method + r'\(([a-zA-Z_][\w.]*)\)',
         r'(call.options[\1] as? ' + swift_type + ')',
         content
     )
