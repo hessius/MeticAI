@@ -62,7 +62,7 @@
         "date-fns": "^4.1.0",
         "embla-carousel-react": "^8.5.2",
         "framer-motion": "^12.37.0",
-        "i18next": "^25.8.18",
+        "i18next": "^26.0.4",
         "i18next-browser-languagedetector": "^8.2.1",
         "i18next-http-backend": "^3.0.2",
         "input-otp": "^1.4.2",
