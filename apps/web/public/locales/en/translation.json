@@ -1604,5 +1604,13 @@
     "brewComplete": "Demo brew complete",
     "noRealConnection": "No real machine connection in demo mode",
     "setupMachine": "Setup Machine"
+  },
+  "notifications": {
+    "brewComplete": "Brew Complete",
+    "brewCompleteBody": "Your {{profile}} is ready to enjoy",
+    "machineReady": "Machine Ready",
+    "machineReadyBody": "Your machine has finished pre-heating",
+    "pourOverComplete": "Pour Over Complete",
+    "pourOverCompleteBody": "Your pour over timer has finished"
   }
 }

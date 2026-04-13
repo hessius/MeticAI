@@ -110,7 +110,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
         }
         if (historyResp.status === 'fulfilled') {
           const h = unwrap(historyResp.value) as { history?: HistoryListingEntry[] }
-          initialStatus.total_shots = (h.history ?? []).length
+          initialStatus.total_shots = Array.isArray(h.history) ? h.history.length : 0
         }
         if (Object.keys(initialStatus).length > 0) {
           statusCallbacks.forEach(cb => cb(initialStatus))
@@ -146,7 +146,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
         return wrapResult(false, (e as Error).message)
       }
     },
-    abortShot: async () => executeRawAction('stop'),
+    abortShot: async () => executeRawAction('reset'),
     continueShot: async () => {
       try {
         await api.executeAction('continue')
@@ -205,9 +205,10 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       }
     },
     enableSounds: async (_enabled: boolean) => {
-      // Sounds toggling requires updating the full settings object
       try {
         await api.updateSetting({ enable_sounds: _enabled })
+        // Optimistic UI update — machine may not echo sounds_enabled in status events
+        statusCallbacks.forEach(cb => cb({ sounds_enabled: _enabled }))
         return wrapResult(true)
       } catch (e) {
         return wrapResult(false, (e as Error).message)

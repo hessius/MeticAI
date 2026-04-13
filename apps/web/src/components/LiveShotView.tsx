@@ -109,6 +109,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
 
+  // Use machine state from props directly
+  const ms = machineState
+
   // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
   const profileImgUrl = useProfileImageSrc(ms.active_profile)
 
@@ -127,9 +130,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     avgPressure: number
     avgFlow: number
   } | null>(null)
-
-  // Use machine state from props directly
-  const ms = machineState
 
   // Fetch target curves and profile info for the active profile
   useEffect(() => {

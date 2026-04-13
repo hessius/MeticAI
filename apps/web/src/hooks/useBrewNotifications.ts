@@ -6,12 +6,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
 
 let nextId = 1000
 
 export function useBrewNotifications() {
+  const { t } = useTranslation()
   const isNative = Capacitor.isNativePlatform()
   const [hasPermission, setHasPermission] = useState(false)
   const checkedRef = useRef(false)
@@ -86,18 +88,27 @@ export function useBrewNotifications() {
 
   const notifyBrewComplete = useCallback(
     (profileName: string) =>
-      scheduleNotification('Brew Complete', `Your ${profileName} is ready to enjoy`),
-    [scheduleNotification],
+      scheduleNotification(
+        t('notifications.brewComplete'),
+        t('notifications.brewCompleteBody', { profile: profileName }),
+      ),
+    [scheduleNotification, t],
   )
 
   const notifyPreheatComplete = useCallback(
-    () => scheduleNotification('Machine Ready', 'Your machine has finished pre-heating'),
-    [scheduleNotification],
+    () => scheduleNotification(
+      t('notifications.machineReady'),
+      t('notifications.machineReadyBody'),
+    ),
+    [scheduleNotification, t],
   )
 
   const notifyPourOverComplete = useCallback(
-    () => scheduleNotification('Pour Over Complete', 'Your pour over timer has finished'),
-    [scheduleNotification],
+    () => scheduleNotification(
+      t('notifications.pourOverComplete'),
+      t('notifications.pourOverCompleteBody'),
+    ),
+    [scheduleNotification, t],
   )
 
   return {

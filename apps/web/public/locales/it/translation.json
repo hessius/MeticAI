@@ -1601,5 +1601,13 @@
     "brewComplete": "Estrazione demo completata",
     "noRealConnection": "Nessuna connessione reale in modalità demo",
     "setupMachine": "Configura macchina"
+  },
+  "notifications": {
+    "brewComplete": "Preparazione completata",
+    "brewCompleteBody": "Il tuo {{profile}} è pronto da gustare",
+    "machineReady": "Macchina pronta",
+    "machineReadyBody": "La tua macchina ha finito di preriscaldarsi",
+    "pourOverComplete": "Pour-over completato",
+    "pourOverCompleteBody": "Il tuo timer pour-over è terminato"
   }
 }

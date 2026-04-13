@@ -1601,5 +1601,13 @@
     "brewComplete": "Demobryggning klar",
     "noRealConnection": "Ingen riktig maskinanslutning i demoläge",
     "setupMachine": "Anslut maskin"
+  },
+  "notifications": {
+    "brewComplete": "Bryggning klar",
+    "brewCompleteBody": "Din {{profile}} är redo att avnjutas",
+    "machineReady": "Maskinen redo",
+    "machineReadyBody": "Din maskin har förvärmts klart",
+    "pourOverComplete": "Pour-over klar",
+    "pourOverCompleteBody": "Din pour-over-timer har avslutats"
   }
 }
