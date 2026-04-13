@@ -2,53 +2,205 @@
 # Patches Capacitor plugin Swift source files for Xcode 16.2 (Swift 6.0.3)
 # compatibility with Capacitor 8.x xcframeworks.
 #
-# The Capacitor xcframework's swiftinterface gates getString(_:)->String? and
-# reject(_:...) behind #if $NonescapableTypes. Without this feature (added in
-# Swift 6.1 / Xcode 16.3), those methods are invisible to the compiler.
+# The Capacitor xcframework's swiftinterface gates these APIs behind
+# #if $NonescapableTypes (Swift 6.1 / Xcode 16.3+):
+#   getString(_:) -> String?       →  call.options["key"] as? String
+#   getBool(_:) -> Bool?           →  call.options["key"] as? Bool
+#   getInt(_:) -> Int?             →  call.options["key"] as? Int  (single-arg only)
+#   getArray(_:) -> JSArray?       →  call.options["key"] as? [Any]
+#   getObject(_:) -> JSObject?     →  call.options["key"] as? [String: Any]
+#   reject(...)                    →  unimplemented(...)
 #
-# This script patches plugin source to use available alternatives:
-#   getString("key") → call.options["key"] as? String
-#   call.reject(msg)  → call.unimplemented(msg)
+# Two-argument versions (e.g. getString("k","default")) are NOT gated and stay.
 #
 # Safe to run multiple times (idempotent).
 
 set -eu
 
-# Cross-platform in-place sed (BSD on macOS, GNU on Linux/Docker)
-sedi() {
-    if sed --version >/dev/null 2>&1; then
-        sed -i "$@"
-    else
-        sed -i '' "$@"
-    fi
-}
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$(dirname "$SCRIPT_DIR")"
 NODE_MODULES="$WEB_DIR/node_modules"
 
-# --- Patch @capacitor/preferences ---
-PREFS="$NODE_MODULES/@capacitor/preferences/ios/Sources/PreferencesPlugin/PreferencesPlugin.swift"
-if [ -f "$PREFS" ]; then
-    if grep -q 'call\.reject' "$PREFS" 2>/dev/null; then
-        # Replace single-arg getString used in guard/if-let with direct options access
-        sedi 's/call\.getString("group")/call.options["group"] as? String/g' "$PREFS"
-        sedi 's/call\.getString("key")/call.options["key"] as? String/g' "$PREFS"
-        # Replace reject() with unimplemented() (available without NonescapableTypes)
-        sedi 's/call\.reject(\(.*\))/call.unimplemented(\1)/g' "$PREFS"
-        echo "Patched: PreferencesPlugin.swift"
-    else
-        echo "Already patched: PreferencesPlugin.swift"
-    fi
-fi
+# ─── Generic patcher (Python) ───────────────────────────────────────
+# Patches any .swift file: replaces single-arg gated calls + reject.
+# Skips files that are already patched (no gated calls remain).
+patch_swift_file() {
+    local FILE="$1"
+    [ -f "$FILE" ] || return 0
 
-# --- Patch capacitor-zeroconf for SPM + Xcode 16.2 ---
+    # Quick idempotency check: skip if no gated calls remain
+    if ! grep -qE 'call\.(getString|getBool|getInt|getArray|getObject)\("[^"]*"\)[^,]|call\.reject\(' "$FILE" 2>/dev/null; then
+        echo "  Already patched: $(basename "$FILE")"
+        return 0
+    fi
+
+    python3 << PYEOF
+import re, sys
+
+path = "$FILE"
+with open(path, 'r') as f:
+    content = f.read()
+
+original = content
+
+# Single-arg getString("key") → call.options["key"] as? String
+# Must NOT match two-arg getString("key", defaultValue)
+content = re.sub(
+    r'call\.getString\("([^"]*)"\)(?!\s*,|\s*\))',
+    r'call.options["\1"] as? String',
+    content
+)
+# Handle getString("key") at end of statement or in guard/if-let
+content = re.sub(
+    r'call\.getString\("([^"]*)"\)',
+    r'call.options["\1"] as? String',
+    content
+)
+
+# Single-arg getBool("key") → call.options["key"] as? Bool
+content = re.sub(
+    r'call\.getBool\("([^"]*)"\)(?!\s*,)',
+    r'call.options["\1"] as? Bool',
+    content
+)
+
+# Single-arg getInt("key") → call.options["key"] as? Int
+content = re.sub(
+    r'call\.getInt\("([^"]*)"\)(?!\s*,)',
+    r'call.options["\1"] as? Int',
+    content
+)
+
+# Single-arg getArray("key") (no type param) → call.options["key"] as? [Any]
+content = re.sub(
+    r'call\.getArray\("([^"]*)"\)(?!\s*,)',
+    r'call.options["\1"] as? [Any]',
+    content
+)
+
+# getArray("key", Type.self) → call.options["key"] as? [Type]
+content = re.sub(
+    r'call\.getArray\("([^"]*)",\s*(\w+)\.self\)',
+    r'call.options["\1"] as? [\2]',
+    content
+)
+
+# Single-arg getObject("key") → call.options["key"] as? [String: Any]
+content = re.sub(
+    r'call\.getObject\("([^"]*)"\)',
+    r'call.options["\1"] as? [String: Any]',
+    content
+)
+
+# reject(...) → unimplemented(first-arg-only)
+# Full reject signature: reject(message, code?, error?, data?)
+# unimplemented only takes a message string
+# Use string scanning to handle nested parens, commas in strings, etc.
+def patch_reject_calls(text):
+    result = []
+    i = 0
+    marker = 'call.reject('
+    while i < len(text):
+        pos = text.find(marker, i)
+        if pos == -1:
+            result.append(text[i:])
+            break
+        result.append(text[i:pos])
+        # Find matching close paren
+        start = pos + len(marker)
+        depth = 1
+        in_str = False
+        esc = False
+        j = start
+        while j < len(text) and depth > 0:
+            ch = text[j]
+            if esc:
+                esc = False
+            elif ch == '\\\\':
+                esc = True
+            elif ch == '"':
+                in_str = not in_str
+            elif not in_str:
+                if ch == '(':
+                    depth += 1
+                elif ch == ')':
+                    depth -= 1
+            j += 1
+        args_str = text[start:j - 1]
+        # Extract first argument
+        depth2 = 0
+        in_str2 = False
+        esc2 = False
+        first_end = len(args_str)
+        for k, ch in enumerate(args_str):
+            if esc2:
+                esc2 = False
+                continue
+            if ch == '\\\\':
+                esc2 = True
+                continue
+            if ch == '"':
+                in_str2 = not in_str2
+            if not in_str2:
+                if ch in '([':
+                    depth2 += 1
+                elif ch in ')]':
+                    depth2 -= 1
+                elif ch == ',' and depth2 == 0:
+                    first_end = k
+                    break
+        first_arg = args_str[:first_end].strip()
+        result.append(f'call.unimplemented({first_arg})')
+        i = j
+    return ''.join(result)
+
+content = patch_reject_calls(content)
+    content
+)
+
+if content != original:
+    with open(path, 'w') as f:
+        f.write(content)
+    print(f"  Patched: {path.split('node_modules/')[-1]}")
+else:
+    print(f"  No changes: {path.split('node_modules/')[-1]}")
+PYEOF
+}
+
+# ─── Discover and patch all plugin Swift files ──────────────────────
+echo "Patching Capacitor plugins for Xcode 16.2 (Swift 6.0.3)..."
+
+# Official Capacitor plugins
+for PLUGIN_DIR in "$NODE_MODULES"/@capacitor/*/ios; do
+    [ -d "$PLUGIN_DIR" ] || continue
+    find "$PLUGIN_DIR" -name "*.swift" -not -path "*/.build/*" | while read -r FILE; do
+        patch_swift_file "$FILE"
+    done
+done
+
+# Community plugins
+for PLUGIN_DIR in "$NODE_MODULES"/@capacitor-community/*/ios; do
+    [ -d "$PLUGIN_DIR" ] || continue
+    find "$PLUGIN_DIR" -name "*.swift" -not -path "*/.build/*" | while read -r FILE; do
+        patch_swift_file "$FILE"
+    done
+done
+
+# Aparajita plugins
+for PLUGIN_DIR in "$NODE_MODULES"/@aparajita/*/ios; do
+    [ -d "$PLUGIN_DIR" ] || continue
+    find "$PLUGIN_DIR" -name "*.swift" -not -path "*/.build/*" | while read -r FILE; do
+        patch_swift_file "$FILE"
+    done
+done
+
+# ─── capacitor-zeroconf special handling ────────────────────────────
+# Needs Package.swift for SPM + CAPBridgedPlugin conformance
 ZEROCONF_DIR="$NODE_MODULES/capacitor-zeroconf"
 ZEROCONF_PLUGIN="$ZEROCONF_DIR/ios/Plugin/ZeroConfPlugin.swift"
 ZEROCONF_PKG="$ZEROCONF_DIR/Package.swift"
 
 if [ -d "$ZEROCONF_DIR" ]; then
-    # Create Package.swift for SPM (Capacitor 8) if missing
     if [ ! -f "$ZEROCONF_PKG" ]; then
         cat > "$ZEROCONF_PKG" << 'PKGEOF'
 // swift-tools-version: 5.9
@@ -75,19 +227,16 @@ let package = Package(
     ]
 )
 PKGEOF
-        echo "Created: capacitor-zeroconf/Package.swift"
+        echo "  Created: capacitor-zeroconf/Package.swift"
     fi
 
-    # Patch ZeroConfPlugin.swift: add CAPBridgedPlugin, replace gated APIs
-    if [ -f "$ZEROCONF_PLUGIN" ] && grep -q 'call\.getString' "$ZEROCONF_PLUGIN" 2>/dev/null; then
+    # Add CAPBridgedPlugin conformance if missing
+    if [ -f "$ZEROCONF_PLUGIN" ] && ! grep -q 'CAPBridgedPlugin' "$ZEROCONF_PLUGIN" 2>/dev/null; then
         python3 << PYEOF
-import re
-
 path = "$ZEROCONF_PLUGIN"
 with open(path, 'r') as f:
     content = f.read()
 
-# Add CAPBridgedPlugin conformance + plugin metadata
 content = content.replace(
     'public class ZeroConfPlugin: CAPPlugin {',
     '''public class ZeroConfPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -103,19 +252,50 @@ content = content.replace(
     ]'''
 )
 
-# Replace gated getString/getInt/getObject/reject calls
-content = re.sub(r'call\.getString\("([^"]*)"\)', r'call.options["\1"] as? String', content)
-content = re.sub(r'call\.getInt\("([^"]*)"\)', r'call.options["\1"] as? Int', content)
-content = re.sub(r'call\.getObject\("([^"]*)"\)', r'call.options["\1"] as? [String: Any]', content)
-content = re.sub(r'call\.reject\(([^)]*)\)', r'call.unimplemented(\1)', content)
+with open(path, 'w') as f:
+    f.write(content)
+print("  Added CAPBridgedPlugin to ZeroConfPlugin")
+PYEOF
+    fi
+
+    # Apply standard gated API patches
+    patch_swift_file "$ZEROCONF_PLUGIN"
+fi
+
+# ─── Add -ObjC linker flag if missing ──────────────────────────────
+# Required so the linker keeps ObjC classes from SPM static libraries,
+# allowing NSClassFromString() to find them at runtime.
+PBXPROJ="$WEB_DIR/ios/App/App.xcodeproj/project.pbxproj"
+if [ -f "$PBXPROJ" ] && ! grep -q 'OTHER_LDFLAGS' "$PBXPROJ" 2>/dev/null; then
+    INHERITED='$(inherited)'
+    python3 - "$PBXPROJ" "$INHERITED" << 'PYEOF'
+import re, sys
+
+path = sys.argv[1]
+inherited = sys.argv[2]
+
+with open(path, 'r') as f:
+    content = f.read()
+
+def add_ldflags(match):
+    block = match.group(0)
+    if 'OTHER_LDFLAGS' not in block and 'PRODUCT_BUNDLE_IDENTIFIER' in block:
+        ld_entry = (
+            f'OTHER_LDFLAGS = (\n'
+            f'\t\t\t\t\t"{inherited}",\n'
+            f'\t\t\t\t\t"-ObjC",\n'
+            f'\t\t\t\t);\n'
+            f'\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER'
+        )
+        block = block.replace('PRODUCT_BUNDLE_IDENTIFIER', ld_entry)
+    return block
+
+content = re.sub(r'buildSettings\s*=\s*\{[^}]+\}', add_ldflags, content)
 
 with open(path, 'w') as f:
     f.write(content)
-print("Patched: capacitor-zeroconf/ZeroConfPlugin.swift")
+print("  Added -ObjC to App target linker flags")
 PYEOF
-    else
-        echo "Already patched or missing: capacitor-zeroconf/ZeroConfPlugin.swift"
-    fi
 fi
 
 echo "Capacitor SPM patching complete."
