@@ -1545,6 +1545,7 @@
       "hint": "Tip: find the IP in your machine's Wi-Fi settings, or check your router's DHCP leases. Type \"demo\" to try without a machine.",
       "searching": "Searching for machines on your network...",
       "foundMachines": "Machines found on your network",
+      "noMachinesFound": "No machines found on your network. Enter the IP address manually.",
       "autoDiscovered": "Machine found automatically!",
       "connectButton": "Connect",
       "ipDescription": "Enter an IP address (e.g. 192.168.1.42) or hostname. The hostname is randomized but always contains \"meticulous\" (e.g. meticulous-a3f7.local)."

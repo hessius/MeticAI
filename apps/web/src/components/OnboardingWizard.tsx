@@ -265,6 +265,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           {t('onboarding.machine.searching')}
         </div>
       )}
+      {!discovering && discoveredMachines.length === 0 && connectionStatus !== 'success' && (
+        <div className="flex items-center gap-2 text-sm text-amber-500 dark:text-amber-400">
+          <WifiSlash size={16} weight="fill" />
+          {t('onboarding.machine.noMachinesFound')}
+        </div>
+      )}
       {!discovering && discoveredMachines.length > 0 && connectionStatus !== 'success' && (
         <div className="space-y-2">
           <Label className="text-sm">{t('onboarding.machine.foundMachines')}</Label>

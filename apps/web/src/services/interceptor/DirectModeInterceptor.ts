@@ -104,18 +104,20 @@ export function installDirectModeInterceptor(): void {
   }
 
   // Background prefetch: refresh profile list on startup so catalogue loads instantly
-  setTimeout(() => {
-    _fetch('/api/v1/profile/list')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: CachedProfile[] | null) => {
-        if (data) {
-          _processProfileList(data)
-          // Kick off background description generation
-          _generateDescriptionsInBackground(data)
-        }
-      })
-      .catch(() => { /* non-critical */ })
-  }, 2000)
+  // Only run after onboarding is complete — before that, no machine URL is configured
+  if (localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
+    setTimeout(() => {
+      _fetch('/api/v1/profile/list')
+        .then(r => r.ok ? r.json() : null)
+        .then((data: CachedProfile[] | null) => {
+          if (data) {
+            _processProfileList(data)
+            _generateDescriptionsInBackground(data)
+          }
+        })
+        .catch(() => { /* non-critical */ })
+    }, 2000)
+  }
 
   // ── Pour-over profile adapters (ported from backend pour_over_adapter.py / recipe_adapter.py) ──
 
@@ -1452,6 +1454,7 @@ export function installDirectModeInterceptor(): void {
             brewRatio: req.brew_ratio ?? null,
           })
           await _fetch(`/api/v1/profile/load`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
+            .then(r => { if (!r.ok) throw new Error(`Machine rejected profile: ${r.status}`) })
           return jsonResponse({ status: 'ready' })
         } catch (e) {
           return jsonResponse({ status: 'error', detail: (e as Error).message }, 500)
@@ -1476,13 +1479,13 @@ export function installDirectModeInterceptor(): void {
           const request = input instanceof Request ? input : new Request(input, init)
           const body = await request.text()
           const { recipe_slug } = JSON.parse(body)
-          // Find recipe in our bundled list
           const recipesResp = await window.fetch(url.replace(/\/pour-over\/prepare-recipe$/, '/recipes'))
           const recipes = await recipesResp.json()
           const recipe = recipes.find((r: { slug: string }) => r.slug === recipe_slug)
           if (!recipe) return jsonResponse({ status: 'error', detail: `Recipe '${recipe_slug}' not found` }, 404)
           const profile = _adaptRecipeToProfile(recipe)
           await _fetch(`/api/v1/profile/load`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
+            .then(r => { if (!r.ok) throw new Error(`Machine rejected recipe profile: ${r.status}`) })
           return jsonResponse({ status: 'ready' })
         } catch (e) {
           return jsonResponse({ status: 'error', detail: (e as Error).message }, 500)
@@ -1633,9 +1636,20 @@ export function installDirectModeInterceptor(): void {
       return Promise.resolve(jsonResponse({ detail: 'Machine detection not available in direct mode' }, 501))
     }
 
-    // ── Backend-only admin routes (explicit 501) ─────────────────────────
+    // ── Backend-only admin routes — return sensible stubs ──────────────
 
-    if (url.match(/\/api\/(update-method|check-updates|restart|tailscale|beta-channel|feedback)/)) {
+    // Settings-adjacent routes that SettingsView loads on mount
+    if (url.match(/\/api\/update-method/)) {
+      return Promise.resolve(jsonResponse({ method: 'manual', can_trigger_update: false }))
+    }
+    if (url.match(/\/api\/tailscale-status/)) {
+      return Promise.resolve(jsonResponse({ enabled: false, installed: false }))
+    }
+    if (url.match(/\/api\/changelog/)) {
+      return Promise.resolve(jsonResponse({ releases: [] }))
+    }
+
+    if (url.match(/\/api\/(check-updates|restart|beta-channel|feedback)/)) {
       return Promise.resolve(jsonResponse({ detail: 'Server administration not available in direct/app mode' }, 501))
     }
 

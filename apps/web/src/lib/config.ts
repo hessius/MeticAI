@@ -1,4 +1,4 @@
-import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from './machineMode';
+import { isDirectMode, isDemoMode } from './machineMode';
 
 /**
  * Configuration loader for application settings
@@ -59,17 +59,13 @@ export async function loadConfig(): Promise<AppConfig> {
 /**
  * Returns the default configuration.
  *
- * In native mode (Capacitor), serverUrl is set to the machine URL
- * so that hooks making API calls (useShotHistory, useMachineTelemetry, etc.)
- * route to the machine instead of the WebView origin.
- *
- * In machine-hosted direct mode (PWA on port 8080), serverUrl stays empty
- * because relative URLs already resolve to the machine.
+ * serverUrl is always empty so that API calls use relative paths.
+ * In native mode (Capacitor), the DirectModeInterceptor catches these
+ * relative URLs and routes them to the machine or provides local stubs.
+ * Returning the machine URL here would create absolute URLs that bypass
+ * the interceptor — causing proxy endpoints to hit the machine directly.
  */
 function getDefaultConfig(): AppConfig {
-  if (isNativePlatform()) {
-    return { serverUrl: getDefaultMachineUrl() };
-  }
   return { serverUrl: '' };
 }
 

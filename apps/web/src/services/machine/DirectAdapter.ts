@@ -96,6 +96,28 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       // the underlying espresso-api client is bound to baseUrl at construction.
       api.connectToSocket()
       setupSocketListeners()
+
+      // Seed initial values that the status event may not include
+      try {
+        const [settingsResp, historyResp] = await Promise.allSettled([
+          api.getSettings(),
+          api.getHistoryShortListing(),
+        ])
+        const initialStatus: Record<string, unknown> = {}
+        if (settingsResp.status === 'fulfilled') {
+          const s = unwrap(settingsResp.value) as MachineSettings
+          if (s.enable_sounds !== undefined) initialStatus.sounds_enabled = s.enable_sounds
+        }
+        if (historyResp.status === 'fulfilled') {
+          const h = unwrap(historyResp.value) as { history?: HistoryListingEntry[] }
+          initialStatus.total_shots = (h.history ?? []).length
+        }
+        if (Object.keys(initialStatus).length > 0) {
+          statusCallbacks.forEach(cb => cb(initialStatus))
+        }
+      } catch {
+        // Non-critical — telemetry will populate these eventually
+      }
     },
     disconnect: () => {
       api.disconnectSocket()
@@ -124,7 +146,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
         return wrapResult(false, (e as Error).message)
       }
     },
-    abortShot: async () => executeRawAction('abort'),
+    abortShot: async () => executeRawAction('stop'),
     continueShot: async () => {
       try {
         await api.executeAction('continue')

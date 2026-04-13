@@ -166,7 +166,7 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
         return discovered
       }
 
-      console.info(`[Discovery] Zeroconf browse found no machines after ${Date.now() - startTime}ms`)
+      console.info(`[Discovery] Zeroconf browse found no machines after ${Date.now() - startTime}ms, falling back to hostname probe`)
     } catch (e) {
       console.warn('[Discovery] Zeroconf plugin not available, falling back to hostname probe:', e)
     }
