@@ -5,7 +5,7 @@
  * Notifications only fire when the app is NOT in the foreground.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
@@ -86,29 +86,42 @@ export function useBrewNotifications() {
     [isNative],
   )
 
+  // Snapshot translated strings so callback identity stays stable across
+  // language changes (prevents effect re-fire in LiveShotView / App.tsx).
+  const strings = useMemo(() => ({
+    brewComplete: t('notifications.brewComplete'),
+    brewCompleteBody: t('notifications.brewCompleteBody', { profile: '{{profile}}' }),
+    machineReady: t('notifications.machineReady'),
+    machineReadyBody: t('notifications.machineReadyBody'),
+    pourOverComplete: t('notifications.pourOverComplete'),
+    pourOverCompleteBody: t('notifications.pourOverCompleteBody'),
+  }), [t])
+  const stringsRef = useRef(strings)
+  stringsRef.current = strings
+
   const notifyBrewComplete = useCallback(
     (profileName: string) =>
       scheduleNotification(
-        t('notifications.brewComplete'),
-        t('notifications.brewCompleteBody', { profile: profileName }),
+        stringsRef.current.brewComplete,
+        stringsRef.current.brewCompleteBody.replace('{{profile}}', profileName),
       ),
-    [scheduleNotification, t],
+    [scheduleNotification],
   )
 
   const notifyPreheatComplete = useCallback(
     () => scheduleNotification(
-      t('notifications.machineReady'),
-      t('notifications.machineReadyBody'),
+      stringsRef.current.machineReady,
+      stringsRef.current.machineReadyBody,
     ),
-    [scheduleNotification, t],
+    [scheduleNotification],
   )
 
   const notifyPourOverComplete = useCallback(
     () => scheduleNotification(
-      t('notifications.pourOverComplete'),
-      t('notifications.pourOverCompleteBody'),
+      stringsRef.current.pourOverComplete,
+      stringsRef.current.pourOverCompleteBody,
     ),
-    [scheduleNotification, t],
+    [scheduleNotification],
   )
 
   return {

@@ -56,8 +56,8 @@
     -webkit-touch-callout: none;
   }
   
-  /* Allow text selection in form inputs */
-  input, textarea, [contenteditable] {
+  /* Allow text selection in form inputs and readable content */
+  input, textarea, [contenteditable], pre, code, .selectable {
     -webkit-user-select: text;
     user-select: text;
   }
