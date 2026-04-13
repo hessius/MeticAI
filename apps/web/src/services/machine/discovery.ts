@@ -114,6 +114,18 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
       console.info('[Discovery] Starting Zeroconf browse for _meticulous._tcp...')
       const ZeroConf = await getZeroConf()
 
+      // Diagnostic: also browse _http._tcp to verify mDNS works at all
+      ZeroConf.watch(
+        { type: '_http._tcp', domain: 'local.' },
+        (result) => {
+          const svc = result.service
+          console.info(
+            `[Discovery][diag] _http._tcp event: action=${result.action} name=${svc?.name} ` +
+            `host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} port=${svc?.port}`
+          )
+        },
+      ).catch((e: unknown) => console.warn('[Discovery][diag] _http._tcp browse failed:', e))
+
       const discovered: DiscoveredMachine[] = []
       let resolveWatch: () => void
       let resolved = false
@@ -175,6 +187,7 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
       try {
         await ZeroConf.unwatch({ type: '_meticulous._tcp', domain: 'local.' })
+        await ZeroConf.unwatch({ type: '_http._tcp', domain: 'local.' }).catch(() => {})
         await ZeroConf.close()
       } catch {
         // cleanup errors are non-fatal
