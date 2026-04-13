@@ -33,7 +33,7 @@ import {
 import { MeticAILogo } from '@/components/MeticAILogo'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { setMachineUrl, isDemoMode, isNativePlatform } from '@/lib/machineMode'
-import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
+import { parseMachineInput, testMachineConnection, discoverMachines, onDiscoveryLog, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
@@ -89,6 +89,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [machineName, setMachineName] = useState('')
   const [discoveredMachines, setDiscoveredMachines] = useState<DiscoveredMachine[]>([])
   const [discovering, setDiscovering] = useState(false)
+  const [discoveryLogs, setDiscoveryLogs] = useState<string[]>([])
+  const discoveryLogRef = useRef<HTMLPreElement>(null)
 
   // User identity
   const [authorName, setAuthorName] = useState(
@@ -130,6 +132,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   useEffect(() => {
     let cancelled = false
     setDiscovering(true)
+    // Subscribe to discovery log events for on-screen debug panel
+    const unsub = onDiscoveryLog((entry) => {
+      if (!cancelled) {
+        setDiscoveryLogs(prev => [...prev, entry])
+      }
+    })
     discoverMachines().then((machines) => {
       if (cancelled) return
       setDiscoveredMachines(machines)
@@ -137,8 +145,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }).catch(() => {
       if (!cancelled) setDiscovering(false)
     })
-    return () => { cancelled = true }
+    return () => { cancelled = true; unsub() }
   }, [])
+
+  // Auto-scroll discovery log
+  useEffect(() => {
+    discoveryLogRef.current?.scrollTo(0, discoveryLogRef.current.scrollHeight)
+  }, [discoveryLogs])
 
   // Auto-fill and test when discovery completes and user reaches machine step
   useEffect(() => {
@@ -300,6 +313,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             </Button>
           ))}
         </div>
+      )}
+
+      {/* Discovery debug log — visible on-screen for diagnostics */}
+      {discoveryLogs.length > 0 && (
+        <details className="text-[10px]">
+          <summary className="text-muted-foreground cursor-pointer select-none">
+            Discovery log ({discoveryLogs.length} entries)
+          </summary>
+          <pre
+            ref={discoveryLogRef}
+            className="mt-1 p-2 bg-muted/50 rounded text-[9px] leading-tight max-h-32 overflow-y-auto font-mono whitespace-pre-wrap break-all"
+          >
+            {discoveryLogs.join('\n')}
+          </pre>
+        </details>
       )}
 
       <div className="space-y-2">
