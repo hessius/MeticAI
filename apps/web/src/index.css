@@ -27,14 +27,12 @@
     position: fixed;
   }
   
-  /* Safe area: top inset on #root pushes content below the status bar.
-     Bottom inset is handled on the content wrapper (not #root) so it
-     only causes scroll when content actually overflows the viewport. */
+  /* Safe area: top and bottom insets are handled on the content wrapper
+     (not #root) so the scroll container extends behind the dynamic island
+     and content can peek through when scrolled. */
   :root {
+    --safe-pt: env(safe-area-inset-top, 0px);
     --safe-pb: calc(1.25rem + env(safe-area-inset-bottom, 0px));
-  }
-  #root {
-    padding-top: env(safe-area-inset-top);
   }
   
   /* Prevent scroll jump when Radix UI dialogs/selects open */

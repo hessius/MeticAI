@@ -44,7 +44,7 @@ import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAuto
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
-import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
+import { useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
@@ -694,6 +694,7 @@ function App() {
   })
 
   const handleViewHistoryEntry = (entry: HistoryEntry, cachedImageUrl?: string) => {
+    document.getElementById('root')?.scrollTo(0, 0)
     setSelectedHistoryEntry(entry)
     setSelectedHistoryImageUrl(cachedImageUrl)
     setViewState('history-detail')
@@ -740,7 +741,9 @@ function App() {
         reply,
         profile_json: profileJson,
       }
-      const imageUrl = profile.display?.image || undefined
+      const imageUrl = (isDirectMode() || isNativePlatform())
+        ? resolveDisplayImage(profile.display?.image) ?? undefined
+        : profile.display?.image || undefined
       previousViewStateRef.current = 'profile-catalogue'
       handleViewHistoryEntry(entry, imageUrl)
     } catch {
@@ -890,7 +893,7 @@ function App() {
         onDismiss={() => setShotBannerDismissed(true)}
       />
 
-      <div className={`flex-1 text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-start pt-5 pb-[var(--safe-pb)] lg:items-center lg:pt-5 lg:pb-[var(--safe-pb)]' : 'items-start pt-3 pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
+      <div className={`flex-1 text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] lg:items-center lg:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         <header>
