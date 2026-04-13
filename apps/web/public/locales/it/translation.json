@@ -28,6 +28,7 @@
     "next": "Avanti",
     "skip": "Salta",
     "noInternetConnection": "Nessuna connessione Internet",
+    "supportProject": "Supporta MeticAI ☕",
     "share": "Condividi",
     "copied": "Copiato!",
     "copy": "Copia"
@@ -398,6 +399,7 @@
     "aboutDescription1": "Quando ho ricevuto il mio Meticulous, dopo un'attesa loooonga, ero sopraffatto dalle opzioni - regolare non era più solo modificare la dimensione della macinatura, il potenziale era (ed è) praticamente illimitato - la mia conoscenza e il mio tempo non altrettanto.",
     "aboutDescription2": "Questo, \"MeticAI\", è un insieme crescente di strumenti AI per consentire a me, e a te, di ottenere il massimo da una macchina espresso Meticulous. Tra le altre cose, ti permette di creare automaticamente profili espresso personalizzati in base alle tue preferenze e al caffè a disposizione, comprendere i tuoi profili espresso e i dati delle estrazioni come mai prima d'ora e, infine, ti permette di scatenare il tuo Meticulous.",
     "viewOnGitHub": "Visualizza su GitHub",
+    "buyMeACoffee": "Offrimi un caffè ☕",
     "configuration": "Configurazione",
     "loadingSettings": "Caricamento impostazioni...",
     "geminiApiKey": "Chiave API Gemini",
@@ -1585,7 +1587,8 @@
       "aiSkipped": "Non configurata",
       "language": "Lingua",
       "startBrewing": "Inizia a preparare",
-      "settingsHint": "Tutte le impostazioni possono essere cambiate nelle Impostazioni."
+      "settingsHint": "Tutte le impostazioni possono essere cambiate nelle Impostazioni.",
+      "supportProject": "Ti piace MeticAI? Offrimi un caffè ☕"
     }
   },
   "demo": {

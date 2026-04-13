@@ -28,10 +28,11 @@ import {
   Monitor,
   User,
   Globe,
+  Heart,
 } from '@phosphor-icons/react'
 import { MeticAILogo } from '@/components/MeticAILogo'
 import { STORAGE_KEYS } from '@/lib/constants'
-import { setMachineUrl } from '@/lib/machineMode'
+import { setMachineUrl, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
@@ -518,6 +519,24 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <Coffee weight="fill" />
         {t('onboarding.complete.startBrewing')}
       </Button>
+
+      {!isDemoMode() && (
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-1"
+          onClick={() => {
+            const url = 'https://buymeacoffee.com/HSUS'
+            if (isNativePlatform()) {
+              import('@capacitor/browser').then(({ Browser }) => Browser.open({ url })).catch(() => window.open(url, '_blank'))
+            } else {
+              window.open(url, '_blank')
+            }
+          }}
+        >
+          <Heart size={14} weight="fill" className="text-red-400" />
+          {t('onboarding.complete.supportProject')}
+        </button>
+      )}
 
       <p className="text-xs text-muted-foreground">
         {t('onboarding.complete.settingsHint')}

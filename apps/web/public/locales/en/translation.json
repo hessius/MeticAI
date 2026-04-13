@@ -30,7 +30,8 @@
     "noInternetConnection": "No internet connection",
     "share": "Share",
     "copied": "Copied!",
-    "copy": "Copy"
+    "copy": "Copy",
+    "supportProject": "Support MeticAI ☕"
   },
   "greetings": {
     "morning": [
@@ -398,6 +399,7 @@
     "aboutDescription1": "When I got my Meticulous, after a loooong wait, I was overwhelmed with the options - dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless - my knowledge and time not so.",
     "aboutDescription2": "This, \"MeticAI\", is a growing set of AI tools to enable me, and you, to get the most out of a Meticulous Espresso machine. Among other things it lets you automatically create espresso profiles tailored to your preferences and coffee at hand, understand your espresso profiles and shot data like never before, and ultimately: lets you unleash your Meticulous.",
     "viewOnGitHub": "View on GitHub",
+    "buyMeACoffee": "Buy Me a Coffee ☕",
     "configuration": "Configuration",
     "loadingSettings": "Loading settings...",
     "geminiApiKey": "Gemini API Key",
@@ -1588,7 +1590,8 @@
       "aiSkipped": "Not configured",
       "language": "Language",
       "startBrewing": "Start Brewing",
-      "settingsHint": "All settings can be changed later in Settings."
+      "settingsHint": "All settings can be changed later in Settings.",
+      "supportProject": "Enjoying MeticAI? Buy me a coffee ☕"
     }
   },
   "demo": {

@@ -30,7 +30,8 @@ import {
   Question,
   Code,
   Info,
-  Rocket
+  Rocket,
+  Heart
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
@@ -801,6 +802,24 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                 <GithubLogo size={18} className="mr-2" weight="bold" />
                 {t('settings.viewOnGitHub')}
               </Button>
+
+              {!isDemoMode() && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    const url = 'https://buymeacoffee.com/HSUS'
+                    if (isNativePlatform()) {
+                      import('@capacitor/browser').then(({ Browser }) => Browser.open({ url })).catch(() => window.open(url, '_blank'))
+                    } else {
+                      window.open(url, '_blank')
+                    }
+                  }}
+                >
+                  <Heart size={18} className="mr-2" weight="fill" />
+                  {t('settings.buyMeACoffee')}
+                </Button>
+              )}
 
               {/* Powered By */}
               <div className="pt-3 border-t border-border/50">

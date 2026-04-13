@@ -30,7 +30,8 @@
     "noInternetConnection": "Ingen internetanslutning",
     "share": "Dela",
     "copied": "Kopierat!",
-    "copy": "Kopiera"
+    "copy": "Kopiera",
+    "supportProject": "Stöd MeticAI ☕"
   },
   "greetings": {
     "morning": [
@@ -398,6 +399,7 @@
     "aboutDescription1": "När jag fick min Meticulous, efter ett lååångt väntetid, blev jag överväldigad av alternativen - att ställa in var inte längre bara att justera malningsgrad, potentialen var (och är) i princip obegränsad - min kunskap och tid inte lika.",
     "aboutDescription2": "Detta, \"MeticAI\", är en växande uppsättning AI-verktyg för att göra det möjligt för mig, och dig, att få ut det mesta av en Meticulous Espresso-maskin. Bland annat låter den dig automatiskt skapa espressoprofiler skräddarsydda för dina preferenser och kaffe till hands, förstå dina espressoprofiler och körningsdata som aldrig förr, och i slutändan: låter dig släppa lös din Meticulous.",
     "viewOnGitHub": "Visa på GitHub",
+    "buyMeACoffee": "Bjud mig på en kaffe ☕",
     "configuration": "Konfiguration",
     "loadingSettings": "Laddar inställningar...",
     "geminiApiKey": "Gemini API-nyckel",
@@ -1585,7 +1587,8 @@
       "aiSkipped": "Ej konfigurerad",
       "language": "Språk",
       "startBrewing": "Börja brygga",
-      "settingsHint": "Alla inställningar kan ändras senare i Inställningar."
+      "settingsHint": "Alla inställningar kan ändras senare i Inställningar.",
+      "supportProject": "Gillar du MeticAI? Bjud mig på en kaffe ☕"
     }
   },
   "demo": {

@@ -1251,6 +1251,20 @@ function App() {
             {/* Mobile Control Center — now rendered inside StartView */}
           </main>
 
+            {/* Desktop-only footer — home view, non-demo */}
+            {isDesktop && isHome && !isDemoMode() && (
+              <footer className="text-center py-4 mt-2">
+                <a
+                  href="https://buymeacoffee.com/HSUS"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                >
+                  {t('common.supportProject')}
+                </a>
+              </footer>
+            )}
+
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (
             <aside className="hidden md:block">
