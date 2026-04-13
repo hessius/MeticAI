@@ -155,14 +155,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   // Auto-fill and test when discovery completes and user reaches machine step
   useEffect(() => {
+    console.error(`[Onboarding] auto-fill check: step=${step} discovering=${discovering} connectionStatus=${connectionStatus} machines=${discoveredMachines.length} machineIp="${machineIp}"`)
     if (step !== 'machine' || discovering || connectionStatus === 'success') return
     if (discoveredMachines.length === 1 && !machineIp.trim()) {
       const machine = discoveredMachines[0]
+      console.error(`[Onboarding] auto-fill: testing ${machine.url}`)
       setMachineIp(machine.host)
       setMachineName(machine.name)
       setConnectionStatus('testing')
       let cancelled = false
       testMachineConnection(machine.url).then((ok) => {
+        console.error(`[Onboarding] auto-fill test result: ok=${ok} cancelled=${cancelled}`)
         if (cancelled) return
         if (ok) {
           setConnectionStatus('success')
@@ -171,6 +174,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         } else {
           setConnectionStatus('idle')
         }
+      }).catch((e) => {
+        console.error(`[Onboarding] auto-fill test error:`, e)
+        if (!cancelled) setConnectionStatus('idle')
       })
       return () => { cancelled = true }
     }

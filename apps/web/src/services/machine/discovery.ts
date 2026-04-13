@@ -177,8 +177,8 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
           if (svc && (result.action === 'added' || result.action === 'resolved')) {
             const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
-            // mDNS advertises port 80 (web UI) but the API is always on 8080
-            const port = 8080
+            // Use mDNS port; the machine's nginx proxies port 80 to the API on 8080
+            const port = svc.port > 0 ? svc.port : 8080
             const existing = discovered.findIndex(d => d.name === svc.name)
             const machine = {
               name: svc.name,
@@ -219,15 +219,11 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
     clearTimeout(timer)
     dlog(`STEP 7: watchDone resolved, discovered=${discovered.length} machines in ${Date.now() - startTime}ms`)
 
-    // Step 8: Cleanup
-    try {
-      await ZeroConf.unwatch({ type: '_meticulous._tcp', domain: 'local.' })
-      await ZeroConf.unwatch({ type: '_http._tcp', domain: 'local.' }).catch(() => {})
-      await ZeroConf.close()
-      dlog('STEP 8: cleanup OK')
-    } catch {
-      dlog('STEP 8: cleanup error (non-fatal)')
-    }
+    // Step 8: Cleanup (fire-and-forget — DO NOT await; unwatch/close can hang)
+    ZeroConf.unwatch({ type: '_meticulous._tcp', domain: 'local.' }).catch(() => {})
+    ZeroConf.unwatch({ type: '_http._tcp', domain: 'local.' }).catch(() => {})
+    ZeroConf.close().catch(() => {})
+    dlog('STEP 8: cleanup dispatched (non-blocking)')
 
     if (discovered.length > 0) {
       dlog(`DONE: found ${discovered.length} machine(s): ${discovered.map(m => m.name).join(', ')}`)
@@ -331,7 +327,7 @@ export function parseMachineInput(input: string): DiscoveredMachine | null {
 export async function testMachineConnection(url: string): Promise<boolean> {
   if (url.toLowerCase() === 'demo') return true
   const probeUrl = `${url}/api/v1/settings`
-  console.info(`[Discovery] Testing connection to ${probeUrl}`)
+  console.error(`[Discovery] Testing connection to ${probeUrl}`)
   try {
     let status: number
 
@@ -350,10 +346,10 @@ export async function testMachineConnection(url: string): Promise<boolean> {
     }
 
     const ok = (status >= 200 && status < 300) || status === 404
-    console.info(`[Discovery] Connection test ${probeUrl} → status ${status}, ok=${ok}`)
+    console.error(`[Discovery] Connection test ${probeUrl} → status ${status}, ok=${ok}`)
     return ok
   } catch (e) {
-    console.warn(`[Discovery] Connection test failed for ${probeUrl}:`, e)
+    console.error(`[Discovery] Connection test failed for ${probeUrl}:`, e)
     return false
   }
 }
