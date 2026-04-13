@@ -146,7 +146,15 @@ export function createDirectAdapter(baseUrl: string): MachineService {
         return wrapResult(false, (e as Error).message)
       }
     },
-    abortShot: async () => executeRawAction('reset'),
+    abortShot: async () => {
+      const result = await executeRawAction('reset')
+      // Clear preheat state so the "preheating" override in telemetry
+      // doesn't keep the UI stuck on "heating" after cancel
+      if (result.success) {
+        statusCallbacks.forEach(cb => cb({ preheat_countdown: 0 }))
+      }
+      return result
+    },
     continueShot: async () => {
       try {
         await api.executeAction('continue')
@@ -174,7 +182,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       }
     },
     homePlunger: async () => executeRawAction('home'),
-    purge: async () => executeRawAction('purge'),
+    purge: async () => executeRawAction('home'),
 
     // -- Configuration commands ---------------------------------------------
     loadProfile: async (name: string) => {

@@ -1094,7 +1094,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <div className="space-y-5">
             {/* ── 1. Weight + Timer + Flow rate (always visible) ── */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
+              <div
+                className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1 cursor-pointer active:bg-secondary/60 transition-colors"
+                onClick={handleTare}
+                role="button"
+                tabIndex={0}
+                aria-label={t('controlCenter.actions.tare')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTare() } }}
+              >
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
                   <Scales size={14} weight="bold" />
                   {t('pourOver.weight')}
