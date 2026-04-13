@@ -128,8 +128,16 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
       ZeroConf.watch(
         { type: '_meticulous._tcp', domain: 'local.' },
         (result) => {
-          if (result.service && (result.action === 'added' || result.action === 'resolved')) {
-            const svc = result.service
+          // Log every event (including removed) so we can see all network traffic
+          const svc = result.service
+          console.info(
+            `[Discovery] Zeroconf event: action=${result.action} name=${svc?.name} ` +
+            `host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ` +
+            `ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} ` +
+            `type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`
+          )
+
+          if (svc && (result.action === 'added' || result.action === 'resolved')) {
             const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
             const port = svc.port || 8080
             const existing = discovered.findIndex(d => d.name === svc.name)
@@ -144,7 +152,7 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
             } else {
               discovered.push(machine)
             }
-            console.info(`[Discovery] Zeroconf ${result.action}: ${svc.name} → ${host}:${port}`)
+            console.info(`[Discovery] Zeroconf matched: ${svc.name} → ${host}:${port}`)
 
             // On first resolved service, give 2s more for additional services then finish
             if (result.action === 'resolved' && discovered.length === 1) {
