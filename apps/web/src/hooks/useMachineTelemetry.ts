@@ -13,6 +13,16 @@ import { useMachineService } from '@/hooks/useMachineService'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { getServerUrl } from '@/lib/config'
 
+// Espresso machines operate 0-120°C. Values outside this range are
+// transient sensor glitches (e.g. 2000°C during state transitions).
+const TEMP_MIN = 0
+const TEMP_MAX = 150
+function clampTemp(val: number | undefined | null, fallback: number | null): number | null {
+  if (val == null) return fallback
+  if (val < TEMP_MIN || val > TEMP_MAX) return fallback
+  return val
+}
+
 // Re-export MachineState for convenience
 export type { MachineState } from '@/hooks/useWebSocket'
 
@@ -119,8 +129,8 @@ function useDirectTelemetry(enabled: boolean): MachineState {
           connected: true,
           _wsConnected: true,
           availability: 'online',
-          boiler_temperature: data.sensors?.t ?? prev.boiler_temperature,
-          brew_head_temperature: data.sensors?.t ?? prev.brew_head_temperature,
+          boiler_temperature: clampTemp(data.sensors?.t, prev.boiler_temperature),
+          brew_head_temperature: clampTemp(data.sensors?.t, prev.brew_head_temperature),
           pressure: data.sensors?.p ?? prev.pressure,
           flow_rate: data.sensors?.f ?? prev.flow_rate,
           shot_weight: data.sensors?.w ?? prev.shot_weight,
@@ -133,7 +143,7 @@ function useDirectTelemetry(enabled: boolean): MachineState {
             : (data.name || data.state || prev.state),
           brewing: data.extracting ?? prev.brewing,
           active_profile: profileName,
-          target_temperature: data.setpoints?.temperature ?? prev.target_temperature,
+          target_temperature: clampTemp(data.setpoints?.temperature, prev.target_temperature),
           target_weight: prev.target_weight,
           _ts: Date.now(),
           _stale: false,
@@ -226,9 +236,9 @@ function useProxyTelemetry(enabled: boolean): MachineState {
             ...prev,
             connected: msg.connected ?? prev.connected,
             availability: msg.availability ?? prev.availability,
-            boiler_temperature: msg.boiler_temperature ?? prev.boiler_temperature,
-            brew_head_temperature: msg.brew_head_temperature ?? prev.brew_head_temperature,
-            target_temperature: msg.target_temperature ?? prev.target_temperature,
+            boiler_temperature: clampTemp(msg.boiler_temperature, prev.boiler_temperature),
+            brew_head_temperature: clampTemp(msg.brew_head_temperature, prev.brew_head_temperature),
+            target_temperature: clampTemp(msg.target_temperature, prev.target_temperature),
             brewing: msg.brewing ?? prev.brewing,
             state: msg.state ?? prev.state,
             pressure: msg.pressure ?? prev.pressure,
