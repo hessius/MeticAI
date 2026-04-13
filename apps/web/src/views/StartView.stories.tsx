@@ -39,17 +39,23 @@ const meta = {
       control: 'number',
       description: 'Number of saved profiles (null if not loaded)',
     },
-    onGenerateNew: {
-      description: 'Callback when "Generate New Profile" is clicked',
+    onAddProfile: {
+      description: 'Callback when "Add Profile" is clicked',
     },
     onViewHistory: {
-      description: 'Callback when "Profile Catalogue" is clicked',
+      description: 'Callback when "View History" is clicked',
     },
     onRunShot: {
       description: 'Callback when "Run / Schedule" is clicked',
     },
-    onSettings: {
-      description: 'Callback when "Settings" is clicked',
+    onDialIn: {
+      description: 'Callback when "Dial In" is clicked',
+    },
+    onPourOver: {
+      description: 'Callback when "Pour Over" is clicked',
+    },
+    onShotAnalysis: {
+      description: 'Callback when "Shot Analysis" is clicked',
     },
   },
 } satisfies Meta<typeof StartView>;
@@ -63,12 +69,12 @@ type Story = StoryObj<typeof meta>;
 export const NoProfiles: Story = {
   args: {
     profileCount: 0,
-    onGenerateNew: () => console.log('Generate new clicked'),
+    onAddProfile: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
     onShotAnalysis: () => console.log('Shot analysis clicked'),
-    onSettings: () => console.log('Settings clicked'),
+    onDialIn: () => console.log('Dial in clicked'),
   },
 };
 
@@ -78,12 +84,12 @@ export const NoProfiles: Story = {
 export const WithProfiles: Story = {
   args: {
     profileCount: 12,
-    onGenerateNew: () => console.log('Generate new clicked'),
+    onAddProfile: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
     onShotAnalysis: () => console.log('Shot analysis clicked'),
-    onSettings: () => console.log('Settings clicked'),
+    onDialIn: () => console.log('Dial in clicked'),
   },
 };
 
@@ -93,12 +99,12 @@ export const WithProfiles: Story = {
 export const SingleProfile: Story = {
   args: {
     profileCount: 1,
-    onGenerateNew: () => console.log('Generate new clicked'),
+    onAddProfile: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
     onShotAnalysis: () => console.log('Shot analysis clicked'),
-    onSettings: () => console.log('Settings clicked'),
+    onDialIn: () => console.log('Dial in clicked'),
   },
 };
 
@@ -108,11 +114,11 @@ export const SingleProfile: Story = {
 export const Loading: Story = {
   args: {
     profileCount: null,
-    onGenerateNew: () => console.log('Generate new clicked'),
+    onAddProfile: () => console.log('Generate new clicked'),
     onViewHistory: () => console.log('View history clicked'),
     onRunShot: () => console.log('Run shot clicked'),
     onPourOver: () => console.log('Pour over clicked'),
     onShotAnalysis: () => console.log('Shot analysis clicked'),
-    onSettings: () => console.log('Settings clicked'),
+    onDialIn: () => console.log('Dial in clicked'),
   },
 };

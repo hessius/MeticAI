@@ -140,7 +140,7 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
     // Step 3: Set up discovery state
     const discovered: DiscoveredMachine[] = []
-    let resolveWatch: () => void
+    let resolveWatch!: () => void
     let resolved = false
     const watchDone = new Promise<void>((resolve) => {
       resolveWatch = () => { if (!resolved) { resolved = true; resolve() } }

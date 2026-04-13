@@ -150,7 +150,7 @@ export function createMeticAIAdapter(): MachineService {
         `${base}/api/shots/dates`
       )
       // Backend returns date strings; map to minimal HistoryListingEntry shape
-      return (resp.dates ?? []).map(d => ({ date: d }) as HistoryListingEntry)
+      return (resp.dates ?? []).map(d => ({ date: d }) as unknown as HistoryListingEntry)
     },
     getLastShot: async () => {
       const base = await getServerUrl()

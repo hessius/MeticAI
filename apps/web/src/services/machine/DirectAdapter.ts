@@ -24,6 +24,7 @@ import type {
   DeviceInfo,
   HistoryListingEntry,
   Settings as MachineSettings,
+  StatusData,
 } from '@meticulous-home/espresso-api'
 
 // ---------------------------------------------------------------------------
@@ -113,7 +114,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
           initialStatus.total_shots = Array.isArray(h.history) ? h.history.length : 0
         }
         if (Object.keys(initialStatus).length > 0) {
-          statusCallbacks.forEach(cb => cb(initialStatus))
+          statusCallbacks.forEach(cb => cb(initialStatus as unknown as StatusData))
         }
       } catch {
         // Non-critical — telemetry will populate these eventually
@@ -151,7 +152,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       // Clear preheat state so the "preheating" override in telemetry
       // doesn't keep the UI stuck on "heating" after cancel
       if (result.success) {
-        statusCallbacks.forEach(cb => cb({ preheat_countdown: 0 }))
+        statusCallbacks.forEach(cb => cb({ preheat_countdown: 0 } as unknown as StatusData))
       }
       return result
     },
@@ -216,7 +217,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       try {
         await api.updateSetting({ enable_sounds: _enabled })
         // Optimistic UI update — machine may not echo sounds_enabled in status events
-        statusCallbacks.forEach(cb => cb({ sounds_enabled: _enabled }))
+        statusCallbacks.forEach(cb => cb({ sounds_enabled: _enabled } as unknown as StatusData))
         return wrapResult(true)
       } catch (e) {
         return wrapResult(false, (e as Error).message)
