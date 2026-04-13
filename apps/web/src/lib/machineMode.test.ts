@@ -1,5 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
+// Node.js v22+ ships a built-in localStorage that shadows happy-dom's mock
+// when --localstorage-file is not set. Provide a functional in-memory shim.
+const localStorageShim = (() => {
+  let store: Record<string, string> = {}
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = String(value) },
+    removeItem: (key: string) => { delete store[key] },
+    clear: () => { store = {} },
+    get length() { return Object.keys(store).length },
+    key: (i: number) => Object.keys(store)[i] ?? null,
+  }
+})()
+
+vi.stubGlobal('localStorage', localStorageShim)
+
 describe('machineMode', () => {
   const originalLocation = window.location
 
@@ -7,6 +23,7 @@ describe('machineMode', () => {
     vi.resetModules()
     // Clear any lingering Capacitor stub
     delete (window as Record<string, unknown>).Capacitor
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -247,6 +264,18 @@ describe('machineMode', () => {
       const { setMachineUrl } = await import('@/lib/machineMode')
       setMachineUrl('http://192.168.1.100:8080')
       expect(localStorage.getItem('meticai-machine-url')).toBe('http://192.168.1.100:8080')
+    })
+
+    it('should dispatch machine-url-changed event', async () => {
+      const { setMachineUrl } = await import('@/lib/machineMode')
+      const handler = vi.fn()
+      window.addEventListener('machine-url-changed', handler)
+      try {
+        setMachineUrl('http://192.168.1.100:8080')
+        expect(handler).toHaveBeenCalledOnce()
+      } finally {
+        window.removeEventListener('machine-url-changed', handler)
+      }
     })
   })
 })
