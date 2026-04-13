@@ -4,14 +4,23 @@
 #
 # The Capacitor xcframework's swiftinterface gates these APIs behind
 # #if $NonescapableTypes (Swift 6.1 / Xcode 16.3+):
-#   getString(_:) -> String?       →  call.options["key"] as? String
-#   getBool(_:) -> Bool?           →  call.options["key"] as? Bool
-#   getInt(_:) -> Int?             →  call.options["key"] as? Int  (single-arg only)
-#   getArray(_:) -> JSArray?       →  call.options["key"] as? [Any]
-#   getObject(_:) -> JSObject?     →  call.options["key"] as? [String: Any]
-#   reject(...)                    →  unimplemented(...)
+#   getString(_:) -> String?             →  call.options["key"] as? String
+#   getBool(_:) -> Bool?                 →  call.options["key"] as? Bool
+#   getInt(_:) -> Int?                   →  call.options["key"] as? Int
+#   getFloat(_:) -> Float?              →  call.options["key"] as? Float
+#   getDouble(_:) -> Double?            →  call.options["key"] as? Double
+#   getArray(_:) -> JSArray?             →  call.options["key"] as? [Any]
+#   getArray(_:, _:.self) -> [T]?        →  call.options["key"] as? [T]
+#   getObject(_:) -> JSObject?           →  call.options["key"] as? [String: Any]
+#   reject(...)                          →  unimplemented(first-arg-only)
+#   bridge?.viewController               →  KVC via NSObject cast
+#   UIColor.capacitor.color(fromHex:)    →  inline hex parser
+#   Data.capacitor.data(base64Encoded..) →  inline base64 parser
+#   JSTypes.coerceDictionaryToJSObject   →  as? JSObject
+#   bridge?.localURL(fromWebURL:)        →  NSObject perform selector
 #
-# Two-argument versions (e.g. getString("k","default")) are NOT gated and stay.
+# Also handles constant args (kKey) not just string literals ("key").
+# Two-argument versions (e.g. getString("k","default")) are NOT gated.
 #
 # Safe to run multiple times (idempotent).
 
@@ -29,7 +38,7 @@ patch_swift_file() {
     [ -f "$FILE" ] || return 0
 
     # Quick idempotency check: skip if no gated calls remain
-    if ! grep -qE 'call\.(getString|getBool|getInt|getArray|getObject)\("[^"]*"\)[^,]|call\.reject\(' "$FILE" 2>/dev/null; then
+    if ! grep -qE 'call\.(getString|getBool|getInt|getFloat|getDouble|getArray|getObject)\([^,)]*\)[^,]|call\.reject\(|bridge\?\.viewController|UIColor\.capacitor\.color|Data\.capacitor\.data|JSTypes\.coerce|bridge\?\.localURL' "$FILE" 2>/dev/null; then
         echo "  Already patched: $(basename "$FILE")"
         return 0
     fi
@@ -43,33 +52,28 @@ with open(path, 'r') as f:
 
 original = content
 
-# Single-arg getString("key") → call.options["key"] as? String
-# Must NOT match two-arg getString("key", defaultValue)
-content = re.sub(
-    r'call\.getString\("([^"]*)"\)(?!\s*,|\s*\))',
-    r'call.options["\1"] as? String',
-    content
-)
-# Handle getString("key") at end of statement or in guard/if-let
-content = re.sub(
-    r'call\.getString\("([^"]*)"\)',
-    r'call.options["\1"] as? String',
-    content
-)
-
-# Single-arg getBool("key") → call.options["key"] as? Bool
-content = re.sub(
-    r'call\.getBool\("([^"]*)"\)(?!\s*,)',
-    r'call.options["\1"] as? Bool',
-    content
-)
-
-# Single-arg getInt("key") → call.options["key"] as? Int
-content = re.sub(
-    r'call\.getInt\("([^"]*)"\)(?!\s*,)',
-    r'call.options["\1"] as? Int',
-    content
-)
+# --- getString, getBool, getInt, getFloat, getDouble: single-arg only ---
+# Match both string literals ("key") and constants (kKey, myVar)
+# Must NOT match two-arg versions (with comma before close paren at same depth)
+for method, swift_type in [
+    ('getString', 'String'),
+    ('getBool', 'Bool'),
+    ('getInt', 'Int'),
+    ('getFloat', 'Float'),
+    ('getDouble', 'Double'),
+]:
+    # String literal arg: call.method("key") -> call.options["key"] as? Type
+    content = re.sub(
+        r'call\.' + method + r'\("([^"]*)"\)',
+        r'(call.options["\1"] as? ' + swift_type + ')',
+        content
+    )
+    # Constant arg: call.method(kConst) -> call.options[kConst] as? Type
+    content = re.sub(
+        r'call\.' + method + r'\(([a-zA-Z_]\w*)\)',
+        r'(call.options[\1] as? ' + swift_type + ')',
+        content
+    )
 
 # Single-arg getArray("key") (no type param) → call.options["key"] as? [Any]
 content = re.sub(
@@ -81,14 +85,83 @@ content = re.sub(
 # getArray("key", Type.self) → call.options["key"] as? [Type]
 content = re.sub(
     r'call\.getArray\("([^"]*)",\s*(\w+)\.self\)',
-    r'call.options["\1"] as? [\2]',
+    r'(call.options["\1"] as? [\2])',
+    content
+)
+
+# Single-arg getArray("key") → call.options["key"] as? [Any]
+content = re.sub(
+    r'call\.getArray\("([^"]*)"\)',
+    r'(call.options["\1"] as? [Any])',
     content
 )
 
 # Single-arg getObject("key") → call.options["key"] as? [String: Any]
 content = re.sub(
     r'call\.getObject\("([^"]*)"\)',
-    r'call.options["\1"] as? [String: Any]',
+    r'(call.options["\1"] as? [String: Any])',
+    content
+)
+
+# JSTypes.coerceDictionaryToJSObject(dict) → dict as? JSObject
+content = re.sub(
+    r'JSTypes\.coerceDictionaryToJSObject\(([^)]+)\)',
+    r'\1 as? JSObject',
+    content
+)
+
+# UIColor.capacitor.color(fromHex: expr) → colorFromHex(expr)
+# Also inject helper function if needed
+if 'UIColor.capacitor.color(fromHex:' in content:
+    helper = '''
+private func colorFromHex(_ hex: String) -> UIColor? {
+    var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+    hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+    var rgb: UInt64 = 0
+    guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
+    let r = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
+    let g = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
+    let b = CGFloat(rgb & 0x0000FF) / 255.0
+    return UIColor(red: r, green: g, blue: b, alpha: 1.0)
+}
+'''
+    content = re.sub(
+        r'UIColor\.capacitor\.color\(fromHex:\s*([^)]+)\)',
+        r'colorFromHex(\1)',
+        content
+    )
+    # Inject helper after last import line
+    import_end = 0
+    for m in re.finditer(r'^import .+$', content, re.MULTILINE):
+        import_end = m.end()
+    if import_end > 0 and 'func colorFromHex' not in content:
+        content = content[:import_end] + '\n' + helper + content[import_end:]
+
+# Data.capacitor.data(base64EncodedOrDataUrl: str) → decodeBase64OrDataUrl(str)
+if 'Data.capacitor.data(base64EncodedOrDataUrl:' in content:
+    helper2 = '''
+private func decodeBase64OrDataUrl(_ string: String) -> Data? {
+    if let range = string.range(of: ";base64,") {
+        return Data(base64Encoded: String(string[range.upperBound...]))
+    }
+    return Data(base64Encoded: string)
+}
+'''
+    content = re.sub(
+        r'Data\.capacitor\.data\(base64EncodedOrDataUrl:\s*([^)]+)\)',
+        r'decodeBase64OrDataUrl(\1)',
+        content
+    )
+    import_end = 0
+    for m in re.finditer(r'^import .+$', content, re.MULTILINE):
+        import_end = m.end()
+    if import_end > 0 and 'func decodeBase64OrDataUrl' not in content:
+        content = content[:import_end] + '\n' + helper2 + content[import_end:]
+
+# bridge?.localURL(fromWebURL: url) → KVC via NSObject
+content = re.sub(
+    r'bridge\?\.localURL\(fromWebURL:\s*([^)]+)\)',
+    r'(bridge as? NSObject)?.perform(NSSelectorFromString("localURLFromWebURL:"), with: \1)?.takeUnretainedValue() as? URL',
     content
 )
 
@@ -155,6 +228,11 @@ def patch_reject_calls(text):
     return ''.join(result)
 
 content = patch_reject_calls(content)
+
+# bridge?.viewController → KVC via NSObject cast (gated behind NonescapableTypes)
+content = re.sub(
+    r'(\bself\?\.)bridge\?\.viewController',
+    r'((\1bridge as? NSObject)?.value(forKey: "viewController") as? UIViewController)',
     content
 )
 
