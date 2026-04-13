@@ -10,11 +10,13 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: true,
   },
   ios: {
-    // Match the dark theme background so overscroll bounce doesn't show white
-    backgroundColor: '#151413',
+    // Match the dark theme background so safe area edges blend seamlessly
+    backgroundColor: '#030202',
     allowsLinkPreview: false,
-    contentInset: 'automatic',
+    // Let CSS env(safe-area-inset-*) handle all insets — disable native adjustment
+    contentInset: 'never',
     limitsNavigationsToAppBoundDomains: false,
+    scrollEnabled: false,
   },
   plugins: {
     Camera: {
