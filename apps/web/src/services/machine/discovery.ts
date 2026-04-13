@@ -177,7 +177,8 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
           if (svc && (result.action === 'added' || result.action === 'resolved')) {
             const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
-            const port = svc.port || 8080
+            // mDNS advertises port 80 (web UI) but the API is always on 8080
+            const port = 8080
             const existing = discovered.findIndex(d => d.name === svc.name)
             const machine = {
               name: svc.name,
