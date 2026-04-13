@@ -116,19 +116,22 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
       const discovered: DiscoveredMachine[] = []
       let resolveWatch: () => void
+      let resolved = false
 
       const watchDone = new Promise<void>((resolve) => {
-        resolveWatch = resolve
+        resolveWatch = () => { if (!resolved) { resolved = true; resolve() } }
       })
 
-      await ZeroConf.watch(
+      // Fire-and-forget: do NOT await watch() — the native plugin only
+      // resolves its promise on the first discovery event, so awaiting it
+      // would hang indefinitely when no machines are on the network.
+      ZeroConf.watch(
         { type: '_meticulous._tcp', domain: 'local.' },
         (result) => {
           if (result.service && (result.action === 'added' || result.action === 'resolved')) {
             const svc = result.service
             const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
             const port = svc.port || 8080
-            // Update existing entry if we already have this service (added→resolved)
             const existing = discovered.findIndex(d => d.name === svc.name)
             const machine = {
               name: svc.name,
@@ -142,12 +145,23 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
               discovered.push(machine)
             }
             console.info(`[Discovery] Zeroconf ${result.action}: ${svc.name} → ${host}:${port}`)
+
+            // On first resolved service, give 2s more for additional services then finish
+            if (result.action === 'resolved' && discovered.length === 1) {
+              setTimeout(() => resolveWatch(), 2000)
+            }
           }
         },
-      )
+      ).catch((e: unknown) => {
+        console.warn('[Discovery] Zeroconf watch() rejected:', e)
+        resolveWatch()
+      })
 
       // Browse for up to 10s — mDNS resolution can take several seconds per service
-      const timer = setTimeout(() => resolveWatch(), 10000)
+      const timer = setTimeout(() => {
+        console.info(`[Discovery] Zeroconf browse timed out after 10s`)
+        resolveWatch()
+      }, 10000)
       await watchDone
       clearTimeout(timer)
 
@@ -172,9 +186,14 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
     }
   }
 
-  // Step 2: Fallback — probe known hostnames
+  // Step 2: Fallback — probe known hostnames in parallel.
+  // The machine hostname is randomized (e.g. meticulous-a3f7.local) but
+  // some installations use the default "meticulous.local".
   console.info('[Discovery] Probing known hostnames...')
-  const probeUrls = ['http://meticulous.local:8080']
+  const probeUrls = [
+    'http://meticulous.local:8080',
+    'http://meticulous-home.local:8080',
+  ]
 
   const results = await Promise.all(probeUrls.map(probeMachine))
   const seen = new Set<string>()

@@ -130,7 +130,7 @@ describe('discovery', () => {
         new Response('{}', { status: 200 }),
       )
       const machines = await discoverMachines()
-      expect(machines).toHaveLength(1)
+      expect(machines.length).toBeGreaterThanOrEqual(1)
       expect(machines[0].host).toBe('meticulous.local')
       expect(machines[0].port).toBe(8080)
     })
@@ -140,7 +140,7 @@ describe('discovery', () => {
         new Response('', { status: 404 }),
       )
       const machines = await discoverMachines()
-      expect(machines).toHaveLength(1)
+      expect(machines.length).toBeGreaterThanOrEqual(1)
       expect(machines[0].host).toBe('meticulous.local')
     })
 
