@@ -890,7 +890,7 @@ function App() {
         onDismiss={() => setShotBannerDismissed(true)}
       />
 
-      <div className={`min-h-screen text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-start pt-5 pb-5 lg:items-center lg:py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
+      <div className={`flex-1 text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-start pt-5 pb-[var(--safe-pb)] lg:items-center lg:pt-5 lg:pb-[var(--safe-pb)]' : 'items-start pt-3 pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         <header>

@@ -27,11 +27,14 @@
     position: fixed;
   }
   
-  /* Safe area insets on #root so the app background fills edge-to-edge
-     (no white gap at top or black band at bottom) */
+  /* Safe area: top inset on #root pushes content below the status bar.
+     Bottom inset is handled on the content wrapper (not #root) so it
+     only causes scroll when content actually overflows the viewport. */
+  :root {
+    --safe-pb: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
   #root {
     padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
   }
   
   /* Prevent scroll jump when Radix UI dialogs/selects open */
@@ -42,6 +45,8 @@
   }
   
   #root {
+    display: flex;
+    flex-direction: column;
     width: 100%;
     max-width: 100vw;
     overflow-x: hidden;
