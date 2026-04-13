@@ -119,10 +119,12 @@ export function getDefaultMachineUrl(): string {
 /**
  * Persist the machine URL for future sessions.
  * Used by machine discovery, QR scanning, and manual IP entry.
+ * Dispatches 'machine-url-changed' so MachineServiceProvider reconnects.
  */
 export function setMachineUrl(url: string): void {
   try {
     localStorage.setItem(STORAGE_KEYS.MACHINE_URL, url)
+    window.dispatchEvent(new Event('machine-url-changed'))
   } catch { /* noop */ }
 }
 

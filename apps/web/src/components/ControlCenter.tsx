@@ -33,8 +33,8 @@ import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode } from '@/lib/machineMode'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,6 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
-  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
   const { impact } = useHaptics()
@@ -116,10 +115,12 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     !machineState.active_profile.startsWith('MeticAI '))
     ? machineState.active_profile : null
 
+  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
+  const profileImgUrl = useProfileImageSrc(activeProfile)
+
   // Reset dependent state when active profile is cleared
   useEffect(() => {
     if (!activeProfile) {
-      setProfileImgUrl(null)
       setProfileImgError(false)
       setProfileAuthor(null)
     }
@@ -131,16 +132,12 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       return
     }
     ;(async () => {
-      const base = await getServerUrl()
       if (!cancelled) {
-        // In direct mode, no AI-generated profile images exist
-        if (!isDirectMode()) {
-          setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
-        }
         setProfileImgError(false)
       }
       // Fetch profile author from machine profiles
       try {
+        const base = await getServerUrl()
         const res = await fetch(`${base}/api/machine/profiles`)
         if (res.ok && !cancelled) {
           const data = await res.json()

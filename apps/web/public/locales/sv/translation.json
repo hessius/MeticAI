@@ -31,7 +31,7 @@
     "share": "Dela",
     "copied": "Kopierat!",
     "copy": "Kopiera",
-    "supportProject": "Stöd MeticAI ☕"
+    "supportProject": "Överväg att stödja MeticAI ☕"
   },
   "greetings": {
     "morning": [
@@ -399,7 +399,7 @@
     "aboutDescription1": "När jag fick min Meticulous, efter ett lååångt väntetid, blev jag överväldigad av alternativen - att ställa in var inte längre bara att justera malningsgrad, potentialen var (och är) i princip obegränsad - min kunskap och tid inte lika.",
     "aboutDescription2": "Detta, \"MeticAI\", är en växande uppsättning AI-verktyg för att göra det möjligt för mig, och dig, att få ut det mesta av en Meticulous Espresso-maskin. Bland annat låter den dig automatiskt skapa espressoprofiler skräddarsydda för dina preferenser och kaffe till hands, förstå dina espressoprofiler och körningsdata som aldrig förr, och i slutändan: låter dig släppa lös din Meticulous.",
     "viewOnGitHub": "Visa på GitHub",
-    "buyMeACoffee": "Bjud mig på en kaffe ☕",
+    "buyMeACoffee": "Överväg att bjuda mig på en kaffe ☕",
     "configuration": "Konfiguration",
     "loadingSettings": "Laddar inställningar...",
     "geminiApiKey": "Gemini API-nyckel",
@@ -1547,7 +1547,8 @@
       "foundMachines": "Maskiner hittade på ditt nätverk",
       "autoDiscovered": "Maskin hittad automatiskt!",
       "connectButton": "Anslut",
-      "ipDescription": "Ange en IP-adress (t.ex. 192.168.1.42) eller värdnamn. Värdnamnet är slumpmässigt men innehåller alltid \"meticulous\" (t.ex. meticulous-a3f7.local)."
+      "ipDescription": "Ange en IP-adress (t.ex. 192.168.1.42) eller värdnamn. Värdnamnet är slumpmässigt men innehåller alltid \"meticulous\" (t.ex. meticulous-a3f7.local).",
+      "configureManually": "Konfigurera manuellt"
     },
     "name": {
       "title": "Vad heter du?",
@@ -1588,7 +1589,7 @@
       "language": "Språk",
       "startBrewing": "Börja brygga",
       "settingsHint": "Alla inställningar kan ändras senare i Inställningar.",
-      "supportProject": "Gillar du MeticAI? Bjud mig på en kaffe ☕"
+      "supportProject": "Gillar du MeticAI? Överväg att bjuda mig på en kaffe ☕"
     }
   },
   "demo": {

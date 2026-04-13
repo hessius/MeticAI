@@ -48,10 +48,10 @@ import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
 import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode } from '@/lib/machineMode'
 import { relativeTime } from '@/lib/timeUtils'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useActionSheet } from '@/hooks/useActionSheet'
+import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { Capacitor } from '@capacitor/core'
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,6 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   const [brightnessValue, setBrightnessValue] = useState<number>(
     machineState.brightness ?? 75,
   )
-  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
   const [profilesLoaded, setProfilesLoaded] = useState(false)
@@ -93,23 +92,13 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     !machineState.active_profile.startsWith('MeticAI '))
     ? machineState.active_profile : null
 
+  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
+  const profileImgUrl = useProfileImageSrc(activeProfile)
+
   useEffect(() => {
-    let cancelled = false
     if (!activeProfile) {
-      setProfileImgUrl(null)
       setProfileImgError(false)
-      return
     }
-    ;(async () => {
-      const base = await getServerUrl()
-      if (!cancelled) {
-        if (!isDirectMode()) {
-          setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
-        }
-        setProfileImgError(false)
-      }
-    })()
-    return () => { cancelled = true }
   }, [activeProfile])
 
   // Fetch machine profiles once when expanded

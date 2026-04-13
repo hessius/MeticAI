@@ -26,6 +26,8 @@ import {
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { extractTagsFromPreferences, getAllTagsFromEntries, getTagColorClass } from '@/lib/tags'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
@@ -790,7 +792,12 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                   >
                     <div className="flex items-start gap-4">
                       {/* Profile image — prefer machine's direct URL over image-proxy cache */}
-                      <ProfileImage imageUrl={profile.display?.image ?? getImageUrl(profile.name) ?? undefined} />
+                      <ProfileImage imageUrl={
+                        ((isDirectMode() || isNativePlatform())
+                          ? resolveDisplayImage(profile.display?.image)
+                          : profile.display?.image
+                        ) ?? getImageUrl(profile.name) ?? undefined
+                      } />
                       
                       {/* Profile info */}
                       <div className="flex-1 min-w-0">

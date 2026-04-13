@@ -52,7 +52,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode } from '@/lib/machineMode'
+import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -108,7 +108,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
-  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+
+  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
+  const profileImgUrl = useProfileImageSrc(ms.active_profile)
 
   // Keep screen awake during live shot view
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
@@ -137,11 +139,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 
     const fetchData = async () => {
       const base = await getServerUrl()
-
-      // Build profile image URL (not available in direct mode)
-      if (!isDirectMode()) {
-        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(profileName!)}/image-proxy`)
-      }
 
       // Fetch target curves
       try {

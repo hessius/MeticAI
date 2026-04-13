@@ -31,7 +31,7 @@
     "share": "Share",
     "copied": "Copied!",
     "copy": "Copy",
-    "supportProject": "Support MeticAI ☕"
+    "supportProject": "Consider supporting MeticAI ☕"
   },
   "greetings": {
     "morning": [
@@ -399,7 +399,7 @@
     "aboutDescription1": "When I got my Meticulous, after a loooong wait, I was overwhelmed with the options - dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless - my knowledge and time not so.",
     "aboutDescription2": "This, \"MeticAI\", is a growing set of AI tools to enable me, and you, to get the most out of a Meticulous Espresso machine. Among other things it lets you automatically create espresso profiles tailored to your preferences and coffee at hand, understand your espresso profiles and shot data like never before, and ultimately: lets you unleash your Meticulous.",
     "viewOnGitHub": "View on GitHub",
-    "buyMeACoffee": "Buy Me a Coffee ☕",
+    "buyMeACoffee": "Consider Buying Me a Coffee ☕",
     "configuration": "Configuration",
     "loadingSettings": "Loading settings...",
     "geminiApiKey": "Gemini API Key",
@@ -1550,7 +1550,8 @@
       "noMachinesFound": "No machines found on your network. Enter the IP address manually.",
       "autoDiscovered": "Machine found automatically!",
       "connectButton": "Connect",
-      "ipDescription": "Enter an IP address (e.g. 192.168.1.42) or hostname. The hostname is randomized but always contains \"meticulous\" (e.g. meticulous-a3f7.local)."
+      "ipDescription": "Enter an IP address (e.g. 192.168.1.42) or hostname. The hostname is randomized but always contains \"meticulous\" (e.g. meticulous-a3f7.local).",
+      "configureManually": "Configure manually"
     },
     "name": {
       "title": "What's Your Name?",
@@ -1591,7 +1592,7 @@
       "language": "Language",
       "startBrewing": "Start Brewing",
       "settingsHint": "All settings can be changed later in Settings.",
-      "supportProject": "Enjoying MeticAI? Buy me a coffee ☕"
+      "supportProject": "Enjoying MeticAI? Consider buying me a coffee ☕"
     }
   },
   "demo": {

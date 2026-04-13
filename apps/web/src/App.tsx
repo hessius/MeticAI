@@ -44,6 +44,7 @@ import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAuto
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
+import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
@@ -134,15 +135,17 @@ function App() {
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
-  const [liveProfileImageUrl, setLiveProfileImageUrl] = useState<string | null>(null)
   const liveProfileFetchedRef = useRef<string | null>(null)
+
+  // Resolve profile image for the desktop right-column header
+  const liveProfileName = viewState === 'live-shot' ? machineState.active_profile : null
+  const liveProfileImageUrl = useProfileImageSrc(liveProfileName)
 
   // Fetch full profile data (with stages) when in live-shot view
   useEffect(() => {
     if (viewState !== 'live-shot') {
       liveProfileFetchedRef.current = null
       setLiveProfileData(null)
-      setLiveProfileImageUrl(null)
       return
     }
     const profileName = machineState.active_profile
@@ -158,10 +161,6 @@ function App() {
         const data = await r.json()
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
-        }
-        // Build image URL (not available in direct or demo mode — no AI-generated images)
-        if (!isDirectMode() && !isDemoMode()) {
-          setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
         }
       } catch { /* non-critical */ }
     })()

@@ -28,7 +28,7 @@
     "next": "Siguiente",
     "skip": "Omitir",
     "noInternetConnection": "Sin conexión a Internet",
-    "supportProject": "Apoya MeticAI ☕",
+    "supportProject": "Considera apoyar MeticAI ☕",
     "share": "Compartir",
     "copied": "¡Copiado!",
     "copy": "Copiar"
@@ -399,7 +399,7 @@
     "aboutDescription1": "Cuando obtuve mi Meticulous, después de una laaaarga espera, me sentí abrumado con las opciones - ajustar ya no era solo ajustar el tamaño de molienda, el potencial era (y es) básicamente ilimitado - mi conocimiento y tiempo no tanto.",
     "aboutDescription2": "Esto, \"MeticAI\", es un conjunto creciente de herramientas de IA para permitirme a mí, y a ti, sacar el máximo provecho de una máquina de espresso Meticulous. Entre otras cosas, te permite crear automáticamente perfiles de espresso adaptados a tus preferencias y café disponible, comprender tus perfiles de espresso y datos de disparos como nunca antes y, en última instancia, te permite liberar tu Meticulous.",
     "viewOnGitHub": "Ver en GitHub",
-    "buyMeACoffee": "Invítame a un café ☕",
+    "buyMeACoffee": "Considera invitarme a un café ☕",
     "configuration": "Configuración",
     "loadingSettings": "Cargando configuración...",
     "geminiApiKey": "Clave API de Gemini",
@@ -1547,7 +1547,8 @@
       "foundMachines": "Máquinas encontradas en tu red",
       "autoDiscovered": "¡Máquina encontrada automáticamente!",
       "connectButton": "Conectar",
-      "ipDescription": "Ingrese una dirección IP (ej. 192.168.1.42) o nombre de host. El nombre de host es aleatorio pero siempre contiene \"meticulous\" (ej. meticulous-a3f7.local)."
+      "ipDescription": "Ingrese una dirección IP (ej. 192.168.1.42) o nombre de host. El nombre de host es aleatorio pero siempre contiene \"meticulous\" (ej. meticulous-a3f7.local).",
+      "configureManually": "Configurar manualmente"
     },
     "name": {
       "title": "¿Cómo te llamas?",
@@ -1588,7 +1589,7 @@
       "language": "Idioma",
       "startBrewing": "Empezar a preparar",
       "settingsHint": "Todos los ajustes se pueden cambiar después en Ajustes.",
-      "supportProject": "¿Te gusta MeticAI? Invítame a un café ☕"
+      "supportProject": "¿Te gusta MeticAI? Considera invitarme a un café ☕"
     }
   },
   "demo": {

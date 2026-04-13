@@ -91,6 +91,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [discovering, setDiscovering] = useState(false)
   const [discoveryLogs, setDiscoveryLogs] = useState<string[]>([])
   const discoveryLogRef = useRef<HTMLPreElement>(null)
+  const [showManualConfig, setShowManualConfig] = useState(false)
 
   // User identity
   const [authorName, setAuthorName] = useState(
@@ -278,50 +279,143 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         </div>
       </div>
 
-      {/* Auto-discovery results */}
-      {discovering && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CircleNotch size={16} className="animate-spin" />
-          {t('onboarding.machine.searching')}
-        </div>
-      )}
-      {!discovering && discoveredMachines.length === 0 && connectionStatus !== 'success' && (
-        <div className="flex items-center gap-2 text-sm text-amber-500 dark:text-amber-400">
-          <WifiSlash size={16} weight="fill" />
-          {t('onboarding.machine.noMachinesFound')}
-        </div>
-      )}
-      {!discovering && discoveredMachines.length > 0 && connectionStatus !== 'success' && (
-        <div className="space-y-2">
-          <Label className="text-sm">{t('onboarding.machine.foundMachines')}</Label>
-          {discoveredMachines.map((m) => (
-            <Button
-              key={m.url}
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={() => {
-                setMachineIp(m.host)
-                setMachineName(m.name)
-                setConnectionStatus('testing')
-                testMachineConnection(m.url).then((ok) => {
-                  if (ok) {
-                    setConnectionStatus('success')
-                    setMachineUrl(m.url)
-                    toast.success(t('onboarding.machine.connected'))
-                  } else {
-                    setConnectionStatus('error')
-                  }
-                })
-              }}
-            >
-              <WifiHigh size={16} weight="duotone" className="text-green-500" />
-              {m.name} ({m.host}:{m.port})
-            </Button>
-          ))}
+      {/* Connection status indicator — shown prominently when connected */}
+      {connectionStatus === 'success' && (
+        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 p-3 rounded-lg bg-green-50 dark:bg-green-950/30">
+          <CheckCircle size={18} weight="fill" />
+          {t('onboarding.machine.successMessage', { name: machineName })}
         </div>
       )}
 
-      {/* Discovery debug log — visible on-screen for diagnostics */}
+      {/* Auto-discovery and manual config — hidden when already connected */}
+      {connectionStatus !== 'success' && (
+        <>
+          {/* Auto-discovery results */}
+          {discovering && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CircleNotch size={16} className="animate-spin" />
+              {t('onboarding.machine.searching')}
+            </div>
+          )}
+          {!discovering && discoveredMachines.length === 0 && (
+            <div className="flex items-center gap-2 text-sm text-amber-500 dark:text-amber-400">
+              <WifiSlash size={16} weight="fill" />
+              {t('onboarding.machine.noMachinesFound')}
+            </div>
+          )}
+          {!discovering && discoveredMachines.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm">{t('onboarding.machine.foundMachines')}</Label>
+              {discoveredMachines.map((m) => (
+                <Button
+                  key={m.url}
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                  onClick={() => {
+                    setMachineIp(m.host)
+                    setMachineName(m.name)
+                    setConnectionStatus('testing')
+                    testMachineConnection(m.url).then((ok) => {
+                      if (ok) {
+                        setConnectionStatus('success')
+                        setMachineUrl(m.url)
+                        toast.success(t('onboarding.machine.connected'))
+                      } else {
+                        setConnectionStatus('error')
+                      }
+                    })
+                  }}
+                >
+                  <WifiHigh size={16} weight="duotone" className="text-green-500" />
+                  {m.name} ({m.host}:{m.port})
+                </Button>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="machine-ip">{t('onboarding.machine.ipLabel')}</Label>
+            <p className="text-xs text-muted-foreground">
+              {t('onboarding.machine.ipDescription')}
+            </p>
+            <div className="flex gap-2">
+              <Input
+                ref={ipInputRef}
+                id="machine-ip"
+                placeholder={t('onboarding.machine.ipPlaceholder')}
+                value={machineIp}
+                onChange={(e) => {
+                  setMachineIp(e.target.value)
+                  setConnectionStatus('idle')
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
+                className="flex-1"
+              />
+              <Button
+                onClick={handleTestConnection}
+                disabled={!machineIp.trim() || connectionStatus === 'testing'}
+                variant="outline"
+              >
+                {connectionStatus === 'testing' ? (
+                  <CircleNotch size={18} className="animate-spin" />
+                ) : (
+                  t('onboarding.machine.connectButton')
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {connectionStatus === 'error' && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <WifiSlash size={18} weight="fill" />
+              {t('onboarding.machine.errorMessage')}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Manual config toggle when auto-connected */}
+      {connectionStatus === 'success' && !showManualConfig && (
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-primary transition-colors underline"
+          onClick={() => setShowManualConfig(true)}
+        >
+          {t('onboarding.machine.configureManually')}
+        </button>
+      )}
+      {connectionStatus === 'success' && showManualConfig && (
+        <div className="space-y-2 pt-2 border-t border-border/50">
+          <Label htmlFor="machine-ip">{t('onboarding.machine.ipLabel')}</Label>
+          <div className="flex gap-2">
+            <Input
+              ref={ipInputRef}
+              id="machine-ip"
+              placeholder={t('onboarding.machine.ipPlaceholder')}
+              value={machineIp}
+              onChange={(e) => {
+                setMachineIp(e.target.value)
+                setConnectionStatus('idle')
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
+              className="flex-1"
+            />
+            <Button
+              onClick={handleTestConnection}
+              disabled={!machineIp.trim() || connectionStatus === 'testing'}
+              variant="outline"
+            >
+              {connectionStatus === 'testing' ? (
+                <CircleNotch size={18} className="animate-spin" />
+              ) : (
+                t('onboarding.machine.connectButton')
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Discovery debug log */}
       {discoveryLogs.length > 0 && (
         <details className="text-[10px]">
           <summary className="text-muted-foreground cursor-pointer select-none">
@@ -334,52 +428,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {discoveryLogs.join('\n')}
           </pre>
         </details>
-      )}
-
-      <div className="space-y-2">
-        <Label htmlFor="machine-ip">{t('onboarding.machine.ipLabel')}</Label>
-        <p className="text-xs text-muted-foreground">
-          {t('onboarding.machine.ipDescription')}
-        </p>
-        <div className="flex gap-2">
-          <Input
-            ref={ipInputRef}
-            id="machine-ip"
-            placeholder={t('onboarding.machine.ipPlaceholder')}
-            value={machineIp}
-            onChange={(e) => {
-              setMachineIp(e.target.value)
-              setConnectionStatus('idle')
-            }}
-            onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
-            className="flex-1"
-          />
-          <Button
-            onClick={handleTestConnection}
-            disabled={!machineIp.trim() || connectionStatus === 'testing'}
-            variant="outline"
-          >
-            {connectionStatus === 'testing' ? (
-              <CircleNotch size={18} className="animate-spin" />
-            ) : (
-              t('onboarding.machine.connectButton')
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Connection status indicator */}
-      {connectionStatus === 'success' && (
-        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-          <CheckCircle size={18} weight="fill" />
-          {t('onboarding.machine.successMessage', { name: machineName })}
-        </div>
-      )}
-      {connectionStatus === 'error' && (
-        <div className="flex items-center gap-2 text-sm text-destructive">
-          <WifiSlash size={18} weight="fill" />
-          {t('onboarding.machine.errorMessage')}
-        </div>
       )}
 
       <p className="text-xs text-muted-foreground mt-2">

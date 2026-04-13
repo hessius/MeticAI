@@ -28,7 +28,7 @@
     "next": "Avanti",
     "skip": "Salta",
     "noInternetConnection": "Nessuna connessione Internet",
-    "supportProject": "Supporta MeticAI ☕",
+    "supportProject": "Considera di supportare MeticAI ☕",
     "share": "Condividi",
     "copied": "Copiato!",
     "copy": "Copia"
@@ -399,7 +399,7 @@
     "aboutDescription1": "Quando ho ricevuto il mio Meticulous, dopo un'attesa loooonga, ero sopraffatto dalle opzioni - regolare non era più solo modificare la dimensione della macinatura, il potenziale era (ed è) praticamente illimitato - la mia conoscenza e il mio tempo non altrettanto.",
     "aboutDescription2": "Questo, \"MeticAI\", è un insieme crescente di strumenti AI per consentire a me, e a te, di ottenere il massimo da una macchina espresso Meticulous. Tra le altre cose, ti permette di creare automaticamente profili espresso personalizzati in base alle tue preferenze e al caffè a disposizione, comprendere i tuoi profili espresso e i dati delle estrazioni come mai prima d'ora e, infine, ti permette di scatenare il tuo Meticulous.",
     "viewOnGitHub": "Visualizza su GitHub",
-    "buyMeACoffee": "Offrimi un caffè ☕",
+    "buyMeACoffee": "Considera di offrirmi un caffè ☕",
     "configuration": "Configurazione",
     "loadingSettings": "Caricamento impostazioni...",
     "geminiApiKey": "Chiave API Gemini",
@@ -1547,7 +1547,8 @@
       "foundMachines": "Macchine trovate nella tua rete",
       "autoDiscovered": "Macchina trovata automaticamente!",
       "connectButton": "Connetti",
-      "ipDescription": "Inserisci un indirizzo IP (es. 192.168.1.42) o nome host. Il nome host è casuale ma contiene sempre \"meticulous\" (es. meticulous-a3f7.local)."
+      "ipDescription": "Inserisci un indirizzo IP (es. 192.168.1.42) o nome host. Il nome host è casuale ma contiene sempre \"meticulous\" (es. meticulous-a3f7.local).",
+      "configureManually": "Configura manualmente"
     },
     "name": {
       "title": "Come ti chiami?",
@@ -1588,7 +1589,7 @@
       "language": "Lingua",
       "startBrewing": "Inizia a preparare",
       "settingsHint": "Tutte le impostazioni possono essere cambiate nelle Impostazioni.",
-      "supportProject": "Ti piace MeticAI? Offrimi un caffè ☕"
+      "supportProject": "Ti piace MeticAI? Considera di offrirmi un caffè ☕"
     }
   },
   "demo": {

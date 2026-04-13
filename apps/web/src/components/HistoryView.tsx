@@ -45,6 +45,8 @@ import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
 import { 
@@ -829,9 +831,15 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         )
         if (response.ok) {
           const data = await response.json()
-          if (data.profile?.image) {
-            // Use the proxy endpoint to get the actual image with cache buster
-            setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${imageCacheBuster}`)
+          if (data.profile?.image || data.profile?.display?.image) {
+            if (isDirectMode() || isNativePlatform()) {
+              // Direct/Capacitor: use actual image URL (fetch interceptor doesn't handle <img src>)
+              const resolved = resolveDisplayImage(data.profile?.display?.image)
+              if (resolved) setProfileImage(resolved)
+            } else {
+              // Proxy mode: use the proxy endpoint to get the actual image with cache buster
+              setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${imageCacheBuster}`)
+            }
           }
         }
       } catch (err) {
