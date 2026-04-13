@@ -15,6 +15,7 @@
  */
 
 import { CapacitorHttp } from '@capacitor/core'
+import { ZeroConf } from 'capacitor-zeroconf'
 import { isNativePlatform } from '@/lib/machineMode'
 
 export interface DiscoveredMachine {
@@ -54,16 +55,6 @@ function dlog(msg: string) {
 // ---------------------------------------------------------------------------
 // Zeroconf mDNS discovery (capacitor-zeroconf plugin)
 // ---------------------------------------------------------------------------
-
-let _zeroconfModule: typeof import('capacitor-zeroconf') | null = null
-
-/** Lazy-load capacitor-zeroconf to avoid import errors on web. */
-async function getZeroConf() {
-  if (!_zeroconfModule) {
-    _zeroconfModule = await import('capacitor-zeroconf')
-  }
-  return _zeroconfModule.ZeroConf
-}
 
 // ---------------------------------------------------------------------------
 // HTTP probe helpers
@@ -135,127 +126,114 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
   if (isNativePlatform()) {
     dlog('STEP 1: isNativePlatform=true, attempting Zeroconf')
 
-    let ZeroConf: Awaited<ReturnType<typeof getZeroConf>> | null = null
-
-    // Step 2: Dynamic import
+    // Step 2: Smoke-test plugin with getHostname()
     try {
-      dlog('STEP 2: importing capacitor-zeroconf module...')
-      ZeroConf = await getZeroConf()
-      dlog(`STEP 2: import OK, ZeroConf type=${typeof ZeroConf}, keys=${Object.keys(ZeroConf || {}).join(',')}`)
+      dlog('STEP 2: calling getHostname() smoke test...')
+      const hostnameResult = await Promise.race([
+        ZeroConf.getHostname(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('getHostname timeout 5s')), 5000)),
+      ])
+      dlog(`STEP 2: getHostname() OK: ${JSON.stringify(hostnameResult)}`)
     } catch (e) {
-      dlog(`STEP 2: import FAILED: ${e}`)
+      dlog(`STEP 2: getHostname() FAILED: ${e} — plugin may not be registered natively`)
     }
 
-    if (ZeroConf) {
-      // Step 3: Smoke-test plugin with getHostname()
-      try {
-        dlog('STEP 3: calling getHostname() smoke test...')
-        const hostnameResult = await Promise.race([
-          ZeroConf.getHostname(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('getHostname timeout 5s')), 5000)),
-        ])
-        dlog(`STEP 3: getHostname() OK: ${JSON.stringify(hostnameResult)}`)
-      } catch (e) {
-        dlog(`STEP 3: getHostname() FAILED: ${e} — plugin may not be registered natively`)
-      }
+    // Step 3: Set up discovery state
+    const discovered: DiscoveredMachine[] = []
+    let resolveWatch: () => void
+    let resolved = false
+    const watchDone = new Promise<void>((resolve) => {
+      resolveWatch = () => { if (!resolved) { resolved = true; resolve() } }
+    })
+    dlog('STEP 3: discovery state ready')
 
-      // Step 4: Set up discovery state
-      const discovered: DiscoveredMachine[] = []
-      let resolveWatch: () => void
-      let resolved = false
-      const watchDone = new Promise<void>((resolve) => {
-        resolveWatch = () => { if (!resolved) { resolved = true; resolve() } }
+    // Step 4: Start diagnostic _http._tcp browse
+    try {
+      dlog('STEP 4: starting _http._tcp diagnostic browse...')
+      ZeroConf.watch(
+        { type: '_http._tcp', domain: 'local.' },
+        (result) => {
+          const svc = result.service
+          dlog(`[diag] _http._tcp: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} port=${svc?.port}`)
+        },
+      ).then(() => {
+        dlog('STEP 4: _http._tcp watch() promise resolved')
+      }).catch((e: unknown) => {
+        dlog(`STEP 4: _http._tcp watch() REJECTED: ${e}`)
       })
-      dlog('STEP 4: discovery state ready')
-
-      // Step 5: Start diagnostic _http._tcp browse
-      try {
-        dlog('STEP 5: starting _http._tcp diagnostic browse...')
-        ZeroConf.watch(
-          { type: '_http._tcp', domain: 'local.' },
-          (result) => {
-            const svc = result.service
-            dlog(`[diag] _http._tcp: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} port=${svc?.port}`)
-          },
-        ).then(() => {
-          dlog('STEP 5: _http._tcp watch() promise resolved')
-        }).catch((e: unknown) => {
-          dlog(`STEP 5: _http._tcp watch() REJECTED: ${e}`)
-        })
-        dlog('STEP 5: _http._tcp watch() call returned (fire-and-forget)')
-      } catch (e) {
-        dlog(`STEP 5: _http._tcp watch() THREW: ${e}`)
-      }
-
-      // Step 6: Start main _meticulous._tcp browse
-      try {
-        dlog('STEP 6: starting _meticulous._tcp browse...')
-        ZeroConf.watch(
-          { type: '_meticulous._tcp', domain: 'local.' },
-          (result) => {
-            const svc = result.service
-            dlog(`Zeroconf event: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`)
-
-            if (svc && (result.action === 'added' || result.action === 'resolved')) {
-              const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
-              const port = svc.port || 8080
-              const existing = discovered.findIndex(d => d.name === svc.name)
-              const machine = {
-                name: svc.name,
-                host,
-                port,
-                url: `http://${host}:${port}`,
-              }
-              if (existing >= 0) {
-                discovered[existing] = machine
-              } else {
-                discovered.push(machine)
-              }
-              dlog(`Matched machine: ${svc.name} → ${host}:${port}`)
-              if (result.action === 'resolved' && discovered.length === 1) {
-                setTimeout(() => resolveWatch(), 2000)
-              }
-            }
-          },
-        ).then(() => {
-          dlog('STEP 6: _meticulous._tcp watch() promise resolved')
-        }).catch((e: unknown) => {
-          dlog(`STEP 6: _meticulous._tcp watch() REJECTED: ${e}`)
-          resolveWatch()
-        })
-        dlog('STEP 6: _meticulous._tcp watch() call returned (fire-and-forget)')
-      } catch (e) {
-        dlog(`STEP 6: _meticulous._tcp watch() THREW: ${e}`)
-        resolveWatch()
-      }
-
-      // Step 7: Set timeout and wait
-      dlog('STEP 7: setting 10s timeout, awaiting watchDone...')
-      const timer = setTimeout(() => {
-        dlog('STEP 7: timeout fired after 10s')
-        resolveWatch()
-      }, 10000)
-      await watchDone
-      clearTimeout(timer)
-      dlog(`STEP 8: watchDone resolved, discovered=${discovered.length} machines in ${Date.now() - startTime}ms`)
-
-      // Step 9: Cleanup
-      try {
-        await ZeroConf.unwatch({ type: '_meticulous._tcp', domain: 'local.' })
-        await ZeroConf.unwatch({ type: '_http._tcp', domain: 'local.' }).catch(() => {})
-        await ZeroConf.close()
-        dlog('STEP 9: cleanup OK')
-      } catch {
-        dlog('STEP 9: cleanup error (non-fatal)')
-      }
-
-      if (discovered.length > 0) {
-        dlog(`DONE: found ${discovered.length} machine(s): ${discovered.map(m => m.name).join(', ')}`)
-        return discovered
-      }
-
-      dlog('No machines found via Zeroconf, falling back to hostname probe')
+      dlog('STEP 4: _http._tcp watch() call returned (fire-and-forget)')
+    } catch (e) {
+      dlog(`STEP 4: _http._tcp watch() THREW: ${e}`)
     }
+
+    // Step 5: Start main _meticulous._tcp browse
+    try {
+      dlog('STEP 5: starting _meticulous._tcp browse...')
+      ZeroConf.watch(
+        { type: '_meticulous._tcp', domain: 'local.' },
+        (result) => {
+          const svc = result.service
+          dlog(`Zeroconf event: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`)
+
+          if (svc && (result.action === 'added' || result.action === 'resolved')) {
+            const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
+            const port = svc.port || 8080
+            const existing = discovered.findIndex(d => d.name === svc.name)
+            const machine = {
+              name: svc.name,
+              host,
+              port,
+              url: `http://${host}:${port}`,
+            }
+            if (existing >= 0) {
+              discovered[existing] = machine
+            } else {
+              discovered.push(machine)
+            }
+            dlog(`Matched machine: ${svc.name} → ${host}:${port}`)
+            if (result.action === 'resolved' && discovered.length === 1) {
+              setTimeout(() => resolveWatch(), 2000)
+            }
+          }
+        },
+      ).then(() => {
+        dlog('STEP 5: _meticulous._tcp watch() promise resolved')
+      }).catch((e: unknown) => {
+        dlog(`STEP 5: _meticulous._tcp watch() REJECTED: ${e}`)
+        resolveWatch()
+      })
+      dlog('STEP 5: _meticulous._tcp watch() call returned (fire-and-forget)')
+    } catch (e) {
+      dlog(`STEP 5: _meticulous._tcp watch() THREW: ${e}`)
+      resolveWatch()
+    }
+
+    // Step 6: Set timeout and wait
+    dlog('STEP 6: setting 10s timeout, awaiting watchDone...')
+    const timer = setTimeout(() => {
+      dlog('STEP 6: timeout fired after 10s')
+      resolveWatch()
+    }, 10000)
+    await watchDone
+    clearTimeout(timer)
+    dlog(`STEP 7: watchDone resolved, discovered=${discovered.length} machines in ${Date.now() - startTime}ms`)
+
+    // Step 8: Cleanup
+    try {
+      await ZeroConf.unwatch({ type: '_meticulous._tcp', domain: 'local.' })
+      await ZeroConf.unwatch({ type: '_http._tcp', domain: 'local.' }).catch(() => {})
+      await ZeroConf.close()
+      dlog('STEP 8: cleanup OK')
+    } catch {
+      dlog('STEP 8: cleanup error (non-fatal)')
+    }
+
+    if (discovered.length > 0) {
+      dlog(`DONE: found ${discovered.length} machine(s): ${discovered.map(m => m.name).join(', ')}`)
+      return discovered
+    }
+
+    dlog('No machines found via Zeroconf, falling back to hostname probe')
   } else {
     dlog('STEP 1: isNativePlatform=false, skipping Zeroconf')
   }
