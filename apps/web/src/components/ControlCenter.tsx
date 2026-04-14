@@ -22,12 +22,12 @@ import {
   Scales,
   CaretDown,
   CaretUp,
+  CaretUpDown,
   Eye,
   XCircle,
   Thermometer,
   Coffee,
   Warning,
-  ArrowsClockwise,
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -328,7 +328,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                   onClick={handleChangeProfile}
                   aria-label={t('controlCenter.profileSelector.placeholder')}
                 >
-                  <ArrowsClockwise size={16} weight="bold" />
+                  <CaretUpDown size={16} weight="bold" />
                 </button>
               )}
               </div>

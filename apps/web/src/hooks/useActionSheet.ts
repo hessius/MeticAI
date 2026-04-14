@@ -24,11 +24,16 @@ export function useActionSheet() {
       try {
         const result = await ActionSheet.showActions({
           title,
-          options: options.map((label) => ({
-            title: label,
-            style: ActionSheetButtonStyle.Default,
-          })),
+          options: [
+            ...options.map((label) => ({
+              title: label,
+              style: ActionSheetButtonStyle.Default,
+            })),
+            { title: 'Cancel', style: ActionSheetButtonStyle.Cancel },
+          ],
         })
+        // Cancel button is the last option — treat as dismissed
+        if (result.index >= options.length) return -1
         return result.index
       } catch {
         // User dismissed or device doesn't support — treat as cancelled

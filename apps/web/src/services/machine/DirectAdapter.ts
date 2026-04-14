@@ -201,10 +201,18 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     // -- Configuration commands ---------------------------------------------
     loadProfile: async (name: string) => {
       try {
-        const profiles = unwrap(await api.listProfiles()) as ProfileIdent[]
-        const match = profiles.find(p => p.profile?.name === name)
+        const raw = unwrap(await api.listProfiles())
+        // Machine API may return flat entries { id, name } or nested { profile: { id, name } }
+        const entries = raw as unknown as Array<Record<string, unknown>>
+        const match = entries.find(p => {
+          const nested = p.profile as { name?: string } | undefined
+          return (nested?.name ?? (p as { name?: string }).name) === name
+        })
         if (!match) return wrapResult(false, `Profile "${name}" not found`)
-        await api.loadProfileByID(match.profile!.id)
+        const nested = match.profile as { id?: string } | undefined
+        const id = nested?.id ?? (match as { id?: string }).id
+        if (!id) return wrapResult(false, `Profile "${name}" has no ID`)
+        await api.loadProfileByID(id)
         return wrapResult(true)
       } catch (e) {
         return wrapResult(false, (e as Error).message)
