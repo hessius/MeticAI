@@ -44,6 +44,7 @@ import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAuto
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
+import { useSmartGreeting } from '@/hooks/useSmartGreeting'
 import { useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
@@ -125,6 +126,7 @@ function App() {
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useMachineTelemetry(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
+  const smartGreeting = useSmartGreeting(mqttEnabled && viewState === 'start')
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
   const prevMachineStateRef = useRef<string | null>(null)
@@ -204,6 +206,18 @@ function App() {
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [viewState])
+
+  // Track session count (once per browser session)
+  useEffect(() => {
+    if (sessionStorage.getItem('meticai-session-counted')) return
+    sessionStorage.setItem('meticai-session-counted', '1')
+    const prev = parseInt(localStorage.getItem(STORAGE_KEYS.SESSION_COUNT) ?? '0', 10)
+    localStorage.setItem(STORAGE_KEYS.SESSION_COUNT, String(prev + 1))
+    // Backfill install date for users who onboarded before tracking was added
+    if (!localStorage.getItem(STORAGE_KEYS.INSTALL_DATE) && localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
+      localStorage.setItem(STORAGE_KEYS.INSTALL_DATE, new Date().toISOString())
+    }
+  }, [])
 
   useEffect(() => {
     setAiEnabled(getAiEnabled())
@@ -904,7 +918,7 @@ function App() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className={isHome ? "text-center mb-6 lg:mb-10" : "text-center mb-6"}
+          className={isHome ? "text-center mb-2 lg:mb-4" : "text-center mb-6"}
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative">
             {/* Settings gear — left side, home screen only */}
@@ -921,19 +935,21 @@ function App() {
                 </Button>
               </div>
             )}
-            <div 
-              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={handleTitleClick}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
-              aria-label={t('a11y.goHome')}
-            >
-              <MeticAILogo size={isHome ? (isMobile ? 36 : 48) : 28} variant={isDark ? 'white' : 'default'} />
-              <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-4xl lg:text-5xl' : 'text-2xl'}`}>
-                Metic<span className="gold-text">AI</span>
-              </h1>
-            </div>
+            {!isHome && (
+              <div 
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={handleTitleClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
+                aria-label={t('a11y.goHome')}
+              >
+                <MeticAILogo size={28} variant={isDark ? 'white' : 'default'} />
+                <h1 className="font-bold tracking-tight transition-all duration-300 text-2xl">
+                  Metic<span className="gold-text">AI</span>
+                </h1>
+              </div>
+            )}
             <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
               {themeMounted && (
                 <Button
@@ -1048,6 +1064,30 @@ function App() {
                       />
                     ) : undefined
                   }
+                  greeting={smartGreeting}
+                  onGreetingAction={(target, context) => {
+                    switch (target) {
+                      case 'shot-analysis':
+                        if (context?.date && context?.filename) {
+                          setShotHistoryInitialDate(context.date)
+                          setShotHistoryInitialFilename(context.filename)
+                          previousViewStateRef.current = 'start'
+                          setViewState('shot-history')
+                        } else {
+                          setViewState('shot-analysis')
+                        }
+                        break
+                      case 'dial-in':
+                        setViewState('dial-in')
+                        break
+                      case 'profile-catalogue':
+                        setViewState('profile-catalogue')
+                        break
+                      case 'add-profile':
+                        setShowAddProfileDialog(true)
+                        break
+                    }
+                  }}
                 />
               )}
 

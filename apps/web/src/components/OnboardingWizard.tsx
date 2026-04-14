@@ -230,8 +230,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     // Request notification permission (non-blocking)
     requestPermission()
 
-    // Mark onboarding complete
+    // Mark onboarding complete and record install date
     localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETE, 'true')
+    if (!localStorage.getItem(STORAGE_KEYS.INSTALL_DATE)) {
+      localStorage.setItem(STORAGE_KEYS.INSTALL_DATE, new Date().toISOString())
+    }
 
     onComplete()
   }, [authorName, geminiKey, onComplete, requestPermission])

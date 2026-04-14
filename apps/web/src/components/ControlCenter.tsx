@@ -231,12 +231,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
 
   return (
     <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
-      {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Coffee size={18} weight="duotone" className="text-primary" />
-          <span className="text-sm font-semibold text-foreground">Meticulous</span>
-        </div>
+      {/* Header row — connection status only */}
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-1.5">
           {(() => {
             const { dot, key } = connectionDot(machineState)
@@ -298,8 +294,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('controlCenter.sections.activeProfile')}
               </h4>
-              <div className="flex items-center gap-2.5">
-              <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+              <div className="h-16 w-16 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                 {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}
@@ -308,15 +304,15 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                     onError={() => setProfileImgError(true)}
                   />
                 ) : (
-                  <Coffee size={18} className="text-muted-foreground" weight="duotone" />
+                  <Coffee size={24} className="text-muted-foreground" weight="duotone" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-sm text-foreground font-medium truncate block">
+                <span className="text-base text-foreground font-semibold truncate block">
                   {activeProfile}
                 </span>
                 {profileAuthor && (
-                  <span className="text-[10px] text-muted-foreground truncate block">
+                  <span className="text-xs text-muted-foreground truncate block">
                     {t('controlCenter.labels.by')} {profileAuthor}
                   </span>
                 )}

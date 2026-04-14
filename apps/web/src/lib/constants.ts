@@ -26,6 +26,10 @@ export const STORAGE_KEYS = {
   // -- Onboarding --
   ONBOARDING_COMPLETE: 'meticai-onboarding-complete',
 
+  // -- Usage tracking --
+  INSTALL_DATE: 'meticai-install-date',
+  SESSION_COUNT: 'meticai-session-count',
+
   // -- Demo mode --
   DEMO_PREV_URL: 'meticai-demo-prev-url',
   DEMO_PROFILES: 'meticai-demo-profiles',

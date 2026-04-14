@@ -1618,5 +1618,18 @@
     "machineReadyBody": "Din maskin har förvärmts klart",
     "pourOverComplete": "Pour-over klar",
     "pourOverCompleteBody": "Din pour-over-timer har avslutats"
+  },
+  "smartGreeting": {
+    "justBrewed": "Du drog precis ett skott på {{profile}} — varför inte analysera det?",
+    "analyzeAction": "Analysera",
+    "milestone": "{{count}} skott avklarade, bara {{remaining}} kvar till {{milestone}}!",
+    "longGap": "Nästan {{hours}}h sedan ditt senaste skott — dags för kaffe?",
+    "unusedProfile": "Du har inte provat {{name}} ännu — testa!",
+    "browseAction": "Bläddra profiler",
+    "anniversary": "Du har använt MeticAI i {{days}} dagar!",
+    "dialIn": "Hur var den koppen? Behöver du justera?",
+    "dialInAction": "Justera",
+    "fewProfiles": "Du har bara {{count}} profiler — skapa en ny?",
+    "createAction": "Skapa profil"
   }
 }
