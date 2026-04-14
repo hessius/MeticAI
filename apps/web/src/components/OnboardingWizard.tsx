@@ -17,6 +17,7 @@ import { Progress } from '@/components/ui/progress'
 import {
   ArrowRight,
   ArrowLeft,
+  ArrowSquareOut,
   WifiHigh,
   WifiSlash,
   CircleNotch,
@@ -143,17 +144,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   // Auto-fill and test when discovery completes and user reaches machine step
   useEffect(() => {
-    console.error(`[Onboarding] auto-fill check: step=${step} discovering=${discovering} connectionStatus=${connectionStatus} machines=${discoveredMachines.length} machineIp="${machineIp}"`)
-    if (step !== 'machine' || discovering || connectionStatus === 'success') return
+    if (step !== 'machine' || discovering || connectionStatus === 'success') return undefined
     if (discoveredMachines.length === 1 && !machineIp.trim()) {
       const machine = discoveredMachines[0]
-      console.error(`[Onboarding] auto-fill: testing ${machine.url}`)
       setMachineIp(machine.host)
       setMachineName(machine.name)
       setConnectionStatus('testing')
       let cancelled = false
       testMachineConnection(machine.url).then((ok) => {
-        console.error(`[Onboarding] auto-fill test result: ok=${ok} cancelled=${cancelled}`)
         if (cancelled) return
         if (ok) {
           setConnectionStatus('success')
@@ -162,12 +160,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         } else {
           setConnectionStatus('idle')
         }
-      }).catch((e) => {
-        console.error(`[Onboarding] auto-fill test error:`, e)
+      }).catch(() => {
         if (!cancelled) setConnectionStatus('idle')
       })
       return () => { cancelled = true }
     }
+    return undefined
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, discovering, discoveredMachines])
 
@@ -256,7 +254,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     </div>
   )
 
-  const renderMachine = () => (
+  const renderMachine = () => {
+    const isTesting = connectionStatus === 'testing'
+    return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 mb-2">
         <WifiHigh size={24} weight="duotone" className="text-primary" />
@@ -389,10 +389,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             />
             <Button
               onClick={handleTestConnection}
-              disabled={!machineIp.trim() || connectionStatus === 'testing'}
+              disabled={!machineIp.trim() || isTesting}
               variant="outline"
             >
-              {connectionStatus === 'testing' ? (
+              {isTesting ? (
                 <CircleNotch size={18} className="animate-spin" />
               ) : (
                 t('onboarding.machine.connectButton')
@@ -405,7 +405,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         </div>
       )}
     </div>
-  )
+    )
+  }
 
   const renderName = () => (
     <div className="space-y-4">
@@ -450,6 +451,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <p className="text-xs text-muted-foreground">
           {t('onboarding.ai.keyHint')}
         </p>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+          onClick={() => {
+            const url = 'https://aistudio.google.com/app/apikey'
+            if (isNativePlatform()) {
+              import('@capacitor/browser').then(({ Browser }) => Browser.open({ url })).catch(() => window.open(url, '_blank'))
+            } else {
+              window.open(url, '_blank')
+            }
+          }}
+        >
+          <ArrowSquareOut size={14} weight="bold" />
+          {t('onboarding.ai.getKey')}
+        </button>
       </div>
 
       <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">

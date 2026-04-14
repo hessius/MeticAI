@@ -1573,7 +1573,8 @@
       "whatItDoes": "Cosa permette l'IA:",
       "feature1": "Generare profili espresso personalizzati da descrizioni",
       "feature2": "Analizzare i tuoi shot con feedback di livello esperto",
-      "feature3": "Ottenere raccomandazioni di dial-in basate sul gusto"
+      "feature3": "Ottenere raccomandazioni di dial-in basate sul gusto",
+      "getKey": "Ottieni una chiave API gratuita da Google AI Studio"
     },
     "language": {
       "title": "Lingua",

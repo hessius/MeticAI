@@ -1576,7 +1576,8 @@
       "whatItDoes": "What AI enables:",
       "feature1": "Generate custom espresso profiles from descriptions",
       "feature2": "Analyze your shots with expert-level feedback",
-      "feature3": "Get dial-in recommendations based on taste"
+      "feature3": "Get dial-in recommendations based on taste",
+      "getKey": "Get a free API key from Google AI Studio"
     },
     "language": {
       "title": "Language",

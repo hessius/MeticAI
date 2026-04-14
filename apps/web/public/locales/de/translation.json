@@ -1573,7 +1573,8 @@
       "whatItDoes": "Was KI ermöglicht:",
       "feature1": "Individuelle Espresso-Profile aus Beschreibungen erstellen",
       "feature2": "Deine Shots mit Experten-Feedback analysieren",
-      "feature3": "Dial-in-Empfehlungen basierend auf Geschmack erhalten"
+      "feature3": "Dial-in-Empfehlungen basierend auf Geschmack erhalten",
+      "getKey": "Kostenlosen API-Schlüssel von Google AI Studio holen"
     },
     "language": {
       "title": "Sprache",

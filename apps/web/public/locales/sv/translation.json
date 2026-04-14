@@ -1573,7 +1573,8 @@
       "whatItDoes": "Vad AI möjliggör:",
       "feature1": "Skapa anpassade espressoprofiler från beskrivningar",
       "feature2": "Analysera dina shots med expertfeedback",
-      "feature3": "Få dial-in-rekommendationer baserat på smak"
+      "feature3": "Få dial-in-rekommendationer baserat på smak",
+      "getKey": "Hämta en gratis API-nyckel från Google AI Studio"
     },
     "language": {
       "title": "Språk",
