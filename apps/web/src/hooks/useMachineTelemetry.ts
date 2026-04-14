@@ -130,7 +130,10 @@ function useDirectTelemetry(enabled: boolean): MachineState {
           _wsConnected: true,
           availability: 'online',
           boiler_temperature: clampTemp(data.sensors?.t, prev.boiler_temperature),
-          brew_head_temperature: clampTemp(data.sensors?.t, prev.brew_head_temperature),
+          brew_head_temperature: clampTemp(
+            (data.sensors as { g?: number })?.g ?? data.sensors?.t,
+            prev.brew_head_temperature,
+          ),
           pressure: data.sensors?.p ?? prev.pressure,
           flow_rate: data.sensors?.f ?? prev.flow_rate,
           shot_weight: data.sensors?.w ?? prev.shot_weight,

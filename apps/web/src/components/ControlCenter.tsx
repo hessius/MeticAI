@@ -512,7 +512,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <ControlCenterExpanded machineState={machineState} profileAuthor={profileAuthor} />
+            <ControlCenterExpanded machineState={machineState} />
           </motion.div>
         )}
       </AnimatePresence>
