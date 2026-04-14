@@ -53,6 +53,11 @@ export function createDirectAdapter(baseUrl: string): MachineService {
   const heaterStatusCallbacks = new Set<(countdown: number) => void>()
   const profileUpdateCallbacks = new Set<ProfileUpdateCallback>()
 
+  // Seeded telemetry values (total_shots, sounds_enabled, firmware_version)
+  // that the machine's raw Socket.IO status events don't include.
+  // Stored here so late subscribers (race condition) still receive them.
+  let seedSnapshot: Record<string, unknown> = {}
+
   /** Direct REST call for actions not in espresso-api's ActionType enum */
   async function executeRawAction(action: string): Promise<CommandResult> {
     try {
@@ -98,11 +103,13 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       api.connectToSocket()
       setupSocketListeners()
 
-      // Seed initial values that the status event may not include
+      // Seed initial values that the machine's Socket.IO status events don't include.
+      // These come from REST APIs: settings (sounds), history (total_shots), device info (firmware).
       try {
-        const [settingsResp, historyResp] = await Promise.allSettled([
+        const [settingsResp, historyResp, deviceResp] = await Promise.allSettled([
           api.getSettings(),
           api.getHistoryShortListing(),
+          api.getDeviceInfo(),
         ])
         const initialStatus: Record<string, unknown> = {}
         if (settingsResp.status === 'fulfilled') {
@@ -110,10 +117,16 @@ export function createDirectAdapter(baseUrl: string): MachineService {
           if (s.enable_sounds !== undefined) initialStatus.sounds_enabled = s.enable_sounds
         }
         if (historyResp.status === 'fulfilled') {
-          const h = unwrap(historyResp.value) as { history?: HistoryListingEntry[] }
-          initialStatus.total_shots = Array.isArray(h.history) ? h.history.length : 0
+          const h = unwrap(historyResp.value)
+          const entries = Array.isArray(h) ? h : (h as { history?: HistoryListingEntry[] }).history
+          initialStatus.total_shots = Array.isArray(entries) ? entries.length : 0
+        }
+        if (deviceResp.status === 'fulfilled') {
+          const d = unwrap(deviceResp.value) as DeviceInfo
+          if (d.firmware) initialStatus.firmware_version = d.firmware
         }
         if (Object.keys(initialStatus).length > 0) {
+          seedSnapshot = { ...seedSnapshot, ...initialStatus }
           statusCallbacks.forEach(cb => cb(initialStatus as unknown as StatusData))
         }
       } catch {
@@ -189,9 +202,9 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     loadProfile: async (name: string) => {
       try {
         const profiles = unwrap(await api.listProfiles()) as ProfileIdent[]
-        const match = profiles.find(p => p.profile.name === name)
+        const match = profiles.find(p => p.profile?.name === name)
         if (!match) return wrapResult(false, `Profile "${name}" not found`)
-        await api.loadProfileByID(match.profile.id)
+        await api.loadProfileByID(match.profile!.id)
         return wrapResult(true)
       } catch (e) {
         return wrapResult(false, (e as Error).message)
@@ -217,6 +230,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       try {
         await api.updateSetting({ enable_sounds: _enabled })
         // Optimistic UI update — machine may not echo sounds_enabled in status events
+        seedSnapshot = { ...seedSnapshot, sounds_enabled: _enabled }
         statusCallbacks.forEach(cb => cb({ sounds_enabled: _enabled } as unknown as StatusData))
         return wrapResult(true)
       } catch (e) {
@@ -244,6 +258,10 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     // -- Telemetry ----------------------------------------------------------
     onStatus: (cb: StatusCallback): Unsubscribe => {
       statusCallbacks.add(cb)
+      // Replay seed snapshot so late subscribers get total_shots, firmware, sounds
+      if (Object.keys(seedSnapshot).length > 0) {
+        queueMicrotask(() => cb(seedSnapshot as unknown as StatusData))
+      }
       return () => { statusCallbacks.delete(cb) }
     },
     onActuators: (cb: ActuatorsCallback): Unsubscribe => {

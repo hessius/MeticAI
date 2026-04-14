@@ -8,7 +8,7 @@
  *  • Quick-action buttons (idle) or live shot metrics (brewing)
  *  • An expand toggle that reveals ControlCenterExpanded
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -27,6 +27,7 @@ import {
   Thermometer,
   Coffee,
   Warning,
+  ArrowsClockwise,
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -34,7 +35,10 @@ import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useActionSheet } from '@/hooks/useActionSheet'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
+import { Capacitor } from '@capacitor/core'
+import { toast } from 'sonner'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 
 // ---------------------------------------------------------------------------
@@ -100,7 +104,10 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const prevShotsRef = useRef<number | null>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
+  const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
   const { impact } = useHaptics()
+  const { showActionSheet } = useActionSheet()
+  const isNativePlatform = Capacitor.isNativePlatform()
 
   // Shared state derivation + command executor
   const {
@@ -108,6 +115,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     canStart, canAbortWarmup, cmd,
   } = useMachineActions(machineState)
   const machine = useMachineService()
+  const isConnected = machineState.connected ?? false
 
   // Build the profile image URL when active_profile changes
   // Suppress MeticAI-managed temp profiles — they're transient and deleted after cleanup.
@@ -126,32 +134,55 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     }
   }, [activeProfile])
 
+  // Fetch profiles (for author + change selector) — once on mount
   useEffect(() => {
     let cancelled = false
-    if (!activeProfile) {
-      return
-    }
     ;(async () => {
-      if (!cancelled) {
-        setProfileImgError(false)
-      }
-      // Fetch profile author from machine profiles
       try {
         const base = await getServerUrl()
         const res = await fetch(`${base}/api/machine/profiles`)
         if (res.ok && !cancelled) {
           const data = await res.json()
-          const match = (data.profiles ?? []).find(
-            (p: { name: string; author?: string }) => p.name === activeProfile
-          )
-          setProfileAuthor(match?.author ?? null)
+          const profiles = (data.profiles ?? [])
+            .filter((p: { id: string; name?: string }) => p.name)
+            .map((p: { id: string; name: string; author?: string }) => ({ id: p.id, name: p.name, author: p.author }))
+          setMachineProfiles(profiles)
+          // Resolve author for current profile
+          if (activeProfile) {
+            const match = profiles.find(
+              (p: { name: string; author?: string }) => p.name === activeProfile
+            )
+            setProfileAuthor(match?.author ?? null)
+          }
         }
       } catch {
-        // Silently ignore — author just won't show
+        // Silently ignore
       }
     })()
     return () => { cancelled = true }
   }, [activeProfile])
+
+  // Profile change handler for the collapsed view selector
+  const handleChangeProfile = useCallback(async () => {
+    if (machineProfiles.length === 0) return
+    impact('light')
+    if (isNativePlatform) {
+      const names = machineProfiles.map(p => p.name)
+      const index = await showActionSheet({
+        title: t('controlCenter.profileSelector.placeholder'),
+        options: names,
+      })
+      if (index >= 0 && index < names.length) {
+        const name = names[index]
+        const res = await machine.loadProfile(name)
+        if (res.success) {
+          toast.success(t('controlCenter.toasts.profileSelected', { name }))
+        } else {
+          toast.error(res.message ?? t('controlCenter.toasts.error'))
+        }
+      }
+    }
+  }, [machineProfiles, isNativePlatform, showActionSheet, t, machine, impact])
 
   // 🎉 Confetti celebration for every 100th shot
   useEffect(() => {
@@ -261,14 +292,14 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             )
           })()}
 
-          {/* Active profile with image + author */}
+          {/* Active profile with image + author + change button */}
           {activeProfile && (
             <div className="space-y-1">
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('controlCenter.sections.activeProfile')}
               </h4>
               <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                 {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}
@@ -277,11 +308,11 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                     onError={() => setProfileImgError(true)}
                   />
                 ) : (
-                  <Coffee size={14} className="text-muted-foreground" weight="duotone" />
+                  <Coffee size={18} className="text-muted-foreground" weight="duotone" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-xs text-foreground font-medium truncate block">
+                <span className="text-sm text-foreground font-medium truncate block">
                   {activeProfile}
                 </span>
                 {profileAuthor && (
@@ -290,6 +321,16 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                   </span>
                 )}
               </div>
+              {/* Change profile button — only when idle and profiles available */}
+              {machineProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected && (
+                <button
+                  className="shrink-0 p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  onClick={handleChangeProfile}
+                  aria-label={t('controlCenter.profileSelector.placeholder')}
+                >
+                  <ArrowsClockwise size={16} weight="bold" />
+                </button>
+              )}
               </div>
             </div>
           )}

@@ -809,7 +809,12 @@
       "sounds": "Ljud",
       "firmware": "Firmware",
       "lastShot": "Senaste bryggning",
-      "by": "av"
+      "by": "av",
+      "softwareVersion": "Mjukvara",
+      "imageVersion": "Bildversion",
+      "updateChannel": "Uppdateringskanal",
+      "serial": "Serienummer",
+      "model": "Modell"
     },
     "lastShot": {
       "title": "Bryggning gjord {{time}}",

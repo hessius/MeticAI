@@ -804,7 +804,12 @@
       "sounds": "Töne",
       "firmware": "Firmware",
       "lastShot": "Letzter Bezug",
-      "by": "von"
+      "by": "von",
+      "softwareVersion": "Software",
+      "imageVersion": "Image-Version",
+      "updateChannel": "Update-Kanal",
+      "serial": "Seriennummer",
+      "model": "Modell"
     },
     "lastShot": {
       "title": "Bezug vor {{time}}",

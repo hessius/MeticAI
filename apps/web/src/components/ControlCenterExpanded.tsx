@@ -2,8 +2,7 @@
  * ControlCenterExpanded — the full control panel that renders inside
  * the ControlCenter card when the user clicks "Show all".
  *
- * Shows all temperatures, machine info, brightness/sounds controls,
- * and every available command button.
+ * Section order: Profile → Temperatures → Actions → Settings → Machine Info
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -42,6 +41,8 @@ import {
   SpeakerSlash,
   Sun as SunIcon,
   Coffee,
+  CaretDown,
+  Info,
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -53,6 +54,7 @@ import { useHaptics } from '@/hooks/useHaptics'
 import { useActionSheet } from '@/hooks/useActionSheet'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { Capacitor } from '@capacitor/core'
+import type { DeviceInfo } from '@meticulous-home/espresso-api'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -78,6 +80,7 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   const [profileImgError, setProfileImgError] = useState(false)
   const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
   const [profilesLoaded, setProfilesLoaded] = useState(false)
+  const [deviceInfo, setDeviceInfo] = useState<Partial<DeviceInfo> | null>(null)
 
   // Shared state derivation + command executor
   const {
@@ -111,7 +114,9 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
         if (res.ok && !cancelled) {
           const data = await res.json()
           setMachineProfiles(
-            (data.profiles ?? []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))
+            (data.profiles ?? [])
+              .filter((p: { id: string; name?: string }) => p.name)
+              .map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))
           )
         }
       } catch {
@@ -122,6 +127,20 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     })()
     return () => { cancelled = true }
   }, [])
+
+  // Fetch device info once when expanded
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const info = await machine.getDeviceInfo()
+        if (!cancelled && info) setDeviceInfo(info)
+      } catch {
+        // Silently ignore — section just won't show
+      }
+    })()
+    return () => { cancelled = true }
+  }, [machine])
 
   const handleBrightnessChange = useCallback(
     async (val: number[]) => {
@@ -148,27 +167,24 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
     [t, machine],
   )
 
+  // Determine if we have any machine info to display
+  const hasMachineInfo = !!(
+    machineState.total_shots != null ||
+    machineState.last_shot_time ||
+    machineState.firmware_version ||
+    deviceInfo?.firmware ||
+    deviceInfo?.software_version ||
+    deviceInfo?.image_version ||
+    deviceInfo?.image_build_channel ||
+    deviceInfo?.serial ||
+    deviceInfo?.model_version
+  )
+
   return (
     <div className="pt-3 space-y-4">
       <Separator />
 
-      {/* ── Temperatures ──────────────────────────────── */}
-      <section>
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {t('controlCenter.sections.temperatures')}
-        </h4>
-        <div className="space-y-1 text-sm">
-          <Row label={t('controlCenter.labels.brewHead')} value={fmt(machineState.brew_head_temperature, '°C')} />
-          <Row label={t('controlCenter.labels.boiler')} value={fmt(machineState.boiler_temperature, '°C')} />
-          {!isIdle && (
-            <Row label={t('controlCenter.labels.target')} value={fmt(machineState.target_temperature, '°C')} />
-          )}
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* ── Profile ─────────────────────────────────── */}
+      {/* ── 1. Active Profile + Selector ─────────────────── */}
       <section>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           {t('controlCenter.sections.activeProfile')}
@@ -226,7 +242,8 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
                     }
                   }}
                 >
-                  {activeProfile ?? t('controlCenter.profileSelector.placeholder')}
+                  <span className="truncate">{activeProfile ?? t('controlCenter.profileSelector.placeholder')}</span>
+                  <CaretDown size={14} className="shrink-0 ml-1 text-muted-foreground" />
                 </Button>
               ) : (
                 <Select
@@ -260,66 +277,23 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
 
       <Separator />
 
-      {/* ── Machine info ──────────────────────────────── */}
+      {/* ── 2. Temperatures ──────────────────────────────── */}
       <section>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {t('controlCenter.sections.info')}
+          {t('controlCenter.sections.temperatures')}
         </h4>
         <div className="space-y-1 text-sm">
-          <Row label={t('controlCenter.labels.shots')} value={machineState.total_shots?.toLocaleString() ?? '—'} />
-          {machineState.last_shot_time && (
-            <Row label={t('controlCenter.labels.lastShot')} value={relativeTime(machineState.last_shot_time, t) ?? '—'} />
-          )}
-          {machineState.firmware_version && (
-            <Row label={t('controlCenter.labels.firmware')} value={machineState.firmware_version} />
+          <Row label={t('controlCenter.labels.brewHead')} value={fmt(machineState.brew_head_temperature, '°C')} />
+          <Row label={t('controlCenter.labels.boiler')} value={fmt(machineState.boiler_temperature, '°C')} />
+          {!isIdle && (
+            <Row label={t('controlCenter.labels.target')} value={fmt(machineState.target_temperature, '°C')} />
           )}
         </div>
       </section>
 
       <Separator />
 
-      {/* ── Machine settings ──────────────────────────── */}
-      <section>
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {t('controlCenter.sections.settings')}
-        </h4>
-        <div className="space-y-3">
-          {/* Brightness slider */}
-          <div className="flex items-center gap-3">
-            <SunIcon size={16} className="text-muted-foreground shrink-0" weight="duotone" />
-            <Slider
-              min={0}
-              max={100}
-              step={5}
-              value={[brightnessValue]}
-              onValueCommit={handleBrightnessChange}
-              className="flex-1"
-              disabled={!isConnected}
-            />
-            <span className="text-xs tabular-nums text-muted-foreground w-8 text-right">{brightnessValue}</span>
-          </div>
-          {/* Sounds toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {machineState.sounds_enabled ? (
-                <SpeakerHigh size={16} className="text-muted-foreground" weight="duotone" />
-              ) : (
-                <SpeakerSlash size={16} className="text-muted-foreground" weight="duotone" />
-              )}
-              <span className="text-sm text-foreground">{t('controlCenter.labels.sounds')}</span>
-            </div>
-            <Switch
-              checked={machineState.sounds_enabled ?? false}
-              onCheckedChange={handleSoundsToggle}
-              disabled={!isConnected}
-            />
-          </div>
-        </div>
-      </section>
-
-      <Separator />
-
-      {/* ── All Actions ───────────────────────────────── */}
+      {/* ── 3. All Actions ───────────────────────────────── */}
       <section>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           {t('controlCenter.sections.actions')}
@@ -390,6 +364,86 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
           />
         </div>
       </section>
+
+      <Separator />
+
+      {/* ── 4. Machine Settings ──────────────────────────── */}
+      <section>
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          {t('controlCenter.sections.settings')}
+        </h4>
+        <div className="space-y-3">
+          {/* Brightness slider */}
+          <div className="flex items-center gap-3">
+            <SunIcon size={16} className="text-muted-foreground shrink-0" weight="duotone" />
+            <Slider
+              min={0}
+              max={100}
+              step={5}
+              value={[brightnessValue]}
+              onValueCommit={handleBrightnessChange}
+              className="flex-1"
+              disabled={!isConnected}
+            />
+            <span className="text-xs tabular-nums text-muted-foreground w-8 text-right">{brightnessValue}</span>
+          </div>
+          {/* Sounds toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {machineState.sounds_enabled ? (
+                <SpeakerHigh size={16} className="text-muted-foreground" weight="duotone" />
+              ) : (
+                <SpeakerSlash size={16} className="text-muted-foreground" weight="duotone" />
+              )}
+              <span className="text-sm text-foreground">{t('controlCenter.labels.sounds')}</span>
+            </div>
+            <Switch
+              checked={machineState.sounds_enabled ?? false}
+              onCheckedChange={handleSoundsToggle}
+              disabled={!isConnected}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── 5. Machine Info (enriched, fail-silently) ───── */}
+      {hasMachineInfo && (
+        <>
+          <Separator />
+          <section>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              <Info size={12} className="inline mr-1 -mt-0.5" weight="fill" />
+              {t('controlCenter.sections.info')}
+            </h4>
+            <div className="space-y-1 text-sm">
+              {machineState.total_shots != null && (
+                <Row label={t('controlCenter.labels.shots')} value={machineState.total_shots.toLocaleString()} />
+              )}
+              {machineState.last_shot_time && (
+                <Row label={t('controlCenter.labels.lastShot')} value={relativeTime(machineState.last_shot_time, t) ?? '—'} />
+              )}
+              {(machineState.firmware_version || deviceInfo?.firmware) && (
+                <Row label={t('controlCenter.labels.firmware')} value={machineState.firmware_version ?? deviceInfo?.firmware ?? ''} />
+              )}
+              {deviceInfo?.software_version && (
+                <Row label={t('controlCenter.labels.softwareVersion')} value={deviceInfo.software_version} />
+              )}
+              {deviceInfo?.image_version && (
+                <Row label={t('controlCenter.labels.imageVersion')} value={deviceInfo.image_version} />
+              )}
+              {deviceInfo?.image_build_channel && (
+                <Row label={t('controlCenter.labels.updateChannel')} value={deviceInfo.image_build_channel} />
+              )}
+              {deviceInfo?.serial && (
+                <Row label={t('controlCenter.labels.serial')} value={deviceInfo.serial} />
+              )}
+              {deviceInfo?.model_version && (
+                <Row label={t('controlCenter.labels.model')} value={deviceInfo.model_version} />
+              )}
+            </div>
+          </section>
+        </>
+      )}
     </div>
   )
 }

@@ -809,7 +809,12 @@
       "shots": "Total Shots",
       "sounds": "Sounds",
       "firmware": "Firmware",
-      "lastShot": "Last Shot"
+      "lastShot": "Last Shot",
+      "softwareVersion": "Software",
+      "imageVersion": "Image Version",
+      "updateChannel": "Update Channel",
+      "serial": "Serial",
+      "model": "Model"
     },
     "lastShot": {
       "title": "Shot pulled {{time}}",
