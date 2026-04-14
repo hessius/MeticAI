@@ -230,7 +230,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   }
 
   return (
-    <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
+    <Card className={`frosted-card p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
       {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>

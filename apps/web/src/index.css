@@ -519,6 +519,14 @@
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
 }
 
+/* ── Frosted glass card (control centre etc.) ──────────────── */
+.frosted-card {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* ── Ember button (warm border glow) ───────────────────────── */
 .ember-button {
   background: rgba(255, 143, 0, 0.08);
@@ -685,8 +693,13 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
+:root:not(.dark) .frosted-card {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border: 1px solid rgba(78, 52, 46, 0.1);
+}
+
 :root:not(.dark) .ambient-blob {
-  opacity: 0.25;
+  opacity: 0.35;
   filter: blur(100px);
 }
 

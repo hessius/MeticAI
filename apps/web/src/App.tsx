@@ -307,7 +307,7 @@ function App() {
 
   const isHome = viewState === 'start'
 
-  // Dynamic Island animation: title → pill with greeting after 3s
+  // Dynamic Island animation: title → pill with greeting after 3s, tappable to toggle
   const [islandExpanded, setIslandExpanded] = useState(false)
   const islandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -319,6 +319,11 @@ function App() {
     }
     return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
   }, [isHome, smartGreeting])
+
+  const toggleIsland = useCallback(() => {
+    if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
+    setIslandExpanded(prev => !prev)
+  }, [])
 
   // Check for existing profiles on mount
   useEffect(() => {
@@ -951,114 +956,30 @@ function App() {
       <div className={`flex-1 text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] lg:items-center lg:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
+        {isHome && (
         <header>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className={isHome ? "text-center mb-3 lg:mb-4" : "text-center mb-6"}
+          className="text-center mb-3 lg:mb-4"
         >
-          <div className="flex items-center justify-center gap-3 mb-1 relative">
-            {/* Settings gear — left side, home screen only */}
-            {isHome && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => setViewState('settings')}
-                  aria-label={t('navigation.settings')}
-                >
-                  <Gear size={18} weight="duotone" />
-                </Button>
-              </div>
-            )}
-
-            {/* Home: Dynamic Island — logo+title → pill with greeting */}
-            {isHome && (
-              <motion.div
-                className="flex items-center justify-center overflow-hidden"
-                animate={{
-                  width: islandExpanded ? 'min(100%, 20rem)' : 'auto',
-                  backgroundColor: islandExpanded
-                    ? (isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.85)')
-                    : 'transparent',
-                  borderRadius: 9999,
-                  paddingLeft: islandExpanded ? 6 : 0,
-                  paddingRight: islandExpanded ? 12 : 0,
-                  paddingTop: islandExpanded ? 4 : 0,
-                  paddingBottom: islandExpanded ? 4 : 0,
-                }}
-                transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+          <div className="flex items-center justify-center gap-3 mb-1 relative h-9">
+            {/* Settings gear — left side */}
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                onClick={() => setViewState('settings')}
+                aria-label={t('navigation.settings')}
               >
-                <motion.div
-                  className="shrink-0"
-                  animate={{ scale: islandExpanded ? 0.85 : 1 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <MeticAILogo
-                    size={28}
-                    variant={islandExpanded ? 'white' : (isDark ? 'white' : 'default')}
-                    className="rounded-full"
-                    style={{ background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'), padding: islandExpanded ? 0 : 2 }}
-                  />
-                </motion.div>
+                <Gear size={18} weight="duotone" />
+              </Button>
+            </div>
 
-                <AnimatePresence mode="wait">
-                  {!islandExpanded ? (
-                    <motion.h1
-                      key="title"
-                      className="font-bold tracking-tight text-2xl ml-3"
-                      initial={{ opacity: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      Metic<span className="gold-text">AI</span>
-                    </motion.h1>
-                  ) : smartGreeting && (
-                    <motion.div
-                      key="greeting"
-                      className="ml-2 min-w-0 flex-1"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.4, delay: 0.2 }}
-                    >
-                      {smartGreeting.action ? (
-                        <button
-                          type="button"
-                          className="text-[11px] text-white/80 hover:text-white transition-colors text-left w-full truncate"
-                          onClick={() => handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context)}
-                        >
-                          {smartGreeting.message}
-                        </button>
-                      ) : (
-                        <p className="text-[11px] text-white/80 truncate">{smartGreeting.message}</p>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            )}
-
-            {/* Non-home: standard logo + title (clickable) */}
-            {!isHome && (
-              <div 
-                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={handleTitleClick}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
-                aria-label={t('a11y.goHome')}
-              >
-                <MeticAILogo size={28} variant={isDark ? 'white' : 'default'} />
-                <h1 className="font-bold tracking-tight transition-all duration-300 text-2xl">
-                  Metic<span className="gold-text">AI</span>
-                </h1>
-              </div>
-            )}
-
-            {/* Right-side controls — always visible */}
-            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
+            {/* Theme toggle + QR — right side */}
+            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10" id="navigation" aria-label={t('navigation.settings')}>
               {themeMounted && (
                 <Button
                   variant="ghost"
@@ -1074,18 +995,104 @@ function App() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => setQrDialogOpen(true)}
-                  aria-label={t('a11y.openOnMobile')}
+                    className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                    onClick={() => setQrDialogOpen(true)}
+                    aria-label={t('a11y.openOnMobile')}
+                  >
+                    <QrCode size={18} weight="duotone" />
+                  </Button>
+                )}
+              </nav>
+
+            {/* Dynamic Island — pure CSS transitions for smoothness */}
+            <div
+                role="button"
+                tabIndex={0}
+                onClick={smartGreeting ? toggleIsland : undefined}
+                onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                className="inline-flex items-center cursor-pointer select-none"
+                style={{
+                  height: 36,
+                  width: islandExpanded ? 'min(16rem, calc(100% - 6rem))' : undefined,
+                  background: islandExpanded
+                    ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.85)')
+                    : 'transparent',
+                  borderRadius: 9999,
+                  border: islandExpanded
+                    ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.1)')
+                    : '1px solid transparent',
+                  padding: islandExpanded ? '0 14px 0 8px' : '0',
+                  overflow: 'hidden',
+                  transition: 'width 0.5s cubic-bezier(0.32, 0.72, 0, 1), background 0.5s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.4s ease, padding 0.5s cubic-bezier(0.32, 0.72, 0, 1)',
+                }}
+              >
+                {/* Logo — always visible, smoothly repositions */}
+                <div
+                  className="shrink-0 flex items-center justify-center"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                    transform: islandExpanded ? 'scale(0.9)' : 'scale(1)',
+                  }}
                 >
-                  <QrCode size={18} weight="duotone" />
-                </Button>
-              )}
-            </nav>
+                  <MeticAILogo
+                    size={28}
+                    variant={isDark || islandExpanded ? 'white' : 'default'}
+                    className="rounded-full"
+                    style={{
+                      background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'),
+                      padding: islandExpanded ? 0 : 2,
+                      transition: 'background 0.4s ease, padding 0.3s ease',
+                    }}
+                  />
+                </div>
+
+                {/* Title or greeting — cross-fade */}
+                <div className="relative flex-1 min-w-0 flex items-center" style={{ marginLeft: 10 }}>
+                  {/* Title text */}
+                  <h1
+                    className="font-bold tracking-tight text-2xl whitespace-nowrap absolute inset-0 flex items-center"
+                    style={{
+                      opacity: islandExpanded ? 0 : 1,
+                      transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
+                      transition: 'opacity 0.3s ease, transform 0.3s ease',
+                      pointerEvents: islandExpanded ? 'none' : 'auto',
+                    }}
+                  >
+                    Metic<span className="gold-text">AI</span>
+                  </h1>
+
+                  {/* Greeting text */}
+                  {smartGreeting && (
+                    <div
+                      className="min-w-0 w-full"
+                      style={{
+                        opacity: islandExpanded ? 1 : 0,
+                        transition: 'opacity 0.4s ease 0.15s',
+                        pointerEvents: islandExpanded ? 'auto' : 'none',
+                      }}
+                    >
+                      {smartGreeting.action ? (
+                        <button
+                          type="button"
+                          className="text-xs text-white/85 hover:text-white transition-colors text-left w-full truncate"
+                          onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
+                        >
+                          {smartGreeting.message}
+                        </button>
+                      ) : (
+                        <p className="text-xs text-white/85 truncate">{smartGreeting.message}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
           </div>
 
         </motion.div>
         </header>
+        )}
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
         <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
