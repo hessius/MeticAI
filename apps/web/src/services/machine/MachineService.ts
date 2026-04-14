@@ -18,10 +18,11 @@ import type {
   ProfileIdent,
   Settings as MachineSettings,
   StatusData,
+  Temperatures,
 } from '@meticulous-home/espresso-api'
 
 // Re-export for convenience
-export type { Profile, ProfileIdent, StatusData, Actuators, MachineNotification, MachineSettings, DeviceInfo, ActionType }
+export type { Profile, ProfileIdent, StatusData, Actuators, Temperatures, MachineNotification, MachineSettings, DeviceInfo, ActionType }
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -38,6 +39,7 @@ export interface CommandResult {
 
 export type StatusCallback = (data: StatusData) => void
 export type ActuatorsCallback = (data: Actuators) => void
+export type TemperaturesCallback = (data: Temperatures) => void
 export type NotificationCallback = (data: MachineNotification) => void
 export type ProfileUpdateCallback = (data: { change: string; profile_id?: string }) => void
 export type HeaterStatusCallback = (countdown: number) => void
@@ -85,6 +87,7 @@ export interface MachineService {
   // -- Telemetry (real-time) ------------------------------------------------
   onStatus(cb: StatusCallback): Unsubscribe
   onActuators(cb: ActuatorsCallback): Unsubscribe
+  onTemperatures(cb: TemperaturesCallback): Unsubscribe
   onHeaterStatus(cb: HeaterStatusCallback): Unsubscribe
   onNotification(cb: NotificationCallback): Unsubscribe
   onProfileUpdate(cb: ProfileUpdateCallback): Unsubscribe

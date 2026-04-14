@@ -326,6 +326,10 @@ export function createDemoAdapter(): MachineService {
       return () => actuatorCbs.delete(cb)
     },
 
+    onTemperatures(): Unsubscribe {
+      return () => {}
+    },
+
     onHeaterStatus(cb: HeaterStatusCallback): Unsubscribe {
       heaterCbs.add(cb)
       return () => heaterCbs.delete(cb)

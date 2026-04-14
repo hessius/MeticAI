@@ -14,6 +14,7 @@ import type {
   CommandResult,
   StatusCallback,
   ActuatorsCallback,
+  TemperaturesCallback,
   NotificationCallback,
   ProfileUpdateCallback,
   ConnectionCallback,
@@ -25,6 +26,7 @@ import type {
   HistoryListingEntry,
   Settings as MachineSettings,
   StatusData,
+  Temperatures,
 } from '@meticulous-home/espresso-api'
 
 // ---------------------------------------------------------------------------
@@ -49,6 +51,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
   const connectionCallbacks = new Set<ConnectionCallback>()
   const statusCallbacks = new Set<StatusCallback>()
   const actuatorCallbacks = new Set<ActuatorsCallback>()
+  const temperaturesCallbacks = new Set<TemperaturesCallback>()
   const notificationCallbacks = new Set<NotificationCallback>()
   const heaterStatusCallbacks = new Set<(countdown: number) => void>()
   const profileUpdateCallbacks = new Set<ProfileUpdateCallback>()
@@ -86,6 +89,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
     socket.on('status', (data) => statusCallbacks.forEach(cb => cb(data)))
+    socket.on('sensors', (data: Temperatures) => temperaturesCallbacks.forEach(cb => cb(data)))
     socket.on('actuators', (data) => actuatorCallbacks.forEach(cb => cb(data)))
     socket.on('heater_status', (data: number) => heaterStatusCallbacks.forEach(cb => cb(data)))
     socket.on('notification', (data) => notificationCallbacks.forEach(cb => cb(data)))
@@ -275,6 +279,10 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     onActuators: (cb: ActuatorsCallback): Unsubscribe => {
       actuatorCallbacks.add(cb)
       return () => { actuatorCallbacks.delete(cb) }
+    },
+    onTemperatures: (cb: TemperaturesCallback): Unsubscribe => {
+      temperaturesCallbacks.add(cb)
+      return () => { temperaturesCallbacks.delete(cb) }
     },
     onHeaterStatus: (cb: (countdown: number) => void): Unsubscribe => {
       heaterStatusCallbacks.add(cb)

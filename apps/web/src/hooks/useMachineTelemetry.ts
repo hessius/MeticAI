@@ -130,9 +130,9 @@ function useDirectTelemetry(enabled: boolean): MachineState {
           _wsConnected: true,
           availability: 'online',
           boiler_temperature: clampTemp(data.sensors?.t, prev.boiler_temperature),
-          // sensors.g (grouphead) is unreliable on some firmware — flickers 0.
-          // Use boiler temp (sensors.t) for both until grouphead stabilises.
-          brew_head_temperature: clampTemp(data.sensors?.t, prev.brew_head_temperature),
+          // brew_head comes from the separate 'sensors' event (t_ext_1), not status.
+          // Keep previous value here — onTemperatures updates it.
+          brew_head_temperature: prev.brew_head_temperature,
           pressure: data.sensors?.p ?? prev.pressure,
           flow_rate: data.sensors?.f ?? prev.flow_rate,
           shot_weight: data.sensors?.w ?? prev.shot_weight,
@@ -159,6 +159,15 @@ function useDirectTelemetry(enabled: boolean): MachineState {
       setState(prev => ({
         ...prev,
         power: data.bh_pwr ?? prev.power,
+      }))
+    }))
+
+    // Temperatures event — separate Socket.IO 'sensors' event with detailed temps.
+    // t_ext_1 = brew head / grouphead temperature (matches MQTT brew_head_temperature topic).
+    unsubs.push(machine.onTemperatures((data) => {
+      setState(prev => ({
+        ...prev,
+        brew_head_temperature: clampTemp(data.t_ext_1, prev.brew_head_temperature),
       }))
     }))
 

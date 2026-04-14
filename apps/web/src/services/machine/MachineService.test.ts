@@ -102,7 +102,7 @@ describe('MachineService adapter interface parity', () => {
       // Profiles
       'listProfiles', 'fetchAllProfiles', 'getProfile', 'saveProfile', 'deleteProfile',
       // Telemetry
-      'onStatus', 'onActuators', 'onHeaterStatus', 'onNotification', 'onProfileUpdate',
+      'onStatus', 'onActuators', 'onTemperatures', 'onHeaterStatus', 'onNotification', 'onProfileUpdate',
       // History
       'getHistoryListing', 'getLastShot',
       // Settings
@@ -149,7 +149,7 @@ describe('MachineService adapter interface parity', () => {
   // -------------------------------------------------------------------
   describe('telemetry subscriptions return unsubscribe functions', () => {
     const TELEMETRY_METHODS = [
-      'onStatus', 'onActuators', 'onHeaterStatus',
+      'onStatus', 'onActuators', 'onTemperatures', 'onHeaterStatus',
       'onNotification', 'onProfileUpdate', 'onConnectionChange',
     ] as const
 
