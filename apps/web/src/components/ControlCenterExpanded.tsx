@@ -34,7 +34,6 @@ import {
   SpeakerHigh,
   SpeakerSlash,
   Sun as SunIcon,
-  Info,
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -265,7 +264,6 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
           <Separator />
           <section>
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              <Info size={12} className="inline mr-1 -mt-0.5" weight="fill" />
               {t('controlCenter.sections.info')}
             </h4>
             <div className="space-y-1 text-sm">
