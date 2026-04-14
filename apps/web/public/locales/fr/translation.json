@@ -1121,7 +1121,7 @@
       "deleteProfileFailed": "Échec de la suppression du profil"
     },
     "fetchFailed": "Échec du chargement des profils",
-    "offlineBanner": "Machine hors ligne — affichage des profils en cache",
+    "offlineBanner": "Machine hors ligne - affichage des profils en cache",
     "addButton": "Ajouter",
     "onMachine": "Sur la machine",
     "importButton": "Importer",
@@ -1311,7 +1311,7 @@
     "under": "Sous",
     "over": "Sur",
     "goldenRulesTitle": "Règles d'or pour le Meticulous",
-    "ruleStartSimple": "<strong>Commencez simple.</strong> Commencez avec un profil intégré du Meticulous (comme \"Italian\"). Maîtrisez d'abord la dose, le rendement et la température — ce sont les leviers les plus importants. Le contrôle avancé du débit et de la pression est puissant, mais fonctionne mieux quand les bases sont en place.",
+    "ruleStartSimple": "<strong>Commencez simple.</strong> Commencez avec un profil intégré du Meticulous (comme \"Italian\"). Maîtrisez d'abord la dose, le rendement et la température - ce sont les leviers les plus importants. Le contrôle avancé du débit et de la pression est puissant, mais fonctionne mieux quand les bases sont en place.",
     "ruleDontChangeDose": "Lorsque vous ajustez le rendement (poids final), <strong>ne changez pas la dose</strong> dans votre porte-filtre; changez uniquement le profil.",
     "ruleYieldTime": "Changer le rendement changera intrinsèquement le temps d'extraction. N'ajustez la mouture que si le temps est très éloigné de la cible. Pour modifier la direction du goût, les ajustements de profil sont plus efficaces que la mouture seule.",
     "ruleEvenExtraction": "Une extraction parfaitement uniforme crée un \"sweet spot\" plus large: concentrez-vous d'abord sur la préparation du puck.",
@@ -1620,16 +1620,16 @@
     "pourOverCompleteBody": "Votre minuteur pour-over est terminé"
   },
   "smartGreeting": {
-    "justBrewed": "Vous venez de tirer un shot avec {{profile}} — pourquoi ne pas l analyser ?",
+    "justBrewed": "Vous venez de tirer un shot avec {{profile}}.\nPourquoi ne pas l analyser ?",
     "analyzeAction": "Analyser",
     "milestone": "{{count}} shots tirés, plus que {{remaining}} avant {{milestone}} !",
-    "longGap": "Presque {{hours}}h depuis votre dernier shot — envie d un café ?",
-    "unusedProfile": "Vous n avez pas encore essayé {{name}} — tentez le coup !",
+    "longGap": "Presque {{hours}}h depuis votre dernier shot.\nEnvie d un café ?",
+    "unusedProfile": "Vous n avez pas encore essayé {{name}}.\nTentez le coup !",
     "browseAction": "Parcourir les profils",
     "anniversary": "Vous utilisez MeticAI depuis {{days}} jours !",
     "dialIn": "Comment était cette tasse ? Besoin d ajuster ?",
     "dialInAction": "Ajuster",
-    "fewProfiles": "Vous n avez que {{count}} profils — en créer un nouveau ?",
+    "fewProfiles": "Vous n avez que {{count}} profils.\nEn créer un nouveau ?",
     "createAction": "Créer un profil"
   }
 }

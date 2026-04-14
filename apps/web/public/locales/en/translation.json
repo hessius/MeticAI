@@ -1067,7 +1067,7 @@
       "deleteProfileFailed": "Failed to delete profile"
     },
     "fetchFailed": "Failed to load profiles",
-    "offlineBanner": "Machine is offline — showing cached profiles",
+    "offlineBanner": "Machine is offline - showing cached profiles",
     "addButton": "Add",
     "onMachine": "On machine",
     "importButton": "Import",
@@ -1311,7 +1311,7 @@
     "under": "Under",
     "over": "Over",
     "goldenRulesTitle": "Golden Rules for the Meticulous",
-    "ruleStartSimple": "<strong>Start simple.</strong> Begin with a built-in Meticulous profile (like \"Italian\"). Master dose, yield, and temperature first — these are the biggest levers. Advanced flow and pressure control is powerful, but works best when the basics are dialed.",
+    "ruleStartSimple": "<strong>Start simple.</strong> Begin with a built-in Meticulous profile (like \"Italian\"). Master dose, yield, and temperature first - these are the biggest levers. Advanced flow and pressure control is powerful, but works best when the basics are dialed.",
     "ruleDontChangeDose": "When adjusting yield (final weight), <strong>don't change the dose</strong> in your portafilter; only change the profile.",
     "ruleYieldTime": "Changing yield will inherently change your shot time. Adjust grind only if your shot time is wildly off target. For flavor direction changes, profile adjustments are more effective than grind alone.",
     "ruleEvenExtraction": "A perfectly even extraction creates a larger \"sweet spot\" to work within: focus on puck prep first.",
@@ -1623,16 +1623,16 @@
     "pourOverCompleteBody": "Your pour over timer has finished"
   },
   "smartGreeting": {
-    "justBrewed": "You just pulled a shot on {{profile}} — why not analyze it?",
+    "justBrewed": "You just pulled a shot on {{profile}}.\nWhy not analyze it?",
     "analyzeAction": "Analyze",
     "milestone": "{{count}} shots down, only {{remaining}} to go until {{milestone}}!",
-    "longGap": "Almost {{hours}}h since your last shot — time for coffee?",
-    "unusedProfile": "You haven't tried {{name}} yet — give it a go!",
+    "longGap": "Almost {{hours}}h since your last shot.\nTime for coffee?",
+    "unusedProfile": "You haven't tried {{name}} yet.\nGive it a go!",
     "browseAction": "Browse profiles",
     "anniversary": "You've been using MeticAI for {{days}} days!",
     "dialIn": "How was that cup? Need to dial in?",
     "dialInAction": "Dial in",
-    "fewProfiles": "You only have {{count}} profiles — why not create a new one?",
+    "fewProfiles": "You only have {{count}} profiles.\nWhy not create a new one?",
     "createAction": "Create profile"
   }
 }

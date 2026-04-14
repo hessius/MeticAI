@@ -1121,7 +1121,7 @@
       "deleteProfileFailed": "Kunde inte ta bort profilen"
     },
     "fetchFailed": "Kunde inte ladda profiler",
-    "offlineBanner": "Maskinen är offline — visar cachade profiler",
+    "offlineBanner": "Maskinen är offline - visar cachade profiler",
     "addButton": "Lägg till",
     "onMachine": "På maskinen",
     "importButton": "Importera",
@@ -1311,7 +1311,7 @@
     "under": "Under",
     "over": "Över",
     "goldenRulesTitle": "Gyllene regler för Meticulous",
-    "ruleStartSimple": "<strong>Börja enkelt.</strong> Börja med en inbyggd Meticulous-profil (t.ex. \"Italian\"). Bemästra dos, utbyte och temperatur först — det är de största spakarna. Avancerad flödes- och tryckkontroll är kraftfullt, men fungerar bäst när grunderna sitter.",
+    "ruleStartSimple": "<strong>Börja enkelt.</strong> Börja med en inbyggd Meticulous-profil (t.ex. \"Italian\"). Bemästra dos, utbyte och temperatur först - det är de största spakarna. Avancerad flödes- och tryckkontroll är kraftfullt, men fungerar bäst när grunderna sitter.",
     "ruleDontChangeDose": "När du justerar utbytet (slutvikt), <strong>ändra inte dosen</strong> i din portafilter; ändra bara profilen.",
     "ruleYieldTime": "Att ändra utbytet kommer i sig att ändra shottiden. Justera bara malningsgraden om shottiden är långt från målet. För smakförändringar är profiljusteringar mer effektiva än enbart malning.",
     "ruleEvenExtraction": "En perfekt jämn extraktion skapar ett större \"sweet spot\" att arbeta inom: fokusera på puckprep först.",
@@ -1620,16 +1620,16 @@
     "pourOverCompleteBody": "Din pour-over-timer har avslutats"
   },
   "smartGreeting": {
-    "justBrewed": "Du drog precis ett skott på {{profile}} — varför inte analysera det?",
+    "justBrewed": "Du drog precis ett skott på {{profile}}.\nVarför inte analysera det?",
     "analyzeAction": "Analysera",
     "milestone": "{{count}} skott avklarade, bara {{remaining}} kvar till {{milestone}}!",
-    "longGap": "Nästan {{hours}}h sedan ditt senaste skott — dags för kaffe?",
-    "unusedProfile": "Du har inte provat {{name}} ännu — testa!",
+    "longGap": "Nästan {{hours}}h sedan ditt senaste skott.\nDags för kaffe?",
+    "unusedProfile": "Du har inte provat {{name}} ännu.\nTesta!",
     "browseAction": "Bläddra profiler",
     "anniversary": "Du har använt MeticAI i {{days}} dagar!",
     "dialIn": "Hur var den koppen? Behöver du justera?",
     "dialInAction": "Justera",
-    "fewProfiles": "Du har bara {{count}} profiler — skapa en ny?",
+    "fewProfiles": "Du har bara {{count}} profiler.\nSkapa en ny?",
     "createAction": "Skapa profil"
   }
 }

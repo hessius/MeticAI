@@ -964,7 +964,7 @@ function App() {
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
           className="text-center mb-3 lg:mb-4"
         >
-          <div className="flex items-center justify-center gap-3 mb-1 relative" style={{ minHeight: 44 }}>
+          <div className="flex items-center justify-center gap-3 mb-1 relative" style={{ minHeight: 48 }}>
             {/* Settings gear — left side */}
             <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
               <Button
@@ -1014,8 +1014,8 @@ function App() {
                   onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                   className="inline-flex items-center cursor-pointer select-none"
                   style={{
-                    height: islandExpanded ? 48 : 36,
-                    width: islandExpanded ? 'min(18rem, calc(100vw - 8rem))' : 36,
+                    height: islandExpanded ? 48 : 40,
+                    width: islandExpanded ? 'min(18rem, calc(100vw - 8rem))' : 40,
                     background: islandExpanded
                       ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
                       : 'transparent',
@@ -1035,14 +1035,14 @@ function App() {
                   <div
                     className="shrink-0 flex items-center justify-center"
                     style={{
-                      width: 28,
-                      height: 28,
+                      width: 32,
+                      height: 32,
                       transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
-                      transform: islandExpanded ? 'scale(0.9)' : 'scale(1)',
+                      transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
                     }}
                   >
                     <MeticAILogo
-                      size={28}
+                      size={32}
                       variant={isDark ? 'white' : 'default'}
                       className="rounded-full"
                       style={{
@@ -1062,8 +1062,8 @@ function App() {
                         opacity: islandExpanded ? 1 : 0,
                         transition: 'opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                         pointerEvents: islandExpanded ? 'auto' : 'none',
-                        maskImage: 'linear-gradient(to right, transparent 0px, black 8px, black calc(100% - 12px), transparent 100%)',
-                        WebkitMaskImage: 'linear-gradient(to right, transparent 0px, black 8px, black calc(100% - 12px), transparent 100%)',
+                        maskImage: islandExpanded ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        WebkitMaskImage: islandExpanded ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
                       }}
                     >
                       {smartGreeting.action ? (
@@ -1089,9 +1089,9 @@ function App() {
                 tabIndex={0}
                 onClick={smartGreeting ? toggleIsland : undefined}
                 onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
-                className="font-bold tracking-tight text-2xl whitespace-nowrap overflow-hidden cursor-pointer select-none"
+                className="font-bold tracking-tight text-3xl whitespace-nowrap overflow-hidden cursor-pointer select-none"
                 style={{
-                  maxWidth: islandExpanded ? 0 : 120,
+                  maxWidth: islandExpanded ? 0 : 140,
                   opacity: islandExpanded ? 0 : 1,
                   marginLeft: islandExpanded ? 0 : 8,
                   transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',

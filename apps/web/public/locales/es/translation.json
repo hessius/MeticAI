@@ -1121,7 +1121,7 @@
       "deleteProfileFailed": "Error al eliminar el perfil"
     },
     "fetchFailed": "Error al cargar perfiles",
-    "offlineBanner": "Máquina desconectada — mostrando perfiles en caché",
+    "offlineBanner": "Máquina desconectada - mostrando perfiles en caché",
     "addButton": "Añadir",
     "onMachine": "En la máquina",
     "importButton": "Importar",
@@ -1311,7 +1311,7 @@
     "under": "Sub",
     "over": "Sobre",
     "goldenRulesTitle": "Reglas de oro para el Meticulous",
-    "ruleStartSimple": "<strong>Empieza simple.</strong> Comienza con un perfil integrado de Meticulous (como \"Italian\"). Domina primero la dosis, el rendimiento y la temperatura — son las palancas más importantes. El control avanzado de flujo y presión es potente, pero funciona mejor cuando lo básico está ajustado.",
+    "ruleStartSimple": "<strong>Empieza simple.</strong> Comienza con un perfil integrado de Meticulous (como \"Italian\"). Domina primero la dosis, el rendimiento y la temperatura - son las palancas más importantes. El control avanzado de flujo y presión es potente, pero funciona mejor cuando lo básico está ajustado.",
     "ruleDontChangeDose": "Al ajustar el rendimiento (peso final), <strong>no cambies la dosis</strong> en tu portafiltro; solo cambia el perfil.",
     "ruleYieldTime": "Cambiar el rendimiento cambiará inherentemente el tiempo del shot. Ajusta la molienda solo si el tiempo está muy lejos del objetivo. Para cambios de dirección de sabor, los ajustes de perfil son más efectivos que la molienda sola.",
     "ruleEvenExtraction": "Una extracción perfectamente uniforme crea un \"sweet spot\" más amplio: enfócate en la preparación del puck primero.",
@@ -1620,16 +1620,16 @@
     "pourOverCompleteBody": "Tu temporizador de pour-over ha finalizado"
   },
   "smartGreeting": {
-    "justBrewed": "Acabas de sacar un shot con {{profile}} — ¿por qué no analizarlo?",
+    "justBrewed": "Acabas de sacar un shot con {{profile}}.\n¿Por qué no analizarlo?",
     "analyzeAction": "Analizar",
     "milestone": "¡{{count}} shots hechos, solo faltan {{remaining}} para {{milestone}}!",
-    "longGap": "Casi {{hours}}h desde tu último shot — ¿hora de un café?",
-    "unusedProfile": "¡Aún no has probado {{name}} — dale una oportunidad!",
+    "longGap": "Casi {{hours}}h desde tu último shot.\n¿Hora de un café?",
+    "unusedProfile": "¡Aún no has probado {{name}}.\nDale una oportunidad!",
     "browseAction": "Ver perfiles",
     "anniversary": "¡Llevas usando MeticAI {{days}} días!",
     "dialIn": "¿Qué tal esa taza? ¿Necesitas ajustar?",
     "dialInAction": "Ajustar",
-    "fewProfiles": "Solo tienes {{count}} perfiles — ¿crear uno nuevo?",
+    "fewProfiles": "Solo tienes {{count}} perfiles.\n¿Crear uno nuevo?",
     "createAction": "Crear perfil"
   }
 }
