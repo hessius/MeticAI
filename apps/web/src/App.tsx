@@ -957,7 +957,7 @@ function App() {
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         {isHome && (
-        <header className="sticky top-0 z-20 backdrop-blur-md" style={{ top: 'var(--safe-pt, 0px)' }}>
+        <header>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
