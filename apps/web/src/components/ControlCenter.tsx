@@ -260,8 +260,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             <div className="flex items-baseline gap-1.5">
               <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
               <span className="text-2xl font-bold tabular-nums text-foreground">
-                {machineState.brew_head_temperature != null
-                  ? machineState.brew_head_temperature.toFixed(1)
+                {machineState.boiler_temperature != null
+                  ? machineState.boiler_temperature.toFixed(1)
                   : '—'}
               </span>
               <span className="text-sm text-muted-foreground">°C</span>
@@ -424,7 +424,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             {stateBadge(machineState.state, true, t)}
             <span className="text-xs text-muted-foreground tabular-nums">
               <Thermometer size={12} className="inline mr-0.5" weight="duotone" />
-              {machineState.brew_head_temperature?.toFixed(1) ?? '—'}°C
+              {machineState.boiler_temperature?.toFixed(1) ?? '—'}°C
             </span>
           </div>
 
