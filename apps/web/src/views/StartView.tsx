@@ -109,10 +109,11 @@ export function StartView({
       animate="visible"
       exit="hidden"
       transition={gentleSpring}
+      className={isMobile ? 'flex flex-col min-h-[calc(100dvh-10rem)]' : ''}
     >
       {isMobile ? (
-        // Mobile: no wrapping card — control centre and buttons as separate cards
-        <div className="space-y-3">
+        // Mobile: CC at top, buttons centered in remaining space
+        <>
           {controlCenter}
 
           {/* Last-shot analysis prompt */}
@@ -120,10 +121,10 @@ export function StartView({
             {lastShotBanner}
           </AnimatePresence>
 
-          <div className="p-1">
+          <div className="flex-1 flex flex-col justify-center p-1 mt-3">
             {actionButtons}
           </div>
-        </div>
+        </>
       ) : (
         // Desktop: single card with all content
         <Card className="p-6 space-y-6">

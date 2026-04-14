@@ -957,14 +957,14 @@ function App() {
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         {isHome && (
-        <header>
+        <header className="sticky top-0 z-20 backdrop-blur-md" style={{ top: 'var(--safe-pt, 0px)' }}>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
           className="text-center mb-3 lg:mb-4"
         >
-          <div className="flex items-center justify-center gap-3 mb-1 relative h-9">
+          <div className="flex items-center justify-center gap-3 mb-1 relative" style={{ minHeight: 44 }}>
             {/* Settings gear — left side */}
             <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
               <Button
@@ -1004,90 +1004,94 @@ function App() {
                 )}
               </nav>
 
-            {/* Dynamic Island — pure CSS transitions for smoothness */}
-            <div
-                role="button"
-                tabIndex={0}
-                onClick={smartGreeting ? toggleIsland : undefined}
-                onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
-                className="inline-flex items-center cursor-pointer select-none"
-                style={{
-                  height: 36,
-                  width: islandExpanded ? 'min(16rem, calc(100% - 6rem))' : undefined,
-                  background: islandExpanded
-                    ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.85)')
-                    : 'transparent',
-                  borderRadius: 9999,
-                  border: islandExpanded
-                    ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.1)')
-                    : '1px solid transparent',
-                  padding: islandExpanded ? '0 14px 0 8px' : '0',
-                  overflow: 'hidden',
-                  transition: 'width 0.5s cubic-bezier(0.32, 0.72, 0, 1), background 0.5s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.4s ease, padding 0.5s cubic-bezier(0.32, 0.72, 0, 1)',
-                }}
-              >
-                {/* Logo — always visible, smoothly repositions */}
-                <div
-                  className="shrink-0 flex items-center justify-center"
+            {/* Centered island + title unit */}
+            <div className="flex items-center justify-center">
+              {/* Dynamic Island — circle→pill CSS transition */}
+              <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={smartGreeting ? toggleIsland : undefined}
+                  onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                  className="inline-flex items-center cursor-pointer select-none"
                   style={{
-                    width: 28,
-                    height: 28,
-                    transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
-                    transform: islandExpanded ? 'scale(0.9)' : 'scale(1)',
+                    height: 36,
+                    width: islandExpanded ? 'min(18rem, calc(100vw - 8rem))' : 36,
+                    background: islandExpanded
+                      ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.85)')
+                      : 'transparent',
+                    borderRadius: 9999,
+                    border: islandExpanded
+                      ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.1)')
+                      : '1px solid transparent',
+                    padding: islandExpanded ? '0 14px 0 4px' : '0',
+                    overflow: 'hidden',
+                    justifyContent: islandExpanded ? 'flex-start' : 'center',
+                    transition: 'width 0.55s cubic-bezier(0.32, 0.72, 0, 1), background 0.45s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.4s ease, padding 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                   }}
                 >
-                  <MeticAILogo
-                    size={28}
-                    variant={isDark || islandExpanded ? 'white' : 'default'}
-                    className="rounded-full"
+                  {/* Logo — always visible */}
+                  <div
+                    className="shrink-0 flex items-center justify-center"
                     style={{
-                      background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'),
-                      padding: islandExpanded ? 0 : 2,
-                      transition: 'background 0.4s ease, padding 0.3s ease',
-                    }}
-                  />
-                </div>
-
-                {/* Title or greeting — cross-fade */}
-                <div className="relative flex-1 min-w-0 flex items-center" style={{ marginLeft: 10 }}>
-                  {/* Title text */}
-                  <h1
-                    className="font-bold tracking-tight text-2xl whitespace-nowrap absolute inset-0 flex items-center"
-                    style={{
-                      opacity: islandExpanded ? 0 : 1,
-                      transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
-                      transition: 'opacity 0.3s ease, transform 0.3s ease',
-                      pointerEvents: islandExpanded ? 'none' : 'auto',
+                      width: 28,
+                      height: 28,
+                      transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                      transform: islandExpanded ? 'scale(0.9)' : 'scale(1)',
                     }}
                   >
-                    Metic<span className="gold-text">AI</span>
-                  </h1>
+                    <MeticAILogo
+                      size={28}
+                      variant={isDark || islandExpanded ? 'white' : 'default'}
+                      className="rounded-full"
+                      style={{
+                        background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'),
+                        padding: islandExpanded ? 0 : 2,
+                        transition: 'background 0.4s ease, padding 0.3s ease',
+                      }}
+                    />
+                  </div>
 
-                  {/* Greeting text */}
+                  {/* Greeting text — only visible when expanded, with delayed fade-in */}
                   {smartGreeting && (
                     <div
-                      className="min-w-0 w-full"
+                      className="min-w-0 flex-1 overflow-hidden"
                       style={{
+                        marginLeft: islandExpanded ? 8 : 0,
                         opacity: islandExpanded ? 1 : 0,
-                        transition: 'opacity 0.4s ease 0.15s',
+                        transition: 'opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                         pointerEvents: islandExpanded ? 'auto' : 'none',
                       }}
                     >
                       {smartGreeting.action ? (
                         <button
                           type="button"
-                          className="text-xs text-white/85 hover:text-white transition-colors text-left w-full truncate"
+                          className="text-xs text-white/85 hover:text-white transition-colors text-left w-full island-marquee-text"
                           onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
                         >
-                          {smartGreeting.message}
+                          <span className="island-marquee-inner">{smartGreeting.message}</span>
                         </button>
                       ) : (
-                        <p className="text-xs text-white/85 truncate">{smartGreeting.message}</p>
+                        <p className="text-xs text-white/85 island-marquee-text">
+                          <span className="island-marquee-inner">{smartGreeting.message}</span>
+                        </p>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
+
+              {/* Title — fades out and collapses when island expands */}
+              <h1
+                className="font-bold tracking-tight text-2xl whitespace-nowrap overflow-hidden"
+                style={{
+                  maxWidth: islandExpanded ? 0 : 120,
+                  opacity: islandExpanded ? 0 : 1,
+                  marginLeft: islandExpanded ? 0 : 8,
+                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                }}
+              >
+                Metic<span className="gold-text">AI</span>
+              </h1>
+            </div>
           </div>
 
         </motion.div>

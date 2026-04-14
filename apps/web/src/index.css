@@ -846,3 +846,26 @@ ul:not([class]) li::before,
   90%  { transform: translateX(calc(-100% + 10rem)); }
   100% { transform: translateX(calc(-100% + 10rem)); }
 }
+
+/* Dynamic Island marquee for long greeting text */
+.island-marquee-text {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.island-marquee-inner {
+  display: inline-block;
+  white-space: nowrap;
+  animation: island-marquee 10s linear infinite;
+  animation-delay: 1s;
+}
+
+@keyframes island-marquee {
+  0%   { transform: translateX(0); }
+  5%   { transform: translateX(0); }
+  45%  { transform: translateX(min(0px, calc(-100% + 12rem))); }
+  55%  { transform: translateX(min(0px, calc(-100% + 12rem))); }
+  95%  { transform: translateX(0); }
+  100% { transform: translateX(0); }
+}
