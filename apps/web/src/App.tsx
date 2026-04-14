@@ -1014,19 +1014,21 @@ function App() {
                   onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                   className="inline-flex items-center cursor-pointer select-none"
                   style={{
-                    height: 36,
+                    height: islandExpanded ? 48 : 36,
                     width: islandExpanded ? 'min(18rem, calc(100vw - 8rem))' : 36,
                     background: islandExpanded
-                      ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.85)')
+                      ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
                       : 'transparent',
+                    backdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
+                    WebkitBackdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
                     borderRadius: 9999,
                     border: islandExpanded
-                      ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.1)')
+                      ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)')
                       : '1px solid transparent',
-                    padding: islandExpanded ? '0 14px 0 4px' : '0',
+                    padding: islandExpanded ? '4px 14px 4px 4px' : '0',
                     overflow: 'hidden',
                     justifyContent: islandExpanded ? 'flex-start' : 'center',
-                    transition: 'width 0.55s cubic-bezier(0.32, 0.72, 0, 1), background 0.45s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.4s ease, padding 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
+                    transition: 'width 0.55s cubic-bezier(0.32, 0.72, 0, 1), height 0.45s cubic-bezier(0.32, 0.72, 0, 1), background 0.45s cubic-bezier(0.32, 0.72, 0, 1), backdrop-filter 0.4s ease, border-color 0.4s ease, padding 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                   }}
                 >
                   {/* Logo — always visible */}
@@ -1041,7 +1043,7 @@ function App() {
                   >
                     <MeticAILogo
                       size={28}
-                      variant={isDark || islandExpanded ? 'white' : 'default'}
+                      variant={isDark ? 'white' : 'default'}
                       className="rounded-full"
                       style={{
                         background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'),
@@ -1060,18 +1062,20 @@ function App() {
                         opacity: islandExpanded ? 1 : 0,
                         transition: 'opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                         pointerEvents: islandExpanded ? 'auto' : 'none',
+                        maskImage: 'linear-gradient(to right, transparent 0px, black 8px, black calc(100% - 12px), transparent 100%)',
+                        WebkitMaskImage: 'linear-gradient(to right, transparent 0px, black 8px, black calc(100% - 12px), transparent 100%)',
                       }}
                     >
                       {smartGreeting.action ? (
                         <button
                           type="button"
-                          className="text-xs text-white/85 hover:text-white transition-colors text-left w-full island-marquee-text"
+                          className={`text-xs transition-colors text-left w-full island-greeting-text ${isDark ? 'text-white/85 hover:text-white' : 'text-foreground/80 hover:text-foreground'}`}
                           onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
                         >
                           <span className="island-marquee-inner">{smartGreeting.message}</span>
                         </button>
                       ) : (
-                        <p className="text-xs text-white/85 island-marquee-text">
+                        <p className={`text-xs island-greeting-text ${isDark ? 'text-white/85' : 'text-foreground/80'}`}>
                           <span className="island-marquee-inner">{smartGreeting.message}</span>
                         </p>
                       )}
@@ -1079,9 +1083,13 @@ function App() {
                   )}
                 </div>
 
-              {/* Title — fades out and collapses when island expands */}
+              {/* Title — fades out and collapses when island expands, tappable */}
               <h1
-                className="font-bold tracking-tight text-2xl whitespace-nowrap overflow-hidden"
+                role="button"
+                tabIndex={0}
+                onClick={smartGreeting ? toggleIsland : undefined}
+                onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                className="font-bold tracking-tight text-2xl whitespace-nowrap overflow-hidden cursor-pointer select-none"
                 style={{
                   maxWidth: islandExpanded ? 0 : 120,
                   opacity: islandExpanded ? 0 : 1,

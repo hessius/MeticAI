@@ -847,18 +847,31 @@ ul:not([class]) li::before,
   100% { transform: translateX(calc(-100% + 10rem)); }
 }
 
-/* Dynamic Island marquee for long greeting text */
-.island-marquee-text {
-  display: block;
+/* Dynamic Island greeting text — 2-line wrapping with overflow marquee */
+.island-greeting-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  white-space: nowrap;
+  line-height: 1.4;
 }
 
 .island-marquee-inner {
+  display: inline;
+}
+
+/* Only enable marquee when container has single-line overflow (scrollWidth > clientWidth) */
+.island-greeting-text.island-marquee-active {
+  display: block;
+  -webkit-line-clamp: unset;
+  white-space: nowrap;
+}
+
+.island-marquee-active .island-marquee-inner {
   display: inline-block;
   white-space: nowrap;
   animation: island-marquee 10s linear infinite;
-  animation-delay: 1s;
+  animation-delay: 2s;
 }
 
 @keyframes island-marquee {

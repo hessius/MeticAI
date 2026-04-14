@@ -109,7 +109,7 @@ export function StartView({
       animate="visible"
       exit="hidden"
       transition={gentleSpring}
-      className={isMobile ? 'flex flex-col min-h-[calc(100dvh-10rem)]' : ''}
+      className={isMobile ? 'flex flex-col min-h-[calc(100dvh-14rem)]' : ''}
     >
       {isMobile ? (
         // Mobile: CC at top, buttons centered in remaining space
@@ -121,7 +121,7 @@ export function StartView({
             {lastShotBanner}
           </AnimatePresence>
 
-          <div className="flex-1 flex flex-col justify-center p-1 mt-3">
+          <div className="flex-1 flex flex-col justify-center p-1 mt-2 -mb-4">
             {actionButtons}
           </div>
         </>
