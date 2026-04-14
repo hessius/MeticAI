@@ -74,10 +74,14 @@ export function useNetworkStatus(): NetworkStatus {
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
 
+    // Poll every 5s on web too — online/offline events can be missed
+    intervalRef.current = setInterval(poll, 5_000)
+
     return () => {
       cancelled = true
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [isNative])
 

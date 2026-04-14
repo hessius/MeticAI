@@ -878,7 +878,10 @@ function App() {
 
       {/* Network status banner */}
       {!isConnected && (
-        <div className="bg-destructive/90 text-destructive-foreground text-center py-1 text-xs font-medium">
+        <div
+          className="bg-destructive/90 text-destructive-foreground text-center py-1 text-xs font-medium"
+          style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))' }}
+        >
           {t('common.noInternetConnection')}
         </div>
       )}
