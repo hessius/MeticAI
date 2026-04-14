@@ -46,7 +46,7 @@ export function StartView({
         <Button
           onClick={onProfileCatalogue ?? onViewHistory}
           variant="dark-brew"
-          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap !rounded-lg"
         >
           <Coffee size={28} className="shrink-0 lg:hidden" weight="fill" />
           <Coffee size={20} className="shrink-0 hidden lg:block mr-2" weight="fill" />
@@ -56,7 +56,7 @@ export function StartView({
         <Button
           onClick={onAddProfile}
           variant="dark-brew"
-          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap !rounded-lg"
         >
           <Plus size={28} className="shrink-0 lg:hidden" weight="bold" />
           <Plus size={20} className="shrink-0 hidden lg:block mr-2" weight="bold" />
@@ -66,7 +66,7 @@ export function StartView({
         <Button
           onClick={onRunShot}
           variant="dark-brew"
-          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap !rounded-lg"
         >
           <Play size={28} className="shrink-0 lg:hidden" weight="fill" />
           <Play size={20} className="shrink-0 hidden lg:block mr-2" weight="fill" />
@@ -76,7 +76,7 @@ export function StartView({
         <Button
           onClick={onDialIn}
           variant="dark-brew"
-          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap !rounded-lg"
         >
           <Crosshair size={28} className="shrink-0 lg:hidden" weight="bold" />
           <Crosshair size={20} className="shrink-0 hidden lg:block mr-2" weight="bold" />
@@ -86,7 +86,7 @@ export function StartView({
         <Button
           onClick={onPourOver}
           variant="dark-brew"
-          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap !rounded-lg"
         >
           <Drop size={28} className="shrink-0 lg:hidden" weight="fill" />
           <Drop size={20} className="shrink-0 hidden lg:block mr-2" weight="fill" />
@@ -96,7 +96,7 @@ export function StartView({
         <Button
           onClick={onShotAnalysis}
           variant="dark-brew"
-          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          className="w-full h-[6rem] lg:h-16 flex flex-col items-center justify-center gap-1.5 lg:flex-row lg:gap-2 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap !rounded-lg"
         >
           <ChartLine size={28} className="shrink-0 lg:hidden" weight="bold" />
           <ChartLine size={20} className="shrink-0 hidden lg:block mr-2" weight="bold" />
@@ -108,21 +108,21 @@ export function StartView({
 
   const greetingElement = greeting ? (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.6, delay: 0.3 }}
-      className="px-1"
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
+      className="rounded-lg bg-muted/40 border border-border/30 px-3 py-2"
     >
       {greeting.action && onGreetingAction ? (
         <button
           type="button"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors text-left w-full"
           onClick={() => onGreetingAction(greeting.action!.target, greeting.action!.context)}
         >
           {greeting.message}
         </button>
       ) : (
-        <p className="text-sm text-muted-foreground">{greeting.message}</p>
+        <p className="text-xs text-muted-foreground">{greeting.message}</p>
       )}
     </motion.div>
   ) : null
@@ -147,9 +147,9 @@ export function StartView({
             {lastShotBanner}
           </AnimatePresence>
 
-          <Card className="p-4">
+          <div className="p-1">
             {actionButtons}
-          </Card>
+          </div>
         </div>
       ) : (
         // Desktop: single card with all content

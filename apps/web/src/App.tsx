@@ -38,7 +38,7 @@ import type { APIResponse, ViewState } from '@/types'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
-import { Sun, Moon, Gear } from '@phosphor-icons/react'
+import { Sun, Moon } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
@@ -918,23 +918,9 @@ function App() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className={isHome ? "text-center mb-2 lg:mb-4" : "text-center mb-6"}
+          className={isHome ? "text-center mb-0" : "text-center mb-6"}
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative">
-            {/* Settings gear — left side, home screen only */}
-            {isHome && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => setViewState('settings')}
-                  aria-label={t('navigation.settings')}
-                >
-                  <Gear size={18} weight="duotone" />
-                </Button>
-              </div>
-            )}
             {!isHome && (
               <div 
                 className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
@@ -950,30 +936,32 @@ function App() {
                 </h1>
               </div>
             )}
-            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
-              {themeMounted && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={toggleTheme}
-                  aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
-                >
-                  {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
-                </Button>
-              )}
-              {isDesktop && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => setQrDialogOpen(true)}
-                  aria-label={t('a11y.openOnMobile')}
-                >
-                  <QrCode size={18} weight="duotone" />
-                </Button>
-              )}
-            </nav>
+            {!isHome && (
+              <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
+                {themeMounted && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                    onClick={toggleTheme}
+                    aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
+                  >
+                    {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
+                  </Button>
+                )}
+                {isDesktop && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                    onClick={() => setQrDialogOpen(true)}
+                    aria-label={t('a11y.openOnMobile')}
+                  >
+                    <QrCode size={18} weight="duotone" />
+                  </Button>
+                )}
+              </nav>
+            )}
           </div>
 
         </motion.div>
@@ -1041,6 +1029,10 @@ function App() {
                       <ControlCenter
                         machineState={machineState}
                         onOpenLiveView={() => setViewState('live-shot')}
+                        onSettings={() => setViewState('settings')}
+                        toggleTheme={toggleTheme}
+                        isDark={isDark}
+                        themeMounted={themeMounted}
                       />
                     ) : undefined
                   }

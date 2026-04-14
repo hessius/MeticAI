@@ -28,6 +28,9 @@ import {
   Thermometer,
   Coffee,
   Warning,
+  Gear,
+  Sun,
+  Moon,
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -48,6 +51,10 @@ import { ControlCenterExpanded } from './ControlCenterExpanded'
 interface ControlCenterProps {
   machineState: MachineState
   onOpenLiveView?: () => void
+  onSettings?: () => void
+  toggleTheme?: () => void
+  isDark?: boolean
+  themeMounted?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +105,7 @@ function connectionDot(machineState: MachineState) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterProps) {
+export function ControlCenter({ machineState, onOpenLiveView, onSettings, toggleTheme, isDark, themeMounted }: ControlCenterProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
@@ -231,46 +238,62 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
 
   return (
     <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
-      {/* Header row — connection status only */}
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-1.5">
+      {/* Header row — settings, connection+status, theme toggle */}
+      <div className="flex items-center gap-2">
+        {onSettings && (
+          <button
+            className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            onClick={onSettings}
+            aria-label={t('navigation.settings')}
+          >
+            <Gear size={16} weight="duotone" />
+          </button>
+        )}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
           {(() => {
             const { dot, key } = connectionDot(machineState)
             return (
               <>
-                <span className="text-[10px] text-muted-foreground">
+                <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
+                <span className="text-[10px] text-muted-foreground truncate">
                   {t(`controlCenter.connection.${key}`)}
+                  {machineState.state && machineState._wsConnected && ` · `}
                 </span>
-                <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                {machineState.state && machineState._wsConnected && (
+                  stateBadge(machineState.state, isBrewing, t)
+                )}
               </>
             )
           })()}
         </div>
+        {themeMounted && toggleTheme && (
+          <button
+            className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            onClick={toggleTheme}
+            aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
+          >
+            {isDark ? <Sun size={16} weight="duotone" /> : <Moon size={16} weight="duotone" />}
+          </button>
+        )}
       </div>
 
       {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>
-          {/* Temperature + state */}
-          <div className="flex items-end justify-between">
-            <div className="flex items-baseline gap-1.5">
-              <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
-              <span className="text-2xl font-bold tabular-nums text-foreground">
-                {machineState.boiler_temperature != null
-                  ? machineState.boiler_temperature.toFixed(1)
-                  : '—'}
+          {/* Temperature */}
+          <div className="flex items-baseline gap-1.5">
+            <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
+            <span className="text-2xl font-bold tabular-nums text-foreground">
+              {machineState.boiler_temperature != null
+                ? machineState.boiler_temperature.toFixed(1)
+                : '—'}
+            </span>
+            <span className="text-sm text-muted-foreground">°C</span>
+            {machineState.target_temperature != null && !isIdle && (
+              <span className="text-xs text-muted-foreground ml-1">
+                / {machineState.target_temperature.toFixed(0)}°C
               </span>
-              <span className="text-sm text-muted-foreground">°C</span>
-              {machineState.target_temperature != null && !isIdle && (
-                <span className="text-xs text-muted-foreground ml-1">
-                  / {machineState.target_temperature.toFixed(0)}°C
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground">{t('controlCenter.labels.status')}</span>
-              {stateBadge(machineState.state, false, t)}
-            </div>
+            )}
           </div>
 
           {/* Preheat countdown — prominent display when preheating */}
@@ -308,9 +331,15 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-base text-foreground font-semibold truncate block">
-                  {activeProfile}
-                </span>
+                <div className="overflow-hidden">
+                  <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
+                    style={{
+                      animation: activeProfile && activeProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                    }}
+                  >
+                    {activeProfile}
+                  </span>
+                </div>
                 {profileAuthor && (
                   <span className="text-xs text-muted-foreground truncate block">
                     {t('controlCenter.labels.by')} {profileAuthor}

@@ -564,9 +564,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       {/* Summary */}
       <div className="w-full max-w-sm rounded-lg bg-muted/50 p-4 text-sm text-left space-y-2">
         {connectionStatus === 'success' && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">{t('onboarding.complete.machine')}</span>
-            <span className="font-medium text-green-600 dark:text-green-400">{machineName || machineIp}</span>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground shrink-0">{t('onboarding.complete.machine')}</span>
+            <span className="font-medium text-green-600 dark:text-green-400 truncate text-right">{machineName || machineIp}</span>
           </div>
         )}
         {authorName.trim() && (
@@ -595,7 +595,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       {!isDemoMode() && (
         <button
           type="button"
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-1"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-md border border-border/50 hover:border-border hover:bg-muted/50"
           onClick={() => {
             const url = 'https://buymeacoffee.com/HSUS'
             if (isNativePlatform()) {
@@ -610,9 +610,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         </button>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        {t('onboarding.complete.settingsHint')}
-      </p>
     </div>
   )
 

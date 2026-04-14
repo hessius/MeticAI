@@ -813,3 +813,11 @@ ul:not([class]) li::before,
 .dark .tag-roast-selected        { background-color: var(--color-orange-500);  border-color: var(--color-orange-400); }
 .dark .tag-characteristic-selected { background-color: var(--color-teal-500);  border-color: var(--color-teal-400); }
 .dark .tag-process-selected      { background-color: var(--color-indigo-500);  border-color: var(--color-indigo-400); }
+
+/* Marquee scroll animation for long text */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  10%  { transform: translateX(0); }
+  90%  { transform: translateX(calc(-100% + 10rem)); }
+  100% { transform: translateX(calc(-100% + 10rem)); }
+}
