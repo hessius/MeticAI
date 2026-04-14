@@ -579,7 +579,7 @@
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.35;
+  opacity: 0.45;
   will-change: transform, opacity;
   animation: ambient-pulse 8s ease-in-out infinite alternate;
 }
@@ -608,18 +608,18 @@
   width: 35vw;
   height: 35vw;
   background: #FFC107;
-  opacity: 0.2;
+  opacity: 0.3;
   animation-delay: -5s;
 }
 
 @keyframes ambient-pulse {
   0% {
     transform: scale(1) translate(0, 0);
-    opacity: 0.3;
+    opacity: 0.4;
   }
   100% {
     transform: scale(1.15) translate(2%, -3%);
-    opacity: 0.45;
+    opacity: 0.55;
   }
 }
 
@@ -673,8 +673,20 @@
   border-color: rgba(255, 143, 0, 0.4);
 }
 
+:root:not(.dark) .frosted-button {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(78, 52, 46, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+:root:not(.dark) .frosted-button:hover {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(78, 52, 46, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
 :root:not(.dark) .ambient-blob {
-  opacity: 0.15;
+  opacity: 0.25;
   filter: blur(100px);
 }
 

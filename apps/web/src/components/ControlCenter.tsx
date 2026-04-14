@@ -28,9 +28,6 @@ import {
   Thermometer,
   Coffee,
   Warning,
-  Gear,
-  Sun,
-  Moon,
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -51,10 +48,6 @@ import { ControlCenterExpanded } from './ControlCenterExpanded'
 interface ControlCenterProps {
   machineState: MachineState
   onOpenLiveView?: () => void
-  onSettings?: () => void
-  toggleTheme?: () => void
-  isDark?: boolean
-  themeMounted?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +98,7 @@ function connectionDot(machineState: MachineState) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ControlCenter({ machineState, onOpenLiveView, onSettings, toggleTheme, isDark, themeMounted }: ControlCenterProps) {
+export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
@@ -238,62 +231,41 @@ export function ControlCenter({ machineState, onOpenLiveView, onSettings, toggle
 
   return (
     <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
-      {/* Header row — settings, connection+status, theme toggle */}
-      <div className="flex items-center gap-2">
-        {onSettings && (
-          <button
-            className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            onClick={onSettings}
-            aria-label={t('navigation.settings')}
-          >
-            <Gear size={16} weight="duotone" />
-          </button>
-        )}
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          {(() => {
-            const { dot, key } = connectionDot(machineState)
-            return (
-              <>
-                <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
-                <span className="text-[10px] text-muted-foreground truncate">
-                  {t(`controlCenter.connection.${key}`)}
-                  {machineState.state && machineState._wsConnected && ` · `}
-                </span>
-                {machineState.state && machineState._wsConnected && (
-                  stateBadge(machineState.state, isBrewing, t)
-                )}
-              </>
-            )
-          })()}
-        </div>
-        {themeMounted && toggleTheme && (
-          <button
-            className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            onClick={toggleTheme}
-            aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
-          >
-            {isDark ? <Sun size={16} weight="duotone" /> : <Moon size={16} weight="duotone" />}
-          </button>
-        )}
-      </div>
-
       {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>
-          {/* Temperature */}
-          <div className="flex items-baseline gap-1.5">
-            <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
-            <span className="text-2xl font-bold tabular-nums text-foreground">
-              {machineState.boiler_temperature != null
-                ? machineState.boiler_temperature.toFixed(1)
-                : '—'}
-            </span>
-            <span className="text-sm text-muted-foreground">°C</span>
-            {machineState.target_temperature != null && !isIdle && (
-              <span className="text-xs text-muted-foreground ml-1">
-                / {machineState.target_temperature.toFixed(0)}°C
+          {/* Temperature + connection status — single row */}
+          <div className="flex items-end justify-between">
+            <div className="flex items-baseline gap-1.5">
+              <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
+              <span className="text-2xl font-bold tabular-nums text-foreground">
+                {machineState.boiler_temperature != null
+                  ? machineState.boiler_temperature.toFixed(1)
+                  : '—'}
               </span>
-            )}
+              <span className="text-sm text-muted-foreground">°C</span>
+              {machineState.target_temperature != null && !isIdle && (
+                <span className="text-xs text-muted-foreground ml-1">
+                  / {machineState.target_temperature.toFixed(0)}°C
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {(() => {
+                const { dot, key } = connectionDot(machineState)
+                return (
+                  <>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t(`controlCenter.connection.${key}`)}
+                    </span>
+                    {machineState.state && machineState._wsConnected && (
+                      stateBadge(machineState.state, false, t)
+                    )}
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
+                  </>
+                )
+              })()}
+            </div>
           </div>
 
           {/* Preheat countdown — prominent display when preheating */}
@@ -318,7 +290,7 @@ export function ControlCenter({ machineState, onOpenLiveView, onSettings, toggle
                 {t('controlCenter.sections.activeProfile')}
               </h4>
               <div className="flex items-center gap-3">
-              <div className="h-16 w-16 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                 {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}

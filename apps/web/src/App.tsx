@@ -38,7 +38,7 @@ import type { APIResponse, ViewState } from '@/types'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
-import { Sun, Moon } from '@phosphor-icons/react'
+import { Sun, Moon, Gear } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
@@ -306,6 +306,19 @@ function App() {
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
 
   const isHome = viewState === 'start'
+
+  // Dynamic Island animation: title → pill with greeting after 3s
+  const [islandExpanded, setIslandExpanded] = useState(false)
+  const islandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (isHome && smartGreeting) {
+      islandTimerRef.current = setTimeout(() => setIslandExpanded(true), 3000)
+    } else {
+      setIslandExpanded(false)
+    }
+    return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
+  }, [isHome, smartGreeting])
 
   // Check for existing profiles on mount
   useEffect(() => {
@@ -880,6 +893,31 @@ function App() {
     !shotBannerDismissed
 
   const prefersReducedMotion = useReducedMotion()
+
+  // Greeting action handler (shared between header pill and StartView)
+  const handleGreetingAction = useCallback((target: string, context?: Record<string, string>) => {
+    switch (target) {
+      case 'shot-analysis':
+        if (context?.date && context?.filename) {
+          setShotHistoryInitialDate(context.date)
+          setShotHistoryInitialFilename(context.filename)
+          previousViewStateRef.current = 'start'
+          setViewState('shot-history')
+        } else {
+          setViewState('shot-analysis')
+        }
+        break
+      case 'dial-in':
+        setViewState('dial-in')
+        break
+      case 'profile-catalogue':
+        setViewState('profile-catalogue')
+        break
+      case 'add-profile':
+        setShowAddProfileDialog(true)
+        break
+    }
+  }, [])
   const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
 
   const appContent = (
@@ -918,9 +956,91 @@ function App() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className={isHome ? "text-center mb-0" : "text-center mb-6"}
+          className={isHome ? "text-center mb-3 lg:mb-4" : "text-center mb-6"}
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative">
+            {/* Settings gear — left side, home screen only */}
+            {isHome && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                  onClick={() => setViewState('settings')}
+                  aria-label={t('navigation.settings')}
+                >
+                  <Gear size={18} weight="duotone" />
+                </Button>
+              </div>
+            )}
+
+            {/* Home: Dynamic Island — logo+title → pill with greeting */}
+            {isHome && (
+              <motion.div
+                className="flex items-center justify-center overflow-hidden"
+                animate={{
+                  width: islandExpanded ? 'min(100%, 20rem)' : 'auto',
+                  backgroundColor: islandExpanded
+                    ? (isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.85)')
+                    : 'transparent',
+                  borderRadius: 9999,
+                  paddingLeft: islandExpanded ? 6 : 0,
+                  paddingRight: islandExpanded ? 12 : 0,
+                  paddingTop: islandExpanded ? 4 : 0,
+                  paddingBottom: islandExpanded ? 4 : 0,
+                }}
+                transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+              >
+                <motion.div
+                  className="shrink-0"
+                  animate={{ scale: islandExpanded ? 0.85 : 1 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <MeticAILogo
+                    size={28}
+                    variant={islandExpanded ? 'white' : (isDark ? 'white' : 'default')}
+                    className="rounded-full"
+                    style={{ background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'), padding: islandExpanded ? 0 : 2 }}
+                  />
+                </motion.div>
+
+                <AnimatePresence mode="wait">
+                  {!islandExpanded ? (
+                    <motion.h1
+                      key="title"
+                      className="font-bold tracking-tight text-2xl ml-3"
+                      initial={{ opacity: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      Metic<span className="gold-text">AI</span>
+                    </motion.h1>
+                  ) : smartGreeting && (
+                    <motion.div
+                      key="greeting"
+                      className="ml-2 min-w-0 flex-1"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.2 }}
+                    >
+                      {smartGreeting.action ? (
+                        <button
+                          type="button"
+                          className="text-[11px] text-white/80 hover:text-white transition-colors text-left w-full truncate"
+                          onClick={() => handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context)}
+                        >
+                          {smartGreeting.message}
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-white/80 truncate">{smartGreeting.message}</p>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
+            {/* Non-home: standard logo + title (clickable) */}
             {!isHome && (
               <div 
                 className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
@@ -936,32 +1056,32 @@ function App() {
                 </h1>
               </div>
             )}
-            {!isHome && (
-              <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
-                {themeMounted && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                    onClick={toggleTheme}
-                    aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
-                  >
-                    {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
-                  </Button>
-                )}
-                {isDesktop && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                    onClick={() => setQrDialogOpen(true)}
-                    aria-label={t('a11y.openOnMobile')}
-                  >
-                    <QrCode size={18} weight="duotone" />
-                  </Button>
-                )}
-              </nav>
-            )}
+
+            {/* Right-side controls — always visible */}
+            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
+              {themeMounted && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                  onClick={toggleTheme}
+                  aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
+                >
+                  {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
+                </Button>
+              )}
+              {isDesktop && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                  onClick={() => setQrDialogOpen(true)}
+                  aria-label={t('a11y.openOnMobile')}
+                >
+                  <QrCode size={18} weight="duotone" />
+                </Button>
+              )}
+            </nav>
           </div>
 
         </motion.div>
@@ -1029,10 +1149,6 @@ function App() {
                       <ControlCenter
                         machineState={machineState}
                         onOpenLiveView={() => setViewState('live-shot')}
-                        onSettings={() => setViewState('settings')}
-                        toggleTheme={toggleTheme}
-                        isDark={isDark}
-                        themeMounted={themeMounted}
                       />
                     ) : undefined
                   }
@@ -1056,30 +1172,6 @@ function App() {
                       />
                     ) : undefined
                   }
-                  greeting={smartGreeting}
-                  onGreetingAction={(target, context) => {
-                    switch (target) {
-                      case 'shot-analysis':
-                        if (context?.date && context?.filename) {
-                          setShotHistoryInitialDate(context.date)
-                          setShotHistoryInitialFilename(context.filename)
-                          previousViewStateRef.current = 'start'
-                          setViewState('shot-history')
-                        } else {
-                          setViewState('shot-analysis')
-                        }
-                        break
-                      case 'dial-in':
-                        setViewState('dial-in')
-                        break
-                      case 'profile-catalogue':
-                        setViewState('profile-catalogue')
-                        break
-                      case 'add-profile':
-                        setShowAddProfileDialog(true)
-                        break
-                    }
-                  }}
                 />
               )}
 
