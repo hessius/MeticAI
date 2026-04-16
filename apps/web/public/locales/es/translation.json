@@ -302,7 +302,8 @@
     "saveScheduleFailed": "Error al guardar programación",
     "saveAsNew": "Guardar como nuevo perfil",
     "saveAsNewDescription": "Guardar variables ajustadas como nuevo perfil",
-    "newProfileNamePlaceholder": "Nombre del nuevo perfil..."
+    "newProfileNamePlaceholder": "Nombre del nuevo perfil...",
+    "titleRun": "Ejecutar"
   },
   "shotHistory": {
     "duration": "Duración",
@@ -1035,7 +1036,8 @@
     "savedToDevice": "Perfil guardado en el dispositivo",
     "savedToHistory": "El perfil se ha guardado en su dispositivo Meticulous y en el catálogo de perfiles",
     "noProfileJson": "No hay perfil JSON disponible",
-    "profileJsonDownloaded": "¡Perfil JSON descargado!"
+    "profileJsonDownloaded": "¡Perfil JSON descargado!",
+    "runShot": "Ejecutar shot"
   },
   "profileEdit": {
     "title": "Editar Perfil",

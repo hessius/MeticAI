@@ -302,7 +302,8 @@
     "saveScheduleFailed": "Failed to save schedule",
     "saveAsNew": "Save as new profile",
     "saveAsNewDescription": "Save adjusted variables as a new profile",
-    "newProfileNamePlaceholder": "New profile name..."
+    "newProfileNamePlaceholder": "New profile name...",
+    "titleRun": "Run"
   },
   "shotHistory": {
     "title": "Shot History",
@@ -1129,7 +1130,8 @@
     "image": "Image",
     "json": "JSON",
     "noProfileJson": "No profile JSON available",
-    "profileJsonDownloaded": "Profile JSON downloaded!"
+    "profileJsonDownloaded": "Profile JSON downloaded!",
+    "runShot": "Run Shot"
   },
   "profileEdit": {
     "title": "Edit Profile",

@@ -302,7 +302,8 @@
     "saveScheduleFailed": "Échec de la sauvegarde de la programmation",
     "saveAsNew": "Enregistrer comme nouveau profil",
     "saveAsNewDescription": "Enregistrer les variables ajustées comme nouveau profil",
-    "newProfileNamePlaceholder": "Nom du nouveau profil..."
+    "newProfileNamePlaceholder": "Nom du nouveau profil...",
+    "titleRun": "Lancer"
   },
   "shotHistory": {
     "duration": "Durée",
@@ -1035,7 +1036,8 @@
     "savedToDevice": "Profil enregistré sur l'appareil",
     "savedToHistory": "Le profil a été enregistré sur votre appareil Meticulous et dans le catalogue de profils",
     "noProfileJson": "Aucun profil JSON disponible",
-    "profileJsonDownloaded": "Profil JSON téléchargé !"
+    "profileJsonDownloaded": "Profil JSON téléchargé !",
+    "runShot": "Lancer shot"
   },
   "profileEdit": {
     "title": "Modifier le profil",

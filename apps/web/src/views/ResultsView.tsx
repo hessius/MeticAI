@@ -10,6 +10,7 @@ import { MarkdownText, cleanProfileName } from '@/components/MarkdownText'
 import { MeticAILogo } from '@/components/MeticAILogo'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import type { APIResponse } from '@/types'
+import { hasFeature } from '@/lib/featureFlags'
 
 function parseProfileSections(text: string | undefined | null) {
   if (!text) return []
@@ -230,7 +231,7 @@ export function ResultsView({
                   className="w-full h-12 text-sm font-semibold"
                 >
                   <Play size={18} className="mr-1.5" weight="fill" />
-                  {t('results.runScheduleShot')}
+                  {hasFeature('scheduledShots') ? t('results.runScheduleShot') : t('results.runShot')}
                 </Button>
               )}
 

@@ -302,7 +302,8 @@
     "saveScheduleFailed": "Fehler beim Speichern des Zeitplans",
     "saveAsNew": "Als neues Profil speichern",
     "saveAsNewDescription": "Angepasste Variablen als neues Profil speichern",
-    "newProfileNamePlaceholder": "Neuer Profilname..."
+    "newProfileNamePlaceholder": "Neuer Profilname...",
+    "titleRun": "Ausführen"
   },
   "shotHistory": {
     "duration": "Dauer",
@@ -1035,7 +1036,8 @@
     "savedToDevice": "Profil auf Gerät gespeichert",
     "savedToHistory": "Profil wurde auf Ihrem Meticulous-Gerät und im Profilkatalog gespeichert",
     "noProfileJson": "Kein Profil-JSON verfügbar",
-    "profileJsonDownloaded": "Profil-JSON heruntergeladen!"
+    "profileJsonDownloaded": "Profil-JSON heruntergeladen!",
+    "runShot": "Shot starten"
   },
   "profileEdit": {
     "title": "Profil bearbeiten",

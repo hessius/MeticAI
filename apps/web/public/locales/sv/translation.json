@@ -302,7 +302,8 @@
     "saveScheduleFailed": "Kunde inte spara schema",
     "saveAsNew": "Spara som ny profil",
     "saveAsNewDescription": "Spara justerade variabler som en ny profil",
-    "newProfileNamePlaceholder": "Nytt profilnamn..."
+    "newProfileNamePlaceholder": "Nytt profilnamn...",
+    "titleRun": "Kör"
   },
   "shotHistory": {
     "duration": "Varaktighet",
@@ -1035,7 +1036,8 @@
     "image": "Bild",
     "json": "JSON",
     "noProfileJson": "Ingen profil-JSON tillgänglig",
-    "profileJsonDownloaded": "Profil-JSON nedladdad!"
+    "profileJsonDownloaded": "Profil-JSON nedladdad!",
+    "runShot": "Kör shot"
   },
   "profileEdit": {
     "title": "Redigera profil",

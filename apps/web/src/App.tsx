@@ -889,7 +889,7 @@ function App() {
 
   // Phase 3 layout helpers
   const showControlCenter = mqttEnabled && machineState._wsConnected
-  const showRightColumn = showControlCenter && ['start', 'run-shot', 'live-shot'].includes(viewState)
+  const showRightColumn = showControlCenter && ['start', 'live-shot'].includes(viewState)
   const showShotBanner =
     mqttEnabled &&
     machineState.brewing &&
@@ -960,7 +960,7 @@ function App() {
         onDismiss={() => setShotBannerDismissed(true)}
       />
 
-      <div className={`flex-1 text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] lg:items-center lg:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
+      <div className={`flex-1 text-foreground flex justify-center px-5 md:px-8 overflow-x-hidden overflow-y-auto relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] xl:items-center xl:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         {isHome && (
@@ -969,7 +969,7 @@ function App() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className="text-center mb-3 lg:mb-4"
+          className="text-center mb-3 md:mb-4"
         >
           <div className="flex items-center justify-center gap-3 mb-1 relative" style={{ minHeight: 48 }}>
             {/* Settings gear — left side */}
@@ -1114,7 +1114,7 @@ function App() {
         )}
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
-        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
+        <div className={showRightColumn ? 'md:grid md:grid-cols-[minmax(0,3fr)_minmax(280px,1fr)] lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] md:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
           <main id="main-content">
             <Suspense fallback={
@@ -1407,7 +1407,7 @@ function App() {
           </main>
 
             {/* Desktop-only footer — home view, non-demo */}
-            {isDesktop && isHome && !isDemoMode() && (
+            {!isMobile && isHome && !isDemoMode() && (
               <footer className="text-center py-4 mt-2">
                 <a
                   href="https://buymeacoffee.com/HSUS"

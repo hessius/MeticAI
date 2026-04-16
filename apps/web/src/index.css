@@ -35,6 +35,13 @@
     --safe-pb: calc(1.25rem + env(safe-area-inset-bottom, 0px));
   }
   
+  /* In landscape, reduce bottom padding since safe area is typically 0 */
+  @media (orientation: landscape) and (max-height: 600px) {
+    :root {
+      --safe-pb: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
+  
   /* Prevent scroll jump when Radix UI dialogs/selects open */
   body[data-scroll-locked] {
     overflow: hidden !important;
@@ -760,7 +767,7 @@ ul:not([class]) li::before,
 }
 
 /* ── Desktop two-column layout ────────────────────────────── */
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .desktop-two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
