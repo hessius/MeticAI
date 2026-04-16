@@ -316,6 +316,8 @@ function App() {
   // Dynamic Island animation: title → pill with greeting after 3s, tappable to toggle
   const [islandExpanded, setIslandExpanded] = useState(false)
   const islandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const greetingTextRef = useRef<HTMLElement | null>(null)
+  const [isMarqueeActive, setIsMarqueeActive] = useState(false)
 
   useEffect(() => {
     if (isHome && smartGreeting) {
@@ -325,6 +327,19 @@ function App() {
     }
     return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
   }, [isHome, smartGreeting])
+
+  // Detect text overflow and enable marquee scrolling
+  useEffect(() => {
+    if (!islandExpanded || !greetingTextRef.current) {
+      setIsMarqueeActive(false)
+      return
+    }
+    const el = greetingTextRef.current
+    const checkOverflow = () => setIsMarqueeActive(el.scrollWidth > el.clientWidth + 4)
+    // Delay check to allow width transition to finish
+    const timer = setTimeout(checkOverflow, 600)
+    return () => clearTimeout(timer)
+  }, [islandExpanded, smartGreeting])
 
   const toggleIsland = useCallback(() => {
     if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
@@ -1075,14 +1090,15 @@ function App() {
                     >
                       {smartGreeting.action ? (
                         <button
+                          ref={greetingTextRef as React.RefObject<HTMLButtonElement>}
                           type="button"
-                          className={`text-xs transition-colors text-left w-full island-greeting-text ${isDark ? 'text-white/85 hover:text-white' : 'text-foreground/80 hover:text-foreground'}`}
+                          className={`text-xs transition-colors text-left w-full island-greeting-text${isMarqueeActive ? ' island-marquee-active' : ''} ${isDark ? 'text-white/85 hover:text-white' : 'text-foreground/80 hover:text-foreground'}`}
                           onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
                         >
                           <span className="island-marquee-inner">{smartGreeting.message}</span>
                         </button>
                       ) : (
-                        <p className={`text-xs island-greeting-text ${isDark ? 'text-white/85' : 'text-foreground/80'}`}>
+                        <p ref={greetingTextRef as React.RefObject<HTMLParagraphElement>} className={`text-xs island-greeting-text${isMarqueeActive ? ' island-marquee-active' : ''} ${isDark ? 'text-white/85' : 'text-foreground/80'}`}>
                           <span className="island-marquee-inner">{smartGreeting.message}</span>
                         </p>
                       )}
