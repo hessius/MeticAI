@@ -351,11 +351,11 @@ describe('DirectAdapter', () => {
       expect(result).toEqual({ success: true })
     })
 
-    it('purge() sends raw "home" action (NOT "purge")', async () => {
+    it('purge() sends raw "purge" action', async () => {
       ;(globalThis.fetch as Mock).mockResolvedValueOnce({ ok: true })
       const result = await svc.purge()
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'http://machine:8080/api/v1/action/home',
+        'http://machine:8080/api/v1/action/purge',
         { method: 'POST' },
       )
       expect(result).toEqual({ success: true })

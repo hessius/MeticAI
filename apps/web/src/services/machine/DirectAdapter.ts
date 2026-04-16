@@ -200,7 +200,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
       }
     },
     homePlunger: async () => executeRawAction('home'),
-    purge: async () => executeRawAction('home'),
+    purge: async () => executeRawAction('purge'),
 
     // -- Configuration commands ---------------------------------------------
     loadProfile: async (name: string) => {
