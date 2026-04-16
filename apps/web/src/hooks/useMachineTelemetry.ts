@@ -124,13 +124,18 @@ function useDirectTelemetry(enabled: boolean): MachineState {
             .catch(() => {/* ignore — profile may not exist */})
         }
 
+        // DirectAdapter seeds total_shots, firmware_version, sounds_enabled via
+        // the status callback (they aren't in the machine's raw status events).
+        // Cast to access seeded fields that aren't part of the StatusData type.
+        const seeded = data as Record<string, unknown>
+
         return {
           ...prev,
           connected: true,
           _wsConnected: true,
           availability: 'online',
           boiler_temperature: clampTemp(data.sensors?.t, prev.boiler_temperature),
-          // brew_head comes from the separate 'sensors' event (t_ext_1), not status.
+          // brew_head comes from the separate 'sensors' event (t_bar_down), not status.
           // Keep previous value here — onTemperatures updates it.
           brew_head_temperature: prev.brew_head_temperature,
           pressure: data.sensors?.p ?? prev.pressure,
@@ -147,6 +152,10 @@ function useDirectTelemetry(enabled: boolean): MachineState {
           active_profile: profileName,
           target_temperature: clampTemp(data.setpoints?.temperature, prev.target_temperature),
           target_weight: prev.target_weight,
+          // Seeded fields from DirectAdapter (total_shots, firmware, sounds)
+          total_shots: (seeded.total_shots as number | null) ?? prev.total_shots,
+          firmware_version: (seeded.firmware_version as string | null) ?? prev.firmware_version,
+          sounds_enabled: (seeded.sounds_enabled as boolean | null) ?? prev.sounds_enabled,
           _ts: Date.now(),
           _stale: false,
         }
@@ -163,11 +172,15 @@ function useDirectTelemetry(enabled: boolean): MachineState {
     }))
 
     // Temperatures event — separate Socket.IO 'sensors' event with detailed temps.
-    // t_ext_1 = brew head / grouphead temperature (matches MQTT brew_head_temperature topic).
+    // The meticulous-addon MQTT bridge maps:
+    //   brew_head_temperature ← t_bar_down (lower bar thermocouple)
+    //   boiler_temperature    ← t_bar_up   (upper bar thermocouple)
+    // t_ext_1/t_ext_2 are external sensors, NOT brew head.
     unsubs.push(machine.onTemperatures((data) => {
       setState(prev => ({
         ...prev,
-        brew_head_temperature: clampTemp(data.t_ext_1, prev.brew_head_temperature),
+        brew_head_temperature: clampTemp(data.t_bar_down, prev.brew_head_temperature),
+        boiler_temperature: clampTemp(data.t_bar_up, prev.boiler_temperature),
       }))
     }))
 
