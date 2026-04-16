@@ -64,6 +64,8 @@
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+    /* Remove blue/grey tap highlight on iOS/Android WebViews */
+    -webkit-tap-highlight-color: transparent;
   }
   
   /* Allow text selection in form inputs and readable content */
