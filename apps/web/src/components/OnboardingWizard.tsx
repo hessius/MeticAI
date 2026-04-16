@@ -36,7 +36,6 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { setMachineUrl, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
-import i18nInstance from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -105,7 +104,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   // Language — initialize from i18n's detected language (device locale on fresh install)
   const [selectedLang, setSelectedLang] = useState<SupportedLanguage>(() => {
-    const detected = i18nInstance.language?.split('-')[0] as SupportedLanguage
+    const detected = i18n.language?.split('-')[0] as SupportedLanguage
     return supportedLanguages.includes(detected) ? detected : 'en'
   })
 

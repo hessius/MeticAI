@@ -635,7 +635,13 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
   const fetchedRef = useRef(false)
 
   useEffect(() => {
-    if (!enabled || fetchedRef.current) return
+    if (!enabled) {
+      fetchedRef.current = false
+      setGreeting(null)
+      return
+    }
+
+    if (fetchedRef.current) return
     fetchedRef.current = true
 
     const build = async () => {

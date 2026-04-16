@@ -1015,11 +1015,11 @@ function App() {
             <div className="flex items-center justify-center">
               {/* Dynamic Island — circle→pill CSS transition */}
               <div
-                  role="button"
-                  tabIndex={0}
+                  role={smartGreeting ? "button" : undefined}
+                  tabIndex={smartGreeting ? 0 : undefined}
                   onClick={smartGreeting ? toggleIsland : undefined}
                   onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
-                  className="inline-flex items-center cursor-pointer select-none"
+                  className={`inline-flex items-center select-none${smartGreeting ? ' cursor-pointer' : ''}`}
                   style={{
                     height: islandExpanded ? 48 : 40,
                     width: islandExpanded ? 'min(18rem, calc(100vw - 8rem))' : 40,
@@ -1092,11 +1092,11 @@ function App() {
 
               {/* Title — fades out and collapses when island expands, tappable */}
               <h1
-                role="button"
-                tabIndex={0}
+                role={smartGreeting ? "button" : undefined}
+                tabIndex={smartGreeting ? 0 : undefined}
                 onClick={smartGreeting ? toggleIsland : undefined}
                 onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
-                className="font-bold tracking-tight text-3xl whitespace-nowrap overflow-hidden cursor-pointer select-none"
+                className={`font-bold tracking-tight text-3xl whitespace-nowrap overflow-hidden select-none${smartGreeting ? ' cursor-pointer' : ''}`}
                 style={{
                   maxWidth: islandExpanded ? 0 : 140,
                   opacity: islandExpanded ? 0 : 1,
