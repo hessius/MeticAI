@@ -921,6 +921,13 @@ function App() {
       case 'add-profile':
         setShowAddProfileDialog(true)
         break
+      case 'shot-history':
+        previousViewStateRef.current = 'start'
+        setViewState('shot-history')
+        break
+      case 'history':
+        setViewState('history')
+        break
     }
   }, [])
   const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
