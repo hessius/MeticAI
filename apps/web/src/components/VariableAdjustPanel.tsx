@@ -190,7 +190,7 @@ export function VariableAdjustPanel({
               {/* Reset All */}
               {overrideCount > 0 && (
                 <div className="flex justify-end">
-                  <Button variant="ghost" size="sm" onClick={onReset}>
+                  <Button variant="ghost" size="sm" data-sound="adjust" onClick={onReset}>
                     <ArrowCounterClockwise size={14} className="mr-1" />
                     {t('variables.resetAll')}
                   </Button>
@@ -268,6 +268,7 @@ export function VariableAdjustPanel({
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
+                  data-sound="adjust"
                   onClick={() => handleResetOne(variable.key)}
                   aria-label={t('a11y.resetVariable', { name: variable.name })}
                 >

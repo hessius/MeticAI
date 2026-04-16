@@ -144,7 +144,7 @@ export function DeleteProfileDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={isDeleting}>
+          <Button variant="ghost" data-sound="close" onClick={onClose} disabled={isDeleting}>
             {t('common.cancel')}
           </Button>
         </DialogFooter>

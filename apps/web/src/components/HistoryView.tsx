@@ -263,6 +263,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('a11y.goBack')}

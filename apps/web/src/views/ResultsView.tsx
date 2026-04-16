@@ -135,6 +135,7 @@ export function ResultsView({
                 <Button
                   variant="ghost"
                   size="icon"
+                  data-sound="back"
                   onClick={onBack}
                   className="shrink-0"
                   title={t('results.backToForm')}

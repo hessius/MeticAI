@@ -190,7 +190,7 @@ export function EspressoCompass({ onBack }: EspressoCompassProps) {
     >
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack} aria-label={t('common.back')}>
+        <Button variant="ghost" size="icon" data-sound="back" onClick={onBack} aria-label={t('common.back')}>
           <ArrowLeft size={20} />
         </Button>
         <div>

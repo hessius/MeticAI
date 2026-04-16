@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Plus, Coffee, Play, Drop, ChartLine, Crosshair } from '@phosphor-icons/react'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { useSoundEffects } from '@/hooks/useSoundEffects'
 
 interface StartViewProps {
   profileCount: number | null
@@ -33,7 +32,6 @@ export function StartView({
 }: StartViewProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
-  const { buttonClick: playButtonClick } = useSoundEffects()
 
   // Action buttons content (shared between mobile and desktop layouts)
   const actionButtons = (
@@ -41,7 +39,7 @@ export function StartView({
       {/* Core actions — 2×3 grid on mobile, stacked on desktop */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-1 md:gap-3">
         <Button
-          onClick={() => { playButtonClick(); (onProfileCatalogue ?? onViewHistory)() }}
+          onClick={onProfileCatalogue ?? onViewHistory}
           variant="frosted"
           className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
@@ -51,7 +49,7 @@ export function StartView({
         </Button>
 
         <Button
-          onClick={() => { playButtonClick(); onAddProfile() }}
+          onClick={onAddProfile}
           variant="frosted"
           className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
@@ -61,7 +59,7 @@ export function StartView({
         </Button>
 
         <Button
-          onClick={() => { playButtonClick(); onRunShot() }}
+          onClick={onRunShot}
           variant="frosted"
           className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
@@ -71,7 +69,7 @@ export function StartView({
         </Button>
 
         <Button
-          onClick={() => { playButtonClick(); onDialIn() }}
+          onClick={onDialIn}
           variant="frosted"
           className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
@@ -81,7 +79,7 @@ export function StartView({
         </Button>
 
         <Button
-          onClick={() => { playButtonClick(); onPourOver() }}
+          onClick={onPourOver}
           variant="frosted"
           className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
@@ -91,7 +89,7 @@ export function StartView({
         </Button>
 
         <Button
-          onClick={() => { playButtonClick(); onShotAnalysis() }}
+          onClick={onShotAnalysis}
           variant="frosted"
           className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >

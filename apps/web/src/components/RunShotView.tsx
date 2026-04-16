@@ -702,6 +702,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         <Button
           variant="ghost"
           size="icon"
+          data-sound="back"
           onClick={onBack}
           className="shrink-0"
           title={t('common.back')}

@@ -132,10 +132,19 @@ describe('useSoundEffects', () => {
     expect(mockTiks.toggle).toHaveBeenCalledWith(false)
 
     act(() => result.current.islandExpand())
-    expect(mockTiks.swoosh).toHaveBeenCalled()
+    expect(mockTiks.notify).toHaveBeenCalled()
 
     act(() => result.current.islandContract())
     expect(mockTiks.pop).toHaveBeenCalledTimes(1)
+
+    act(() => result.current.backButton())
+    expect(mockTiks.notify).toHaveBeenCalledTimes(2)
+
+    act(() => result.current.closeButton())
+    expect(mockTiks.notify).toHaveBeenCalledTimes(3)
+
+    act(() => result.current.hoverAdjust())
+    expect(mockTiks.hover).toHaveBeenCalled()
   })
 
   it('reflects enabled state from preferences', () => {

@@ -70,7 +70,7 @@ import { useStorageMigration } from '@/services/storage'
 // Capacitor plugin hooks
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
-import { useSoundEffects } from '@/hooks/useSoundEffects'
+import { useSoundEffects, useGlobalSoundDelegation } from '@/hooks/useSoundEffects'
 
 function App() {
   const { t } = useTranslation()
@@ -135,7 +135,8 @@ function App() {
   // Capacitor plugin hooks
   const { isConnected } = useNetworkStatus()
   const { notifyPreheatComplete } = useBrewNotifications()
-  const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete, islandExpand: playIslandExpand, islandContract: playIslandContract, buttonClick: playButtonClick } = useSoundEffects()
+  const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete, islandExpand: playIslandExpand, islandContract: playIslandContract } = useSoundEffects()
+  useGlobalSoundDelegation()
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
@@ -1031,7 +1032,7 @@ function App() {
                 variant="ghost"
                 size="icon"
                 className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                onClick={() => { playButtonClick(); setViewState('settings') }}
+                onClick={() => setViewState('settings')}
                 aria-label={t('navigation.settings')}
               >
                 <Gear size={18} weight="duotone" />
@@ -1045,7 +1046,7 @@ function App() {
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => { playButtonClick(); toggleTheme() }}
+                  onClick={toggleTheme}
                   aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
                 >
                   {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
@@ -1056,7 +1057,7 @@ function App() {
                   variant="ghost"
                   size="icon"
                     className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                    onClick={() => { playButtonClick(); setQrDialogOpen(true) }}
+                    onClick={() => setQrDialogOpen(true)}
                     aria-label={t('a11y.openOnMobile')}
                   >
                     <QrCode size={18} weight="duotone" />
@@ -1069,6 +1070,7 @@ function App() {
               {/* Dynamic Island — circle→pill CSS transition */}
               <div
                   className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
+                  data-sound="none"
                   onClick={!islandExpanded && smartGreeting ? toggleIsland : undefined}
                   role={!islandExpanded && smartGreeting ? 'button' : undefined}
                   tabIndex={!islandExpanded && smartGreeting ? 0 : undefined}
@@ -1094,6 +1096,7 @@ function App() {
                   {/* Logo — tap to collapse when expanded */}
                   <button
                     type="button"
+                    data-sound="none"
                     className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
                     onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
                     tabIndex={islandExpanded ? 0 : -1}
@@ -1145,7 +1148,7 @@ function App() {
                     <button
                       type="button"
                       className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-black/5 hover:bg-black/10 text-foreground/60'}`}
-                      onClick={(e) => { e.stopPropagation(); playButtonClick(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
+                      onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
                       aria-label={smartGreeting.action.label}
                       style={{
                         width: 32,
@@ -1163,6 +1166,7 @@ function App() {
               {/* Title — fades out and collapses when island expands, tappable */}
               <h1
                 role={smartGreeting ? "button" : undefined}
+                data-sound="none"
                 tabIndex={smartGreeting ? 0 : undefined}
                 onClick={smartGreeting ? toggleIsland : undefined}
                 onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}

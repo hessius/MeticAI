@@ -113,7 +113,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
   const { authenticate: biometricAuth } = useBiometrics()
   const { copyToClipboard } = useClipboard()
-  const { toggleOn: playToggleOn, toggleOff: playToggleOff, buttonClick: playButtonClick } = useSoundEffects()
+  const { toggleOn: playToggleOn, toggleOff: playToggleOff } = useSoundEffects()
 
   // Direct and demo modes both use local storage for settings (no backend server)
   const isLocalMode = () => isDirectMode() || isDemoMode()
@@ -731,7 +731,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => { playButtonClick(); onBack() }}
+          data-sound="back"
+          onClick={onBack}
           className="shrink-0"
           title={t('common.back')}
         >

@@ -265,7 +265,7 @@ export function BulkDeleteDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="ghost" onClick={handleClose} disabled={isDeleting}>
+          <Button variant="ghost" data-sound="close" onClick={handleClose} disabled={isDeleting}>
             {t('common.cancel')}
           </Button>
           {deletable.length > 0 && (

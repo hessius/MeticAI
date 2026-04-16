@@ -386,7 +386,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
               </div>
               <h2 className="text-lg font-bold tracking-tight">{t('profileImport.title')}</h2>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
+            <Button variant="ghost" size="icon" data-sound="close" onClick={handleClose} className="h-8 w-8">
               <X size={18} weight="bold" />
             </Button>
           </div>
@@ -677,7 +677,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     <p className="text-sm text-muted-foreground mt-1">{importedProfileName}</p>
                   )}
                 </div>
-                <Button onClick={handleClose} className="w-full">
+                <Button data-sound="close" onClick={handleClose} className="w-full">
                   {t('profileImport.viewInCatalogue')}
                 </Button>
               </motion.div>
@@ -715,7 +715,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     )}
                   </div>
                 </div>
-                <Button onClick={handleClose} className="w-full">
+                <Button data-sound="close" onClick={handleClose} className="w-full">
                   {t('profileImport.viewInCatalogue')}
                 </Button>
               </motion.div>

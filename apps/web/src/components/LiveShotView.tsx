@@ -357,7 +357,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+        <Button variant="ghost" size="sm" data-sound="back" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft size={16} className="mr-1" />
           {t('common.back')}
         </Button>
@@ -738,7 +738,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     {t('controlCenter.liveShot.analyzeShot', 'Analyze Shot')}
                   </Button>
                 )}
-                <Button variant="default" className="h-11 px-6" onClick={onBack}>
+                <Button variant="default" className="h-11 px-6" data-sound="back" onClick={onBack}>
                   {t('controlCenter.liveShot.backHome')}
                 </Button>
               </div>
