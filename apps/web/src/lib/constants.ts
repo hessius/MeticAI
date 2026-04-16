@@ -35,6 +35,9 @@ export const STORAGE_KEYS = {
   LAST_GREETING_ID: 'meticai-last-greeting',
   PERSONAL_BEST_SHOTS_DAY: 'meticai-best-shots-day',
 
+  // -- Sound effects --
+  SOUNDS_ENABLED: 'meticai-sounds-enabled',
+
   // -- Demo mode --
   DEMO_PREV_URL: 'meticai-demo-prev-url',
   DEMO_PROFILES: 'meticai-demo-profiles',

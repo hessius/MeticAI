@@ -37,6 +37,7 @@ import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
+import { getSoundsEnabled, setSoundsEnabled } from '@/lib/soundPreferences'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
@@ -167,6 +168,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const [tailscaleMessage, setTailscaleMessage] = useState('')
   const [aiEnabled, setAiEnabledState] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
+  const [soundsEnabled, setSoundsEnabledState] = useState(false)
   const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
 
   // Beta channel state
@@ -204,6 +206,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   useEffect(() => {
     setAiEnabledState(getAiEnabled())
     setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
+    setSoundsEnabledState(getSoundsEnabled())
   }, [])
 
   // Load current settings on mount
@@ -966,6 +969,23 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                 {t('settings.language.label')}
               </Label>
               <LanguageSelector variant="outline" showLabel={true} />
+            </div>
+
+            {/* Sound Effects */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="sounds-toggle" className="text-sm font-medium">{t('settings.enableSoundEffects')}</Label>
+                <p className="text-xs text-muted-foreground">{t('settings.enableSoundEffectsDescription')}</p>
+              </div>
+              <Switch
+                id="sounds-toggle"
+                checked={soundsEnabled}
+                onCheckedChange={(checked) => {
+                  const next = checked as boolean
+                  setSoundsEnabledState(next)
+                  setSoundsEnabled(next)
+                }}
+              />
             </div>
 
             {/* AI Settings — CollapsibleSection */}

@@ -418,6 +418,8 @@
     "aiAssistantOptional": "Optionnel.",
     "enableAiFeatures": "Activer les fonctionnalités IA",
     "enableAiFeaturesDescription": "Active/désactive les outils IA sans supprimer votre clé API enregistrée.",
+    "enableSoundEffects": "Effets sonores",
+    "enableSoundEffectsDescription": "Joue des sons subtils lors d'événements machine comme la fin d'extraction et le préchauffage terminé.",
     "hideAiWhenUnavailable": "Masquer les contrôles IA quand indisponibles",
     "hideAiWhenUnavailableDescription": "Lorsque désactivé, les contrôles IA restent visibles mais désactivés jusqu'à ce que l'IA soit disponible.",
     "getApiKey": "Obtenez votre clé API depuis",

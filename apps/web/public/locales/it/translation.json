@@ -418,6 +418,8 @@
     "aiAssistantOptional": "Opzionale.",
     "enableAiFeatures": "Abilita funzionalità AI",
     "enableAiFeaturesDescription": "Attiva/disattiva gli strumenti AI senza rimuovere la chiave API salvata.",
+    "enableSoundEffects": "Effetti sonori",
+    "enableSoundEffectsDescription": "Riproduce suoni discreti per eventi macchina come completamento shot e preriscaldamento pronto.",
     "hideAiWhenUnavailable": "Nascondi controlli AI quando non disponibili",
     "hideAiWhenUnavailableDescription": "Quando disabilitato, i controlli AI rimangono visibili ma disattivati fino a quando l'AI è disponibile.",
     "getApiKey": "Ottieni la tua chiave API da",

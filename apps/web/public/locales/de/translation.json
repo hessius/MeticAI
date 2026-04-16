@@ -418,6 +418,8 @@
     "aiAssistantOptional": "Optional.",
     "enableAiFeatures": "KI-Funktionen aktivieren",
     "enableAiFeaturesDescription": "Schaltet KI-Tools ein/aus, ohne deinen gespeicherten API-Schlüssel zu entfernen.",
+    "enableSoundEffects": "Soundeffekte",
+    "enableSoundEffectsDescription": "Spielt dezente Töne bei Maschinenereignissen wie Shot-Fertigstellung und Aufheizbereitschaft.",
     "hideAiWhenUnavailable": "KI-Steuerungen ausblenden, wenn nicht verfügbar",
     "hideAiWhenUnavailableDescription": "Wenn deaktiviert, bleiben KI-Steuerungen sichtbar aber deaktiviert, bis KI verfügbar ist.",
     "getApiKey": "Hol dir deinen API-Schlüssel von",

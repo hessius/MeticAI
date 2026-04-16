@@ -12,6 +12,35 @@ beforeAll(() => {
   })
 })
 
+// Mock AudioContext for @rexa-developer/tiks (Web Audio API not available in happy-dom)
+class MockAudioContext {
+  state = 'running'
+  sampleRate = 44100
+  currentTime = 0
+  destination = { maxChannelCount: 2 }
+  createOscillator() {
+    return {
+      type: 'sine', frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      connect: vi.fn(), start: vi.fn(), stop: vi.fn(), disconnect: vi.fn(),
+    }
+  }
+  createGain() {
+    return { gain: { value: 1, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() }
+  }
+  createBiquadFilter() {
+    return { type: 'lowpass', frequency: { value: 0 }, Q: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() }
+  }
+  createBufferSource() {
+    return { buffer: null, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), disconnect: vi.fn() }
+  }
+  createBuffer(channels: number, length: number, sampleRate: number) {
+    return { numberOfChannels: channels, length, sampleRate, getChannelData: () => new Float32Array(length) }
+  }
+  resume() { return Promise.resolve() }
+  close() { return Promise.resolve() }
+}
+global.AudioContext = MockAudioContext as unknown as typeof AudioContext
+
 // Cleanup after each test
 afterEach(() => {
   cleanup()

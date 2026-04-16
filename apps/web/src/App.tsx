@@ -70,6 +70,7 @@ import { useStorageMigration } from '@/services/storage'
 // Capacitor plugin hooks
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
+import { useSoundEffects } from '@/hooks/useSoundEffects'
 
 function App() {
   const { t } = useTranslation()
@@ -134,6 +135,7 @@ function App() {
   // Capacitor plugin hooks
   const { isConnected } = useNetworkStatus()
   const { notifyPreheatComplete } = useBrewNotifications()
+  const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete } = useSoundEffects()
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
@@ -279,15 +281,18 @@ function App() {
     }
   }, [aiEnabled, t]) // aiEnabled changes on AI_PREFS_CHANGED_EVENT, retriggering this
 
-  // Reset shot banner dismissed state when brewing ends
+  // Reset shot banner dismissed state when brewing ends; sound on brewing start
   useEffect(() => {
     if (prevBrewingRef.current && !machineState.brewing) {
       setShotBannerDismissed(false)
     }
+    if (!prevBrewingRef.current && machineState.brewing) {
+      playBrewingStarted()
+    }
     prevBrewingRef.current = machineState.brewing
-  }, [machineState.brewing])
+  }, [machineState.brewing, playBrewingStarted])
 
-  // Notify when preheat completes (state transitions from preheating/heating → ready)
+  // Notify + sound when preheat completes (state transitions from preheating/heating → ready)
   useEffect(() => {
     const currentState = machineState.state?.toLowerCase() ?? null
     const prevState = prevMachineStateRef.current
@@ -299,8 +304,9 @@ function App() {
       currentState?.startsWith('click to start')
     ) {
       notifyPreheatComplete()
+      playMachineReady()
     }
-  }, [machineState.state, notifyPreheatComplete])
+  }, [machineState.state, notifyPreheatComplete, playMachineReady])
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
@@ -590,6 +596,7 @@ function App() {
         }
       }
       
+      playGenerationComplete()
       setViewState('results')
     } catch (error) {
       clearInterval(messageInterval)

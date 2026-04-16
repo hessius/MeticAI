@@ -418,6 +418,8 @@
     "aiAssistantOptional": "Valfritt.",
     "enableAiFeatures": "Aktivera AI-funktioner",
     "enableAiFeaturesDescription": "Slår på/av AI-verktyg utan att ta bort din sparade API-nyckel.",
+    "enableSoundEffects": "Ljudeffekter",
+    "enableSoundEffectsDescription": "Spelar subtila ljud för maskinhändelser som färdig shot och uppvärmning klar.",
     "hideAiWhenUnavailable": "Dölj AI-kontroller när de inte är tillgängliga",
     "hideAiWhenUnavailableDescription": "När det är inaktiverat förblir AI-kontrollerna synliga men inaktiverade tills AI är tillgängligt.",
     "getApiKey": "Hämta din API-nyckel från",

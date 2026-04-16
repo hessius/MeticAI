@@ -418,6 +418,8 @@
     "aiAssistantOptional": "Opcional.",
     "enableAiFeatures": "Activar funciones de IA",
     "enableAiFeaturesDescription": "Activa/desactiva las herramientas de IA sin eliminar tu clave API guardada.",
+    "enableSoundEffects": "Efectos de sonido",
+    "enableSoundEffectsDescription": "Reproduce sonidos sutiles para eventos de la máquina como finalización de shot y precalentamiento listo.",
     "hideAiWhenUnavailable": "Ocultar controles de IA cuando no estén disponibles",
     "hideAiWhenUnavailableDescription": "Cuando está desactivado, los controles de IA permanecen visibles pero deshabilitados hasta que la IA esté disponible.",
     "getApiKey": "Obtén tu clave API de",
