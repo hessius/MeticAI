@@ -637,7 +637,6 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
   useEffect(() => {
     if (!enabled) {
       fetchedRef.current = false
-      setGreeting(null)
       return
     }
 

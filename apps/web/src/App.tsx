@@ -877,13 +877,6 @@ function App() {
     }
   }
 
-  const handleTitleClick = () => {
-    // Single tap: go to start screen (only if not on start already)
-    if (viewState !== 'start') {
-      handleBackToStart()
-    }
-  }
-
   const aiAvailable = isAiConfigured && aiEnabled
   const canSubmit = !!(aiAvailable && (imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0))
 
