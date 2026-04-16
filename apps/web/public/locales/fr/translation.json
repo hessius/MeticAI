@@ -1510,7 +1510,9 @@
   },
   "update": {
     "failed": "Échec de la mise à jour",
-    "timeout": "La mise à jour ne s'est pas terminée dans le temps prévu. Veuillez actualiser manuellement."
+    "timeout": "La mise à jour ne s'est pas terminée dans le temps prévu. Veuillez actualiser manuellement.",
+    "triggerFailed": "Impossible de déclencher la mise à jour",
+    "checkFailed": "Impossible de vérifier les mises à jour"
   },
   "sync": {
     "fetchProfileFailed": "Échec de la récupération du profil",
@@ -1561,7 +1563,8 @@
       "autoDiscovered": "Machine trouvée automatiquement !",
       "connectButton": "Connecter",
       "ipDescription": "Entrez une adresse IP (ex. 192.168.1.42) ou un nom d'hôte. Le nom d'hôte est aléatoire mais contient toujours « meticulous » (ex. meticulous-a3f7.local).",
-      "configureManually": "Configurer manuellement"
+      "configureManually": "Configurer manuellement",
+      "noMachinesFound": "Aucune machine trouvée sur votre réseau. Entrez l'adresse IP manuellement."
     },
     "name": {
       "title": "Comment vous appelez-vous ?",

@@ -967,6 +967,7 @@ function App() {
         if (context?.profileId && context?.profileName) {
           viewMachineProfileRef.current({ id: context.profileId, name: context.profileName })
         } else {
+          console.warn('[DynamicIsland] view-profile action missing context, falling back to catalogue', context)
           setViewState('profile-catalogue')
         }
         break

@@ -1510,7 +1510,9 @@
   },
   "update": {
     "failed": "Aggiornamento fallito",
-    "timeout": "L'aggiornamento non è stato completato nel tempo previsto. Aggiornare manualmente."
+    "timeout": "L'aggiornamento non è stato completato nel tempo previsto. Aggiornare manualmente.",
+    "triggerFailed": "Impossibile avviare l'aggiornamento",
+    "checkFailed": "Impossibile verificare gli aggiornamenti"
   },
   "sync": {
     "fetchProfileFailed": "Impossibile recuperare il profilo",
@@ -1561,7 +1563,8 @@
       "autoDiscovered": "Macchina trovata automaticamente!",
       "connectButton": "Connetti",
       "ipDescription": "Inserisci un indirizzo IP (es. 192.168.1.42) o nome host. Il nome host è casuale ma contiene sempre \"meticulous\" (es. meticulous-a3f7.local).",
-      "configureManually": "Configura manualmente"
+      "configureManually": "Configura manualmente",
+      "noMachinesFound": "Nessuna macchina trovata sulla rete. Inserire l'indirizzo IP manualmente."
     },
     "name": {
       "title": "Come ti chiami?",

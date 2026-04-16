@@ -1510,7 +1510,9 @@
   },
   "update": {
     "failed": "Uppdatering misslyckades",
-    "timeout": "Uppdateringen slutfördes inte inom förväntad tid. Vänligen uppdatera manuellt."
+    "timeout": "Uppdateringen slutfördes inte inom förväntad tid. Vänligen uppdatera manuellt.",
+    "triggerFailed": "Kunde inte starta uppdateringen",
+    "checkFailed": "Kunde inte söka efter uppdateringar"
   },
   "sync": {
     "fetchProfileFailed": "Kunde inte hämta profil",
@@ -1561,7 +1563,8 @@
       "autoDiscovered": "Maskin hittad automatiskt!",
       "connectButton": "Anslut",
       "ipDescription": "Ange en IP-adress (t.ex. 192.168.1.42) eller värdnamn. Värdnamnet är slumpmässigt men innehåller alltid \"meticulous\" (t.ex. meticulous-a3f7.local).",
-      "configureManually": "Konfigurera manuellt"
+      "configureManually": "Konfigurera manuellt",
+      "noMachinesFound": "Inga maskiner hittades på ditt nätverk. Ange IP-adressen manuellt."
     },
     "name": {
       "title": "Vad heter du?",

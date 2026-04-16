@@ -1510,7 +1510,9 @@
   },
   "update": {
     "failed": "Aktualisierung fehlgeschlagen",
-    "timeout": "Aktualisierung wurde nicht innerhalb der erwarteten Zeit abgeschlossen. Bitte manuell aktualisieren."
+    "timeout": "Aktualisierung wurde nicht innerhalb der erwarteten Zeit abgeschlossen. Bitte manuell aktualisieren.",
+    "triggerFailed": "Aktualisierung konnte nicht ausgelöst werden",
+    "checkFailed": "Suche nach Aktualisierungen fehlgeschlagen"
   },
   "sync": {
     "fetchProfileFailed": "Fehler beim Abrufen des Profils",
@@ -1561,7 +1563,8 @@
       "autoDiscovered": "Maschine automatisch gefunden!",
       "connectButton": "Verbinden",
       "ipDescription": "Geben Sie eine IP-Adresse (z.B. 192.168.1.42) oder einen Hostnamen ein. Der Hostname ist zufällig, enthält aber immer „meticulous\" (z.B. meticulous-a3f7.local).",
-      "configureManually": "Manuell konfigurieren"
+      "configureManually": "Manuell konfigurieren",
+      "noMachinesFound": "Keine Maschinen in Ihrem Netzwerk gefunden. Geben Sie die IP-Adresse manuell ein."
     },
     "name": {
       "title": "Wie heißt du?",

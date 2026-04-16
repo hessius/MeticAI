@@ -26,6 +26,13 @@ function clampTemp(val: number | undefined | null, fallback: number | null): num
 // Re-export MachineState for convenience
 export type { MachineState } from '@/hooks/useWebSocket'
 
+/** Fields that DirectAdapter seeds via the status callback but aren't in StatusData. */
+interface SeededStatusFields {
+  total_shots?: number | null
+  firmware_version?: string | null
+  sounds_enabled?: boolean | null
+}
+
 const INITIAL_STATE: MachineState = {
   connected: false,
   availability: null,
@@ -126,8 +133,7 @@ function useDirectTelemetry(enabled: boolean): MachineState {
 
         // DirectAdapter seeds total_shots, firmware_version, sounds_enabled via
         // the status callback (they aren't in the machine's raw status events).
-        // Cast to access seeded fields that aren't part of the StatusData type.
-        const seeded = data as Record<string, unknown>
+        const seeded = data as typeof data & SeededStatusFields
 
         return {
           ...prev,
@@ -153,9 +159,9 @@ function useDirectTelemetry(enabled: boolean): MachineState {
           target_temperature: clampTemp(data.setpoints?.temperature, prev.target_temperature),
           target_weight: prev.target_weight,
           // Seeded fields from DirectAdapter (total_shots, firmware, sounds)
-          total_shots: (seeded.total_shots as number | null) ?? prev.total_shots,
-          firmware_version: (seeded.firmware_version as string | null) ?? prev.firmware_version,
-          sounds_enabled: (seeded.sounds_enabled as boolean | null) ?? prev.sounds_enabled,
+          total_shots: seeded.total_shots ?? prev.total_shots,
+          firmware_version: seeded.firmware_version ?? prev.firmware_version,
+          sounds_enabled: seeded.sounds_enabled ?? prev.sounds_enabled,
           _ts: Date.now(),
           _stale: false,
         }
