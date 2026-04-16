@@ -23,7 +23,7 @@ import type { CatalogueProfile } from '@/services/catalogue/CatalogueService'
 export interface SmartGreetingAction {
   label: string
   /** Navigation target — the consuming component maps this to actual navigation */
-  target: 'shot-analysis' | 'dial-in' | 'profile-catalogue' | 'add-profile' | 'shot-history'
+  target: 'shot-analysis' | 'dial-in' | 'profile-catalogue' | 'view-profile' | 'add-profile' | 'shot-history'
   /** Optional context for the navigation (e.g. shot date/filename) */
   context?: Record<string, string>
 }
@@ -440,10 +440,13 @@ export const GREETING_RULES: GreetingRule[] = [
       const sorted = [...ctx.stats.byProfile].sort((a, b) => b.count - a.count)
       const favorite = sorted[0]
       if (ctx.recentProfiles.includes(favorite.name)) return null
+      const matchedProfile = ctx.profiles.find(p => p.name.toLowerCase() === favorite.name.toLowerCase())
       return {
         id: 'neglectedFavorite',
         message: ctx.t('smartGreeting.neglectedFavorite', { name: favorite.name }),
-        action: { label: ctx.t('smartGreeting.browseAction'), target: 'profile-catalogue' },
+        action: matchedProfile
+          ? { label: ctx.t('smartGreeting.viewProfileAction'), target: 'view-profile' as const, context: { profileId: matchedProfile.id, profileName: matchedProfile.name } }
+          : { label: ctx.t('smartGreeting.browseAction'), target: 'profile-catalogue' as const },
       }
     },
   },
@@ -560,7 +563,7 @@ export const GREETING_RULES: GreetingRule[] = [
       return {
         id: 'unusedProfile',
         message: ctx.t('smartGreeting.unusedProfile', { name: pick.name }),
-        action: { label: ctx.t('smartGreeting.browseAction'), target: 'profile-catalogue' },
+        action: { label: ctx.t('smartGreeting.viewProfileAction'), target: 'view-profile', context: { profileId: pick.id, profileName: pick.name } },
       }
     },
   },

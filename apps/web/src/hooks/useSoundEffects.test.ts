@@ -118,6 +118,26 @@ describe('useSoundEffects', () => {
     expect(mockTiks.warning).toHaveBeenCalled()
   })
 
+  it('maps interaction sounds to correct tiks methods', () => {
+    soundsEnabledValue = true
+    const { result } = renderHook(() => useSoundEffects())
+
+    act(() => result.current.buttonClick())
+    expect(mockTiks.click).toHaveBeenCalled()
+
+    act(() => result.current.toggleOn())
+    expect(mockTiks.toggle).toHaveBeenCalledWith(true)
+
+    act(() => result.current.toggleOff())
+    expect(mockTiks.toggle).toHaveBeenCalledWith(false)
+
+    act(() => result.current.islandExpand())
+    expect(mockTiks.swoosh).toHaveBeenCalled()
+
+    act(() => result.current.islandContract())
+    expect(mockTiks.pop).toHaveBeenCalledTimes(1)
+  })
+
   it('reflects enabled state from preferences', () => {
     soundsEnabledValue = false
     const { result } = renderHook(() => useSoundEffects())

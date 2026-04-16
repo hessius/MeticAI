@@ -38,7 +38,7 @@ import type { APIResponse, ViewState } from '@/types'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
-import { Sun, Moon, Gear } from '@phosphor-icons/react'
+import { Sun, Moon, Gear, ArrowRight } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
@@ -135,7 +135,7 @@ function App() {
   // Capacitor plugin hooks
   const { isConnected } = useNetworkStatus()
   const { notifyPreheatComplete } = useBrewNotifications()
-  const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete } = useSoundEffects()
+  const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete, islandExpand: playIslandExpand, islandContract: playIslandContract, buttonClick: playButtonClick } = useSoundEffects()
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
@@ -317,34 +317,61 @@ function App() {
   const [islandExpanded, setIslandExpanded] = useState(false)
   const islandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const greetingTextRef = useRef<HTMLElement | null>(null)
-  const [isMarqueeActive, setIsMarqueeActive] = useState(false)
+  const greetingInnerRef = useRef<HTMLElement | null>(null)
+  const [isScrollActive, setIsScrollActive] = useState(false)
 
   useEffect(() => {
     if (isHome && smartGreeting) {
-      islandTimerRef.current = setTimeout(() => setIslandExpanded(true), 3000)
+      islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpand() }, 3000)
     } else {
       setIslandExpanded(false)
     }
     return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
-  }, [isHome, smartGreeting])
+  }, [isHome, smartGreeting, playIslandExpand])
 
-  // Detect text overflow and enable marquee scrolling
+  // Detect vertical text overflow and enable scroll animation
   useEffect(() => {
-    if (!islandExpanded || !greetingTextRef.current) {
-      setIsMarqueeActive(false)
+    if (!islandExpanded || !greetingTextRef.current || !greetingInnerRef.current) {
+      setIsScrollActive(false)
       return
     }
-    const el = greetingTextRef.current
-    const checkOverflow = () => setIsMarqueeActive(el.scrollWidth > el.clientWidth + 4)
-    // Delay check to allow width transition to finish
+    const container = greetingTextRef.current
+    const inner = greetingInnerRef.current
+
+    const checkOverflow = () => {
+      const overflow = inner.scrollHeight - container.clientHeight
+      if (overflow > 4) {
+        // Set CSS variable BEFORE adding active class (Safari safety)
+        inner.style.setProperty('--island-scroll-y', `-${overflow}px`)
+        // Scale duration: ~6s base + 1s per extra line of overflow
+        const lineHeight = parseFloat(getComputedStyle(container).lineHeight) || 16.8
+        const extraLines = Math.max(0, Math.round(overflow / lineHeight))
+        inner.style.setProperty('--island-scroll-duration', `${6 + extraLines * 1}s`)
+        setIsScrollActive(true)
+      } else {
+        setIsScrollActive(false)
+      }
+    }
+
+    // Initial check after expansion transition completes
     const timer = setTimeout(checkOverflow, 600)
-    return () => clearTimeout(timer)
+    // Re-check on resize (responsive width changes, font loading)
+    const observer = new ResizeObserver(checkOverflow)
+    observer.observe(container)
+
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
   }, [islandExpanded, smartGreeting])
 
   const toggleIsland = useCallback(() => {
     if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
-    setIslandExpanded(prev => !prev)
-  }, [])
+    setIslandExpanded(prev => {
+      if (prev) playIslandContract(); else playIslandExpand()
+      return !prev
+    })
+  }, [playIslandExpand, playIslandContract])
 
   // Check for existing profiles on mount
   useEffect(() => {
@@ -915,6 +942,9 @@ function App() {
   const prefersReducedMotion = useReducedMotion()
 
   // Greeting action handler (shared between header pill and StartView)
+  const viewMachineProfileRef = useRef(handleViewMachineProfile)
+  viewMachineProfileRef.current = handleViewMachineProfile
+
   const handleGreetingAction = useCallback((target: string, context?: Record<string, string>) => {
     switch (target) {
       case 'shot-analysis':
@@ -932,6 +962,13 @@ function App() {
         break
       case 'profile-catalogue':
         setViewState('profile-catalogue')
+        break
+      case 'view-profile':
+        if (context?.profileId && context?.profileName) {
+          viewMachineProfileRef.current({ id: context.profileId, name: context.profileName })
+        } else {
+          setViewState('profile-catalogue')
+        }
         break
       case 'add-profile':
         setShowAddProfileDialog(true)
@@ -993,7 +1030,7 @@ function App() {
                 variant="ghost"
                 size="icon"
                 className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                onClick={() => setViewState('settings')}
+                onClick={() => { playButtonClick(); setViewState('settings') }}
                 aria-label={t('navigation.settings')}
               >
                 <Gear size={18} weight="duotone" />
@@ -1007,7 +1044,7 @@ function App() {
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={toggleTheme}
+                  onClick={() => { playButtonClick(); toggleTheme() }}
                   aria-label={t('a11y.toggleTheme', { mode: isDark ? 'light' : 'dark' })}
                 >
                   {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
@@ -1018,7 +1055,7 @@ function App() {
                   variant="ghost"
                   size="icon"
                     className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                    onClick={() => setQrDialogOpen(true)}
+                    onClick={() => { playButtonClick(); setQrDialogOpen(true) }}
                     aria-label={t('a11y.openOnMobile')}
                   >
                     <QrCode size={18} weight="duotone" />
@@ -1030,14 +1067,14 @@ function App() {
             <div className="flex items-center justify-center">
               {/* Dynamic Island — circle→pill CSS transition */}
               <div
-                  role={smartGreeting ? "button" : undefined}
-                  tabIndex={smartGreeting ? 0 : undefined}
-                  onClick={smartGreeting ? toggleIsland : undefined}
-                  onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
-                  className={`inline-flex items-center select-none${smartGreeting ? ' cursor-pointer' : ''}`}
+                  className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
+                  onClick={!islandExpanded && smartGreeting ? toggleIsland : undefined}
+                  role={!islandExpanded && smartGreeting ? 'button' : undefined}
+                  tabIndex={!islandExpanded && smartGreeting ? 0 : undefined}
+                  onKeyDown={!islandExpanded && smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                   style={{
                     height: islandExpanded ? 48 : 40,
-                    width: islandExpanded ? 'min(18rem, calc(100vw - 8rem))' : 40,
+                    width: islandExpanded ? 'min(20rem, calc(100vw - 6rem))' : 40,
                     background: islandExpanded
                       ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
                       : 'transparent',
@@ -1047,18 +1084,23 @@ function App() {
                     border: islandExpanded
                       ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)')
                       : '1px solid transparent',
-                    padding: islandExpanded ? '4px 14px 4px 4px' : '0',
+                    padding: islandExpanded ? '4px 4px 4px 4px' : '0',
                     overflow: 'hidden',
                     justifyContent: islandExpanded ? 'flex-start' : 'center',
                     transition: 'width 0.55s cubic-bezier(0.32, 0.72, 0, 1), height 0.45s cubic-bezier(0.32, 0.72, 0, 1), background 0.45s cubic-bezier(0.32, 0.72, 0, 1), backdrop-filter 0.4s ease, border-color 0.4s ease, padding 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                   }}
                 >
-                  {/* Logo — always visible */}
-                  <div
-                    className="shrink-0 flex items-center justify-center"
+                  {/* Logo — tap to collapse when expanded */}
+                  <button
+                    type="button"
+                    className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
+                    onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
+                    tabIndex={islandExpanded ? 0 : -1}
+                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : undefined}
                     style={{
                       width: 32,
                       height: 32,
+                      cursor: islandExpanded ? 'pointer' : 'default',
                       transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                       transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
                     }}
@@ -1073,36 +1115,47 @@ function App() {
                         transition: 'background 0.4s ease, padding 0.3s ease',
                       }}
                     />
-                  </div>
+                  </button>
 
                   {/* Greeting text — only visible when expanded, with delayed fade-in */}
                   {smartGreeting && (
                     <div
                       className="min-w-0 flex-1 overflow-hidden"
                       style={{
-                        marginLeft: islandExpanded ? 8 : 0,
+                        marginLeft: islandExpanded ? 6 : 0,
                         opacity: islandExpanded ? 1 : 0,
                         transition: 'opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                         pointerEvents: islandExpanded ? 'auto' : 'none',
-                        maskImage: islandExpanded ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
-                        WebkitMaskImage: islandExpanded ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        maskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        WebkitMaskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
                       }}
                     >
-                      {smartGreeting.action ? (
-                        <button
-                          ref={greetingTextRef as React.RefObject<HTMLButtonElement>}
-                          type="button"
-                          className={`text-xs transition-colors text-left w-full island-greeting-text${isMarqueeActive ? ' island-marquee-active' : ''} ${isDark ? 'text-white/85 hover:text-white' : 'text-foreground/80 hover:text-foreground'}`}
-                          onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
-                        >
-                          <span className="island-marquee-inner">{smartGreeting.message}</span>
-                        </button>
-                      ) : (
-                        <p ref={greetingTextRef as React.RefObject<HTMLParagraphElement>} className={`text-xs island-greeting-text${isMarqueeActive ? ' island-marquee-active' : ''} ${isDark ? 'text-white/85' : 'text-foreground/80'}`}>
-                          <span className="island-marquee-inner">{smartGreeting.message}</span>
-                        </p>
-                      )}
+                      <div
+                        ref={greetingTextRef as React.RefObject<HTMLDivElement>}
+                        className={`text-xs island-greeting-text${isScrollActive ? ' island-scroll-active' : ''} ${isDark ? 'text-white/85' : 'text-foreground/80'}`}
+                      >
+                        <span ref={greetingInnerRef as React.RefObject<HTMLSpanElement>} className="island-marquee-inner">{smartGreeting.message}</span>
+                      </div>
                     </div>
+                  )}
+
+                  {/* Action button — circular chevron on the right */}
+                  {smartGreeting?.action && islandExpanded && (
+                    <button
+                      type="button"
+                      className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-black/5 hover:bg-black/10 text-foreground/60'}`}
+                      onClick={(e) => { e.stopPropagation(); playButtonClick(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
+                      aria-label={smartGreeting.action.label}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        marginLeft: 4,
+                        opacity: islandExpanded ? 1 : 0,
+                        transition: 'opacity 0.3s ease 0.4s, background 0.2s ease',
+                      }}
+                    >
+                      <ArrowRight size={16} weight="bold" />
+                    </button>
                   )}
                 </div>
 

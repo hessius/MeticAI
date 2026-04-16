@@ -48,8 +48,12 @@ export function useSoundEffects() {
   const brewingStarted = useCallback(() => play(tiks.click), [play, tiks.click])
   const generationComplete = useCallback(() => play(tiks.success), [play, tiks.success])
 
-  // ── Interaction sounds (for future use) ──
+  // ── Interaction sounds ──
   const buttonClick = useCallback(() => play(tiks.click), [play, tiks.click])
+  const toggleOn = useCallback(() => play(() => tiks.toggle(true)), [play, tiks])
+  const toggleOff = useCallback(() => play(() => tiks.toggle(false)), [play, tiks])
+  const islandExpand = useCallback(() => play(tiks.swoosh), [play, tiks.swoosh])
+  const islandContract = useCallback(() => play(tiks.pop), [play, tiks.pop])
   const warningSound = useCallback(() => play(tiks.warning), [play, tiks.warning])
 
   return {
@@ -61,6 +65,10 @@ export function useSoundEffects() {
     brewingStarted,
     generationComplete,
     buttonClick,
+    toggleOn,
+    toggleOff,
+    islandExpand,
+    islandContract,
     warningSound,
     enabled,
   }

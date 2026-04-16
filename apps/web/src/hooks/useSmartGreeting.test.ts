@@ -289,7 +289,9 @@ describe('pickGreeting', () => {
     }))
     expect(result).not.toBeNull()
     expect(result!.id).toBe('unusedProfile')
-    expect(result!.action?.target).toBe('profile-catalogue')
+    expect(result!.action?.target).toBe('view-profile')
+    expect(result!.action?.context?.profileId).toBeDefined()
+    expect(result!.action?.context?.profileName).toBe('Untried Blend')
   })
 
   it('rule: anniversary — triggers every 10 days', () => {

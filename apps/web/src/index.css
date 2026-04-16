@@ -854,30 +854,27 @@ ul:not([class]) li::before,
   100% { transform: translateX(calc(-100% + 10rem)); }
 }
 
-/* Dynamic Island greeting text — single line, truncated with fade edge */
+/* Dynamic Island greeting text — 2-line max with vertical scroll for overflow */
 .island-greeting-text {
   display: block;
-  white-space: nowrap;
+  white-space: pre-line;
   overflow: hidden;
   line-height: 1.4;
+  max-height: calc(2 * 1.4em);
 }
 
 .island-marquee-inner {
-  display: inline-block;
-  white-space: nowrap;
+  display: block;
 }
 
-/* Marquee scroll for long greetings that overflow the pill */
-.island-greeting-text.island-marquee-active .island-marquee-inner {
-  animation: island-marquee 10s linear infinite;
+/* Vertical scroll for greetings that exceed 2 lines */
+.island-greeting-text.island-scroll-active .island-marquee-inner {
+  animation: island-vscroll var(--island-scroll-duration, 8s) ease-in-out infinite;
   animation-delay: 2s;
 }
 
-@keyframes island-marquee {
-  0%   { transform: translateX(0); }
-  5%   { transform: translateX(0); }
-  45%  { transform: translateX(min(0px, calc(-100% + 12rem))); }
-  55%  { transform: translateX(min(0px, calc(-100% + 12rem))); }
-  95%  { transform: translateX(0); }
-  100% { transform: translateX(0); }
+@keyframes island-vscroll {
+  0%, 20%  { transform: translateY(0); }
+  35%, 65% { transform: translateY(var(--island-scroll-y, 0px)); }
+  80%, 100% { transform: translateY(0); }
 }

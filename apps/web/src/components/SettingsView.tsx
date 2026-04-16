@@ -38,6 +38,7 @@ import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
 import { getSoundsEnabled, setSoundsEnabled } from '@/lib/soundPreferences'
+import { useSoundEffects } from '@/hooks/useSoundEffects'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
@@ -112,6 +113,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
   const { authenticate: biometricAuth } = useBiometrics()
   const { copyToClipboard } = useClipboard()
+  const { toggleOn: playToggleOn, toggleOff: playToggleOff, buttonClick: playButtonClick } = useSoundEffects()
 
   // Direct and demo modes both use local storage for settings (no backend server)
   const isLocalMode = () => isDirectMode() || isDemoMode()
@@ -729,7 +731,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         <Button
           variant="ghost"
           size="icon"
-          onClick={onBack}
+          onClick={() => { playButtonClick(); onBack() }}
           className="shrink-0"
           title={t('common.back')}
         >
@@ -984,6 +986,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   const next = checked as boolean
                   setSoundsEnabledState(next)
                   setSoundsEnabled(next)
+                  if (next) playToggleOn(); else playToggleOff()
                 }}
               />
             </div>
@@ -1004,6 +1007,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     const next = checked as boolean
                     setAiEnabledState(next)
                     setAiEnabled(next)
+                    if (next) playToggleOn(); else playToggleOff()
                   }}
                   disabled={!hasGeminiKey}
                 />
@@ -1088,6 +1092,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     const next = checked as boolean
                     setHideAiWhenUnavailableState(next)
                     setHideAiWhenUnavailable(next)
+                    if (next) playToggleOn(); else playToggleOff()
                   }}
                 />
               </div>
@@ -1127,6 +1132,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                       debouncedSave(next)
                       return next
                     })
+                    if (checked) playToggleOn(); else playToggleOff()
                   }}
                 />
               </div>
@@ -1205,7 +1211,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     <Switch
                       id="theme-toggle"
                       checked={!isDark}
-                      onCheckedChange={onToggleTheme}
+                      onCheckedChange={(checked) => { onToggleTheme?.(); if (checked) playToggleOn(); else playToggleOff() }}
                     />
                   </div>
                 )}
@@ -1220,7 +1226,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     <Switch
                       id="system-theme-toggle"
                       checked={isFollowSystem}
-                      onCheckedChange={(checked) => onSetFollowSystem(checked as boolean)}
+                      onCheckedChange={(checked) => { onSetFollowSystem(checked as boolean); if (checked) playToggleOn(); else playToggleOff() }}
                     />
                   </div>
                 )}
@@ -1235,7 +1241,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     <Switch
                       id="blob-toggle"
                       checked={showBlobs}
-                      onCheckedChange={onToggleBlobs}
+                      onCheckedChange={(checked) => { onToggleBlobs?.(); if (checked) playToggleOn(); else playToggleOff() }}
                     />
                   </div>
                 )}
@@ -1312,7 +1318,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   <Switch
                     id="tailscale-toggle"
                     checked={tailscaleStatus?.enabled ?? false}
-                    onCheckedChange={(checked) => handleTailscaleToggle(checked as boolean)}
+                    onCheckedChange={(checked) => { handleTailscaleToggle(checked as boolean); if (checked) playToggleOn(); else playToggleOff() }}
                     disabled={tailscaleSaving}
                   />
                 </div>
@@ -1501,7 +1507,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   <Switch
                     id="beta-channel-switch"
                     checked={betaChannelEnabled}
-                    onCheckedChange={handleBetaChannelToggle}
+                    onCheckedChange={(checked) => { handleBetaChannelToggle(checked); if (checked) playToggleOn(); else playToggleOff() }}
                     disabled={betaSwitching}
                     aria-label={t('settings.beta.enableUpdates')}
                   />
