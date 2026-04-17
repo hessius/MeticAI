@@ -35,6 +35,13 @@
     --safe-pb: calc(1.25rem + env(safe-area-inset-bottom, 0px));
   }
   
+  /* In landscape, reduce bottom padding since safe area is typically 0 */
+  @media (orientation: landscape) and (max-height: 600px) {
+    :root {
+      --safe-pb: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
+  
   /* Prevent scroll jump when Radix UI dialogs/selects open */
   body[data-scroll-locked] {
     overflow: hidden !important;
@@ -52,11 +59,13 @@
     height: 100%;
     height: 100dvh;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: none;
     /* Prevent text/element selection on long-press in native app */
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+    /* Remove blue/grey tap highlight on iOS/Android WebViews */
+    -webkit-tap-highlight-color: transparent;
   }
   
   /* Allow text selection in form inputs and readable content */
@@ -519,6 +528,14 @@
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
 }
 
+/* ── Frosted glass card (control centre etc.) ──────────────── */
+.frosted-card {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* ── Ember button (warm border glow) ───────────────────────── */
 .ember-button {
   background: rgba(255, 143, 0, 0.08);
@@ -579,7 +596,7 @@
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.35;
+  opacity: 0.45;
   will-change: transform, opacity;
   animation: ambient-pulse 8s ease-in-out infinite alternate;
 }
@@ -608,18 +625,18 @@
   width: 35vw;
   height: 35vw;
   background: #FFC107;
-  opacity: 0.2;
+  opacity: 0.3;
   animation-delay: -5s;
 }
 
 @keyframes ambient-pulse {
   0% {
     transform: scale(1) translate(0, 0);
-    opacity: 0.3;
+    opacity: 0.4;
   }
   100% {
     transform: scale(1.15) translate(2%, -3%);
-    opacity: 0.45;
+    opacity: 0.55;
   }
 }
 
@@ -673,8 +690,25 @@
   border-color: rgba(255, 143, 0, 0.4);
 }
 
+:root:not(.dark) .frosted-button {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(78, 52, 46, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+:root:not(.dark) .frosted-button:hover {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(78, 52, 46, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+:root:not(.dark) .frosted-card {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border: 1px solid rgba(78, 52, 46, 0.1);
+}
+
 :root:not(.dark) .ambient-blob {
-  opacity: 0.15;
+  opacity: 0.35;
   filter: blur(100px);
 }
 
@@ -735,7 +769,7 @@ ul:not([class]) li::before,
 }
 
 /* ── Desktop two-column layout ────────────────────────────── */
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .desktop-two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -813,3 +847,36 @@ ul:not([class]) li::before,
 .dark .tag-roast-selected        { background-color: var(--color-orange-500);  border-color: var(--color-orange-400); }
 .dark .tag-characteristic-selected { background-color: var(--color-teal-500);  border-color: var(--color-teal-400); }
 .dark .tag-process-selected      { background-color: var(--color-indigo-500);  border-color: var(--color-indigo-400); }
+
+/* Marquee scroll animation for long text */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  10%  { transform: translateX(0); }
+  90%  { transform: translateX(calc(-100% + 10rem)); }
+  100% { transform: translateX(calc(-100% + 10rem)); }
+}
+
+/* Dynamic Island greeting text — 2-line max with vertical scroll for overflow */
+.island-greeting-text {
+  display: block;
+  white-space: pre-line;
+  overflow: hidden;
+  line-height: 1.4;
+  max-height: calc(2 * 1.4em);
+}
+
+.island-marquee-inner {
+  display: block;
+}
+
+/* Vertical scroll for greetings that exceed 2 lines */
+.island-greeting-text.island-scroll-active .island-marquee-inner {
+  animation: island-vscroll var(--island-scroll-duration, 8s) ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+@keyframes island-vscroll {
+  0%, 20%  { transform: translateY(0); }
+  35%, 65% { transform: translateY(var(--island-scroll-y, 0px)); }
+  80%, 100% { transform: translateY(0); }
+}

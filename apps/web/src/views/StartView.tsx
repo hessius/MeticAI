@@ -35,60 +35,66 @@ export function StartView({
 
   // Action buttons content (shared between mobile and desktop layouts)
   const actionButtons = (
-    <div className="space-y-2 lg:space-y-3">
+    <div className="space-y-2 md:space-y-3">
       {/* Core actions — 2×3 grid on mobile, stacked on desktop */}
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-1 md:gap-3">
         <Button
           onClick={onProfileCatalogue ?? onViewHistory}
-          variant="dark-brew"
-          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          variant="frosted"
+          className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
-          <Coffee size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
+          <Coffee size={28} className="shrink-0 md:hidden" weight="fill" />
+          <Coffee size={20} className="shrink-0 hidden md:block mr-2" weight="fill" />
           {t('navigation.profileCatalogue')}
         </Button>
 
         <Button
           onClick={onAddProfile}
-          variant="dark-brew"
-          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          variant="frosted"
+          className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
-          <Plus size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
+          <Plus size={28} className="shrink-0 md:hidden" weight="bold" />
+          <Plus size={20} className="shrink-0 hidden md:block mr-2" weight="bold" />
           {t('navigation.addProfile')}
         </Button>
 
         <Button
           onClick={onRunShot}
-          variant="dark-brew"
-          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          variant="frosted"
+          className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
-          <Play size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
+          <Play size={28} className="shrink-0 md:hidden" weight="fill" />
+          <Play size={20} className="shrink-0 hidden md:block mr-2" weight="fill" />
           {t('navigation.runSchedule')}
         </Button>
 
         <Button
           onClick={onDialIn}
-          variant="dark-brew"
-          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          variant="frosted"
+          className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
-          <Crosshair size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
+          <Crosshair size={28} className="shrink-0 md:hidden" weight="bold" />
+          <Crosshair size={20} className="shrink-0 hidden md:block mr-2" weight="bold" />
           {t('dialIn.title')}
         </Button>
 
         <Button
           onClick={onPourOver}
-          variant="dark-brew"
-          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          variant="frosted"
+          className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
-          <Drop size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="fill" />
+          <Drop size={28} className="shrink-0 md:hidden" weight="fill" />
+          <Drop size={20} className="shrink-0 hidden md:block mr-2" weight="fill" />
           {t('pourOver.title')}
         </Button>
 
         <Button
           onClick={onShotAnalysis}
-          variant="dark-brew"
-          className="w-full h-[4.5rem] lg:h-14 text-sm lg:text-base whitespace-normal lg:whitespace-nowrap"
+          variant="frosted"
+          className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
         >
-          <ChartLine size={20} className="mr-1.5 lg:mr-2 shrink-0" weight="bold" />
+          <ChartLine size={28} className="shrink-0 md:hidden" weight="bold" />
+          <ChartLine size={20} className="shrink-0 hidden md:block mr-2" weight="bold" />
           {t('navigation.shotAnalysis')}
         </Button>
       </div>
@@ -103,10 +109,11 @@ export function StartView({
       animate="visible"
       exit="hidden"
       transition={gentleSpring}
+      className={isMobile ? 'flex flex-col min-h-[calc(100dvh-14rem)]' : ''}
     >
       {isMobile ? (
-        // Mobile: no wrapping card — control centre and buttons as separate cards
-        <div className="space-y-3">
+        // Mobile: CC at top, buttons centered in remaining space
+        <>
           {controlCenter}
 
           {/* Last-shot analysis prompt */}
@@ -114,10 +121,10 @@ export function StartView({
             {lastShotBanner}
           </AnimatePresence>
 
-          <Card className="p-4">
+          <div className="flex-1 flex flex-col justify-center p-1 mt-2 -mb-4">
             {actionButtons}
-          </Card>
-        </div>
+          </div>
+        </>
       ) : (
         // Desktop: single card with all content
         <Card className="p-6 space-y-6">

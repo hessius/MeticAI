@@ -93,6 +93,7 @@ export function MarkdownEditor({
           <Button
             variant="ghost"
             size="sm"
+            data-sound="close"
             onClick={handleCancel}
             disabled={saving}
           >

@@ -230,32 +230,11 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   }
 
   return (
-    <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
-      {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Coffee size={18} weight="duotone" className="text-primary" />
-          <span className="text-sm font-semibold text-foreground">Meticulous</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {(() => {
-            const { dot, key } = connectionDot(machineState)
-            return (
-              <>
-                <span className="text-[10px] text-muted-foreground">
-                  {t(`controlCenter.connection.${key}`)}
-                </span>
-                <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
-              </>
-            )
-          })()}
-        </div>
-      </div>
-
+    <Card className={`frosted-card p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
       {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>
-          {/* Temperature + state */}
+          {/* Temperature + connection status — single row */}
           <div className="flex items-end justify-between">
             <div className="flex items-baseline gap-1.5">
               <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
@@ -272,8 +251,20 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground">{t('controlCenter.labels.status')}</span>
-              {stateBadge(machineState.state, false, t)}
+              {(() => {
+                const { dot, key } = connectionDot(machineState)
+                return (
+                  <>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t(`controlCenter.connection.${key}`)}
+                    </span>
+                    {machineState.state && machineState._wsConnected && (
+                      stateBadge(machineState.state, false, t)
+                    )}
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
+                  </>
+                )
+              })()}
             </div>
           </div>
 
@@ -298,8 +289,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('controlCenter.sections.activeProfile')}
               </h4>
-              <div className="flex items-center gap-2.5">
-              <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                 {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}
@@ -308,15 +299,21 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                     onError={() => setProfileImgError(true)}
                   />
                 ) : (
-                  <Coffee size={18} className="text-muted-foreground" weight="duotone" />
+                  <Coffee size={24} className="text-muted-foreground" weight="duotone" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-sm text-foreground font-medium truncate block">
-                  {activeProfile}
-                </span>
+                <div className="overflow-hidden">
+                  <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
+                    style={{
+                      animation: activeProfile && activeProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                    }}
+                  >
+                    {activeProfile}
+                  </span>
+                </div>
                 {profileAuthor && (
-                  <span className="text-[10px] text-muted-foreground truncate block">
+                  <span className="text-xs text-muted-foreground truncate block">
                     {t('controlCenter.labels.by')} {profileAuthor}
                   </span>
                 )}

@@ -46,6 +46,7 @@ import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { hasFeature } from '@/lib/featureFlags'
 import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
@@ -262,6 +263,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('a11y.goBack')}
@@ -1393,7 +1395,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                 className="flex-1 min-w-[180px] h-12 text-sm font-semibold bg-success hover:bg-success/90"
               >
                 <Play size={18} className="mr-2" weight="fill" />
-                {t('results.runScheduleShot')}
+                {hasFeature('scheduledShots') ? t('results.runScheduleShot') : t('results.runShot')}
               </Button>
             )}
 
@@ -1402,7 +1404,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         )}
 
         {/* Two-column layout wrapper for desktop */}
-        <div className="space-y-4 lg:space-y-0 desktop-two-col">
+        <div className="space-y-4 md:space-y-0 desktop-two-col">
         {/* Left column: Content */}
         <div className="space-y-4 desktop-panel-left">
         <div className="space-y-4">

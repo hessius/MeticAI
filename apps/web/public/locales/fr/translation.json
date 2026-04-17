@@ -302,7 +302,8 @@
     "saveScheduleFailed": "Échec de la sauvegarde de la programmation",
     "saveAsNew": "Enregistrer comme nouveau profil",
     "saveAsNewDescription": "Enregistrer les variables ajustées comme nouveau profil",
-    "newProfileNamePlaceholder": "Nom du nouveau profil..."
+    "newProfileNamePlaceholder": "Nom du nouveau profil...",
+    "titleRun": "Lancer"
   },
   "shotHistory": {
     "duration": "Durée",
@@ -417,6 +418,8 @@
     "aiAssistantOptional": "Optionnel.",
     "enableAiFeatures": "Activer les fonctionnalités IA",
     "enableAiFeaturesDescription": "Active/désactive les outils IA sans supprimer votre clé API enregistrée.",
+    "enableSoundEffects": "Effets sonores",
+    "enableSoundEffectsDescription": "Joue des sons subtils lors d'événements machine comme la fin d'extraction et le préchauffage terminé.",
     "hideAiWhenUnavailable": "Masquer les contrôles IA quand indisponibles",
     "hideAiWhenUnavailableDescription": "Lorsque désactivé, les contrôles IA restent visibles mais désactivés jusqu'à ce que l'IA soit disponible.",
     "getApiKey": "Obtenez votre clé API depuis",
@@ -1035,7 +1038,8 @@
     "savedToDevice": "Profil enregistré sur l'appareil",
     "savedToHistory": "Le profil a été enregistré sur votre appareil Meticulous et dans le catalogue de profils",
     "noProfileJson": "Aucun profil JSON disponible",
-    "profileJsonDownloaded": "Profil JSON téléchargé !"
+    "profileJsonDownloaded": "Profil JSON téléchargé !",
+    "runShot": "Lancer shot"
   },
   "profileEdit": {
     "title": "Modifier le profil",
@@ -1121,7 +1125,7 @@
       "deleteProfileFailed": "Échec de la suppression du profil"
     },
     "fetchFailed": "Échec du chargement des profils",
-    "offlineBanner": "Machine hors ligne — affichage des profils en cache",
+    "offlineBanner": "Machine hors ligne - affichage des profils en cache",
     "addButton": "Ajouter",
     "onMachine": "Sur la machine",
     "importButton": "Importer",
@@ -1311,7 +1315,7 @@
     "under": "Sous",
     "over": "Sur",
     "goldenRulesTitle": "Règles d'or pour le Meticulous",
-    "ruleStartSimple": "<strong>Commencez simple.</strong> Commencez avec un profil intégré du Meticulous (comme \"Italian\"). Maîtrisez d'abord la dose, le rendement et la température — ce sont les leviers les plus importants. Le contrôle avancé du débit et de la pression est puissant, mais fonctionne mieux quand les bases sont en place.",
+    "ruleStartSimple": "<strong>Commencez simple.</strong> Commencez avec un profil intégré du Meticulous (comme \"Italian\"). Maîtrisez d'abord la dose, le rendement et la température - ce sont les leviers les plus importants. Le contrôle avancé du débit et de la pression est puissant, mais fonctionne mieux quand les bases sont en place.",
     "ruleDontChangeDose": "Lorsque vous ajustez le rendement (poids final), <strong>ne changez pas la dose</strong> dans votre porte-filtre; changez uniquement le profil.",
     "ruleYieldTime": "Changer le rendement changera intrinsèquement le temps d'extraction. N'ajustez la mouture que si le temps est très éloigné de la cible. Pour modifier la direction du goût, les ajustements de profil sont plus efficaces que la mouture seule.",
     "ruleEvenExtraction": "Une extraction parfaitement uniforme crée un \"sweet spot\" plus large: concentrez-vous d'abord sur la préparation du puck.",
@@ -1446,6 +1450,7 @@
     "skipToNav": "Aller à la navigation",
     "toggleTheme": "Passer en mode {{mode}}",
     "openOnMobile": "Ouvrir sur appareil mobile",
+    "collapseGreeting": "Masquer le message",
     "goHome": "Retour à l'écran d'accueil",
     "goBack": "Retour",
     "stepProgress": "Étape {{current}} sur {{total}} : {{step}}",
@@ -1505,7 +1510,9 @@
   },
   "update": {
     "failed": "Échec de la mise à jour",
-    "timeout": "La mise à jour ne s'est pas terminée dans le temps prévu. Veuillez actualiser manuellement."
+    "timeout": "La mise à jour ne s'est pas terminée dans le temps prévu. Veuillez actualiser manuellement.",
+    "triggerFailed": "Impossible de déclencher la mise à jour",
+    "checkFailed": "Impossible de vérifier les mises à jour"
   },
   "sync": {
     "fetchProfileFailed": "Échec de la récupération du profil",
@@ -1556,7 +1563,8 @@
       "autoDiscovered": "Machine trouvée automatiquement !",
       "connectButton": "Connecter",
       "ipDescription": "Entrez une adresse IP (ex. 192.168.1.42) ou un nom d'hôte. Le nom d'hôte est aléatoire mais contient toujours « meticulous » (ex. meticulous-a3f7.local).",
-      "configureManually": "Configurer manuellement"
+      "configureManually": "Configurer manuellement",
+      "noMachinesFound": "Aucune machine trouvée sur votre réseau. Entrez l'adresse IP manuellement."
     },
     "name": {
       "title": "Comment vous appelez-vous ?",
@@ -1598,7 +1606,7 @@
       "language": "Langue",
       "startBrewing": "Commencer à préparer",
       "settingsHint": "Tous les paramètres peuvent être modifiés plus tard dans les Paramètres.",
-      "supportProject": "Vous aimez MeticAI ? Envisagez de m'offrir un café ☕"
+      "supportProject": "Vous aimez MeticAI ? Envisagez de m'offrir un café"
     }
   },
   "demo": {
@@ -1618,5 +1626,47 @@
     "machineReadyBody": "Votre machine a fini de préchauffer",
     "pourOverComplete": "Pour-over terminé",
     "pourOverCompleteBody": "Votre minuteur pour-over est terminé"
+  },
+  "smartGreeting": {
+    "justBrewed": "Vous venez de tirer un shot avec {{profile}}.\nPourquoi ne pas l'analyser ?",
+    "analyzeAction": "Analyser",
+    "milestone": "{{count}} shots tirés, plus que {{remaining}} avant {{milestone}} !",
+    "longGap": "Presque {{hours}}h depuis votre dernier shot.\nEnvie d'un café ?",
+    "unusedProfile": "Vous n'avez pas encore essayé {{name}}.\nTentez le coup !",
+    "browseAction": "Parcourir les profils",
+    "anniversary": "Vous utilisez MeticAI depuis {{days}} jours !",
+    "dialIn": "Comment était cette tasse ? Besoin d'ajuster ?",
+    "dialInAction": "Ajuster",
+    "fewProfiles": "Vous n'avez que {{count}} profils.\nEn créer un nouveau ?",
+    "createAction": "Créer un profil",
+    "doubleShot": "Déjà un deuxième ? Audacieux.",
+    "ratingNudge": "Comment était votre shot de {{profile}} ?\nN'oubliez pas de le noter !",
+    "ratingNudgeNew": "Saviez-vous que vous pouvez noter vos shots\npour trouver vos favoris ?",
+    "rateAction": "Noter",
+    "milestoneHit": "{{count}} shots !\nUn vrai parcours espresso.",
+    "personalBestDay": "{{count}} shots aujourd'hui.\nEst-ce un nouveau record ?",
+    "dailyStreak": "{{days}} jours d'affilée.\nQuelle détermination.",
+    "powerUser": "{{count}} shots aujourd'hui ?\nVous êtes pratiquement barista.",
+    "firstWeek": "Une semaine avec MeticAI !\nComment va le café ?",
+    "oneMonth": "Un mois ensemble.\nOn est pratiquement meilleurs amis.",
+    "morningRitual": "Bonjour !\nVotre machine vous attend.",
+    "firstShotOfDay": "Premier shot de la journée ?\nFaites qu'il compte.",
+    "postLunch": "Coup de mou de l'après-midi ?\nUn shot pourrait être la solution.",
+    "lateNight": "Encore debout ? Peut-être passer au déca...\nou pas, on ne juge pas.",
+    "earlyBird": "Debout avant le soleil ?\nVotre machine respecte l'effort.",
+    "backToBack": "Fidèle à {{name}}.\nUne personne de constance.",
+    "varietyExplorer": "{{count}} profils différents cette semaine.\nL'esprit aventurier !",
+    "topProfile": "{{name}} est votre favori.\n{{percent}}% de tous vos shots !",
+    "consistencyKing": "Vous préparez toujours vers {{time}}.\nCréature d'habitude !",
+    "neglectedFavorite": "Cela fait un moment sans {{name}}.\nIl vous manque ?",
+    "shotCountToday": "Shot numéro {{count}} aujourd'hui.\nBien chargé en caféine !",
+    "viewHistoryAction": "Voir l'historique",
+    "viewProfileAction": "Voir le profil",
+    "weekendMorning": "Ambiance weekend.\nPrenez votre temps avec celui-ci.",
+    "friday": "Bon vendredi !\nVous avez mérité ce shot.",
+    "mondayMotivation": "Lundi. D'abord le café,\nle reste ensuite.",
+    "quietWeek": "Semaine plus calme ?\nVotre machine s'ennuie de vous.",
+    "singleProfileUser": "{{count}} shots d'affilée sur {{name}}.\nTant que ça marche...",
+    "profileCollector": "{{count}} profils !\nVous construisez toute une collection."
   }
 }

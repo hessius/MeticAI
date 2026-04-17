@@ -14,6 +14,7 @@ import { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useSoundEffects } from '@/hooks/useSoundEffects'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -119,8 +120,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
   useEffect(() => { requestWakeLock(); return () => { releaseWakeLock() } }, [requestWakeLock, releaseWakeLock])
 
-  // Haptic + notification hooks
+  // Haptic + sound + notification hooks
   const { notification: hapticsNotification } = useHaptics()
+  const { shotComplete: playShotComplete } = useSoundEffects()
   const { notifyBrewComplete } = useBrewNotifications()
 
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
@@ -188,12 +190,13 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     }
   }, [ms.brewing])
 
-  // Haptic + notification on brew completion
+  // Haptic + sound + notification on brew completion
   useEffect(() => {
     if (!shotComplete) return
     hapticsNotification('success')
+    playShotComplete()
     notifyBrewComplete(ms.active_profile ?? 'Espresso')
-  }, [shotComplete, hapticsNotification, notifyBrewComplete, ms.active_profile])
+  }, [shotComplete, hapticsNotification, playShotComplete, notifyBrewComplete, ms.active_profile])
 
   // Accumulate data from WebSocket frames — push + rAF for O(1) per frame
   useEffect(() => {
@@ -354,7 +357,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+        <Button variant="ghost" size="sm" data-sound="back" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft size={16} className="mr-1" />
           {t('common.back')}
         </Button>
@@ -735,7 +738,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     {t('controlCenter.liveShot.analyzeShot', 'Analyze Shot')}
                   </Button>
                 )}
-                <Button variant="default" className="h-11 px-6" onClick={onBack}>
+                <Button variant="default" className="h-11 px-6" data-sound="back" onClick={onBack}>
                   {t('controlCenter.liveShot.backHome')}
                 </Button>
               </div>

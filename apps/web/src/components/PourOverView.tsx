@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useSoundEffects } from '@/hooks/useSoundEffects'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
@@ -384,6 +385,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // Keep screen awake while pour over is active
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
   const { notification: hapticsNotification } = useHaptics()
+  const { pourOverTarget: playPourOverTarget, pourOverDone: playPourOverDone, machineError: playMachineError } = useSoundEffects()
   const { notifyPourOverComplete } = useBrewNotifications()
   const prevTargetReachedRef = useRef(false)
   useEffect(() => {
@@ -692,14 +694,15 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     (mode === 'ratio' && isRunning && targetWeight !== null && targetWeight > 0 && weight >= targetWeight) ||
     (mode === 'recipe' && isRunning && selectedRecipe !== null && weight >= selectedRecipe.ingredients.water_g)
 
-  // Haptic + notification when pour-over target is reached
+  // Haptic + sound + notification when pour-over target is reached
   useEffect(() => {
     if (targetReached && !prevTargetReachedRef.current) {
       hapticsNotification('success')
+      playPourOverTarget()
       notifyPourOverComplete()
     }
     prevTargetReachedRef.current = targetReached
-  }, [targetReached, hapticsNotification, notifyPourOverComplete])
+  }, [targetReached, hapticsNotification, playPourOverTarget, notifyPourOverComplete])
 
   const recipeTimings = useMemo((): RecipeStepTiming[] => {
     if (!selectedRecipe) return []
@@ -900,6 +903,19 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     }
   }, [machineLifecycle, updateMachineIntegration, updateAutoStart])
 
+  // Sound effects for natural machine lifecycle events
+  const prevLifecycleRef = useRef<MachineLifecycle>(machineLifecycle)
+  useEffect(() => {
+    const prev = prevLifecycleRef.current
+    prevLifecycleRef.current = machineLifecycle
+
+    if (machineLifecycle === 'done' && prev === 'drawdown') {
+      playPourOverDone()
+    } else if (machineLifecycle === 'error') {
+      playMachineError()
+    }
+  }, [machineLifecycle, playPourOverDone, playMachineError])
+
   // Reset machine lifecycle when done (allow starting again)
   // Also tare the scale, reset the timer, and clear the graph
   const resetMachineLifecycle = useCallback(() => {
@@ -1067,6 +1083,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('common.back')}

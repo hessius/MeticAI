@@ -41,6 +41,7 @@ export function DemoModeBanner() {
         </button>
         <button
           type="button"
+          data-sound="close"
           onClick={() => setDismissed(true)}
           className="rounded-md p-1.5 hover:bg-amber-950/20 active:bg-amber-950/30 transition-colors"
           aria-label={t('common.dismiss', 'Dismiss')}

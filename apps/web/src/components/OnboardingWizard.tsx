@@ -102,8 +102,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     () => localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
   )
 
-  // Language — default to English for onboarding regardless of browser locale
-  const [selectedLang, setSelectedLang] = useState<SupportedLanguage>('en')
+  // Language — initialize from i18n's detected language (device locale on fresh install)
+  const [selectedLang, setSelectedLang] = useState<SupportedLanguage>(() => {
+    const detected = i18n.language?.split('-')[0] as SupportedLanguage
+    return supportedLanguages.includes(detected) ? detected : 'en'
+  })
 
   // Ref for IP input auto-focus
   const ipInputRef = useRef<HTMLInputElement>(null)
@@ -230,8 +233,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     // Request notification permission (non-blocking)
     requestPermission()
 
-    // Mark onboarding complete
+    // Mark onboarding complete and record install date
     localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETE, 'true')
+    if (!localStorage.getItem(STORAGE_KEYS.INSTALL_DATE)) {
+      localStorage.setItem(STORAGE_KEYS.INSTALL_DATE, new Date().toISOString())
+    }
 
     onComplete()
   }, [authorName, geminiKey, onComplete, requestPermission])
@@ -561,9 +567,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       {/* Summary */}
       <div className="w-full max-w-sm rounded-lg bg-muted/50 p-4 text-sm text-left space-y-2">
         {connectionStatus === 'success' && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">{t('onboarding.complete.machine')}</span>
-            <span className="font-medium text-green-600 dark:text-green-400">{machineName || machineIp}</span>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground shrink-0">{t('onboarding.complete.machine')}</span>
+            <span className="font-medium text-green-600 dark:text-green-400 truncate text-right">{machineName || machineIp}</span>
           </div>
         )}
         {authorName.trim() && (
@@ -592,7 +598,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       {!isDemoMode() && (
         <button
           type="button"
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-1"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-md border border-border/50 hover:border-border hover:bg-muted/50"
           onClick={() => {
             const url = 'https://buymeacoffee.com/HSUS'
             if (isNativePlatform()) {
@@ -607,9 +613,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         </button>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        {t('onboarding.complete.settingsHint')}
-      </p>
     </div>
   )
 

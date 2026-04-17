@@ -23,6 +23,18 @@ export const STORAGE_KEYS = {
   // -- Onboarding --
   ONBOARDING_COMPLETE: 'meticai-onboarding-complete',
 
+  // -- Usage tracking --
+  INSTALL_DATE: 'meticai-install-date',
+  SESSION_COUNT: 'meticai-session-count',
+
+  // -- Greeting tracking --
+  GREETING_LOG: 'meticai-greeting-log',
+  LAST_GREETING_ID: 'meticai-last-greeting',
+  PERSONAL_BEST_SHOTS_DAY: 'meticai-best-shots-day',
+
+  // -- Sound effects --
+  SOUNDS_ENABLED: 'meticai-sounds-enabled',
+
   // -- Demo mode --
   DEMO_PREV_URL: 'meticai-demo-prev-url',
   DEMO_PROFILES: 'meticai-demo-profiles',

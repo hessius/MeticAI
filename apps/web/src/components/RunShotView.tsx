@@ -702,13 +702,14 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         <Button
           variant="ghost"
           size="icon"
+          data-sound="back"
           onClick={onBack}
           className="shrink-0"
           title={t('common.back')}
         >
           <CaretLeft size={22} weight="bold" />
         </Button>
-        <h2 className="text-xl font-bold">{t('runShot.title')}</h2>
+        <h2 className="text-xl font-bold">{hasFeature('scheduledShots') ? t('runShot.title') : t('runShot.titleRun')}</h2>
         {machineStatus !== 'unknown' && (
           <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 text-xs">
             <span className={`w-2 h-2 rounded-full ${getMachineStatusIndicatorClass(machineStatus)}`} />
@@ -740,7 +741,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       </AnimatePresence>
 
       {/* Desktop two-column layout */}
-      <div className="desktop-two-col space-y-6 lg:space-y-0">
+      <div className="desktop-two-col space-y-6 md:space-y-0">
       {/* Left column: Profile + Options + Action */}
       <div className="space-y-6 desktop-panel-left">
 
@@ -820,8 +821,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         </AnimatePresence>
       </Card>
 
-      {/* Variable Adjustments */}
-      {selectedProfile && profileVariables.length > 0 && (
+      {/* Variable Adjustments — left column when scheduling available */}
+      {hasFeature('scheduledShots') && selectedProfile && profileVariables.length > 0 && (
         <VariableAdjustPanel
           profileVariables={profileVariables}
           profileStages={selectedProfile.stages}
@@ -982,8 +983,19 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       </p>
       </div>{/* end left column */}
 
-      {/* Right column: Schedules */}
+      {/* Right column: Schedules / Variable Adjustments */}
       <div className="space-y-6 desktop-panel-right">
+
+      {/* Variable Adjustments — right column when scheduling unavailable */}
+      {!hasFeature('scheduledShots') && selectedProfile && profileVariables.length > 0 && (
+        <VariableAdjustPanel
+          profileVariables={profileVariables}
+          profileStages={selectedProfile.stages}
+          overrides={overrides}
+          onOverridesChange={setOverrides}
+          onReset={() => setOverrides({})}
+        />
+      )}
 
       {/* Scheduled Shots */}
       {scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (

@@ -52,6 +52,7 @@ export function ShotDetectionBanner({ visible, onWatch, onDismiss }: ShotDetecti
             </Button>
             <button
               className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              data-sound="close"
               onClick={onDismiss}
               aria-label={t('common.dismiss')}
             >

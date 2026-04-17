@@ -73,6 +73,7 @@ export function BetaBanner({ className }: BetaBannerProps) {
         </a>
         <button
           onClick={handleDismiss}
+          data-sound="close"
           className="p-1 hover:bg-black/10 rounded"
           aria-label={t('common.dismiss')}
         >

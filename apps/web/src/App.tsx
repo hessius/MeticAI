@@ -38,12 +38,13 @@ import type { APIResponse, ViewState } from '@/types'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
-import { Sun, Moon, Gear } from '@phosphor-icons/react'
+import { Sun, Moon, Gear, ArrowRight } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
+import { useSmartGreeting } from '@/hooks/useSmartGreeting'
 import { useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
@@ -69,6 +70,7 @@ import { useStorageMigration } from '@/services/storage'
 // Capacitor plugin hooks
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
+import { useSoundEffects, useGlobalSoundDelegation } from '@/hooks/useSoundEffects'
 
 function App() {
   const { t } = useTranslation()
@@ -125,6 +127,7 @@ function App() {
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useMachineTelemetry(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
+  const smartGreeting = useSmartGreeting(mqttEnabled && viewState === 'start')
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
   const prevMachineStateRef = useRef<string | null>(null)
@@ -132,6 +135,8 @@ function App() {
   // Capacitor plugin hooks
   const { isConnected } = useNetworkStatus()
   const { notifyPreheatComplete } = useBrewNotifications()
+  const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete, islandExpand: playIslandExpand, islandContract: playIslandContract } = useSoundEffects()
+  useGlobalSoundDelegation()
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
@@ -205,6 +210,18 @@ function App() {
     window.scrollTo(0, 0)
   }, [viewState])
 
+  // Track session count (once per browser session)
+  useEffect(() => {
+    if (sessionStorage.getItem('meticai-session-counted')) return
+    sessionStorage.setItem('meticai-session-counted', '1')
+    const prev = parseInt(localStorage.getItem(STORAGE_KEYS.SESSION_COUNT) ?? '0', 10)
+    localStorage.setItem(STORAGE_KEYS.SESSION_COUNT, String(prev + 1))
+    // Backfill install date for users who onboarded before tracking was added
+    if (!localStorage.getItem(STORAGE_KEYS.INSTALL_DATE) && localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
+      localStorage.setItem(STORAGE_KEYS.INSTALL_DATE, new Date().toISOString())
+    }
+  }, [])
+
   useEffect(() => {
     setAiEnabled(getAiEnabled())
     setHideAiWhenUnavailable(getHideAiWhenUnavailable())
@@ -265,15 +282,18 @@ function App() {
     }
   }, [aiEnabled, t]) // aiEnabled changes on AI_PREFS_CHANGED_EVENT, retriggering this
 
-  // Reset shot banner dismissed state when brewing ends
+  // Reset shot banner dismissed state when brewing ends; sound on brewing start
   useEffect(() => {
     if (prevBrewingRef.current && !machineState.brewing) {
       setShotBannerDismissed(false)
     }
+    if (!prevBrewingRef.current && machineState.brewing) {
+      playBrewingStarted()
+    }
     prevBrewingRef.current = machineState.brewing
-  }, [machineState.brewing])
+  }, [machineState.brewing, playBrewingStarted])
 
-  // Notify when preheat completes (state transitions from preheating/heating → ready)
+  // Notify + sound when preheat completes (state transitions from preheating/heating → ready)
   useEffect(() => {
     const currentState = machineState.state?.toLowerCase() ?? null
     const prevState = prevMachineStateRef.current
@@ -285,13 +305,74 @@ function App() {
       currentState?.startsWith('click to start')
     ) {
       notifyPreheatComplete()
+      playMachineReady()
     }
-  }, [machineState.state, notifyPreheatComplete])
+  }, [machineState.state, notifyPreheatComplete, playMachineReady])
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
 
   const isHome = viewState === 'start'
+
+  // Dynamic Island animation: title → pill with greeting after 3s, tappable to toggle
+  const [islandExpanded, setIslandExpanded] = useState(false)
+  const islandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const greetingTextRef = useRef<HTMLElement | null>(null)
+  const greetingInnerRef = useRef<HTMLElement | null>(null)
+  const [isScrollActive, setIsScrollActive] = useState(false)
+
+  useEffect(() => {
+    if (isHome && smartGreeting) {
+      islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpand() }, 3000)
+    } else {
+      setIslandExpanded(false)
+    }
+    return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
+  }, [isHome, smartGreeting, playIslandExpand])
+
+  // Detect vertical text overflow and enable scroll animation
+  useEffect(() => {
+    if (!islandExpanded || !greetingTextRef.current || !greetingInnerRef.current) {
+      setIsScrollActive(false)
+      return
+    }
+    const container = greetingTextRef.current
+    const inner = greetingInnerRef.current
+
+    const checkOverflow = () => {
+      const overflow = inner.scrollHeight - container.clientHeight
+      if (overflow > 4) {
+        // Set CSS variable BEFORE adding active class (Safari safety)
+        inner.style.setProperty('--island-scroll-y', `-${overflow}px`)
+        // Scale duration: ~6s base + 1s per extra line of overflow
+        const lineHeight = parseFloat(getComputedStyle(container).lineHeight) || 16.8
+        const extraLines = Math.max(0, Math.round(overflow / lineHeight))
+        inner.style.setProperty('--island-scroll-duration', `${6 + extraLines * 1}s`)
+        setIsScrollActive(true)
+      } else {
+        setIsScrollActive(false)
+      }
+    }
+
+    // Initial check after expansion transition completes
+    const timer = setTimeout(checkOverflow, 600)
+    // Re-check on resize (responsive width changes, font loading)
+    const observer = new ResizeObserver(checkOverflow)
+    observer.observe(container)
+
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [islandExpanded, smartGreeting])
+
+  const toggleIsland = useCallback(() => {
+    if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
+    setIslandExpanded(prev => {
+      if (prev) playIslandContract(); else playIslandExpand()
+      return !prev
+    })
+  }, [playIslandExpand, playIslandContract])
 
   // Check for existing profiles on mount
   useEffect(() => {
@@ -558,6 +639,7 @@ function App() {
         }
       }
       
+      playGenerationComplete()
       setViewState('results')
     } catch (error) {
       clearInterval(messageInterval)
@@ -845,19 +927,12 @@ function App() {
     }
   }
 
-  const handleTitleClick = () => {
-    // Single tap: go to start screen (only if not on start already)
-    if (viewState !== 'start') {
-      handleBackToStart()
-    }
-  }
-
   const aiAvailable = isAiConfigured && aiEnabled
   const canSubmit = !!(aiAvailable && (imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0))
 
   // Phase 3 layout helpers
   const showControlCenter = mqttEnabled && machineState._wsConnected
-  const showRightColumn = showControlCenter && ['start', 'run-shot', 'live-shot'].includes(viewState)
+  const showRightColumn = showControlCenter && ['start', 'live-shot'].includes(viewState)
   const showShotBanner =
     mqttEnabled &&
     machineState.brewing &&
@@ -866,6 +941,49 @@ function App() {
     !shotBannerDismissed
 
   const prefersReducedMotion = useReducedMotion()
+
+  // Greeting action handler (shared between header pill and StartView)
+  const viewMachineProfileRef = useRef(handleViewMachineProfile)
+  viewMachineProfileRef.current = handleViewMachineProfile
+
+  const handleGreetingAction = useCallback((target: string, context?: Record<string, string>) => {
+    switch (target) {
+      case 'shot-analysis':
+        if (context?.date && context?.filename) {
+          setShotHistoryInitialDate(context.date)
+          setShotHistoryInitialFilename(context.filename)
+          previousViewStateRef.current = 'start'
+          setViewState('shot-history')
+        } else {
+          setViewState('shot-analysis')
+        }
+        break
+      case 'dial-in':
+        setViewState('dial-in')
+        break
+      case 'profile-catalogue':
+        setViewState('profile-catalogue')
+        break
+      case 'view-profile':
+        if (context?.profileId && context?.profileName) {
+          viewMachineProfileRef.current({ id: context.profileId, name: context.profileName })
+        } else {
+          console.warn('[DynamicIsland] view-profile action missing context, falling back to catalogue', context)
+          setViewState('profile-catalogue')
+        }
+        break
+      case 'add-profile':
+        setShowAddProfileDialog(true)
+        break
+      case 'shot-history':
+        previousViewStateRef.current = 'start'
+        setViewState('shot-history')
+        break
+      case 'history':
+        setViewState('history')
+        break
+    }
+  }, [])
   const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
 
   const appContent = (
@@ -896,45 +1014,33 @@ function App() {
         onDismiss={() => setShotBannerDismissed(true)}
       />
 
-      <div className={`flex-1 text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] lg:items-center lg:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
+      <div className={`flex-1 text-foreground flex justify-center px-5 md:px-8 overflow-x-hidden overflow-y-auto relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] xl:items-center xl:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
+        {isHome && (
         <header>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className={isHome ? "text-center mb-6 lg:mb-10" : "text-center mb-6"}
+          className="text-center mb-3 md:mb-4"
         >
-          <div className="flex items-center justify-center gap-3 mb-1 relative">
-            {/* Settings gear — left side, home screen only */}
-            {isHome && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => setViewState('settings')}
-                  aria-label={t('navigation.settings')}
-                >
-                  <Gear size={18} weight="duotone" />
-                </Button>
-              </div>
-            )}
-            <div 
-              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={handleTitleClick}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
-              aria-label={t('a11y.goHome')}
-            >
-              <MeticAILogo size={isHome ? (isMobile ? 36 : 48) : 28} variant={isDark ? 'white' : 'default'} />
-              <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-4xl lg:text-5xl' : 'text-2xl'}`}>
-                Metic<span className="gold-text">AI</span>
-              </h1>
+          <div className="flex items-center justify-center gap-3 mb-1 relative" style={{ minHeight: 48 }}>
+            {/* Settings gear — left side */}
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                onClick={() => setViewState('settings')}
+                aria-label={t('navigation.settings')}
+              >
+                <Gear size={18} weight="duotone" />
+              </Button>
             </div>
-            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
+
+            {/* Theme toggle + QR — right side */}
+            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10" id="navigation" aria-label={t('navigation.settings')}>
               {themeMounted && (
                 <Button
                   variant="ghost"
@@ -950,21 +1056,139 @@ function App() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => setQrDialogOpen(true)}
-                  aria-label={t('a11y.openOnMobile')}
+                    className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                    onClick={() => setQrDialogOpen(true)}
+                    aria-label={t('a11y.openOnMobile')}
+                  >
+                    <QrCode size={18} weight="duotone" />
+                  </Button>
+                )}
+              </nav>
+
+            {/* Centered island + title unit */}
+            <div className="flex items-center justify-center">
+              {/* Dynamic Island — circle→pill CSS transition */}
+              <div
+                  className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
+                  data-sound="none"
+                  onClick={!islandExpanded && smartGreeting ? toggleIsland : undefined}
+                  role={!islandExpanded && smartGreeting ? 'button' : undefined}
+                  tabIndex={!islandExpanded && smartGreeting ? 0 : undefined}
+                  onKeyDown={!islandExpanded && smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                  style={{
+                    height: islandExpanded ? 48 : 40,
+                    width: islandExpanded ? 'min(20rem, calc(100vw - 6rem))' : 40,
+                    background: islandExpanded
+                      ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
+                      : 'transparent',
+                    backdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
+                    WebkitBackdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
+                    borderRadius: 9999,
+                    border: islandExpanded
+                      ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)')
+                      : '1px solid transparent',
+                    padding: islandExpanded ? '4px 4px 4px 4px' : '0',
+                    overflow: 'hidden',
+                    justifyContent: islandExpanded ? 'flex-start' : 'center',
+                    transition: 'width 0.55s cubic-bezier(0.32, 0.72, 0, 1), height 0.45s cubic-bezier(0.32, 0.72, 0, 1), background 0.45s cubic-bezier(0.32, 0.72, 0, 1), backdrop-filter 0.4s ease, border-color 0.4s ease, padding 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
+                  }}
                 >
-                  <QrCode size={18} weight="duotone" />
-                </Button>
-              )}
-            </nav>
+                  {/* Logo — tap to collapse when expanded */}
+                  <button
+                    type="button"
+                    data-sound="none"
+                    className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
+                    onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
+                    tabIndex={islandExpanded ? 0 : -1}
+                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : undefined}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      cursor: islandExpanded ? 'pointer' : 'default',
+                      transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                      transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
+                    }}
+                  >
+                    <MeticAILogo
+                      size={32}
+                      variant={isDark ? 'white' : 'default'}
+                      className="rounded-full"
+                      style={{
+                        background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'),
+                        padding: islandExpanded ? 0 : 2,
+                        transition: 'background 0.4s ease, padding 0.3s ease',
+                      }}
+                    />
+                  </button>
+
+                  {/* Greeting text — only visible when expanded, with delayed fade-in */}
+                  {smartGreeting && (
+                    <div
+                      className="min-w-0 flex-1 overflow-hidden"
+                      style={{
+                        marginLeft: islandExpanded ? 6 : 0,
+                        opacity: islandExpanded ? 1 : 0,
+                        transition: 'opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
+                        pointerEvents: islandExpanded ? 'auto' : 'none',
+                        maskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        WebkitMaskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                      }}
+                    >
+                      <div
+                        ref={greetingTextRef as React.RefObject<HTMLDivElement>}
+                        className={`text-xs island-greeting-text${isScrollActive ? ' island-scroll-active' : ''} ${isDark ? 'text-white/85' : 'text-foreground/80'}`}
+                      >
+                        <span ref={greetingInnerRef as React.RefObject<HTMLSpanElement>} className="island-marquee-inner">{smartGreeting.message}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action button — circular chevron on the right */}
+                  {smartGreeting?.action && islandExpanded && (
+                    <button
+                      type="button"
+                      className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-black/5 hover:bg-black/10 text-foreground/60'}`}
+                      onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
+                      aria-label={smartGreeting.action.label}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        marginLeft: 4,
+                        opacity: islandExpanded ? 1 : 0,
+                        transition: 'opacity 0.3s ease 0.4s, background 0.2s ease',
+                      }}
+                    >
+                      <ArrowRight size={16} weight="bold" />
+                    </button>
+                  )}
+                </div>
+
+              {/* Title — fades out and collapses when island expands, tappable */}
+              <h1
+                role={smartGreeting ? "button" : undefined}
+                data-sound="none"
+                tabIndex={smartGreeting ? 0 : undefined}
+                onClick={smartGreeting ? toggleIsland : undefined}
+                onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                className={`font-bold tracking-tight text-3xl whitespace-nowrap overflow-hidden select-none${smartGreeting ? ' cursor-pointer' : ''}`}
+                style={{
+                  maxWidth: islandExpanded ? 0 : 140,
+                  opacity: islandExpanded ? 0 : 1,
+                  marginLeft: islandExpanded ? 0 : 8,
+                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                }}
+              >
+                Metic<span className="gold-text">AI</span>
+              </h1>
+            </div>
           </div>
 
         </motion.div>
         </header>
+        )}
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
-        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
+        <div className={showRightColumn ? 'md:grid md:grid-cols-[minmax(0,3fr)_minmax(280px,1fr)] lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] md:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
           <main id="main-content">
             <Suspense fallback={
@@ -1257,7 +1481,7 @@ function App() {
           </main>
 
             {/* Desktop-only footer — home view, non-demo */}
-            {isDesktop && isHome && !isDemoMode() && (
+            {!isMobile && isHome && !isDemoMode() && (
               <footer className="text-center py-4 mt-2">
                 <a
                   href="https://buymeacoffee.com/HSUS"

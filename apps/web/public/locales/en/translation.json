@@ -302,7 +302,8 @@
     "saveScheduleFailed": "Failed to save schedule",
     "saveAsNew": "Save as new profile",
     "saveAsNewDescription": "Save adjusted variables as a new profile",
-    "newProfileNamePlaceholder": "New profile name..."
+    "newProfileNamePlaceholder": "New profile name...",
+    "titleRun": "Run"
   },
   "shotHistory": {
     "title": "Shot History",
@@ -417,6 +418,8 @@
     "aiAssistantOptional": "Optional.",
     "enableAiFeatures": "Enable AI features",
     "enableAiFeaturesDescription": "Turns AI tools on/off without removing your saved API key.",
+    "enableSoundEffects": "Sound effects",
+    "enableSoundEffectsDescription": "Plays subtle sounds for machine events like shot completion and preheat ready.",
     "hideAiWhenUnavailable": "Hide AI controls when unavailable",
     "hideAiWhenUnavailableDescription": "When disabled, AI controls stay visible but disabled until AI is available.",
     "getApiKey": "Get your API key from",
@@ -1067,7 +1070,7 @@
       "deleteProfileFailed": "Failed to delete profile"
     },
     "fetchFailed": "Failed to load profiles",
-    "offlineBanner": "Machine is offline — showing cached profiles",
+    "offlineBanner": "Machine is offline - showing cached profiles",
     "addButton": "Add",
     "onMachine": "On machine",
     "importButton": "Import",
@@ -1129,7 +1132,8 @@
     "image": "Image",
     "json": "JSON",
     "noProfileJson": "No profile JSON available",
-    "profileJsonDownloaded": "Profile JSON downloaded!"
+    "profileJsonDownloaded": "Profile JSON downloaded!",
+    "runShot": "Run Shot"
   },
   "profileEdit": {
     "title": "Edit Profile",
@@ -1311,7 +1315,7 @@
     "under": "Under",
     "over": "Over",
     "goldenRulesTitle": "Golden Rules for the Meticulous",
-    "ruleStartSimple": "<strong>Start simple.</strong> Begin with a built-in Meticulous profile (like \"Italian\"). Master dose, yield, and temperature first — these are the biggest levers. Advanced flow and pressure control is powerful, but works best when the basics are dialed.",
+    "ruleStartSimple": "<strong>Start simple.</strong> Begin with a built-in Meticulous profile (like \"Italian\"). Master dose, yield, and temperature first - these are the biggest levers. Advanced flow and pressure control is powerful, but works best when the basics are dialed.",
     "ruleDontChangeDose": "When adjusting yield (final weight), <strong>don't change the dose</strong> in your portafilter; only change the profile.",
     "ruleYieldTime": "Changing yield will inherently change your shot time. Adjust grind only if your shot time is wildly off target. For flavor direction changes, profile adjustments are more effective than grind alone.",
     "ruleEvenExtraction": "A perfectly even extraction creates a larger \"sweet spot\" to work within: focus on puck prep first.",
@@ -1446,6 +1450,7 @@
     "skipToNav": "Skip to navigation",
     "toggleTheme": "Switch to {{mode}} mode",
     "openOnMobile": "Open on mobile device",
+    "collapseGreeting": "Collapse greeting",
     "goHome": "Go to home screen",
     "goBack": "Go back",
     "stepProgress": "Step {{current}} of {{total}}: {{step}}",
@@ -1601,7 +1606,7 @@
       "language": "Language",
       "startBrewing": "Start Brewing",
       "settingsHint": "All settings can be changed later in Settings.",
-      "supportProject": "Enjoying MeticAI? Consider buying me a coffee ☕"
+      "supportProject": "Enjoying MeticAI? Consider buying me a coffee"
     }
   },
   "demo": {
@@ -1621,5 +1626,47 @@
     "machineReadyBody": "Your machine has finished pre-heating",
     "pourOverComplete": "Pour Over Complete",
     "pourOverCompleteBody": "Your pour over timer has finished"
+  },
+  "smartGreeting": {
+    "justBrewed": "You just pulled a shot on {{profile}}.\nWhy not analyze it?",
+    "analyzeAction": "Analyze",
+    "milestone": "{{count}} shots down, only {{remaining}} to go until {{milestone}}!",
+    "longGap": "Almost {{hours}}h since your last shot.\nTime for coffee?",
+    "unusedProfile": "You haven't tried {{name}} yet.\nGive it a go!",
+    "browseAction": "Browse profiles",
+    "anniversary": "You've been using MeticAI for {{days}} days!",
+    "dialIn": "How was that cup? Need to dial in?",
+    "dialInAction": "Dial in",
+    "fewProfiles": "You only have {{count}} profiles.\nWhy not create a new one?",
+    "createAction": "Create profile",
+    "doubleShot": "Going for round two already? Bold move.",
+    "ratingNudge": "How was your shot of {{profile}}?\nDon't forget to rate it!",
+    "ratingNudgeNew": "Did you know you can rate your shots\nto track your favorites?",
+    "rateAction": "Rate",
+    "milestoneHit": "{{count}} shots!\nThat's a proper espresso journey.",
+    "personalBestDay": "{{count}} shots today.\nIs that a new record?",
+    "dailyStreak": "{{days}} days straight.\nThat's dedication.",
+    "powerUser": "{{count}} shots today?\nYou're practically a barista.",
+    "firstWeek": "One week with MeticAI!\nHow's the coffee been?",
+    "oneMonth": "A whole month together.\nWe're basically best friends now.",
+    "morningRitual": "Good morning!\nYour machine is waiting.",
+    "firstShotOfDay": "First shot of the day?\nMake it count.",
+    "postLunch": "Afternoon slump?\nA shot might be just what you need.",
+    "lateNight": "Still up? Maybe switch to decaf...\nor don't, we won't judge.",
+    "earlyBird": "Up before the sun?\nYour espresso machine respects the hustle.",
+    "backToBack": "Loyal to {{name}}.\nA person of consistency.",
+    "varietyExplorer": "{{count}} different profiles this week.\nThe adventurous type!",
+    "topProfile": "{{name}} is your go-to.\n{{percent}}% of all your shots!",
+    "consistencyKing": "You always brew around {{time}}.\nCreature of habit!",
+    "neglectedFavorite": "You haven't used {{name}} in a while.\nMissing it yet?",
+    "shotCountToday": "Shot number {{count}} today.\nStaying well-caffeinated!",
+    "viewHistoryAction": "View history",
+    "viewProfileAction": "View profile",
+    "weekendMorning": "Weekend vibes.\nTake your time with this one.",
+    "friday": "Happy Friday!\nYou've earned this shot.",
+    "mondayMotivation": "Monday. Coffee first,\neverything else after.",
+    "quietWeek": "Slower week?\nYour machine misses you.",
+    "singleProfileUser": "{{count}} shots in a row on {{name}}.\nIf it ain't broke...",
+    "profileCollector": "{{count}} profiles!\nYou're building quite the collection."
   }
 }
