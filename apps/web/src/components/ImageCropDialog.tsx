@@ -164,6 +164,7 @@ export function ImageCropDialog({
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
             variant="outline"
+            data-sound="close"
             onClick={handleClose}
             disabled={isUploading}
           >

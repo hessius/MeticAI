@@ -33,7 +33,7 @@ i18n
       lookupLocalStorage: 'meticai-language',
     },
     backend: {
-      loadPath: '/locales/{{lng}}/{{ns}}.json',
+      loadPath: `${import.meta.env.BASE_URL || '/'}locales/{{lng}}/{{ns}}.json`,
       queryStringParams: { v: __APP_VERSION__ },
     },
     react: {

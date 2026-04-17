@@ -12,6 +12,10 @@
  */
 import { useRef, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useWakeLock } from '@/hooks/useWakeLock'
+import { useHaptics } from '@/hooks/useHaptics'
+import { useSoundEffects } from '@/hooks/useSoundEffects'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,6 +53,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { getServerUrl } from '@/lib/config'
+import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -104,7 +109,21 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
-  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+
+  // Use machine state from props directly
+  const ms = machineState
+
+  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
+  const profileImgUrl = useProfileImageSrc(ms.active_profile)
+
+  // Keep screen awake during live shot view
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
+  useEffect(() => { requestWakeLock(); return () => { releaseWakeLock() } }, [requestWakeLock, releaseWakeLock])
+
+  // Haptic + sound + notification hooks
+  const { notification: hapticsNotification } = useHaptics()
+  const { shotComplete: playShotComplete } = useSoundEffects()
+  const { notifyBrewComplete } = useBrewNotifications()
 
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
   const [summary, setSummary] = useState<{
@@ -114,9 +133,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     avgFlow: number
   } | null>(null)
 
-  // Use machine state from props directly
-  const ms = machineState
-
   // Fetch target curves and profile info for the active profile
   useEffect(() => {
     const profileName = ms.active_profile
@@ -125,9 +141,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 
     const fetchData = async () => {
       const base = await getServerUrl()
-
-      // Build profile image URL
-      setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(profileName!)}/image-proxy`)
 
       // Fetch target curves
       try {
@@ -176,6 +189,14 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
       }
     }
   }, [ms.brewing])
+
+  // Haptic + sound + notification on brew completion
+  useEffect(() => {
+    if (!shotComplete) return
+    hapticsNotification('success')
+    playShotComplete()
+    notifyBrewComplete(ms.active_profile ?? 'Espresso')
+  }, [shotComplete, hapticsNotification, playShotComplete, notifyBrewComplete, ms.active_profile])
 
   // Accumulate data from WebSocket frames — push + rAF for O(1) per frame
   useEffect(() => {
@@ -336,7 +357,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+        <Button variant="ghost" size="sm" data-sound="back" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft size={16} className="mr-1" />
           {t('common.back')}
         </Button>
@@ -717,7 +738,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     {t('controlCenter.liveShot.analyzeShot', 'Analyze Shot')}
                   </Button>
                 )}
-                <Button variant="default" className="h-11 px-6" onClick={onBack}>
+                <Button variant="default" className="h-11 px-6" data-sound="back" onClick={onBack}>
                   {t('controlCenter.liveShot.backHome')}
                 </Button>
               </div>

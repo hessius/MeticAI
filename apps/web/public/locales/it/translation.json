@@ -11,7 +11,7 @@
     "edit": "Modifica",
     "update": "Aggiorna",
     "confirm": "Conferma",
-    "dismiss": "Ignora",
+    "dismiss": "Chiudi",
     "retry": "Riprova",
     "or": "O",
     "and": "E",
@@ -23,7 +23,15 @@
     "thu": "Gio",
     "fri": "Ven",
     "sat": "Sab",
-    "sun": "Dom"
+    "sun": "Dom",
+    "done": "Fatto",
+    "next": "Avanti",
+    "skip": "Salta",
+    "noInternetConnection": "Nessuna connessione Internet",
+    "supportProject": "Considera di supportare MeticAI ☕",
+    "share": "Condividi",
+    "copied": "Copiato!",
+    "copy": "Copia"
   },
   "greetings": {
     "morning": [
@@ -114,9 +122,10 @@
     }
   },
   "navigation": {
-    "generateNewProfile": "Genera nuovo profilo",
-    "profileCatalogue": "Catalogo profili",
-    "runSchedule": "Esegui / Programma",
+    "generateNewProfile": "Nuovo profilo",
+    "addProfile": "Aggiungi profilo",
+    "profileCatalogue": "Profili",
+    "runSchedule": "Esegui shot",
     "pourOver": "Pour-over",
     "shotAnalysis": "Analisi estrazione",
     "settings": "Impostazioni",
@@ -293,7 +302,8 @@
     "saveScheduleFailed": "Impossibile salvare la programmazione",
     "saveAsNew": "Salva come nuovo profilo",
     "saveAsNewDescription": "Salva le variabili regolate come nuovo profilo",
-    "newProfileNamePlaceholder": "Nome del nuovo profilo..."
+    "newProfileNamePlaceholder": "Nome del nuovo profilo...",
+    "titleRun": "Esegui"
   },
   "shotHistory": {
     "duration": "Durata",
@@ -347,6 +357,9 @@
     "incomplete": "◐ Incompleto",
     "exporting": "Esportazione...",
     "exportAsImage": "Esporta come immagine",
+    "shareSummary": "Condividi riepilogo",
+    "shareChart": "Condividi grafico",
+    "shareAnalysis": "Condividi analisi",
     "viewAiAnalysis": "Vedi analisi IA",
     "getAiAnalysis": "Ottieni analisi IA",
     "runAnalysisForOverlay": "Esegui analisi per vedere sovrapposizione grafico",
@@ -390,6 +403,7 @@
     "aboutDescription1": "Quando ho ricevuto il mio Meticulous, dopo un'attesa loooonga, ero sopraffatto dalle opzioni - regolare non era più solo modificare la dimensione della macinatura, il potenziale era (ed è) praticamente illimitato - la mia conoscenza e il mio tempo non altrettanto.",
     "aboutDescription2": "Questo, \"MeticAI\", è un insieme crescente di strumenti AI per consentire a me, e a te, di ottenere il massimo da una macchina espresso Meticulous. Tra le altre cose, ti permette di creare automaticamente profili espresso personalizzati in base alle tue preferenze e al caffè a disposizione, comprendere i tuoi profili espresso e i dati delle estrazioni come mai prima d'ora e, infine, ti permette di scatenare il tuo Meticulous.",
     "viewOnGitHub": "Visualizza su GitHub",
+    "buyMeACoffee": "Considera di offrirmi un caffè ☕",
     "configuration": "Configurazione",
     "loadingSettings": "Caricamento impostazioni...",
     "geminiApiKey": "Chiave API Gemini",
@@ -398,11 +412,14 @@
     "apiKeyPlaceholderNew": "Inserisci nuova chiave per modificare",
     "apiKeyConfigured": "Chiave API configurata. Clicca sul campo per inserire una nuova chiave.",
     "apiKeyConfiguredExtended": "Chiave API configurata. Clicca sul campo per inserire una nuova chiave. Puoi mantenere la chiave salvata e disabilitare le funzionalità AI qui sotto.",
+    "biometricReasonApiKey": "Autenticati per rivelare la tua chiave API",
     "aiAssistant": "Assistente AI",
     "aiAssistantDescription": "La chiave API Gemini è opzionale. Aggiungine una solo se desideri funzionalità di profilo e analisi basate su AI.",
     "aiAssistantOptional": "Opzionale.",
     "enableAiFeatures": "Abilita funzionalità AI",
     "enableAiFeaturesDescription": "Attiva/disattiva gli strumenti AI senza rimuovere la chiave API salvata.",
+    "enableSoundEffects": "Effetti sonori",
+    "enableSoundEffectsDescription": "Riproduce suoni discreti per eventi macchina come completamento shot e preriscaldamento pronto.",
     "hideAiWhenUnavailable": "Nascondi controlli AI quando non disponibili",
     "hideAiWhenUnavailableDescription": "Quando disabilitato, i controlli AI rimangono visibili ma disattivati fino a quando l'AI è disponibile.",
     "getApiKey": "Ottieni la tua chiave API da",
@@ -422,10 +439,10 @@
     "authorName": "Nome autore",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Il tuo nome per il campo autore nel JSON del profilo generato. Predefinito \"MeticAI\" se lasciato vuoto.",
+    "geminiModel": "Modello Gemini",
+    "geminiModelDescription": "Seleziona quale modello Gemini utilizzare per le funzioni IA.",
     "mqttEnabled": "Bridge MQTT",
     "mqttEnabledDescription": "Telemetria macchina in tempo reale via MQTT. Alimenta la dashboard di controllo dal vivo.",
-    "saveSettings": "Salva impostazioni",
-    "saving": "Salvataggio...",
     "settingsSaved": "Impostazioni salvate con successo!",
     "settingsSaveFailed": "Impossibile salvare le impostazioni",
     "changelog": "Registro modifiche",
@@ -454,6 +471,8 @@
     "restartTriggered": "Riavvio attivato! Il sistema si riavvierà a breve.",
     "restartFailed": "Impossibile attivare il riavvio",
     "apiDocs": "Documentazione API",
+    "restartOnboarding": "Riavvia procedura guidata",
+    "restartOnboardingDescription": "Esegui nuovamente la configurazione iniziale per riconfigurare IP della macchina, nome e preferenze.",
     "language": {
       "select": "Seleziona lingua",
       "label": "Lingua"
@@ -536,7 +555,13 @@
     "runsOn": "Runs on",
     "andCaffeine": "and caffeine ☕",
     "betaChannelFailed": "Impossibile cambiare il canale beta",
-    "feedbackFailed": "Impossibile inviare il feedback"
+    "feedbackFailed": "Impossibile inviare il feedback",
+    "geminiModel25Flash": "Gemini 2.5 Flash (Consigliato)",
+    "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel20Flash": "Gemini 2.0 Flash",
+    "aiSettings": "Impostazioni IA",
+    "versionAndChangelog": "Versione e registro modifiche",
+    "mqttBridge": "Bridge MQTT"
   },
   "profileBreakdown": {
     "title": "Dettagli profilo",
@@ -651,7 +676,17 @@
     "bulkImportFailed": "Importazione di massa fallita",
     "fetchDetailsFailed": "Impossibile recuperare i dettagli del profilo",
     "noResponseStream": "Nessun flusso di risposta disponibile",
-    "bulkImportStartFailed": "Impossibile avviare l'importazione di massa"
+    "bulkImportStartFailed": "Impossibile avviare l'importazione di massa",
+    "fromUrl": "Da URL",
+    "jsonOrMet": ".json / .met",
+    "importFromUrl": "Importa da URL",
+    "urlPlaceholder": "Incolla URL del profilo...",
+    "urlHint": "Supporta URL di profili .json e .met",
+    "back": "Indietro",
+    "importButton": "Importa",
+    "fetchingUrl": "Recupero del profilo dall'URL...",
+    "importUrlFailed": "Importazione da URL non riuscita",
+    "invalidUrl": "Inserisci un URL valido"
   },
   "imageCrop": {
     "title": "Ritaglia immagine profilo",
@@ -772,7 +807,12 @@
       "sounds": "Suoni",
       "firmware": "Firmware",
       "lastShot": "Ultima estrazione",
-      "by": "di"
+      "by": "di",
+      "softwareVersion": "Software",
+      "imageVersion": "Versione immagine",
+      "updateChannel": "Canale di aggiornamento",
+      "serial": "Numero di serie",
+      "model": "Modello"
     },
     "lastShot": {
       "title": "Estrazione {{time}} fa",
@@ -859,7 +899,15 @@
     "followSystemTheme": "Follow system theme",
     "followSystemDescription": "Automatically match your system's dark/light mode preference",
     "backgroundAnimations": "Background animations",
-    "animationsDescription": "Show animated background effects"
+    "animationsDescription": "Show animated background effects",
+    "platformTheme": "Tema piattaforma",
+    "platformThemeDescription": "Adatta lo stile visivo al tuo dispositivo",
+    "platformThemeAuto": "Rilevamento automatico",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Predefinito",
+    "useKonstaUi": "Usa Konsta UI",
+    "useKonstaUiDescription": "Abilita i componenti mobili nativi (Konsta UI) per un aspetto nativo della piattaforma"
   },
   "advanced": {
     "detailedKnowledge": "Conoscenza IA dettagliata",
@@ -990,7 +1038,8 @@
     "savedToDevice": "Profilo salvato sul dispositivo",
     "savedToHistory": "Il profilo è stato salvato sul dispositivo Meticulous e nel catalogo profili",
     "noProfileJson": "Nessun profilo JSON disponibile",
-    "profileJsonDownloaded": "Profilo JSON scaricato!"
+    "profileJsonDownloaded": "Profilo JSON scaricato!",
+    "runShot": "Esegui shot"
   },
   "profileEdit": {
     "title": "Modifica Profilo",
@@ -1015,7 +1064,9 @@
     "deleteDescription": "Come vuoi rimuovere '{{name}}'?",
     "removeFromHistoryOnly": "Rimuovi solo da MeticAI",
     "removeFromHistoryHint": "Mantiene il profilo sulla macchina, lo rimuove dal catalogo MeticAI",
-    "deleteFromMachine": "Elimina anche dalla macchina",
+    "deleteFromMachine": "Elimina dalla macchina",
+    "deleteFromBoth": "Elimina ovunque",
+    "deleteFromBothHint": "Rimuove definitivamente il profilo dalla macchina e dal catalogo MeticAI",
     "deleteFromMachineHint": "Rimuove permanentemente il profilo dalla tua macchina Meticulous",
     "removedFromHistory": "Rimosso dal catalogo MeticAI",
     "orphanTitle": "Profilo orfano",
@@ -1074,13 +1125,23 @@
       "deleteProfileFailed": "Impossibile eliminare il profilo"
     },
     "fetchFailed": "Impossibile caricare i profili",
+    "offlineBanner": "Macchina offline - profili dalla cache",
+    "addButton": "Aggiungi",
+    "onMachine": "Sulla macchina",
+    "importButton": "Importa",
     "syncFailed": "Sincronizzazione fallita",
     "renameFailed": "Impossibile rinominare il profilo",
     "exportFailed": "Impossibile esportare il profilo",
+    "loadFailed": "Impossibile caricare il profilo",
+    "loaded": "{{name}} caricato",
     "bulkDelete": {
       "button": "Elimina in blocco",
       "title": "Eliminazione in blocco",
       "description": "Seleziona i profili da eliminare permanentemente dalla tua macchina. I profili nel catalogo sono esclusi.",
+      "modeTitle": "Elimina da",
+      "modeBoth": "Entrambi",
+      "modeMachineOnly": "Solo macchina",
+      "modeMeticaiOnly": "Solo MeticAI",
       "selectAll": "Seleziona tutti",
       "deselectAll": "Deseleziona tutti",
       "selected": "{{count}} selezionati",
@@ -1254,11 +1315,11 @@
     "under": "Sotto",
     "over": "Sopra",
     "goldenRulesTitle": "Regole d'oro per il Meticulous",
-    "ruleStartSimple": "<strong>Inizia semplice.</strong> Quando regoli un caffè nuovo, inizia con uno dei profili integrati del Meticulous (come \"Italian\"). Questa bussola copre le basi: dose, resa e temperatura. La profilazione avanzata di flusso e pressione è potente ma dovrebbe venire dopo.",
+    "ruleStartSimple": "<strong>Inizia semplice.</strong> Comincia con un profilo integrato del Meticulous (come \"Italian\"). Padroneggia prima dose, resa e temperatura - sono le leve più importanti. Il controllo avanzato di flusso e pressione è potente, ma funziona meglio quando le basi sono a punto.",
     "ruleDontChangeDose": "Quando regoli la resa (peso finale), <strong>non cambiare la dose</strong> nel tuo portafiltro; cambia solo il profilo.",
-    "ruleYieldTime": "Cambiare la resa cambierà intrinsecamente il tempo dell'estrazione. Regola la macinatura solo se il tempo è completamente fuori dall'intervallo previsto.",
+    "ruleYieldTime": "Cambiare la resa cambierà intrinsecamente il tempo dell'estrazione. Regola la macinatura solo se il tempo è molto lontano dall'obiettivo. Per cambiare la direzione del gusto, le regolazioni del profilo sono più efficaci della sola macinatura.",
     "ruleEvenExtraction": "Un'estrazione perfettamente uniforme crea uno \"sweet spot\" più ampio: concentrati prima sulla preparazione del puck.",
-    "rulePreciseControl": "Il Meticulous ti dà un controllo preciso sui profili di pressione e flusso. Usa quel potere per estendere o accorciare fasi specifiche invece di regolare solo la macinatura.",
+    "rulePreciseControl": "<strong>Guida il gusto con flusso, pressione e temperatura.</strong> Una volta che le basi sono a punto, esplora la precisione del Meticulous: un flusso più alto spinge verso acidità e chiarezza (ideale per tostature chiare), un flusso più basso verso corpo e dolcezza. Una temperatura più alta estrae di più (tostature chiare: 92–96°C), una temperatura più bassa previene l'amarezza (tostature scure: 82–90°C). Ridurre la pressione nell'ultimo terzo attenua l'asprezza.",
     "attribution": "Concettualmente ispirato dall'<em>Espresso Compass di Barista Hustle</em>. Adattato per la macchina espresso Meticulous.",
     "emptyState": "Seleziona i sapori sopra per analizzare il tuo shot e ottenere consigli sulla regolazione.",
     "analysis": {
@@ -1389,6 +1450,7 @@
     "skipToNav": "Vai alla navigazione",
     "toggleTheme": "Passa alla modalità {{mode}}",
     "openOnMobile": "Apri su dispositivo mobile",
+    "collapseGreeting": "Nascondi saluto",
     "goHome": "Vai alla schermata iniziale",
     "goBack": "Indietro",
     "stepProgress": "Passaggio {{current}} di {{total}}: {{step}}",
@@ -1448,7 +1510,9 @@
   },
   "update": {
     "failed": "Aggiornamento fallito",
-    "timeout": "L'aggiornamento non è stato completato nel tempo previsto. Aggiornare manualmente."
+    "timeout": "L'aggiornamento non è stato completato nel tempo previsto. Aggiornare manualmente.",
+    "triggerFailed": "Impossibile avviare l'aggiornamento",
+    "checkFailed": "Impossibile verificare gli aggiornamenti"
   },
   "sync": {
     "fetchProfileFailed": "Impossibile recuperare il profilo",
@@ -1456,5 +1520,153 @@
     "acceptUpdateFailed": "Impossibile accettare l'aggiornamento",
     "removeFailed": "Impossibile rimuovere",
     "restoreFailed": "Impossibile ripristinare"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Preparazione del prompt...",
+      "processingImage": "Elaborazione immagine...",
+      "generatingProfile": "Generazione del profilo...",
+      "validatingProfile": "Convalida del profilo...",
+      "profileGenerated": "Profilo generato con successo"
+    }
+  },
+  "onboarding": {
+    "stepProgress": "Passo {{current}} di {{total}}: {{step}}",
+    "stepOf": "Passo {{current}} di {{total}}",
+    "steps": {
+      "welcome": "Benvenuto",
+      "machine": "Connessione macchina",
+      "name": "Il tuo nome",
+      "ai": "Configurazione IA",
+      "language": "Lingua",
+      "theme": "Aspetto",
+      "complete": "Pronto"
+    },
+    "welcome": {
+      "title": "Benvenuto in MeticAI",
+      "description": "Il tuo compagno espresso con IA. Configuriamo tutto in pochi passaggi.",
+      "getStarted": "Inizia"
+    },
+    "machine": {
+      "title": "Connetti la tua macchina",
+      "description": "Cercheremo automaticamente nella tua rete. Puoi anche inserire l'indirizzo manualmente.",
+      "ipLabel": "Indirizzo IP o nome host",
+      "ipPlaceholder": "192.168.1.42",
+      "invalidIp": "Inserisci un indirizzo IP o hostname valido",
+      "connected": "Macchina connessa con successo!",
+      "unreachable": "Impossibile raggiungere la macchina. Controlla l'IP e assicurati di essere sulla stessa rete.",
+      "successMessage": "Connesso a {{name}}",
+      "errorMessage": "Impossibile raggiungere la macchina. Controlla l'indirizzo e assicurati di essere sulla stessa rete Wi-Fi.",
+      "hint": "Suggerimento: trova l'IP nelle impostazioni Wi-Fi della macchina o nella lista DHCP del router. Scrivi \"demo\" per provare senza macchina.",
+      "searching": "Ricerca di macchine nella tua rete...",
+      "foundMachines": "Macchine trovate nella tua rete",
+      "autoDiscovered": "Macchina trovata automaticamente!",
+      "connectButton": "Connetti",
+      "ipDescription": "Inserisci un indirizzo IP (es. 192.168.1.42) o nome host. Il nome host è casuale ma contiene sempre \"meticulous\" (es. meticulous-a3f7.local).",
+      "configureManually": "Configura manualmente",
+      "noMachinesFound": "Nessuna macchina trovata sulla rete. Inserire l'indirizzo IP manualmente."
+    },
+    "name": {
+      "title": "Come ti chiami?",
+      "description": "Usato come nome dell'autore per i profili che crei.",
+      "label": "Il tuo nome",
+      "placeholder": "Barista straordinario"
+    },
+    "ai": {
+      "title": "Funzionalità IA",
+      "description": "MeticAI usa Google Gemini per generare profili, analizzare shot e dare raccomandazioni.",
+      "keyLabel": "Chiave API Gemini",
+      "keyPlaceholder": "AIza...",
+      "keyHint": "Ottieni una chiave API gratuita su aistudio.google.com. Puoi aggiungerla dopo nelle Impostazioni.",
+      "whatItDoes": "Cosa permette l'IA:",
+      "feature1": "Generare profili espresso personalizzati da descrizioni",
+      "feature2": "Analizzare i tuoi shot con feedback di livello esperto",
+      "feature3": "Ottenere raccomandazioni di dial-in basate sul gusto",
+      "getKey": "Ottieni una chiave API gratuita da Google AI Studio"
+    },
+    "language": {
+      "title": "Lingua",
+      "description": "Scegli la tua lingua preferita. Puoi cambiarla in qualsiasi momento nelle Impostazioni."
+    },
+    "theme": {
+      "title": "Aspetto",
+      "description": "Scegli come appare MeticAI.",
+      "light": "Chiaro",
+      "dark": "Scuro",
+      "system": "Sistema"
+    },
+    "complete": {
+      "title": "Tutto pronto!",
+      "description": "Tutto è configurato. È ora di preparare qualcosa di straordinario.",
+      "machine": "Macchina",
+      "name": "Nome",
+      "ai": "IA",
+      "aiConfigured": "Configurata",
+      "aiSkipped": "Non configurata",
+      "language": "Lingua",
+      "startBrewing": "Inizia a preparare",
+      "settingsHint": "Tutte le impostazioni possono essere cambiate nelle Impostazioni.",
+      "supportProject": "Ti piace MeticAI? Considera di offrirmi un caffè"
+    }
+  },
+  "demo": {
+    "banner": "Modalità demo",
+    "bannerHint": "Dati simulati, nessuna macchina reale",
+    "exit": "Esci",
+    "machineConnected": "Macchina demo connessa",
+    "brewStarted": "Estrazione demo avviata",
+    "brewComplete": "Estrazione demo completata",
+    "noRealConnection": "Nessuna connessione reale in modalità demo",
+    "setupMachine": "Configura macchina"
+  },
+  "notifications": {
+    "brewComplete": "Preparazione completata",
+    "brewCompleteBody": "Il tuo {{profile}} è pronto da gustare",
+    "machineReady": "Macchina pronta",
+    "machineReadyBody": "La tua macchina ha finito di preriscaldarsi",
+    "pourOverComplete": "Pour-over completato",
+    "pourOverCompleteBody": "Il tuo timer pour-over è terminato"
+  },
+  "smartGreeting": {
+    "justBrewed": "Hai appena fatto un shot con {{profile}}.\nPerché non analizzarlo?",
+    "analyzeAction": "Analizza",
+    "milestone": "{{count}} shot fatti, solo {{remaining}} per arrivare a {{milestone}}!",
+    "longGap": "Quasi {{hours}}h dall'ultimo shot.\nÈ ora di un caffè?",
+    "unusedProfile": "Non hai ancora provato {{name}}.\nProvalo!",
+    "browseAction": "Sfoglia profili",
+    "anniversary": "Usi MeticAI da {{days}} giorni!",
+    "dialIn": "Com'era quella tazza? Devi regolare?",
+    "dialInAction": "Regola",
+    "fewProfiles": "Hai solo {{count}} profili.\nCreane uno nuovo?",
+    "createAction": "Crea profilo",
+    "doubleShot": "Già il secondo? Coraggioso.",
+    "ratingNudge": "Com'era il tuo shot di {{profile}}?\nNon dimenticare di valutarlo!",
+    "ratingNudgeNew": "Sapevi che puoi valutare i tuoi shot\nper trovare i tuoi preferiti?",
+    "rateAction": "Valuta",
+    "milestoneHit": "{{count}} shot!\nUn vero viaggio nell'espresso.",
+    "personalBestDay": "{{count}} shot oggi.\nÈ un nuovo record?",
+    "dailyStreak": "{{days}} giorni di fila.\nQuesta è dedizione.",
+    "powerUser": "{{count}} shot oggi?\nSei praticamente un barista.",
+    "firstWeek": "Una settimana con MeticAI!\nCom'è andato il caffè?",
+    "oneMonth": "Un mese intero insieme.\nSiamo praticamente migliori amici.",
+    "morningRitual": "Buongiorno!\nLa tua macchina ti aspetta.",
+    "firstShotOfDay": "Primo shot della giornata?\nRendilo memorabile.",
+    "postLunch": "Calo pomeridiano?\nUno shot potrebbe essere la soluzione.",
+    "lateNight": "Ancora sveglio? Forse meglio il decaffeinato...\no forse no, non giudichiamo.",
+    "earlyBird": "In piedi prima del sole?\nLa tua macchina rispetta l'impegno.",
+    "backToBack": "Fedele a {{name}}.\nUna persona di costanza.",
+    "varietyExplorer": "{{count}} profili diversi questa settimana.\nLo spirito avventuroso!",
+    "topProfile": "{{name}} è il tuo preferito.\n{{percent}}% di tutti i tuoi shot!",
+    "consistencyKing": "Prepari sempre intorno alle {{time}}.\nAbitudinario!",
+    "neglectedFavorite": "Non usi {{name}} da un po'.\nTi manca?",
+    "shotCountToday": "Shot numero {{count}} oggi.\nBen caricato di caffeina!",
+    "viewHistoryAction": "Vedi cronologia",
+    "viewProfileAction": "Vedi profilo",
+    "weekendMorning": "Atmosfera da weekend.\nPrenditi il tuo tempo con questo.",
+    "friday": "Buon venerdì!\nQuesto shot te lo sei meritato.",
+    "mondayMotivation": "Lunedì. Prima il caffè,\npoi tutto il resto.",
+    "quietWeek": "Settimana più tranquilla?\nLa tua macchina sente la mancanza.",
+    "singleProfileUser": "{{count}} shot di fila con {{name}}.\nSe funziona...",
+    "profileCollector": "{{count}} profili!\nStai costruendo una bella collezione."
   }
 }

@@ -8,7 +8,7 @@
  *  • Quick-action buttons (idle) or live shot metrics (brewing)
  *  • An expand toggle that reveals ControlCenterExpanded
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import {
   Scales,
   CaretDown,
   CaretUp,
+  CaretUpDown,
   Eye,
   XCircle,
   Thermometer,
@@ -33,6 +34,11 @@ import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
+import { useHaptics } from '@/hooks/useHaptics'
+import { useActionSheet } from '@/hooks/useActionSheet'
+import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
+import { Capacitor } from '@capacitor/core'
+import { toast } from 'sonner'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 
 // ---------------------------------------------------------------------------
@@ -96,9 +102,12 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
-  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
+  const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
+  const { impact } = useHaptics()
+  const { showActionSheet } = useActionSheet()
+  const isNativePlatform = Capacitor.isNativePlatform()
 
   // Shared state derivation + command executor
   const {
@@ -106,6 +115,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     canStart, canAbortWarmup, cmd,
   } = useMachineActions(machineState)
   const machine = useMachineService()
+  const isConnected = machineState.connected ?? false
 
   // Build the profile image URL when active_profile changes
   // Suppress MeticAI-managed temp profiles — they're transient and deleted after cleanup.
@@ -113,42 +123,66 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     !machineState.active_profile.startsWith('MeticAI '))
     ? machineState.active_profile : null
 
+  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
+  const profileImgUrl = useProfileImageSrc(activeProfile)
+
   // Reset dependent state when active profile is cleared
   useEffect(() => {
     if (!activeProfile) {
-      setProfileImgUrl(null)
       setProfileImgError(false)
       setProfileAuthor(null)
     }
   }, [activeProfile])
 
+  // Fetch profiles (for author + change selector) — once on mount
   useEffect(() => {
     let cancelled = false
-    if (!activeProfile) {
-      return
-    }
     ;(async () => {
-      const base = await getServerUrl()
-      if (!cancelled) {
-        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
-        setProfileImgError(false)
-      }
-      // Fetch profile author from machine profiles
       try {
+        const base = await getServerUrl()
         const res = await fetch(`${base}/api/machine/profiles`)
         if (res.ok && !cancelled) {
           const data = await res.json()
-          const match = (data.profiles ?? []).find(
-            (p: { name: string; author?: string }) => p.name === activeProfile
-          )
-          setProfileAuthor(match?.author ?? null)
+          const profiles = (data.profiles ?? [])
+            .filter((p: { id: string; name?: string }) => p.name)
+            .map((p: { id: string; name: string; author?: string }) => ({ id: p.id, name: p.name, author: p.author }))
+          setMachineProfiles(profiles)
+          // Resolve author for current profile
+          if (activeProfile) {
+            const match = profiles.find(
+              (p: { name: string; author?: string }) => p.name === activeProfile
+            )
+            setProfileAuthor(match?.author ?? null)
+          }
         }
       } catch {
-        // Silently ignore — author just won't show
+        // Silently ignore
       }
     })()
     return () => { cancelled = true }
   }, [activeProfile])
+
+  // Profile change handler for the collapsed view selector
+  const handleChangeProfile = useCallback(async () => {
+    if (machineProfiles.length === 0) return
+    impact('light')
+    if (isNativePlatform) {
+      const names = machineProfiles.map(p => p.name)
+      const index = await showActionSheet({
+        title: t('controlCenter.profileSelector.placeholder'),
+        options: names,
+      })
+      if (index >= 0 && index < names.length) {
+        const name = names[index]
+        const res = await machine.loadProfile(name)
+        if (res.success) {
+          toast.success(t('controlCenter.toasts.profileSelected', { name }))
+        } else {
+          toast.error(res.message ?? t('controlCenter.toasts.error'))
+        }
+      }
+    }
+  }, [machineProfiles, isNativePlatform, showActionSheet, t, machine, impact])
 
   // 🎉 Confetti celebration for every 100th shot
   useEffect(() => {
@@ -196,38 +230,17 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   }
 
   return (
-    <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
-      {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Coffee size={18} weight="duotone" className="text-primary" />
-          <span className="text-sm font-semibold text-foreground">Meticulous</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {(() => {
-            const { dot, key } = connectionDot(machineState)
-            return (
-              <>
-                <span className="text-[10px] text-muted-foreground">
-                  {t(`controlCenter.connection.${key}`)}
-                </span>
-                <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
-              </>
-            )
-          })()}
-        </div>
-      </div>
-
+    <Card className={`frosted-card p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
       {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>
-          {/* Temperature + state */}
+          {/* Temperature + connection status — single row */}
           <div className="flex items-end justify-between">
             <div className="flex items-baseline gap-1.5">
               <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
               <span className="text-2xl font-bold tabular-nums text-foreground">
-                {machineState.brew_head_temperature != null
-                  ? machineState.brew_head_temperature.toFixed(1)
+                {machineState.boiler_temperature != null
+                  ? machineState.boiler_temperature.toFixed(1)
                   : '—'}
               </span>
               <span className="text-sm text-muted-foreground">°C</span>
@@ -238,8 +251,20 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground">{t('controlCenter.labels.status')}</span>
-              {stateBadge(machineState.state, false, t)}
+              {(() => {
+                const { dot, key } = connectionDot(machineState)
+                return (
+                  <>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t(`controlCenter.connection.${key}`)}
+                    </span>
+                    {machineState.state && machineState._wsConnected && (
+                      stateBadge(machineState.state, false, t)
+                    )}
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
+                  </>
+                )
+              })()}
             </div>
           </div>
 
@@ -258,14 +283,14 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             )
           })()}
 
-          {/* Active profile with image + author */}
+          {/* Active profile with image + author + change button */}
           {activeProfile && (
             <div className="space-y-1">
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('controlCenter.sections.activeProfile')}
               </h4>
-              <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                 {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}
@@ -274,19 +299,35 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                     onError={() => setProfileImgError(true)}
                   />
                 ) : (
-                  <Coffee size={14} className="text-muted-foreground" weight="duotone" />
+                  <Coffee size={24} className="text-muted-foreground" weight="duotone" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-xs text-foreground font-medium truncate block">
-                  {activeProfile}
-                </span>
+                <div className="overflow-hidden">
+                  <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
+                    style={{
+                      animation: activeProfile && activeProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                    }}
+                  >
+                    {activeProfile}
+                  </span>
+                </div>
                 {profileAuthor && (
-                  <span className="text-[10px] text-muted-foreground truncate block">
+                  <span className="text-xs text-muted-foreground truncate block">
                     {t('controlCenter.labels.by')} {profileAuthor}
                   </span>
                 )}
               </div>
+              {/* Change profile button — only when idle and profiles available */}
+              {machineProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected && (
+                <button
+                  className="shrink-0 p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  onClick={handleChangeProfile}
+                  aria-label={t('controlCenter.profileSelector.placeholder')}
+                >
+                  <CaretUpDown size={16} weight="bold" />
+                </button>
+              )}
               </div>
             </div>
           )}
@@ -317,7 +358,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!canStart}
-              onClick={() => cmd(() => isReady ? machine.continueShot() : machine.startShot(), 'startingShot')}
+              onClick={() => { impact('medium'); cmd(() => isReady ? machine.continueShot() : machine.startShot(), 'startingShot') }}
             >
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
@@ -329,7 +370,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!machineState.connected}
-                onClick={() => cmd(() => machine.abortShot(), isPreheating ? 'preheatCancelled' : 'warmupCancelled')}
+                onClick={() => { impact('medium'); cmd(() => machine.abortShot(), isPreheating ? 'preheatCancelled' : 'warmupCancelled') }}
               >
                 <XCircle size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.abortPreheat')}
@@ -340,7 +381,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!isIdle || !machineState.connected}
-                onClick={() => cmd(() => machine.preheat(), 'preheating')}
+                onClick={() => { impact('medium'); cmd(() => machine.preheat(), 'preheating') }}
               >
                 <Fire size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.preheat')}
@@ -351,7 +392,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!machineState.connected}
-              onClick={() => cmd(() => machine.tareScale(), 'tared')}
+              onClick={() => { impact('light'); cmd(() => machine.tareScale(), 'tared') }}
             >
               <Scales size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.tare')}
@@ -380,7 +421,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             {stateBadge(machineState.state, true, t)}
             <span className="text-xs text-muted-foreground tabular-nums">
               <Thermometer size={12} className="inline mr-0.5" weight="duotone" />
-              {machineState.brew_head_temperature?.toFixed(1) ?? '—'}°C
+              {machineState.boiler_temperature?.toFixed(1) ?? '—'}°C
             </span>
           </div>
 
@@ -427,7 +468,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               variant="destructive"
               size="sm"
               className="h-9 text-xs"
-              onClick={() => cmd(() => machine.stopShot(), 'stopping')}
+              onClick={() => { impact('heavy'); cmd(() => machine.stopShot(), 'stopping') }}
             >
               <Stop size={14} weight="fill" className="mr-1" />
               {t('controlCenter.actions.stop')}
@@ -468,7 +509,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <ControlCenterExpanded machineState={machineState} profileAuthor={profileAuthor} />
+            <ControlCenterExpanded machineState={machineState} />
           </motion.div>
         )}
       </AnimatePresence>

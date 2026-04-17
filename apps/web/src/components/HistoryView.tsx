@@ -45,6 +45,9 @@ import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { hasFeature } from '@/lib/featureFlags'
+import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
 import { 
@@ -114,9 +117,11 @@ interface HistoryViewProps {
   onManageMachine?: () => void
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
+  importUrl?: string | null
+  onImportUrlConsumed?: () => void
 }
 
-export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMachine, aiConfigured = true, hideAiWhenUnavailable = false }: HistoryViewProps) {
+export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMachine, aiConfigured = true, hideAiWhenUnavailable = false, importUrl, onImportUrlConsumed }: HistoryViewProps) {
   const { t } = useTranslation()
   const { 
     entries, 
@@ -142,6 +147,8 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
   useEffect(() => {
     fetchHistory()
   }, [fetchHistory])
+
+  useEffect(() => { if (importUrl) setShowImportDialog(true) }, [importUrl])
 
   // Fetch sync badge count
   useEffect(() => {
@@ -256,6 +263,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('a11y.goBack')}
@@ -545,15 +553,10 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
         isOpen={showImportDialog}
         aiConfigured={aiConfigured}
         hideAiWhenUnavailable={hideAiWhenUnavailable}
-        onClose={() => setShowImportDialog(false)}
-        onImported={() => {
-          setShowImportDialog(false)
-          fetchHistory()
-        }}
-        onGenerateNew={() => {
-          setShowImportDialog(false)
-          onGenerateNew()
-        }}
+        initialUrl={importUrl || undefined}
+        onClose={() => { setShowImportDialog(false); onImportUrlConsumed?.() }}
+        onImported={() => { setShowImportDialog(false); onImportUrlConsumed?.(); fetchHistory() }}
+        onGenerateNew={() => { setShowImportDialog(false); onImportUrlConsumed?.(); onGenerateNew() }}
       />
     </motion.div>
   )
@@ -830,9 +833,15 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         )
         if (response.ok) {
           const data = await response.json()
-          if (data.profile?.image) {
-            // Use the proxy endpoint to get the actual image with cache buster
-            setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${imageCacheBuster}`)
+          if (data.profile?.image || data.profile?.display?.image) {
+            if (isDirectMode() || isNativePlatform()) {
+              // Direct/Capacitor: use actual image URL (fetch interceptor doesn't handle <img src>)
+              const resolved = resolveDisplayImage(data.profile?.display?.image)
+              if (resolved) setProfileImage(resolved)
+            } else {
+              // Proxy mode: use the proxy endpoint to get the actual image with cache buster
+              setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${imageCacheBuster}`)
+            }
           }
         }
       } catch (err) {
@@ -1029,16 +1038,59 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
     setIsRegeneratingDescription(true)
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(
-        `${serverUrl}/api/profile/${encodeURIComponent(entry.id)}/regenerate-description`,
-        { method: 'POST' }
-      )
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to generate AI description')
+
+      const regenerateByEntryId = async (targetEntryId: string) => {
+        const response = await fetch(
+          `${serverUrl}/api/profile/${encodeURIComponent(targetEntryId)}/regenerate-description`,
+          { method: 'POST' },
+        )
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({} as { detail?: string }))
+          return {
+            ok: false as const,
+            status: response.status,
+            detail: data.detail || 'Failed to generate AI description',
+          }
+        }
+
+        const data = await response.json()
+        return {
+          ok: true as const,
+          description: data.description as string,
+        }
       }
-      const data = await response.json()
-      setCurrentReply(data.description)
+
+      let regenerated = await regenerateByEntryId(entry.id)
+
+      const shouldResolveByName =
+        !regenerated.ok &&
+        regenerated.status === 404 &&
+        /history entry not found/i.test(regenerated.detail)
+
+      if (shouldResolveByName) {
+        const historyResponse = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+        if (historyResponse.ok) {
+          const historyData = await historyResponse.json()
+          const normalizedName = entry.profile_name.trim().toLowerCase()
+          const matchingEntry = historyData.entries?.find(
+            (historyEntry: { id?: string; profile_name?: string }) =>
+              typeof historyEntry.id === 'string' &&
+              typeof historyEntry.profile_name === 'string' &&
+              historyEntry.profile_name.trim().toLowerCase() === normalizedName,
+          )
+
+          if (matchingEntry?.id) {
+            regenerated = await regenerateByEntryId(matchingEntry.id)
+          }
+        }
+      }
+
+      if (!regenerated.ok) {
+        throw new Error(regenerated.detail || 'Failed to generate AI description')
+      }
+
+      setCurrentReply(regenerated.description)
       toast.success(t('history.aiDescriptionGenerated'))
     } catch (err) {
       console.error('Failed to regenerate description:', err)
@@ -1203,11 +1255,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           <div className="text-center mb-6">
             <div className="flex items-center justify-center gap-3 mb-2">
               <MeticAILogo size={40} variant="white" />
-              <h1 className="text-4xl font-bold tracking-tight">
-                Metic<span className="text-primary">AI</span>
+              <h1 className="text-4xl font-bold tracking-tight text-white">
+                Metic<span className="text-orange-400">AI</span>
               </h1>
             </div>
-            <p className="text-muted-foreground text-sm">{t('history.captureSubtitle')}</p>
           </div>
         )}
         <Card className={`p-6 ${isCapturing ? 'space-y-4' : 'space-y-5'}`}>
@@ -1344,7 +1395,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                 className="flex-1 min-w-[180px] h-12 text-sm font-semibold bg-success hover:bg-success/90"
               >
                 <Play size={18} className="mr-2" weight="fill" />
-                {t('results.runScheduleShot')}
+                {hasFeature('scheduledShots') ? t('results.runScheduleShot') : t('results.runShot')}
               </Button>
             )}
 
@@ -1353,7 +1404,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         )}
 
         {/* Two-column layout wrapper for desktop */}
-        <div className="space-y-4 lg:space-y-0 desktop-two-col">
+        <div className="space-y-4 md:space-y-0 desktop-two-col">
         {/* Left column: Content */}
         <div className="space-y-4 desktop-panel-left">
         <div className="space-y-4">

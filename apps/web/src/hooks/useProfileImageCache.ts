@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 
 interface CacheEntry {
   url: string
@@ -149,7 +151,15 @@ export function useProfileImageCache() {
               // Always construct image URL if profile exists - let the image proxy handle missing images
               // This prevents the case where profiles exist but image field hasn't been populated yet
               if (data.profile) {
-                const imageUrl = `${serverUrl}/api/profile/${encodeURIComponent(profileName)}/image-proxy`
+                let imageUrl: string
+                if (isDirectMode() || isNativePlatform()) {
+                  // Direct/Capacitor: use actual image URL (fetch interceptor doesn't handle <img src>)
+                  const resolved = resolveDisplayImage(data.profile?.display?.image)
+                  if (!resolved) return
+                  imageUrl = resolved
+                } else {
+                  imageUrl = `${serverUrl}/api/profile/${encodeURIComponent(profileName)}/image-proxy`
+                }
                 results[profileName] = imageUrl
                 setImageUrlRef.current(profileName, imageUrl)
               }

@@ -117,7 +117,7 @@ export function LoadingView({ currentMessage, progress }: LoadingViewProps) {
     if (showFunny) {
       return loadingMessages[funnyIndex]
     }
-    return progress.message
+    return t(progress.message, { defaultValue: progress.message })
   })()
   
   const messageKey = (() => {

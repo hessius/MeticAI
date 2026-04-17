@@ -28,8 +28,9 @@ from services.gemini_service import (
     PROFILING_KNOWLEDGE,
     PROFILING_KNOWLEDGE_DISTILLED
 )
-from services.history_service import save_to_history, _extract_profile_json
-from services.meticulous_service import async_create_profile
+from services.history_service import save_to_history, _extract_profile_json, compute_content_hash, update_entry_sync_fields
+from services.meticulous_service import async_create_profile, async_list_profiles, async_get_profile
+from utils.file_utils import deep_convert_to_dict
 from services.validation_service import validate_profile
 from services.generation_progress import (
     GenerationPhase, ProgressEvent, GenerationState,
@@ -960,6 +961,31 @@ async def analyze_and_profile(
                 user_prefs=user_prefs,
                 reply=reply
             )
+
+            # Update content_hash from the machine's representation so that
+            # sync detection compares against what the machine actually stores.
+            entry_id = history_entry.get("id")
+            profile_name_for_hash = profile_json_check.get("name") if isinstance(profile_json_check, dict) else None
+            if entry_id and profile_name_for_hash:
+                try:
+                    machine_profiles = await async_list_profiles()
+                    for mp in (machine_profiles or []):
+                        if getattr(mp, "name", None) == profile_name_for_hash:
+                            full_mp = await async_get_profile(getattr(mp, "id", ""))
+                            machine_dict = deep_convert_to_dict(full_mp)
+                            machine_hash = compute_content_hash(machine_dict)
+                            update_entry_sync_fields(
+                                entry_id,
+                                content_hash=machine_hash,
+                                profile_json=machine_dict,
+                            )
+                            break
+                except Exception as hash_exc:
+                    logger.warning(
+                        "Could not update content_hash from machine: %s",
+                        hash_exc,
+                        extra={"request_id": request_id},
+                    )
 
             progress.emit(ProgressEvent(
                 phase=GenerationPhase.COMPLETE,

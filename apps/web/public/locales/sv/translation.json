@@ -23,7 +23,15 @@
     "fri": "Fre",
     "sat": "Lör",
     "sun": "Sön",
-    "tryAgain": "Försök igen"
+    "tryAgain": "Försök igen",
+    "done": "Klar",
+    "next": "Nästa",
+    "skip": "Hoppa över",
+    "noInternetConnection": "Ingen internetanslutning",
+    "share": "Dela",
+    "copied": "Kopierat!",
+    "copy": "Kopiera",
+    "supportProject": "Överväg att stödja MeticAI ☕"
   },
   "greetings": {
     "morning": [
@@ -114,9 +122,10 @@
     }
   },
   "navigation": {
-    "generateNewProfile": "Generera ny profil",
-    "profileCatalogue": "Profilkatalog",
-    "runSchedule": "Kör / Schemalägg",
+    "generateNewProfile": "Ny profil",
+    "addProfile": "Lägg till profil",
+    "profileCatalogue": "Profiler",
+    "runSchedule": "Kör shot",
     "pourOver": "Pour-over",
     "shotAnalysis": "Shot-analys",
     "settings": "Inställningar",
@@ -293,7 +302,8 @@
     "saveScheduleFailed": "Kunde inte spara schema",
     "saveAsNew": "Spara som ny profil",
     "saveAsNewDescription": "Spara justerade variabler som en ny profil",
-    "newProfileNamePlaceholder": "Nytt profilnamn..."
+    "newProfileNamePlaceholder": "Nytt profilnamn...",
+    "titleRun": "Kör"
   },
   "shotHistory": {
     "duration": "Varaktighet",
@@ -347,6 +357,9 @@
     "incomplete": "◐ Ofullständig",
     "exporting": "Exporterar...",
     "exportAsImage": "Exportera som bild",
+    "shareSummary": "Dela sammanfattning",
+    "shareChart": "Dela diagram",
+    "shareAnalysis": "Dela analys",
     "viewAiAnalysis": "Visa AI-analys",
     "getAiAnalysis": "Hämta AI-analys",
     "runAnalysisForOverlay": "Kör analys för att se graföverlappning",
@@ -390,6 +403,7 @@
     "aboutDescription1": "När jag fick min Meticulous, efter ett lååångt väntetid, blev jag överväldigad av alternativen - att ställa in var inte längre bara att justera malningsgrad, potentialen var (och är) i princip obegränsad - min kunskap och tid inte lika.",
     "aboutDescription2": "Detta, \"MeticAI\", är en växande uppsättning AI-verktyg för att göra det möjligt för mig, och dig, att få ut det mesta av en Meticulous Espresso-maskin. Bland annat låter den dig automatiskt skapa espressoprofiler skräddarsydda för dina preferenser och kaffe till hands, förstå dina espressoprofiler och körningsdata som aldrig förr, och i slutändan: låter dig släppa lös din Meticulous.",
     "viewOnGitHub": "Visa på GitHub",
+    "buyMeACoffee": "Överväg att bjuda mig på en kaffe ☕",
     "configuration": "Konfiguration",
     "loadingSettings": "Laddar inställningar...",
     "geminiApiKey": "Gemini API-nyckel",
@@ -398,11 +412,14 @@
     "apiKeyPlaceholderNew": "Ange ny nyckel för att ändra",
     "apiKeyConfigured": "API-nyckel är konfigurerad. Klicka på fältet för att ange en ny nyckel.",
     "apiKeyConfiguredExtended": "API-nyckel är konfigurerad. Klicka på fältet för att ange en ny nyckel. Du kan behålla nyckeln sparad och inaktivera AI-funktioner nedan.",
+    "biometricReasonApiKey": "Autentisera för att visa din API-nyckel",
     "aiAssistant": "AI-assistent",
     "aiAssistantDescription": "Gemini API-nyckel är valfri. Lägg bara till en om du vill ha AI-drivna profil- och analysfunktioner.",
     "aiAssistantOptional": "Valfritt.",
     "enableAiFeatures": "Aktivera AI-funktioner",
     "enableAiFeaturesDescription": "Slår på/av AI-verktyg utan att ta bort din sparade API-nyckel.",
+    "enableSoundEffects": "Ljudeffekter",
+    "enableSoundEffectsDescription": "Spelar subtila ljud för maskinhändelser som färdig shot och uppvärmning klar.",
     "hideAiWhenUnavailable": "Dölj AI-kontroller när de inte är tillgängliga",
     "hideAiWhenUnavailableDescription": "När det är inaktiverat förblir AI-kontrollerna synliga men inaktiverade tills AI är tillgängligt.",
     "getApiKey": "Hämta din API-nyckel från",
@@ -422,10 +439,10 @@
     "authorName": "Författarnamn",
     "authorNamePlaceholder": "MeticAI",
     "authorNameDescription": "Ditt namn för författarfältet i genererad profil-JSON. Standardvärde \"MeticAI\" om det lämnas tomt.",
+    "geminiModel": "Gemini-modell",
+    "geminiModelDescription": "Välj vilken Gemini-modell som ska användas för AI-funktioner.",
     "mqttEnabled": "MQTT-brygga",
     "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
-    "saveSettings": "Spara inställningar",
-    "saving": "Sparar...",
     "settingsSaved": "Inställningar sparade framgångsrikt!",
     "settingsSaveFailed": "Misslyckades spara inställningar",
     "changelog": "Ändringslogg",
@@ -454,6 +471,8 @@
     "restartTriggered": "Omstart utlöst! Systemet kommer att starta om omedelbart.",
     "restartFailed": "Misslyckades utlösa omstart",
     "apiDocs": "API-dokumentation",
+    "restartOnboarding": "Starta om installationsguiden",
+    "restartOnboardingDescription": "Kör den första installationen igen för att konfigurera maskin-IP, namn och inställningar.",
     "language": {
       "select": "Välj språk",
       "label": "Språk"
@@ -536,7 +555,13 @@
     "runsOn": "Runs on",
     "andCaffeine": "and caffeine ☕",
     "betaChannelFailed": "Kunde inte byta betakanal",
-    "feedbackFailed": "Kunde inte skicka feedback"
+    "feedbackFailed": "Kunde inte skicka feedback",
+    "geminiModel25Flash": "Gemini 2.5 Flash (Rekommenderad)",
+    "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel20Flash": "Gemini 2.0 Flash",
+    "aiSettings": "AI-inställningar",
+    "versionAndChangelog": "Version och ändringslogg",
+    "mqttBridge": "MQTT-brygga"
   },
   "profileBreakdown": {
     "title": "Profildetaljer",
@@ -656,7 +681,17 @@
     "bulkImportFailed": "Bulkimport misslyckades",
     "fetchDetailsFailed": "Kunde inte hämta profildetaljer",
     "noResponseStream": "Ingen svarsström tillgänglig",
-    "bulkImportStartFailed": "Kunde inte starta bulkimport"
+    "bulkImportStartFailed": "Kunde inte starta bulkimport",
+    "fromUrl": "Från URL",
+    "jsonOrMet": ".json / .met",
+    "importFromUrl": "Importera från URL",
+    "urlPlaceholder": "Klistra in profil-URL...",
+    "urlHint": "Stöder .json- och .met-profil-URL:er",
+    "back": "Tillbaka",
+    "importButton": "Importera",
+    "fetchingUrl": "Hämtar profil från URL...",
+    "importUrlFailed": "Kunde inte importera från URL",
+    "invalidUrl": "Ange en giltig URL"
   },
   "imageCrop": {
     "title": "Beskär profilbild",
@@ -777,7 +812,12 @@
       "sounds": "Ljud",
       "firmware": "Firmware",
       "lastShot": "Senaste bryggning",
-      "by": "av"
+      "by": "av",
+      "softwareVersion": "Mjukvara",
+      "imageVersion": "Bildversion",
+      "updateChannel": "Uppdateringskanal",
+      "serial": "Serienummer",
+      "model": "Modell"
     },
     "lastShot": {
       "title": "Bryggning gjord {{time}}",
@@ -864,7 +904,15 @@
     "followSystemTheme": "Följ systemtema",
     "followSystemDescription": "Matcha automatiskt ditt systems mörkt-/ljust-läge",
     "backgroundAnimations": "Bakgrundsanimationer",
-    "animationsDescription": "Visa animerade bakgrundseffekter"
+    "animationsDescription": "Visa animerade bakgrundseffekter",
+    "platformTheme": "Plattformstema",
+    "platformThemeDescription": "Anpassa utseendet efter din enhet",
+    "platformThemeAuto": "Automatisk",
+    "platformThemeIos": "iOS",
+    "platformThemeMaterial": "Material (Android)",
+    "platformThemeNone": "Standard",
+    "useKonstaUi": "Använd Konsta UI",
+    "useKonstaUiDescription": "Aktivera inbyggda mobilkomponenter (Konsta UI) för ett plattformsanpassat utseende"
   },
   "pourOver": {
     "title": "Pour Over",
@@ -990,7 +1038,8 @@
     "image": "Bild",
     "json": "JSON",
     "noProfileJson": "Ingen profil-JSON tillgänglig",
-    "profileJsonDownloaded": "Profil-JSON nedladdad!"
+    "profileJsonDownloaded": "Profil-JSON nedladdad!",
+    "runShot": "Kör shot"
   },
   "profileEdit": {
     "title": "Redigera profil",
@@ -1015,7 +1064,9 @@
     "deleteDescription": "Hur vill du ta bort '{{name}}'?",
     "removeFromHistoryOnly": "Ta bort från MeticAI bara",
     "removeFromHistoryHint": "Behåller profilen på maskinen, tar bort den från MeticAI-katalogen",
-    "deleteFromMachine": "Ta bort från maskinen också",
+    "deleteFromMachine": "Ta bort från maskinen",
+    "deleteFromBoth": "Radera överallt",
+    "deleteFromBothHint": "Tar permanent bort profilen från både din maskin och MeticAI-katalogen",
     "deleteFromMachineHint": "Tar permanent bort profilen från din Meticulous-maskin",
     "removedFromHistory": "Borttagen från MeticAI-katalogen",
     "orphanTitle": "Föräldralös profil",
@@ -1074,13 +1125,23 @@
       "deleteProfileFailed": "Kunde inte ta bort profilen"
     },
     "fetchFailed": "Kunde inte ladda profiler",
+    "offlineBanner": "Maskinen är offline - visar cachade profiler",
+    "addButton": "Lägg till",
+    "onMachine": "På maskinen",
+    "importButton": "Importera",
     "syncFailed": "Synkronisering misslyckades",
     "renameFailed": "Kunde inte byta namn på profil",
     "exportFailed": "Kunde inte exportera profil",
+    "loadFailed": "Kunde inte ladda profil",
+    "loaded": "{{name}} laddad",
     "bulkDelete": {
       "button": "Massradera",
       "title": "Massradera profiler",
       "description": "Välj profiler att permanent ta bort från din maskin. Profiler i din katalog är exkluderade.",
+      "modeTitle": "Radera från",
+      "modeBoth": "Båda",
+      "modeMachineOnly": "Endast maskin",
+      "modeMeticaiOnly": "Endast MeticAI",
       "selectAll": "Välj alla",
       "deselectAll": "Avmarkera alla",
       "selected": "{{count}} valda",
@@ -1254,11 +1315,11 @@
     "under": "Under",
     "over": "Över",
     "goldenRulesTitle": "Gyllene regler för Meticulous",
-    "ruleStartSimple": "<strong>Börja enkelt.</strong> När du ställer in ett nytt kaffe, börja med en av de inbyggda Meticulous-profilerna (t.ex. \"Italian\"). Denna kompass täcker grunderna: dos, utbyte och temperatur. Avancerad flödes- och tryckprofilering är kraftfullt men bör komma senare.",
+    "ruleStartSimple": "<strong>Börja enkelt.</strong> Börja med en inbyggd Meticulous-profil (t.ex. \"Italian\"). Bemästra dos, utbyte och temperatur först - det är de största spakarna. Avancerad flödes- och tryckkontroll är kraftfullt, men fungerar bäst när grunderna sitter.",
     "ruleDontChangeDose": "När du justerar utbytet (slutvikt), <strong>ändra inte dosen</strong> i din portafilter; ändra bara profilen.",
-    "ruleYieldTime": "Att ändra utbytet kommer i sig att ändra shottiden. Justera bara malningsgraden om shottiden är helt utanför förväntat intervall.",
+    "ruleYieldTime": "Att ändra utbytet kommer i sig att ändra shottiden. Justera bara malningsgraden om shottiden är långt från målet. För smakförändringar är profiljusteringar mer effektiva än enbart malning.",
     "ruleEvenExtraction": "En perfekt jämn extraktion skapar ett större \"sweet spot\" att arbeta inom: fokusera på puckprep först.",
-    "rulePreciseControl": "Meticulous ger dig exakt kontroll över tryck- och flödesprofiler. Använd den kraften för att förlänga eller förkorta specifika steg istället för att bara justera malningen.",
+    "rulePreciseControl": "<strong>Styr smaken med flöde, tryck och temperatur.</strong> När grunderna sitter, utforska Meticulous precision: högre flöde driver mot syra och klarhet (perfekt för ljusa rostningar), lägre flöde mot kropp och sötma. Högre temperatur extraherar mer (ljusa rostningar behöver 92–96°C), lägre temperatur förhindrar beska (mörka rostningar: 82–90°C). Avtagande tryck i sista tredjedelen minskar strävhet.",
     "attribution": "Konceptuellt inspirerad av <em>Espresso Compass av Barista Hustle</em>. Anpassad för Meticulous espressomaskin.",
     "emptyState": "Välj smaker ovan för att analysera din shot och få tips om inställning.",
     "analysis": {
@@ -1270,20 +1331,20 @@
       "lackingBody": "Saknar kropp",
       "sweetSpotDesc": "Du är mitt i sweet spot! Extraktion och styrka är välbalanserade.",
       "sweetSpotAdvice": "Ytterligare ändringar är en fråga om personlig preferens. Prova små justeringar: ±0,5°C temperatur eller ±1g utbyte - för att utforska kaffets smaker.",
-      "underDesc": "Skottet är underextraherat: för mycket syra kommer igenom innan de söta och balanserade föreningarna hinner lösa upp sig.",
+      "underDesc": "Shoten är underextraherad: för mycket syra kommer igenom innan de söta och balanserade föreningarna hinner lösa upp sig.",
       "underAdvice": "Öka slutvikten/utbytet i din profil för att låta mer vatten passera genom pucken. Du kan också prova att höja temperaturen med 1–2°C. Om extraktionen är mycket låg, mal finare.",
       "overDesc": "Espressen är överextraherad: beska, torra och sträva föreningar från sent i extraktionen dominerar.",
       "overAdvice": "Minska slutvikten/utbytet i din profil så att shoten avslutas tidigare. Du kan också prova att sänka temperaturen med 1–2°C. Om kraftigt överextraherat, mal grövre.",
-      "strongDesc": "Skottet är mycket tätt och intensivt: koncentrationen är hög.",
+      "strongDesc": "Shoten är mycket tät och intensiv: koncentrationen är hög.",
       "strongAdvice": "Öka slutvikten i din profil så att mer vatten passerar igenom och späder ut koncentrationen. Detta skiftar bryggkvoten mot ett längre shot.",
-      "weakDesc": "Skottet känns tunt eller vattnigt: det saknar den sirapslika kropp som förväntas av espresso.",
+      "weakDesc": "Shoten känns tunn eller vattnig: den saknar den sirapslika kropp som förväntas av espresso.",
       "weakAdvice": "Minska slutvikten i din profil så att mindre vatten passerar igenom och koncentrerar smakerna. Du kan också öka dosen något.",
       "unevenDesc": "Du smakar både syrlighet och bitterhet samtidigt: ett klassiskt tecken på channeling (vattnet hittar minsta motståndets väg genom pucken).",
       "unevenAdvice": "Fokusera på puckprep innan du ändrar profilen. Använd ett WDT-verktyg för att fördela malet jämnt och se till att tampen är perfekt plan. På Meticulous, verifiera även att förinfusionssteget har tillräckligt med tid för att mätta pucken jämnt."
     }
   },
   "dialIn": {
-    "title": "Inställningsguide",
+    "title": "Justera in",
     "stepOf": "Steg {{current}} av {{total}}",
     "sessionCompleted": "Inställningssession klar!",
     "steps": {
@@ -1389,6 +1450,7 @@
     "skipToNav": "Hoppa till navigering",
     "toggleTheme": "Byt till {{mode}}-läge",
     "openOnMobile": "Öppna på mobil enhet",
+    "collapseGreeting": "Dölj hälsning",
     "goHome": "Gå till startskärmen",
     "goBack": "Tillbaka",
     "stepProgress": "Steg {{current}} av {{total}}: {{step}}",
@@ -1448,7 +1510,9 @@
   },
   "update": {
     "failed": "Uppdatering misslyckades",
-    "timeout": "Uppdateringen slutfördes inte inom förväntad tid. Vänligen uppdatera manuellt."
+    "timeout": "Uppdateringen slutfördes inte inom förväntad tid. Vänligen uppdatera manuellt.",
+    "triggerFailed": "Kunde inte starta uppdateringen",
+    "checkFailed": "Kunde inte söka efter uppdateringar"
   },
   "sync": {
     "fetchProfileFailed": "Kunde inte hämta profil",
@@ -1456,5 +1520,153 @@
     "acceptUpdateFailed": "Kunde inte acceptera uppdatering",
     "removeFailed": "Kunde inte ta bort",
     "restoreFailed": "Kunde inte återställa"
+  },
+  "generation": {
+    "progress": {
+      "preparingPrompt": "Förbereder prompt...",
+      "processingImage": "Bearbetar bild...",
+      "generatingProfile": "Genererar profil...",
+      "validatingProfile": "Validerar profil...",
+      "profileGenerated": "Profilen genererades framgångsrikt"
+    }
+  },
+  "onboarding": {
+    "stepProgress": "Steg {{current}} av {{total}}: {{step}}",
+    "stepOf": "Steg {{current}} av {{total}}",
+    "steps": {
+      "welcome": "Välkommen",
+      "machine": "Maskinanslutning",
+      "name": "Ditt namn",
+      "ai": "AI-inställning",
+      "language": "Språk",
+      "theme": "Utseende",
+      "complete": "Klart"
+    },
+    "welcome": {
+      "title": "Välkommen till MeticAI",
+      "description": "Din AI-drivna espressokompanjon. Låt oss komma igång med några enkla steg.",
+      "getStarted": "Kom igång"
+    },
+    "machine": {
+      "title": "Anslut din maskin",
+      "description": "Vi söker ditt nätverk automatiskt. Du kan också ange adressen manuellt.",
+      "ipLabel": "IP-adress eller värdnamn",
+      "ipPlaceholder": "192.168.1.42",
+      "invalidIp": "Ange en giltig IP-adress eller värdnamn",
+      "connected": "Maskinen ansluten!",
+      "unreachable": "Kunde inte nå maskinen. Kontrollera IP-adressen och att du är på samma nätverk.",
+      "successMessage": "Ansluten till {{name}}",
+      "errorMessage": "Kunde inte nå maskinen. Kontrollera adressen och att du är på samma Wi-Fi-nätverk.",
+      "hint": "Tips: hitta IP-adressen i maskinens Wi-Fi-inställningar, eller kolla routerns DHCP-lista. Skriv \"demo\" för att prova utan maskin.",
+      "searching": "Söker efter maskiner på ditt nätverk...",
+      "foundMachines": "Maskiner hittade på ditt nätverk",
+      "autoDiscovered": "Maskin hittad automatiskt!",
+      "connectButton": "Anslut",
+      "ipDescription": "Ange en IP-adress (t.ex. 192.168.1.42) eller värdnamn. Värdnamnet är slumpmässigt men innehåller alltid \"meticulous\" (t.ex. meticulous-a3f7.local).",
+      "configureManually": "Konfigurera manuellt",
+      "noMachinesFound": "Inga maskiner hittades på ditt nätverk. Ange IP-adressen manuellt."
+    },
+    "name": {
+      "title": "Vad heter du?",
+      "description": "Används som författarnamn för profiler du skapar.",
+      "label": "Ditt namn",
+      "placeholder": "Barista extraordinär"
+    },
+    "ai": {
+      "title": "AI-funktioner",
+      "description": "MeticAI använder Google Gemini för att skapa profiler, analysera shots och ge rekommendationer.",
+      "keyLabel": "Gemini API-nyckel",
+      "keyPlaceholder": "AIza...",
+      "keyHint": "Skaffa en gratis API-nyckel på aistudio.google.com. Du kan lägga till detta senare i Inställningar.",
+      "whatItDoes": "Vad AI möjliggör:",
+      "feature1": "Skapa anpassade espressoprofiler från beskrivningar",
+      "feature2": "Analysera dina shots med expertfeedback",
+      "feature3": "Få dial-in-rekommendationer baserat på smak",
+      "getKey": "Hämta en gratis API-nyckel från Google AI Studio"
+    },
+    "language": {
+      "title": "Språk",
+      "description": "Välj ditt föredragna språk. Du kan ändra detta när som helst i Inställningar."
+    },
+    "theme": {
+      "title": "Utseende",
+      "description": "Välj hur MeticAI ska se ut.",
+      "light": "Ljust",
+      "dark": "Mörkt",
+      "system": "System"
+    },
+    "complete": {
+      "title": "Allt klart!",
+      "description": "Allt är konfigurerat. Dags att brygga något fantastiskt.",
+      "machine": "Maskin",
+      "name": "Namn",
+      "ai": "AI",
+      "aiConfigured": "Konfigurerad",
+      "aiSkipped": "Ej konfigurerad",
+      "language": "Språk",
+      "startBrewing": "Börja brygga",
+      "settingsHint": "Alla inställningar kan ändras senare i Inställningar.",
+      "supportProject": "Gillar du MeticAI? Överväg att bjuda mig på en kaffe"
+    }
+  },
+  "demo": {
+    "banner": "Demoläge",
+    "bannerHint": "Simulerad data, ingen riktig maskin",
+    "exit": "Avsluta",
+    "machineConnected": "Demomaskin ansluten",
+    "brewStarted": "Demobryggning startad",
+    "brewComplete": "Demobryggning klar",
+    "noRealConnection": "Ingen riktig maskinanslutning i demoläge",
+    "setupMachine": "Anslut maskin"
+  },
+  "notifications": {
+    "brewComplete": "Bryggning klar",
+    "brewCompleteBody": "Din {{profile}} är redo att avnjutas",
+    "machineReady": "Maskinen redo",
+    "machineReadyBody": "Din maskin har förvärmts klart",
+    "pourOverComplete": "Pour-over klar",
+    "pourOverCompleteBody": "Din pour-over-timer har avslutats"
+  },
+  "smartGreeting": {
+    "justBrewed": "Du drog precis ett skott på {{profile}}.\nVarför inte analysera det?",
+    "analyzeAction": "Analysera",
+    "milestone": "{{count}} skott avklarade, bara {{remaining}} kvar till {{milestone}}!",
+    "longGap": "Nästan {{hours}}h sedan ditt senaste skott.\nDags för kaffe?",
+    "unusedProfile": "Du har inte provat {{name}} ännu.\nTesta!",
+    "browseAction": "Bläddra profiler",
+    "anniversary": "Du har använt MeticAI i {{days}} dagar!",
+    "dialIn": "Hur var den koppen? Behöver du justera?",
+    "dialInAction": "Justera",
+    "fewProfiles": "Du har bara {{count}} profiler.\nSkapa en ny?",
+    "createAction": "Skapa profil",
+    "doubleShot": "Dags för en till redan? Modigt.",
+    "ratingNudge": "Hur var din shot av {{profile}}?\nGlöm inte att betygsätta!",
+    "ratingNudgeNew": "Visste du att du kan betygsätta dina shots\nför att hitta favoriterna?",
+    "rateAction": "Betygsätt",
+    "milestoneHit": "{{count}} shots!\nEn riktig espressoresa.",
+    "personalBestDay": "{{count}} shots idag.\nÄr det nytt rekord?",
+    "dailyStreak": "{{days}} dagar i rad.\nDet är hängivenhet.",
+    "powerUser": "{{count}} shots idag?\nDu är i princip barista.",
+    "firstWeek": "En vecka med MeticAI!\nHur har kaffet varit?",
+    "oneMonth": "En hel månad tillsammans.\nVi är i princip bästa vänner nu.",
+    "morningRitual": "God morgon!\nDin maskin väntar.",
+    "firstShotOfDay": "Dagens första shot?\nGör den minnesvärd.",
+    "postLunch": "Eftermiddagssvacka?\nEn shot kanske är precis vad du behöver.",
+    "lateNight": "Fortfarande uppe? Byt till koffeinfritt...\neller inte, vi dömer inte.",
+    "earlyBird": "Uppe före solen?\nDin espressomaskin respekterar drivet.",
+    "backToBack": "Lojal mot {{name}}.\nEn person av konsistens.",
+    "varietyExplorer": "{{count}} olika profiler denna vecka.\nÄventyraren!",
+    "topProfile": "{{name}} är din favorit.\n{{percent}}% av alla dina shots!",
+    "consistencyKing": "Du brygger alltid runt {{time}}.\nVanans makt!",
+    "neglectedFavorite": "Du har inte använt {{name}} på ett tag.\nSaknar du den?",
+    "shotCountToday": "Shot nummer {{count}} idag.\nHåller kaffenivån uppe!",
+    "viewHistoryAction": "Visa historik",
+    "viewProfileAction": "Visa profil",
+    "weekendMorning": "Helgkänsla.\nTa det lugnt med den här.",
+    "friday": "Trevlig fredag!\nDu har förtjänat denna shot.",
+    "mondayMotivation": "Måndag. Kaffe först,\nallt annat sedan.",
+    "quietWeek": "Lugnare vecka?\nDin maskin saknar dig.",
+    "singleProfileUser": "{{count}} shots i rad på {{name}}.\nOm det funkar...",
+    "profileCollector": "{{count}} profiler!\nDu bygger en fin samling."
   }
 }

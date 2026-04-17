@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useWakeLock } from '@/hooks/useWakeLock'
+import { useHaptics } from '@/hooks/useHaptics'
+import { useSoundEffects } from '@/hooks/useSoundEffects'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +14,7 @@ import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Stop, Play, Pause, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
@@ -377,6 +381,17 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<'free' | 'ratio' | 'recipe'>('free')
   const [isRunning, setIsRunning] = useState(false)
+
+  // Keep screen awake while pour over is active
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
+  const { notification: hapticsNotification } = useHaptics()
+  const { pourOverTarget: playPourOverTarget, pourOverDone: playPourOverDone, machineError: playMachineError } = useSoundEffects()
+  const { notifyPourOverComplete } = useBrewNotifications()
+  const prevTargetReachedRef = useRef(false)
+  useEffect(() => {
+    if (isRunning) requestWakeLock()
+    else releaseWakeLock()
+  }, [isRunning, requestWakeLock, releaseWakeLock])
   const [baseElapsedMs, setBaseElapsedMs] = useState(0)
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(baseElapsedMs)
@@ -446,9 +461,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     setMode(newMode)
     if (!prefsRef.current) return
     if (newMode === 'recipe') {
-      setMeticulousIntegration(prefsRef.current.recipe.machineIntegration)
-      setAutoStartEnabled(prefsRef.current.recipe.autoStart ?? true)
-      setRecipeProgressionMode(prefsRef.current.recipe.progressionMode ?? 'weight')
+      setMeticulousIntegration(prefsRef.current.recipe?.machineIntegration ?? false)
+      setAutoStartEnabled(prefsRef.current.recipe?.autoStart ?? true)
+      setRecipeProgressionMode(prefsRef.current.recipe?.progressionMode ?? 'weight')
     } else {
       const mp = prefsRef.current[newMode]
       setAutoStartEnabled(mp.autoStart)
@@ -549,13 +564,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const flowStartTimestampRef = useRef<number | null>(null)
   // Track weight when continuous flow started (for weight-based escape hatch)
   const flowStartWeightRef = useRef<number | null>(null)
-  // Require 800ms of continuous valid flow to trigger auto-start
-  // Filters momentary disturbances while remaining responsive to quick pours
-  const FLOW_CONFIRMATION_MS = 800
+  // Require 1500ms of continuous valid flow to trigger auto-start
+  // Filters grounds settling and momentary disturbances
+  const FLOW_CONFIRMATION_MS = 1500
   // If total weight gain since flow started exceeds this threshold,
   // trigger auto-start immediately regardless of elapsed time.
-  // 3g is unambiguously a pour, not grounds settling or scale drift.
-  const FLOW_WEIGHT_ESCAPE_G = 3
+  // 8g is unambiguously a pour, not grounds settling or scale drift.
+  const FLOW_WEIGHT_ESCAPE_G = 8
 
   const { cmd, isBrewing, isConnected, canStart, isClickToPurge } = useMachineActions(machineState)
   const machine = useMachineService()
@@ -670,7 +685,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const parsedDose = parsePositiveNumber(doseGrams)
   const parsedRatio = parsePositiveNumber(brewRatio)
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
-  const bloomWeightTarget = parsedDose !== null && bloomEnabled
+  const bloomWeightTarget = parsedDose !== null && bloomEnabled && mode !== 'free'
     ? parsedDose * (parsePositiveNumber(bloomWeightMultiplier) ?? 2)
     : null
   const remainingWeight = targetWeight !== null ? Math.max(targetWeight - weight, 0) : null
@@ -678,6 +693,16 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const targetReached =
     (mode === 'ratio' && isRunning && targetWeight !== null && targetWeight > 0 && weight >= targetWeight) ||
     (mode === 'recipe' && isRunning && selectedRecipe !== null && weight >= selectedRecipe.ingredients.water_g)
+
+  // Haptic + sound + notification when pour-over target is reached
+  useEffect(() => {
+    if (targetReached && !prevTargetReachedRef.current) {
+      hapticsNotification('success')
+      playPourOverTarget()
+      notifyPourOverComplete()
+    }
+    prevTargetReachedRef.current = targetReached
+  }, [targetReached, hapticsNotification, playPourOverTarget, notifyPourOverComplete])
 
   const recipeTimings = useMemo((): RecipeStepTiming[] => {
     if (!selectedRecipe) return []
@@ -878,6 +903,19 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     }
   }, [machineLifecycle, updateMachineIntegration, updateAutoStart])
 
+  // Sound effects for natural machine lifecycle events
+  const prevLifecycleRef = useRef<MachineLifecycle>(machineLifecycle)
+  useEffect(() => {
+    const prev = prevLifecycleRef.current
+    prevLifecycleRef.current = machineLifecycle
+
+    if (machineLifecycle === 'done' && prev === 'drawdown') {
+      playPourOverDone()
+    } else if (machineLifecycle === 'error') {
+      playMachineError()
+    }
+  }, [machineLifecycle, playPourOverDone, playMachineError])
+
   // Reset machine lifecycle when done (allow starting again)
   // Also tare the scale, reset the timer, and clear the graph
   const resetMachineLifecycle = useCallback(() => {
@@ -1045,6 +1083,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('common.back')}
@@ -1072,7 +1111,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <div className="space-y-5">
             {/* ── 1. Weight + Timer + Flow rate (always visible) ── */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
+              <div
+                className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1 cursor-pointer active:bg-secondary/60 transition-colors"
+                onClick={handleTare}
+                role="button"
+                tabIndex={0}
+                aria-label={t('controlCenter.actions.tare')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTare() } }}
+              >
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
                   <Scales size={14} weight="bold" />
                   {t('pourOver.weight')}
@@ -1358,7 +1404,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     className="w-full h-11 rounded-xl"
                     disabled={machineLifecycle === 'purging'}
                   >
-                    <Pause size={18} weight="fill" className="mr-1.5" />
+                    <Stop size={18} weight="fill" className="mr-1.5" />
                     {t('pourOver.integration.stop')}
                   </Button>
                 )}
@@ -1646,7 +1692,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 </div>
               )}
 
-              {mode !== 'recipe' && bloomEnabled && parsedDose !== null && (
+              {mode !== 'recipe' && mode !== 'free' && bloomEnabled && parsedDose !== null && (
                 <div className="space-y-1.5">
                   <Label>{t('pourOver.bloomWeightMultiplier')}</Label>
                   <p className="text-xs text-muted-foreground">{t('pourOver.bloomWeightMultiplierDescription')}</p>

@@ -22,6 +22,7 @@ from types import SimpleNamespace
 import time
 import asyncio
 import requests
+import httpx
 
 
 # Import the app and services
@@ -7927,6 +7928,46 @@ class TestSaveSettingsEndpoint:
         # Should handle gracefully
         assert response.status_code in [200, 400, 500]
 
+    def test_save_gemini_model_persists_and_returns(self, client, monkeypatch, tmp_path):
+        """POST geminiModel then GET and verify it is returned."""
+        import services.settings_service as settings_svc
+
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text("{}")
+        monkeypatch.setattr(settings_svc, "SETTINGS_FILE", settings_file)
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+
+        resp = client.post("/api/settings", json={"geminiModel": "gemini-2.5-pro"})
+        assert resp.status_code == 200
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["geminiModel"] == "gemini-2.5-pro"
+
+    def test_save_gemini_model_empty_falls_back_to_default(self, client, monkeypatch, tmp_path):
+        """POST empty geminiModel falls back to the default model."""
+        import services.settings_service as settings_svc
+
+        settings_file = tmp_path / "settings.json"
+        settings_file.write_text("{}")
+        monkeypatch.setattr(settings_svc, "SETTINGS_FILE", settings_file)
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+
+        resp = client.post("/api/settings", json={"geminiModel": "  "})
+        assert resp.status_code == 200
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["geminiModel"] == "gemini-2.5-flash"
+
+    def test_get_settings_includes_gemini_model(self, client, monkeypatch):
+        """GET /api/settings always includes geminiModel."""
+        monkeypatch.delenv("GEMINI_MODEL", raising=False)
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert "geminiModel" in resp.json()
+
 
 class TestDecompressShotData:
     """Test shot data decompression."""
@@ -12991,11 +13032,13 @@ class TestProfileSync:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_sync_status_counts(self, mock_list, mock_history, client):
+    def test_sync_status_counts(self, mock_list, mock_get, mock_history, client):
         """GET /api/profiles/sync/status returns correct counts."""
         profile = self._make_mock_profile()
         mock_list.return_value = [profile]
+        mock_get.return_value = profile
         mock_history.return_value = [{
             "id": "orphan-1",
             "profile_name": "GoneProfile",
@@ -13010,10 +13053,12 @@ class TestProfileSync:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
-    def test_sync_status_dual_route(self, mock_list, mock_history, client):
+    def test_sync_status_dual_route(self, mock_list, mock_get, mock_history, client):
         """Both /profiles/sync/status and /api/profiles/sync/status work."""
         mock_list.return_value = []
+        mock_get.return_value = None
         mock_history.return_value = []
 
         for path in ["/profiles/sync/status", "/api/profiles/sync/status"]:
@@ -13068,6 +13113,98 @@ class TestProfileSync:
         for path in ["/profiles/sync", "/api/profiles/sync"]:
             response = client.post(path)
             assert response.status_code == 200
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.update_entry_sync_fields')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_backfills_missing_hash(self, mock_list, mock_get, mock_history, mock_update, client):
+        """Entries without content_hash get backfilled, not flagged as updated."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_update.return_value = {"id": "entry-1"}
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "reply": "test",
+            # No content_hash — should trigger backfill
+        }]
+
+        response = client.post("/api/profiles/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["updated"]) == 0, "Backfill should NOT flag as updated"
+        assert len(data["new"]) == 0
+        mock_update.assert_called_once()
+        call_kwargs = mock_update.call_args
+        assert call_kwargs[0][0] == "entry-1"
+        assert "content_hash" in call_kwargs[1]
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.update_entry_sync_fields')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_status_detects_updated(self, mock_list, mock_get, mock_history, mock_update, client):
+        """sync/status returns accurate updated_count when hashes differ."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_update.return_value = None
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "content_hash": "stale_hash_value",
+            "reply": "test",
+        }]
+
+        response = client.get("/api/profiles/sync/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["updated_count"] == 1
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.update_entry_sync_fields')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_sync_status_backfills_missing_hash(self, mock_list, mock_get, mock_history, mock_update, client):
+        """sync/status backfills missing hashes without counting as updated."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_update.return_value = {"id": "entry-1"}
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "reply": "test",
+            # No content_hash
+        }]
+
+        response = client.get("/api/profiles/sync/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["updated_count"] == 0, "Backfill should not count as updated"
+        mock_update.assert_called_once()
+
+    @patch('services.history_service.save_history')
+    @patch('services.history_service.load_history')
+    def test_save_to_history_stores_content_hash(self, mock_load, mock_save):
+        """save_to_history() computes and stores content_hash from profile_json."""
+        from services.history_service import save_to_history
+        mock_load.return_value = []
+
+        reply = '**Profile Created:** Test\n```json\n{"name": "Test", "temperature": 93}\n```'
+        entry = save_to_history(
+            coffee_analysis="test beans",
+            user_prefs="normal",
+            reply=reply
+        )
+
+        assert "content_hash" in entry
+        assert len(entry["content_hash"]) == 64  # SHA-256 hex digest
 
 
 class TestHistoryNotesEndpoints:
@@ -13874,3 +14011,142 @@ class TestDialInPromptBuilder:
         prompt = build_dialin_recommendation_prompt(roast_level="dark", iterations=[])
         assert "dark" in prompt
         assert "Iteration" not in prompt
+
+
+class TestImportFromUrl:
+    """Tests for the /api/import-from-url endpoint."""
+
+    VALID_PROFILE = {"name": "URL Espresso", "temperature": 93.0, "stages": [{"name": "extraction"}]}
+
+    @staticmethod
+    def _mock_httpx_stream(response_bytes=b'{}', raise_for_status_error=None):
+        """Build a mock httpx.AsyncClient that streams response_bytes."""
+        class FakeStream:
+            def __init__(self):
+                self.status_code = 200
+            def raise_for_status(self):
+                if raise_for_status_error:
+                    raise raise_for_status_error
+            async def aiter_bytes(self, chunk_size=8192):
+                yield response_bytes
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                return False
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                pass
+            def stream(self, method, url):
+                return FakeStream()
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                return False
+
+        return FakeClient
+
+    def test_missing_url(self, client):
+        """Returns 400 when URL is missing or empty."""
+        resp = client.post("/api/import-from-url", json={"url": ""})
+        assert resp.status_code == 400
+        assert "No URL" in resp.json()["detail"]
+
+    def test_invalid_scheme(self, client):
+        """Returns 400 for non-http(s) schemes."""
+        resp = client.post("/api/import-from-url", json={"url": "ftp://example.com/profile.json"})
+        assert resp.status_code == 400
+        assert "http" in resp.json()["detail"].lower() or "scheme" in resp.json()["detail"].lower()
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    def test_ssrf_blocked(self, mock_validate, client):
+        """Returns 400 when SSRF validation blocks the URL."""
+        mock_validate.side_effect = ValueError("URL resolves to private/reserved IP: 127.0.0.1")
+        resp = client.post("/api/import-from-url", json={"url": "http://localhost:8080/profile.json"})
+        assert resp.status_code == 400
+        assert "Blocked URL" in resp.json()["detail"]
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_remote_non_200(self, mock_client_class, mock_ssrf, client):
+        """Returns 502 when the remote server returns an error."""
+        mock_ssrf.return_value = None
+        mock_client_class.side_effect = [TestImportFromUrl._mock_httpx_stream(
+            raise_for_status_error=httpx.HTTPStatusError(
+                "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
+            )
+        )]
+        # Replace with direct class substitution
+        fake_cls = TestImportFromUrl._mock_httpx_stream(
+            raise_for_status_error=httpx.HTTPStatusError(
+                "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
+            )
+        )
+        mock_client_class.side_effect = None
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/missing.json"})
+        assert resp.status_code == 502
+        assert "404" in resp.json()["detail"]
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_non_json_body(self, mock_client_class, mock_ssrf, client):
+        """Returns 400 when URL returns non-JSON content."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=b"<html>Not JSON</html>")
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/page.html"})
+        assert resp.status_code == 400
+        assert "valid JSON" in resp.json()["detail"]
+
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_missing_name_field(self, mock_client_class, mock_ssrf, client):
+        """Returns 400 when profile JSON is missing 'name'."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=json.dumps({"temperature": 93.0}).encode())
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/profile.json"})
+        assert resp.status_code == 400
+        assert "name" in resp.json()["detail"].lower()
+
+    @patch('api.routes.profiles.async_create_profile', new_callable=AsyncMock, return_value={"id": "m-1"})
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history', return_value=[
+        {"id": "old-1", "profile_name": "URL Espresso", "reply": "desc"}
+    ])
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_dedupe_exists(self, mock_client_class, mock_ssrf, mock_load, mock_save, mock_create, client):
+        """Returns 'exists' when a profile with the same name is already in history."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=json.dumps(self.VALID_PROFILE).encode())
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/profile.json"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "exists"
+        assert data["profile_name"] == "URL Espresso"
+        mock_save.assert_not_called()
+
+    @patch('api.routes.profiles.async_create_profile', new_callable=AsyncMock, return_value={"id": "m-2"})
+    @patch('api.routes.profiles.save_history')
+    @patch('api.routes.profiles.load_history', return_value=[])
+    @patch('api.routes.profiles._generate_profile_description', new_callable=AsyncMock, return_value="Rich espresso")
+    @patch('api.routes.profiles._validate_url_for_ssrf')
+    @patch('httpx.AsyncClient')
+    def test_success_path(self, mock_client_class, mock_ssrf, mock_gen_desc, mock_load, mock_save, mock_create, client):
+        """Full success path: fetch, parse, save, upload."""
+        mock_ssrf.return_value = None
+        fake_cls = TestImportFromUrl._mock_httpx_stream(response_bytes=json.dumps(self.VALID_PROFILE).encode())
+        mock_client_class.return_value = fake_cls()
+        resp = client.post("/api/import-from-url", json={"url": "https://example.com/profile.json"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["profile_name"] == "URL Espresso"
+        assert data["has_description"] is True
+        assert data["uploaded_to_machine"] is True
+        assert "entry_id" in data
+        mock_save.assert_called_once()
+        mock_create.assert_called_once()

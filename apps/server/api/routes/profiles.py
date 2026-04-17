@@ -32,6 +32,8 @@ from services.meticulous_service import (
     async_load_profile_by_id,
     async_execute_action,
     async_delete_profile,
+    MachineUnreachableError,
+    invalidate_profile_list_cache,
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
@@ -1227,11 +1229,12 @@ async def analyze_shot(
                         "name": full_profile.name,
                         "temperature": getattr(full_profile, 'temperature', None),
                         "final_weight": getattr(full_profile, 'final_weight', None),
+                        "description": None,
+                        "user_preferences": None,
                         "variables": [],
                         "stages": []
                     }
-                    
-                    # Extract variables if present
+
                     if hasattr(full_profile, 'variables') and full_profile.variables:
                         for var in full_profile.variables:
                             var_dict = {
@@ -1715,6 +1718,7 @@ async def list_machine_profiles(request: Request):
                     try:
                         for entry in entries:
                             if entry.get("profile_name") == profile_dict["name"]:
+                                profile_dict["user_preferences"] = entry.get("user_preferences")
                                 if entry.get("reply"):
                                     profile_dict["has_description"] = True
                                 break
@@ -1737,7 +1741,8 @@ async def list_machine_profiles(request: Request):
                     "final_weight": getattr(partial_profile, 'final_weight', None),
                     "in_history": False,
                     "has_description": False,
-                    "description": None
+                    "description": None,
+                    "user_preferences": None,
                 }
                 profiles.append(profile_dict)
         
@@ -1752,6 +1757,45 @@ async def list_machine_profiles(request: Request):
             "total": len(profiles)
         }
         
+    except MachineUnreachableError:
+        # Offline fallback — return profiles from history
+        logger.info(
+            "Machine unreachable, returning history-based profiles",
+            extra={"request_id": request_id}
+        )
+        try:
+            history = load_history()
+            entries = history if isinstance(history, list) else history.get("entries", [])
+            profiles = []
+            seen: set[str] = set()
+            for entry in entries:
+                name = entry.get("profile_name")
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                pj = entry.get("profile_json") or {}
+                profiles.append({
+                    "id": entry.get("id", ""),
+                    "name": name,
+                    "author": pj.get("author"),
+                    "temperature": pj.get("temperature"),
+                    "final_weight": pj.get("final_weight"),
+                    "in_history": True,
+                    "has_description": bool(entry.get("reply")),
+                    "user_preferences": entry.get("user_preferences"),
+                })
+            return {
+                "status": "success",
+                "profiles": profiles,
+                "total": len(profiles),
+                "offline": True,
+            }
+        except Exception as fallback_err:
+            logger.warning(
+                f"Offline fallback also failed: {fallback_err}",
+                extra={"request_id": request_id}
+            )
+            raise MachineUnreachableError() from fallback_err
     except HTTPException:
         raise
     except Exception as e:
@@ -2200,13 +2244,15 @@ async def import_profile(request: Request):
         entry_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
         
+        profile_dict = deep_convert_to_dict(profile_json)
         new_entry = {
             "id": entry_id,
             "created_at": created_at,
             "profile_name": profile_name,
             "user_preferences": f"Imported from {source}",
             "reply": reply,
-            "profile_json": deep_convert_to_dict(profile_json),
+            "profile_json": profile_dict,
+            "content_hash": compute_content_hash(profile_dict),
             "imported": True,
             "import_source": source
         }
@@ -2264,6 +2310,109 @@ async def import_profile(request: Request):
             detail={"status": "error", "error": str(e)}
         )
 
+
+
+def _validate_url_for_ssrf(url: str) -> None:
+    """Reject URLs that could hit internal/private network resources."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported scheme: {parsed.scheme}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("No hostname in URL")
+    blocked = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "metadata.google.internal"}
+    if hostname.lower() in blocked:
+        raise ValueError(f"Blocked hostname: {hostname}")
+    try:
+        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError(f"URL resolves to private/reserved IP: {ip}")
+    except socket.gaierror:
+        pass  # Let httpx handle DNS errors
+
+
+@router.post("/api/import-from-url")
+async def import_from_url(request: Request):
+    """Import a profile from a URL (JSON or .met format)."""
+    request_id = request.state.request_id
+    try:
+        body = await request.json()
+        url = body.get("url", "").strip()
+        generate_description = body.get("generate_description", True)
+        if not url:
+            raise HTTPException(status_code=400, detail="No URL provided")
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise HTTPException(status_code=400, detail="Only http and https URLs are supported")
+        try:
+            _validate_url_for_ssrf(url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Blocked URL: {exc}")
+        logger.info("Importing profile from URL: %s", url, extra={"request_id": request_id})
+        max_size = 5 * 1024 * 1024
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                async with client.stream("GET", url) as resp:
+                    resp.raise_for_status()
+                    chunks: list[bytes] = []
+                    total = 0
+                    async for chunk in resp.aiter_bytes(8192):
+                        total += len(chunk)
+                        if total > max_size:
+                            raise HTTPException(status_code=413, detail="Response too large (max 5 MB)")
+                        chunks.append(chunk)
+                    content = b"".join(chunks)
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=408, detail="Request timed out fetching URL")
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(status_code=502, detail=f"Remote server returned {exc.response.status_code}")
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {exc}")
+        try:
+            profile_json = json.loads(content)
+        except Exception:
+            raise HTTPException(status_code=400, detail="URL did not return valid JSON")
+        if not isinstance(profile_json, dict):
+            raise HTTPException(status_code=400, detail="URL did not return a valid profile object")
+        if not profile_json.get("name"):
+            raise HTTPException(status_code=400, detail="Profile is missing a 'name' field")
+        profile_name = profile_json["name"]
+        reply = None
+        if generate_description:
+            try:
+                reply = await _generate_profile_description(profile_json, request_id)
+            except Exception as e:
+                logger.warning("Failed to generate description for URL import: %s", e, extra={"request_id": request_id})
+                from services.analysis_service import _build_static_profile_description
+                reply = _build_static_profile_description(profile_json)
+        else:
+            from services.analysis_service import _build_static_profile_description
+            reply = _build_static_profile_description(profile_json)
+        entry_id = str(uuid.uuid4())
+        created_at = datetime.now(timezone.utc).isoformat()
+        new_entry = {"id": entry_id, "created_at": created_at, "profile_name": profile_name, "user_preferences": f"Imported from URL: {url}", "reply": reply, "profile_json": deep_convert_to_dict(profile_json), "imported": True, "import_source": "url"}
+        with _history_lock:
+            history = load_history()
+            entries = history if isinstance(history, list) else history.get("entries", [])
+            for entry in entries:
+                if entry.get("profile_name") == profile_name:
+                    return {"status": "exists", "message": f"Profile '{profile_name}' already exists", "entry_id": entry.get("id"), "profile_name": profile_name}
+            entries.insert(0, new_entry)
+            save_history(entries)
+        machine_profile_id = None
+        try:
+            result = await async_create_profile(profile_json)
+            machine_profile_id = result.get("id") if isinstance(result, dict) else None
+            logger.info("URL-imported profile uploaded to machine: %s", profile_name, extra={"request_id": request_id, "machine_profile_id": machine_profile_id})
+        except Exception as exc:
+            logger.warning("Profile saved to history but failed to upload to machine: %s", exc, extra={"request_id": request_id, "error_type": type(exc).__name__})
+        logger.info("Profile imported from URL successfully: %s", profile_name, extra={"request_id": request_id, "entry_id": entry_id, "source_url": url})
+        return {"status": "success", "entry_id": entry_id, "profile_name": profile_name, "has_description": reply is not None and "Description generation failed" not in reply, "uploaded_to_machine": machine_profile_id is not None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to import profile from URL: %s", str(e), exc_info=True, extra={"request_id": request_id, "error_type": type(e).__name__})
+        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
 
 @router.post("/api/profile/import-all")
 async def import_all_profiles(request: Request):
@@ -2654,7 +2803,18 @@ async def sync_profiles(request: Request):
                 })
             else:
                 stored_hash = entry.get("content_hash")
-                if stored_hash and stored_hash != current_hash:
+                if not stored_hash:
+                    # Backfill: first sync after creation — store the machine
+                    # hash as baseline without flagging as "updated".
+                    try:
+                        update_entry_sync_fields(
+                            entry["id"],
+                            content_hash=current_hash,
+                            profile_json=profile_dict,
+                        )
+                    except Exception:
+                        pass
+                elif stored_hash != current_hash:
                     updated_profiles.append({
                         "profile_id": profile_id,
                         "profile_name": profile_name,
@@ -2793,11 +2953,11 @@ async def accept_sync_update(profile_id: str, request: Request, ai_description: 
 @router.get("/profiles/sync/status")
 @router.get("/api/profiles/sync/status")
 async def sync_status(request: Request):
-    """Quick count of pending sync items for badge display.
+    """Count of pending sync items for badge display.
 
-    This is a lightweight version of the full sync endpoint that avoids
-    fetching every full profile — it only checks existence by name and
-    compares stored hashes where available.
+    Fetches full profiles to compute content hashes so that updated profiles
+    are accurately reflected in the badge count.  Also backfills hashes for
+    history entries that were created before hash tracking was added.
     """
     request_id = request.state.request_id
 
@@ -2823,18 +2983,33 @@ async def sync_status(request: Request):
 
         for partial in profiles_result:
             name = getattr(partial, "name", "")
+            profile_id = getattr(partial, "id", "")
             machine_names.add(name)
             entry = history_by_name.get(name)
             if entry is None:
                 new_count += 1
             else:
-                # For updated detection without a full fetch, we rely on
-                # stored hashes. If no hash stored yet, we can't tell.
                 stored_hash = entry.get("content_hash")
-                if stored_hash:
-                    # We need a full fetch to compare — but for status we
-                    # skip this to stay lightweight.  The full sync will
-                    # detect changes.
+                try:
+                    full = await async_get_profile(profile_id)
+                    if hasattr(full, "error") and full.error:
+                        continue
+                    profile_dict = deep_convert_to_dict(full)
+                    current_hash = compute_content_hash(profile_dict)
+
+                    if not stored_hash:
+                        # Backfill baseline hash silently
+                        try:
+                            update_entry_sync_fields(
+                                entry["id"],
+                                content_hash=current_hash,
+                                profile_json=profile_dict,
+                            )
+                        except Exception:
+                            pass
+                    elif stored_hash != current_hash:
+                        updated_count += 1
+                except Exception:
                     pass
 
         orphan_count = sum(
@@ -2946,15 +3121,21 @@ async def auto_sync_profiles(request: Request):
                 # Existing profile — check for updates
                 existing = history_by_name[profile_name]
                 stored_hash = existing.get("content_hash")
-                if not stored_hash:
-                    continue  # No hash to compare — skip
                 try:
                     full_profile = await async_get_profile(profile_id)
                     if hasattr(full_profile, "error") and full_profile.error:
                         continue
                     profile_dict = deep_convert_to_dict(full_profile)
                     current_hash = compute_content_hash(profile_dict)
-                    if current_hash != stored_hash:
+
+                    if not stored_hash:
+                        # Backfill: store machine hash as baseline (not an update)
+                        update_entry_sync_fields(
+                            existing["id"],
+                            content_hash=current_hash,
+                            profile_json=profile_dict,
+                        )
+                    elif current_hash != stored_hash:
                         new_reply = None
                         if ai_description:
                             try:
@@ -3033,13 +3214,39 @@ async def restore_profile_from_history(history_id: str, request: Request):
             extra={"request_id": request_id, "history_id": history_id},
         )
 
-        result = await async_save_profile(profile_json)
+        # Send profile dict directly to the machine API.
+        # We bypass async_save_profile / Profile model because the stored
+        # JSON may lack fields the Pydantic model requires (e.g. author_id).
+        import httpx
+        import os
 
-        if hasattr(result, "error") and result.error:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Machine API error: {result.error}",
+        meticulous_ip = os.environ.get("METICULOUS_IP", "").strip()
+        if not meticulous_ip:
+            raise HTTPException(status_code=503, detail="METICULOUS_IP not configured")
+
+        # Ensure author_id is present — machine API may require it
+        if "author_id" not in profile_json:
+            profile_json["author_id"] = profile_json.get("author", "MeticAI")
+
+        # Strip None values (machine API rejects them)
+        clean_json = {k: v for k, v in profile_json.items() if v is not None}
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"http://{meticulous_ip}/api/v1/profile/save",
+                json=clean_json,
             )
+            if resp.status_code != 200:
+                logger.error(
+                    f"Machine API rejected profile save: {resp.status_code} - {resp.text}",
+                    extra={"request_id": request_id},
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Machine API error: {resp.text}",
+                )
+
+        invalidate_profile_list_cache()
 
         logger.info(
             f"Successfully restored profile '{profile_name}' to machine",

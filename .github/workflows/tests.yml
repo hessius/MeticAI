@@ -2,9 +2,9 @@ name: Test Suite
 
 on:
   push:
-    branches: [main, develop, version/2.0.0]
+    branches: [main, develop, "version/*", "feat/machine-hosted-pwa"]
   pull_request:
-    branches: [main, develop, version/2.0.0]
+    branches: [main, develop, "version/*"]
 
 jobs:
   # ============================================================================
@@ -48,7 +48,7 @@ jobs:
             --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./apps/server/coverage.xml
           flags: relay
@@ -107,11 +107,14 @@ jobs:
       - name: Run unit tests
         run: bun run test:run
 
+      - name: Run direct-mode tests
+        run: bun run test:direct
+
       - name: Generate coverage report
         run: bun run test:coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./apps/web/coverage/coverage-final.json
           flags: web
