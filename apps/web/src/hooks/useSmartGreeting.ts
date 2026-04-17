@@ -79,15 +79,23 @@ function getGreetingLog(): GreetingLogEntry[] {
 }
 
 export function logGreeting(id: string): void {
-  const log = getGreetingLog()
-  log.push({ id, ts: Math.floor(Date.now() / 1000) })
-  while (log.length > 100) log.shift()
-  localStorage.setItem(STORAGE_KEYS.GREETING_LOG, JSON.stringify(log))
-  localStorage.setItem(STORAGE_KEYS.LAST_GREETING_ID, id)
+  try {
+    const log = getGreetingLog()
+    log.push({ id, ts: Math.floor(Date.now() / 1000) })
+    while (log.length > 100) log.shift()
+    localStorage.setItem(STORAGE_KEYS.GREETING_LOG, JSON.stringify(log))
+    localStorage.setItem(STORAGE_KEYS.LAST_GREETING_ID, id)
+  } catch {
+    // Storage unavailable — silently skip
+  }
 }
 
 function getLastGreetingId(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.LAST_GREETING_ID)
+  try {
+    return localStorage.getItem(STORAGE_KEYS.LAST_GREETING_ID)
+  } catch {
+    return null
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -640,11 +648,14 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
   useEffect(() => {
     if (!enabled) {
       fetchedRef.current = false
+      setGreeting(null)
       return
     }
 
     if (fetchedRef.current) return
     fetchedRef.current = true
+
+    let cancelled = false
 
     const build = async () => {
       const [stats, lastShot, profiles, recentShots] = await Promise.all([
@@ -654,21 +665,32 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
         shotService.getRecentShots(50).catch(() => [] as HistoryListingEntry[]),
       ])
 
+      if (cancelled) return
+
       const minutesSinceLastShot = lastShot?.time
         ? Math.max(0, Math.round((Date.now() / 1000 - lastShot.time) / 60))
         : null
 
-      const authorName = localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || null
-      const installDateStr = localStorage.getItem(STORAGE_KEYS.INSTALL_DATE)
-      const installDays = installDateStr
-        ? Math.floor((Date.now() - new Date(installDateStr).getTime()) / (24 * 60 * 60 * 1000))
-        : null
-      const sessionCount = parseInt(localStorage.getItem(STORAGE_KEYS.SESSION_COUNT) ?? '0', 10)
+      let authorName: string | null = null
+      let installDays: number | null = null
+      let sessionCount = 0
+      let personalBestShotsDay = 0
+      try {
+        authorName = localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || null
+        const installDateStr = localStorage.getItem(STORAGE_KEYS.INSTALL_DATE)
+        installDays = installDateStr
+          ? Math.floor((Date.now() - new Date(installDateStr).getTime()) / (24 * 60 * 60 * 1000))
+          : null
+        sessionCount = parseInt(localStorage.getItem(STORAGE_KEYS.SESSION_COUNT) ?? '0', 10)
+        personalBestShotsDay = parseInt(
+          localStorage.getItem(STORAGE_KEYS.PERSONAL_BEST_SHOTS_DAY) ?? '0', 10,
+        )
+      } catch {
+        // Storage unavailable — use defaults
+      }
+
       const now = new Date()
       const shotsToday = countShotsToday(recentShots)
-      const personalBestShotsDay = parseInt(
-        localStorage.getItem(STORAGE_KEYS.PERSONAL_BEST_SHOTS_DAY) ?? '0', 10,
-      )
 
       const result = pickGreeting({
         t, stats, lastShot, profiles, minutesSinceLastShot,
@@ -684,10 +706,14 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
         personalBestShotsDay,
       })
 
+      if (cancelled) return
+
       if (result) {
         logGreeting(result.id)
         if (result.id === 'personalBestDay') {
-          localStorage.setItem(STORAGE_KEYS.PERSONAL_BEST_SHOTS_DAY, String(shotsToday))
+          try {
+            localStorage.setItem(STORAGE_KEYS.PERSONAL_BEST_SHOTS_DAY, String(shotsToday))
+          } catch { /* storage unavailable */ }
         }
       }
 
@@ -695,6 +721,8 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
     }
 
     build()
+
+    return () => { cancelled = true }
   }, [enabled, shotService, catalogueService, t])
 
   return greeting

@@ -64,6 +64,15 @@ export function useSoundEffects() {
   const closeButton = useCallback(() => play(tiks.notify), [play, tiks.notify])
   const hoverAdjust = useCallback(() => play(tiks.hover), [play, tiks.hover])
 
+  // Bypass the enabled gate for the sounds toggle itself (OFF→ON confirmation)
+  const confirmSoundToggle = useCallback(
+    (on: boolean) => {
+      if (document.visibilityState !== 'visible') return
+      if (on) tiks.toggle(true); else tiks.toggle(false)
+    },
+    [tiks],
+  )
+
   return {
     shotComplete,
     machineReady,
@@ -81,6 +90,7 @@ export function useSoundEffects() {
     backButton,
     closeButton,
     hoverAdjust,
+    confirmSoundToggle,
     enabled,
   }
 }
