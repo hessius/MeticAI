@@ -78,7 +78,7 @@
         "react-easy-crop": "^5.5.7",
         "react-error-boundary": "^6.1.1",
         "react-hook-form": "^7.72.1",
-        "react-i18next": "^16.5.8",
+        "react-i18next": "^17.0.2",
         "react-resizable-panels": "^4.10.0",
         "recharts": "^3.8.0",
         "sonner": "^2.0.1",
