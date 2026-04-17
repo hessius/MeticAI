@@ -22,12 +22,14 @@ import type {
   CommandResult,
   StatusCallback,
   ActuatorsCallback,
+  TemperaturesCallback,
   NotificationCallback,
   ProfileUpdateCallback,
   HeaterStatusCallback,
   ConnectionCallback,
   Unsubscribe,
 } from './MachineService'
+import type { Temperatures } from '@meticulous-home/espresso-api'
 import { getDemoStore, generateSensorData } from '@/demo/demoStore'
 
 // ---------------------------------------------------------------------------
@@ -55,6 +57,7 @@ export function createDemoAdapter(): MachineService {
   // Callback sets (mirrors DirectAdapter pattern)
   const statusCbs = new Set<StatusCallback>()
   const actuatorCbs = new Set<ActuatorsCallback>()
+  const temperatureCbs = new Set<TemperaturesCallback>()
   const heaterCbs = new Set<HeaterStatusCallback>()
   const notifCbs = new Set<NotificationCallback>()
   const profileCbs = new Set<ProfileUpdateCallback>()
@@ -73,6 +76,10 @@ export function createDemoAdapter(): MachineService {
 
   function emitActuators(data: Actuators) {
     actuatorCbs.forEach((cb) => cb(data))
+  }
+
+  function emitTemperatures(data: Temperatures) {
+    temperatureCbs.forEach((cb) => cb(data))
   }
 
   function ok(message?: string): CommandResult {
@@ -105,6 +112,16 @@ export function createDemoAdapter(): MachineService {
         m_pwr: 0,
         m_cur: 0,
         bh_pwr: 30,
+      })
+      emitTemperatures({
+        t_bar_down: 92.5 + (Math.random() - 0.5) * 0.3,
+        t_bar_up: 94.0 + (Math.random() - 0.5) * 0.3,
+        t_bar_md: 93.5 + (Math.random() - 0.5) * 0.3,
+        t_bar_mu: 93.8 + (Math.random() - 0.5) * 0.3,
+        t_ext_1: 22.0 + (Math.random() - 0.5) * 0.5,
+        t_ext_2: 21.5 + (Math.random() - 0.5) * 0.5,
+        t_tube: 82.0 + (Math.random() - 0.5) * 0.3,
+        t_valv: 77.0 + (Math.random() - 0.5) * 0.3,
       })
     }, 500)
   }
@@ -171,6 +188,21 @@ export function createDemoAdapter(): MachineService {
       m_pwr: dp.sensors.motor_power,
       m_cur: dp.sensors.motor_current,
       bh_pwr: dp.sensors.bandheater_power,
+    })
+
+    // Emit temperature data during brew — values drift with slight randomness
+    const brewProgress = state.tick / state.dataPoints.length
+    const tBarDown = 88 + brewProgress * 5 + (Math.random() - 0.5) * 0.4
+    const tBarUp = 92 + brewProgress * 4 + (Math.random() - 0.5) * 0.4
+    emitTemperatures({
+      t_bar_down: tBarDown,
+      t_bar_up: tBarUp,
+      t_bar_md: (tBarDown + tBarUp) / 2,
+      t_bar_mu: tBarUp - (tBarUp - tBarDown) * 0.25,
+      t_ext_1: 22.0 + (Math.random() - 0.5) * 1.0,
+      t_ext_2: 21.5 + (Math.random() - 0.5) * 1.0,
+      t_tube: 80 + brewProgress * 5 + (Math.random() - 0.5) * 0.4,
+      t_valv: 75 + brewProgress * 5 + (Math.random() - 0.5) * 0.4,
     })
 
     state.tick++
@@ -326,8 +358,9 @@ export function createDemoAdapter(): MachineService {
       return () => actuatorCbs.delete(cb)
     },
 
-    onTemperatures(): Unsubscribe {
-      return () => {}
+    onTemperatures(cb: TemperaturesCallback): Unsubscribe {
+      temperatureCbs.add(cb)
+      return () => temperatureCbs.delete(cb)
     },
 
     onHeaterStatus(cb: HeaterStatusCallback): Unsubscribe {
