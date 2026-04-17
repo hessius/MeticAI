@@ -17,9 +17,6 @@ export const STORAGE_KEYS = {
   DESCRIPTION_CACHE: 'meticai-direct-desc-cache',
   POUR_OVER_PREFS: 'meticai-direct-pour-over-prefs',
 
-  // -- Appearance --
-  PLATFORM_THEME: 'meticai-platform-theme',
-
   // -- Machine connection --
   MACHINE_URL: 'meticai-machine-url',
 
