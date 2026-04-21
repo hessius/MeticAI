@@ -895,6 +895,13 @@ async def analyze_and_profile(
             )
             create_elapsed = time.monotonic() - create_start
 
+            # Extract the normalised JSON that was actually sent to the machine.
+            # This is the ground truth for export — it includes all fields the
+            # machine requires (id, author_id, stage keys, limits, dynamics, etc.)
+            normalised_json = None
+            if isinstance(create_result, dict):
+                normalised_json = create_result.pop("_normalised_json", None)
+
             logger.info(
                 "Machine profile creation completed",
                 extra={
@@ -954,12 +961,40 @@ async def analyze_and_profile(
                 }
             )
         
-            # Save to history
+            # Save to history with the normalised (machine-validated) JSON
             history_entry = save_to_history(
                 coffee_analysis=coffee_analysis,
                 user_prefs=user_prefs,
-                reply=reply
+                reply=reply,
+                profile_json_override=normalised_json,
             )
+
+            # Best-effort upgrade: fetch the profile back from the machine
+            # by ID to capture any fields the machine itself added/modified.
+            machine_profile_id = None
+            if isinstance(create_result, dict):
+                machine_profile_id = create_result.get("id")
+            if not machine_profile_id and normalised_json:
+                machine_profile_id = normalised_json.get("id")
+
+            if machine_profile_id and history_entry.get("id"):
+                try:
+                    from services.meticulous_service import fetch_machine_profile_dict
+                    machine_dict = await fetch_machine_profile_dict(machine_profile_id)
+                    if isinstance(machine_dict, dict) and machine_dict.get("name"):
+                        from services.history_service import update_entry_sync_fields, compute_content_hash
+                        update_entry_sync_fields(
+                            history_entry["id"],
+                            content_hash=compute_content_hash(machine_dict),
+                            profile_json=machine_dict,
+                        )
+                except Exception as exc:
+                    # Non-fatal — Layer 1 already stored valid normalised JSON
+                    logger.debug(
+                        "Post-upload profile fetch-back failed (non-fatal): %s",
+                        exc,
+                        extra={"request_id": request_id},
+                    )
 
             progress.emit(ProgressEvent(
                 phase=GenerationPhase.COMPLETE,

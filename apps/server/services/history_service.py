@@ -139,7 +139,8 @@ def save_to_history(
     coffee_analysis: Optional[str],
     user_prefs: Optional[str],
     reply: str,
-    image_preview: Optional[str] = None
+    image_preview: Optional[str] = None,
+    profile_json_override: Optional[dict] = None,
 ) -> dict:
     """Save a generated profile to history.
     
@@ -148,6 +149,10 @@ def save_to_history(
         user_prefs: User preferences provided
         reply: The full LLM reply
         image_preview: Optional base64 image preview (thumbnail)
+        profile_json_override: When provided, store this as the canonical
+            ``profile_json`` instead of parsing from the LLM reply.  This
+            should be the normalised JSON that was actually sent to the
+            machine so exports always match.
         
     Returns:
         The saved history entry
@@ -157,8 +162,11 @@ def save_to_history(
     # Generate a unique ID
     entry_id = str(uuid.uuid4())
     
-    # Extract profile JSON and name
-    profile_json = _extract_profile_json(reply)
+    # Use override when available; fall back to LLM-text extraction
+    if profile_json_override is not None:
+        profile_json = profile_json_override
+    else:
+        profile_json = _extract_profile_json(reply)
     profile_name = _extract_profile_name(reply)
     
     # Create history entry

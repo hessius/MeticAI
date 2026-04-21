@@ -448,7 +448,12 @@ async def async_create_profile(profile_json):
     Normalises the espresso-profile-schema JSON (as produced by the AI model)
     into the machine-compatible format and POSTs it to ``/api/v1/profile/save``,
     following the same approach used by the MCP server's ``create_profile`` tool.
-    
+
+    Returns a dict with keys:
+        - All keys from the machine response (typically ``id``, ``error``, etc.)
+        - ``_normalised_json``: the exact dict that was POSTed to the machine,
+          suitable for storage as the canonical ``profile_json``.
+
     Raises:
         DuplicateProfileNameError: If a profile with the same name already exists.
     """
@@ -493,7 +498,11 @@ async def async_create_profile(profile_json):
         )
     response.raise_for_status()
     invalidate_profile_list_cache()
-    return response.json()
+
+    result = response.json()
+    if isinstance(result, dict):
+        result["_normalised_json"] = normalised
+    return result
 
 
 @_wrap_machine_call
@@ -608,6 +617,24 @@ async def async_get_profile(profile_id: str):
     api = get_meticulous_api()
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, api.get_profile, profile_id)
+
+
+@_wrap_machine_call
+async def fetch_machine_profile_dict(profile_id: str) -> Dict[str, Any]:
+    """Fetch a profile from the machine by ID via raw HTTP and return as dict.
+
+    Uses ``/api/v1/profile/get/{id}`` directly so the result is exactly
+    the JSON the machine stores — no SDK object conversion, no lost fields.
+    This is the canonical representation used for export.
+    """
+    base_url = _resolve_meticulous_base_url()
+    client = _get_http_client()
+    response = await client.get(
+        f"{base_url}/api/v1/profile/get/{profile_id}",
+        timeout=15.0,
+    )
+    response.raise_for_status()
+    return response.json()
 
 
 @_wrap_machine_call
