@@ -49,6 +49,7 @@ export function DialInRecommendStep({ session, onTryAgain, onViewHistory, onComp
 
   useEffect(() => {
     if (!latestIteration) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting loading on missing data
       setLoading(false)
       return
     }

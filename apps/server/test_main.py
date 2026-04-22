@@ -4134,21 +4134,19 @@ class TestMachineProfilesEndpoint:
 class TestMachineProfileJsonEndpoint:
     """Tests for the /api/machine/profile/{profile_id}/json endpoint."""
 
-    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
-    def test_get_profile_json_success(self, mock_get_profile, client):
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_get_profile_json_success(self, mock_fetch, client):
         """Test successful profile JSON retrieval."""
-        # Mock profile object with various attributes
-        mock_profile = MagicMock()
-        mock_profile.id = "profile-123"
-        mock_profile.name = "Test Profile"
-        mock_profile.author = "Barista Joe"
-        mock_profile.temperature = 93.0
-        mock_profile.final_weight = 36.0
-        mock_profile.stages = [{"name": "preinfusion"}]
-        mock_profile.variables = {"key": "value"}
-        mock_profile.error = None
-        
-        mock_get_profile.return_value = mock_profile
+        machine_json = {
+            "id": "profile-123",
+            "name": "Test Profile",
+            "author": "Barista Joe",
+            "temperature": 93.0,
+            "final_weight": 36.0,
+            "stages": [{"name": "preinfusion"}],
+            "variables": [{"key": "value"}],
+        }
+        mock_fetch.return_value = machine_json
         
         response = client.get("/api/machine/profile/profile-123/json")
         
@@ -4160,33 +4158,25 @@ class TestMachineProfileJsonEndpoint:
         assert data["profile"]["author"] == "Barista Joe"
         assert data["profile"]["temperature"] == 93.0
 
-    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
-    def test_get_profile_json_api_error(self, mock_get_profile, client):
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_get_profile_json_api_error(self, mock_fetch, client):
         """Test error handling when machine API fails."""
-        mock_result = MagicMock()
-        mock_result.error = "Profile not found"
-        mock_get_profile.return_value = mock_result
+        mock_fetch.side_effect = Exception("Profile not found")
         
         response = client.get("/api/machine/profile/invalid-id/json")
         
         assert response.status_code == 502
         assert "Machine API error" in response.json()["detail"]
 
-    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
-    def test_get_profile_json_nested_objects(self, mock_get_profile, client):
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_get_profile_json_nested_objects(self, mock_fetch, client):
         """Test handling of nested objects in profile."""
-        # Create mock profile with nested object using simple class
-        mock_profile = type('Profile', (), {})()
-        mock_profile.id = "profile-456"
-        mock_profile.name = "Complex Profile"
-        mock_profile.error = None
-        
-        # Create nested display object
-        nested_obj = type('Display', (), {})()
-        nested_obj.nested_key = "nested_value"
-        mock_profile.display = nested_obj
-        
-        mock_get_profile.return_value = mock_profile
+        machine_json = {
+            "id": "profile-456",
+            "name": "Complex Profile",
+            "display": {"nested_key": "nested_value"},
+        }
+        mock_fetch.return_value = machine_json
         
         response = client.get("/api/machine/profile/profile-456/json")
         
@@ -4194,22 +4184,18 @@ class TestMachineProfileJsonEndpoint:
         data = response.json()
         assert "display" in data["profile"]
 
-    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
-    def test_get_profile_json_list_of_objects(self, mock_get_profile, client):
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_get_profile_json_list_of_objects(self, mock_fetch, client):
         """Test handling of list of objects in profile."""
-        stage1 = MagicMock()
-        stage1.__dict__ = {"name": "preinfusion", "duration": 5}
-        
-        stage2 = MagicMock()
-        stage2.__dict__ = {"name": "extraction", "duration": 25}
-        
-        mock_profile = MagicMock()
-        mock_profile.id = "profile-789"
-        mock_profile.name = "Multi-Stage Profile"
-        mock_profile.stages = [stage1, stage2]
-        mock_profile.error = None
-        
-        mock_get_profile.return_value = mock_profile
+        machine_json = {
+            "id": "profile-789",
+            "name": "Multi-Stage Profile",
+            "stages": [
+                {"name": "preinfusion", "duration": 5},
+                {"name": "extraction", "duration": 25},
+            ],
+        }
+        mock_fetch.return_value = machine_json
         
         response = client.get("/api/machine/profile/profile-789/json")
         
@@ -4218,14 +4204,14 @@ class TestMachineProfileJsonEndpoint:
         assert len(data["profile"]["stages"]) == 2
         assert data["profile"]["stages"][0]["name"] == "preinfusion"
 
-    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
-    def test_get_profile_json_exception(self, mock_get_profile, client):
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_get_profile_json_exception(self, mock_fetch, client):
         """Test handling of unexpected exceptions."""
-        mock_get_profile.side_effect = Exception("Unexpected error")
+        mock_fetch.side_effect = Exception("Unexpected error")
         
         response = client.get("/api/machine/profile/error-id/json")
         
-        assert response.status_code == 500
+        assert response.status_code == 502
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     def test_get_profile_json_merges_synthesized_variables(self, mock_get_profile, client):
@@ -13068,11 +13054,17 @@ class TestProfileSync:
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.profiles.update_entry_sync_fields')
     @patch('api.routes.profiles.load_history')
-    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
-    def test_accept_sync_update(self, mock_get, mock_history, mock_update, client):
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_accept_sync_update(self, mock_fetch, mock_history, mock_update, client):
         """POST /api/profiles/sync/accept/{id} updates history entry."""
-        profile = self._make_mock_profile()
-        mock_get.return_value = profile
+        machine_json = {
+            "id": "prof-1",
+            "name": "TestProfile",
+            "author": "MeticAI",
+            "stages": [],
+            "variables": [],
+        }
+        mock_fetch.return_value = machine_json
         mock_history.return_value = [{
             "id": "entry-1",
             "profile_name": "TestProfile",
@@ -13090,11 +13082,16 @@ class TestProfileSync:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch('api.routes.profiles.load_history')
-    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
-    def test_accept_sync_update_not_found(self, mock_get, mock_history, client):
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_accept_sync_update_not_found(self, mock_fetch, mock_history, client):
         """Accept returns 404 when no matching history entry exists."""
-        profile = self._make_mock_profile(name="Unknown")
-        mock_get.return_value = profile
+        machine_json = {
+            "id": "prof-1",
+            "name": "Unknown",
+            "author": "MeticAI",
+            "stages": [],
+        }
+        mock_fetch.return_value = machine_json
         mock_history.return_value = []
 
         response = client.post("/api/profiles/sync/accept/prof-1")
@@ -14150,3 +14147,249 @@ class TestImportFromUrl:
         assert "entry_id" in data
         mock_save.assert_called_once()
         mock_create.assert_called_once()
+
+# ─── Profile Export JSON Fix Tests ──────────────────────────────────────────
+
+
+class TestSaveToHistoryOverride:
+    """Tests for the profile_json_override parameter in save_to_history()."""
+
+    @patch('services.history_service.save_history')
+    @patch('services.history_service.load_history', return_value=[])
+    def test_override_used_when_provided(self, mock_load, mock_save):
+        """When profile_json_override is provided, it should be stored instead of LLM-parsed JSON."""
+        override = {"name": "Override Profile", "id": "test-uuid", "stages": []}
+        reply = "**Profile Created:** Test\n```json\n{\"name\": \"LLM Version\"}\n```"
+
+        entry = save_to_history(
+            coffee_analysis="test",
+            user_prefs="test prefs",
+            reply=reply,
+            profile_json_override=override,
+        )
+
+        assert entry["profile_json"] == override
+        assert entry["profile_json"]["name"] == "Override Profile"
+        # Verify it was saved
+        saved_history = mock_save.call_args[0][0]
+        assert saved_history[0]["profile_json"] == override
+
+    @patch('services.history_service.save_history')
+    @patch('services.history_service.load_history', return_value=[])
+    def test_fallback_to_llm_parsing_without_override(self, mock_load, mock_save):
+        """Without override, should fall back to LLM text extraction."""
+        reply = '**Profile Created:** Test\n```json\n{"name": "LLM Version"}\n```'
+
+        entry = save_to_history(
+            coffee_analysis="test",
+            user_prefs="test prefs",
+            reply=reply,
+        )
+
+        assert entry["profile_json"] is not None
+        assert entry["profile_json"]["name"] == "LLM Version"
+
+
+class TestAsyncCreateProfileReturnsNormalized:
+    """Tests that async_create_profile() returns _normalised_json in its result."""
+
+    @patch.dict(os.environ, {"METICULOUS_IP": "192.168.1.100"})
+    @patch('services.meticulous_service._get_http_client')
+    def test_create_profile_includes_normalised_json(self, mock_http_factory):
+        """The result dict from async_create_profile should include _normalised_json."""
+        from services.meticulous_service import async_create_profile
+
+        # Mock the httpx AsyncClient
+        mock_client = AsyncMock()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "returned-id", "name": "Test"}
+        mock_client.post.return_value = mock_response
+        mock_http_factory.return_value = mock_client
+
+        profile_json = {
+            "name": "Test Profile",
+            "stages": [{"type": "flow", "dynamics": {"points": [[0, 3]], "interpolation": "linear"}, "exit_triggers": []}],
+        }
+
+        result = asyncio.run(
+            async_create_profile(profile_json)
+        )
+
+        # The result should contain _normalised_json with machine-ready fields
+        assert "_normalised_json" in result
+        normalised = result["_normalised_json"]
+        assert "id" in normalised
+        assert normalised.get("author") == "MeticAI"
+        assert "author_id" in normalised
+        assert isinstance(normalised.get("variables"), list)
+
+
+class TestFetchMachineProfileDict:
+    """Tests for the fetch_machine_profile_dict helper."""
+
+    @patch.dict(os.environ, {"METICULOUS_IP": "192.168.1.100"})
+    @patch('services.meticulous_service._get_http_client')
+    def test_returns_dict_from_machine(self, mock_http_factory):
+        """fetch_machine_profile_dict should return a proper dict from the machine API."""
+        from services.meticulous_service import fetch_machine_profile_dict
+
+        machine_json = {
+            "id": "abc-123",
+            "name": "Machine Profile",
+            "author": "MeticAI",
+            "stages": [],
+        }
+        mock_client = AsyncMock()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = machine_json
+        mock_client.get.return_value = mock_response
+        mock_http_factory.return_value = mock_client
+
+        result = asyncio.run(
+            fetch_machine_profile_dict("abc-123")
+        )
+
+        assert result == machine_json
+        assert result["name"] == "Machine Profile"
+
+    @patch.dict(os.environ, {"METICULOUS_IP": "192.168.1.100"})
+    @patch('services.meticulous_service._get_http_client')
+    def test_raises_on_not_found(self, mock_http_factory):
+        """fetch_machine_profile_dict should raise on 404."""
+        from services.meticulous_service import fetch_machine_profile_dict
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.text = "Not found"
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "404 Not Found", request=Mock(), response=mock_response
+        )
+        mock_client.get.return_value = mock_response
+        mock_http_factory.return_value = mock_client
+
+        with pytest.raises(httpx.HTTPStatusError):
+            asyncio.run(
+                fetch_machine_profile_dict("nonexistent")
+            )
+
+
+class TestProfileExportEndpoint:
+    """Tests for the fixed /api/machine/profile/{id}/json endpoint."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    def test_export_returns_raw_machine_json(self, mock_fetch, client):
+        """The export endpoint should return JSON fetched directly from the machine."""
+        machine_json = {
+            "id": "prof-1",
+            "name": "Exported Profile",
+            "author": "MeticAI",
+            "author_id": "uuid-123",
+            "stages": [{"key": "stage-0-flow", "type": "flow"}],
+            "variables": [],
+        }
+        mock_fetch.return_value = machine_json
+
+        response = client.get("/api/machine/profile/prof-1/json")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile"] == machine_json
+        assert data["status"] == "success"
+        mock_fetch.assert_called_once_with("prof-1")
+
+
+class TestRepairEndpoint:
+    """Tests for the /api/profiles/repair endpoint."""
+
+    def _make_mock_profile(self, name="TestProfile", pid="prof-1"):
+        profile = Mock()
+        profile.id = pid
+        profile.name = name
+        profile.error = None
+        return profile
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.update_entry_sync_fields')
+    @patch('api.routes.profiles.fetch_machine_profile_dict', new_callable=AsyncMock)
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_repair_fetches_from_machine(self, mock_list, mock_history, mock_fetch, mock_update, client):
+        """Entries with machine matches should be repaired with canonical JSON."""
+        profile = self._make_mock_profile()
+        mock_list.return_value = [profile]
+
+        mock_history.return_value = [{
+            "id": "entry-1",
+            "profile_name": "TestProfile",
+            "profile_json": {"name": "TestProfile", "stages": []},
+        }]
+
+        canonical = {
+            "id": "prof-1",
+            "name": "TestProfile",
+            "author": "MeticAI",
+            "author_id": "uuid-1",
+            "stages": [],
+            "variables": [],
+        }
+        mock_fetch.return_value = canonical
+
+        response = client.post("/api/profiles/repair")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["repaired_from_machine"] == 1
+        assert data["normalized_locally"] == 0
+        assert data["errors"] == 0
+
+        mock_fetch.assert_called_once_with("prof-1")
+        mock_update.assert_called_once()
+        call_kwargs = mock_update.call_args
+        assert call_kwargs[1]["profile_json"] == canonical
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.update_entry_sync_fields')
+    @patch('api.routes.profiles._normalize_profile_for_machine')
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_repair_normalizes_orphaned_entries(self, mock_list, mock_history, mock_normalize, mock_update, client):
+        """Entries without a machine match should be re-normalized locally."""
+        mock_list.return_value = []  # No machine profiles
+
+        mock_history.return_value = [{
+            "id": "entry-orphan",
+            "profile_name": "DeletedProfile",
+            "profile_json": {"name": "DeletedProfile", "stages": []},
+        }]
+
+        normalized = {"name": "DeletedProfile", "id": "new-uuid", "stages": [], "variables": []}
+        mock_normalize.return_value = normalized
+
+        response = client.post("/api/profiles/repair")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["repaired_from_machine"] == 0
+        assert data["normalized_locally"] == 1
+        assert data["errors"] == 0
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch('api.routes.profiles.load_history')
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    def test_repair_skips_entries_without_json(self, mock_list, mock_history, client):
+        """Entries with no profile_json should be skipped."""
+        mock_list.return_value = []
+
+        mock_history.return_value = [{
+            "id": "entry-no-json",
+            "profile_name": "NoJson",
+        }]
+
+        response = client.post("/api/profiles/repair")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["skipped_no_json"] == 1
+        assert data["repaired_from_machine"] == 0
+        assert data["normalized_locally"] == 0

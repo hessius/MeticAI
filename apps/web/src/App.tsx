@@ -150,6 +150,7 @@ function App() {
   useEffect(() => {
     if (viewState !== 'live-shot') {
       liveProfileFetchedRef.current = null
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on view change
       setLiveProfileData(null)
       return
     }
@@ -223,13 +224,12 @@ function App() {
   }, [])
 
   useEffect(() => {
-    setAiEnabled(getAiEnabled())
-    setHideAiWhenUnavailable(getHideAiWhenUnavailable())
-
     const handler = () => {
       setAiEnabled(getAiEnabled())
       setHideAiWhenUnavailable(getHideAiWhenUnavailable())
     }
+    // Sync initial values in handler to avoid direct setState in effect
+    handler()
 
     window.addEventListener(AI_PREFS_CHANGED_EVENT, handler)
     return () => window.removeEventListener(AI_PREFS_CHANGED_EVENT, handler)

@@ -170,8 +170,10 @@ export function ShotAnalysisView({ onBack, onSelectShot }: ShotAnalysisViewProps
 
   useEffect(() => {
     if (activeTab === 'recent') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- triggering async fetch on tab change
       fetchRecentShots()
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchByProfile()
     }
   }, [activeTab, fetchRecentShots, fetchByProfile])

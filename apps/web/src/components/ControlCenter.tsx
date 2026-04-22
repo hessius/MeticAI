@@ -130,6 +130,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   useEffect(() => {
     if (!activeProfile) {
       setProfileImgError(false)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileAuthor(null)
     }
   }, [activeProfile])

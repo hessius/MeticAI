@@ -896,6 +896,13 @@ async def analyze_and_profile(
             )
             create_elapsed = time.monotonic() - create_start
 
+            # Extract the normalised JSON that was actually sent to the machine.
+            # This is the ground truth for export — it includes all fields the
+            # machine requires (id, author_id, stage keys, limits, dynamics, etc.)
+            normalised_json = None
+            if isinstance(create_result, dict):
+                normalised_json = create_result.pop("_normalised_json", None)
+
             logger.info(
                 "Machine profile creation completed",
                 extra={
@@ -955,35 +962,38 @@ async def analyze_and_profile(
                 }
             )
         
-            # Save to history
+            # Save to history with the normalised (machine-validated) JSON
             history_entry = save_to_history(
                 coffee_analysis=coffee_analysis,
                 user_prefs=user_prefs,
-                reply=reply
+                reply=reply,
+                profile_json_override=normalised_json,
             )
 
-            # Update content_hash from the machine's representation so that
-            # sync detection compares against what the machine actually stores.
-            entry_id = history_entry.get("id")
-            profile_name_for_hash = profile_json_check.get("name") if isinstance(profile_json_check, dict) else None
-            if entry_id and profile_name_for_hash:
+            # Best-effort upgrade: fetch the profile back from the machine
+            # by ID to capture any fields the machine itself added/modified.
+            machine_profile_id = None
+            if isinstance(create_result, dict):
+                machine_profile_id = create_result.get("id")
+            if not machine_profile_id and normalised_json:
+                machine_profile_id = normalised_json.get("id")
+
+            if machine_profile_id and history_entry.get("id"):
                 try:
-                    machine_profiles = await async_list_profiles()
-                    for mp in (machine_profiles or []):
-                        if getattr(mp, "name", None) == profile_name_for_hash:
-                            full_mp = await async_get_profile(getattr(mp, "id", ""))
-                            machine_dict = deep_convert_to_dict(full_mp)
-                            machine_hash = compute_content_hash(machine_dict)
-                            update_entry_sync_fields(
-                                entry_id,
-                                content_hash=machine_hash,
-                                profile_json=machine_dict,
-                            )
-                            break
-                except Exception as hash_exc:
-                    logger.warning(
-                        "Could not update content_hash from machine: %s",
-                        hash_exc,
+                    from services.meticulous_service import fetch_machine_profile_dict
+                    machine_dict = await fetch_machine_profile_dict(machine_profile_id)
+                    if isinstance(machine_dict, dict) and machine_dict.get("name"):
+                        from services.history_service import update_entry_sync_fields, compute_content_hash
+                        update_entry_sync_fields(
+                            history_entry["id"],
+                            content_hash=compute_content_hash(machine_dict),
+                            profile_json=machine_dict,
+                        )
+                except Exception as exc:
+                    # Non-fatal — Layer 1 already stored valid normalised JSON
+                    logger.debug(
+                        "Post-upload profile fetch-back failed (non-fatal): %s",
+                        exc,
                         extra={"request_id": request_id},
                     )
 

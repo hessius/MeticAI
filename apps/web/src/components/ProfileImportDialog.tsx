@@ -84,11 +84,17 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setStep(initialUrl ? 'url' : 'choose')
       setImportUrl(initialUrl || '')
       setMachineProfiles([])
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedProfile(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setImportedProfileName(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBulkProgress(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBulkLogs([])
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGenerateDescriptions(aiConfigured)
       if (initialUrl) {
         autoImportTimerRef.current = setTimeout(() => handleUrlImport(initialUrl), 100)

@@ -1,4 +1,4 @@
-fastapi==0.135.3
+fastapi==0.136.0
 uvicorn==0.44.0
 google-genai>=1.0.0
 pillow>=10.3.0

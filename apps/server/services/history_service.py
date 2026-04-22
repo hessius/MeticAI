@@ -3,6 +3,7 @@
 import hashlib
 import json
 import re
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,11 @@ from utils.sanitization import clean_profile_name
 logger = get_logger()
 
 HISTORY_FILE = DATA_DIR / "profile_history.json"
+
+# Reentrant lock shared across all history mutations (load-modify-save cycles).
+# Importers (e.g. profiles.py, coffee.py) may acquire this lock externally
+# while also calling helpers that acquire it internally — RLock allows that.
+_history_lock = threading.RLock()
 
 # In-memory cache (loaded from disk on first access, write-through on save)
 _history_cache: Optional[list] = None
@@ -139,7 +145,8 @@ def save_to_history(
     coffee_analysis: Optional[str],
     user_prefs: Optional[str],
     reply: str,
-    image_preview: Optional[str] = None
+    image_preview: Optional[str] = None,
+    profile_json_override: Optional[dict] = None,
 ) -> dict:
     """Save a generated profile to history.
     
@@ -148,6 +155,10 @@ def save_to_history(
         user_prefs: User preferences provided
         reply: The full LLM reply
         image_preview: Optional base64 image preview (thumbnail)
+        profile_json_override: When provided, store this as the canonical
+            ``profile_json`` instead of parsing from the LLM reply.  This
+            should be the normalised JSON that was actually sent to the
+            machine so exports always match.
         
     Returns:
         The saved history entry
@@ -157,9 +168,13 @@ def save_to_history(
     # Generate a unique ID
     entry_id = str(uuid.uuid4())
     
-    # Extract profile JSON and name
-    profile_json = _extract_profile_json(reply)
-    profile_name = _extract_profile_name(reply)
+    # Use override when available; fall back to LLM-text extraction
+    if profile_json_override is not None:
+        profile_json = profile_json_override
+        profile_name = profile_json_override.get("name") or _extract_profile_name(reply)
+    else:
+        profile_json = _extract_profile_json(reply)
+        profile_name = _extract_profile_name(reply)
     
     # Create history entry
     entry = {
@@ -266,30 +281,32 @@ def update_entry_sync_fields(
     """Update sync-related fields on a history entry.
 
     Any keyword argument that is not ``None`` will be written to the entry.
+    Thread-safe: acquires ``_history_lock`` internally.
 
     Returns:
         The updated entry, or ``None`` if not found.
     """
-    history = load_history()
+    with _history_lock:
+        history = load_history()
 
-    for entry in history:
-        if entry.get("id") == entry_id:
-            if content_hash is not None:
-                entry["content_hash"] = content_hash
-            if machine_updated_at is not None:
-                entry["machine_updated_at"] = machine_updated_at
-            if profile_json is not None:
-                entry["profile_json"] = profile_json
-            if reply is not None:
-                entry["reply"] = reply
+        for entry in history:
+            if entry.get("id") == entry_id:
+                if content_hash is not None:
+                    entry["content_hash"] = content_hash
+                if machine_updated_at is not None:
+                    entry["machine_updated_at"] = machine_updated_at
+                if profile_json is not None:
+                    entry["profile_json"] = profile_json
+                if reply is not None:
+                    entry["reply"] = reply
 
-            save_history(history)
+                save_history(history)
 
-            logger.info(
-                f"Updated sync fields for history entry: {entry.get('profile_name', entry_id)}",
-                extra={"entry_id": entry_id, "has_hash": content_hash is not None},
-            )
-            return entry
+                logger.info(
+                    f"Updated sync fields for history entry: {entry.get('profile_name', entry_id)}",
+                    extra={"entry_id": entry_id, "has_hash": content_hash is not None},
+                )
+                return entry
 
-    logger.warning(f"History entry not found for sync update: {entry_id}")
-    return None
+        logger.warning(f"History entry not found for sync update: {entry_id}")
+        return None

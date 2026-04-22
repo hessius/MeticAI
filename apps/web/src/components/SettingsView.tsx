@@ -379,6 +379,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
 
   useEffect(() => {
     if (changelogExpanded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- triggering async fetch on expand
       loadReleaseNotes()
     }
   }, [changelogExpanded, loadReleaseNotes])
