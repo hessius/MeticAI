@@ -1,5 +1,5 @@
 #!/bin/bash
-# install-direct.sh — Install MeticAI Direct Mode PWA on a Meticulous machine
+# install-direct.sh — Install Metic Direct Mode PWA on a Meticulous machine
 #
 # TODO(release): Before merging to main, update the GitHub download URLs
 #   to point to the release tarball instead of CI artifacts, and remove
@@ -7,7 +7,7 @@
 #
 # Usage (auto-download from GitHub):
 #   python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
-#     https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install-direct.sh | bash
+#     https://raw.githubusercontent.com/hessius/Metic/main/scripts/install-direct.sh | bash
 #
 # Usage (manual — build locally and SCP):
 #   # On your dev machine:
@@ -67,7 +67,7 @@ download() {
 }
 
 echo "╔══════════════════════════════════════════╗"
-echo "║   MeticAI PWA Installer                  ║"
+echo "║   Metic PWA Installer                  ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
@@ -98,7 +98,7 @@ if [ -n "$LOCAL_TARBALL" ]; then
   echo "Using local tarball: ${LOCAL_TARBALL}"
 elif [ "$METICAI_VERSION" = "latest" ]; then
   echo "Resolving latest release..."
-  RELEASE_URL=$(fetch https://api.github.com/repos/hessius/MeticAI/releases/latest \
+  RELEASE_URL=$(fetch https://api.github.com/repos/hessius/Metic/releases/latest \
     | grep "browser_download_url.*meticai-web.tar.gz" | head -1 | cut -d'"' -f4)
   if [ -z "$RELEASE_URL" ]; then
     echo "ERROR: Could not find meticai-web.tar.gz in latest release"
@@ -173,7 +173,7 @@ if [ -f "$WEB_UI" ]; then
     echo "  ✓ Tornado route already configured"
   else
     echo "  Patching ${WEB_UI}..."
-    # Insert MeticAI routes before the closing bracket of WEB_UI_HANDLER
+    # Insert Metic routes before the closing bracket of WEB_UI_HANDLER
     # Find the last line of WEB_UI_HANDLER array and append before it
     cp "$WEB_UI" "${WEB_UI}.bak"
     python3 -c "
@@ -227,7 +227,7 @@ if [ -f "$WEB_UI" ] && grep -q '/meticai' "$WEB_UI"; then
 fi
 
 echo ""
-echo "── Access MeticAI ──────────────────────────"
+echo "── Access Metic ──────────────────────────"
 echo ""
 echo "  http://$(hostname).local:8080/meticai/"
 echo ""

@@ -1,4 +1,4 @@
-# MeticAI Project Conventions
+# Metic Project Conventions
 
 > **This is the single source of truth for all project rules and conventions.**
 > All agent configuration files (CLAUDE.md, AGENTS.md, GEMINI.md, copilot-instructions.md) reference this document.
@@ -142,5 +142,5 @@ cd ../web && bun run lint && bun run test:run && bun run build
 
 ---
 
-*Last updated: 2026-03-11 | Maintained by the MeticAI team and AI agents*
+*Last updated: 2026-03-11 | Maintained by the Metic team and AI agents*
 *To add a new convention, use the `learn_convention` extension tool or edit this file directly.*

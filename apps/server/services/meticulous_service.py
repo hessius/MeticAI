@@ -344,7 +344,7 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
             existing_id = ""
     if not existing_id:
         data["id"] = str(uuid.uuid4())
-    data.setdefault("author", "MeticAI")
+    data.setdefault("author", "Metic")
     if "author_id" not in data or not data["author_id"]:
         data["author_id"] = str(uuid.uuid4())
     data.setdefault("temperature", 90.0)

@@ -73,9 +73,9 @@ test.describe('v2.0.0 Task Verification', () => {
   // -----------------------------------------------------------------
   // Basic app loading
   // -----------------------------------------------------------------
-  test('homepage loads and renders MeticAI', async ({ page }) => {
+  test('homepage loads and renders Metic', async ({ page }) => {
     await page.goto('/')
-    // The app should render something with "MeticAI" or "Meticulous"
+    // The app should render something with "Metic" or "Meticulous"
     await expect(page.locator('body')).toContainText(/Metic/i)
   })
 

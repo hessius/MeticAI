@@ -80,10 +80,10 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: MeticAI v${{ steps.version.outputs.version }}
+          name: Metic v${{ steps.version.outputs.version }}
           files: meticai-web.tar.gz
           body: |
-            ## MeticAI v${{ steps.version.outputs.version }}
+            ## Metic v${{ steps.version.outputs.version }}
             
             ### What's Changed
             ${{ steps.changelog.outputs.changelog }}

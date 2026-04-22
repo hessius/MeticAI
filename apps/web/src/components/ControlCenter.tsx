@@ -118,9 +118,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const isConnected = machineState.connected ?? false
 
   // Build the profile image URL when active_profile changes
-  // Suppress MeticAI-managed temp profiles — they're transient and deleted after cleanup.
+  // Suppress Metic-managed temp profiles — they're transient and deleted after cleanup.
   const activeProfile = (machineState.active_profile &&
-    !machineState.active_profile.startsWith('MeticAI '))
+    !machineState.active_profile.startsWith('Metic '))
     ? machineState.active_profile : null
 
   // Resolve profile image URL (works in both proxy and direct/Capacitor modes)

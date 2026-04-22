@@ -1,4 +1,4 @@
-# MeticAI v2.0 — API Reference
+# Metic v2.0 — API Reference
 
 ## Base URL
 
@@ -7,7 +7,7 @@ http://<SERVER_IP>:3550/api
 ```
 
 All endpoints are served via nginx on port **3550**. The `/api` prefix is required.
-Container name: `meticai`. Interactive docs: `http://<SERVER_IP>:3550/docs`
+Container name: `metic`. Interactive docs: `http://<SERVER_IP>:3550/docs`
 
 ---
 
@@ -240,10 +240,10 @@ curl "http://<SERVER_IP>:3550/api/logs?lines=200&level=ERROR"
 
 ```bash
 # Check container is running
-docker ps | grep meticai
+docker ps | grep metic
 
 # View logs
-docker logs meticai -f
+docker logs metic -f
 
 # Test connectivity
 curl http://<SERVER_IP>:3550/health

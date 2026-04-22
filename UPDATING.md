@@ -1,9 +1,9 @@
-# 🔄 Updating MeticAI
+# 🔄 Updating Metic
 
 ## Quick Update (v2.x)
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose pull
 docker compose up -d
 ```
@@ -12,7 +12,7 @@ That's it. Your data and settings are preserved.
 
 ## Automatic Updates with Watchtower
 
-If you enabled Watchtower during installation, MeticAI checks for updates every 6 hours and updates automatically. No action needed.
+If you enabled Watchtower during installation, Metic checks for updates every 6 hours and updates automatically. No action needed.
 
 **Check if Watchtower is running:**
 
@@ -23,17 +23,17 @@ docker ps | grep watchtower
 **Enable Watchtower on an existing installation:**
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
 ```
 
 ## When Auto-Update Didn't Work
 
-If your MeticAI instance is outdated and Watchtower didn't update it (or you don't have Watchtower), try these options in order:
+If your Metic instance is outdated and Watchtower didn't update it (or you don't have Watchtower), try these options in order:
 
 ### Option A: Update from the Web UI
 
-1. Open MeticAI in your browser (`http://<server-ip>:3550`)
+1. Open Metic in your browser (`http://<server-ip>:3550`)
 2. Go to **Settings**
 3. Look for the update notification or version info
 4. Click **Check for Updates** / **Update** if available
@@ -41,7 +41,7 @@ If your MeticAI instance is outdated and Watchtower didn't update it (or you don
 ### Option B: Run `update.sh`
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 ./update.sh
 ```
 
@@ -50,7 +50,7 @@ This script pulls the latest image and restarts containers. It also handles v1.x
 ### Option C: Manual Pull
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose pull
 docker compose up -d
 ```
@@ -72,14 +72,14 @@ docker compose ${COMPOSE_FILES} up -d
 
 ## Migrating from v1.x to v2.0
 
-MeticAI v2.0 is a complete rewrite — from multiple containers to a single unified container. Migration is handled automatically in most cases.
+Metic v2.0 is a complete rewrite — from multiple containers to a single unified container. Migration is handled automatically in most cases.
 
 ### Automatic Migration (Recommended)
 
 If you installed v1.x via `git clone`:
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 git pull
 ./update.sh
 ```
@@ -98,20 +98,20 @@ If automatic migration fails or you prefer a clean start:
 
 ```bash
 # 1. Back up your config
-cp ~/MeticAI/.env ~/meticai-backup.env
+cp ~/Metic/.env ~/metic-backup.env
 
 # 2. Remove old installation
-cd ~/MeticAI
+cd ~/Metic
 docker compose down -v
-cd ~ && rm -rf MeticAI
+cd ~ && rm -rf Metic
 
 # 3. Fresh install
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
 
 # 4. Or clone and start manually
 git clone https://github.com/hessius/MeticAI.git
-cd MeticAI
-cp ~/meticai-backup.env .env
+cd Metic
+cp ~/metic-backup.env .env
 docker compose up -d
 ```
 

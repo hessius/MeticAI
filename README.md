@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="resources/logo.png" alt="MeticAI Logo" width="200" />
+<img src="resources/logo.png" alt="Metic Logo" width="200" />
 
-# MeticAI
+# Metic
 
-### Your AI Barista Coach for the Meticulous Espresso Machine
+### All-in-one toolkit for the Meticulous Espresso Machine
 
 *Create, profile and understand your espresso.*
 *1. Take a photo or describe your coffee. Get a perfect espresso profile. Automatically.*
@@ -16,11 +16,11 @@
 
 ---
 
-## 🎯 What is MeticAI?
+## 🎯 What is Metic?
 
 When I got my Meticulous, after a loooong wait, I was overwhelmed with the options — dialing in was no longer just adjusting grind size, the potential was (and is) basically limitless — my knowledge and time not so.
 
-**MeticAI** is a growing set of AI tools to help you get the most out of your Meticulous Espresso machine. Among other things it lets you:
+**Metic** is a growing set of AI tools to help you get the most out of your Meticulous Espresso machine. Among other things it lets you:
 
 - 🧠 **Automatically create espresso profiles** tailored to your preferences and coffee at hand
 - 📊 **Understand your espresso profiles and shot data** like never before
@@ -59,7 +59,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 ### What You Need
 - ☑️ A **Meticulous Espresso Machine** (connected to your network)
-- ☑️ A server to run MeticAI (Raspberry Pi, Mac, Linux, or Windows with Docker)
+- ☑️ A server to run Metic (Raspberry Pi, Mac, Linux, or Windows with Docker)
 - ☑️ A **free Google Gemini API key** → [Get yours here](https://aistudio.google.com/app/apikey) (takes 30 seconds)
 
 ### Installation (5 minutes)
@@ -70,7 +70,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 **Quick Install:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
 ```
 
 **Docker:**
@@ -80,7 +80,7 @@ docker pull ghcr.io/hessius/meticai:v2.0.6
 
 **Upgrading from v1.x:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/migrate-to-unified.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/migrate-to-unified.sh | bash
 ```
 
 
@@ -101,11 +101,11 @@ Open `http://YOUR_SERVER_IP:3550` in any browser to access the web interface!
 - 📱 [iOS Shortcuts](IOS_SHORTCUTS.md)
 - 🔧 [Troubleshooting](#-troubleshooting)
 
-## 📱 Using MeticAI
+## 📱 Using Metic
 
 ### Web Interface (Recommended)
 
-The web interface is the easiest and most powerful way to use MeticAI. Simply open `http://YOUR_SERVER_IP:3550` in any browser.
+The web interface is the easiest and most powerful way to use Metic. Simply open `http://YOUR_SERVER_IP:3550` in any browser.
 
 **Create a profile in 3 steps:**
 1. **Upload a photo** of your coffee bag, or **describe what you want** - like "bold and chocolatey" or "light and fruity"
@@ -147,7 +147,7 @@ For power users who want one-tap brewing from their iPhone, you can create custo
 
 ## 🎛️ Control Center
 
-MeticAI includes a real-time Control Center powered by the [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT bridge:
+Metic includes a real-time Control Center powered by the [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT bridge:
 
 - **Live telemetry** — Real-time pressure, flow, weight, and temperature gauges
 - **Machine control** — Preheat, tare, purge, abort, brightness, sounds, and more
@@ -162,19 +162,19 @@ The Control Center appears as a side panel on desktop and a full page on mobile.
 
 When the MQTT bridge is enabled, your Meticulous machine is automatically discoverable in Home Assistant.
 
-1. Start MeticAI with the Home Assistant overlay:
+1. Start Metic with the Home Assistant overlay:
    ```bash
    docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
    ```
-2. In HA, add the **MQTT** integration and point it to your MeticAI server's IP on port 1883
+2. In HA, add the **MQTT** integration and point it to your Metic server's IP on port 1883
 3. This enables automations like "notify me when my shot is done" or "preheat at 7am on weekdays"
 
 [→ Full Home Assistant integration guide](HOME_ASSISTANT.md)
 
-## 🔄 Updating MeticAI
+## 🔄 Updating Metic
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose pull
 docker compose up -d
 ```
@@ -188,57 +188,57 @@ You can enable or disable optional addons at any time (Watchtower, Tailscale, Ho
 Linux/macOS:
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 bash scripts/addons.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-cd $HOME/MeticAI
+cd $HOME/Metic
 powershell -ExecutionPolicy Bypass -File .\scripts\addons.ps1
 ```
 
 Remote one-liner (Linux/macOS):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/addons.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/addons.sh | bash
 ```
 
 [→ Full update guide, migration from v1.x, and troubleshooting](UPDATING.md)
 
-## 🗑️ Uninstalling MeticAI
+## 🗑️ Uninstalling Metic
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose down -v  # -v removes all volumes and data
-rm -rf ~/MeticAI
+rm -rf ~/Metic
 ```
 
 **Note:** To verify volume names before removal, use `docker volume ls`
 
 ## 🌐 Optional: Remote Access with Tailscale
 
-Access MeticAI from anywhere using Tailscale:
+Access Metic from anywhere using Tailscale:
 
 1. Get an auth key from [Tailscale Admin](https://login.tailscale.com/admin/settings/keys)
 2. Enable during installation, or add manually:
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 echo "TAILSCALE_AUTHKEY=your_key_here" >> .env
 docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 ```
 
-> **Important:** Both your MeticAI server and the device you're accessing it from must have Tailscale installed and connected to the same account. See the [full Tailscale setup guide](TAILSCALE.md) for HTTPS setup, troubleshooting, and more.
+> **Important:** Both your Metic server and the device you're accessing it from must have Tailscale installed and connected to the same account. See the [full Tailscale setup guide](TAILSCALE.md) for HTTPS setup, troubleshooting, and more.
 
 ## 🏗️ Architecture
 
-MeticAI v2.0 runs as a single unified container with five internal services managed by s6-overlay:
+Metic v2.0 runs as a single unified container with five internal services managed by s6-overlay:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                      MeticAI Container                       │
+│                      Metic Container                       │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │                    nginx (:3550)                       │  │
 │  │             Web UI + API Reverse Proxy                 │  │
@@ -287,7 +287,7 @@ docker exec meticai s6-svc -r /run/service/server
 
 ```bash
 # Check logs
-cd ~/MeticAI && docker compose logs -f
+cd ~/Metic && docker compose logs -f
 
 # Check container status
 docker compose ps
@@ -309,7 +309,7 @@ docker compose logs meticai | grep -i error
 ### Reset everything
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose down -v  # -v removes volumes
 docker compose pull
 docker compose up -d

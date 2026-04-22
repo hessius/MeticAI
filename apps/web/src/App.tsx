@@ -15,7 +15,7 @@ import { QRCodeDialog } from '@/components/QRCodeDialog'
 import { useIsDesktop } from '@/hooks/use-desktop'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import { MeticAILogo } from '@/components/MeticAILogo'
+import { MeticLogo } from '@/components/MeticLogo'
 import { HistoryEntry } from '@/hooks/useHistory'
 import { StartView } from '@/views/StartView'
 import { LoadingView, LOADING_MESSAGE_COUNT } from '@/views/LoadingView'
@@ -1109,7 +1109,7 @@ function App() {
                       transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
                     }}
                   >
-                    <MeticAILogo
+                    <MeticLogo
                       size={32}
                       variant={isDark ? 'white' : 'default'}
                       className="rounded-full"
@@ -1178,7 +1178,7 @@ function App() {
                   transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
               >
-                Metic<span className="gold-text">AI</span>
+                Metic
               </h1>
             </div>
           </div>

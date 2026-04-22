@@ -37,7 +37,7 @@ import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { MarkdownText, cleanProfileName } from '@/components/MarkdownText'
 import { formatDistanceToNow } from 'date-fns'
 import { domToPng } from 'modern-screenshot'
-import { MeticAILogo } from '@/components/MeticAILogo'
+import { MeticLogo } from '@/components/MeticLogo'
 import { ShotHistoryView } from '@/components/ShotHistoryView'
 import { ImageCropDialog } from '@/components/ImageCropDialog'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
@@ -1260,9 +1260,9 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         {isCapturing && (
           <div className="text-center mb-6">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <MeticAILogo size={40} variant="white" />
+              <MeticLogo size={40} variant="white" />
               <h1 className="text-4xl font-bold tracking-tight text-white">
-                Metic<span className="text-orange-400">AI</span>
+                Metic
               </h1>
             </div>
           </div>

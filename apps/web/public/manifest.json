@@ -1,7 +1,7 @@
 {
-  "name": "MeticAI",
-  "short_name": "MeticAI",
-  "description": "AI-powered espresso profile generator for Meticulous Espresso Machines",
+  "name": "Metic",
+  "short_name": "Metic",
+  "description": "All-in-one toolkit for Meticulous Espresso Machines",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

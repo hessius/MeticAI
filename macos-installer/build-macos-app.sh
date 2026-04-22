@@ -1,10 +1,10 @@
 #!/bin/bash
 
 ################################################################################
-# MeticAI - macOS App Builder Script
+# Metic - macOS App Builder Script
 ################################################################################
 # 
-# This script builds a standalone macOS .app bundle for MeticAI installer
+# This script builds a standalone macOS .app bundle for Metic installer
 # using Platypus (or manually if Platypus is not available).
 #
 # USAGE:
@@ -28,20 +28,20 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_NAME="MeticAI Installer"
+APP_NAME="Metic Installer"
 BUNDLE_ID="com.meticai.installer"
 VERSION="2.0.0"
 OUTPUT_DIR="$SCRIPT_DIR/build"
 APP_PATH="$OUTPUT_DIR/${APP_NAME}.app"
 # Executable name without spaces for compatibility
-EXEC_NAME="MeticAI-Installer"
+EXEC_NAME="Metic-Installer"
 
 # Script and resources
 WRAPPER_SCRIPT="$SCRIPT_DIR/install-wrapper.sh"
-ICON_FILE="$REPO_ROOT/resources/MeticAI.icns"
+ICON_FILE="$REPO_ROOT/resources/Metic.icns"
 
 echo -e "${BLUE}=========================================${NC}"
-echo -e "${BLUE}   MeticAI macOS App Builder (v2.0)${NC}"
+echo -e "${BLUE}   Metic macOS App Builder (v2.0)${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
@@ -71,7 +71,7 @@ if command -v platypus &> /dev/null; then
         --name "$APP_NAME"
         --bundle-identifier "$BUNDLE_ID"
         --app-version "$VERSION"
-        --author "MeticAI"
+        --author "Metic"
         --interface-type "Progress Bar"
         --interpreter "/bin/bash"
         --quit-after-execution
@@ -178,10 +178,10 @@ echo ""
 # Build Uninstaller App
 # ==============================================================================
 
-UNINSTALL_APP_NAME="MeticAI Uninstaller"
+UNINSTALL_APP_NAME="Metic Uninstaller"
 UNINSTALL_BUNDLE_ID="com.meticai.uninstaller"
 UNINSTALL_APP_PATH="$OUTPUT_DIR/${UNINSTALL_APP_NAME}.app"
-UNINSTALL_EXEC_NAME="MeticAI-Uninstaller"
+UNINSTALL_EXEC_NAME="Metic-Uninstaller"
 UNINSTALL_SCRIPT="$SCRIPT_DIR/uninstall-wrapper.sh"
 
 if [ -f "$UNINSTALL_SCRIPT" ]; then
@@ -192,7 +192,7 @@ if [ -f "$UNINSTALL_SCRIPT" ]; then
             --name "$UNINSTALL_APP_NAME"
             --bundle-identifier "$UNINSTALL_BUNDLE_ID"
             --app-version "$VERSION"
-            --author "MeticAI"
+            --author "Metic"
             --interface-type "Progress Bar"
             --interpreter "/bin/bash"
             --quit-after-execution
@@ -276,5 +276,5 @@ echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Test: open \"$APP_PATH\""
 echo "2. Install to Applications: mv \"$OUTPUT_DIR\"/*.app /Applications/"
 echo "3. Create distributable DMG:"
-echo "   hdiutil create -volname \"MeticAI\" -srcfolder \"$OUTPUT_DIR\" -ov -format UDZO \"$OUTPUT_DIR/MeticAI.dmg\""
+echo "   hdiutil create -volname \"Metic\" -srcfolder \"$OUTPUT_DIR\" -ov -format UDZO \"$OUTPUT_DIR/Metic.dmg\""
 echo ""

@@ -19,7 +19,7 @@ test.describe('Run / Schedule View', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
@@ -86,7 +86,7 @@ test.describe('Shot Scheduling - Recurring', () => {
     }
 
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
 
     const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })

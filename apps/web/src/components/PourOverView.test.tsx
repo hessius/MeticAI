@@ -144,7 +144,7 @@ const mockRecipes = [
 ]
 
 vi.mock('@/lib/pourOverApi', () => ({
-  preparePourOver: vi.fn().mockResolvedValue({ profile_id: 'test-id', profile_name: 'MeticAI Ratio Pour-Over', loaded: true }),
+  preparePourOver: vi.fn().mockResolvedValue({ profile_id: 'test-id', profile_name: 'Metic Ratio Pour-Over', loaded: true }),
   cleanupPourOver: vi.fn().mockResolvedValue({ deleted: true, purged: true }),
   forceCleanupPourOver: vi.fn().mockResolvedValue({ deleted: true }),
   getActivePourOver: vi.fn().mockResolvedValue({ active: false }),

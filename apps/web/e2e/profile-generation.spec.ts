@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Profile Generation - Form', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should access profile generation form', async ({ page }) => {
@@ -113,7 +113,7 @@ test.describe('Profile Generation - Form', () => {
 test.describe('Profile Generation - File Upload', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should have file upload zone', async ({ page }) => {
@@ -153,13 +153,13 @@ test.describe('Profile Generation - Results', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should show loading state during generation', async ({ page }) => {
     // This would require mocking - just verify the view structure exists
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     
     // Verify loading view component exists by checking for loading messages
     // in the codebase (tested indirectly)
@@ -182,7 +182,7 @@ test.describe('Profile Generation - Results', () => {
     await expect(page.getByPlaceholder(/Balanced extraction/i)).toBeVisible()
 
     // Go back via logo
-    await page.locator('h1:has-text("MeticAI")').click()
+    await page.locator('h1:has-text("Metic")').click()
 
     // Should be back on start - look for Settings button which should be visible
     await expect(page.getByRole('button', { name: /^Settings$/i })).toBeVisible({ timeout: 5000 })

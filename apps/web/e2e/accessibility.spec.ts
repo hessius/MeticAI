@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 /**
- * E2E Accessibility Tests for MeticAI Web Application
+ * E2E Accessibility Tests for Metic Web Application
  *
  * Tests WCAG 2.1 AA compliance for actual app structure:
  * - Automated axe-core scans (with exclusions for known intentional patterns)
@@ -26,7 +26,7 @@ import AxeBuilder from '@axe-core/playwright'
 test.describe('Accessibility - Automated Scans', () => {
   test('should pass axe accessibility scan on home/start view', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -293,9 +293,9 @@ test.describe('Accessibility - ARIA Attributes and Roles', () => {
 
   test('should have proper heading hierarchy', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
-    // App has h1 ("MeticAI") in header and h2 (greeting) in start view
+    // App has h1 ("Metic") in header and h2 (greeting) in start view
     const headings = page.locator('h1, h2, h3')
     const count = await headings.count()
     expect(count).toBeGreaterThanOrEqual(1)
@@ -524,7 +524,7 @@ test.describe('Accessibility - Screen Reader Compatibility', () => {
 
   test('should have descriptive link text', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
     const links = await page.getByRole('link').all()
 
@@ -547,7 +547,7 @@ test.describe('Accessibility - Screen Reader Compatibility', () => {
 
   test('should have alt text for images', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
     const images = await page.locator('img').all()
 
@@ -567,7 +567,7 @@ test.describe('Accessibility - Mobile and Responsive', () => {
   test('should maintain accessibility on mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 })
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
@@ -598,7 +598,7 @@ test.describe('Accessibility - Mobile and Responsive', () => {
 test.describe('Accessibility - Multi-language Support', () => {
   test('should have language selector with accessible name', async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
     const langSelector = page.getByRole('button', { name: /language/i }).or(
       page.locator('button:has-text("English")')

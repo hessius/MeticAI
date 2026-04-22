@@ -14,7 +14,7 @@ test.describe('Settings View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     // Wait for app to initialize
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should navigate to settings page', async ({ page }) => {
@@ -45,7 +45,7 @@ test.describe('Settings View', () => {
     await settingsButton.click()
 
     // Check for about section
-    await expect(page.getByText(/About MeticAI/i)).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText(/About Metic/i)).toBeVisible({ timeout: 5000 })
     await expect(page.getByText(/GitHub/i)).toBeVisible({ timeout: 5000 })
   })
 
@@ -83,8 +83,8 @@ test.describe('Settings View', () => {
     if (hasBackButton) {
       await backButton.click()
     } else {
-      // Click the MeticAI title/logo to go home
-      const h1 = page.locator('h1:has-text("MeticAI")')
+      // Click the Metic title/logo to go home
+      const h1 = page.locator('h1:has-text("Metic")')
       await h1.waitFor({ state: 'visible', timeout: 5000 })
       await h1.click({ force: true })
     }

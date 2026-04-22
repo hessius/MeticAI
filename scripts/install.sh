@@ -1,15 +1,15 @@
 #!/bin/bash
 # ==============================================================================
-# MeticAI Installer (v2)
+# Metic Installer (v2)
 # ==============================================================================
-# Single-command installation for MeticAI.
+# Single-command installation for Metic.
 #
 # Usage (interactive):
-#   curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
 #
 # Usage (non-interactive):
 #   GEMINI_API_KEY=xxx METICULOUS_IP=192.168.1.50 METICAI_NON_INTERACTIVE=true \
-#     curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
 #
 # Environment variables (pre-set to skip prompts):
 #   GEMINI_API_KEY          - Google Gemini API key (optional)
@@ -23,7 +23,7 @@
 #
 # Branch testing:
 #   REPO_BRANCH=version/2.0.0 bash <(curl -fsSL \
-#     https://raw.githubusercontent.com/hessius/MeticAI/version/2.0.0/scripts/install.sh)
+#     https://raw.githubusercontent.com/hessius/Metic/version/2.0.0/scripts/install.sh)
 # ==============================================================================
 
 set -e
@@ -37,14 +37,14 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="${INSTALL_DIR:-${HOME}/MeticAI}"
+INSTALL_DIR="${INSTALL_DIR:-${HOME}/Metic}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 if [[ "$REPO_BRANCH" == "main" ]]; then
     METICAI_TAG="${METICAI_TAG:-latest}"
 else
     METICAI_TAG="${METICAI_TAG:-$(echo "$REPO_BRANCH" | tr '/' '-')}"
 fi
-REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
+REPO_URL="https://raw.githubusercontent.com/hessius/Metic/${REPO_BRANCH}"
 
 # ==============================================================================
 # Logging helpers
@@ -62,7 +62,7 @@ log_error() { echo -e "${RED}x${NC} $1"; }
 echo ""
 echo -e "${CYAN}"
 echo "  +======================================+"
-echo "  |          MeticAI Installer           |"
+echo "  |          Metic Installer           |"
 echo "  |     Autonomous Espresso AI Agent     |"
 echo "  +======================================+"
 echo -e "${NC}"
@@ -88,7 +88,7 @@ if [[ "$PLATFORM" == "windows" ]]; then
     echo ""
     echo "  For the best Windows experience, use the PowerShell installer:"
     echo ""
-    echo "    irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1"
+    echo "    irm https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1"
     echo ""
     log_info "Continuing with bash installer anyway..."
     echo ""
@@ -414,7 +414,7 @@ fi
 
 if [[ "$IS_V1" == "true" ]]; then
     # Old v1 multi-container installation detected
-    log_warning "Old MeticAI v1 installation detected at ~/MeticAI"
+    log_warning "Old Metic v1 installation detected at ~/Metic"
 
     if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
         log_info "Non-interactive mode: proceeding with fresh install"
@@ -446,7 +446,7 @@ if [[ "$IS_V1" == "true" ]]; then
     fi
 elif [[ -f "$HAS_V2" ]] || [[ -f "${INSTALL_DIR}/.env" ]]; then
     # Previous v2 installation detected
-    log_warning "Existing MeticAI v2 installation detected at ${INSTALL_DIR}"
+    log_warning "Existing Metic v2 installation detected at ${INSTALL_DIR}"
 
     if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
         log_info "Non-interactive mode: proceeding with reinstall"
@@ -533,14 +533,14 @@ echo ""
 if [[ -z "$GEMINI_API_KEY" ]]; then
     if [[ "${METICAI_NON_INTERACTIVE}" == "true" ]]; then
         log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
-        log_info "You can add a key later in Settings within the MeticAI web UI"
+        log_info "You can add a key later in Settings within the Metic web UI"
     else
         echo "Get your API key from: https://aistudio.google.com/app/apikey"
-        echo "(Press Enter to skip — AI features will be disabled, but MeticAI will still work)"
+        echo "(Press Enter to skip — AI features will be disabled, but Metic will still work)"
         read -p "Gemini API Key: " GEMINI_API_KEY < /dev/tty
         if [[ -z "$GEMINI_API_KEY" ]]; then
             log_warning "No API key provided — AI features (profile generation, coffee analysis) will be disabled"
-            log_info "You can add a key later in Settings within the MeticAI web UI"
+            log_info "You can add a key later in Settings within the Metic web UI"
         else
             log_success "API key configured"
         fi
@@ -678,7 +678,7 @@ fi
 log_info "Writing configuration..."
 
 cat > .env << EOF
-# MeticAI Configuration
+# Metic Configuration
 # Generated on $(date)
 
 # Docker Compose project name (keeps volume ownership consistent regardless of
@@ -746,7 +746,7 @@ generate_update_script() {
 #!/bin/bash
 cd "$(dirname "$0")"
 source .env 2>/dev/null
-echo "Pulling latest MeticAI image..."
+echo "Pulling latest Metic image..."
 docker compose ${COMPOSE_FILES:--f docker-compose.yml} pull
 echo "Restarting..."
 docker compose ${COMPOSE_FILES:--f docker-compose.yml} up -d
@@ -761,7 +761,7 @@ generate_uninstall_script() {
 cd "$(dirname "$0")"
 source .env 2>/dev/null
 echo ""
-echo "  MeticAI Uninstaller"
+echo "  Metic Uninstaller"
 echo "  ==================="
 echo ""
 INSTALL_PATH="$(pwd)"
@@ -779,7 +779,7 @@ if [[ -f "${INSTALL_PATH}/.meticai-dev" ]]; then
     exit 1
 fi
 
-echo "This will stop MeticAI and remove all files from ${INSTALL_PATH}."
+echo "This will stop Metic and remove all files from ${INSTALL_PATH}."
 echo "Your data (profiles, history) is stored in a Docker volume and will be preserved."
 echo ""
 read -p "Are you sure? (y/N): " CONFIRM < /dev/tty
@@ -801,20 +801,20 @@ if [[ "$REMOVE_DATA" =~ ^[Yy]$ ]]; then
     echo "Data volumes removed"
 fi
 
-read -p "Also remove the MeticAI Docker image? (y/N): " REMOVE_IMAGE < /dev/tty
+read -p "Also remove the Metic Docker image? (y/N): " REMOVE_IMAGE < /dev/tty
 if [[ "$REMOVE_IMAGE" =~ ^[Yy]$ ]]; then
     docker rmi "ghcr.io/hessius/meticai:${METICAI_TAG:-latest}" 2>/dev/null || true
     echo "Image removed"
 fi
 
 # Remove macOS Dock shortcut if it exists
-if [[ -d "/Applications/MeticAI.app" ]]; then
+if [[ -d "/Applications/Metic.app" ]]; then
     echo "Removing macOS app shortcut..."
-    rm -rf "/Applications/MeticAI.app" 2>/dev/null || sudo rm -rf "/Applications/MeticAI.app" 2>/dev/null || true
+    rm -rf "/Applications/Metic.app" 2>/dev/null || sudo rm -rf "/Applications/Metic.app" 2>/dev/null || true
 fi
 
 echo ""
-echo "MeticAI has been uninstalled."
+echo "Metic has been uninstalled."
 echo ""
 echo "To remove the installation directory:"
 echo "  rm -rf ${INSTALL_PATH}"
@@ -835,21 +835,21 @@ log_success "Generated: start.sh, stop.sh, update.sh, uninstall.sh"
 # ==============================================================================
 
 echo ""
-echo -e "${YELLOW}[4/4] Starting MeticAI...${NC}"
+echo -e "${YELLOW}[4/4] Starting Metic...${NC}"
 echo ""
 
-log_info "Pulling MeticAI image (this may take a few minutes)..."
+log_info "Pulling Metic image (this may take a few minutes)..."
 if ! docker compose ${COMPOSE_FILES} pull 2>&1; then
     log_warning "Image pull encountered errors. Continuing anyway (cached image may work)..."
 fi
 
-log_info "Starting MeticAI..."
+log_info "Starting Metic..."
 # Remove any leftover containers that could conflict
 docker rm -f meticai 2>/dev/null || true
 docker rm -f meticai-watchtower 2>/dev/null || true
 
 if ! docker compose ${COMPOSE_FILES} up -d 2>&1; then
-    log_error "Failed to start MeticAI containers."
+    log_error "Failed to start Metic containers."
     echo ""
     echo "  Troubleshooting:"
     echo "    1. Is Docker running?  docker info"
@@ -870,7 +870,7 @@ sleep 10
 CONTAINER_RUNNING=false
 if docker compose ${COMPOSE_FILES} ps 2>/dev/null | grep -qi "running\|healthy\|up"; then
     CONTAINER_RUNNING=true
-    log_success "MeticAI container is running"
+    log_success "Metic container is running"
 else
     log_warning "Container may still be starting..."
     echo "  Check status with: cd ${INSTALL_DIR} && docker compose ps"
@@ -888,7 +888,7 @@ if [[ "$CONTAINER_RUNNING" == "true" ]]; then
         sleep 5
     done
     if [[ "$HEALTH_OK" == "true" ]]; then
-        log_success "MeticAI is responding at http://localhost:3550"
+        log_success "Metic is responding at http://localhost:3550"
     else
         log_warning "Service not responding yet. It may need another minute to start."
         echo "  Try opening http://localhost:3550 in your browser shortly."
@@ -904,22 +904,22 @@ SERVER_IP=${SERVER_IP:-localhost}
 
 if [[ "$PLATFORM" == "macos" ]] && [[ "$METICAI_NON_INTERACTIVE" != "true" ]]; then
     echo ""
-    read -p "Add MeticAI to your macOS Dock? (y/N): " ADD_DOCK < /dev/tty
+    read -p "Add Metic to your macOS Dock? (y/N): " ADD_DOCK < /dev/tty
     if [[ "$ADD_DOCK" =~ ^[Yy]$ ]]; then
-        APP_PATH="/Applications/MeticAI.app"
+        APP_PATH="/Applications/Metic.app"
         APP_URL="http://${SERVER_IP}:3550"
 
         mkdir -p "${APP_PATH}/Contents/MacOS"
         mkdir -p "${APP_PATH}/Contents/Resources"
 
-        cat > "${APP_PATH}/Contents/MacOS/MeticAI" << APPEOF
+        cat > "${APP_PATH}/Contents/MacOS/Metic" << APPEOF
 #!/bin/bash
 open "${APP_URL}"
 APPEOF
-        chmod +x "${APP_PATH}/Contents/MacOS/MeticAI"
+        chmod +x "${APP_PATH}/Contents/MacOS/Metic"
 
         # Download the proper .icns icon
-        curl -fsSL "${REPO_URL}/resources/MeticAI.icns" -o "${APP_PATH}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+        curl -fsSL "${REPO_URL}/resources/Metic.icns" -o "${APP_PATH}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
 
         cat > "${APP_PATH}/Contents/Info.plist" << PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -927,11 +927,11 @@ APPEOF
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>MeticAI</string>
+    <string>Metic</string>
     <key>CFBundleIdentifier</key>
     <string>com.meticai.app</string>
     <key>CFBundleName</key>
-    <string>MeticAI</string>
+    <string>Metic</string>
     <key>CFBundleVersion</key>
     <string>2.0.0</string>
     <key>CFBundlePackageType</key>
@@ -955,7 +955,7 @@ PLISTEOF
                         <integer>15</integer>
                     </dict>
                     <key>file-label</key>
-                    <string>MeticAI</string>
+                    <string>Metic</string>
                     <key>file-type</key>
                     <integer>41</integer>
                 </dict>
@@ -964,7 +964,7 @@ PLISTEOF
             </dict>"
         killall Dock 2>/dev/null || true
 
-        log_success "MeticAI.app added to Dock"
+        log_success "Metic.app added to Dock"
     fi
 fi
 
@@ -1024,10 +1024,10 @@ echo "    curl -sf ${METICAI_URL}/api/version"
 echo ""
 echo "  Useful commands:"
 echo "    cd ${INSTALL_DIR}"
-echo "    ./start.sh        Start MeticAI"
-echo "    ./stop.sh         Stop MeticAI"
+echo "    ./start.sh        Start Metic"
+echo "    ./stop.sh         Stop Metic"
 echo "    ./update.sh       Pull latest image & restart"
-echo "    ./uninstall.sh    Remove MeticAI"
+echo "    ./uninstall.sh    Remove Metic"
 echo "    docker compose logs -f   View live logs"
 echo ""
 echo "  Enjoy your coffee! ☕"

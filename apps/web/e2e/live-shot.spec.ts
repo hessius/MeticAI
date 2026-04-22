@@ -19,7 +19,7 @@ test.describe('Live Shot View', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
@@ -39,7 +39,7 @@ test.describe('Run Shot View - Profile Selection', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
@@ -84,7 +84,7 @@ test.describe('Run Shot View - Profile Selection', () => {
     await runShotButton.click()
 
     // Click logo to go back
-    await page.locator('text=MeticAI').first().click()
+    await page.locator('text=Metic').first().click()
 
     // Should be back on start
     await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })

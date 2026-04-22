@@ -18,7 +18,7 @@ const HAS_BACKEND = BASE_URL_SET && (process.env.BASE_URL?.includes('3550') || f
 test.describe('History View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     // Wait for page to fully render
     await page.waitForLoadState('networkidle')
   })
@@ -51,7 +51,7 @@ test.describe('History View', () => {
     await historyButton.click()
     
     // Click logo/heading to go back
-    await page.getByRole('heading', { name: /MeticAI/ }).click()
+    await page.getByRole('heading', { name: /Metic/ }).click()
 
     // Should be back on start view (Profile Catalogue button is always visible on start)
     await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })
@@ -61,7 +61,7 @@ test.describe('History View', () => {
 test.describe('Profile Import from Machine', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
@@ -130,7 +130,7 @@ test.describe('Console Error Detection', () => {
     })
 
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
     const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
     await historyButton.click()
@@ -158,7 +158,7 @@ test.describe('Console Error Detection', () => {
     })
 
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
     const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
     await historyButton.click()
