@@ -778,7 +778,9 @@
       "started": "Gestartet"
     },
     "profileSelector": {
-      "placeholder": "Profil wechseln…"
+      "placeholder": "Profil wechseln…",
+      "noProfiles": "Keine Profile verfügbar",
+      "noDescription": "Keine Beschreibung"
     },
     "confirm": {
       "stopTitle": "Bezug stoppen?",

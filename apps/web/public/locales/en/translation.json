@@ -783,7 +783,9 @@
       "profileSelected": "Profile selected: {{name}}"
     },
     "profileSelector": {
-      "placeholder": "Switch profile…"
+      "placeholder": "Switch profile…",
+      "noProfiles": "No profiles available",
+      "noDescription": "No description"
     },
     "confirm": {
       "stopTitle": "Stop Shot?",

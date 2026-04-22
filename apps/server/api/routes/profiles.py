@@ -1708,10 +1708,13 @@ async def list_machine_profiles(request: Request):
                 }
                 stages = getattr(full_profile, 'stages', None)
                 variables = getattr(full_profile, 'variables', None)
+                display = getattr(full_profile, 'display', None)
                 if stages:
                     profile_dict["stages"] = deep_convert_to_dict(stages)
                 if variables:
                     profile_dict["variables"] = deep_convert_to_dict(variables)
+                if display:
+                    profile_dict["display"] = deep_convert_to_dict(display)
                 
                 # Check for existing description in history
                 if in_history:

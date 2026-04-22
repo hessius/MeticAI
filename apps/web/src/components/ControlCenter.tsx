@@ -8,7 +8,7 @@
  *  • Quick-action buttons (idle) or live shot metrics (brewing)
  *  • An expand toggle that reveals ControlCenterExpanded
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -22,7 +22,6 @@ import {
   Scales,
   CaretDown,
   CaretUp,
-  CaretUpDown,
   Eye,
   XCircle,
   Thermometer,
@@ -35,11 +34,12 @@ import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
 import { useHaptics } from '@/hooks/useHaptics'
-import { useActionSheet } from '@/hooks/useActionSheet'
-import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
-import { Capacitor } from '@capacitor/core'
+import { useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { isDirectMode, isNativePlatform as isNativePlatformFn } from '@/lib/machineMode'
 import { toast } from 'sonner'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
+import { ProfileDropdown, type DropdownProfile } from './ProfileDropdown'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -104,10 +104,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const prevShotsRef = useRef<number | null>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
-  const [machineProfiles, setMachineProfiles] = useState<{ id: string; name: string }[]>([])
+  const [machineProfiles, setMachineProfiles] = useState<DropdownProfile[]>([])
   const { impact } = useHaptics()
-  const { showActionSheet } = useActionSheet()
-  const isNativePlatform = Capacitor.isNativePlatform()
+  const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
 
   // Shared state derivation + command executor
   const {
@@ -144,15 +143,32 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
         const res = await fetch(`${base}/api/machine/profiles`)
         if (res.ok && !cancelled) {
           const data = await res.json()
-          const profiles = (data.profiles ?? [])
-            .filter((p: { id: string; name?: string }) => p.name)
-            .map((p: { id: string; name: string; author?: string }) => ({ id: p.id, name: p.name, author: p.author }))
+          interface RawProfile {
+            id: string
+            name?: string
+            author?: string
+            display?: { description?: string; shortDescription?: string; image?: string }
+          }
+          const profiles: DropdownProfile[] = (data.profiles ?? [])
+            .filter((p: RawProfile) => p.name)
+            .map((p: RawProfile) => ({
+              id: p.id,
+              name: p.name!,
+              author: p.author,
+              display: p.display,
+              // In direct/native mode, resolve machine-relative image URLs.
+              // In proxy mode, leave null — the image cache uses /api/profile/{name}/image-proxy.
+              resolvedImageUrl:
+                (isDirectMode() || isNativePlatformFn())
+                  ? resolveDisplayImage(p.display?.image)
+                  : null,
+            }))
           setMachineProfiles(profiles)
+          // Batch-fetch images for profiles missing display.image (proxy mode fallback)
+          fetchImagesForProfiles(profiles.map(p => p.name))
           // Resolve author for current profile
           if (activeProfile) {
-            const match = profiles.find(
-              (p: { name: string; author?: string }) => p.name === activeProfile
-            )
+            const match = profiles.find(p => p.name === activeProfile)
             setProfileAuthor(match?.author ?? null)
           }
         }
@@ -161,29 +177,27 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       }
     })()
     return () => { cancelled = true }
-  }, [activeProfile])
+  }, [activeProfile, fetchImagesForProfiles])
 
-  // Profile change handler for the collapsed view selector
-  const handleChangeProfile = useCallback(async () => {
-    if (machineProfiles.length === 0) return
+  // Merge display images with cached fallbacks for the dropdown
+  const dropdownProfiles = useMemo<DropdownProfile[]>(() =>
+    machineProfiles.map(p => ({
+      ...p,
+      resolvedImageUrl: p.resolvedImageUrl || getImageUrl(p.name) || null,
+    })),
+    [machineProfiles, getImageUrl],
+  )
+
+  // Profile change handler — used by ProfileDropdown
+  const handleSelectProfile = useCallback(async (name: string) => {
     impact('light')
-    if (isNativePlatform) {
-      const names = machineProfiles.map(p => p.name)
-      const index = await showActionSheet({
-        title: t('controlCenter.profileSelector.placeholder'),
-        options: names,
-      })
-      if (index >= 0 && index < names.length) {
-        const name = names[index]
-        const res = await machine.loadProfile(name)
-        if (res.success) {
-          toast.success(t('controlCenter.toasts.profileSelected', { name }))
-        } else {
-          toast.error(res.message ?? t('controlCenter.toasts.error'))
-        }
-      }
+    const res = await machine.loadProfile(name)
+    if (res.success) {
+      toast.success(t('controlCenter.toasts.profileSelected', { name }))
+    } else {
+      toast.error(res.message ?? t('controlCenter.toasts.error'))
     }
-  }, [machineProfiles, isNativePlatform, showActionSheet, t, machine, impact])
+  }, [t, machine, impact])
 
   // 🎉 Confetti celebration for every 100th shot
   useEffect(() => {
@@ -319,15 +333,13 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                   </span>
                 )}
               </div>
-              {/* Change profile button — only when idle and profiles available */}
-              {machineProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected && (
-                <button
-                  className="shrink-0 p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                  onClick={handleChangeProfile}
-                  aria-label={t('controlCenter.profileSelector.placeholder')}
-                >
-                  <CaretUpDown size={16} weight="bold" />
-                </button>
+              {/* Change profile dropdown — only when idle and profiles available */}
+              {dropdownProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected && (
+                <ProfileDropdown
+                  profiles={dropdownProfiles}
+                  activeProfile={activeProfile}
+                  onSelectProfile={handleSelectProfile}
+                />
               )}
               </div>
             </div>
