@@ -32,11 +32,13 @@ from services.meticulous_service import (
     async_load_profile_by_id,
     async_execute_action,
     async_delete_profile,
+    fetch_machine_profile_dict,
+    _normalize_profile_for_machine,
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
 from services.profile_recommendation_service import recommendation_service
-from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id
+from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id, _history_lock
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
@@ -45,8 +47,6 @@ from services.temp_profile_service import is_temp_profile
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-_history_lock = threading.Lock()
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
@@ -1858,6 +1858,10 @@ async def get_machine_profile(profile_id: str, request: Request):
 async def get_machine_profile_json(profile_id: str, request: Request):
     """Get the full profile JSON from the Meticulous machine.
     
+    Fetches the profile directly from the machine's REST API and returns
+    the raw JSON as-is — no SDK object conversion, so all fields are
+    preserved exactly as the machine stores them.
+    
     Args:
         profile_id: The profile ID to fetch
         
@@ -1872,36 +1876,11 @@ async def get_machine_profile_json(profile_id: str, request: Request):
             extra={"request_id": request_id, "profile_id": profile_id}
         )
         
-        profile = await async_get_profile(profile_id)
-        
-        if hasattr(profile, 'error') and profile.error:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Machine API error: {profile.error}"
-            )
-        
-        # Convert to dict for JSON serialization
-        profile_json = {}
-        for attr in ['id', 'name', 'author', 'temperature', 'final_weight', 'stages', 
-                     'variables', 'display', 'isDefault', 'source', 'beverage_type',
-                     'tank_temperature']:
-            if hasattr(profile, attr):
-                val = getattr(profile, attr)
-                if val is not None:
-                    # Handle nested objects
-                    if hasattr(val, '__dict__'):
-                        profile_json[attr] = val.__dict__
-                    elif isinstance(val, list):
-                        profile_json[attr] = [
-                            item.__dict__ if hasattr(item, '__dict__') else item 
-                            for item in val
-                        ]
-                    else:
-                        profile_json[attr] = val
+        profile_dict = await fetch_machine_profile_dict(profile_id)
         
         return {
             "status": "success",
-            "profile": profile_json
+            "profile": profile_dict
         }
         
     except HTTPException:
@@ -1913,8 +1892,8 @@ async def get_machine_profile_json(profile_id: str, request: Request):
             extra={"request_id": request_id, "error_type": type(e).__name__}
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=502,
+            detail=f"Machine API error: {str(e)}"
         )
 
 
@@ -2196,6 +2175,30 @@ async def import_profile(request: Request):
             from services.analysis_service import _build_static_profile_description
             reply = _build_static_profile_description(profile_json)
         
+        # Normalise the JSON for storage.  For machine imports the profile
+        # already exists on the machine so we fetch canonical JSON by ID.
+        # For file imports we normalise locally first, then upgrade after upload.
+        stored_json = deep_convert_to_dict(profile_json)
+        if source == "machine":
+            # Profile is already on machine — try to fetch canonical version
+            machine_id = profile_json.get("id") if isinstance(profile_json, dict) else None
+            if machine_id:
+                try:
+                    stored_json = await fetch_machine_profile_dict(machine_id)
+                except Exception:
+                    # Fall back to local normalisation
+                    stored_json = _normalize_profile_for_machine(stored_json)
+            else:
+                stored_json = _normalize_profile_for_machine(stored_json)
+        else:
+            # File import — normalise locally as baseline
+            stored_json = _normalize_profile_for_machine(stored_json)
+
+        # Re-derive profile_name from the finalised JSON so the history entry
+        # name always matches stored_json["name"] (normalisation may change it).
+        if isinstance(stored_json, dict) and stored_json.get("name"):
+            profile_name = stored_json["name"]
+
         # Create history entry
         entry_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
@@ -2206,11 +2209,14 @@ async def import_profile(request: Request):
             "profile_name": profile_name,
             "user_preferences": f"Imported from {source}",
             "reply": reply,
-            "profile_json": deep_convert_to_dict(profile_json),
+            "profile_json": stored_json,
             "imported": True,
             "import_source": source
         }
         
+        if stored_json and isinstance(stored_json, dict):
+            new_entry["content_hash"] = compute_content_hash(stored_json)
+
         # Save to history using cache-aware save to keep in-memory cache in sync
         with _history_lock:
             history = load_history()
@@ -2227,7 +2233,23 @@ async def import_profile(request: Request):
         if source == "file":
             try:
                 result = await async_create_profile(profile_json)
+                normalised_from_create = result.get("_normalised_json") if isinstance(result, dict) else None
                 machine_profile_id = result.get("id") if isinstance(result, dict) else None
+
+                # Upgrade stored JSON with machine-fetched version
+                fetch_id = machine_profile_id or (normalised_from_create or {}).get("id")
+                if fetch_id:
+                    try:
+                        machine_dict = await fetch_machine_profile_dict(fetch_id)
+                        if isinstance(machine_dict, dict) and machine_dict.get("name"):
+                            update_entry_sync_fields(
+                                entry_id,
+                                content_hash=compute_content_hash(machine_dict),
+                                profile_json=machine_dict,
+                            )
+                    except Exception:
+                        pass  # Layer 1 already stored normalised JSON
+
                 logger.info(
                     f"Profile uploaded to machine: {profile_name}",
                     extra={"request_id": request_id, "machine_profile_id": machine_profile_id}
@@ -2361,8 +2383,11 @@ async def import_all_profiles(request: Request):
                 }) + "\n"
                 
                 try:
-                    # Convert profile to JSON dict using deep conversion
-                    profile_json = deep_convert_to_dict(profile)
+                    # Fetch canonical JSON directly from machine API.
+                    # This intentionally re-fetches each profile even though
+                    # the filtering step already retrieved an SDK Profile object,
+                    # because SDK serialisation loses fields (the bug this PR fixes).
+                    profile_json = await fetch_machine_profile_dict(profile.id)
                     
                     # Generate description
                     if generate_description:
@@ -2388,7 +2413,8 @@ async def import_all_profiles(request: Request):
                         "reply": reply,
                         "profile_json": profile_json,
                         "imported": True,
-                        "import_source": "machine_bulk"
+                        "import_source": "machine_bulk",
+                        "content_hash": compute_content_hash(profile_json) if isinstance(profile_json, dict) else None,
                     }
                     
                     # Save to history using cache-aware save
@@ -2636,13 +2662,10 @@ async def sync_profiles(request: Request):
 
             # Fetch full profile to compute hash
             try:
-                full = await async_get_profile(profile_id)
-                if hasattr(full, "error") and full.error:
-                    full = partial
+                profile_dict = await fetch_machine_profile_dict(profile_id)
             except Exception:
-                full = partial
+                profile_dict = deep_convert_to_dict(partial)
 
-            profile_dict = deep_convert_to_dict(full)
             current_hash = compute_content_hash(profile_dict)
 
             entry = history_by_name.get(profile_name)
@@ -2718,16 +2741,9 @@ async def accept_sync_update(profile_id: str, request: Request, ai_description: 
             extra={"request_id": request_id, "profile_id": profile_id, "ai_description": ai_description},
         )
 
-        # Fetch latest from machine
-        full_profile = await async_get_profile(profile_id)
-        if hasattr(full_profile, "error") and full_profile.error:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Machine API error: {full_profile.error}",
-            )
-
-        profile_dict = deep_convert_to_dict(full_profile)
-        profile_name = profile_dict.get("name", getattr(full_profile, "name", "Unknown"))
+        # Fetch latest from machine via raw HTTP
+        profile_dict = await fetch_machine_profile_dict(profile_id)
+        profile_name = profile_dict.get("name", "Unknown")
         new_hash = compute_content_hash(profile_dict)
 
         # Find the history entry by name
@@ -2903,10 +2919,7 @@ async def auto_sync_profiles(request: Request):
             if profile_name not in history_by_name:
                 # New profile — import it
                 try:
-                    full_profile = await async_get_profile(profile_id)
-                    if hasattr(full_profile, "error") and full_profile.error:
-                        continue
-                    profile_dict = deep_convert_to_dict(full_profile)
+                    profile_dict = await fetch_machine_profile_dict(profile_id)
 
                     if ai_description:
                         try:
@@ -2949,10 +2962,7 @@ async def auto_sync_profiles(request: Request):
                 if not stored_hash:
                     continue  # No hash to compare — skip
                 try:
-                    full_profile = await async_get_profile(profile_id)
-                    if hasattr(full_profile, "error") and full_profile.error:
-                        continue
-                    profile_dict = deep_convert_to_dict(full_profile)
+                    profile_dict = await fetch_machine_profile_dict(profile_id)
                     current_hash = compute_content_hash(profile_dict)
                     if current_hash != stored_hash:
                         new_reply = None
@@ -2993,6 +3003,134 @@ async def auto_sync_profiles(request: Request):
     except Exception as e:
         logger.error(
             f"Auto-sync failed: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/profiles/repair")
+@router.post("/api/profiles/repair")
+async def repair_profile_json(request: Request):
+    """Repair all history entries to contain machine-canonical profile JSON.
+
+    For each entry that has profile_json:
+    - If a matching profile exists on the machine (by name): fetch canonical
+      JSON from the machine and replace the stored version.
+    - If no match on the machine (orphaned): re-normalize the stored JSON
+      locally via _normalize_profile_for_machine().
+
+    Returns a summary of how many entries were repaired, normalized, skipped,
+    or errored.
+    """
+    request_id = request.state.request_id
+    logger.info("Starting profile JSON repair", extra={"request_id": request_id})
+
+    try:
+        # Build machine lookup: name → profile_id
+        machine_map: dict[str, str] = {}
+        try:
+            profiles_result = await async_list_profiles()
+            if not (hasattr(profiles_result, "error") and profiles_result.error):
+                for p in profiles_result:
+                    pname = getattr(p, "name", "")
+                    pid = getattr(p, "id", "")
+                    if pname and pid:
+                        machine_map[pname] = pid
+        except Exception as exc:
+            logger.warning(
+                f"Repair: could not list machine profiles, will normalize only: {exc}",
+                extra={"request_id": request_id},
+            )
+
+        history = load_history()
+        entries = history if isinstance(history, list) else history.get("entries", [])
+
+        repaired = 0       # Fetched canonical JSON from machine
+        normalized = 0     # Re-normalized locally (orphaned entries)
+        skipped = 0        # No profile_json to fix
+        errors = 0
+        error_details: list[str] = []
+
+        for entry in entries:
+            entry_id = entry.get("id", "unknown")
+            profile_json = entry.get("profile_json")
+            profile_name = entry.get("profile_name", "")
+
+            if not profile_json:
+                skipped += 1
+                continue
+
+            machine_profile_id = machine_map.get(profile_name)
+
+            if machine_profile_id:
+                # Entry has a matching machine profile — fetch canonical JSON
+                try:
+                    canonical = await fetch_machine_profile_dict(machine_profile_id)
+                    with _history_lock:
+                        update_entry_sync_fields(
+                            entry_id,
+                            profile_json=canonical,
+                            content_hash=compute_content_hash(canonical),
+                            machine_updated_at=datetime.now(timezone.utc).isoformat(),
+                        )
+                    repaired += 1
+                except Exception as exc:
+                    # Machine fetch failed — fall back to local normalization
+                    try:
+                        norm = _normalize_profile_for_machine(
+                            profile_json if isinstance(profile_json, dict) else json.loads(profile_json)
+                        )
+                        with _history_lock:
+                            update_entry_sync_fields(
+                                entry_id,
+                                profile_json=norm,
+                                content_hash=compute_content_hash(norm),
+                            )
+                        normalized += 1
+                    except Exception as inner_exc:
+                        errors += 1
+                        error_details.append(f"{entry_id}: machine fetch failed ({exc}), normalize failed ({inner_exc})")
+            else:
+                # Orphaned entry — re-normalize locally
+                try:
+                    source = profile_json if isinstance(profile_json, dict) else json.loads(profile_json)
+                    norm = _normalize_profile_for_machine(source)
+                    with _history_lock:
+                        update_entry_sync_fields(
+                            entry_id,
+                            profile_json=norm,
+                            content_hash=compute_content_hash(norm),
+                        )
+                    normalized += 1
+                except Exception as exc:
+                    errors += 1
+                    error_details.append(f"{entry_id}: normalize failed ({exc})")
+
+        logger.info(
+            f"Repair complete: {repaired} from machine, {normalized} normalized, "
+            f"{skipped} skipped, {errors} errors",
+            extra={"request_id": request_id},
+        )
+
+        return {
+            "status": "success",
+            "repaired_from_machine": repaired,
+            "normalized_locally": normalized,
+            "skipped_no_json": skipped,
+            "errors": errors,
+            "error_details": error_details[:20] if error_details else [],
+            "total_processed": repaired + normalized + skipped + errors,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Profile repair failed: {str(e)}",
             exc_info=True,
             extra={"request_id": request_id, "error_type": type(e).__name__},
         )

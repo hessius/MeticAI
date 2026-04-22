@@ -89,7 +89,9 @@ export function ControlCenterExpanded({ machineState, profileAuthor }: ControlCe
   useEffect(() => {
     let cancelled = false
     if (!activeProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state when profile clears
       setProfileImgUrl(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileImgError(false)
       return
     }

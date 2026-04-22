@@ -185,8 +185,11 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
   })()
 
   useEffect(() => {
-    setAiEnabledState(getAiEnabled())
-    setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
+    const handler = () => {
+      setAiEnabledState(getAiEnabled())
+      setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
+    }
+    handler()
   }, [])
 
   // Load current settings on mount
@@ -324,6 +327,7 @@ export function SettingsView({ onBack, showBlobs, onToggleBlobs, isDark, isFollo
 
   useEffect(() => {
     if (changelogExpanded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- triggering async fetch on expand
       loadReleaseNotes()
     }
   }, [changelogExpanded, loadReleaseNotes])

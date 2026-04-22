@@ -96,6 +96,7 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
 
   // Read cached status on mount and periodically
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- triggering initial cache read on mount
     readCachedStatus()
 
     const interval = setInterval(readCachedStatus, CHECK_INTERVAL)

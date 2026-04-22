@@ -70,6 +70,7 @@ export function ProfileRecommendations({
 
   useEffect(() => {
     if (tags.length < 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting when insufficient tags
       setRecommendations([])
       return
     }

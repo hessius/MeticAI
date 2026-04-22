@@ -57,6 +57,7 @@ export function ExpertAnalysisView({
   // Fetch backend-classified recommendations with proper is_patchable flags
   useEffect(() => {
     if (!showRecommendations || !profileName || !shotFilename) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state when conditions unmet
       setClassifiedRecs(null);
       return;
     }

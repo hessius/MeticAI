@@ -167,6 +167,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   useEffect(() => {
     const mql = window.matchMedia('(pointer: coarse)')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync initial media query state
     setIsCoarsePointer(mql.matches)
     const handler = (e: MediaQueryListEvent) => setIsCoarsePointer(e.matches)
     mql.addEventListener('change', handler)
@@ -251,8 +252,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   }
   
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
     fetchProfiles()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchOrphaned()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSyncStatus()
   }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
 
