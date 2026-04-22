@@ -592,7 +592,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
   // Use cached image URL immediately if available, prevents delay on detail view
   const [profileImage, setProfileImage] = useState<string | null>(cachedImageUrl || null)
-  const [imageCacheBuster, setImageCacheBuster] = useState(Date.now())
+  const [imageCacheBuster, setImageCacheBuster] = useState(() => Date.now())
   const [showCropDialog, setShowCropDialog] = useState(false)
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
   // Image generation states
@@ -647,12 +647,18 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
 
   // Sync local state when entry prop updates (e.g. after edit save)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing local state from prop updates
     setNotes(entry.notes || '')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentReply(entry.reply)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditName(entry.profile_name)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditTemperature(entry.profile_json?.temperature?.toString() ?? '')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditFinalWeight(entry.profile_json?.final_weight?.toString() ?? '')
     const vars = (entry.profile_json as ProfileData | null)?.variables ?? []
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditVariables(
       vars
         .filter((v: { key: string }) => !v.key.startsWith('info_'))

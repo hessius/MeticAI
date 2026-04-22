@@ -81,6 +81,7 @@ export function FindSimilarOverlay({
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- triggering fetch on dialog open
       fetchSimilar()
     }
     return () => {

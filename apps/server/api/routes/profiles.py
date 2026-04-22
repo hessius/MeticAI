@@ -38,7 +38,7 @@ from services.meticulous_service import (
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
 from services.profile_recommendation_service import recommendation_service
-from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id
+from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id, _history_lock
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
@@ -47,8 +47,6 @@ from services.temp_profile_service import is_temp_profile
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-_history_lock = threading.Lock()
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
 
@@ -2196,6 +2194,11 @@ async def import_profile(request: Request):
             # File import — normalise locally as baseline
             stored_json = _normalize_profile_for_machine(stored_json)
 
+        # Re-derive profile_name from the finalised JSON so the history entry
+        # name always matches stored_json["name"] (normalisation may change it).
+        if isinstance(stored_json, dict) and stored_json.get("name"):
+            profile_name = stored_json["name"]
+
         # Create history entry
         entry_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
@@ -2380,7 +2383,10 @@ async def import_all_profiles(request: Request):
                 }) + "\n"
                 
                 try:
-                    # Fetch canonical JSON directly from machine API
+                    # Fetch canonical JSON directly from machine API.
+                    # This intentionally re-fetches each profile even though
+                    # the filtering step already retrieved an SDK Profile object,
+                    # because SDK serialisation loses fields (the bug this PR fixes).
                     profile_json = await fetch_machine_profile_dict(profile.id)
                     
                     # Generate description

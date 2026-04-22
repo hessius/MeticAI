@@ -193,7 +193,9 @@ export function ShotDetail({
   // ---- LLM cache check on shot change -------------------------------------
   useEffect(() => {
     if (!selectedShot) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state when shot clears
       setLlmAnalysisResult(null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLlmCached(false)
       return
     }
@@ -259,9 +261,13 @@ export function ShotDetail({
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting analysis state on shot/data change
     setAnalysisResult(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAnalysisError(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLlmAnalysisResult(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLlmAnalysisError(null)
     if (selectedShot && shotData) {
       handleAnalyze()

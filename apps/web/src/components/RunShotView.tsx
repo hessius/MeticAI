@@ -170,7 +170,9 @@ export function RunShotView({ onBack, onNavigateToLive, onProfileSelected, initi
   // at least basic adjustable parameters.
   useEffect(() => {
     if (!selectedProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state when profile clears
       setProfileVariables([])
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOverrides({})
       return
     }

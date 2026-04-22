@@ -55,6 +55,23 @@ export function ShotHistoryView({
   // Track whether the component was opened with a specific shot pre-selected
   const enteredWithShot = useRef(!!(initialShotDate && initialShotFilename))
 
+  // ---- Handlers (declared before effects that reference them) -------------
+  const handleSelectShot = async (shot: ShotInfo) => {
+    setSelectedShot(shot)
+    setLoadingData(true)
+    setDataError(null)
+    setShotData(null)
+
+    try {
+      const data = await fetchShotData(shot.date, shot.filename)
+      setShotData(data)
+    } catch (err) {
+      setDataError(err instanceof Error ? err.message : 'Failed to load shot data')
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
   // ---- Fetch shots (stale-while-revalidate) -------------------------------
   useEffect(() => {
     const loadShots = async () => {
@@ -100,23 +117,6 @@ export function ShotHistoryView({
     }
     fetchAnnotations()
   }, [shots])
-
-  // ---- Handlers -----------------------------------------------------------
-  const handleSelectShot = async (shot: ShotInfo) => {
-    setSelectedShot(shot)
-    setLoadingData(true)
-    setDataError(null)
-    setShotData(null)
-
-    try {
-      const data = await fetchShotData(shot.date, shot.filename)
-      setShotData(data)
-    } catch (err) {
-      setDataError(err instanceof Error ? err.message : 'Failed to load shot data')
-    } finally {
-      setLoadingData(false)
-    }
-  }
 
   const handleBack = () => {
     if (selectedShot && !enteredWithShot.current) {

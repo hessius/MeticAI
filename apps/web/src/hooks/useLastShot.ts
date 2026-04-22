@@ -97,6 +97,7 @@ export function useLastShot(enabled: boolean): UseLastShotResult {
   // Initial fetch + periodic refresh
   useEffect(() => {
     if (!enabled) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- triggering initial fetch on mount
     fetchLastShot()
     const id = setInterval(() => {
       // Only update minutesAgo between full fetches

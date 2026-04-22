@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { getServerUrl } from '@/lib/config'
 
 interface CacheEntry {
@@ -105,9 +105,11 @@ export function useProfileImageCache() {
   // Use refs to avoid recreating fetchImagesForProfiles when cache changes
   // This prevents infinite loops in useEffect dependencies
   const cacheRef = useRef(cache)
-  cacheRef.current = cache
   const setImageUrlRef = useRef(setImageUrl)
-  setImageUrlRef.current = setImageUrl
+  useEffect(() => {
+    cacheRef.current = cache
+    setImageUrlRef.current = setImageUrl
+  })
 
   // Fetch images for multiple profiles, using cache where available
   // This callback is stable (no dependencies that change with cache)
