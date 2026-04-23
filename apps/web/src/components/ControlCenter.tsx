@@ -149,6 +149,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             author?: string
             display?: { description?: string; shortDescription?: string; image?: string }
           }
+          const isDirect = isDirectMode() || isNativePlatformFn()
           const profiles: DropdownProfile[] = (data.profiles ?? [])
             .filter((p: RawProfile) => p.name)
             .map((p: RawProfile) => ({
@@ -158,18 +159,13 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               display: p.display,
               // In direct/native mode, resolve machine-relative image URLs.
               // In proxy mode, leave null — the image cache uses /api/profile/{name}/image-proxy.
-              resolvedImageUrl:
-                (isDirectMode() || isNativePlatformFn())
-                  ? resolveDisplayImage(p.display?.image)
-                  : null,
+              resolvedImageUrl: isDirect ? resolveDisplayImage(p.display?.image) : null,
             }))
           setMachineProfiles(profiles)
-          // Batch-fetch images for profiles missing display.image (proxy mode fallback)
-          fetchImagesForProfiles(profiles.map(p => p.name))
-          // Resolve author for current profile
-          if (activeProfile) {
-            const match = profiles.find(p => p.name === activeProfile)
-            setProfileAuthor(match?.author ?? null)
+          // In proxy mode, batch-fetch images only for profiles without a display image
+          if (!isDirect) {
+            const needsImage = profiles.filter(p => !p.display?.image).map(p => p.name)
+            if (needsImage.length > 0) fetchImagesForProfiles(needsImage)
           }
         }
       } catch {
@@ -177,7 +173,15 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       }
     })()
     return () => { cancelled = true }
-  }, [activeProfile, fetchImagesForProfiles])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchImagesForProfiles])
+
+  // Derive profileAuthor from machineProfiles when activeProfile changes
+  useEffect(() => {
+    if (!activeProfile) return
+    const match = machineProfiles.find(p => p.name === activeProfile)
+    setProfileAuthor(match?.author ?? null)
+  }, [activeProfile, machineProfiles])
 
   // Merge display images with cached fallbacks for the dropdown
   const dropdownProfiles = useMemo<DropdownProfile[]>(() =>

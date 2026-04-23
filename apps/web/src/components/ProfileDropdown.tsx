@@ -172,9 +172,14 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
                       <Check size={14} weight="bold" className="text-primary shrink-0" />
                     )}
                   </div>
-                  {(desc || profile.author) && (
+                  {desc && (
                     <span className="text-xs text-muted-foreground line-clamp-1">
-                      {desc || (profile.author ? `${t('controlCenter.labels.by')} ${profile.author}` : '')}
+                      {desc}
+                    </span>
+                  )}
+                  {profile.author && (
+                    <span className="text-xs text-muted-foreground/70 line-clamp-1">
+                      {t('controlCenter.labels.by')} {profile.author}
                     </span>
                   )}
                 </div>
