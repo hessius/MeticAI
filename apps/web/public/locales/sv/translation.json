@@ -783,7 +783,9 @@
       "started": "Startad"
     },
     "profileSelector": {
-      "placeholder": "Byt profil…"
+      "placeholder": "Byt profil…",
+      "noProfiles": "Inga profiler tillgängliga",
+      "noDescription": "Ingen beskrivning"
     },
     "confirm": {
       "stopTitle": "Stoppa bryggning?",

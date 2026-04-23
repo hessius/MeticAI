@@ -28,6 +28,7 @@ import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescri
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { ProfileImage } from '@/components/ProfileImage'
 import { extractTagsFromPreferences, getAllTagsFromEntries, getTagColorClass } from '@/lib/tags'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
@@ -119,26 +120,7 @@ function SwipeableCard({
   )
 }
 
-function ProfileImage({ imageUrl }: { imageUrl?: string }) {
-  const [error, setError] = useState(false)
-
-  return (
-    <div className="w-10 h-10 rounded-full overflow-hidden border border-border/30 shrink-0 bg-secondary/60">
-      {imageUrl && !error ? (
-        <img
-          src={imageUrl}
-          alt=""
-          className="w-full h-full object-cover"
-          onError={() => setError(true)}
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Coffee size={18} className="text-muted-foreground/40" weight="fill" />
-        </div>
-      )}
-    </div>
-  )
-}
+// ProfileImage is imported from '@/components/ProfileImage'
 
 export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()

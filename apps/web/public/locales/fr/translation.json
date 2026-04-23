@@ -778,7 +778,9 @@
       "started": "Démarré"
     },
     "profileSelector": {
-      "placeholder": "Changer de profil…"
+      "placeholder": "Changer de profil…",
+      "noProfiles": "Aucun profil disponible",
+      "noDescription": "Aucune description"
     },
     "confirm": {
       "stopTitle": "Arrêter l'extraction ?",
