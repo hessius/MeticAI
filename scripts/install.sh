@@ -5,11 +5,11 @@
 # Single-command installation for Metic.
 #
 # Usage (interactive):
-#   curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
 #
 # Usage (non-interactive):
 #   GEMINI_API_KEY=xxx METICULOUS_IP=192.168.1.50 METICAI_NON_INTERACTIVE=true \
-#     curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
 #
 # Environment variables (pre-set to skip prompts):
 #   GEMINI_API_KEY          - Google Gemini API key (optional)
@@ -23,7 +23,7 @@
 #
 # Branch testing:
 #   REPO_BRANCH=version/2.0.0 bash <(curl -fsSL \
-#     https://raw.githubusercontent.com/hessius/Metic/version/2.0.0/scripts/install.sh)
+#     https://raw.githubusercontent.com/hessius/MeticAI/version/2.0.0/scripts/install.sh)
 # ==============================================================================
 
 set -e
@@ -44,7 +44,7 @@ if [[ "$REPO_BRANCH" == "main" ]]; then
 else
     METICAI_TAG="${METICAI_TAG:-$(echo "$REPO_BRANCH" | tr '/' '-')}"
 fi
-REPO_URL="https://raw.githubusercontent.com/hessius/Metic/${REPO_BRANCH}"
+REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
 
 # ==============================================================================
 # Logging helpers
@@ -88,7 +88,7 @@ if [[ "$PLATFORM" == "windows" ]]; then
     echo ""
     echo "  For the best Windows experience, use the PowerShell installer:"
     echo ""
-    echo "    irm https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1"
+    echo "    irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1"
     echo ""
     log_info "Continuing with bash installer anyway..."
     echo ""
@@ -414,7 +414,7 @@ fi
 
 if [[ "$IS_V1" == "true" ]]; then
     # Old v1 multi-container installation detected
-    log_warning "Old Metic v1 installation detected at ~/Metic"
+    log_warning "Old MeticAI v1 installation detected at ~/MeticAI"
 
     if [[ "$METICAI_NON_INTERACTIVE" == "true" ]]; then
         log_info "Non-interactive mode: proceeding with fresh install"

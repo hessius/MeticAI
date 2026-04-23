@@ -35,13 +35,13 @@ python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.ur
 
 This will:
 1. Download the latest pre-built PWA files (~2 MB)
-2. Install to `/opt/metic-web/`
+2. Install to `/opt/meticai-web/`
 3. Patch the machine's web server to serve Metic at `/metic/`
 4. Restart the backend
 
-Then open: **http://`<your-machine>`.local:8080/metic/**
+Then open: **http://`<your-machine>`.local:8080/meticai/**
 
-> **Finding your machine's address:** Your machine's hostname is printed at the end of installation. It's usually something like `meticulousFlatWhite.local` or `meticulous-abc123.local`. Alternatively, check your router's connected devices for the machine's IP and use `http://<ip>:8080/metic/`.
+> **Finding your machine's address:** Your machine's hostname is printed at the end of installation. It's usually something like `meticulousFlatWhite.local` or `meticulous-abc123.local`. Alternatively, check your router's connected devices for the machine's IP and use `http://<ip>:8080/meticai/`.
 
 ## Step-by-Step Install
 
@@ -73,17 +73,17 @@ ssh root@<machine-ip>
 python3 -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/Metic/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')"
 
 # Download the pre-built PWA
-python3 -c "import urllib.request; urllib.request.urlretrieve('https://github.com/hessius/MeticAI/releases/download/latest/metic-web.tar.gz', '/tmp/metic-web.tar.gz')"
+python3 -c "import urllib.request; urllib.request.urlretrieve('https://github.com/hessius/MeticAI/releases/download/latest/meticai-web.tar.gz', '/tmp/meticai-web.tar.gz')"
 
 # Run the installer with the local tarball
-bash /tmp/install-direct.sh --local /tmp/metic-web.tar.gz
+bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz
 ```
 
 > **Note:** During beta, releases may not be available yet. Download the latest CI build artifact instead — see [Using CI Artifacts](#using-ci-artifacts) below.
 
 ### 4. Open Metic
 
-Navigate to `http://<machine-ip>:8080/metic/` in any browser.
+Navigate to `http://<machine-ip>:8080/meticai/` in any browser.
 
 **Pro tip:** Add it to your phone's home screen for an app-like experience:
 - **iOS:** Safari → Share → Add to Home Screen
@@ -95,20 +95,20 @@ During the beta, the easiest way to get pre-built files without building yoursel
 
 1. Go to [GitHub Actions — Build Machine PWA](https://github.com/hessius/MeticAI/actions/workflows/build-machine-pwa.yml)
 2. Click the latest successful run on the `feat/machine-hosted-pwa` branch
-3. Download the **metic-web** artifact (zip file)
-4. Unzip it — you'll get `metic-web.tar.gz`
+3. Download the **meticai-web** artifact (zip file)
+4. Unzip it — you'll get `meticai-web.tar.gz`
 5. Copy to your machine and install:
 
 ```bash
 # From your computer
-scp metic-web.tar.gz root@<machine-ip>:/tmp/
-ssh root@<machine-ip> 'bash /tmp/install-direct.sh --local /tmp/metic-web.tar.gz'
+scp meticai-web.tar.gz root@<machine-ip>:/tmp/
+ssh root@<machine-ip> 'bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz'
 ```
 
 Or as a one-liner (after copying the tarball):
 
 ```bash
-scp metic-web.tar.gz root@<machine-ip>:/tmp/ && ssh root@<machine-ip> "python3 -c \"import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/Metic/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')\" && bash /tmp/install-direct.sh --local /tmp/metic-web.tar.gz"
+scp meticai-web.tar.gz root@<machine-ip>:/tmp/ && ssh root@<machine-ip> "python3 -c \"import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/Metic/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')\" && bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz"
 ```
 
 ## AI Features (Optional)
@@ -133,7 +133,7 @@ python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.ur
 
 ```bash
 ssh root@<machine-ip>
-rm -rf /opt/metic-web /opt/metic-web.bak.*
+rm -rf /opt/meticai-web /opt/metic-web.bak.*
 ```
 
 The Tornado route patch is harmless if the files are removed — it will just show a 404.

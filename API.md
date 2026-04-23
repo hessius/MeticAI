@@ -7,7 +7,7 @@ http://<SERVER_IP>:3550/api
 ```
 
 All endpoints are served via nginx on port **3550**. The `/api` prefix is required.
-Container name: `metic`. Interactive docs: `http://<SERVER_IP>:3550/docs`
+Container name: `meticai`. Interactive docs: `http://<SERVER_IP>:3550/docs`
 
 ---
 
@@ -240,10 +240,10 @@ curl "http://<SERVER_IP>:3550/api/logs?lines=200&level=ERROR"
 
 ```bash
 # Check container is running
-docker ps | grep metic
+docker ps | grep meticai
 
 # View logs
-docker logs metic -f
+docker logs meticai -f
 
 # Test connectivity
 curl http://<SERVER_IP>:3550/health

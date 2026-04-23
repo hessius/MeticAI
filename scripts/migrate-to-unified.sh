@@ -30,10 +30,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="${HOME}/Metic"
+INSTALL_DIR="${HOME}/MeticAI"
 BACKUP_DIR="${INSTALL_DIR}/backup-$(date +%Y%m%d-%H%M%S)"
 REPO_BRANCH="${REPO_BRANCH:-main}"
-REPO_URL="https://raw.githubusercontent.com/hessius/Metic/${REPO_BRANCH}"
+REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
 if [[ "$REPO_BRANCH" == "main" ]]; then
     METICAI_TAG="${METICAI_TAG:-latest}"
 else
@@ -74,7 +74,7 @@ fi
 if [[ ! -d "$INSTALL_DIR" ]] && [[ ! -f "${INSTALL_DIR}/.env" ]]; then
     log_warning "No existing Metic installation found at $INSTALL_DIR"
     echo "Run the installer instead:"
-    echo "  curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash"
+    echo "  curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash"
     exit 0
 fi
 
@@ -419,7 +419,7 @@ echo ""
 echo "Backup saved to: $BACKUP_DIR"
 echo ""
 echo "Useful commands:"
-echo "  cd ~/Metic"
+echo "  cd ~/MeticAI"
 echo "  ./start.sh        Start Metic"
 echo "  ./stop.sh         Stop Metic"
 echo "  ./update.sh       Pull latest image & restart"
@@ -433,7 +433,7 @@ fi
 if [[ -z "$TAILSCALE_AUTHKEY" ]] && echo "$COMPOSE_FILES" | grep -q tailscale; then
     echo "⚠️  Tailscale is enabled but needs an auth key."
     echo "   Add it via the Settings UI or:"
-    echo "   echo 'TAILSCALE_AUTHKEY=tskey-...' >> ~/Metic/.env && ./start.sh"
+    echo "   echo 'TAILSCALE_AUTHKEY=tskey-...' >> ~/MeticAI/.env && ./start.sh"
     echo ""
 fi
 echo "☕ Enjoy your coffee!"

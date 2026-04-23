@@ -7,7 +7,7 @@
 #
 # Usage (auto-download from GitHub):
 #   python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
-#     https://raw.githubusercontent.com/hessius/Metic/main/scripts/install-direct.sh | bash
+#     https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install-direct.sh | bash
 #
 # Usage (manual — build locally and SCP):
 #   # On your dev machine:
@@ -98,7 +98,7 @@ if [ -n "$LOCAL_TARBALL" ]; then
   echo "Using local tarball: ${LOCAL_TARBALL}"
 elif [ "$METICAI_VERSION" = "latest" ]; then
   echo "Resolving latest release..."
-  RELEASE_URL=$(fetch https://api.github.com/repos/hessius/Metic/releases/latest \
+  RELEASE_URL=$(fetch https://api.github.com/repos/hessius/MeticAI/releases/latest \
     | grep "browser_download_url.*meticai-web.tar.gz" | head -1 | cut -d'"' -f4)
   if [ -z "$RELEASE_URL" ]; then
     echo "ERROR: Could not find meticai-web.tar.gz in latest release"
