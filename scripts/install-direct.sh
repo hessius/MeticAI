@@ -1,5 +1,5 @@
 #!/bin/bash
-# install-direct.sh — Install MeticAI Direct Mode PWA on a Meticulous machine
+# install-direct.sh — Install Metic Direct Mode PWA on a Meticulous machine
 #
 # TODO(release): Before merging to main, update the GitHub download URLs
 #   to point to the release tarball instead of CI artifacts, and remove
@@ -67,7 +67,7 @@ download() {
 }
 
 echo "╔══════════════════════════════════════════╗"
-echo "║   MeticAI PWA Installer                  ║"
+echo "║   Metic PWA Installer                  ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
@@ -173,7 +173,7 @@ if [ -f "$WEB_UI" ]; then
     echo "  ✓ Tornado route already configured"
   else
     echo "  Patching ${WEB_UI}..."
-    # Insert MeticAI routes before the closing bracket of WEB_UI_HANDLER
+    # Insert Metic routes before the closing bracket of WEB_UI_HANDLER
     # Find the last line of WEB_UI_HANDLER array and append before it
     cp "$WEB_UI" "${WEB_UI}.bak"
     python3 -c "
@@ -227,7 +227,7 @@ if [ -f "$WEB_UI" ] && grep -q '/meticai' "$WEB_UI"; then
 fi
 
 echo ""
-echo "── Access MeticAI ──────────────────────────"
+echo "── Access Metic ──────────────────────────"
 echo ""
 echo "  http://$(hostname).local:8080/meticai/"
 echo ""

@@ -3369,7 +3369,7 @@ async def restore_profile_from_history(history_id: str, request: Request):
 
         # Ensure author_id is present — machine API may require it
         if "author_id" not in profile_json:
-            profile_json["author_id"] = profile_json.get("author", "MeticAI")
+            profile_json["author_id"] = profile_json.get("author", "Metic")
 
         # Strip None values (machine API rejects them)
         clean_json = {k: v for k, v in profile_json.items() if v is not None}

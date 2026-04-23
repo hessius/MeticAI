@@ -122,9 +122,9 @@ export function installDirectModeInterceptor(): void {
   // ── Pour-over profile adapters (ported from backend pour_over_adapter.py / recipe_adapter.py) ──
 
   const _POUR_OVER_BASE = {
-    name: 'MeticAI Ratio Pour-Over',
+    name: 'Metic Ratio Pour-Over',
     id: '', // will be replaced
-    author: 'MeticAI',
+    author: 'Metic',
     author_id: '',
     display: { accentColor: '#566656' },
     temperature: 0,
@@ -202,7 +202,7 @@ export function installDirectModeInterceptor(): void {
     profile.id = _uuid()
     profile.author_id = _uuid()
     const recipeName = recipe.metadata?.name ?? 'Recipe'
-    profile.name = `MeticAI Recipe: ${recipeName}`
+    profile.name = `Metic Recipe: ${recipeName}`
     const totalWater = Number(recipe.ingredients?.water_g ?? 0)
     const coffeeG = Number(recipe.ingredients?.coffee_g ?? 0) || null
     profile.final_weight = totalWater
@@ -627,7 +627,7 @@ export function installDirectModeInterceptor(): void {
     if (url.match(/\/api\/machine\/schedule-shot/) && method === 'POST') {
       return jsonResponse({
         status: 'error',
-        detail: 'Scheduled shots are not supported in direct mode. Use the machine UI or MeticAI Docker mode.',
+        detail: 'Scheduled shots are not supported in direct mode. Use the machine UI or Metic Docker mode.',
       }, 501)
     }
 
@@ -1350,7 +1350,7 @@ export function installDirectModeInterceptor(): void {
                   return {
                     name: p.name || 'AI Generated Profile',
                     id: uuid(),
-                    author: typeof p.author === 'string' ? p.author : 'MeticAI',
+                    author: typeof p.author === 'string' ? p.author : 'Metic',
                     author_id: uuid(),
                     previous_authors: [],
                     display: { accentColor: '#6366f1' },

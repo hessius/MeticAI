@@ -19,7 +19,7 @@ test.describe('Screenshot Generation', () => {
 
       await page.goto('/');
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForSelector('text=MeticAI');
+      await page.waitForSelector('text=Metic');
 
       // Allow i18n to settle after page load
       await page.waitForTimeout(500);

@@ -14,7 +14,7 @@ log_error() { echo -e "${RED}x${NC} $1"; }
 
 INSTALL_DIR="${INSTALL_DIR:-}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
-REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/${REPO_BRANCH}"
+REPO_URL="https://raw.githubusercontent.com/hessius/Metic/${REPO_BRANCH}"
 
 find_install_dir() {
     # Honor INSTALL_DIR env var if set and valid
@@ -22,7 +22,7 @@ find_install_dir() {
         return 0
     fi
 
-    local candidates=("$PWD" "$HOME/MeticAI" "/opt/meticai")
+    local candidates=("$PWD" "$HOME/Metic" "/opt/meticai")
     for dir in "${candidates[@]}"; do
         if [[ -f "$dir/.env" && -f "$dir/docker-compose.yml" ]]; then
             INSTALL_DIR="$dir"
@@ -30,7 +30,7 @@ find_install_dir() {
         fi
     done
 
-    log_error "Could not find a MeticAI installation directory."
+    log_error "Could not find a Metic installation directory."
     log_info "Run this from your install folder or export INSTALL_DIR=/path/to/meticai first."
     exit 1
 }
@@ -176,7 +176,7 @@ print_menu() {
     compose_has_file "$compose_string" "docker-compose.homeassistant.yml" && ha="[x]"
 
     echo ""
-    echo "MeticAI Addon Manager"
+    echo "Metic Addon Manager"
     echo "====================="
     echo "Install dir: $INSTALL_DIR"
     echo ""

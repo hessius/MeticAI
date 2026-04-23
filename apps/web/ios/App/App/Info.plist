@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>MeticAI</string>
+	<string>Metic</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -36,9 +36,9 @@
 		<string>_meticulous._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>MeticAI uses the camera to scan QR codes for machine discovery and to capture images for AI profile generation.</string>
+	<string>Metic uses the camera to scan QR codes for machine discovery and to capture images for AI profile generation.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>MeticAI needs local network access to communicate with your Meticulous espresso machine.</string>
+	<string>Metic needs local network access to communicate with your Meticulous espresso machine.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

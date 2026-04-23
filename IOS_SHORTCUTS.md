@@ -1,6 +1,6 @@
 # iOS Shortcuts Setup
 
-Control MeticAI with one tap from your iPhone using Apple Shortcuts.
+Control Metic with one tap from your iPhone using Apple Shortcuts.
 
 > **Tip:** The web interface at `http://<SERVER_IP>:3550` is easier and more feature-rich for most users.
 
@@ -46,7 +46,7 @@ Same as Photo workflow but use endpoint: `http://<SERVER_IP>:3550/api/analyze_co
 
 ## Import Profile from Share Sheet
 
-Share a profile URL (`.json` or `.met`) from any app to import it directly into MeticAI.
+Share a profile URL (`.json` or `.met`) from any app to import it directly into Metic.
 
 ### Setup
 
@@ -59,7 +59,7 @@ Share a profile URL (`.json` or `.met`) from any app to import it directly into 
 
 ### How It Works
 
-MeticAI supports a `?import=<url>` query parameter. When the app loads with this parameter, it automatically opens the import dialog and begins importing the profile from the given URL.
+Metic supports a `?import=<url>` query parameter. When the app loads with this parameter, it automatically opens the import dialog and begins importing the profile from the given URL.
 
 ### Alternative: Direct API Import
 

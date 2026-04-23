@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ################################################################################
-# MeticAI - macOS Uninstaller Wrapper Script (v2.0)
+# Metic - macOS Uninstaller Wrapper Script (v2.0)
 ################################################################################
 # 
 # This script provides a GUI-based uninstallation experience for macOS users.
@@ -22,7 +22,7 @@ set -e
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
 # Default — only used as a hint for the folder picker
-DEFAULT_INSTALL_DIR="${HOME}/MeticAI"
+DEFAULT_INSTALL_DIR="${HOME}/Metic"
 
 # Get icon path for dialogs
 get_icon_path() {
@@ -51,7 +51,7 @@ show_dialog() {
 tell application "System Events"
     activate
     set iconPath to POSIX file "$ICON_PATH"
-    display dialog "$message" buttons {$buttons} default button "$default_button" with icon file iconPath with title "MeticAI Uninstaller"
+    display dialog "$message" buttons {$buttons} default button "$default_button" with icon file iconPath with title "Metic Uninstaller"
     return button returned of result
 end tell
 EOF
@@ -59,7 +59,7 @@ EOF
         osascript <<EOF
 tell application "System Events"
     activate
-    display dialog "$message" buttons {$buttons} default button "$default_button" with icon $icon with title "MeticAI Uninstaller"
+    display dialog "$message" buttons {$buttons} default button "$default_button" with icon $icon with title "Metic Uninstaller"
     return button returned of result
 end tell
 EOF
@@ -73,7 +73,7 @@ show_input_dialog() {
     osascript <<EOF
 tell application "System Events"
     activate
-    set dialogResult to display dialog "$prompt" default answer "$default_value" buttons {"Cancel", "OK"} default button "OK" with title "MeticAI Uninstaller"
+    set dialogResult to display dialog "$prompt" default answer "$default_value" buttons {"Cancel", "OK"} default button "OK" with title "Metic Uninstaller"
     return text returned of dialogResult
 end tell
 EOF
@@ -95,10 +95,10 @@ EOF
 # Show progress notification
 show_progress() {
     local message="$1"
-    osascript -e "display notification \"$message\" with title \"MeticAI Uninstaller\""
+    osascript -e "display notification \"$message\" with title \"Metic Uninstaller\""
 }
 
-# Detect the install directory from running MeticAI Docker containers.
+# Detect the install directory from running Metic Docker containers.
 # Docker labels or `docker compose ls` can reveal the project directory.
 detect_install_from_docker() {
     # Method 1: docker compose ls — lists project directories
@@ -138,7 +138,7 @@ for p in json.load(sys.stdin):
     return 1
 }
 
-# Validate that a directory looks like a MeticAI installation (not a dev checkout)
+# Validate that a directory looks like a Metic installation (not a dev checkout)
 validate_install_dir() {
     local dir="$1"
 
@@ -165,9 +165,9 @@ This folder is marked as a development environment and will NOT be deleted." '"O
         return 1
     fi
 
-    # Verify it looks like a MeticAI installation
+    # Verify it looks like a Metic installation
     if [ ! -f "${dir}/docker-compose.yml" ] && [ ! -f "${dir}/.env" ]; then
-        result=$(show_dialog "This folder does not appear to be a MeticAI installation:
+        result=$(show_dialog "This folder does not appear to be a Metic installation:
 ${dir}
 
 No docker-compose.yml or .env file was found.
@@ -184,9 +184,9 @@ Are you sure you want to proceed?" '"Cancel", "Proceed Anyway"' "Cancel" "cautio
 # Main uninstallation flow
 main() {
     # Welcome / confirmation
-    result=$(show_dialog "MeticAI Uninstaller
+    result=$(show_dialog "Metic Uninstaller
 
-This will help you remove MeticAI from your Mac.
+This will help you remove Metic from your Mac.
 
 Click Continue to begin." '"Cancel", "Continue"' "Continue" "caution")
     
@@ -197,14 +197,14 @@ Click Continue to begin." '"Cancel", "Continue"' "Continue" "caution")
     # --- Detect install location ---
     local INSTALL_DIR=""
 
-    show_progress "Looking for MeticAI installation..."
+    show_progress "Looking for Metic installation..."
     INSTALL_DIR=$(detect_install_from_docker 2>/dev/null || true)
 
     if [[ -n "$INSTALL_DIR" ]]; then
         # Found from Docker — confirm with user
-        result=$(show_dialog "MeticAI Installation Found
+        result=$(show_dialog "Metic Installation Found
 
-Detected MeticAI running from:
+Detected Metic running from:
 ${INSTALL_DIR}
 
 Is this the installation you want to remove?" '"Cancel", "Browse…", "Yes, Remove"' "Yes, Remove")
@@ -225,7 +225,7 @@ Is this the installation you want to remove?" '"Cancel", "Browse…", "Yes, Remo
     if [[ -z "$INSTALL_DIR" ]]; then
         # Try default location
         if [ -f "${DEFAULT_INSTALL_DIR}/docker-compose.yml" ] || [ -f "${DEFAULT_INSTALL_DIR}/.env" ]; then
-            result=$(show_dialog "MeticAI Installation Found
+            result=$(show_dialog "Metic Installation Found
 
 Found an installation at the default location:
 ${DEFAULT_INSTALL_DIR}
@@ -248,18 +248,18 @@ Is this the installation you want to remove?" '"Cancel", "Browse…", "Yes, Remo
 
     if [[ -z "$INSTALL_DIR" ]]; then
         # Ask user to locate their installation
-        result=$(show_dialog "Locate MeticAI Installation
+        result=$(show_dialog "Locate Metic Installation
 
-Could not automatically detect your MeticAI installation.
+Could not automatically detect your Metic installation.
 
-Please browse to the folder where MeticAI was installed." '"Cancel", "Browse…"' "Browse…")
+Please browse to the folder where Metic was installed." '"Cancel", "Browse…"' "Browse…")
 
         if [ "$result" != "Browse…" ]; then
             exit 0
         fi
 
         local chosen
-        chosen=$(choose_folder "Select your MeticAI installation folder" "$HOME")
+        chosen=$(choose_folder "Select your Metic installation folder" "$HOME")
         if [ -z "$chosen" ]; then
             exit 0
         fi
@@ -274,7 +274,7 @@ Please browse to the folder where MeticAI was installed." '"Cancel", "Browse…"
     # --- Confirm uninstallation ---
     result=$(show_dialog "Confirm Uninstall
 
-This will uninstall MeticAI from:
+This will uninstall Metic from:
 ${INSTALL_DIR}
 
 • Stop and remove Docker containers
@@ -289,7 +289,7 @@ Are you sure?" '"Cancel", "Uninstall"' "Cancel" "caution")
     # --- Ask about data ---
     result=$(show_dialog "Remove Data?
 
-Would you like to also remove all MeticAI data?
+Would you like to also remove all Metic data?
 (Profiles, shot history, settings stored in Docker volumes)
 
 This cannot be undone." '"Keep Data", "Remove Everything"' "Keep Data" "caution")
@@ -300,7 +300,7 @@ This cannot be undone." '"Keep Data", "Remove Everything"' "Keep Data" "caution"
     fi
     
     # --- Stop containers ---
-    show_progress "Stopping MeticAI containers..."
+    show_progress "Stopping Metic containers..."
     
     if [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
         cd "$INSTALL_DIR"
@@ -321,7 +321,7 @@ This cannot be undone." '"Keep Data", "Remove Everything"' "Keep Data" "caution"
     # --- Remove Docker image (optional) ---
     result=$(show_dialog "Remove Docker Image?
 
-Would you like to also remove the MeticAI Docker image to free disk space?
+Would you like to also remove the Metic Docker image to free disk space?
 
 (You can always re-download it later)" '"Keep Image", "Remove Image"' "Keep Image")
 
@@ -344,7 +344,7 @@ Would you like to also remove the MeticAI Docker image to free disk space?
         # Full removal — delete the entire directory
         rm -rf "$INSTALL_DIR"
     else
-        # Keep data safe — only remove MeticAI-specific files, not the whole tree
+        # Keep data safe — only remove Metic-specific files, not the whole tree
         cd "$INSTALL_DIR" 2>/dev/null || true
         rm -f docker-compose.yml docker-compose.watchtower.yml \
               docker-compose.tailscale.yml docker-compose.homeassistant.yml \
@@ -360,28 +360,28 @@ Would you like to also remove the MeticAI Docker image to free disk space?
     fi
     
     # --- Remove macOS app shortcut ---
-    if [ -d "/Applications/MeticAI.app" ]; then
+    if [ -d "/Applications/Metic.app" ]; then
         show_progress "Removing Dock shortcut..."
-        rm -rf "/Applications/MeticAI.app" 2>/dev/null || sudo rm -rf "/Applications/MeticAI.app" 2>/dev/null || true
+        rm -rf "/Applications/Metic.app" 2>/dev/null || sudo rm -rf "/Applications/Metic.app" 2>/dev/null || true
     fi
 
     # --- Success ---
     if [ "$REMOVE_DATA" = "y" ]; then
-        show_dialog "MeticAI Uninstalled ☕
+        show_dialog "Metic Uninstalled ☕
 
-All MeticAI files and data have been removed.
+All Metic files and data have been removed.
 
-Thank you for using MeticAI!" '"OK"' "OK"
+Thank you for using Metic!" '"OK"' "OK"
     else
-        show_dialog "MeticAI Uninstalled ☕
+        show_dialog "Metic Uninstalled ☕
 
-MeticAI configuration has been removed. Your data is preserved
+Metic configuration has been removed. Your data is preserved
 in the Docker volume 'meticai-data'.
 
 To completely remove data later, run:
 docker volume rm meticai-data
 
-Thank you for using MeticAI!" '"OK"' "OK"
+Thank you for using Metic!" '"OK"' "OK"
     fi
 }
 

@@ -1,4 +1,4 @@
-# MeticAI v2.0 — API Reference
+# Metic v2.0 — API Reference
 
 ## Base URL
 

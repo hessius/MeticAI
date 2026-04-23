@@ -1,33 +1,33 @@
 import { ImgHTMLAttributes } from 'react'
 
-interface MeticAILogoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
+interface MeticLogoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   size?: number | string
   variant?: 'default' | 'white'
 }
 
 /**
- * MeticAI Logo Component
+ * Metic Logo Component
  * 
- * Renders the MeticAI coffee cup logo using the SVG files from public folder.
+ * Renders the Metic coffee cup logo using the SVG files from public folder.
  * Supports custom sizing and light/dark variants.
  * 
  * @param size - Width/height of the logo (default: 40)
  * @param variant - 'default' for dark logo, 'white' for light logo
  * @param className - Additional CSS classes
  */
-export function MeticAILogo({ 
+export function MeticLogo({ 
   size = 40, 
   variant = 'default',
   className = '',
   ...props 
-}: MeticAILogoProps) {
+}: MeticLogoProps) {
   const base = import.meta.env.BASE_URL || '/'
   const logoSrc = variant === 'white' ? `${base}logo-white.svg` : `${base}logo.svg`
 
   return (
     <img
       src={logoSrc}
-      alt="MeticAI Logo"
+      alt="Metic Logo"
       width={size}
       height={size}
       className={className}

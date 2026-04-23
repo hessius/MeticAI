@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ################################################################################
-# MeticAI - Common Shell Library
+# Metic - Common Shell Library
 ################################################################################
-# Shared functions and utilities for MeticAI shell scripts
+# Shared functions and utilities for Metic shell scripts
 # 
 # USAGE:
 #   source "$(dirname "$0")/scripts/lib/common.sh"

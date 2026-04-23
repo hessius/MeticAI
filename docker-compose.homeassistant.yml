@@ -1,5 +1,5 @@
 # ==============================================================================
-# MeticAI Home Assistant Integration
+# Metic Home Assistant Integration
 # ==============================================================================
 # Exposes the MQTT broker so Home Assistant (or other MQTT clients) can
 # subscribe to real-time machine telemetry.

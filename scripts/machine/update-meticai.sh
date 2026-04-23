@@ -1,5 +1,5 @@
 #!/bin/bash
-# update-meticai.sh — Update MeticAI PWA to a new version
+# update-meticai.sh — Update Metic PWA to a new version
 #
 # Usage:
 #   ./update-meticai.sh           # Update to latest
@@ -10,7 +10,7 @@ METICAI_VERSION="${1:-latest}"
 INSTALL_DIR="/opt/meticai-web"
 
 echo "╔══════════════════════════════════════════╗"
-echo "║   MeticAI PWA Updater                   ║"
+echo "║   Metic PWA Updater                   ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 

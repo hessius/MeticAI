@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ################################################################################
-# MeticAI - macOS Installer Wrapper Script (v2.0)
+# Metic - macOS Installer Wrapper Script (v2.0)
 ################################################################################
 # 
 # This script provides a GUI-based installation experience for macOS users.
@@ -18,7 +18,7 @@ set -e
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
 # Configuration
-DEFAULT_INSTALL_DIR="${HOME}/MeticAI"
+DEFAULT_INSTALL_DIR="${HOME}/Metic"
 INSTALL_DIR=""  # Set by user during install flow
 REPO_URL="https://raw.githubusercontent.com/hessius/MeticAI/main"
 METICAI_TAG="latest"
@@ -57,7 +57,7 @@ show_dialog() {
 tell application "System Events"
     activate
     set iconPath to POSIX file "$ICON_PATH"
-    display dialog "$message" buttons {$buttons} default button "$default_button" with icon file iconPath with title "MeticAI Installer"
+    display dialog "$message" buttons {$buttons} default button "$default_button" with icon file iconPath with title "Metic Installer"
     return button returned of result
 end tell
 EOF
@@ -65,7 +65,7 @@ EOF
         osascript <<EOF
 tell application "System Events"
     activate
-    display dialog "$message" buttons {$buttons} default button "$default_button" with icon $icon with title "MeticAI Installer"
+    display dialog "$message" buttons {$buttons} default button "$default_button" with icon $icon with title "Metic Installer"
     return button returned of result
 end tell
 EOF
@@ -80,7 +80,7 @@ show_input_dialog() {
     osascript <<EOF
 tell application "System Events"
     activate
-    set dialogResult to display dialog "$prompt" default answer "$default_value" buttons {"Cancel", "OK"} default button "OK" with title "MeticAI Installer"
+    set dialogResult to display dialog "$prompt" default answer "$default_value" buttons {"Cancel", "OK"} default button "OK" with title "Metic Installer"
     return text returned of dialogResult
 end tell
 EOF
@@ -102,7 +102,7 @@ EOF
 # Show progress notification
 show_progress() {
     local message="$1"
-    osascript -e "display notification \"$message\" with title \"MeticAI Installer\""
+    osascript -e "display notification \"$message\" with title \"Metic Installer\""
 }
 
 # Auto-detect Meticulous machine on the network via Bonjour.
@@ -213,14 +213,14 @@ check_docker() {
 # Main installation flow
 main() {
     # Welcome dialog
-    show_dialog "Welcome to MeticAI Installer
+    show_dialog "Welcome to Metic Installer
 
-This will install MeticAI - your AI Barista for the Meticulous Espresso Machine.
+This will install Metic - your AI Barista for the Meticulous Espresso Machine.
 
 The installation will:
 • Check for Docker Desktop
 • Configure your API key and machine IP
-• Start MeticAI in Docker
+• Start Metic in Docker
 
 Click Continue to begin." '"Cancel", "Continue"' "Continue"
     
@@ -238,7 +238,7 @@ Click Continue to begin." '"Cancel", "Continue"' "Continue"
             # Docker not installed
             result=$(show_dialog "Docker Desktop Required
 
-Docker Desktop is not installed. MeticAI requires Docker to run.
+Docker Desktop is not installed. Metic requires Docker to run.
 
 Would you like to download Docker Desktop now?" '"Cancel", "Download Docker"' "Download Docker" "caution")
             
@@ -267,7 +267,7 @@ You can find it in your Applications folder." '"OK"' "OK" "caution"
 
     result=$(show_dialog "Choose Installation Location
 
-MeticAI files will be stored in this folder.
+Metic files will be stored in this folder.
 Default: ${DEFAULT_INSTALL_DIR}${existing_note}
 
 Click Browse to choose a different folder, or Continue to use the default." '"Cancel", "Browse…", "Continue"' "Continue")
@@ -276,14 +276,14 @@ Click Browse to choose a different folder, or Continue to use the default." '"Ca
         "Browse…")
             # Ensure the default parent directory exists for the folder picker
             mkdir -p "${DEFAULT_INSTALL_DIR%/*}"
-            chosen=$(choose_folder "Choose a folder for MeticAI" "${DEFAULT_INSTALL_DIR%/*}")
+            chosen=$(choose_folder "Choose a folder for Metic" "${DEFAULT_INSTALL_DIR%/*}")
             if [ -z "$chosen" ]; then
                 show_error "No folder selected. Installation cancelled."
             fi
-            # Append MeticAI subfolder if user picked a parent
+            # Append Metic subfolder if user picked a parent
             chosen="${chosen%/}"
-            if [[ "$(basename "$chosen")" != "MeticAI" && "$(basename "$chosen")" != "meticai" ]]; then
-                INSTALL_DIR="${chosen}/MeticAI"
+            if [[ "$(basename "$chosen")" != "Metic" && "$(basename "$chosen")" != "metic" ]]; then
+                INSTALL_DIR="${chosen}/Metic"
             else
                 INSTALL_DIR="$chosen"
             fi
@@ -307,12 +307,12 @@ Click Browse to choose a different folder, or Continue to use the default." '"Ca
     fi
 
     if [ "$IS_V1" = "true" ]; then
-        result=$(show_dialog "Old MeticAI v1 Installation Detected
+        result=$(show_dialog "Old Metic v1 Installation Detected
 
-An older MeticAI v1 installation was found at:
+An older Metic v1 installation was found at:
 ${INSTALL_DIR}
 
-MeticAI v2.0 uses a completely new unified-container architecture. A fresh install is recommended.
+Metic v2.0 uses a completely new unified-container architecture. A fresh install is recommended.
 
 Would you like to stop the old containers and proceed with a fresh install?" '"Cancel", "Fresh Install"' "Fresh Install" "caution")
 
@@ -328,13 +328,13 @@ Would you like to stop the old containers and proceed with a fresh install?" '"C
     if [ "$IS_V1" = "false" ] && [ -f "${INSTALL_DIR}/.env" ]; then
         result=$(show_dialog "Existing Installation Found
 
-MeticAI is already installed at ${INSTALL_DIR}
+Metic is already installed at ${INSTALL_DIR}
 
 What would you like to do?" '"Cancel", "Reinstall", "Update"' "Update")
         
         case "$result" in
             "Update")
-                show_progress "Updating MeticAI..."
+                show_progress "Updating Metic..."
                 cd "$INSTALL_DIR"
                 source .env 2>/dev/null || true
                 eval "docker compose \${COMPOSE_FILES:--f docker-compose.yml} pull"
@@ -354,9 +354,9 @@ What would you like to do?" '"Cancel", "Reinstall", "Update"' "Update")
                 fi
                 update_ip=${update_ip:-localhost}
 
-                show_dialog "MeticAI Updated!
+                show_dialog "Metic Updated!
 
-Access MeticAI at:
+Access Metic at:
 http://${update_ip}:3550
 
 The services are now running in the background." '"OK"' "OK"
@@ -427,7 +427,7 @@ Would you like to enable automatic updates?
 
 Would you like to enable Tailscale for remote access?
 
-This lets you access MeticAI from anywhere using a free Tailscale account.
+This lets you access Metic from anywhere using a free Tailscale account.
 
 Learn more: https://tailscale.com" '"No", "Yes"' "No")
 
@@ -461,7 +461,7 @@ This exposes the MQTT broker on port 1883 for Home Assistant to connect to." '"N
     fi
     
     # Create installation directory
-    show_progress "Installing MeticAI..."
+    show_progress "Installing Metic..."
     mkdir -p "$INSTALL_DIR"
     cd "$INSTALL_DIR"
 
@@ -480,7 +480,7 @@ This exposes the MQTT broker on port 1883 for Home Assistant to connect to." '"N
 
     # Create .env file
     cat > .env << EOF
-# MeticAI Configuration
+# Metic Configuration
 # Generated by macOS Installer on $(date)
 
 # Required
@@ -546,7 +546,7 @@ SCRIPT_END
 #!/bin/bash
 cd "$(dirname "$0")"
 source .env 2>/dev/null
-echo "Pulling latest MeticAI image..."
+echo "Pulling latest Metic image..."
 docker compose ${COMPOSE_FILES:--f docker-compose.yml} pull
 echo "Restarting..."
 docker compose ${COMPOSE_FILES:--f docker-compose.yml} up -d
@@ -559,7 +559,7 @@ SCRIPT_END
 cd "$(dirname "$0")"
 source .env 2>/dev/null
 echo ""
-echo "  MeticAI Uninstaller"
+echo "  Metic Uninstaller"
 echo "  ==================="
 echo ""
 INSTALL_PATH="$(pwd)"
@@ -577,7 +577,7 @@ if [[ -f "${INSTALL_PATH}/.meticai-dev" ]]; then
     exit 1
 fi
 
-echo "This will stop MeticAI and remove all files from ${INSTALL_PATH}."
+echo "This will stop Metic and remove all files from ${INSTALL_PATH}."
 echo "Your data (profiles, history) is stored in a Docker volume and will be preserved."
 echo ""
 read -p "Are you sure? (y/N): " CONFIRM < /dev/tty
@@ -596,17 +596,17 @@ if [[ "$REMOVE_DATA" =~ ^[Yy]$ ]]; then
     docker volume rm meticai-tailscale-state 2>/dev/null || true
     echo "Data volumes removed"
 fi
-read -p "Also remove the MeticAI Docker image? (y/N): " REMOVE_IMAGE < /dev/tty
+read -p "Also remove the Metic Docker image? (y/N): " REMOVE_IMAGE < /dev/tty
 if [[ "$REMOVE_IMAGE" =~ ^[Yy]$ ]]; then
     docker rmi "ghcr.io/hessius/meticai:${METICAI_TAG:-latest}" 2>/dev/null || true
     echo "Image removed"
 fi
-if [[ -d "/Applications/MeticAI.app" ]]; then
+if [[ -d "/Applications/Metic.app" ]]; then
     echo "Removing macOS app shortcut..."
-    rm -rf "/Applications/MeticAI.app" 2>/dev/null || sudo rm -rf "/Applications/MeticAI.app" 2>/dev/null || true
+    rm -rf "/Applications/Metic.app" 2>/dev/null || sudo rm -rf "/Applications/Metic.app" 2>/dev/null || true
 fi
 echo ""
-echo "MeticAI has been uninstalled."
+echo "Metic has been uninstalled."
 echo "To remove the installation directory: rm -rf ${INSTALL_PATH}"
 echo ""
 SCRIPT_END
@@ -616,7 +616,7 @@ SCRIPT_END
     show_progress "Pulling Docker images (this may take a few minutes)..."
     eval "docker compose ${COMPOSE_FILES} pull"
     
-    show_progress "Starting MeticAI..."
+    show_progress "Starting Metic..."
     eval "docker compose ${COMPOSE_FILES} up -d"
     
     # Wait for startup
@@ -640,25 +640,25 @@ SCRIPT_END
     # Offer macOS Dock shortcut
     result=$(show_dialog "Add Dock Shortcut?
 
-Would you like to add a MeticAI shortcut to your Dock?
+Would you like to add a Metic shortcut to your Dock?
 
-This creates a simple app that opens the MeticAI web interface." '"No", "Yes"' "Yes")
+This creates a simple app that opens the Metic web interface." '"No", "Yes"' "Yes")
 
     if [ "$result" = "Yes" ]; then
-        local APP_PATH="/Applications/MeticAI.app"
+        local APP_PATH="/Applications/Metic.app"
         local APP_URL="http://${server_ip}:3550"
 
         mkdir -p "${APP_PATH}/Contents/MacOS"
         mkdir -p "${APP_PATH}/Contents/Resources"
 
-        cat > "${APP_PATH}/Contents/MacOS/MeticAI" << APPEOF
+        cat > "${APP_PATH}/Contents/MacOS/Metic" << APPEOF
 #!/bin/bash
 open "${APP_URL}"
 APPEOF
-        chmod +x "${APP_PATH}/Contents/MacOS/MeticAI"
+        chmod +x "${APP_PATH}/Contents/MacOS/Metic"
 
         # Download the proper .icns icon
-        curl -fsSL "${REPO_URL}/resources/MeticAI.icns" \
+        curl -fsSL "${REPO_URL}/resources/Metic.icns" \
             -o "${APP_PATH}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
 
         cat > "${APP_PATH}/Contents/Info.plist" << PLISTEOF
@@ -667,11 +667,11 @@ APPEOF
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>MeticAI</string>
+    <string>Metic</string>
     <key>CFBundleIdentifier</key>
     <string>com.meticai.app</string>
     <key>CFBundleName</key>
-    <string>MeticAI</string>
+    <string>Metic</string>
     <key>CFBundleVersion</key>
     <string>2.0.0</string>
     <key>CFBundlePackageType</key>
@@ -696,7 +696,7 @@ PLISTEOF
                         <integer>15</integer>
                     </dict>
                     <key>file-label</key>
-                    <string>MeticAI</string>
+                    <string>Metic</string>
                     <key>file-type</key>
                     <integer>41</integer>
                 </dict>
@@ -716,7 +716,7 @@ PLISTEOF
     # Success!
     show_dialog "Installation Complete! ☕
 
-MeticAI is now running.
+Metic is now running.
 
 Access the web interface at:
 http://${server_ip}:3550${features}

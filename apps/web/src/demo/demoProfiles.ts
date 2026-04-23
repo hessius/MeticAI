@@ -7,7 +7,7 @@
 
 import type { Profile } from '@meticulous-home/espresso-profile'
 
-const DEMO_AUTHOR = 'MeticAI Demo'
+const DEMO_AUTHOR = 'Metic Demo'
 const DEMO_AUTHOR_ID = 'demo-author-001'
 
 export const DEMO_PROFILES: Profile[] = [

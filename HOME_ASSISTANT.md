@@ -1,10 +1,10 @@
 # 🏠 Home Assistant Integration
 
-Connect MeticAI to Home Assistant to get real-time espresso machine telemetry, create automations, and control your Meticulous from HA dashboards.
+Connect Metic to Home Assistant to get real-time espresso machine telemetry, create automations, and control your Meticulous from HA dashboards.
 
 ## How It Works
 
-MeticAI includes an MQTT bridge (based on the excellent [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) by @nickwilsonr) that publishes live sensor data from your Meticulous machine to an internal Mosquitto MQTT broker. By enabling the Home Assistant overlay, port 1883 is exposed so Home Assistant can connect and subscribe to all telemetry topics.
+Metic includes an MQTT bridge (based on the excellent [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) by @nickwilsonr) that publishes live sensor data from your Meticulous machine to an internal Mosquitto MQTT broker. By enabling the Home Assistant overlay, port 1883 is exposed so Home Assistant can connect and subscribe to all telemetry topics.
 
 ```text
 Meticulous Machine ←── Socket.IO ──→ MQTT Bridge ──→ Mosquitto (:1883)
@@ -16,8 +16,8 @@ Meticulous Machine ←── Socket.IO ──→ MQTT Bridge ──→ Mosquitto
 
 ## Prerequisites
 
-- MeticAI running with the MQTT bridge enabled (Settings → Control Center → MQTT Bridge: On)
-- Home Assistant instance on the same network as MeticAI
+- Metic running with the MQTT bridge enabled (Settings → Control Center → MQTT Bridge: On)
+- Home Assistant instance on the same network as Metic
 - The MQTT integration available in Home Assistant (built-in)
 
 ## Setup
@@ -35,7 +35,7 @@ Enable Home Assistant MQTT integration? (y/N): y
 **On an existing installation:**
 
 ```bash
-cd ~/MeticAI   # or wherever MeticAI is installed
+cd ~/Metic   # or wherever Metic is installed
 
 # Start with the Home Assistant overlay
 docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
@@ -44,7 +44,7 @@ docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
 **Verify the port is open:**
 
 ```bash
-nc -zv <meticai-host-ip> 1883
+nc -zv <metic-host-ip> 1883
 # Should output: Connection to <ip> port 1883 succeeded!
 ```
 
@@ -55,19 +55,19 @@ nc -zv <meticai-host-ip> 1883
 1. In Home Assistant, go to **Settings → Devices & Services → Add Integration**
 2. Search for **MQTT**
 3. Configure:
-   - **Broker**: The IP address of the machine running MeticAI (e.g., `192.168.50.22`)
+   - **Broker**: The IP address of the machine running Metic (e.g., `192.168.50.22`)
    - **Port**: `1883`
    - **Username**: *(leave empty)*
    - **Password**: *(leave empty)*
 4. Click **Submit**
 
-> **Tip:** If MeticAI and Home Assistant are running on the same machine (e.g., both on a Raspberry Pi), use `localhost` or `127.0.0.1` as the broker address. If they are in separate Docker networks, use the host machine's LAN IP instead.
+> **Tip:** If Metic and Home Assistant are running on the same machine (e.g., both on a Raspberry Pi), use `localhost` or `127.0.0.1` as the broker address. If they are in separate Docker networks, use the host machine's LAN IP instead.
 
-### Step 3: Enable the MQTT Bridge in MeticAI
+### Step 3: Enable the MQTT Bridge in Metic
 
 The MQTT bridge must be enabled for sensor data to flow:
 
-1. Open MeticAI web UI → **Settings**
+1. Open Metic web UI → **Settings**
 2. Under **Control Center**, toggle **MQTT Bridge** to **On**
 3. Verify: the bridge status should show "Connected"
 
@@ -181,28 +181,28 @@ icon: mdi:thermometer
 ### "Can't connect to MQTT broker"
 
 1. **Is the overlay running?** Check that you started with `-f docker-compose.homeassistant.yml`
-2. **Is the port open?** Run `nc -zv <meticai-ip> 1883` from the HA host
-3. **Firewall?** Ensure port 1883 is not blocked between the HA and MeticAI hosts
+2. **Is the port open?** Run `nc -zv <metic-ip> 1883` from the HA host
+3. **Firewall?** Ensure port 1883 is not blocked between the HA and Metic hosts
 4. **Same machine?** If both are on the same host, use `localhost` as the broker address. If HA is in Docker too, you may need the host's LAN IP or Docker bridge IP.
 
 ### Sensors show "Unavailable"
 
-- Make sure the **MQTT Bridge** is enabled in MeticAI Settings
-- Check that MeticAI can reach your Meticulous machine: Settings → Machine Status should show "Connected"
+- Make sure the **MQTT Bridge** is enabled in Metic Settings
+- Check that Metic can reach your Meticulous machine: Settings → Machine Status should show "Connected"
 - Check bridge logs: `docker logs meticai 2>&1 | grep bridge`
 
 ### No sensor data flowing
 
-- Verify the bridge is running: `curl http://<meticai-ip>:3550/api/bridge/status`
+- Verify the bridge is running: `curl http://<metic-ip>:3550/api/bridge/status`
 - Make sure the machine is powered on and connected to the network
-- Try restarting the bridge: `curl -X POST http://<meticai-ip>:3550/api/bridge/restart`
+- Try restarting the bridge: `curl -X POST http://<metic-ip>:3550/api/bridge/restart`
 
 ## Security Notes
 
 - The MQTT broker has **no authentication** enabled by default (suitable for local networks)
 - Only expose port 1883 on trusted networks
 - If you need MQTT authentication, you can create a custom mosquitto config with username/password
-- The overlay only exposes MQTT — the MeticAI web UI remains on port 3550
+- The overlay only exposes MQTT — the Metic web UI remains on port 3550
 
 ## Combining with Other Overlays
 

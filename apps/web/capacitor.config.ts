@@ -2,11 +2,11 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.meticai.app',
-  appName: 'MeticAI',
+  appName: 'Metic',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    // Enable Safari Web Inspector for debugging (Develop → Simulator → MeticAI)
+    // Enable Safari Web Inspector for debugging (Develop → Simulator → Metic)
     webContentsDebuggingEnabled: true,
   },
   ios: {

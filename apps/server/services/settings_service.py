@@ -67,7 +67,7 @@ def save_settings(settings: dict):
 
 
 def get_author_name() -> str:
-    """Get the configured author name, defaulting to 'MeticAI' if not set."""
+    """Get the configured author name, defaulting to 'Metic' if not set."""
     settings = load_settings()
     author = settings.get("authorName", "").strip()
-    return author if author else "MeticAI"
+    return author if author else "Metic"

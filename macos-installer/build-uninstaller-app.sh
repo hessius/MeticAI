@@ -1,10 +1,10 @@
 #!/bin/bash
 
 ################################################################################
-# MeticAI - macOS Uninstaller App Builder Script
+# Metic - macOS Uninstaller App Builder Script
 ################################################################################
 # 
-# This script builds a standalone macOS .app bundle for MeticAI uninstaller
+# This script builds a standalone macOS .app bundle for Metic uninstaller
 # using Platypus (or manually if Platypus is not available).
 #
 # USAGE:
@@ -28,20 +28,20 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_NAME="MeticAI Uninstaller"
+APP_NAME="Metic Uninstaller"
 BUNDLE_ID="com.meticai.uninstaller"
 VERSION="2.0.0"
 OUTPUT_DIR="$SCRIPT_DIR/build"
 APP_PATH="$OUTPUT_DIR/${APP_NAME}.app"
 # Executable name without spaces for compatibility
-EXEC_NAME="MeticAI-Uninstaller"
+EXEC_NAME="Metic-Uninstaller"
 
 # Script and resources
 WRAPPER_SCRIPT="$SCRIPT_DIR/uninstall-wrapper.sh"
-ICON_FILE="$REPO_ROOT/resources/MeticAI.icns"
+ICON_FILE="$REPO_ROOT/resources/Metic.icns"
 
 echo -e "${BLUE}=========================================${NC}"
-echo -e "${BLUE}   MeticAI Uninstaller App Builder${NC}"
+echo -e "${BLUE}   Metic Uninstaller App Builder${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
@@ -71,7 +71,7 @@ if command -v platypus &> /dev/null; then
         --name "$APP_NAME"
         --bundle-identifier "$BUNDLE_ID"
         --app-version "$VERSION"
-        --author "MeticAI"
+        --author "Metic"
         --interface-type "Progress Bar"
         --interpreter "/bin/bash"
         --quit-after-execution
@@ -184,5 +184,5 @@ echo "2. Move to Applications: mv \"$APP_PATH\" /Applications/"
 echo "3. Distribute: Create a DMG or ZIP file"
 echo ""
 echo -e "${YELLOW}To create a distributable DMG:${NC}"
-echo "  hdiutil create -volname \"MeticAI Uninstaller\" -srcfolder \"$APP_PATH\" -ov -format UDZO \"$OUTPUT_DIR/MeticAI-Uninstaller.dmg\""
+echo "  hdiutil create -volname \"Metic Uninstaller\" -srcfolder \"$APP_PATH\" -ov -format UDZO \"$OUTPUT_DIR/Metic-Uninstaller.dmg\""
 echo ""

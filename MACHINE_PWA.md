@@ -1,12 +1,12 @@
-# MeticAI — Machine-Hosted PWA (Beta)
+# Metic — Machine-Hosted PWA (Beta)
 
-Run MeticAI directly on your Meticulous machine — no server, no Docker, no cloud. Just your machine and a browser.
+Run Metic directly on your Meticulous machine — no server, no Docker, no cloud. Just your machine and a browser.
 
 > **Status:** Beta — testing on `feat/machine-hosted-pwa` branch.
 
 ## What This Is
 
-A lightweight version of MeticAI that runs as static files on the Meticulous machine itself. Your browser talks directly to the machine's API — no MeticAI backend needed.
+A lightweight version of Metic that runs as static files on the Meticulous machine itself. Your browser talks directly to the machine's API — no Metic backend needed.
 
 **What works:**
 - Profile catalogue (browse, run, delete, rename)
@@ -30,13 +30,13 @@ SSH into your machine and run a single command:
 
 ```bash
 python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
-  https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh | bash
+  https://raw.githubusercontent.com/hessius/Metic/feat/machine-hosted-pwa/scripts/install-direct.sh | bash
 ```
 
 This will:
 1. Download the latest pre-built PWA files (~2 MB)
 2. Install to `/opt/meticai-web/`
-3. Patch the machine's web server to serve MeticAI at `/meticai/`
+3. Patch the machine's web server to serve Metic at `/metic/`
 4. Restart the backend
 
 Then open: **http://`<your-machine>`.local:8080/meticai/**
@@ -70,7 +70,7 @@ ssh root@<machine-ip>
 
 ```bash
 # Download the installer
-python3 -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')"
+python3 -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/Metic/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')"
 
 # Download the pre-built PWA
 python3 -c "import urllib.request; urllib.request.urlretrieve('https://github.com/hessius/MeticAI/releases/download/latest/meticai-web.tar.gz', '/tmp/meticai-web.tar.gz')"
@@ -81,7 +81,7 @@ bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz
 
 > **Note:** During beta, releases may not be available yet. Download the latest CI build artifact instead — see [Using CI Artifacts](#using-ci-artifacts) below.
 
-### 4. Open MeticAI
+### 4. Open Metic
 
 Navigate to `http://<machine-ip>:8080/meticai/` in any browser.
 
@@ -108,15 +108,15 @@ ssh root@<machine-ip> 'bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.
 Or as a one-liner (after copying the tarball):
 
 ```bash
-scp meticai-web.tar.gz root@<machine-ip>:/tmp/ && ssh root@<machine-ip> "python3 -c \"import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')\" && bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz"
+scp meticai-web.tar.gz root@<machine-ip>:/tmp/ && ssh root@<machine-ip> "python3 -c \"import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/hessius/Metic/feat/machine-hosted-pwa/scripts/install-direct.sh', '/tmp/install-direct.sh')\" && bash /tmp/install-direct.sh --local /tmp/meticai-web.tar.gz"
 ```
 
 ## AI Features (Optional)
 
-MeticAI can generate espresso profiles and analyze shots using Google Gemini. In machine-hosted mode, this runs entirely in your browser — your API key never leaves your device.
+Metic can generate espresso profiles and analyze shots using Google Gemini. In machine-hosted mode, this runs entirely in your browser — your API key never leaves your device.
 
 1. Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey)
-2. Open MeticAI → Settings → Enter your Gemini API key
+2. Open Metic → Settings → Enter your Gemini API key
 3. The key is stored in your browser's local storage — not on the machine
 
 ## Updating
@@ -126,14 +126,14 @@ Re-run the install command. The installer handles replacing the previous version
 ```bash
 ssh root@<machine-ip>
 python3 -c "import urllib.request,sys; sys.stdout.buffer.write(urllib.request.urlopen(sys.argv[1]).read())" \
-  https://raw.githubusercontent.com/hessius/MeticAI/feat/machine-hosted-pwa/scripts/install-direct.sh | bash
+  https://raw.githubusercontent.com/hessius/Metic/feat/machine-hosted-pwa/scripts/install-direct.sh | bash
 ```
 
 ## Uninstalling
 
 ```bash
 ssh root@<machine-ip>
-rm -rf /opt/meticai-web /opt/meticai-web.bak.*
+rm -rf /opt/meticai-web /opt/metic-web.bak.*
 ```
 
 The Tornado route patch is harmless if the files are removed — it will just show a 404.

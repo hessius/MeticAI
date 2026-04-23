@@ -1,16 +1,16 @@
 #!/bin/bash
-# uninstall-meticai.sh — Remove MeticAI PWA from a Meticulous machine
+# uninstall-meticai.sh — Remove Metic PWA from a Meticulous machine
 set -euo pipefail
 
 INSTALL_DIR="/opt/meticai-web"
 
 echo "╔══════════════════════════════════════════╗"
-echo "║   MeticAI PWA Uninstaller               ║"
+echo "║   Metic PWA Uninstaller               ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
 if [ ! -d "$INSTALL_DIR" ] && ! ls "${INSTALL_DIR}.bak."* 1>/dev/null 2>&1; then
-  echo "MeticAI is not installed."
+  echo "Metic is not installed."
   exit 0
 fi
 
@@ -27,7 +27,7 @@ if [ "$BACKUP_COUNT" -gt 0 ]; then
 fi
 
 echo ""
-read -rp "Remove all MeticAI files? [y/N] " confirm
+read -rp "Remove all Metic files? [y/N] " confirm
 if [ "${confirm,,}" != "y" ]; then
   echo "Cancelled."
   exit 0

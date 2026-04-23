@@ -14,7 +14,7 @@
 ### Option A: Interactive Installer (Recommended)
 
 ```powershell
-irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 -OutFile install.ps1
+irm https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.ps1 -OutFile install.ps1
 .\install.ps1
 ```
 
@@ -25,12 +25,12 @@ The installer guides you through configuration including optional Tailscale and 
 > **Note:** Do **not** use `git clone` on Windows. The repository contains macOS metadata files with special characters that are incompatible with NTFS. The install script and the steps below download only the files needed.
 
 ```powershell
-# 1. Create the MeticAI directory
-mkdir ~\MeticAI
-cd ~\MeticAI
+# 1. Create the Metic directory
+mkdir ~\Metic
+cd ~\Metic
 
 # 2. Download docker-compose.yml
-irm https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.yml -OutFile docker-compose.yml
+irm https://raw.githubusercontent.com/hessius/Metic/main/docker-compose.yml -OutFile docker-compose.yml
 
 # 3. Create .env file
 @"
@@ -38,7 +38,7 @@ GEMINI_API_KEY=your_api_key_here
 METICULOUS_IP=meticulous.local
 "@ | Set-Content .env
 
-# 4. Start MeticAI
+# 4. Start Metic
 docker compose up -d
 ```
 
@@ -70,12 +70,12 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
 ### Watchtower on Windows
 
-Watchtower (automatic updates) works on Windows but may require the Docker socket to be exposed. If Watchtower fails to start, you can update manually instead — see [Updating MeticAI](UPDATING.md).
+Watchtower (automatic updates) works on Windows but may require the Docker socket to be exposed. If Watchtower fails to start, you can update manually instead — see [Updating Metic](UPDATING.md).
 
 ## Updating
 
 ```powershell
-cd ~\MeticAI
+cd ~\Metic
 docker compose pull
 docker compose up -d
 ```
@@ -86,17 +86,17 @@ See [UPDATING.md](UPDATING.md) for more options including migration from v1.x.
 
 ```powershell
 # Download and run the uninstaller
-irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/uninstall.ps1 -OutFile uninstall.ps1
+irm https://raw.githubusercontent.com/hessius/Metic/main/scripts/uninstall.ps1 -OutFile uninstall.ps1
 .\uninstall.ps1
 ```
 
 Or manually:
 
 ```powershell
-cd ~\MeticAI
+cd ~\Metic
 docker compose down -v   # -v removes data volumes
 cd ~
-Remove-Item -Recurse -Force MeticAI
+Remove-Item -Recurse -Force Metic
 ```
 
 ## Troubleshooting

@@ -516,7 +516,7 @@ export async function generateProfile(
   }
 
   // Build task section
-  const authorName = localStorage.getItem('meticai-author-name') || 'MeticAI'
+  const authorName = localStorage.getItem('meticai-author-name') || 'Metic'
   let userTask: string
   if (imageFile && allPrefs) {
     userTask = (

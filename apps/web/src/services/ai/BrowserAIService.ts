@@ -117,8 +117,8 @@ export function createBrowserAIService(): AIService {
 
       // Build the full system prompt (matching server parity)
       const authorName = (() => {
-        try { return localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || 'MeticAI' }
-        catch { return 'MeticAI' }
+        try { return localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || 'Metic' }
+        catch { return 'Metic' }
       })()
       const systemPrompt = buildFullProfilePrompt(
         authorName,

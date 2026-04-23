@@ -1,5 +1,5 @@
 # ==============================================================================
-# MeticAI Watchtower Sidecar
+# Metic Watchtower Sidecar
 # ==============================================================================
 # Adds automatic Docker image updates via Watchtower.
 #

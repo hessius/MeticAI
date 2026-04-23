@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# MeticAI — Universal Update Script
+# Metic — Universal Update Script
 # ==============================================================================
 # This script serves two purposes:
 #
@@ -62,7 +62,7 @@ if $CHECK_ONLY; then
   }
 }
 EOF
-        echo "MeticAI v2.0 is running. Watchtower handles updates."
+        echo "Metic v2.0 is running. Watchtower handles updates."
         exit 0
     fi
 
@@ -76,7 +76,7 @@ EOF
   }
 }
 EOF
-    echo "MeticAI v2.0.0 is available. Click Update to migrate."
+    echo "Metic v2.0.0 is available. Click Update to migrate."
     exit 0
 fi
 
@@ -105,7 +105,7 @@ is_v1_migration() {
 do_v1_migration() {
     echo ""
     echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║   MeticAI v2.0 — Automatic Migration    ║${NC}"
+    echo -e "${CYAN}║   Metic v2.0 — Automatic Migration    ║${NC}"
     echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
     echo ""
 
@@ -202,7 +202,7 @@ do_v1_migration() {
     fi
 
     cat > "$SCRIPT_DIR/.env" <<EOF
-# MeticAI Configuration
+# Metic Configuration
 # Migrated from v1.x on $(date)
 
 # Required
@@ -247,11 +247,11 @@ SCRIPT_END
 cd "$(dirname "$0")"
 source .env 2>/dev/null
 echo ""
-echo "  MeticAI Uninstaller"
+echo "  Metic Uninstaller"
 echo "  ==================="
 echo ""
 INSTALL_PATH="$(pwd)"
-echo "This will stop MeticAI and remove all files from ${INSTALL_PATH}."
+echo "This will stop Metic and remove all files from ${INSTALL_PATH}."
 echo ""
 read -p "Are you sure? (y/N): " CONFIRM < /dev/tty
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then echo "Cancelled."; exit 0; fi
@@ -260,7 +260,7 @@ read -p "Also remove data volume? (y/N): " REMOVE_DATA < /dev/tty
 if [[ "$REMOVE_DATA" =~ ^[Yy]$ ]]; then
     docker volume rm meticai-data mosquitto-data meticai-tailscale-state 2>/dev/null || true
 fi
-echo "MeticAI has been uninstalled."
+echo "Metic has been uninstalled."
 echo "To remove the installation directory: rm -rf ${INSTALL_PATH}"
 SCRIPT_END
     chmod +x "$SCRIPT_DIR/uninstall.sh"
@@ -286,18 +286,18 @@ SCRIPT_END
     source "$SCRIPT_DIR/.env"
 
     echo ""
-    echo -e "${YELLOW}Pulling MeticAI v2.0 image...${NC}"
+    echo -e "${YELLOW}Pulling Metic v2.0 image...${NC}"
     docker compose ${COMPOSE_FILES} pull
 
-    echo -e "${YELLOW}Starting MeticAI v2.0...${NC}"
+    echo -e "${YELLOW}Starting Metic v2.0...${NC}"
     docker compose ${COMPOSE_FILES} up -d || {
         # Watchtower may fail to start (port conflict with existing services).
         # If meticai itself is running, that's OK — watchtower is optional.
         if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^meticai$'; then
-            echo -e "${YELLOW}  Note: Watchtower failed to start (port conflict?), but MeticAI is running.${NC}"
+            echo -e "${YELLOW}  Note: Watchtower failed to start (port conflict?), but Metic is running.${NC}"
             echo "  You can change the Watchtower port in docker-compose.watchtower.yml."
         else
-            echo -e "${RED}ERROR: Failed to start MeticAI.${NC}"
+            echo -e "${RED}ERROR: Failed to start Metic.${NC}"
             echo "  Check logs: docker compose ${COMPOSE_FILES} logs"
             exit 1
         fi
@@ -305,7 +305,7 @@ SCRIPT_END
 
     # --- 10. Wait for healthy --------------------------------------------------
     echo ""
-    echo -e "${YELLOW}Waiting for MeticAI to start...${NC}"
+    echo -e "${YELLOW}Waiting for Metic to start...${NC}"
     local attempts=0
     while [[ $attempts -lt 30 ]]; do
         if curl -sf http://localhost:3550/health >/dev/null 2>&1; then
@@ -318,7 +318,7 @@ SCRIPT_END
     echo ""
     if curl -sf http://localhost:3550/health >/dev/null 2>&1; then
         echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║   Migration complete! MeticAI v2.0 🎉   ║${NC}"
+        echo -e "${GREEN}║   Migration complete! Metic v2.0 🎉   ║${NC}"
         echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
         echo ""
         echo "  Open http://localhost:3550 in your browser"
@@ -329,7 +329,7 @@ SCRIPT_END
         fi
         echo ""
     else
-        echo -e "${YELLOW}MeticAI started but health check not yet passing.${NC}"
+        echo -e "${YELLOW}Metic started but health check not yet passing.${NC}"
         echo "  Check logs: docker logs meticai -f"
     fi
 }
@@ -346,7 +346,7 @@ do_v2_update() {
 
     local CF="${COMPOSE_FILES:--f docker-compose.yml}"
 
-    echo -e "${BLUE}Pulling latest MeticAI image...${NC}"
+    echo -e "${BLUE}Pulling latest Metic image...${NC}"
     docker compose ${CF} pull
 
     echo -e "${BLUE}Restarting...${NC}"

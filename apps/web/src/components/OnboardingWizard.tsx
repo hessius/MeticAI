@@ -31,7 +31,7 @@ import {
   Globe,
   Heart,
 } from '@phosphor-icons/react'
-import { MeticAILogo } from '@/components/MeticAILogo'
+import { MeticLogo } from '@/components/MeticLogo'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { setMachineUrl, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
@@ -246,7 +246,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   const renderWelcome = () => (
     <div className="flex flex-col items-center text-center gap-6 py-4">
-      <MeticAILogo size={80} variant={isDark ? 'white' : 'default'} />
+      <MeticLogo size={80} variant={isDark ? 'white' : 'default'} />
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">{t('onboarding.welcome.title')}</h2>
         <p className="text-muted-foreground max-w-sm">

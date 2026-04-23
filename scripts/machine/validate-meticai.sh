@@ -1,11 +1,11 @@
 #!/bin/bash
-# validate-meticai.sh — Verify MeticAI PWA installation on a Meticulous machine
+# validate-meticai.sh — Verify Metic PWA installation on a Meticulous machine
 set -euo pipefail
 
 INSTALL_DIR="/opt/meticai-web"
 
 echo "╔══════════════════════════════════════════╗"
-echo "║   MeticAI Installation Validator         ║"
+echo "║   Metic Installation Validator         ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
@@ -30,9 +30,9 @@ echo "── Disk ──"
 df -h / | awk 'NR==2{printf "  Total: %s | Used: %s | Free: %s | Use: %s\n",$2,$3,$4,$5}'
 if [ -d "$INSTALL_DIR" ]; then
   INSTALL_SIZE=$(du -sh "$INSTALL_DIR" | cut -f1)
-  echo "  MeticAI: ${INSTALL_SIZE}"
+  echo "  Metic: ${INSTALL_SIZE}"
 else
-  echo "  MeticAI: NOT INSTALLED"
+  echo "  Metic: NOT INSTALLED"
 fi
 echo ""
 

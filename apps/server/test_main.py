@@ -4219,7 +4219,7 @@ class TestMachineProfileJsonEndpoint:
         mock_profile = type('Profile', (), {})()
         mock_profile.id = "profile-merge"
         mock_profile.name = "Yirgacheffe You Going?"
-        mock_profile.author = "MeticAI"
+        mock_profile.author = "Metic"
         mock_profile.temperature = 94.0
         mock_profile.final_weight = 38.0
         mock_profile.error = None
@@ -6575,7 +6575,7 @@ class TestVersionEndpoint:
         data = response.json()
         # Should be a GitHub URL
         assert "github.com" in data["repo_url"]
-        assert "MeticAI" in data["repo_url"]
+        assert "Metic" in data["repo_url"]
     
     def test_version_endpoint_handles_errors_gracefully(self, client):
         """Test that version endpoint doesn't crash even if files are missing."""
@@ -9898,7 +9898,7 @@ class TestNormalizeProfileForMachine:
 
     def test_adds_author_and_author_id(self):
         result = self._normalize({"name": "X", "stages": []})
-        assert result["author"] == "MeticAI"
+        assert result["author"] == "Metic"
         assert len(result["author_id"]) == 36
 
     def test_preserves_existing_author(self):
@@ -12725,7 +12725,7 @@ class TestEditProfileEndpoint:
     """Tests for the PUT /api/profile/{name}/edit endpoint."""
 
     def _make_mock_profile(self, name="TestProfile", profile_id="abc-123",
-                           temperature=93.0, final_weight=36.0, author="MeticAI"):
+                           temperature=93.0, final_weight=36.0, author="Metic"):
         """Helper to build a mock profile object."""
         profile = Mock()
         profile.id = profile_id
@@ -13060,7 +13060,7 @@ class TestProfileSync:
         machine_json = {
             "id": "prof-1",
             "name": "TestProfile",
-            "author": "MeticAI",
+            "author": "Metic",
             "stages": [],
             "variables": [],
         }
@@ -13088,7 +13088,7 @@ class TestProfileSync:
         machine_json = {
             "id": "prof-1",
             "name": "Unknown",
-            "author": "MeticAI",
+            "author": "Metic",
             "stages": [],
         }
         mock_fetch.return_value = machine_json
@@ -13508,7 +13508,7 @@ class TestApplyRecommendationsEndpoint:
         info_var = SimpleNamespace(key="info_dose", name="☕ Dose", value=18.0, type="weight")
         profile.variables = [var, info_var]
         profile.error = None
-        profile.author = "MeticAI"
+        profile.author = "Metic"
         profile.author_id = None
         profile.display = None
         profile.isDefault = False
@@ -14220,7 +14220,7 @@ class TestAsyncCreateProfileReturnsNormalized:
         assert "_normalised_json" in result
         normalised = result["_normalised_json"]
         assert "id" in normalised
-        assert normalised.get("author") == "MeticAI"
+        assert normalised.get("author") == "Metic"
         assert "author_id" in normalised
         assert isinstance(normalised.get("variables"), list)
 
@@ -14237,7 +14237,7 @@ class TestFetchMachineProfileDict:
         machine_json = {
             "id": "abc-123",
             "name": "Machine Profile",
-            "author": "MeticAI",
+            "author": "Metic",
             "stages": [],
         }
         mock_client = AsyncMock()
@@ -14287,7 +14287,7 @@ class TestProfileExportEndpoint:
         machine_json = {
             "id": "prof-1",
             "name": "Exported Profile",
-            "author": "MeticAI",
+            "author": "Metic",
             "author_id": "uuid-123",
             "stages": [{"key": "stage-0-flow", "type": "flow"}],
             "variables": [],
@@ -14331,7 +14331,7 @@ class TestRepairEndpoint:
         canonical = {
             "id": "prof-1",
             "name": "TestProfile",
-            "author": "MeticAI",
+            "author": "Metic",
             "author_id": "uuid-1",
             "stages": [],
             "variables": [],

@@ -1,21 +1,21 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * E2E Tests for MeticAI Web Application
+ * E2E Tests for Metic Web Application
  *
  * Note: Tests that require the "Generate New Profile" button will be skipped
  * when AI features are unavailable (no API key configured in CI).
  */
 
-test.describe('MeticAI Web Application E2E Tests', () => {
+test.describe('Metic Web Application E2E Tests', () => {
   test('should load the homepage successfully', async ({ page }) => {
     await page.goto('/')
     
     // Check that the page loaded with correct title
-    await expect(page).toHaveTitle('MeticAI - Espresso Profile Generator')
+    await expect(page).toHaveTitle('Metic — All-in-one toolkit for the Meticulous')
     
     // Check for the application title
-    await expect(page.getByRole('heading', { name: /MeticAI/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Metic/ })).toBeVisible()
   })
 
   test('should display form elements', async ({ page }) => {
@@ -162,7 +162,7 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Test desktop view
     await page.setViewportSize({ width: 1920, height: 1080 })
-    await expect(page.getByRole('heading', { name: /MeticAI/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Metic/ })).toBeVisible()
     
     // Navigate to form
     await page.waitForSelector('text=Generate New Profile')
@@ -178,7 +178,7 @@ test.describe('MeticAI Web Application E2E Tests', () => {
     
     // Test mobile view
     await page.setViewportSize({ width: 375, height: 667 })
-    await expect(page.getByRole('heading', { name: /MeticAI/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Metic/ })).toBeVisible()
     await expect(page.getByPlaceholder(/Balanced extraction/)).toBeVisible()
   })
 
