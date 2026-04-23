@@ -19,6 +19,7 @@ export function ProfileImage({ imageUrl, alt = '', size = 'md', className }: Pro
   const [error, setError] = useState(false)
 
   // Reset error when URL changes (e.g., cached image becomes available)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setError(false) }, [imageUrl])
   const s = sizes[size]
 

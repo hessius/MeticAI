@@ -128,6 +128,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   // Reset dependent state when active profile is cleared
   useEffect(() => {
     if (!activeProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileImgError(false)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileAuthor(null)
@@ -180,6 +181,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   useEffect(() => {
     if (!activeProfile) return
     const match = machineProfiles.find(p => p.name === activeProfile)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfileAuthor(match?.author ?? null)
   }, [activeProfile, machineProfiles])
 

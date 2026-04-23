@@ -48,6 +48,7 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
   useEffect(() => {
     if (open) {
       const idx = profiles.findIndex(p => p.name === activeProfile)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFocusIndex(idx >= 0 ? idx : 0)
       // Defer focus to after Radix renders the content
       requestAnimationFrame(() => listRef.current?.focus())
