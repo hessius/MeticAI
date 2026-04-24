@@ -785,7 +785,8 @@
     "profileSelector": {
       "placeholder": "Switch profile…",
       "noProfiles": "No profiles available",
-      "noDescription": "No description"
+      "noDescription": "No description",
+      "defaultDescription": "Espresso profile"
     },
     "confirm": {
       "stopTitle": "Stop Shot?",
@@ -1572,6 +1573,7 @@
       "ipDescription": "Enter an IP address (e.g. 192.168.1.42) or hostname. The hostname is randomized but always contains \"meticulous\" (e.g. meticulous-a3f7.local).",
       "configureManually": "Configure manually"
     },
+    "retryDiscovery": "Scan again",
     "name": {
       "title": "What's Your Name?",
       "description": "Used as the author name for profiles you create.",

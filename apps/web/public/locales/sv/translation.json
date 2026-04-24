@@ -785,7 +785,8 @@
     "profileSelector": {
       "placeholder": "Byt profil…",
       "noProfiles": "Inga profiler tillgängliga",
-      "noDescription": "Ingen beskrivning"
+      "noDescription": "Ingen beskrivning",
+      "defaultDescription": "Espressoprofil"
     },
     "confirm": {
       "stopTitle": "Stoppa bryggning?",
@@ -1572,6 +1573,7 @@
       "configureManually": "Konfigurera manuellt",
       "noMachinesFound": "Inga maskiner hittades på ditt nätverk. Ange IP-adressen manuellt."
     },
+    "retryDiscovery": "Sök igen",
     "name": {
       "title": "Vad heter du?",
       "description": "Används som författarnamn för profiler du skapar.",

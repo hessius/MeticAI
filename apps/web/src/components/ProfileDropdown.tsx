@@ -91,8 +91,8 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
     }
   }, [focusIndex, profiles, handleSelect])
 
-  const getDescription = (profile: DropdownProfile): string | undefined => {
-    return profile.display?.shortDescription || profile.display?.description
+  const getDescription = (profile: DropdownProfile): string => {
+    return profile.display?.shortDescription || profile.display?.description || t('controlCenter.profileSelector.defaultDescription')
   }
 
   if (profiles.length === 0) return null
@@ -115,7 +115,7 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
       </PopoverTrigger>
 
       <PopoverContent
-        align="end"
+        align="center"
         sideOffset={8}
         className="w-[min(320px,calc(100vw-2rem))] p-0 overflow-hidden"
       >

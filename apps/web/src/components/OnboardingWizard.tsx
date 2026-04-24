@@ -18,6 +18,7 @@ import {
   ArrowRight,
   ArrowLeft,
   ArrowSquareOut,
+  ArrowClockwise,
   WifiHigh,
   WifiSlash,
   CircleNotch,
@@ -131,19 +132,44 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }, [step])
 
   // Start machine discovery immediately on mount so results are ready
-  // by the time user reaches the machine step
-  useEffect(() => {
-    let cancelled = false
+  // by the time user reaches the machine step.
+  // Auto-retries up to 3 times with a 2 s delay to allow iOS local-network
+  // permission to be granted before giving up.
+  const MAX_DISCOVERY_ATTEMPTS = 3
+  const RETRY_DELAY_MS = 2000
+
+  const runDiscovery = useCallback(async (signal: { cancelled: boolean }) => {
     setDiscovering(true)
-    discoverMachines().then((machines) => {
-      if (cancelled) return
-      setDiscoveredMachines(machines)
+    try {
+      for (let attempt = 1; attempt <= MAX_DISCOVERY_ATTEMPTS; attempt++) {
+        const machines = await discoverMachines()
+        if (signal.cancelled) return
+        if (machines.length > 0) {
+          setDiscoveredMachines(machines)
+          setDiscovering(false)
+          return
+        }
+        if (attempt < MAX_DISCOVERY_ATTEMPTS) {
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS))
+          if (signal.cancelled) return
+        }
+      }
+      setDiscoveredMachines([])
       setDiscovering(false)
-    }).catch(() => {
-      if (!cancelled) setDiscovering(false)
-    })
-    return () => { cancelled = true }
+    } catch {
+      if (!signal.cancelled) setDiscovering(false)
+    }
   }, [])
+
+  useEffect(() => {
+    const signal = { cancelled: false }
+    runDiscovery(signal)
+    return () => { signal.cancelled = true }
+  }, [runDiscovery])
+
+  const retryDiscovery = useCallback(() => {
+    runDiscovery({ cancelled: false })
+  }, [runDiscovery])
 
   // Auto-fill and test when discovery completes and user reaches machine step
   useEffect(() => {
@@ -291,9 +317,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             </div>
           )}
           {!discovering && discoveredMachines.length === 0 && (
-            <div className="flex items-center gap-2 text-sm text-amber-500 dark:text-amber-400">
-              <WifiSlash size={16} weight="fill" />
-              {t('onboarding.machine.noMachinesFound')}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-amber-500 dark:text-amber-400">
+                <WifiSlash size={16} weight="fill" />
+                {t('onboarding.machine.noMachinesFound')}
+              </div>
+              <Button variant="outline" size="sm" onClick={retryDiscovery} disabled={discovering}>
+                <ArrowClockwise size={16} className="mr-2" />
+                {t('onboarding.retryDiscovery')}
+              </Button>
             </div>
           )}
           {!discovering && discoveredMachines.length > 0 && (

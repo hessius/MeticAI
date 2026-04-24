@@ -780,7 +780,8 @@
     "profileSelector": {
       "placeholder": "Profil wechseln…",
       "noProfiles": "Keine Profile verfügbar",
-      "noDescription": "Keine Beschreibung"
+      "noDescription": "Keine Beschreibung",
+      "defaultDescription": "Espresso-Profil"
     },
     "confirm": {
       "stopTitle": "Bezug stoppen?",
@@ -1572,6 +1573,7 @@
       "configureManually": "Manuell konfigurieren",
       "noMachinesFound": "Keine Maschinen in Ihrem Netzwerk gefunden. Geben Sie die IP-Adresse manuell ein."
     },
+    "retryDiscovery": "Erneut suchen",
     "name": {
       "title": "Wie heißt du?",
       "description": "Wird als Autorenname für Profile verwendet, die du erstellst.",

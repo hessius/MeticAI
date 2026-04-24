@@ -780,7 +780,8 @@
     "profileSelector": {
       "placeholder": "Changer de profil…",
       "noProfiles": "Aucun profil disponible",
-      "noDescription": "Aucune description"
+      "noDescription": "Aucune description",
+      "defaultDescription": "Profil espresso"
     },
     "confirm": {
       "stopTitle": "Arrêter l'extraction ?",
@@ -1572,6 +1573,7 @@
       "configureManually": "Configurer manuellement",
       "noMachinesFound": "Aucune machine trouvée sur votre réseau. Entrez l'adresse IP manuellement."
     },
+    "retryDiscovery": "Réessayer",
     "name": {
       "title": "Comment vous appelez-vous ?",
       "description": "Utilisé comme nom d'auteur pour les profils que vous créez.",
