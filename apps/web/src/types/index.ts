@@ -115,7 +115,6 @@ export type ViewState =
   | 'loading' 
   | 'results' 
   | 'error' 
-  | 'history' 
   | 'history-detail' 
   | 'settings' 
   | 'run-shot'

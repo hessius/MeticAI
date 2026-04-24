@@ -22,7 +22,6 @@ import { LoadingView, LOADING_MESSAGE_COUNT } from '@/views/LoadingView'
 import { ErrorView } from '@/views/ErrorView'
 
 // Lazy-loaded views — code-split into separate chunks
-const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })))
 const ProfileDetailView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.ProfileDetailView })))
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })))
 const RunShotView = lazy(() => import('./components/RunShotView').then(m => ({ default: m.RunShotView })))
@@ -227,6 +226,10 @@ function App() {
     const handler = () => {
       setAiEnabled(getAiEnabled())
       setHideAiWhenUnavailable(getHideAiWhenUnavailable())
+      // Re-check API key availability (may have been added/removed in Settings)
+      if (isDemoMode() || isDirectMode()) {
+        setIsAiConfigured(Boolean(localStorage.getItem('meticai-gemini-key')?.trim()))
+      }
     }
     // Sync initial values in handler to avoid direct setState in effect
     handler()
@@ -406,7 +409,8 @@ function App() {
     const importParam = params.get('import')
     if (importParam) {
       setPendingImportUrl(importParam)
-      setViewState('history')
+      setShowAddProfileDialog(true)
+      setViewState('profile-catalogue')
       const url = new URL(window.location.href)
       url.searchParams.delete('import')
       window.history.replaceState({}, '', url.toString())
@@ -744,9 +748,8 @@ function App() {
         handleReset()
         break
       case 'history-detail':
-        setViewState('history')
+        setViewState('profile-catalogue')
         break
-      case 'history':
       case 'settings':
       case 'pour-over':
       case 'live-shot':
@@ -947,41 +950,46 @@ function App() {
   viewMachineProfileRef.current = handleViewMachineProfile
 
   const handleGreetingAction = useCallback((target: string, context?: Record<string, string>) => {
-    switch (target) {
-      case 'shot-analysis':
-        if (context?.date && context?.filename) {
-          setShotHistoryInitialDate(context.date)
-          setShotHistoryInitialFilename(context.filename)
+    try {
+      switch (target) {
+        case 'shot-analysis':
+          if (context?.date && context?.filename) {
+            setShotHistoryInitialDate(context.date)
+            setShotHistoryInitialFilename(context.filename)
+            previousViewStateRef.current = 'start'
+            setViewState('shot-history')
+          } else {
+            setViewState('shot-analysis')
+          }
+          break
+        case 'dial-in':
+          setViewState('dial-in')
+          break
+        case 'history':
+        case 'profile-catalogue':
+          setViewState('profile-catalogue')
+          break
+        case 'view-profile':
+          if (context?.profileId && context?.profileName) {
+            viewMachineProfileRef.current({ id: context.profileId, name: context.profileName })
+          } else {
+            console.warn('[DynamicIsland] view-profile action missing context, falling back to catalogue', context)
+            setViewState('profile-catalogue')
+          }
+          break
+        case 'add-profile':
+          setShowAddProfileDialog(true)
+          break
+        case 'shot-history':
           previousViewStateRef.current = 'start'
           setViewState('shot-history')
-        } else {
-          setViewState('shot-analysis')
-        }
-        break
-      case 'dial-in':
-        setViewState('dial-in')
-        break
-      case 'profile-catalogue':
-        setViewState('profile-catalogue')
-        break
-      case 'view-profile':
-        if (context?.profileId && context?.profileName) {
-          viewMachineProfileRef.current({ id: context.profileId, name: context.profileName })
-        } else {
-          console.warn('[DynamicIsland] view-profile action missing context, falling back to catalogue', context)
-          setViewState('profile-catalogue')
-        }
-        break
-      case 'add-profile':
-        setShowAddProfileDialog(true)
-        break
-      case 'shot-history':
-        previousViewStateRef.current = 'start'
-        setViewState('shot-history')
-        break
-      case 'history':
-        setViewState('history')
-        break
+          break
+        default:
+          console.warn('[DynamicIsland] Unknown greeting action target:', target)
+          break
+      }
+    } catch (err) {
+      console.error('[DynamicIsland] Error handling greeting action:', target, err)
     }
   }, [])
   const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
@@ -1234,7 +1242,7 @@ function App() {
                 <StartView
                   profileCount={profileCount}
                   onAddProfile={() => setShowAddProfileDialog(true)}
-                  onViewHistory={() => setViewState('history')}
+                  onViewHistory={() => setViewState('profile-catalogue')}
                   onProfileCatalogue={() => setViewState('profile-catalogue')}
                   onRunShot={() => {
                     setRunShotProfileId(undefined)
@@ -1294,22 +1302,7 @@ function App() {
                     onAdvancedOptionsChange={setAdvancedOptions}
                     onSubmit={handleSubmit}
                     onBack={handleBackToStart}
-                    onViewHistory={() => setViewState('history')}
-                  />
-                </FeatureErrorBoundary>
-              )}
-
-              {viewState === 'history' && (
-                <FeatureErrorBoundary feature="History">
-                  <HistoryView
-                    onBack={handleBackToStart}
-                    onViewProfile={handleViewHistoryEntry}
-                    onGenerateNew={() => setViewState('form')}
-                    onManageMachine={() => setViewState('profile-catalogue')}
-                    aiConfigured={aiAvailable}
-                    hideAiWhenUnavailable={hideAiWhenUnavailable}
-                    importUrl={pendingImportUrl}
-                    onImportUrlConsumed={() => setPendingImportUrl(null)}
+                    onViewHistory={() => setViewState('profile-catalogue')}
                   />
                 </FeatureErrorBoundary>
               )}
@@ -1319,8 +1312,7 @@ function App() {
                   <ProfileDetailView
                     entry={selectedHistoryEntry}
                     onBack={() => {
-                      const prev = previousViewStateRef.current
-                      setViewState(prev === 'profile-catalogue' ? 'profile-catalogue' : 'history')
+                      setViewState('profile-catalogue')
                     }}
                     cachedImageUrl={selectedHistoryImageUrl}
                     aiConfigured={aiAvailable}
@@ -1454,7 +1446,7 @@ function App() {
                     onBack={handleReset}
                     onSaveResults={handleSaveResults}
                     onDownloadJson={handleDownloadJson}
-                    onViewHistory={() => setViewState('history')}
+                    onViewHistory={() => setViewState('profile-catalogue')}
                     onRunProfile={() => {
                       if (createdProfileId && currentProfileJson?.name) {
                         setRunShotProfileId(createdProfileId)

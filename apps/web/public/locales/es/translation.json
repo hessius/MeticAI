@@ -1286,6 +1286,7 @@
   },
   "profileRecommendations": {
     "title": "Perfiles recomendados",
+    "selectMoreTags": "Selecciona al menos 2 etiquetas de sabor para ver recomendaciones.",
     "loading": "Buscando perfiles coincidentes…",
     "empty": "No se encontraron perfiles coincidentes. Prueba con otras etiquetas.",
     "basedOn": "Basado en tus etiquetas y preferencias seleccionadas",
@@ -1333,6 +1334,9 @@
       "lackingBody": "Falta de cuerpo",
       "sweetSpotDesc": "¡Estás justo en el sweet spot! La extracción y la fuerza están bien equilibradas.",
       "sweetSpotAdvice": "Cualquier cambio adicional es cuestión de preferencia personal. Prueba pequeños ajustes: ±0,5°C de temperatura o ±1g de rendimiento - para explorar los sabores de tu café.",
+      "almostThere": "Casi ahí",
+      "almostThereDesc": "Estás cerca del punto ideal, pero aún no llegas. El balance entre extracción e intensidad necesita un pequeño ajuste.",
+      "almostThereAdvice": "Vas por buen camino. Observa dónde cae el punto en relación al centro y haz pequeños ajustes: prueba ±0,5°C de temperatura o ±1g de rendimiento para llevar el sabor a la zona verde.",
       "underDesc": "El shot está sub-extraído: demasiada acidez está pasando antes de que los compuestos dulces y equilibrados puedan disolverse.",
       "underAdvice": "Aumenta el peso final/rendimiento de tu perfil para permitir más agua a través del puck. También puedes intentar aumentar la temperatura 1–2°C. Si la extracción es muy baja, muele más fino.",
       "overDesc": "El espresso está sobre-extraído: compuestos amargos, secos y ásperos de la parte final de la extracción están dominando.",

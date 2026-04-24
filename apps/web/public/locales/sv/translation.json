@@ -1286,6 +1286,7 @@
   },
   "profileRecommendations": {
     "title": "Rekommenderade profiler",
+    "selectMoreTags": "Välj minst 2 smaktaggar för att se rekommendationer.",
     "loading": "Söker matchande profiler…",
     "empty": "Inga matchande profiler hittades. Prova andra taggar.",
     "basedOn": "Baserat på dina valda taggar och preferenser",
@@ -1333,6 +1334,9 @@
       "lackingBody": "Saknar kropp",
       "sweetSpotDesc": "Du är mitt i sweet spot! Extraktion och styrka är välbalanserade.",
       "sweetSpotAdvice": "Ytterligare ändringar är en fråga om personlig preferens. Prova små justeringar: ±0,5°C temperatur eller ±1g utbyte - för att utforska kaffets smaker.",
+      "almostThere": "Nästan där",
+      "almostThereDesc": "Du är nära sweet spot, men inte riktigt där ännu. Balansen mellan extraktion och styrka behöver en liten justering.",
+      "almostThereAdvice": "Du är på rätt spår. Titta på var pricken hamnar i förhållande till mitten och gör små justeringar: prova ±0,5°C temperatur eller ±1g utbyte för att nudda smaken in i den gröna zonen.",
       "underDesc": "Shoten är underextraherad: för mycket syra kommer igenom innan de söta och balanserade föreningarna hinner lösa upp sig.",
       "underAdvice": "Öka slutvikten/utbytet i din profil för att låta mer vatten passera genom pucken. Du kan också prova att höja temperaturen med 1–2°C. Om extraktionen är mycket låg, mal finare.",
       "overDesc": "Espressen är överextraherad: beska, torra och sträva föreningar från sent i extraktionen dominerar.",

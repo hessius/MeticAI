@@ -1286,6 +1286,7 @@
   },
   "profileRecommendations": {
     "title": "Profili consigliati",
+    "selectMoreTags": "Seleziona almeno 2 tag di sapore per vedere i consigli.",
     "loading": "Ricerca profili corrispondenti…",
     "empty": "Nessun profilo corrispondente trovato. Prova con altri tag.",
     "basedOn": "In base ai tag e alle preferenze selezionati",
@@ -1333,6 +1334,9 @@
       "lackingBody": "Manca corpo",
       "sweetSpotDesc": "Sei proprio nel sweet spot! L'estrazione e l'intensità sono ben bilanciate.",
       "sweetSpotAdvice": "Qualsiasi ulteriore modifica è questione di preferenza personale. Prova piccoli aggiustamenti: ±0,5°C di temperatura o ±1g di resa - per esplorare i sapori del tuo caffè.",
+      "almostThere": "Quasi",
+      "almostThereDesc": "Sei vicino al sweet spot, ma non ci sei ancora. L'equilibrio tra estrazione e intensità ha bisogno di un piccolo aggiustamento.",
+      "almostThereAdvice": "Sei sulla buona strada. Guarda dove si trova il punto rispetto al centro e fai piccoli aggiustamenti: prova ±0,5°C di temperatura o ±1g di resa per portare il sapore nella zona verde.",
       "underDesc": "Lo shot è sotto-estratto: troppa acidità sta passando prima che i composti dolci e bilanciati possano dissolversi.",
       "underAdvice": "Aumenta il peso finale/la resa del tuo profilo per far passare più acqua attraverso il puck. Puoi anche provare ad aumentare la temperatura di 1–2°C. Se l'estrazione è molto bassa, macina più fine.",
       "overDesc": "L'espresso è sovra-estratto: composti amari, secchi e aspri dalla parte finale dell'estrazione stanno dominando.",

@@ -58,6 +58,7 @@ export function ProfileRecommendations({
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
+      console.warn('[ProfileRecommendations] Failed to fetch recommendations:', err)
       if (!controller.signal.aborted) {
         setRecommendations([])
       }
@@ -91,7 +92,16 @@ export function ProfileRecommendations({
     }
   }, [])
 
-  if (tags.length < 2 && recommendations.length === 0) return null
+  if (tags.length === 0 && recommendations.length === 0) return null
+
+  if (tags.length < 2 && recommendations.length === 0) {
+    return (
+      <div className="flex items-center gap-2 py-2 px-1 text-sm text-muted-foreground">
+        <Sparkle size={14} className="text-primary/60" />
+        <span>{t('profileRecommendations.selectMoreTags')}</span>
+      </div>
+    )
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>

@@ -1286,6 +1286,7 @@
   },
   "profileRecommendations": {
     "title": "Recommended Profiles",
+    "selectMoreTags": "Select at least 2 flavor tags to see recommendations.",
     "loading": "Finding matching profiles…",
     "empty": "No matching profiles found. Try selecting different tags.",
     "basedOn": "Based on your selected tags and preferences",
@@ -1333,6 +1334,9 @@
       "lackingBody": "Lacking Body",
       "sweetSpotDesc": "You're right in the sweet spot! The extraction and strength are well-balanced.",
       "sweetSpotAdvice": "Any further changes are up to personal preference. Try small tweaks: ±0.5°C temperature or ±1g yield - to explore the flavors of your coffee.",
+      "almostThere": "Almost There",
+      "almostThereDesc": "You're close to the sweet spot, but not quite there yet. The balance between extraction and strength needs a small adjustment.",
+      "almostThereAdvice": "You're on the right track. Look at where the dot falls relative to the center and make small adjustments: try ±0.5°C temperature or ±1g yield to nudge the flavor into the green zone.",
       "underDesc": "The shot is under-extracted: too much acidity is coming through before the sweet and balanced compounds can dissolve.",
       "underAdvice": "Increase the final weight/yield of your profile to allow more water through the puck. You can also try increasing temperature by 1–2°C. If extraction is severely low, grind finer.",
       "overDesc": "The espresso is over-extracted: bitter, dry, and harsh compounds from late in the extraction are dominating.",

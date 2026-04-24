@@ -1286,6 +1286,7 @@
   },
   "profileRecommendations": {
     "title": "Empfohlene Profile",
+    "selectMoreTags": "Wählen Sie mindestens 2 Geschmacks-Tags aus, um Empfehlungen zu sehen.",
     "loading": "Passende Profile werden gesucht…",
     "empty": "Keine passenden Profile gefunden. Versuche andere Tags.",
     "basedOn": "Basierend auf deinen ausgewählten Tags und Vorlieben",
@@ -1333,6 +1334,9 @@
       "lackingBody": "Fehlender Körper",
       "sweetSpotDesc": "Sie sind genau im Sweet Spot! Extraktion und Stärke sind gut ausbalanciert.",
       "sweetSpotAdvice": "Weitere Änderungen sind Geschmackssache. Probieren Sie kleine Anpassungen: ±0,5°C Temperatur oder ±1g Ertrag - um die Aromen Ihres Kaffees zu erkunden.",
+      "almostThere": "Fast geschafft",
+      "almostThereDesc": "Sie sind nah am Sweet Spot, aber noch nicht ganz da. Die Balance zwischen Extraktion und Stärke braucht eine kleine Anpassung.",
+      "almostThereAdvice": "Sie sind auf dem richtigen Weg. Schauen Sie, wo der Punkt im Verhältnis zur Mitte liegt, und nehmen Sie kleine Anpassungen vor: Versuchen Sie ±0,5°C Temperatur oder ±1g Ertrag, um den Geschmack in die grüne Zone zu bringen.",
       "underDesc": "Der Schuss ist unterextrahiert: zu viel Säure kommt durch, bevor die süßen und ausgewogenen Verbindungen sich lösen können.",
       "underAdvice": "Erhöhen Sie das Endgewicht/den Ertrag Ihres Profils, um mehr Wasser durch den Puck zu lassen. Sie können auch versuchen, die Temperatur um 1–2°C zu erhöhen. Bei sehr niedriger Extraktion feiner mahlen.",
       "overDesc": "Der Espresso ist überextrahiert: bittere, trockene und scharfe Verbindungen aus dem späten Teil der Extraktion dominieren.",

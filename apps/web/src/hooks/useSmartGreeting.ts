@@ -708,6 +708,13 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
 
       if (cancelled) return
 
+      // Discard greetings that contain raw i18n keys (translation not yet ready)
+      if (result && result.message.includes('.') && !result.message.includes(' ')) {
+        console.warn('[SmartGreeting] Skipping greeting with untranslated key:', result.message)
+        setGreeting(null)
+        return
+      }
+
       if (result) {
         logGreeting(result.id)
         if (result.id === 'personalBestDay') {

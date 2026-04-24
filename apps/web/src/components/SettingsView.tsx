@@ -34,9 +34,9 @@ import {
   Heart
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
-import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable } from '@/lib/aiPreferences'
+import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable, AI_PREFS_CHANGED_EVENT } from '@/lib/aiPreferences'
 import { getSoundsEnabled, setSoundsEnabled } from '@/lib/soundPreferences'
 import { useSoundEffects } from '@/hooks/useSoundEffects'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
@@ -219,7 +219,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           const storedKey = await secureGetItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
           setSettings({
             geminiApiKey: storedKey,
-            meticulousIp: window.location.hostname,
+            meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
             mqttEnabled: true,
@@ -231,7 +231,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           const fallbackKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
           setSettings({
             geminiApiKey: fallbackKey,
-            meticulousIp: window.location.hostname,
+            meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
             mqttEnabled: true,
@@ -399,6 +399,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             } catch {
               localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
             }
+            window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
           }
           if (nextSettings.authorName) {
             localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, nextSettings.authorName)
@@ -457,16 +458,31 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     setDetectResult(null)
     
     try {
-      const response = await fetch(`${await getServerUrl()}/api/machine/detect`, {
-        method: 'POST',
-      })
-      
-      const result = await response.json()
-      setDetectResult(result)
-      
-      if (result.found && result.ip) {
-        // Auto-fill the IP field
-        handleChange('meticulousIp', result.ip)
+      if (isLocalMode()) {
+        // In direct/demo mode, use client-side discovery instead of server endpoint
+        const { discoverMachines } = await import('@/services/machine/discovery')
+        const machines = await discoverMachines()
+        if (machines.length > 0) {
+          const machine = machines[0]
+          setDetectResult({ found: true, ip: machine.host, hostname: machine.name })
+          handleChange('meticulousIp', machine.host)
+          // Exit demo mode by storing the real machine URL
+          if (isDemoMode()) {
+            localStorage.setItem(STORAGE_KEYS.MACHINE_URL, machine.url)
+            window.location.reload()
+          }
+        } else {
+          setDetectResult({ found: false, guidance_key: 'notFound' })
+        }
+      } else {
+        const response = await fetch(`${await getServerUrl()}/api/machine/detect`, {
+          method: 'POST',
+        })
+        const result = await response.json()
+        setDetectResult(result)
+        if (result.found && result.ip) {
+          handleChange('meticulousIp', result.ip)
+        }
       }
     } catch (error) {
       console.error('Machine detection failed:', error)
@@ -878,8 +894,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Meticulous IP — hidden in direct mode (IP is implicit), but shown in native mode */}
-            {(!isLocalMode() || isNativePlatform()) && (
+            {/* Meticulous IP — hidden in direct mode (IP is implicit), shown in native, proxy, or demo mode */}
+            {(!isLocalMode() || isNativePlatform() || isDemoMode()) && (
             <div className="space-y-2">
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
                 {t('settings.meticulousIp')}

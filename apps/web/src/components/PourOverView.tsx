@@ -1033,13 +1033,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
   // ── Load recipes when entering recipe mode ──
   useEffect(() => {
-    if (mode !== 'recipe' || recipes.length > 0 || recipesLoading) return
+    if (mode !== 'recipe' || recipes.length > 0) return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag before async fetch
     setRecipesLoading(true)
     getRecipes()
       .then(r => { setRecipes(r); setRecipesLoading(false) })
-      .catch(() => setRecipesLoading(false))
-  }, [mode, recipes.length, recipesLoading])
+      .catch(() => { setRecipesLoading(false) })
+  }, [mode, recipes.length])
 
   // ── Recipe step auto-advance ──
   useEffect(() => {

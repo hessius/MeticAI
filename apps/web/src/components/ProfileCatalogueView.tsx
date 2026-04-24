@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -71,57 +71,6 @@ interface ProfileCatalogueViewProps {
   onViewProfile?: (profile: MachineProfile) => void
 }
 
-const SWIPE_THRESHOLD = -80
-
-function SwipeableCard({
-  children,
-  onSwipeDelete,
-  isCoarse,
-}: {
-  children: React.ReactNode
-  onSwipeDelete: () => void
-  isCoarse: boolean
-}) {
-  const x = useMotionValue(0)
-  const deleteOpacity = useTransform(x, [-120, -60], [1, 0])
-  const deleteScale = useTransform(x, [-120, -60], [1, 0.8])
-
-  if (!isCoarse) {
-    return <>{children}</>
-  }
-
-  const handleDragEnd = (_: never, info: PanInfo) => {
-    if (info.offset.x < SWIPE_THRESHOLD) {
-      onSwipeDelete()
-    }
-  }
-
-  return (
-    <div className="relative overflow-hidden rounded-lg">
-      {/* Delete action revealed behind card */}
-      <motion.div
-        className="absolute inset-0 flex items-center justify-end pr-6 bg-destructive text-destructive-foreground rounded-lg"
-        style={{ opacity: deleteOpacity, scale: deleteScale }}
-      >
-        <Trash className="w-6 h-6" />
-      </motion.div>
-
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: -120, right: 0 }}
-        dragElastic={0.1}
-        onDragEnd={handleDragEnd}
-        style={{ x }}
-        className="relative z-10 rounded-lg overflow-hidden"
-      >
-        {children}
-      </motion.div>
-    </div>
-  )
-}
-
-// ProfileImage is imported from '@/components/ProfileImage'
-
 export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
 
@@ -184,16 +133,6 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
 
   // Detect coarse pointer (touch device)
-  const [isCoarsePointer, setIsCoarsePointer] = useState(false)
-  useEffect(() => {
-    const mql = window.matchMedia('(pointer: coarse)')
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync initial media query state
-    setIsCoarsePointer(mql.matches)
-    const handler = (e: MediaQueryListEvent) => setIsCoarsePointer(e.matches)
-    mql.addEventListener('change', handler)
-    return () => mql.removeEventListener('change', handler)
-  }, [])
-  
   // Fetch profiles from machine
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true)
@@ -768,10 +707,6 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                 exit={{ opacity: 0, x: -100 }}
                 transition={{ duration: 0.2 }}
               >
-                <SwipeableCard
-                  isCoarse={isCoarsePointer}
-                  onSwipeDelete={() => openDeleteDialog(profile)}
-                >
                   <Card
                     className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''} ${!isEditing ? 'cursor-pointer active:bg-accent/50 transition-colors' : ''}`}
                     onClick={() => !isEditing && onViewProfile?.(profile)}
@@ -924,7 +859,6 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                       )}
                     </div>
                   </Card>
-                </SwipeableCard>
               </motion.div>
             ))}
           </AnimatePresence>

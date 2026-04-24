@@ -420,7 +420,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     <div className="w-full border-t border-border/30" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-card px-3 text-xs text-muted-foreground font-medium">{t('profileImport.orImport')}</span>
+                    <span className="bg-background px-3 text-xs text-muted-foreground font-medium">{t('profileImport.orImport')}</span>
                   </div>
                 </div>
                 
