@@ -147,7 +147,8 @@ function Phone({
           style={{
             display: "block",
             width: "100%",
-            height: "100%",
+            height: "104%",
+            marginTop: "-2%",
             objectFit: "cover",
             objectPosition: "top",
           }}
