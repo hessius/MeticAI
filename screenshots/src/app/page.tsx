@@ -71,9 +71,10 @@ const IMAGE_PATHS = [
   "/app-icon.png",
   "/screenshots/en/home.png",
   "/screenshots/en/compass.png",
-  "/screenshots/en/profile-creation.png",
+  "/screenshots/en/create-profile.png",
   "/screenshots/en/pour-over.png",
-  "/screenshots/en/history.png",
+  "/screenshots/en/shot-analysis.png",
+  "/screenshots/en/profile-catalogue.png",
 ];
 
 const imageCache: Record<string, string> = {};
@@ -314,9 +315,9 @@ type PhoneComp = typeof Phone | typeof AndroidPhone;
 
 function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
   return [
-    // Slide 1: Hero — Meticulous Unleashed
+    // Slide 1: Hero — Home Screen
     {
-      id: "hero",
+      id: "home",
       component: ({ cW, cH }: SlideProps) => {
         const fw = phoneW(cW, cH) * 100;
         return (
@@ -457,7 +458,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
 
     // Slide 3: AI Profile Creation — bright contrast slide
     {
-      id: "profile-creation",
+      id: "create-profile",
       component: ({ cW, cH }: SlideProps) => {
         const fw = phoneW(cW, cH) * 100;
         return (
@@ -493,7 +494,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
             />
 
             <PhoneComp
-              src={img(`${basePath}/profile-creation.png`)}
+              src={img(`${basePath}/create-profile.png`)}
               alt="AI Profile Creation"
               style={{
                 position: "absolute",
@@ -566,13 +567,83 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
       },
     },
 
-    // Slide 5: Shot History + More Features
+    // Slide 5: Shot Analysis
     {
-      id: "history-more",
+      id: "shot-analysis",
+      component: ({ cW, cH }: SlideProps) => {
+        const fw = phoneW(cW, cH) * 100;
+        return (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              position: "relative",
+              overflow: "hidden",
+              background:
+                "linear-gradient(165deg, #0A0A0A 0%, #0D1A0D 50%, #0A1A0A 100%)",
+            }}
+          >
+            <GlowBlob
+              color={THEME.green}
+              size="50%"
+              top="15%"
+              left="55%"
+              opacity={0.2}
+            />
+            <GlowBlob
+              color={THEME.accent}
+              size="35%"
+              top="45%"
+              left="-10%"
+              opacity={0.15}
+            />
+
+            <Caption
+              cW={cW}
+              label="SHOT ANALYSIS"
+              headline={
+                <>
+                  Every shot,
+                  <br />
+                  perfected.
+                </>
+              }
+            />
+
+            <PhoneComp
+              src={img(`${basePath}/shot-analysis.png`)}
+              alt="Shot Analysis"
+              style={{
+                position: "absolute",
+                bottom: 0,
+                width: `${fw * 0.92}%`,
+                right: "-4%",
+                transform: "translateY(10%)",
+              }}
+            />
+
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: "4px",
+                background: `linear-gradient(90deg, ${THEME.green}, ${THEME.accent})`,
+                zIndex: 30,
+              }}
+            />
+          </div>
+        );
+      },
+    },
+
+    // Slide 6: Profile Catalogue
+    {
+      id: "profile-catalogue",
       component: ({ cW, cH }: SlideProps) => {
         const fw = phoneW(cW, cH) * 100;
         const pills = [
-          "Pour Over Mode",
           "Home Assistant",
           "iOS Shortcuts",
           "MQTT Bridge",
@@ -591,14 +662,14 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
             }}
           >
             <GlowBlob
-              color={THEME.green}
+              color={THEME.accent}
               size="50%"
               top="5%"
               left="40%"
               opacity={0.15}
             />
             <GlowBlob
-              color={THEME.accent}
+              color={THEME.violet}
               size="40%"
               top="50%"
               left="70%"
@@ -607,7 +678,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
 
             <Caption
               cW={cW}
-              label="AND SO MUCH MORE"
+              label="PROFILE CATALOGUE"
               headline={
                 <>
                   Your espresso.
@@ -618,8 +689,8 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
             />
 
             <PhoneComp
-              src={img(`${basePath}/history.png`)}
-              alt="Shot History"
+              src={img(`${basePath}/profile-catalogue.png`)}
+              alt="Profile Catalogue"
               style={{
                 position: "absolute",
                 bottom: `${cH * 0.18}px`,
