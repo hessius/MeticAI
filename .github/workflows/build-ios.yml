@@ -64,7 +64,7 @@ jobs:
         run: |
           xcodebuild build \
             -project ios/App/App.xcodeproj \
-            -scheme App \
+            -scheme Metic \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \

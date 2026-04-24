@@ -10,6 +10,8 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: true,
   },
   ios: {
+    // Capacitor defaults the Xcode scheme to "App"; override for our renamed target
+    scheme: 'Metic',
     // Match the dark theme background so safe area edges blend seamlessly
     backgroundColor: '#030202',
     allowsLinkPreview: false,
