@@ -644,9 +644,11 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
       component: ({ cW, cH }: SlideProps) => {
         const fw = phoneW(cW, cH) * 100;
         const pills = [
-          "Home Assistant",
-          "iOS Shortcuts",
-          "MQTT Bridge",
+          "Replay",
+          "Shot vs Shot",
+          "Shot vs Profile",
+          "AI Shot Analysis",
+          "AI Profile Improvement",
           "Dark Mode",
           "Multi-language",
         ];
