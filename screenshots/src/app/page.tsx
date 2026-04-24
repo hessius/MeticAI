@@ -969,7 +969,7 @@ export default function ScreenshotsPage() {
       el.style.opacity = "1";
       el.style.zIndex = "-1";
 
-      const opts = { width: w, height: h, pixelRatio: 1, cacheBust: true };
+      const opts = { width: w, height: h, pixelRatio: 1, cacheBust: true, backgroundColor: '#000000' };
       await toPng(el, opts);
       const dataUrl = await toPng(el, opts);
 
