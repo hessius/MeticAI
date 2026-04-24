@@ -147,8 +147,7 @@ function Phone({
           style={{
             display: "block",
             width: "100%",
-            height: "104%",
-            marginTop: "-2%",
+            height: "100%",
             objectFit: "cover",
             objectPosition: "top",
           }}
@@ -906,10 +905,12 @@ function ScreenshotPreview({
       <div
         ref={exportRef}
         style={{
-          position: "absolute",
+          position: "fixed",
+          top: 0,
           left: -9999,
           width: cW,
           height: cH,
+          overflow: "hidden",
           opacity: 0,
         }}
       >
