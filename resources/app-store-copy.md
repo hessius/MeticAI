@@ -2,23 +2,26 @@
 
 ## Promotional Text (155 chars)
 
-Unleash your Meticulous. Create AI-powered espresso profiles, dial in with the Espresso Compass, and analyze every shot — all from your phone.
+Unleash your Meticulous. Analyze your shots, create espresso profiles, dial in with the Espresso Compass, run pour-overs and more!
 
 ## Description
 
-Metic is the all-in-one companion for the Meticulous Espresso Machine. Take a photo of your coffee bag or describe what you're looking for — Metic uses AI to craft a tailored espresso profile and sends it straight to your machine.
+Metic is the all-in-one companion for the Meticulous Espresso Machine and aims to augment the official Meticulous app. Please note that Metic is not affiliated with Meticulous Home.
 
-• AI Profile Creation — snap a photo or describe your coffee, get a dialed-in profile instantly
-• Espresso Compass — visually dial in your shots with guided taste feedback
-• Shot Analysis — review shot graphs, compare extractions, and get AI coaching
-• Pour-Over Recipes — great coffee beyond espresso with step-by-step guides
-• Profile Catalogue — browse, organize, and manage all your profiles
-• Home Assistant & MQTT — integrate with your smart home
-• iOS Shortcuts — one-tap brewing from your home screen
-• Multi-language — English, Swedish, German, Spanish, French, and Italian
+Metic offers:
 
-Self-hosted and open source. Your data stays on your network.
+• Live Analysis: Follow your shots in real-time, get instant feedback, and learn from every shot.
+• Shot Analysis: Review shot graphs, compare shot vs shot and shot vs profile, and get automatic analysis and AI coaching
+• AI Profile Creation: Snap a photo or describe the profile you're seeking and get a tailored profile instantly.
+• Espresso Compass: Visually dial in your shots with guided taste feedback
+• Pour-Over Recipes: Great coffee beyond espresso with step-by-step guides using the integrated Acaia scale.
+• Profile Catalogue: Browse, organize, and manage all your profiles
+• Multi-language: English, Swedish, German, Spanish, French, and Italian
+
+And more!
+
+Metic is completely free and open-source and does not collect any data. All AI features are optional.
 
 ## Keywords
 
-espresso, meticulous, coffee, profiling, AI, barista, extraction, grinder, dial-in, brewing, pour-over, shot analysis, compass, recipes, smart home
+espresso,meticulous,coffee,profiling,barista,dial-in,pour-over,shot analysis,recipes,smart home

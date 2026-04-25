@@ -475,6 +475,51 @@
   }
 }
 
+/* ── Header dot + shimmer ──────────────────────────────────── */
+.header-dot {
+  color: #d77100;
+  text-shadow: 0 0 8px rgba(215, 113, 0, 0.6);
+  animation: dot-pulse 3s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { text-shadow: 0 0 6px rgba(215, 113, 0, 0.4); }
+  50% { text-shadow: 0 0 14px rgba(215, 113, 0, 0.8), 0 0 4px rgba(255, 193, 7, 0.3); }
+}
+
+h1:has(.header-dot) {
+  position: relative;
+  overflow: hidden;
+}
+
+h1:has(.header-dot)::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(215, 113, 0, 0.12) 40%,
+    rgba(255, 193, 7, 0.18) 50%,
+    rgba(215, 113, 0, 0.12) 60%,
+    transparent 100%
+  );
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+h1:has(.header-dot):hover::after {
+  left: 120%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-dot { animation: none; }
+  h1:has(.header-dot)::after { display: none; }
+}
+
 /* ── Liquid gold button ────────────────────────────────────── */
 .liquid-button {
   background: var(--gold-gradient);
@@ -598,7 +643,7 @@
   filter: blur(80px);
   opacity: 0.45;
   will-change: transform, opacity;
-  animation: ambient-pulse 8s ease-in-out infinite alternate;
+  animation: ambient-pulse 5s ease-in-out infinite alternate;
 }
 
 .ambient-blob--amber {
@@ -708,7 +753,7 @@
 }
 
 :root:not(.dark) .ambient-blob {
-  opacity: 0.35;
+  opacity: 0.5;
   filter: blur(100px);
 }
 

@@ -75,12 +75,33 @@ function useDirectTelemetry(enabled: boolean): MachineState {
   const staleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastProfileIdRef = useRef<string | null>(null)
 
-  // Temperature throttle: buffer latest values, flush to state every ~200ms
-  // to prevent display flickering from 50+ Hz sensor events in direct mode.
-  const latestBoilerTempRef = useRef<number | undefined | null>(undefined)
-  const latestBrewHeadTempRef = useRef<number | undefined | null>(undefined)
-  const tempDirtyRef = useRef(false)
+  // Temperature smoothing: maintain a rolling 1-second average to prevent
+  // display flickering from 50+ Hz sensor events in direct mode.
+  const boilerSamplesRef = useRef<{ value: number; time: number }[]>([])
+  const brewHeadSamplesRef = useRef<{ value: number; time: number }[]>([])
   const tempIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const addTempSample = useCallback((
+    buffer: React.MutableRefObject<{ value: number; time: number }[]>,
+    value: number | undefined | null,
+  ) => {
+    if (value == null || value < TEMP_MIN || value > TEMP_MAX) return
+    const now = Date.now()
+    buffer.current.push({ value, time: now })
+    // Prune samples older than 1 second
+    const cutoff = now - 1000
+    buffer.current = buffer.current.filter(s => s.time >= cutoff)
+  }, [])
+
+  const computeAverage = useCallback((
+    buffer: React.MutableRefObject<{ value: number; time: number }[]>,
+    fallback: number | null,
+  ): number | null => {
+    const samples = buffer.current
+    if (samples.length === 0) return fallback
+    const sum = samples.reduce((acc, s) => acc + s.value, 0)
+    return Math.round((sum / samples.length) * 10) / 10
+  }, [])
 
   const resetStaleTimer = useCallback(() => {
     if (staleTimerRef.current) clearTimeout(staleTimerRef.current)
@@ -98,19 +119,20 @@ function useDirectTelemetry(enabled: boolean): MachineState {
 
     const unsubs: (() => void)[] = []
 
-    // Flush buffered temperature values to state at ~5 FPS.
-    // The machine fires sensor events at 50+ Hz; the server-side proxy
-    // already rate-limits to 10 FPS (FRAME_INTERVAL = 0.1s in websocket.py).
-    const TEMP_THROTTLE_MS = 200
+    // Flush rolling average to state at ~5 FPS.
+    // The machine fires sensor events at 50+ Hz; we smooth over 1 second
+    // to eliminate visual flicker from oscillating readings.
+    const TEMP_FLUSH_MS = 200
     tempIntervalRef.current = setInterval(() => {
-      if (!tempDirtyRef.current) return
-      tempDirtyRef.current = false
+      const boilerSamples = boilerSamplesRef.current
+      const brewSamples = brewHeadSamplesRef.current
+      if (boilerSamples.length === 0 && brewSamples.length === 0) return
       setState(prev => ({
         ...prev,
-        boiler_temperature: clampTemp(latestBoilerTempRef.current, prev.boiler_temperature),
-        brew_head_temperature: clampTemp(latestBrewHeadTempRef.current, prev.brew_head_temperature),
+        boiler_temperature: computeAverage(boilerSamplesRef, prev.boiler_temperature),
+        brew_head_temperature: computeAverage(brewHeadSamplesRef, prev.brew_head_temperature),
       }))
-    }, TEMP_THROTTLE_MS)
+    }, TEMP_FLUSH_MS)
 
     // Connection status
     unsubs.push(machine.onConnectionChange((connected) => {
@@ -126,10 +148,9 @@ function useDirectTelemetry(enabled: boolean): MachineState {
 
     // Status events (main telemetry stream)
     unsubs.push(machine.onStatus((data) => {
-      // Buffer boiler temp — committed to state by the throttle interval
+      // Buffer boiler temp — averaged and committed to state by the flush interval
       if (data.sensors?.t != null) {
-        latestBoilerTempRef.current = data.sensors.t
-        tempDirtyRef.current = true
+        addTempSample(boilerSamplesRef, data.sensors.t)
       }
       setState(prev => {
         // Machine sends profile_time in milliseconds — convert to seconds
@@ -209,15 +230,9 @@ function useDirectTelemetry(enabled: boolean): MachineState {
     //   boiler_temperature    ← t_bar_up   (upper bar thermocouple)
     // t_ext_1/t_ext_2 are external sensors, NOT brew head.
     unsubs.push(machine.onTemperatures((data) => {
-      // Buffer latest values — committed to state by the throttle interval
-      if (data.t_bar_down != null) {
-        latestBrewHeadTempRef.current = data.t_bar_down
-        tempDirtyRef.current = true
-      }
-      if (data.t_bar_up != null) {
-        latestBoilerTempRef.current = data.t_bar_up
-        tempDirtyRef.current = true
-      }
+      // Buffer latest values — averaged and committed to state by the flush interval
+      addTempSample(brewHeadSamplesRef, data.t_bar_down)
+      addTempSample(boilerSamplesRef, data.t_bar_up)
     }))
 
     // Heater status events — detect preheat from countdown value
@@ -240,8 +255,10 @@ function useDirectTelemetry(enabled: boolean): MachineState {
       unsubs.forEach(fn => fn())
       if (staleTimerRef.current) clearTimeout(staleTimerRef.current)
       if (tempIntervalRef.current) clearInterval(tempIntervalRef.current)
+      boilerSamplesRef.current = []
+      brewHeadSamplesRef.current = []
     }
-  }, [enabled, machine, resetStaleTimer])
+  }, [enabled, machine, resetStaleTimer, addTempSample, computeAverage])
 
   return state
 }

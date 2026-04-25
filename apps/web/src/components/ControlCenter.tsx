@@ -234,6 +234,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
           <Skeleton className="h-9 flex-1" />
           <Skeleton className="h-9 flex-1" />
         </div>
+        <div className="border-t border-border/30" />
+        <Skeleton className="h-4 w-16 mx-auto" />
       </Card>
     )
   }

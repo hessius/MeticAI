@@ -1186,7 +1186,7 @@ function App() {
                   transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
               >
-                Metic
+                Metic<span className="header-dot">·</span>
               </h1>
             </div>
           </div>
@@ -1470,7 +1470,6 @@ function App() {
             </Suspense>
 
             {/* Mobile Control Center — now rendered inside StartView */}
-          </main>
 
             {/* Desktop-only footer — home view, non-demo */}
             {!isMobile && isHome && !isDemoMode() && (
@@ -1485,6 +1484,7 @@ function App() {
                 </a>
               </footer>
             )}
+          </main>
 
           {/* ── Right column — desktop Control Center ─── */}
           {showRightColumn && (
