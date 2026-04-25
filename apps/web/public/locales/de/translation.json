@@ -797,7 +797,8 @@
       "settings": "Maschineneinstellungen",
       "actions": "Aktionen",
       "profile": "Profil",
-      "activeProfile": "Aktives Profil"
+      "activeProfile": "Aktives Profil",
+      "selectedProfile": "Ausgewähltes Profil"
     },
     "labels": {
       "brewHead": "Brühkopf",

@@ -797,7 +797,8 @@
       "settings": "Impostazioni macchina",
       "actions": "Azioni",
       "profile": "Profilo",
-      "activeProfile": "Profilo attivo"
+      "activeProfile": "Profilo attivo",
+      "selectedProfile": "Profilo selezionato"
     },
     "labels": {
       "brewHead": "Gruppo erogatore",

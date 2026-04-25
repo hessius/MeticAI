@@ -122,18 +122,44 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     !machineState.active_profile.startsWith('Metic '))
     ? machineState.active_profile : null
 
-  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
-  const profileImgUrl = useProfileImageSrc(activeProfile)
+  // Pending profile — selected in UI but not yet loaded on machine.
+  // Only sent to the machine when the user explicitly presses Start.
+  const [pendingProfile, setPendingProfile] = useState<string | null>(null)
 
-  // Reset dependent state when active profile is cleared
+  // The profile to display in the UI (pending overrides active)
+  const displayProfile = pendingProfile ?? activeProfile
+
+  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
+  const activeProfileImgUrl = useProfileImageSrc(activeProfile)
+
+  // When a pending profile is selected, resolve its image from the dropdown cache
+  const pendingProfileMeta = useMemo(() => {
+    if (!pendingProfile) return null
+    return machineProfiles.find(p => p.name === pendingProfile) ?? null
+  }, [pendingProfile, machineProfiles])
+
+  const profileImgUrl = pendingProfileMeta?.resolvedImageUrl ?? activeProfileImgUrl
+
+  // Clear pending once the machine reports it as active
   useEffect(() => {
-    if (!activeProfile) {
+    if (activeProfile && activeProfile === pendingProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPendingProfile(null)
+    }
+  }, [activeProfile, pendingProfile])
+
+  // Reset dependent state when displayed profile changes
+  useEffect(() => {
+    if (!displayProfile) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileImgError(false)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileAuthor(null)
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setProfileImgError(false)
     }
-  }, [activeProfile])
+  }, [displayProfile])
 
   // Fetch profiles (for author + change selector) — once on mount
   useEffect(() => {
@@ -194,16 +220,12 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     [machineProfiles, getImageUrl],
   )
 
-  // Profile change handler — used by ProfileDropdown
-  const handleSelectProfile = useCallback(async (name: string) => {
+  // Profile change handler — UI-only, does NOT touch the machine
+  const handleSelectProfile = useCallback((name: string) => {
     impact('light')
-    const res = await machine.loadProfile(name)
-    if (res.success) {
-      toast.success(t('controlCenter.toasts.profileSelected', { name }))
-    } else {
-      toast.error(res.message ?? t('controlCenter.toasts.error'))
-    }
-  }, [t, machine, impact])
+    setPendingProfile(name === activeProfile ? null : name)
+    toast.success(t('controlCenter.toasts.profileSelected', { name }))
+  }, [t, activeProfile, impact])
 
   // 🎉 Confetti celebration for every 100th shot
   useEffect(() => {
@@ -307,17 +329,19 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
           })()}
 
           {/* Active profile with image + author + change button */}
-          {activeProfile && (
+          {displayProfile && (
             <div className="space-y-1">
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                {t('controlCenter.sections.activeProfile')}
+                {pendingProfile
+                  ? t('controlCenter.sections.selectedProfile')
+                  : t('controlCenter.sections.activeProfile')}
               </h4>
               <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                 {profileImgUrl && !profileImgError ? (
                   <img
                     src={profileImgUrl}
-                    alt={activeProfile ?? ''}
+                    alt={displayProfile ?? ''}
                     className="h-full w-full object-cover"
                     onError={() => setProfileImgError(true)}
                   />
@@ -329,15 +353,15 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 <div className="overflow-hidden">
                   <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
                     style={{
-                      animation: activeProfile && activeProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                      animation: displayProfile && displayProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
                     }}
                   >
-                    {activeProfile}
+                    {displayProfile}
                   </span>
                 </div>
-                {profileAuthor && (
+                {(pendingProfileMeta?.author ?? profileAuthor) && (
                   <span className="text-xs text-muted-foreground truncate block">
-                    {t('controlCenter.labels.by')} {profileAuthor}
+                    {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
                   </span>
                 )}
               </div>
@@ -345,7 +369,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               {dropdownProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected && (
                 <ProfileDropdown
                   profiles={dropdownProfiles}
-                  activeProfile={activeProfile}
+                  activeProfile={displayProfile}
                   onSelectProfile={handleSelectProfile}
                 />
               )}
@@ -373,13 +397,26 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
 
           {/* Quick actions — adapt to preheat/ready/idle state */}
           <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
-            {/* Start button — available during idle, preheating, or ready */}
+            {/* Start button — loads pending profile first if needed, then starts */}
             <Button
               variant="dark-brew"
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!canStart}
-              onClick={() => { impact('medium'); cmd(() => isReady ? machine.continueShot() : machine.startShot(), 'startingShot') }}
+              onClick={() => {
+                impact('medium')
+                cmd(async () => {
+                  if (pendingProfile && pendingProfile !== activeProfile) {
+                    const res = await machine.loadProfile(pendingProfile)
+                    if (!res.success) {
+                      toast.error(res.message ?? t('controlCenter.toasts.error'))
+                      return
+                    }
+                    await new Promise(r => setTimeout(r, 300))
+                  }
+                  return isReady ? machine.continueShot() : machine.startShot()
+                }, 'startingShot')
+              }}
             >
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}

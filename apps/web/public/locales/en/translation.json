@@ -800,6 +800,7 @@
       "temperatures": "Temperatures",
       "profile": "Profile",
       "activeProfile": "Active Profile",
+      "selectedProfile": "Selected Profile",
       "info": "Machine Info",
       "settings": "Machine Settings",
       "actions": "Actions"

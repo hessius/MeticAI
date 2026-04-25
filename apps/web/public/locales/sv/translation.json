@@ -802,7 +802,8 @@
       "settings": "Maskininställningar",
       "actions": "Åtgärder",
       "profile": "Profil",
-      "activeProfile": "Aktiv profil"
+      "activeProfile": "Aktiv profil",
+      "selectedProfile": "Vald profil",
     },
     "labels": {
       "brewHead": "Brygghuvud",

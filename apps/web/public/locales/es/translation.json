@@ -797,7 +797,8 @@
       "settings": "Ajustes de la máquina",
       "actions": "Acciones",
       "profile": "Perfil",
-      "activeProfile": "Perfil activo"
+      "activeProfile": "Perfil activo",
+      "selectedProfile": "Perfil seleccionado"
     },
     "labels": {
       "brewHead": "Cabezal",

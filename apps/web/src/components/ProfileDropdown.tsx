@@ -117,6 +117,7 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
       <PopoverContent
         align="center"
         sideOffset={8}
+        collisionPadding={16}
         className="w-[min(320px,calc(100vw-2rem))] p-0 overflow-hidden"
       >
         {/* Header */}

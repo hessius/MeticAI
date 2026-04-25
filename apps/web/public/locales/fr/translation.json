@@ -797,7 +797,8 @@
       "settings": "Réglages machine",
       "actions": "Actions",
       "profile": "Profil",
-      "activeProfile": "Profil actif"
+      "activeProfile": "Profil actif",
+      "selectedProfile": "Profil sélectionné"
     },
     "labels": {
       "brewHead": "Tête de groupe",
