@@ -194,19 +194,11 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, blo
     .map(point => `${toX(point.t).toFixed(2)},${toY(point.w).toFixed(2)}`)
     .join(' ')
 
-  // Smooth flow data using a wider rolling average and clamp outliers
+  // Flow data — already smoothed upstream via EMA at data collection time
   const flowPoints = points.filter(point => point.flow !== undefined && point.flow >= 0)
-  const SMOOTH_WINDOW = 15  // ~3-5 seconds at typical update rate
-  const smoothedFlowPoints = flowPoints.map((point, i) => {
-    const windowStart = Math.max(0, i - Math.floor(SMOOTH_WINDOW / 2))
-    const windowEnd = Math.min(flowPoints.length, i + Math.ceil(SMOOTH_WINDOW / 2))
-    const windowSlice = flowPoints.slice(windowStart, windowEnd)
-    const avgFlow = windowSlice.reduce((sum, p) => sum + Math.min(p.flow ?? 0, FLOW_CLAMP), 0) / windowSlice.length
-    return { t: point.t, flow: Math.min(avgFlow, FLOW_CLAMP) }
-  })
 
-  const flowPolyline = smoothedFlowPoints
-    .map(point => `${toX(point.t).toFixed(2)},${toFlowY(point.flow).toFixed(2)}`)
+  const flowPolyline = flowPoints
+    .map(point => `${toX(point.t).toFixed(2)},${toFlowY(Math.min(point.flow ?? 0, FLOW_CLAMP)).toFixed(2)}`)
     .join(' ')
 
   const targetY = targetWeight !== null ? toY(targetWeight) : null
@@ -560,6 +552,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const previousWeightTimestampRef = useRef<number | null>(null)
   const trendStartTimestampRef = useRef<number | null>(null)
   const justTaredRef = useRef(false)
+  // EMA refs for graph smoothing — smooth weight before differentiating
+  // to prevent noise amplification, then smooth the flow result too.
+  const emaWeightRef = useRef<number | null>(null)
+  const prevEmaWeightRef = useRef<number | null>(null)
+  const emaFlowRef = useRef<number>(0)
   // Track continuous flow start time for auto-start confirmation
   const flowStartTimestampRef = useRef<number | null>(null)
   // Track weight when continuous flow started (for weight-based escape hatch)
@@ -614,6 +611,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     trendStartTimestampRef.current = null
     flowStartTimestampRef.current = null
     flowStartWeightRef.current = null
+    emaWeightRef.current = null
+    prevEmaWeightRef.current = null
+    emaFlowRef.current = 0
     setFlowRate(0)
     // Send tare command
     cmd(() => machine.tareScale(), 'tared')
@@ -934,6 +934,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     previousWeightTimestampRef.current = null
     flowStartTimestampRef.current = null
     flowStartWeightRef.current = null
+    emaWeightRef.current = null
+    prevEmaWeightRef.current = null
+    emaFlowRef.current = 0
     setFlowRate(0)
     // Tare the scale
     justTaredRef.current = true
@@ -961,11 +964,27 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     const previousWeight = previousWeightRef.current
     const previousTimestamp = previousWeightTimestampRef.current
 
-    // Compute instantaneous flow rate (g/s)
+    // ── EMA-smoothed weight for graph + flow computation ──
+    // Smoothing raw weight before differentiating prevents noise amplification.
+    // α=0.3 gives ~1s settling at 3Hz updates; higher = more responsive but noisier.
+    const WEIGHT_EMA_ALPHA = 0.3
+    const FLOW_EMA_ALPHA = 0.15
+    prevEmaWeightRef.current = emaWeightRef.current
+    if (emaWeightRef.current === null) {
+      emaWeightRef.current = currentWeight
+    } else {
+      emaWeightRef.current = WEIGHT_EMA_ALPHA * currentWeight + (1 - WEIGHT_EMA_ALPHA) * emaWeightRef.current
+    }
+    const smoothedWeight = emaWeightRef.current
+
+    // Compute flow rate from smoothed weight (not raw) to avoid jitter
     let currentFlowRate = 0
-    if (previousWeight !== null && previousTimestamp !== null) {
+    if (prevEmaWeightRef.current !== null && previousTimestamp !== null) {
       const deltaSeconds = Math.max((now - previousTimestamp) / 1000, 0.01)
-      currentFlowRate = Math.max((currentWeight - previousWeight) / deltaSeconds, 0)
+      const rawFlow = Math.max((smoothedWeight - prevEmaWeightRef.current) / deltaSeconds, 0)
+      // Apply EMA to flow for extra smoothness
+      emaFlowRef.current = FLOW_EMA_ALPHA * rawFlow + (1 - FLOW_EMA_ALPHA) * emaFlowRef.current
+      currentFlowRate = emaFlowRef.current
     }
     setFlowRate(currentFlowRate)
 
@@ -978,7 +997,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       const trendTimeSeconds = (now - trendStartTimestampRef.current) / 1000
 
       setWeightTrend(prev => {
-        const next = [...prev, { t: trendTimeSeconds, w: currentWeight, flow: currentFlowRate }]
+        const next = [...prev, { t: trendTimeSeconds, w: smoothedWeight, flow: currentFlowRate }]
         // Keep enough points for a full 5-minute pour-over (~900 points at 3Hz)
         return next.slice(-900)
       })
