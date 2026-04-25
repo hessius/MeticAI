@@ -643,17 +643,17 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
   const shotService = useShotDataService()
   const catalogueService = useCatalogueService()
   const [greeting, setGreeting] = useState<SmartGreeting | null>(null)
-  const fetchedRef = useRef(false)
+  const completedRef = useRef(false)
 
   useEffect(() => {
     if (!enabled) {
-      fetchedRef.current = false
+      completedRef.current = false
       setGreeting(null)
       return
     }
 
-    if (fetchedRef.current) return
-    fetchedRef.current = true
+    // Only skip if a greeting was successfully set (not just attempted)
+    if (completedRef.current) return
 
     let cancelled = false
 
@@ -724,6 +724,7 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
         }
       }
 
+      completedRef.current = true
       setGreeting(result)
     }
 
