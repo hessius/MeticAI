@@ -152,6 +152,24 @@ function useDirectTelemetry(enabled: boolean): MachineState {
       if (data.sensors?.t != null) {
         addTempSample(boilerSamplesRef, data.sensors.t)
       }
+
+      // Fetch target weight from loaded profile when profile changes
+      // (side effect — kept outside setState updater to avoid calling async
+      // functions from a pure function)
+      const ext = data as typeof data & {loaded_profile?: string; id?: string}
+      const profileId = ext.id
+      if (profileId && profileId !== lastProfileIdRef.current) {
+        lastProfileIdRef.current = profileId
+        machine.getProfile(profileId)
+          .then((profile) => {
+            const weight = (profile as unknown as {final_weight?: number})?.final_weight
+            if (weight) {
+              setState(s => ({ ...s, target_weight: weight }))
+            }
+          })
+          .catch(() => {/* ignore — profile may not exist */})
+      }
+
       setState(prev => {
         // Machine sends profile_time in milliseconds — convert to seconds
         const shotTimer = data.profile_time != null
@@ -161,22 +179,7 @@ function useDirectTelemetry(enabled: boolean): MachineState {
         // data.name = current stage/phase (e.g. "heating", "Preinfusion")
         // data.profile / data.loaded_profile = actual profile name
         // data.state = machine state ('idle', 'brewing', 'home', 'purge')
-        const ext = data as {loaded_profile?: string; id?: string}
         const profileName = ext.loaded_profile || data.profile || prev.active_profile
-
-        // Fetch target weight from loaded profile when profile changes
-        const profileId = ext.id
-        if (profileId && profileId !== lastProfileIdRef.current) {
-          lastProfileIdRef.current = profileId
-          machine.getProfile(profileId)
-            .then((profile) => {
-              const weight = (profile as unknown as {final_weight?: number})?.final_weight
-              if (weight) {
-                setState(s => ({ ...s, target_weight: weight }))
-              }
-            })
-            .catch(() => {/* ignore — profile may not exist */})
-        }
 
         // DirectAdapter seeds total_shots, firmware_version, sounds_enabled via
         // the status callback (they aren't in the machine's raw status events).
