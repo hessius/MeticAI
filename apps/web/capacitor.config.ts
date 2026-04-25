@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.metic.app',
-  appName: 'Metic',
+  appName: 'Metic.',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
