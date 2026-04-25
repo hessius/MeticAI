@@ -75,3 +75,12 @@ SESSION_HANDOFF.md
 .superpowers
 
 tasks.old.md
+
+# Old build artifacts
+apps/web/dist.old/
+
+# Playwright MCP (leftover logs)
+.playwright-mcp/
+
+# Reports (empty/generated)
+reports/
