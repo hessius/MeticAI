@@ -1077,9 +1077,7 @@ function App() {
               </nav>
 
             {/* Centered island + title unit */}
-            <div className="flex items-center justify-center" style={{ width: '100%' }}>
-              {/* Wrapper: sized by island only, h1 positioned absolutely outside */}
-              <div style={{ display: 'inline-flex', alignItems: 'center', position: 'relative' }}>
+            <div className="flex items-center justify-center">
               {/* Dynamic Island — circle→pill CSS transition */}
               <div
                   className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
@@ -1134,16 +1132,19 @@ function App() {
                     />
                   </button>
 
-                  {/* Greeting text — only rendered when expanded to prevent layout shift */}
-                  {islandExpanded && smartGreeting && (
+                  {/* Greeting text — always in DOM for smooth animation, zero-width when collapsed */}
+                  {smartGreeting && (
                     <div
-                      className="min-w-0 flex-1 overflow-hidden"
+                      className="min-w-0 overflow-hidden"
                       style={{
-                        marginLeft: 6,
-                        opacity: 1,
-                        transition: 'opacity 0.35s ease 0.25s',
-                        maskImage: !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
-                        WebkitMaskImage: !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        flex: islandExpanded ? '1 1 0%' : '0 0 0px',
+                        width: islandExpanded ? undefined : 0,
+                        marginLeft: islandExpanded ? 6 : 0,
+                        opacity: islandExpanded ? 1 : 0,
+                        transition: 'flex 0.45s cubic-bezier(0.32, 0.72, 0, 1), width 0.45s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
+                        pointerEvents: islandExpanded ? 'auto' : 'none',
+                        maskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        WebkitMaskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
                       }}
                     >
                       <div
@@ -1175,7 +1176,7 @@ function App() {
                   )}
                 </div>
 
-              {/* Title — absolute to wrapper, doesn't affect centering */}
+              {/* Title — collapses when island expands */}
               <h1
                 role={smartGreeting ? "button" : undefined}
                 data-sound="none"
@@ -1184,20 +1185,15 @@ function App() {
                 onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                 className={`font-bold tracking-tight text-3xl whitespace-nowrap overflow-hidden select-none${smartGreeting ? ' cursor-pointer' : ''}`}
                 style={{
-                  position: 'absolute',
-                  left: '100%',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
                   maxWidth: islandExpanded ? 0 : 140,
                   opacity: islandExpanded ? 0 : 1,
                   padding: '4px 6px',
-                  marginLeft: 4,
-                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease',
+                  margin: islandExpanded ? '0' : '-4px -6px -4px 8px',
+                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
               >
                 Metic<span className="header-dot">.</span>
               </h1>
-              </div>
             </div>
           </div>
 
