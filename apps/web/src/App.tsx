@@ -1183,7 +1183,9 @@ function App() {
                   maxWidth: islandExpanded ? 0 : 140,
                   opacity: islandExpanded ? 0 : 1,
                   marginLeft: islandExpanded ? 0 : 8,
-                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                  padding: '4px 6px',
+                  margin: islandExpanded ? '0' : '-4px -6px -4px 8px',
+                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
               >
                 Metic<span className="header-dot">.</span>
