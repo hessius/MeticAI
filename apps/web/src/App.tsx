@@ -1186,7 +1186,7 @@ function App() {
                   transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
               >
-                Metic<span className="header-dot">·</span>
+                Metic<span className="header-dot">.</span>
               </h1>
             </div>
           </div>
@@ -1487,7 +1487,7 @@ function App() {
           </main>
 
           {/* ── Right column — desktop Control Center ─── */}
-          {showRightColumn && (
+          {showRightColumn && !isMobile && (
             <aside className="hidden md:block">
               <div className={`sticky top-4 ${viewState === 'live-shot' ? 'mt-10' : 'mt-2'}`}>
                 {/* Hide control center during live shot — profile breakdown takes over */}

@@ -478,9 +478,6 @@
 /* ── Header dot + shimmer ──────────────────────────────────── */
 .header-dot {
   color: #d77100;
-  font-size: 1.5em;
-  position: relative;
-  top: 0.05em;
   text-shadow: 0 0 8px rgba(215, 113, 0, 0.6);
   animation: dot-pulse 3s ease-in-out infinite;
 }
@@ -492,7 +489,6 @@
 
 h1:has(.header-dot) {
   position: relative;
-  overflow: hidden;
 }
 
 h1:has(.header-dot)::after {
@@ -739,20 +735,24 @@ h1:has(.header-dot):hover::after {
 }
 
 :root:not(.dark) .frosted-button {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: rgba(78, 52, 46, 0.12);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(78, 52, 46, 0.1);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 :root:not(.dark) .frosted-button:hover {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(78, 52, 46, 0.2);
+  background: rgba(255, 255, 255, 0.4);
+  border-color: rgba(78, 52, 46, 0.18);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 :root:not(.dark) .frosted-card {
-  background: rgba(255, 255, 255, 0.45) !important;
-  border: 1px solid rgba(78, 52, 46, 0.1);
+  background: rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(78, 52, 46, 0.08);
 }
 
 :root:not(.dark) .ambient-blob {
