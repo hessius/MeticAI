@@ -323,15 +323,18 @@ function App() {
   const greetingTextRef = useRef<HTMLElement | null>(null)
   const greetingInnerRef = useRef<HTMLElement | null>(null)
   const [isScrollActive, setIsScrollActive] = useState(false)
+  const playIslandExpandRef = useRef(playIslandExpand)
+  useEffect(() => { playIslandExpandRef.current = playIslandExpand }, [playIslandExpand])
 
   useEffect(() => {
     if (isHome && smartGreeting) {
-      islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpand() }, 3000)
+      islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpandRef.current() }, 3000)
     } else {
       setIslandExpanded(false)
     }
     return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
-  }, [isHome, smartGreeting, playIslandExpand])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHome, smartGreeting])
 
   // Detect vertical text overflow and enable scroll animation
   useEffect(() => {
@@ -1074,7 +1077,7 @@ function App() {
               </nav>
 
             {/* Centered island + title unit */}
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center" style={{ width: '100%', position: 'relative' }}>
               {/* Dynamic Island — circle→pill CSS transition */}
               <div
                   className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
@@ -1085,7 +1088,7 @@ function App() {
                   onKeyDown={!islandExpanded && smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                   style={{
                     height: islandExpanded ? 48 : 40,
-                    width: islandExpanded ? 'min(20rem, calc(100vw - 6rem))' : 40,
+                    width: islandExpanded ? 'min(20rem, calc(100vw - 7rem))' : 40,
                     background: islandExpanded
                       ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
                       : 'transparent',
@@ -1171,7 +1174,7 @@ function App() {
                   )}
                 </div>
 
-              {/* Title — fades out and collapses when island expands, tappable */}
+              {/* Title — positioned absolutely so it doesn't shift the centered island */}
               <h1
                 role={smartGreeting ? "button" : undefined}
                 data-sound="none"
@@ -1180,12 +1183,13 @@ function App() {
                 onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                 className={`font-bold tracking-tight text-3xl whitespace-nowrap overflow-hidden select-none${smartGreeting ? ' cursor-pointer' : ''}`}
                 style={{
+                  position: 'absolute',
+                  left: '50%',
+                  marginLeft: islandExpanded ? 0 : 24,
                   maxWidth: islandExpanded ? 0 : 140,
                   opacity: islandExpanded ? 0 : 1,
-                  marginLeft: islandExpanded ? 0 : 8,
                   padding: '4px 6px',
-                  margin: islandExpanded ? '0' : '-4px -6px -4px 8px',
-                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin-left 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
               >
                 Metic<span className="header-dot">.</span>
