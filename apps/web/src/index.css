@@ -478,6 +478,9 @@
 /* ── Header dot + shimmer ──────────────────────────────────── */
 .header-dot {
   color: #d77100;
+  font-size: 1.5em;
+  position: relative;
+  top: 0.05em;
   text-shadow: 0 0 8px rgba(215, 113, 0, 0.6);
   animation: dot-pulse 3s ease-in-out infinite;
 }
