@@ -1,6 +1,8 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
+import { findSimilarProfiles, getRecommendations } from '@/lib/profileRecommendation'
+import type { AnalyzableProfile } from '@/lib/profileAnalysis'
 
 // ── Private helpers ─────────────────────────────────────────────────────────
 
@@ -1926,16 +1928,59 @@ export function installDirectModeInterceptor(): void {
       return Promise.resolve(jsonResponse({ status: 'completed' }))
     }
 
-    // ── Profile recommendations (not available without backend) ──────────
+    // ── Profile recommendations (client-side engine) ───────────────────────
 
-    // POST /api/profiles/find-similar → return empty (no backend ranking engine)
+    // POST /api/profiles/find-similar → client-side recommendation engine
     if (url.match(/\/api\/profiles\/find-similar/) && method === 'POST') {
-      return Promise.resolve(jsonResponse({ recommendations: [] }))
+      return (async () => {
+        try {
+          let profileName = ''
+          let limit = 10
+          const body = init?.body
+          if (body instanceof FormData) {
+            profileName = body.get('profile_name')?.toString() ?? ''
+            limit = parseInt(body.get('limit')?.toString() ?? '10', 10)
+          }
+
+          const res = await _fetch('/api/v1/profile/list')
+          if (!res.ok) return jsonResponse({ recommendations: [] })
+          const profiles: AnalyzableProfile[] = await res.json()
+          if (!profiles?.length) return jsonResponse({ recommendations: [] })
+
+          const source = profiles.find(p => p.name === profileName)
+          if (!source) return jsonResponse({ recommendations: [] })
+
+          const recommendations = findSimilarProfiles(source, profiles, limit)
+          return jsonResponse({ recommendations })
+        } catch {
+          return jsonResponse({ recommendations: [] })
+        }
+      })()
     }
 
-    // POST /api/profiles/recommend → return empty
+    // POST /api/profiles/recommend → client-side recommendation engine
     if (url.match(/\/api\/profiles\/recommend/) && method === 'POST') {
-      return Promise.resolve(jsonResponse({ recommendations: [] }))
+      return (async () => {
+        try {
+          let tags: string[] = []
+          let limit = 5
+          const body = init?.body
+          if (body instanceof FormData) {
+            tags = body.getAll('tags').map(t => t.toString())
+            limit = parseInt(body.get('limit')?.toString() ?? '5', 10)
+          }
+
+          const res = await _fetch('/api/v1/profile/list')
+          if (!res.ok) return jsonResponse({ recommendations: [] })
+          const profiles: AnalyzableProfile[] = await res.json()
+          if (!profiles?.length) return jsonResponse({ recommendations: [] })
+
+          const recommendations = getRecommendations(tags, profiles, limit)
+          return jsonResponse({ recommendations })
+        } catch {
+          return jsonResponse({ recommendations: [] })
+        }
+      })()
     }
 
     // ── Status/health endpoints ─────────────────────────────────────────
