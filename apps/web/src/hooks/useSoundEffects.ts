@@ -10,7 +10,7 @@
  *
  * useGlobalSoundDelegation provides automatic click sounds for ALL
  * interactive elements via event delegation. Mount it once in App.tsx.
- * Use data-sound attributes to customise: "back", "close" → notify,
+ * Use data-sound attributes to customise: "back", "close" → click,
  * "adjust" → hover, "none" → suppress.
  */
 

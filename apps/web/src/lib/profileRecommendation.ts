@@ -260,6 +260,7 @@ function buildUserFingerprint(
   let controlMode: ProfileFingerprint['controlMode'] = 'unknown'
   if (techniqueTags.has('pressure-profile')) controlMode = 'pressure'
   else if (techniqueTags.has('flow-profile')) controlMode = 'flow'
+  else if (techniqueTags.has('mixed-profile')) controlMode = 'mixed'
 
   let stageCount = 2
   if (techniqueTags.has('preinfusion')) stageCount += 1
