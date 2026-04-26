@@ -400,6 +400,209 @@ export function installDirectModeInterceptor(): void {
       }))
     }
 
+    // POST /api/profile/:id/regenerate-description → use BrowserAIService
+    const regenDescMatch = url.match(/\/api\/profile\/([^/]+)\/regenerate-description$/)
+    if (regenDescMatch && method === 'POST') {
+      return (async () => {
+        try {
+          const entryId = decodeURIComponent(regenDescMatch[1])
+
+          // The caller may pass a history entry ID or a profile name.
+          // Try multiple resolution strategies to find the profile JSON.
+          let profileJson: Record<string, unknown> | null = null
+          let profileName = entryId
+
+          // Strategy 1: Try entryId as a history entry — fetch from machine history
+          try {
+            const histResp = await _fetch('/api/v1/history')
+            if (histResp.ok) {
+              const raw = await histResp.json() as unknown
+              type MachineHistEntry = { id: string; name: string; profile?: { name?: string } }
+              const list: MachineHistEntry[] = Array.isArray(raw) ? raw : ((raw as { history?: MachineHistEntry[] }).history ?? [])
+              const histEntry = list.find(e => e.id === entryId)
+              if (histEntry) {
+                profileName = histEntry.profile?.name ?? histEntry.name ?? entryId
+                // Fetch the full profile by name from profile cache
+                const cached = _profileCache.get(profileName)
+                if (cached) {
+                  const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+                  if (r.ok) profileJson = await r.json()
+                }
+              }
+            }
+          } catch {
+            // History lookup failed — try other strategies
+          }
+
+          // Strategy 2: Try entryId as a profile name via cache
+          if (!profileJson) {
+            const cached = _profileCache.get(entryId)
+            if (cached) {
+              const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+              if (r.ok) {
+                profileJson = await r.json()
+                profileName = entryId
+              }
+            }
+          }
+
+          // Strategy 3: Try entryId as a machine profile ID directly
+          if (!profileJson) {
+            const r = await _fetch(`/api/v1/profile/get/${entryId}`)
+            if (r.ok) profileJson = await r.json()
+          }
+
+          if (!profileJson) {
+            return jsonResponse({ status: 'error', detail: 'History entry not found' }, 404)
+          }
+
+          // Try AI description first, fall back to static
+          const aiService = createBrowserAIService()
+          if (aiService.isConfigured()) {
+            try {
+              const { GoogleGenAI } = await import('@google/genai')
+              const key = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+              if (!key) throw new Error('No API key')
+              const client = new GoogleGenAI({ apiKey: key })
+              const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
+              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
+              const response = await client.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              })
+              const description = response.text?.trim()
+              if (description && !description.includes('generated without AI')) {
+                return jsonResponse({ status: 'success', description })
+              }
+            } catch {
+              // AI generation failed — fall back to static
+            }
+          }
+
+          // Static fallback
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          const description = buildStaticProfileDescription(profileJson as Parameters<typeof buildStaticProfileDescription>[0])
+          return jsonResponse({ status: 'success', description })
+        } catch {
+          return jsonResponse({ status: 'error', detail: 'Failed to regenerate description' }, 500)
+        }
+      })()
+    }
+
+    // POST /api/profile/:name/generate-image → use BrowserAIService.generateImage
+    const genImageMatch = url.match(/\/api\/profile\/([^/]+)\/generate-image/)
+    if (genImageMatch && method === 'POST') {
+      return (async () => {
+        try {
+          const profileName = decodeURIComponent(genImageMatch[1])
+          const queryString = url.split('?')[1] || ''
+          const params = new URLSearchParams(queryString)
+          const style = params.get('style') || 'abstract'
+          const tags = params.get('tags')?.split(',').filter(Boolean) || []
+          const preview = params.get('preview') === 'true'
+
+          const aiService = createBrowserAIService()
+          if (!aiService.isConfigured()) {
+            return jsonResponse({ status: 'error', detail: 'AI features are unavailable. Please configure a Gemini API key in Settings.' }, 503)
+          }
+
+          const imageBlob = await aiService.generateImage({ profileName, style, tags })
+
+          // Convert Blob to data URI
+          const buffer = await imageBlob.arrayBuffer()
+          const bytes = new Uint8Array(buffer)
+          let binary = ''
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+          const base64 = btoa(binary)
+          const imageDataUri = `data:image/png;base64,${base64}`
+
+          if (preview) {
+            return jsonResponse({
+              status: 'preview',
+              message: `Preview image generated for profile '${profileName}'`,
+              style,
+              image_data: imageDataUri,
+            })
+          }
+
+          // Save: update the profile on the machine with the new image
+          const cached = _profileCache.get(profileName)
+          if (!cached) {
+            return jsonResponse({ status: 'error', detail: `Profile '${profileName}' not found on machine` }, 404)
+          }
+          const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+          if (!r.ok) {
+            return jsonResponse({ status: 'error', detail: 'Failed to fetch profile from machine' }, 502)
+          }
+          const fullProfile = await r.json() as Record<string, unknown>
+          const display = (fullProfile.display || {}) as Record<string, unknown>
+          display.image = imageDataUri
+          fullProfile.display = display
+          const saveResp = await _fetch('/api/v1/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fullProfile),
+          })
+          if (!saveResp.ok) {
+            return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
+          }
+          return jsonResponse({
+            status: 'success',
+            message: `Image generated for profile '${profileName}'`,
+            profile_id: cached.id,
+            style,
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Image generation failed'
+          return jsonResponse({ status: 'error', detail: msg }, 500)
+        }
+      })()
+    }
+
+    // POST /api/profile/:name/apply-image → save approved preview image to machine profile
+    const applyImageMatch = url.match(/\/api\/profile\/([^/]+)\/apply-image/)
+    if (applyImageMatch && method === 'POST') {
+      return (async () => {
+        try {
+          const profileName = decodeURIComponent(applyImageMatch[1])
+          const body = await new Response(init?.body || '{}').json() as { image_data?: string }
+          const imageData = body.image_data
+          if (!imageData) {
+            return jsonResponse({ status: 'error', detail: 'No image data provided' }, 400)
+          }
+
+          const cached = _profileCache.get(profileName)
+          if (!cached) {
+            return jsonResponse({ status: 'error', detail: `Profile '${profileName}' not found on machine` }, 404)
+          }
+          const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+          if (!r.ok) {
+            return jsonResponse({ status: 'error', detail: 'Failed to fetch profile from machine' }, 502)
+          }
+          const fullProfile = await r.json() as Record<string, unknown>
+          const display = (fullProfile.display || {}) as Record<string, unknown>
+          display.image = imageData
+          fullProfile.display = display
+          const saveResp = await _fetch('/api/v1/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fullProfile),
+          })
+          if (!saveResp.ok) {
+            return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
+          }
+          return jsonResponse({
+            status: 'success',
+            message: `Image applied to profile '${profileName}'`,
+            profile_id: cached.id,
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Failed to apply image'
+          return jsonResponse({ status: 'error', detail: msg }, 500)
+        }
+      })()
+    }
+
 
     // POST /api/import-from-url -> fetch URL, parse profile JSON, save to machine
     if (url.match(/\/api\/import-from-url/) && method === 'POST') {
@@ -795,7 +998,9 @@ export function installDirectModeInterceptor(): void {
     // GET/PUT/DELETE /api/shots/:date/:filename/annotation → localStorage-backed annotation CRUD
     const annotationMatch = pathname.match(/^\/api\/shots\/([^/]+)\/([^/]+)\/annotation$/)
     if (annotationMatch) {
-      const annotKey = `meticai-annotation-${decodeURIComponent(annotationMatch[1])}-${decodeURIComponent(annotationMatch[2])}`
+      const annotDate = decodeURIComponent(annotationMatch[1])
+      const annotFile = decodeURIComponent(annotationMatch[2])
+      const annotKey = `meticai-annotation-${annotDate}/${annotFile}`
 
       if (method === 'GET') {
         const stored = localStorage.getItem(annotKey)
@@ -828,11 +1033,22 @@ export function installDirectModeInterceptor(): void {
     const annotationsAllMatch = url.match(/\/api\/shots\/annotations/)
     if (annotationsAllMatch) {
       const annotations: Record<string, unknown> = {}
+      const PREFIX = 'meticai-annotation-'
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
-        if (key?.startsWith('meticai-annotation-')) {
-          try { annotations[key.replace('meticai-annotation-', '')] = JSON.parse(localStorage.getItem(key)!) }
-          catch { /* skip corrupted entries */ }
+        if (key?.startsWith(PREFIX)) {
+          try {
+            const annotKey = key.slice(PREFIX.length)
+            // Support both legacy separator (-) and current (/)
+            const parsed = JSON.parse(localStorage.getItem(key)!)
+            annotations[annotKey] = parsed
+            // Migrate legacy keys that used '-' separator to '/' separator
+            if (!annotKey.includes('/') && annotKey.match(/^\d{4}-\d{2}-\d{2}-/)) {
+              const legacyDate = annotKey.slice(0, 10)
+              const legacyFile = annotKey.slice(11)
+              annotations[`${legacyDate}/${legacyFile}`] = parsed
+            }
+          } catch { /* skip corrupted entries */ }
         }
       }
       return Promise.resolve(jsonResponse({ annotations }))
@@ -1186,6 +1402,73 @@ export function installDirectModeInterceptor(): void {
               temperature: entry.profile?.temperature ?? null,
               stage_count: profileStages.length,
             },
+            profile_target_curves: (() => {
+              // Generate target curves from profile stages aligned with actual shot stage times
+              const curves: { time: number; target_pressure: number | null; target_flow: number | null; stage_name: string }[] = []
+              for (const ps of profileStages) {
+                const stageName = (ps.name ?? '').trim()
+                const stageType = ps.type ?? 'unknown'
+                let sd: StageStats | undefined
+                for (const [k, v] of shotStages) {
+                  if (k.trim().toLowerCase() === stageName.toLowerCase()) { sd = v; break }
+                }
+                if (!sd) continue
+                const dp = ps.dynamics?.points ?? []
+                if (dp.length === 0) continue
+                const over = (ps.dynamics?.over ?? 'time')
+                // Build weight-to-time pairs for this stage for weight-based dynamics
+                const wTimePairs: [number, number][] = []
+                if (over === 'weight') {
+                  for (const pt2 of pts) {
+                    const t2 = (pt2.time ?? 0) / 1000
+                    if (t2 >= sd.startTime && t2 <= sd.endTime) {
+                      wTimePairs.push([pt2.shot?.weight ?? 0, t2])
+                    }
+                  }
+                }
+                const weightToTime = (w: number): number => {
+                  if (wTimePairs.length === 0) return sd!.startTime
+                  for (let i2 = 0; i2 < wTimePairs.length; i2++) {
+                    if (wTimePairs[i2][0] >= w) return wTimePairs[i2][1]
+                  }
+                  return wTimePairs[wTimePairs.length - 1][1]
+                }
+                const numPoints = Math.max(2, Math.ceil(sd.duration * 2))
+                for (let i2 = 0; i2 < numPoints; i2++) {
+                  const frac = numPoints > 1 ? i2 / (numPoints - 1) : 0
+                  const t = sd.startTime + frac * sd.duration
+                  // Interpolate target value from dynamics points
+                  let val = 0
+                  if (dp.length === 1) {
+                    val = _resolveVar(dp[0][1] ?? dp[0][0], vars)
+                  } else {
+                    const xAxis = over === 'weight'
+                      ? (wTimePairs.length > 0 ? (() => { for (const wp of wTimePairs) { if (wp[1] >= t) return wp[0] }; return wTimePairs[wTimePairs.length - 1][0] })() : 0)
+                      : (t - sd.startTime)
+                    // Find surrounding dynamics points for interpolation
+                    let lo = 0, hi = dp.length - 1
+                    for (let j = 0; j < dp.length - 1; j++) {
+                      if (_sf(dp[j][0]) <= xAxis && _sf(dp[j + 1][0]) >= xAxis) { lo = j; hi = j + 1; break }
+                    }
+                    if (xAxis <= _sf(dp[0][0])) { val = _resolveVar(dp[0][1], vars) }
+                    else if (xAxis >= _sf(dp[dp.length - 1][0])) { val = _resolveVar(dp[dp.length - 1][1], vars) }
+                    else {
+                      const x0 = _sf(dp[lo][0]), x1 = _sf(dp[hi][0])
+                      const y0 = _resolveVar(dp[lo][1], vars), y1 = _resolveVar(dp[hi][1], vars)
+                      const ratio = x1 !== x0 ? (xAxis - x0) / (x1 - x0) : 0
+                      val = y0 + ratio * (y1 - y0)
+                    }
+                  }
+                  curves.push({
+                    time: _round1(t),
+                    ...(stageType === 'pressure' ? { target_pressure: _round1(val) } : {}),
+                    ...(stageType === 'flow' ? { target_flow: _round1(val) } : {}),
+                    stage_name: stageName,
+                  })
+                }
+              }
+              return curves
+            })(),
           }
           return jsonResponse({ status: 'success', analysis })
         } catch (err) {
@@ -1373,10 +1656,28 @@ export function installDirectModeInterceptor(): void {
             }
           }
 
+          // Clean up the response for display:
+          // - Strip raw JSON blocks (already parsed into profile)
+          // - Strip Coffee Analysis section if no image was provided
+          let cleanedAnalysis = result.analysis
+            .replace(/```json\s*[\s\S]*?```/g, '')  // remove JSON blocks
+            .replace(/PROFILE JSON:?\s*/gi, '')      // remove JSON labels
+            .trim()
+
+          // If no image was uploaded, remove Coffee Analysis section entirely
+          if (!image) {
+            cleanedAnalysis = cleanedAnalysis
+              .replace(/Coffee Analysis:[\s\S]*?(?=\n(?:Profile Created|Description|Preparation|Why This Works|Special Notes):|\n*$)/gi, '')
+              .trim()
+          }
+
+          // Remove any duplicate empty lines
+          cleanedAnalysis = cleanedAnalysis.replace(/\n{3,}/g, '\n\n')
+
           return jsonResponse({
             status: result.status,
-            analysis: result.analysis,
-            reply: result.analysis,
+            analysis: image ? cleanedAnalysis : '',
+            reply: cleanedAnalysis,
           })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error'

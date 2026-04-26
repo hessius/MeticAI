@@ -178,7 +178,20 @@ function App() {
       // In direct or demo mode, no MeticAI backend — use sensible defaults
       if (isDemoMode() || isDirectMode()) {
         setMqttEnabled(true) // DemoAdapter / Socket.IO provides telemetry
-        setIsAiConfigured(Boolean(localStorage.getItem('meticai-gemini-key')?.trim()))
+        // On native, the API key may be in SecureStorage (Keychain) but not in localStorage.
+        // Mirror it so synchronous checks (BrowserAIService, feature flags) find it.
+        if (isNativePlatform() && !localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()) {
+          try {
+            const { SecureStorage } = await import('@aparajita/capacitor-secure-storage')
+            const secureKey = await SecureStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+            if (secureKey?.trim()) {
+              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, secureKey)
+            }
+          } catch {
+            // SecureStorage unavailable — skip migration
+          }
+        }
+        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
         return
       }
       try {
@@ -228,7 +241,7 @@ function App() {
       setHideAiWhenUnavailable(getHideAiWhenUnavailable())
       // Re-check API key availability (may have been added/removed in Settings)
       if (isDemoMode() || isDirectMode()) {
-        setIsAiConfigured(Boolean(localStorage.getItem('meticai-gemini-key')?.trim()))
+        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
       }
     }
     // Sync initial values in handler to avoid direct setState in effect
@@ -957,6 +970,7 @@ function App() {
       switch (target) {
         case 'shot-analysis':
           if (context?.date && context?.filename) {
+            setShotHistoryProfileName(context.profileName || machineState.active_profile || 'Unknown')
             setShotHistoryInitialDate(context.date)
             setShotHistoryInitialFilename(context.filename)
             previousViewStateRef.current = 'start'
@@ -994,7 +1008,8 @@ function App() {
     } catch (err) {
       console.error('[DynamicIsland] Error handling greeting action:', target, err)
     }
-  }, [])
+  }, [machineState.active_profile])
+
   const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
 
   const appContent = (

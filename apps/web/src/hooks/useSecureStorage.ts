@@ -21,7 +21,8 @@ export function useSecureStorage() {
         const value = await SecureStorage.getItem(key)
         return value ?? null
       } catch {
-        return null
+        // Keychain read failed — fall back to localStorage mirror
+        return localStorage.getItem(key)
       }
     },
     [isNative],
@@ -33,10 +34,17 @@ export function useSecureStorage() {
         localStorage.setItem(key, value)
         return
       }
+      // On native: write to Keychain AND mirror to localStorage
+      // so synchronous readers (BrowserAIService, App.tsx) can find it.
       try {
         await SecureStorage.setItem(key, value)
       } catch {
-        // Storage write failed — non-critical
+        // Keychain write failed — non-critical
+      }
+      try {
+        localStorage.setItem(key, value)
+      } catch {
+        // localStorage fallback — non-critical
       }
     },
     [isNative],
@@ -48,10 +56,16 @@ export function useSecureStorage() {
         localStorage.removeItem(key)
         return
       }
+      // On native: remove from both Keychain and localStorage mirror
       try {
         await SecureStorage.removeItem(key)
       } catch {
-        // Storage removal failed — non-critical
+        // Removal failed — non-critical
+      }
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        // localStorage cleanup — non-critical
       }
     },
     [isNative],
