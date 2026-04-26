@@ -812,28 +812,35 @@ function App() {
       if (isDemoMode()) return
 
       if (isDirectMode() || isNativePlatform()) {
-        // In direct/Capacitor mode, fetch profile data via interceptor
-        const profileRes = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
-        if (!profileRes.ok) return
-        const profileData = await profileRes.json()
-        const profile = profileData?.profile
-        if (!profile) return
+        // In direct/Capacitor mode, look up profile from the machine's profile list
+        let profileId = profileName
+        let displayImage: string | undefined
+
+        // Try cache first, then fall back to fetching the full profile list
+        const cacheRes = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
+        if (cacheRes.ok) {
+          const cacheData = await cacheRes.json()
+          if (cacheData?.profile?.id) {
+            profileId = cacheData.profile.id
+            displayImage = cacheData.profile.display?.image
+          }
+        }
 
         // Fetch profile JSON for the breakdown view
-        const jsonRes = await fetch(`/api/machine/profile/${encodeURIComponent(profile.id || profileName)}/json`)
+        const jsonRes = await fetch(`/api/machine/profile/${encodeURIComponent(profileId)}/json`)
         const jsonData = jsonRes.ok ? await jsonRes.json() : {}
         const profileJson = jsonData?.profile ?? null
 
         const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
-        let reply = descCache?.get(profile.id || profileName) ?? ''
+        let reply = descCache?.get(profileId) ?? ''
         if (!reply && profileJson) {
           const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
           reply = buildStaticProfileDescription(profileJson)
-          descCache?.set(profile.id || profileName, reply)
+          descCache?.set(profileId, reply)
         }
 
         const entry: HistoryEntry = {
-          id: profile.id || profileName,
+          id: profileId,
           profile_name: profileName,
           created_at: new Date().toISOString(),
           coffee_analysis: null,
@@ -841,7 +848,7 @@ function App() {
           reply,
           profile_json: profileJson,
         }
-        const imageUrl = resolveDisplayImage(profile.display?.image) ?? undefined
+        const imageUrl = resolveDisplayImage(displayImage) ?? undefined
         handleViewHistoryEntry(entry, imageUrl)
       } else {
         // Proxy mode: search history for matching entry
@@ -1393,6 +1400,7 @@ function App() {
               {viewState === 'history-detail' && selectedHistoryEntry && (
                 <FeatureErrorBoundary feature="Profile Detail">
                   <ProfileDetailView
+                    key={selectedHistoryEntry.id}
                     entry={selectedHistoryEntry}
                     onBack={() => {
                       setViewState('profile-catalogue')
