@@ -163,8 +163,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     }
   }, [displayProfile])
 
-  // Fetch profiles (for author + change selector) — once on mount
+  // Fetch profiles (for author + change selector) — on mount and when connection is established
   useEffect(() => {
+    if (!isConnected) return
     let cancelled = false
     ;(async () => {
       try {
@@ -203,7 +204,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchImagesForProfiles])
+  }, [isConnected, fetchImagesForProfiles])
 
   // Derive profileAuthor from machineProfiles when activeProfile changes
   useEffect(() => {
