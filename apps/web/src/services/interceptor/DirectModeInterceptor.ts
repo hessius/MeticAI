@@ -1431,7 +1431,7 @@ export function installDirectModeInterceptor(): void {
                   const frac = numPoints > 1 ? i2 / (numPoints - 1) : 0
                   const t = sd.startTime + frac * sd.duration
                   // Interpolate target value from dynamics points
-                  let val = 0
+                  let val: number
                   if (dp.length === 1) {
                     val = _resolveVar(dp[0][1] ?? dp[0][0], vars)
                   } else {
