@@ -806,18 +806,55 @@ function App() {
   }
 
   const handleViewProfileByName = async (profileName: string) => {
-    if (isDemoMode() || isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
-      if (!response.ok) return
-      const data = await response.json()
-      const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
-      if (match) {
-        handleViewHistoryEntry(match)
+
+      if (isDemoMode()) return
+
+      if (isDirectMode() || isNativePlatform()) {
+        // In direct/Capacitor mode, fetch profile data via interceptor
+        const profileRes = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
+        if (!profileRes.ok) return
+        const profileData = await profileRes.json()
+        const profile = profileData?.profile
+        if (!profile) return
+
+        // Fetch profile JSON for the breakdown view
+        const jsonRes = await fetch(`/api/machine/profile/${encodeURIComponent(profile.id || profileName)}/json`)
+        const jsonData = jsonRes.ok ? await jsonRes.json() : {}
+        const profileJson = jsonData?.profile ?? null
+
+        const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+        let reply = descCache?.get(profile.id || profileName) ?? ''
+        if (!reply && profileJson) {
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          reply = buildStaticProfileDescription(profileJson)
+          descCache?.set(profile.id || profileName, reply)
+        }
+
+        const entry: HistoryEntry = {
+          id: profile.id || profileName,
+          profile_name: profileName,
+          created_at: new Date().toISOString(),
+          coffee_analysis: null,
+          user_preferences: null,
+          reply,
+          profile_json: profileJson,
+        }
+        const imageUrl = resolveDisplayImage(profile.display?.image) ?? undefined
+        handleViewHistoryEntry(entry, imageUrl)
+      } else {
+        // Proxy mode: search history for matching entry
+        const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+        if (!response.ok) return
+        const data = await response.json()
+        const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
+        if (match) {
+          handleViewHistoryEntry(match)
+        }
       }
     } catch {
-      // Silently fail — profile may not exist in history
+      // Silently fail — profile may not exist
     }
   }
 
@@ -1348,6 +1385,7 @@ function App() {
                     onSubmit={handleSubmit}
                     onBack={handleBackToStart}
                     onViewHistory={() => setViewState('profile-catalogue')}
+                    onViewProfile={handleViewProfileByName}
                   />
                 </FeatureErrorBoundary>
               )}
