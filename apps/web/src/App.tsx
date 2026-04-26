@@ -996,7 +996,8 @@ function App() {
                 const serverUrl = await getServerUrl()
                 const res = await fetch(`${serverUrl}/api/machine/profiles`)
                 if (res.ok) {
-                  const profiles = await res.json() as { id: string; name: string; display?: { image?: string; description?: string } }[]
+                  const data = await res.json()
+                  const profiles = (data.profiles ?? []) as { id: string; name: string; display?: { image?: string; description?: string } }[]
                   const match = profiles.find((p: { name: string }) => p.name.toLowerCase() === context.profileName!.toLowerCase())
                   if (match) {
                     viewMachineProfileRef.current(match)

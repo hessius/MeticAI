@@ -413,19 +413,36 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             </div>
           )}
 
-          {/* Empty state when no profile is active — still allow selection */}
-          {!displayProfile && isConnected && dropdownProfiles.length > 0 && (isIdle || isPreheating || isReady) && (
+          {/* Empty state when no profile is active — always show when connected */}
+          {!displayProfile && isConnected && (
             <div className="space-y-1">
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('controlCenter.sections.activeProfile')}
               </h4>
-              <ProfileDropdown
-                profiles={dropdownProfiles}
-                activeProfile=""
-                onSelectProfile={handleSelectProfile}
-                anchorRef={profileSectionRef}
-              >
-                <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/30 p-3 cursor-pointer hover:border-muted-foreground/50 transition-colors">
+              {dropdownProfiles.length > 0 ? (
+                <ProfileDropdown
+                  profiles={dropdownProfiles}
+                  activeProfile=""
+                  onSelectProfile={handleSelectProfile}
+                  anchorRef={profileSectionRef}
+                >
+                  <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/30 p-3 cursor-pointer hover:border-muted-foreground/50 transition-colors">
+                    <div className="h-12 w-12 rounded-xl bg-muted shrink-0 flex items-center justify-center">
+                      <Coffee size={24} className="text-muted-foreground/50" weight="duotone" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm text-muted-foreground font-medium block">
+                        {t('controlCenter.noProfileSelected')}
+                      </span>
+                      <span className="text-xs text-muted-foreground/70 block">
+                        {t('controlCenter.tapToSelect')}
+                      </span>
+                    </div>
+                    <CaretUpDown size={16} weight="bold" className="shrink-0 text-muted-foreground/50" />
+                  </div>
+                </ProfileDropdown>
+              ) : (
+                <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/30 p-3">
                   <div className="h-12 w-12 rounded-xl bg-muted shrink-0 flex items-center justify-center">
                     <Coffee size={24} className="text-muted-foreground/50" weight="duotone" />
                   </div>
@@ -433,13 +450,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                     <span className="text-sm text-muted-foreground font-medium block">
                       {t('controlCenter.noProfileSelected')}
                     </span>
-                    <span className="text-xs text-muted-foreground/70 block">
-                      {t('controlCenter.tapToSelect')}
-                    </span>
                   </div>
-                  <CaretUpDown size={16} weight="bold" className="shrink-0 text-muted-foreground/50" />
                 </div>
-              </ProfileDropdown>
+              )}
             </div>
           )}
 

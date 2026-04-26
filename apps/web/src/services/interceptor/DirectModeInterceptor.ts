@@ -526,7 +526,12 @@ export function installDirectModeInterceptor(): void {
           }
 
           // Save: update the profile on the machine with the new image
-          const cached = _profileCache.get(profileName)
+          let cached = _profileCache.get(profileName)
+          if (!cached) {
+            for (const [key, val] of _profileCache) {
+              if (key.toLowerCase() === profileName.toLowerCase()) { cached = val; break }
+            }
+          }
           if (!cached) {
             return jsonResponse({ status: 'error', detail: `Profile '${profileName}' not found on machine` }, 404)
           }
@@ -565,18 +570,28 @@ export function installDirectModeInterceptor(): void {
       return (async () => {
         try {
           const profileName = decodeURIComponent(applyImageMatch[1])
-          const body = await new Response(init?.body || '{}').json() as { image_data?: string }
+          const bodyStr = typeof init?.body === 'string' ? init.body : '{}'
+          const body = JSON.parse(bodyStr) as { image_data?: string }
           const imageData = body.image_data
           if (!imageData) {
+            console.error('[DirectMode] apply-image: no image_data in body')
             return jsonResponse({ status: 'error', detail: 'No image data provided' }, 400)
           }
 
-          const cached = _profileCache.get(profileName)
+          // Case-insensitive profile cache lookup
+          let cached = _profileCache.get(profileName)
           if (!cached) {
+            for (const [key, val] of _profileCache) {
+              if (key.toLowerCase() === profileName.toLowerCase()) { cached = val; break }
+            }
+          }
+          if (!cached) {
+            console.error(`[DirectMode] apply-image: profile '${profileName}' not in cache (${_profileCache.size} entries)`)
             return jsonResponse({ status: 'error', detail: `Profile '${profileName}' not found on machine` }, 404)
           }
           const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
           if (!r.ok) {
+            console.error(`[DirectMode] apply-image: profile/get/${cached.id} returned ${r.status}`)
             return jsonResponse({ status: 'error', detail: 'Failed to fetch profile from machine' }, 502)
           }
           const fullProfile = await r.json() as Record<string, unknown>
@@ -589,7 +604,10 @@ export function installDirectModeInterceptor(): void {
             body: JSON.stringify(fullProfile),
           })
           if (!saveResp.ok) {
-            return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
+            let detail = 'Failed to save profile to machine'
+            try { const errBody = await saveResp.json(); detail = errBody?.message || errBody?.error || detail } catch { /* ignore */ }
+            console.error(`[DirectMode] apply-image: profile/save returned ${saveResp.status}: ${detail}`)
+            return jsonResponse({ status: 'error', detail }, 502)
           }
           return jsonResponse({
             status: 'success',
@@ -598,6 +616,7 @@ export function installDirectModeInterceptor(): void {
           })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Failed to apply image'
+          console.error('[DirectMode] apply-image error:', msg)
           return jsonResponse({ status: 'error', detail: msg }, 500)
         }
       })()
