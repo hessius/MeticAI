@@ -1221,14 +1221,15 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                 {onToggleTheme !== undefined && (
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="theme-toggle" className="text-sm font-medium">
+                      <Label htmlFor="theme-toggle" className={`text-sm font-medium${isFollowSystem ? ' text-muted-foreground' : ''}`}>
                         {t('appearance.useLightMode')}
                       </Label>
-                      <p className="text-xs text-muted-foreground">{t('appearance.lightModeDescription')}</p>
+                      <p className="text-xs text-muted-foreground">{isFollowSystem ? t('appearance.controlledBySystem') : t('appearance.lightModeDescription')}</p>
                     </div>
                     <Switch
                       id="theme-toggle"
                       checked={!isDark}
+                      disabled={isFollowSystem}
                       onCheckedChange={(checked) => { onToggleTheme?.(); if (checked) playToggleOn(); else playToggleOff() }}
                     />
                   </div>

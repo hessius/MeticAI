@@ -31,7 +31,8 @@ import { buildFullProfilePrompt, validateAndRetryProfile } from './profilePrompt
 import { STORAGE_KEYS } from '@/lib/constants'
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
-const IMAGE_MODEL = 'imagen-3.0-generate-002'
+const IMAGE_MODEL = 'imagen-4.0-generate-001'
+const IMAGE_MODEL_FALLBACK = 'imagen-3.0-generate-002'
 
 function getGeminiModel(): string {
   try {
@@ -205,7 +206,18 @@ export function createBrowserAIService(): AIService {
           },
         })
       } catch (err) {
-        wrapApiError(err)
+        // Try fallback model before giving up
+        try {
+          response = await client.models.generateImages({
+            model: IMAGE_MODEL_FALLBACK,
+            prompt,
+            config: {
+              numberOfImages: 1,
+            },
+          })
+        } catch {
+          wrapApiError(err)
+        }
       }
 
       const images = response.generatedImages

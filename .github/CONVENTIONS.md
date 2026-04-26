@@ -61,6 +61,8 @@ cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -x -q &
 cd ../web && bun run lint && bun run test:run && bun run build
 ```
 
+
+- After all tests pass, also rebuild the Docker dev container (`docker compose -f docker-compose.yml -f docker-compose.dev.yml build`) and the Capacitor iOS app (`npx cap sync ios` + Xcode build) before marking a task complete.
 ## Commits
 
 - **Format:** [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`.

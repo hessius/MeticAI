@@ -48,7 +48,7 @@ interface StageLimit {
 
 interface ExitTrigger {
   type: string
-  value?: number
+  value?: number | string
   comparison?: string
 }
 
@@ -456,13 +456,20 @@ function describeDynamics(dynamics: StageDynamics | undefined, stageType: string
   }
 }
 
-function formatExitTriggers(triggers?: ExitTrigger[]): string | null {
+function formatExitTriggers(triggers?: ExitTrigger[], variables?: ProfileVariable[]): string | null {
   if (!Array.isArray(triggers) || triggers.length === 0) return null
   
   return triggers.map(t => {
     if (t.value !== undefined) {
       const unit = t.type === 'weight' ? 'g' : t.type === 'time' ? 's' : ''
-      return `${t.type} ${t.comparison || '>='} ${t.value}${unit}`
+      let displayValue: string
+      if (typeof t.value === 'string' && t.value.startsWith('$')) {
+        const resolved = resolveValue(t.value, variables)
+        displayValue = resolved !== null ? `${resolved}` : t.value
+      } else {
+        displayValue = String(t.value)
+      }
+      return `${t.type} ${t.comparison || '>='} ${displayValue}${unit}`
     }
     return t.type
   }).join(', ')
@@ -773,7 +780,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
             </div>
             <div className="space-y-2">
               {displayProfile.stages!.map((stage, idx) => {
-                const exitInfo = formatExitTriggers(stage.exit_triggers)
+                const exitInfo = formatExitTriggers(stage.exit_triggers, displayProfile.variables)
                 const limitsInfo = formatLimits(stage.limits, displayProfile.variables)
                 // Normalize dynamics - handles both nested and flattened formats
                 const normalizedDynamics = getNormalizedDynamics(stage)

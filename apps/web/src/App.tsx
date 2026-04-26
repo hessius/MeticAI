@@ -989,6 +989,25 @@ function App() {
         case 'view-profile':
           if (context?.profileId && context?.profileName) {
             viewMachineProfileRef.current({ id: context.profileId, name: context.profileName })
+          } else if (context?.profileName) {
+            // No profileId — try to find the profile by name from the machine
+            (async () => {
+              try {
+                const serverUrl = await getServerUrl()
+                const res = await fetch(`${serverUrl}/api/machine/profiles`)
+                if (res.ok) {
+                  const profiles = await res.json() as { id: string; name: string; display?: { image?: string; description?: string } }[]
+                  const match = profiles.find((p: { name: string }) => p.name.toLowerCase() === context.profileName!.toLowerCase())
+                  if (match) {
+                    viewMachineProfileRef.current(match)
+                    return
+                  }
+                }
+              } catch {
+                // Profile lookup failed
+              }
+              setViewState('profile-catalogue')
+            })()
           } else {
             console.warn('[DynamicIsland] view-profile action missing context, falling back to catalogue', context)
             setViewState('profile-catalogue')

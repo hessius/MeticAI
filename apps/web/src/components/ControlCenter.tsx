@@ -22,6 +22,7 @@ import {
   Scales,
   CaretDown,
   CaretUp,
+  CaretUpDown,
   Eye,
   XCircle,
   Thermometer,
@@ -102,6 +103,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
+  const profileSectionRef = useRef<HTMLDivElement>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
   const [machineProfiles, setMachineProfiles] = useState<DropdownProfile[]>([])
@@ -330,50 +332,113 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
 
           {/* Active profile with image + author + change button */}
           {displayProfile && (
-            <div className="space-y-1">
+            <div className="space-y-1" ref={profileSectionRef}>
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {pendingProfile
                   ? t('controlCenter.sections.selectedProfile')
                   : t('controlCenter.sections.activeProfile')}
               </h4>
-              <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-                {profileImgUrl && !profileImgError ? (
-                  <img
-                    src={profileImgUrl}
-                    alt={displayProfile ?? ''}
-                    className="h-full w-full object-cover"
-                    onError={() => setProfileImgError(true)}
-                  />
-                ) : (
-                  <Coffee size={24} className="text-muted-foreground" weight="duotone" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="overflow-hidden">
-                  <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
-                    style={{
-                      animation: displayProfile && displayProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
-                    }}
-                  >
-                    {displayProfile}
-                  </span>
-                </div>
-                {(pendingProfileMeta?.author ?? profileAuthor) && (
-                  <span className="text-xs text-muted-foreground truncate block">
-                    {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
-                  </span>
-                )}
-              </div>
-              {/* Change profile dropdown — only when idle and profiles available */}
-              {dropdownProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected && (
+              {dropdownProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected ? (
                 <ProfileDropdown
                   profiles={dropdownProfiles}
                   activeProfile={displayProfile}
                   onSelectProfile={handleSelectProfile}
-                />
+                  anchorRef={profileSectionRef}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                      {profileImgUrl && !profileImgError ? (
+                        <img
+                          src={profileImgUrl}
+                          alt={displayProfile ?? ''}
+                          className="h-full w-full object-cover"
+                          onError={() => setProfileImgError(true)}
+                        />
+                      ) : (
+                        <Coffee size={24} className="text-muted-foreground" weight="duotone" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="overflow-hidden">
+                        <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
+                          style={{
+                            animation: displayProfile && displayProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                          }}
+                        >
+                          {displayProfile}
+                        </span>
+                      </div>
+                      {(pendingProfileMeta?.author ?? profileAuthor) && (
+                        <span className="text-xs text-muted-foreground truncate block">
+                          {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
+                        </span>
+                      )}
+                    </div>
+                    <CaretUpDown size={16} weight="bold" className="shrink-0 text-muted-foreground" />
+                  </div>
+                </ProfileDropdown>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                    {profileImgUrl && !profileImgError ? (
+                      <img
+                        src={profileImgUrl}
+                        alt={displayProfile ?? ''}
+                        className="h-full w-full object-cover"
+                        onError={() => setProfileImgError(true)}
+                      />
+                    ) : (
+                      <Coffee size={24} className="text-muted-foreground" weight="duotone" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="overflow-hidden">
+                      <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
+                        style={{
+                          animation: displayProfile && displayProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                        }}
+                      >
+                        {displayProfile}
+                      </span>
+                    </div>
+                    {(pendingProfileMeta?.author ?? profileAuthor) && (
+                      <span className="text-xs text-muted-foreground truncate block">
+                        {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
-              </div>
+            </div>
+          )}
+
+          {/* Empty state when no profile is active — still allow selection */}
+          {!displayProfile && isConnected && dropdownProfiles.length > 0 && (isIdle || isPreheating || isReady) && (
+            <div className="space-y-1">
+              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {t('controlCenter.sections.activeProfile')}
+              </h4>
+              <ProfileDropdown
+                profiles={dropdownProfiles}
+                activeProfile=""
+                onSelectProfile={handleSelectProfile}
+                anchorRef={profileSectionRef}
+              >
+                <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/30 p-3 cursor-pointer hover:border-muted-foreground/50 transition-colors">
+                  <div className="h-12 w-12 rounded-xl bg-muted shrink-0 flex items-center justify-center">
+                    <Coffee size={24} className="text-muted-foreground/50" weight="duotone" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm text-muted-foreground font-medium block">
+                      {t('controlCenter.noProfileSelected')}
+                    </span>
+                    <span className="text-xs text-muted-foreground/70 block">
+                      {t('controlCenter.tapToSelect')}
+                    </span>
+                  </div>
+                  <CaretUpDown size={16} weight="bold" className="shrink-0 text-muted-foreground/50" />
+                </div>
+              </ProfileDropdown>
             </div>
           )}
 

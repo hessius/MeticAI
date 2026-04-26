@@ -223,7 +223,7 @@ export const GREETING_RULES: GreetingRule[] = [
         action: {
           label: ctx.t('smartGreeting.analyzeAction'),
           target: 'shot-analysis',
-          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file ?? '' },
+          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file?.split('/').slice(1).join('/') || ctx.lastShot.file || '', profileName: shotProfileName(ctx.lastShot) },
         },
       }
     },
@@ -253,7 +253,7 @@ export const GREETING_RULES: GreetingRule[] = [
         action: {
           label: ctx.t('smartGreeting.rateAction'),
           target: 'shot-analysis',
-          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file ?? '' },
+          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file?.split('/').slice(1).join('/') || ctx.lastShot.file || '', profileName: shotProfileName(ctx.lastShot) },
         },
       }
     },
@@ -272,7 +272,7 @@ export const GREETING_RULES: GreetingRule[] = [
         action: {
           label: ctx.t('smartGreeting.rateAction'),
           target: 'shot-analysis',
-          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file ?? '' },
+          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file?.split('/').slice(1).join('/') || ctx.lastShot.file || '', profileName: shotProfileName(ctx.lastShot) },
         },
       }
     },
@@ -452,9 +452,13 @@ export const GREETING_RULES: GreetingRule[] = [
       return {
         id: 'neglectedFavorite',
         message: ctx.t('smartGreeting.neglectedFavorite', { name: favorite.name }),
-        action: matchedProfile
-          ? { label: ctx.t('smartGreeting.viewProfileAction'), target: 'view-profile' as const, context: { profileId: matchedProfile.id, profileName: matchedProfile.name } }
-          : { label: ctx.t('smartGreeting.browseAction'), target: 'profile-catalogue' as const },
+        action: {
+          label: ctx.t('smartGreeting.viewProfileAction'),
+          target: 'view-profile' as const,
+          context: matchedProfile
+            ? { profileId: matchedProfile.id, profileName: matchedProfile.name }
+            : { profileName: favorite.name },
+        },
       }
     },
   },

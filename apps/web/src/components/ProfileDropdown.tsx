@@ -32,13 +32,16 @@ interface ProfileDropdownProps {
   activeProfile: string | null
   onSelectProfile: (name: string) => void
   disabled?: boolean
+  children?: React.ReactNode
+  /** Ref to an ancestor element the popover should center on */
+  anchorRef?: React.RefObject<HTMLElement | null>
 }
 
 function optionId(profileId: string) {
   return `profile-option-${profileId}`
 }
 
-export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disabled }: ProfileDropdownProps) {
+export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disabled, children, anchorRef }: ProfileDropdownProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [focusIndex, setFocusIndex] = useState(-1)
@@ -101,21 +104,52 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
     ? optionId(profiles[focusIndex].id)
     : undefined
 
+  // Compute horizontal offset to center popover on the anchorRef element
+  const [alignOffset, setAlignOffset] = useState(0)
+  const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open || !anchorRef?.current || !triggerRef.current) {
+      setAlignOffset(0)
+      return
+    }
+    const anchorRect = anchorRef.current.getBoundingClientRect()
+    const triggerRect = triggerRef.current.getBoundingClientRect()
+    const anchorCenter = anchorRect.left + anchorRect.width / 2
+    const triggerCenter = triggerRect.left + triggerRect.width / 2
+    setAlignOffset(Math.round(anchorCenter - triggerCenter))
+  }, [open, anchorRef])
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild disabled={disabled}>
-        <button
-          className="shrink-0 p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-          aria-label={t('controlCenter.profileSelector.placeholder')}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-        >
-          <CaretUpDown size={16} weight="bold" />
-        </button>
+        {children ? (
+          <div
+            ref={triggerRef as React.RefObject<HTMLDivElement>}
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer"
+            aria-label={t('controlCenter.profileSelector.placeholder')}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+          >
+            {children}
+          </div>
+        ) : (
+          <button
+            ref={triggerRef as React.RefObject<HTMLButtonElement>}
+            className="shrink-0 p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label={t('controlCenter.profileSelector.placeholder')}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+          >
+            <CaretUpDown size={16} weight="bold" />
+          </button>
+        )}
       </PopoverTrigger>
 
       <PopoverContent
         align="center"
+        alignOffset={alignOffset}
         sideOffset={8}
         collisionPadding={16}
         className="w-[min(320px,calc(100vw-2rem))] p-0 overflow-hidden"
