@@ -1208,7 +1208,8 @@ function App() {
                     className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
                     onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
                     tabIndex={islandExpanded ? 0 : -1}
-                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : undefined}
+                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : t('a11y.appLogo', 'Metic logo')}
+                    aria-hidden={islandExpanded ? undefined : true}
                     style={{
                       width: 32,
                       height: 32,

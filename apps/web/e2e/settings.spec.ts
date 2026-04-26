@@ -44,8 +44,11 @@ test.describe('Settings View', () => {
     const settingsButton = page.getByRole('button', { name: /^Settings$/i })
     await settingsButton.click()
 
-    // Check for about section
+    // About Metic section is collapsible — check it exists
     await expect(page.getByText(/About Metic/i)).toBeVisible({ timeout: 5000 })
+    
+    // Expand the about section to see GitHub link
+    await page.getByText(/About Metic/i).click()
     await expect(page.getByText(/GitHub/i)).toBeVisible({ timeout: 5000 })
   })
 
@@ -63,9 +66,8 @@ test.describe('Settings View', () => {
     const settingsButton = page.getByRole('button', { name: /^Settings$/i })
     await settingsButton.click()
 
-    // Find a save button
-    const saveButton = page.getByRole('button', { name: /Save/i })
-    await expect(saveButton).toBeVisible({ timeout: 5000 })
+    // Settings now auto-save, so verify configuration fields exist instead
+    await expect(page.getByText(/Configuration/i)).toBeVisible({ timeout: 5000 })
   })
 
   test('should navigate back from settings', async ({ page }) => {

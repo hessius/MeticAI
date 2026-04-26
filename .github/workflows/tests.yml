@@ -169,8 +169,6 @@ jobs:
         run: bunx playwright install --with-deps
 
       - name: Run E2E tests
-        env:
-          VITE_MACHINE_MODE: direct
         run: bun run e2e
 
       - name: Upload Playwright Report
