@@ -206,8 +206,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   })()
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync localStorage read on mount
     setAiEnabledState(getAiEnabled())
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHideAiWhenUnavailableState(getHideAiWhenUnavailable())
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSoundsEnabledState(getSoundsEnabled())
   }, [])
 

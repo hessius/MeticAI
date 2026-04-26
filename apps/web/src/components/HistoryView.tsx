@@ -148,6 +148,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
     fetchHistory()
   }, [fetchHistory])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- trigger dialog when importUrl is set
   useEffect(() => { if (importUrl) setShowImportDialog(true) }, [importUrl])
 
   // Fetch sync badge count

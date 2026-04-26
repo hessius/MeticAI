@@ -97,7 +97,7 @@ export function useBrewNotifications() {
     pourOverCompleteBody: t('notifications.pourOverCompleteBody'),
   }), [t])
   const stringsRef = useRef(strings)
-  stringsRef.current = strings
+  useEffect(() => { stringsRef.current = strings }, [strings])
 
   const notifyBrewComplete = useCallback(
     (profileName: string) =>

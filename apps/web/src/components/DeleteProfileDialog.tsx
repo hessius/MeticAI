@@ -13,7 +13,7 @@ import { SpinnerGap, Trash, Archive, Desktop } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
 
-type DeleteMode = 'both' | 'machine-only' | 'meticai-only'
+type DeleteMode = 'both' | 'machine-only' | 'metic-only'
 
 interface DeleteProfileDialogProps {
   isOpen: boolean
@@ -44,7 +44,7 @@ export function DeleteProfileDialog({
     }
   }
 
-  const deleteFromMeticai = async (serverUrl: string) => {
+  const deleteFromMetic = async (serverUrl: string) => {
     if (!historyId) {
       throw new Error(t('profileCatalogue.errors.removeFromHistoryFailed'))
     }
@@ -64,13 +64,13 @@ export function DeleteProfileDialog({
 
       if (mode === 'both') {
         await deleteFromMachine(serverUrl)
-        await deleteFromMeticai(serverUrl)
+        await deleteFromMetic(serverUrl)
         toast.success(t('profileCatalogue.deleted'))
       } else if (mode === 'machine-only') {
         await deleteFromMachine(serverUrl)
         toast.success(t('profileCatalogue.deleted'))
       } else {
-        await deleteFromMeticai(serverUrl)
+        await deleteFromMetic(serverUrl)
         toast.success(t('profileCatalogue.removedFromHistory'))
       }
 
@@ -113,7 +113,7 @@ export function DeleteProfileDialog({
               <Button
                 variant="outline"
                 className="justify-start gap-3 h-auto py-2.5 px-3"
-                onClick={() => handleDelete('meticai-only')}
+                onClick={() => handleDelete('metic-only')}
                 disabled={isDeleting}
               >
                 {isDeleting ? (

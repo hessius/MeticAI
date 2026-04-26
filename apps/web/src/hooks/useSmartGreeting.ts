@@ -652,6 +652,7 @@ export function useSmartGreeting(enabled: boolean): SmartGreeting | null {
   useEffect(() => {
     if (!enabled) {
       completedRef.current = false
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when disabled
       setGreeting(null)
       return
     }

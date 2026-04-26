@@ -343,6 +343,7 @@ function App() {
     if (isHome && smartGreeting) {
       islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpandRef.current() }, 3000)
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when leaving home
       setIslandExpanded(false)
     }
     return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
@@ -424,8 +425,11 @@ function App() {
     const params = new URLSearchParams(window.location.search)
     const importParam = params.get('import')
     if (importParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL param init on mount
       setPendingImportUrl(importParam)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowAddProfileDialog(true)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewState('profile-catalogue')
       const url = new URL(window.location.href)
       url.searchParams.delete('import')
@@ -963,7 +967,7 @@ function App() {
 
   // Greeting action handler (shared between header pill and StartView)
   const viewMachineProfileRef = useRef(handleViewMachineProfile)
-  viewMachineProfileRef.current = handleViewMachineProfile
+  useEffect(() => { viewMachineProfileRef.current = handleViewMachineProfile }, [handleViewMachineProfile])
 
   const handleGreetingAction = useCallback((target: string, context?: Record<string, string>) => {
     try {
@@ -1222,9 +1226,9 @@ function App() {
                 style={{
                   maxWidth: islandExpanded ? 0 : 140,
                   opacity: islandExpanded ? 0 : 1,
-                  padding: '4px 6px',
+                  padding: islandExpanded ? '0' : '4px 6px',
                   margin: islandExpanded ? '0' : '-4px -6px -4px 8px',
-                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin 0.4s cubic-bezier(0.32, 0.72, 0, 1), padding 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
               >
                 Metic<span className="header-dot">.</span>

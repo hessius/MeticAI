@@ -15,7 +15,7 @@ import { SpinnerGap, Trash, Coffee } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { getServerUrl } from '@/lib/config'
 
-type DeletionMode = 'both' | 'machine-only' | 'meticai-only'
+type DeletionMode = 'both' | 'machine-only' | 'metic-only'
 
 interface MachineProfile {
   id: string
@@ -95,7 +95,7 @@ export function BulkDeleteDialog({
             }
           }
 
-          if (deletionMode === 'both' || deletionMode === 'meticai-only') {
+          if (deletionMode === 'both' || deletionMode === 'metic-only') {
             const historyId = resolveHistoryId(profile.name)
             if (!historyId) {
               failed++
@@ -198,13 +198,13 @@ export function BulkDeleteDialog({
                 <input
                   type="radio"
                   name="deletion-mode"
-                  value="meticai-only"
-                  checked={deletionMode === 'meticai-only'}
-                  onChange={() => setDeletionMode('meticai-only')}
+                  value="metic-only"
+                  checked={deletionMode === 'metic-only'}
+                  onChange={() => setDeletionMode('metic-only')}
                   disabled={isDeleting}
                   className="accent-primary"
                 />
-                <span className="text-sm">{t('profileCatalogue.bulkDelete.modeMeticaiOnly')}</span>
+                <span className="text-sm">{t('profileCatalogue.bulkDelete.modeMeticOnly')}</span>
               </label>
             </div>
           </div>

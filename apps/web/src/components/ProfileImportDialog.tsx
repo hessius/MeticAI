@@ -77,12 +77,16 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const autoImportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleUrlImportRef = useRef<(urlOverride?: string) => Promise<void>>(async () => {})
 
   // Reset state when dialog opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset state when dialog opens
       setStep(initialUrl ? 'url' : 'choose')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setImportUrl(initialUrl || '')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMachineProfiles([])
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedProfile(null)
@@ -97,9 +101,10 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setGenerateDescriptions(aiConfigured)
       if (initialUrl) {
-        autoImportTimerRef.current = setTimeout(() => handleUrlImport(initialUrl), 100)
+        autoImportTimerRef.current = setTimeout(() => handleUrlImportRef.current(initialUrl), 100)
       }
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setImportUrl('')
       if (autoImportTimerRef.current) {
         clearTimeout(autoImportTimerRef.current)
@@ -185,6 +190,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setStep('error')
     }
   }
+  useEffect(() => { handleUrlImportRef.current = handleUrlImport })
 
   const handleBulkImport = async () => {
     setStep('bulk-importing')

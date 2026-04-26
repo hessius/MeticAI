@@ -33,7 +33,7 @@ export function useSoundEffects() {
 
   // Stable ref so callbacks don't re-create on every toggle
   const canPlayRef = useRef(false)
-  canPlayRef.current = enabled && !reducedMotion
+  useEffect(() => { canPlayRef.current = enabled && !reducedMotion }, [enabled, reducedMotion])
 
   const play = useCallback(
     (sound: () => void) => {
@@ -113,7 +113,7 @@ export function useGlobalSoundDelegation() {
   const enabledRef = useRef(getSoundsEnabled())
   const reducedMotionRef = useRef(false)
   const reducedMotion = useReducedMotion()
-  reducedMotionRef.current = reducedMotion
+  useEffect(() => { reducedMotionRef.current = reducedMotion }, [reducedMotion])
 
   // Keep enabled ref in sync
   useEffect(() => {

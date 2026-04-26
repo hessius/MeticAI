@@ -98,12 +98,6 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
     return profile.display?.shortDescription || profile.display?.description || t('controlCenter.profileSelector.defaultDescription')
   }
 
-  if (profiles.length === 0) return null
-
-  const activeDescendant = focusIndex >= 0 && focusIndex < profiles.length
-    ? optionId(profiles[focusIndex].id)
-    : undefined
-
   // Compute horizontal offset to center popover on the anchorRef element
   const [alignOffset, setAlignOffset] = useState(0)
   const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null)
@@ -118,6 +112,12 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
     const triggerCenter = triggerRect.left + triggerRect.width / 2
     setAlignOffset(Math.round(anchorCenter - triggerCenter))
   }, [open, anchorRef])
+
+  if (profiles.length === 0) return null
+
+  const activeDescendant = focusIndex >= 0 && focusIndex < profiles.length
+    ? optionId(profiles[focusIndex].id)
+    : undefined
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

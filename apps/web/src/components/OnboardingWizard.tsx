@@ -163,6 +163,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   useEffect(() => {
     const signal = { cancelled: false }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fire-and-forget async discovery on mount
     runDiscovery(signal)
     return () => { signal.cancelled = true }
   }, [runDiscovery])
@@ -176,8 +177,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (step !== 'machine' || discovering || connectionStatus === 'success') return undefined
     if (discoveredMachines.length === 1 && !machineIp.trim()) {
       const machine = discoveredMachines[0]
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-fill from discovered machine
       setMachineIp(machine.host)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMachineName(machine.name)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConnectionStatus('testing')
       let cancelled = false
       testMachineConnection(machine.url).then((ok) => {
