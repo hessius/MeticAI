@@ -6,11 +6,9 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { extractFingerprint, extractNameTags } from './profileAnalysis'
 import { findSimilarProfiles, getRecommendations } from './profileRecommendation'
 import {
   makeProfile,
-  makeStage,
   PRESSURE_PROFILE,
   FLOW_PROFILE,
   FLAT_PROFILE,
@@ -176,8 +174,6 @@ describe('getRecommendations', () => {
 describe('scoring parity', () => {
   it('similar pressure profiles score > 30 (matches Python)', () => {
     // Python: _score_profile(source_tags, source_fp, LEVER_PROFILE) -> score > 30
-    const sourceFp = extractFingerprint(PRESSURE_PROFILE)
-    const sourceTags = extractNameTags(PRESSURE_PROFILE)
     const results = findSimilarProfiles(PRESSURE_PROFILE, [LEVER_PROFILE])
     expect(results.length).toBe(1)
     expect(results[0].score).toBeGreaterThan(30)

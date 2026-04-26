@@ -161,19 +161,19 @@ export function extractFingerprint(profile: AnalyzableProfile): ProfileFingerpri
   const pressureCount = stageTypes.filter(t => t === 'pressure').length
   const flowCount = stageTypes.filter(t => t === 'flow').length
   const total = pressureCount + flowCount
-  let controlMode: ProfileFingerprint['controlMode'] = 'unknown'
+  let controlMode: ProfileFingerprint['controlMode']
 
-  if (total === 0) {
-    controlMode = 'unknown'
-  } else if (pressureCount > 0 && flowCount === 0) {
+  if (pressureCount > 0 && flowCount === 0) {
     controlMode = 'pressure'
     techniqueTags.add('pressure-profile')
   } else if (flowCount > 0 && pressureCount === 0) {
     controlMode = 'flow'
     techniqueTags.add('flow-profile')
-  } else {
+  } else if (total > 0) {
     controlMode = 'mixed'
     techniqueTags.add('mixed-profile')
+  } else {
+    controlMode = 'unknown'
   }
 
   // Pulse heuristic: many short stages (>4 stages often indicates pulse-like)
