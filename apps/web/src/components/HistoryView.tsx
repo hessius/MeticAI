@@ -619,6 +619,14 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
   
   // Find Similar state
   const [showFindSimilar, setShowFindSimilar] = useState(false)
+
+  // Scroll to top on mount (key-based remount on profile navigation)
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    // The app's main content area uses overflow-y-auto — find and scroll it
+    const scrollContainer = document.querySelector('.overflow-y-auto')
+    if (scrollContainer) scrollContainer.scrollTop = 0
+  }, [])
   
   // Notes state
   const [notes, setNotes] = useState<string>(entry.notes || '')
