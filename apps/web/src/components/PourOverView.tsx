@@ -418,6 +418,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const prevBrewingRef = useRef(false)
   // Always-current machine state string for async polling
   const machineStateRef = useRef(machineState.state)
+  // Always-current brewing flag for async polling
+  const brewingRef = useRef(machineState.brewing)
 
   // ── Server-side preferences persistence ──
   const prefsRef = useRef<PourOverPreferences | null>(null)
@@ -575,7 +577,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // Keep machineStateRef in sync with the latest prop value
   useEffect(() => {
     machineStateRef.current = machineState.state
-  }, [machineState.state])
+    brewingRef.current = machineState.brewing
+  }, [machineState.state, machineState.brewing])
 
   /**
    * Poll machineStateRef until it matches `target` (case-insensitive),
@@ -806,16 +809,25 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
 
-      // Auto-start the shot:
-      // 1. First continue advances past the temperature control phase.
-      // 2. Wait for machine to reach "Click to start" (press-to-start state).
-      // 3. Second continue actually begins extraction.
-      await cmd(() => machine.continueShot(), 'started')
-      try {
-        await waitForState('click to start')
-      } catch {
-        // Timeout — machine may already be past this state; try anyway
+      // Auto-start: pour-over profiles have temperature=0 (no preheat), so the
+      // machine may already be at "click to start". Check state before each
+      // continue to avoid sending two continues (which would skip bloom).
+      const stateNow = (machineStateRef.current ?? '').toLowerCase()
+      if (stateNow !== 'click to start') {
+        // Need to advance past temperature control phase first
+        await cmd(() => machine.continueShot(), 'started')
+        // Wait for machine to reach "click to start" or start brewing
+        try {
+          await waitForState('click to start')
+        } catch {
+          // Timeout — check if machine started brewing (temp=0 profile)
+          if (brewingRef.current) {
+            // Already extracting — do NOT send second continue
+            return
+          }
+        }
       }
+      // Machine is at "click to start" — send continue to begin extraction
       await cmd(() => machine.continueShot(), 'started')
     } catch {
       setMachineLifecycle('error')
@@ -875,11 +887,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       await prepareRecipe(selectedRecipe.slug)
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
-      await cmd(() => machine.continueShot(), 'started')
-      try {
-        await waitForState('click to start')
-      } catch {
-        // Timeout — machine may already be past this state; try anyway
+      const stateNow = (machineStateRef.current ?? '').toLowerCase()
+      if (stateNow !== 'click to start') {
+        await cmd(() => machine.continueShot(), 'started')
+        try {
+          await waitForState('click to start')
+        } catch {
+          if (brewingRef.current) return
+        }
       }
       await cmd(() => machine.continueShot(), 'started')
     } catch {

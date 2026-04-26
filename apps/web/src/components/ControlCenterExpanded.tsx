@@ -65,7 +65,7 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
 
   // Shared state derivation + command executor
   const {
-    isIdle, isBrewing, isReady,
+    isIdle, isBrewing, isReady, isClickToPurge,
     canStart, canAbortWarmup, isConnected, cmd,
   } = useMachineActions(machineState)
   const machine = useMachineService()
@@ -189,7 +189,7 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
           <ConfirmButton
             icon={<Drop size={14} weight="fill" />}
             label={t('controlCenter.actions.purge')}
-            disabled={(!isIdle && !isReady) || !isConnected}
+            disabled={(!isIdle && !isReady && !isClickToPurge) || !isConnected}
             title={t('controlCenter.confirm.purgeTitle')}
             description={t('controlCenter.confirm.purgeDesc')}
             onConfirm={() => { impact('medium'); cmd(() => machine.purge(), 'purging') }}

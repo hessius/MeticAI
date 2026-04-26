@@ -1775,8 +1775,23 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/pour-over/cleanup, force-cleanup → no-op (profile is ephemeral, no purge in pour-over)
-    if (url.match(/\/api\/pour-over\/(cleanup|force-cleanup)$/)) {
+    // POST /api/pour-over/cleanup → purge the machine and return ok
+    if (url.match(/\/api\/pour-over\/cleanup$/) && method === 'POST') {
+      return (async () => {
+        let purged = false
+        try {
+          const purgeResp = await _fetch('/api/v1/action/purge', { method: 'POST' })
+          purged = purgeResp.ok
+          if (!purged) console.warn(`[DirectMode] pour-over cleanup: purge returned ${purgeResp.status}`)
+        } catch {
+          console.warn('[DirectMode] pour-over cleanup: purge action failed (non-fatal)')
+        }
+        return jsonResponse({ status: 'ok', purged })
+      })()
+    }
+
+    // POST /api/pour-over/force-cleanup → skip purge, just acknowledge
+    if (url.match(/\/api\/pour-over\/force-cleanup$/) && method === 'POST') {
       return Promise.resolve(jsonResponse({ status: 'ok' }))
     }
 
