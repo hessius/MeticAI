@@ -145,8 +145,27 @@ function scoreProfile(
 
   // --- Tag matching (25 points) ---
   const userLower = new Set([...userTags].map(t => t.toLowerCase()))
-  // Merge structural technique tags into candidate tags for broader matching
-  const allCandTags = new Set([...candTags, ...candFp.techniqueTags])
+  // Normalize internal technique tags → user-facing labels + add derived tags
+  const techniqueToLabel: Record<string, string> = {
+    'pressure-profile': 'pressure-controlled',
+    'flow-profile': 'flow-controlled',
+    'mixed-profile': 'mixed-controlled',
+  }
+  const normalizedTechniqueTags = [...candFp.techniqueTags].map(t =>
+    (techniqueToLabel[t] ?? t).toLowerCase(),
+  )
+  const allCandTags = new Set([
+    ...[...candTags].map(t => t.toLowerCase()),
+    ...normalizedTechniqueTags,
+  ])
+  // Add control-mode as a derived tag
+  if (candFp.controlMode && candFp.controlMode !== 'unknown') {
+    allCandTags.add(`${candFp.controlMode}-controlled`)
+  }
+  // Add temperature range as a derived tag
+  if (candFp.temperature != null) {
+    allCandTags.add(temperatureRange(candFp.temperature).toLowerCase())
+  }
   if (userLower.size > 0) {
     const tagSim = jaccard(userLower, allCandTags)
     const tagPts = tagSim * 25
@@ -226,6 +245,9 @@ function buildUserFingerprint(
     flat: 'flat',
     pressure: 'pressure-profile',
     flow: 'flow-profile',
+    'pressure-controlled': 'pressure-profile',
+    'flow-controlled': 'flow-profile',
+    'mixed-controlled': 'mixed-profile',
   }
 
   for (const tag of userTags) {

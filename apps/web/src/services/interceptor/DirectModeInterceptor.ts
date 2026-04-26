@@ -67,6 +67,24 @@ export function installDirectModeInterceptor(): void {
   // keyed by profile ID.  Persisted to localStorage and exposed on window so
   // App.tsx can read descriptions when navigating to profile detail.
   const DESC_CACHE_KEY = STORAGE_KEYS.DESCRIPTION_CACHE
+
+  // Short-lived in-memory cache for /api/v1/profile/list used by recommendation engine
+  let _rawProfileListCache: { data: AnalyzableProfile[]; ts: number } | null = null
+  const RAW_PROFILE_LIST_TTL = 30_000 // 30 seconds
+
+  async function _getCachedProfileList(): Promise<AnalyzableProfile[]> {
+    if (_rawProfileListCache && Date.now() - _rawProfileListCache.ts < RAW_PROFILE_LIST_TTL) {
+      return _rawProfileListCache.data
+    }
+    const res = await _fetch('/api/v1/profile/list')
+    if (!res.ok) return []
+    const profiles: AnalyzableProfile[] = await res.json()
+    if (profiles?.length) {
+      _rawProfileListCache = { data: profiles, ts: Date.now() }
+    }
+    return profiles ?? []
+  }
+
   const _descriptionCache = new Map<string, string>()
   try {
     const stored = localStorage.getItem(DESC_CACHE_KEY)
@@ -1939,13 +1957,12 @@ export function installDirectModeInterceptor(): void {
           const body = init?.body
           if (body instanceof FormData) {
             profileName = body.get('profile_name')?.toString() ?? ''
-            limit = parseInt(body.get('limit')?.toString() ?? '10', 10)
+            const parsed = parseInt(body.get('limit')?.toString() ?? '10', 10)
+            if (Number.isFinite(parsed)) limit = Math.min(100, Math.max(1, parsed))
           }
 
-          const res = await _fetch('/api/v1/profile/list')
-          if (!res.ok) return jsonResponse({ recommendations: [] })
-          const profiles: AnalyzableProfile[] = await res.json()
-          if (!profiles?.length) return jsonResponse({ recommendations: [] })
+          const profiles = await _getCachedProfileList()
+          if (!profiles.length) return jsonResponse({ recommendations: [] })
 
           const source = profiles.find(p => p.name === profileName)
           if (!source) return jsonResponse({ recommendations: [] })
@@ -1967,13 +1984,12 @@ export function installDirectModeInterceptor(): void {
           const body = init?.body
           if (body instanceof FormData) {
             tags = body.getAll('tags').map(t => t.toString())
-            limit = parseInt(body.get('limit')?.toString() ?? '5', 10)
+            const parsed = parseInt(body.get('limit')?.toString() ?? '5', 10)
+            if (Number.isFinite(parsed)) limit = Math.min(100, Math.max(1, parsed))
           }
 
-          const res = await _fetch('/api/v1/profile/list')
-          if (!res.ok) return jsonResponse({ recommendations: [] })
-          const profiles: AnalyzableProfile[] = await res.json()
-          if (!profiles?.length) return jsonResponse({ recommendations: [] })
+          const profiles = await _getCachedProfileList()
+          if (!profiles.length) return jsonResponse({ recommendations: [] })
 
           const recommendations = getRecommendations(tags, profiles, limit)
           return jsonResponse({ recommendations })

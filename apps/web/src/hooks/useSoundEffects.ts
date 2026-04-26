@@ -103,7 +103,7 @@ export function useSoundEffects() {
  * since those use explicit toggleOn/toggleOff.
  *
  * Customise per-element with data-sound:
- *   "back" | "close"  → notify
+ *   "back" | "close"  → click (same as forward navigation)
  *   "adjust"           → hover
  *   "none"             → suppress (for elements with explicit non-click sounds)
  *   (default)          → click

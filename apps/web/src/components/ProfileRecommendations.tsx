@@ -214,12 +214,14 @@ export function ProfileRecommendations({
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
                   <Card
-                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40"
-                    onClick={() => onUseProfile?.(rec.profile_name)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUseProfile?.(rec.profile_name) } }}
-                    aria-label={t('a11y.useProfile', { name: rec.profile_name })}
+                    className={`p-2 sm:p-3 transition-colors ${onUseProfile ? 'cursor-pointer hover:bg-secondary/40' : ''}`}
+                    {...(onUseProfile ? {
+                      onClick: () => onUseProfile(rec.profile_name),
+                      role: 'button' as const,
+                      tabIndex: 0,
+                      onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUseProfile(rec.profile_name) } },
+                      'aria-label': t('a11y.useProfile', { name: rec.profile_name }),
+                    } : {})}
                   >
                     <div className="flex items-start gap-2.5 min-w-0">
                       {/* Profile Image */}

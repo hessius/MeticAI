@@ -816,7 +816,7 @@ function App() {
         let profileId = profileName
         let displayImage: string | undefined
 
-        // Try cache first, then fall back to fetching the full profile list
+        // Try cache first
         const cacheRes = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
         if (cacheRes.ok) {
           const cacheData = await cacheRes.json()
@@ -824,6 +824,20 @@ function App() {
             profileId = cacheData.profile.id
             displayImage = cacheData.profile.display?.image
           }
+        }
+
+        // If cache didn't resolve an actual ID, try the full profile list from machine
+        if (profileId === profileName) {
+          try {
+            const listRes = await fetch('/api/v1/profile/list')
+            if (listRes.ok) {
+              const profiles = await listRes.json()
+              const match = Array.isArray(profiles) && profiles.find(
+                (p: { name?: string; id?: string }) => p.name === profileName
+              )
+              if (match?.id) profileId = match.id
+            }
+          } catch { /* proceed with name as ID */ }
         }
 
         // Fetch profile JSON for the breakdown view

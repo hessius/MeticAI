@@ -178,12 +178,14 @@ export function FindSimilarOverlay({
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
                   <Card
-                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40"
-                    onClick={() => handleSelect(rec.profile_name)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(rec.profile_name) } }}
-                    aria-label={t('a11y.useProfile', { name: rec.profile_name })}
+                    className={`p-2 sm:p-3 transition-colors ${onSelectProfile ? 'cursor-pointer hover:bg-secondary/40' : ''}`}
+                    {...(onSelectProfile ? {
+                      onClick: () => handleSelect(rec.profile_name),
+                      role: 'button' as const,
+                      tabIndex: 0,
+                      onKeyDown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(rec.profile_name) } },
+                      'aria-label': t('a11y.useProfile', { name: rec.profile_name }),
+                    } : {})}
                   >
                     <div className="flex items-start gap-2.5 min-w-0">
                       {/* Profile Image */}
