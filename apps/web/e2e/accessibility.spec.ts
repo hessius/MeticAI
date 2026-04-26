@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { navigateToForm, isAiAvailableInForm } from './helpers'
+import { navigateToForm } from './helpers'
 
 /**
  * E2E Accessibility Tests for Metic Web Application
