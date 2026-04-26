@@ -1404,7 +1404,7 @@ export function installDirectModeInterceptor(): void {
             },
             profile_target_curves: (() => {
               // Generate target curves from profile stages aligned with actual shot stage times
-              const curves: { time: number; target_pressure: number | null; target_flow: number | null; stage_name: string }[] = []
+              const curves: { time: number; target_pressure?: number; target_flow?: number; stage_name: string }[] = []
               for (const ps of profileStages) {
                 const stageName = (ps.name ?? '').trim()
                 const stageType = ps.type ?? 'unknown'
@@ -1425,13 +1425,6 @@ export function installDirectModeInterceptor(): void {
                       wTimePairs.push([pt2.shot?.weight ?? 0, t2])
                     }
                   }
-                }
-                const weightToTime = (w: number): number => {
-                  if (wTimePairs.length === 0) return sd!.startTime
-                  for (let i2 = 0; i2 < wTimePairs.length; i2++) {
-                    if (wTimePairs[i2][0] >= w) return wTimePairs[i2][1]
-                  }
-                  return wTimePairs[wTimePairs.length - 1][1]
                 }
                 const numPoints = Math.max(2, Math.ceil(sd.duration * 2))
                 for (let i2 = 0; i2 < numPoints; i2++) {
