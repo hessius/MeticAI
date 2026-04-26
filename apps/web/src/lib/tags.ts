@@ -39,11 +39,12 @@ export const PRESET_TAGS = [
   { label: 'Decline', category: 'technique' },
   { label: 'Taper', category: 'technique' },
   // Temperature range tags
-  { label: 'Very low temp', category: 'temperature' },
-  { label: 'Low temp', category: 'temperature' },
-  { label: 'Medium temp', category: 'temperature' },
-  { label: 'High temp', category: 'temperature' },
-  { label: 'Very high temp', category: 'temperature' },
+  { label: 'Very low temp (<82°C)', category: 'temperature' },
+  { label: 'Low temp (82–84°C)', category: 'temperature' },
+  { label: 'Warm (85–87°C)', category: 'temperature' },
+  { label: 'Medium temp (88–90°C)', category: 'temperature' },
+  { label: 'High temp (91–93°C)', category: 'temperature' },
+  { label: 'Very high temp (94°C+)', category: 'temperature' },
 ] as const
 
 export type TagCategory = typeof PRESET_TAGS[number]['category']

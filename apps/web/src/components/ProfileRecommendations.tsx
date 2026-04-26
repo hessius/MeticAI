@@ -8,6 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { CaretDown, Sparkle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getMatchReasonColorClass, getScoreColorClass } from '@/lib/tags'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 
 interface Recommendation {
   profile_name: string
@@ -21,6 +23,51 @@ interface ProfileRecommendationsProps {
   onUseProfile?: (profileName: string) => void
 }
 
+// Small wrapper that resolves a profile image in both proxy and direct modes
+function ProfileImage({ name, serverUrl }: { name: string; serverUrl: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting state when name changes
+    setError(false)
+    setSrc(null)
+
+    if (isDirectMode() || isNativePlatform()) {
+      fetch(`/api/profile/${encodeURIComponent(name)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!cancelled) {
+            setSrc(resolveDisplayImage(data?.profile?.display?.image))
+          }
+        })
+        .catch(() => { if (!cancelled) setError(true) })
+    } else if (serverUrl) {
+      setSrc(`${serverUrl}/api/profile/${encodeURIComponent(name)}/image-proxy`)
+    }
+
+    return () => { cancelled = true }
+  }, [name, serverUrl])
+
+  if (!src || error) {
+    return (
+      <span className="text-[10px] font-bold text-muted-foreground/60 uppercase leading-none">
+        {name.split(/[\s-]+/).slice(0, 2).map(w => w[0]).join('')}
+      </span>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="w-full h-full object-cover"
+      onError={() => setError(true)}
+    />
+  )
+}
+
 export function ProfileRecommendations({
   tags,
   onUseProfile,
@@ -29,7 +76,6 @@ export function ProfileRecommendations({
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(true)
-  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
   const [serverUrl, setServerUrl] = useState<string>('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -46,7 +92,6 @@ export function ProfileRecommendations({
     abortRef.current = controller
 
     setIsLoading(true)
-    setImageErrors(new Set())
     try {
       const url = serverUrl || await getServerUrl()
       if (!serverUrl && url) setServerUrl(url)
@@ -75,7 +120,7 @@ export function ProfileRecommendations({
         setIsLoading(false)
       }
     }
-  }, [t])
+  }, [serverUrl, t])
 
   useEffect(() => {
     if (tags.length < 2) {
@@ -169,30 +214,19 @@ export function ProfileRecommendations({
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
                   <Card
-                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40 overflow-hidden"
+                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40"
                     onClick={() => onUseProfile?.(rec.profile_name)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUseProfile?.(rec.profile_name) } }}
                     aria-label={t('a11y.useProfile', { name: rec.profile_name })}
                   >
-                    <div className="flex items-start gap-2.5 min-w-0 overflow-hidden">
+                    <div className="flex items-start gap-2.5 min-w-0">
                       {/* Profile Image */}
                       <div className="w-10 h-10 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
-                        {serverUrl && !imageErrors.has(rec.profile_name) ? (
-                          <img
-                            src={`${serverUrl}/api/profile/${encodeURIComponent(rec.profile_name)}/image-proxy`}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            onError={() => setImageErrors(prev => new Set(prev).add(rec.profile_name))}
-                          />
-                        ) : (
-                          <span className="text-[10px] font-bold text-muted-foreground/60 uppercase leading-none">
-                            {rec.profile_name.split(/[\s-]+/).slice(0, 2).map(w => w[0]).join('')}
-                          </span>
-                        )}
+                        <ProfileImage name={rec.profile_name} serverUrl={serverUrl} />
                       </div>
-                      <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <h4 className="text-sm font-medium truncate flex-1 min-w-0">{rec.profile_name}</h4>
                           <Badge
@@ -202,11 +236,6 @@ export function ProfileRecommendations({
                             {Math.round(rec.score)}%
                           </Badge>
                         </div>
-                        {rec.explanation && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words min-w-0">
-                            {rec.explanation}
-                          </p>
-                        )}
                         {rec.match_reasons.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {rec.match_reasons.map((reason) => (

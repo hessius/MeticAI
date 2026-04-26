@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Sparkle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getMatchReasonColorClass, getScoreColorClass } from '@/lib/tags'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 
 interface Recommendation {
   profile_name: string
@@ -30,6 +31,51 @@ interface FindSimilarOverlayProps {
   onSelectProfile?: (profileName: string) => void
 }
 
+// Small wrapper that resolves a profile image in both proxy and direct modes
+function ProfileImage({ name, serverUrl }: { name: string; serverUrl: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting state when name changes
+    setError(false)
+    setSrc(null)
+
+    if (isDirectMode() || isNativePlatform()) {
+      fetch(`/api/profile/${encodeURIComponent(name)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!cancelled) {
+            setSrc(resolveDisplayImage(data?.profile?.display?.image))
+          }
+        })
+        .catch(() => { if (!cancelled) setError(true) })
+    } else if (serverUrl) {
+      setSrc(`${serverUrl}/api/profile/${encodeURIComponent(name)}/image-proxy`)
+    }
+
+    return () => { cancelled = true }
+  }, [name, serverUrl])
+
+  if (!src || error) {
+    return (
+      <span className="text-[10px] font-bold text-muted-foreground/60 uppercase leading-none">
+        {name.split(/[\s-]+/).slice(0, 2).map(w => w[0]).join('')}
+      </span>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="w-full h-full object-cover"
+      onError={() => setError(true)}
+    />
+  )
+}
+
 export function FindSimilarOverlay({
   open,
   onOpenChange,
@@ -39,7 +85,6 @@ export function FindSimilarOverlay({
   const { t } = useTranslation()
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
   const [serverUrl, setServerUrl] = useState<string>('')
 
@@ -53,7 +98,6 @@ export function FindSimilarOverlay({
     abortRef.current = controller
 
     setIsLoading(true)
-    setImageErrors(new Set())
     try {
       const url = serverUrl || await getServerUrl()
       if (!serverUrl && url) setServerUrl(url)
@@ -98,23 +142,20 @@ export function FindSimilarOverlay({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[80vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 pr-8">
             <Sparkle size={20} weight="fill" className="text-primary" />
             {t('profileRecommendations.findSimilar')}
           </DialogTitle>
-          <DialogDescription>
-            {t('profileRecommendations.similarTo', { name: profileName })}
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           {isLoading ? (
             <div className="space-y-2" aria-busy="true" aria-label={t('a11y.loading')}>
               {[1, 2, 3, 4].map(i => (
                 <Card key={i} className="p-3">
                   <div className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-lg" />
-                    <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       <Skeleton className="h-4 w-3/5" />
                       <Skeleton className="h-3 w-4/5" />
                     </div>
@@ -137,30 +178,19 @@ export function FindSimilarOverlay({
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
                   <Card
-                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40 overflow-hidden"
+                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40"
                     onClick={() => handleSelect(rec.profile_name)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(rec.profile_name) } }}
                     aria-label={t('a11y.useProfile', { name: rec.profile_name })}
                   >
-                    <div className="flex items-start gap-2.5 min-w-0 overflow-hidden">
+                    <div className="flex items-start gap-2.5 min-w-0">
                       {/* Profile Image */}
                       <div className="w-10 h-10 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
-                        {serverUrl && !imageErrors.has(rec.profile_name) ? (
-                          <img
-                            src={`${serverUrl}/api/profile/${encodeURIComponent(rec.profile_name)}/image-proxy`}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            onError={() => setImageErrors(prev => new Set(prev).add(rec.profile_name))}
-                          />
-                        ) : (
-                          <span className="text-[10px] font-bold text-muted-foreground/60 uppercase leading-none">
-                            {rec.profile_name.split(/[\s-]+/).slice(0, 2).map(w => w[0]).join('')}
-                          </span>
-                        )}
+                        <ProfileImage name={rec.profile_name} serverUrl={serverUrl} />
                       </div>
-                      <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <h4 className="text-sm font-medium truncate flex-1 min-w-0">{rec.profile_name}</h4>
                           <Badge
@@ -170,11 +200,6 @@ export function FindSimilarOverlay({
                             {Math.round(rec.score)}%
                           </Badge>
                         </div>
-                        {rec.explanation && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words min-w-0">
-                            {rec.explanation}
-                          </p>
-                        )}
                         {rec.match_reasons.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {rec.match_reasons.map(reason => (

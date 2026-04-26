@@ -65,11 +65,12 @@ function proximityScore(
 // ── Temperature range grouping ─────────────────────────────────────────────
 
 function temperatureRange(temp: number): string {
-  if (temp < 80) return 'Very low temp'
-  if (temp <= 87) return 'Low temp'
-  if (temp <= 91) return 'Medium temp'
-  if (temp <= 95) return 'High temp'
-  return 'Very high temp'
+  if (temp < 82) return 'Very low temp (<82°C)'
+  if (temp <= 84) return 'Low temp (82–84°C)'
+  if (temp <= 87) return 'Warm (85–87°C)'
+  if (temp <= 90) return 'Medium temp (88–90°C)'
+  if (temp <= 93) return 'High temp (91–93°C)'
+  return 'Very high temp (94°C+)'
 }
 
 // ── Main scoring function ──────────────────────────────────────────────────
