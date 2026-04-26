@@ -62,6 +62,16 @@ function proximityScore(
   return 0
 }
 
+// ── Temperature range grouping ─────────────────────────────────────────────
+
+function temperatureRange(temp: number): string {
+  if (temp < 80) return 'Very low temp'
+  if (temp <= 87) return 'Low temp'
+  if (temp <= 91) return 'Medium temp'
+  if (temp <= 95) return 'High temp'
+  return 'Very high temp'
+}
+
 // ── Main scoring function ──────────────────────────────────────────────────
 
 /**
@@ -86,7 +96,9 @@ function scoreProfile(
     // Control mode match (pressure/flow/mixed) — 12 pts
     if (userFingerprint.controlMode === candFp.controlMode) {
       structScore += 12
-      reasons.push(`${candFp.controlMode.charAt(0).toUpperCase() + candFp.controlMode.slice(1)}-controlled`)
+      if (candFp.controlMode !== 'unknown') {
+        reasons.push(`${candFp.controlMode.charAt(0).toUpperCase() + candFp.controlMode.slice(1)}-controlled`)
+      }
     } else if (
       userFingerprint.controlMode !== 'unknown' &&
       candFp.controlMode !== 'unknown'
@@ -104,6 +116,8 @@ function scoreProfile(
       structScore += techSim * 15
       const overlap: string[] = []
       for (const t of userTechniques) {
+        // Skip 'flat' when isFlat match will already produce "Flat profile" reason
+        if (t === 'flat' && userFingerprint.isFlat && candFp.isFlat) continue
         if (candTechniques.has(t)) overlap.push(t)
       }
       if (overlap.length > 0) {
@@ -177,7 +191,7 @@ function scoreProfile(
   const tPts = proximityScore(userTemp, candTemp, 2.0, 5.0, 10)
   score += tPts
   if (tPts >= 7 && candTemp != null) {
-    reasons.push(`Temperature: ${candTemp.toFixed(1)}°C`)
+    reasons.push(temperatureRange(candTemp))
   }
 
   const explanation = reasons.join('; ')

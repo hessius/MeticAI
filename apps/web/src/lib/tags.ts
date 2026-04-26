@@ -29,7 +29,21 @@ export const PRESET_TAGS = [
   { label: 'Balanced', category: 'characteristic' },
   { label: 'Bloom', category: 'process' },
   { label: 'Pre-infusion', category: 'process' },
-  { label: 'Pulse', category: 'process' }
+  { label: 'Pulse', category: 'process' },
+  // Technique tags (from structural analysis)
+  { label: 'Pressure-controlled', category: 'technique' },
+  { label: 'Flow-controlled', category: 'technique' },
+  { label: 'Mixed-controlled', category: 'technique' },
+  { label: 'Flat profile', category: 'technique' },
+  { label: 'Ramp', category: 'technique' },
+  { label: 'Decline', category: 'technique' },
+  { label: 'Taper', category: 'technique' },
+  // Temperature range tags
+  { label: 'Very low temp', category: 'temperature' },
+  { label: 'Low temp', category: 'temperature' },
+  { label: 'Medium temp', category: 'temperature' },
+  { label: 'High temp', category: 'temperature' },
+  { label: 'Very high temp', category: 'temperature' },
 ] as const
 
 export type TagCategory = typeof PRESET_TAGS[number]['category']
@@ -46,6 +60,8 @@ export const CATEGORY_COLORS: Record<TagCategory, string> = {
   roast: 'tag-roast',
   characteristic: 'tag-characteristic',
   process: 'tag-process',
+  technique: 'tag-technique',
+  temperature: 'tag-temperature',
 }
 
 export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
@@ -57,6 +73,8 @@ export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
   roast: 'tag-roast-selected text-white shadow-sm',
   characteristic: 'tag-characteristic-selected text-white shadow-sm',
   process: 'tag-process-selected text-white shadow-sm',
+  technique: 'tag-technique-selected text-white shadow-sm',
+  temperature: 'tag-temperature-selected text-white shadow-sm',
 }
 
 // Get category for a tag label
@@ -92,4 +110,49 @@ export function getAllTagsFromEntries(entries: Array<{ user_preferences: string 
   })
   
   return Array.from(allTags).sort()
+}
+
+// Map a match reason string from the recommendation engine to a tag color class.
+// Match reasons have patterns like "Pressure-controlled", "Techniques: bloom, preinfusion",
+// "Flat profile", "Target weight: 36g", "Peak pressure: 9.0 bar", "High temp", "Matching: fruity, sweet"
+export function getMatchReasonColorClass(reason: string): string {
+  const lower = reason.toLowerCase()
+
+  // Direct preset tag lookup first
+  const directCategory = getTagCategory(reason)
+  if (directCategory) return CATEGORY_COLORS[directCategory]
+
+  // Control mode reasons
+  if (lower.endsWith('-controlled')) return 'tag-technique'
+
+  // Technique reasons (prefix or direct)
+  if (lower.startsWith('techniques:') || lower === 'flat profile') return 'tag-technique'
+
+  // Temperature range reasons
+  if (lower.includes('temp')) return 'tag-temperature'
+
+  // Weight reasons
+  if (lower.startsWith('target weight')) return 'tag-extraction'
+
+  // Pressure reasons
+  if (lower.startsWith('peak pressure')) return 'tag-process'
+
+  // "Matching:" prefix — try to detect the category from the first matched tag
+  if (lower.startsWith('matching:')) {
+    const tags = reason.slice('matching:'.length).split(',').map(t => t.trim())
+    for (const tag of tags) {
+      const cat = getTagCategory(tag)
+      if (cat) return CATEGORY_COLORS[cat]
+    }
+  }
+
+  return 'tag-default'
+}
+
+// Get CSS class for a match score percentage badge
+export function getScoreColorClass(score: number): string {
+  if (score >= 75) return 'score-high'
+  if (score >= 50) return 'score-good'
+  if (score >= 25) return 'score-fair'
+  return 'score-low'
 }

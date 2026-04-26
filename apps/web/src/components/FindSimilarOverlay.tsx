@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Sparkle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { getMatchReasonColorClass, getScoreColorClass } from '@/lib/tags'
 
 interface Recommendation {
   profile_name: string
@@ -136,16 +137,16 @@ export function FindSimilarOverlay({
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
                   <Card
-                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40"
+                    className="p-2 sm:p-3 transition-colors cursor-pointer hover:bg-secondary/40 overflow-hidden"
                     onClick={() => handleSelect(rec.profile_name)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(rec.profile_name) } }}
                     aria-label={t('a11y.useProfile', { name: rec.profile_name })}
                   >
-                    <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="flex items-start gap-2.5 min-w-0 overflow-hidden">
                       {/* Profile Image */}
-                      <div className="w-9 h-9 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
                         {serverUrl && !imageErrors.has(rec.profile_name) ? (
                           <img
                             src={`${serverUrl}/api/profile/${encodeURIComponent(rec.profile_name)}/image-proxy`}
@@ -159,12 +160,12 @@ export function FindSimilarOverlay({
                           </span>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="flex items-center gap-2 min-w-0">
                           <h4 className="text-sm font-medium truncate flex-1 min-w-0">{rec.profile_name}</h4>
                           <Badge
-                            variant={rec.score >= 70 ? 'default' : rec.score >= 40 ? 'secondary' : 'outline'}
-                            className="text-xs shrink-0"
+                            variant="outline"
+                            className={`text-xs shrink-0 border ${getScoreColorClass(rec.score)}`}
                           >
                             {Math.round(rec.score)}%
                           </Badge>
@@ -177,13 +178,12 @@ export function FindSimilarOverlay({
                         {rec.match_reasons.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {rec.match_reasons.map(reason => (
-                              <Badge
+                              <span
                                 key={reason}
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0"
+                                className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md border font-medium ${getMatchReasonColorClass(reason)}`}
                               >
                                 {reason}
-                              </Badge>
+                              </span>
                             ))}
                           </div>
                         )}

@@ -143,7 +143,7 @@ export function useGlobalSoundDelegation() {
       switch (soundAttr) {
         case 'back':
         case 'close':
-          tiks.notify()
+          tiks.click()
           break
         case 'adjust':
           tiks.hover()
