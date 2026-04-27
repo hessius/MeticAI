@@ -684,7 +684,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     trendStartTimestampRef.current = null
   }
 
-  const weight = machineState.shot_weight ?? 0
+  const weight = Number(machineState.shot_weight) || 0
   const parsedDose = parsePositiveNumber(doseGrams)
   const parsedRatio = parsePositiveNumber(brewRatio)
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
