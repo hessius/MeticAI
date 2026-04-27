@@ -14,7 +14,7 @@ os.environ.setdefault("TEST_MODE", "true")
 
 from services.profile_recommendation_service import (
     _jaccard,
-    _extract_fingerprint,
+    extract_fingerprint,
     _extract_name_tags,
     _score_profile,
     _proximity_score,
@@ -165,7 +165,7 @@ class TestProximityScore:
 
 class TestExtractFingerprint:
     def test_pressure_profile(self):
-        fp = _extract_fingerprint(PRESSURE_PROFILE)
+        fp = extract_fingerprint(PRESSURE_PROFILE)
         assert fp["control_mode"] == "pressure"
         assert fp["has_preinfusion"] is True
         assert fp["stage_count"] == 3
@@ -174,7 +174,7 @@ class TestExtractFingerprint:
         assert "preinfusion" in fp["technique_tags"]
 
     def test_flow_profile_with_bloom(self):
-        fp = _extract_fingerprint(FLOW_PROFILE)
+        fp = extract_fingerprint(FLOW_PROFILE)
         assert fp["control_mode"] == "flow"
         assert fp["has_bloom"] is True
         assert fp["has_preinfusion"] is True
@@ -182,26 +182,26 @@ class TestExtractFingerprint:
         assert "bloom" in fp["technique_tags"]
 
     def test_flat_profile(self):
-        fp = _extract_fingerprint(FLAT_PROFILE)
+        fp = extract_fingerprint(FLAT_PROFILE)
         assert fp["is_flat"] is True
         assert fp["stage_count"] == 1
         assert "flat" in fp["technique_tags"]
 
     def test_turbo_profile(self):
-        fp = _extract_fingerprint(TURBO_PROFILE)
+        fp = extract_fingerprint(TURBO_PROFILE)
         assert fp["control_mode"] == "flow"
         assert fp["temperature"] == 96.0
         assert fp["final_weight"] == 20.0
 
     def test_lever_with_decline(self):
-        fp = _extract_fingerprint(LEVER_PROFILE)
+        fp = extract_fingerprint(LEVER_PROFILE)
         assert fp["has_preinfusion"] is True
         assert "decline" in fp["technique_tags"]
         assert fp["peak_pressure"] >= 9.0
 
     def test_empty_stages(self):
         profile = _make_profile("Empty", stages=[])
-        fp = _extract_fingerprint(profile)
+        fp = extract_fingerprint(profile)
         assert fp["stage_count"] == 0
         assert fp["control_mode"] == "unknown"
         assert fp["peak_pressure"] == 0
@@ -209,7 +209,7 @@ class TestExtractFingerprint:
     def test_pulse_detection_many_stages(self):
         stages = [_make_stage(f"Step {i}", "pressure", [[0, 3], [1, 6]]) for i in range(6)]
         profile = _make_profile("Pulse Profile", stages=stages)
-        fp = _extract_fingerprint(profile)
+        fp = extract_fingerprint(profile)
         assert fp["has_pulse"] is True
         assert "pulse" in fp["technique_tags"]
 
@@ -244,14 +244,14 @@ class TestExtractNameTags:
 
 class TestScoreProfile:
     def test_similar_pressure_profiles_score_high(self):
-        source_fp = _extract_fingerprint(PRESSURE_PROFILE)
+        source_fp = extract_fingerprint(PRESSURE_PROFILE)
         source_tags = _extract_name_tags(PRESSURE_PROFILE)
         score, reasons, explanation = _score_profile(source_tags, source_fp, LEVER_PROFILE)
         # Both pressure-controlled with preinfusion
         assert score > 30
 
     def test_different_control_modes_score_lower(self):
-        source_fp = _extract_fingerprint(PRESSURE_PROFILE)
+        source_fp = extract_fingerprint(PRESSURE_PROFILE)
         source_tags = _extract_name_tags(PRESSURE_PROFILE)
         score_pressure, _, _ = _score_profile(source_tags, source_fp, LEVER_PROFILE)
         score_flow, _, _ = _score_profile(source_tags, source_fp, TURBO_PROFILE)
@@ -282,13 +282,13 @@ class TestScoreProfile:
 
     def test_score_capped_at_100(self):
         # Even with maximum overlap, score should not exceed 100
-        source_fp = _extract_fingerprint(PRESSURE_PROFILE)
+        source_fp = extract_fingerprint(PRESSURE_PROFILE)
         source_tags = _extract_name_tags(PRESSURE_PROFILE)
         score, _, _ = _score_profile(source_tags, source_fp, PRESSURE_PROFILE)
         assert score <= 100
 
     def test_explanation_is_string(self):
-        source_fp = _extract_fingerprint(PRESSURE_PROFILE)
+        source_fp = extract_fingerprint(PRESSURE_PROFILE)
         source_tags = _extract_name_tags(PRESSURE_PROFILE)
         _, _, explanation = _score_profile(source_tags, source_fp, LEVER_PROFILE)
         assert isinstance(explanation, str)

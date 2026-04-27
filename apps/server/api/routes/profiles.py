@@ -39,7 +39,7 @@ from services.meticulous_service import (
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
-from services.profile_recommendation_service import recommendation_service, _extract_fingerprint
+from services.profile_recommendation_service import recommendation_service, extract_fingerprint
 from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id, _history_lock
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
@@ -85,14 +85,15 @@ def _temperature_range(temp: float) -> str:
 
 
 def _derive_structural_tags(profile_obj: object) -> list[str]:
-    """Derive user-facing structural tags from a profile object using _extract_fingerprint.
+    """Derive user-facing structural tags from a profile object using extract_fingerprint.
 
     Must be called on the raw Meticulous profile object (with attributes),
-    NOT on a dict — _extract_fingerprint uses getattr().
+    NOT on a dict — extract_fingerprint uses getattr().
     """
     try:
-        fp = _extract_fingerprint(profile_obj)
-    except Exception:
+        fp = extract_fingerprint(profile_obj)
+    except (AttributeError, TypeError, KeyError) as exc:
+        logger.debug("Failed to extract fingerprint for structural tags: %s", exc)
         return []
 
     tags: set[str] = set()
@@ -115,7 +116,7 @@ def _derive_structural_tags_from_dict(profile_dict: dict) -> list[str]:
     """Derive structural tags from a profile stored as a plain dict.
 
     Used for offline/history fallback where profile_json is a dict.
-    Wraps the dict in a SimpleNamespace so _extract_fingerprint's getattr() calls work.
+    Wraps the dict in a SimpleNamespace so extract_fingerprint's getattr() calls work.
     """
     from types import SimpleNamespace
 
@@ -129,7 +130,8 @@ def _derive_structural_tags_from_dict(profile_dict: dict) -> list[str]:
     try:
         ns = _to_ns(profile_dict)
         return _derive_structural_tags(ns)
-    except Exception:
+    except (AttributeError, TypeError, KeyError) as exc:
+        logger.debug("Failed to derive structural tags from dict: %s", exc)
         return []
 
 # Simple placeholder SVG for profiles without images (coffee bean icon)

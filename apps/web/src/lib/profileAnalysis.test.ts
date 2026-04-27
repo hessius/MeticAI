@@ -346,7 +346,7 @@ describe('deriveStructuralTags', () => {
     // Note: "Lever" is in profile NAME (extractNameTags), not stage names (extractFingerprint)
   })
 
-  it('returns only flat + temperature for empty profile (no stages, no temperature)', () => {
+  it('returns only flat tag for empty profile (no stages, no temperature)', () => {
     const profile: AnalyzableProfile = { name: 'Empty', stages: [] }
     const tags = deriveStructuralTags(profile)
     // 0 stages: isFlat stays true (initial value), no temperature
