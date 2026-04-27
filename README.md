@@ -84,9 +84,9 @@ curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/migrate-
 ```
 
 
-**Windows:** See the [Windows Installation Guide](WINDOWS.md) for PowerShell installer and Windows-specific notes.
+**macOS / Windows:** Docker Desktop is required. See [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/) or [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/).
 
-**macOS App Installer:** Download from [Releases](https://github.com/hessius/MeticAI/releases/latest) — no terminal required.
+> **Note:** The macOS .app installer and Windows PowerShell installer were deprecated in v2.4.0. Use the Docker-based installation above for all platforms.
 
 ### After Installation
 
@@ -94,7 +94,6 @@ Open `http://YOUR_SERVER_IP:3550` in any browser to access the web interface!
 
 ### Need Help?
 - 📖 [API Reference](API.md)
-- 🪟 [Windows Installation](WINDOWS.md)
 - 🔄 [Updating & Migration](UPDATING.md)
 - 🌐 [Remote Access (Tailscale)](TAILSCALE.md)
 - 🏠 [Home Assistant Integration](HOME_ASSISTANT.md)

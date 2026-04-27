@@ -561,7 +561,8 @@
     "geminiModel20Flash": "Gemini 2.0 Flash",
     "aiSettings": "AI-inställningar",
     "versionAndChangelog": "Version och ändringslogg",
-    "mqttBridge": "MQTT-brygga"
+    "mqttBridge": "MQTT-brygga",
+    "disclaimer": "Metic är ett oberoende open source-projekt och är inte anslutet till, godkänt av eller kopplat till Meticulous Home, tillverkaren av Meticulous espressomaskinen."
   },
   "profileBreakdown": {
     "title": "Profildetaljer",
@@ -1556,7 +1557,8 @@
     "welcome": {
       "title": "Välkommen till Metic",
       "description": "Allt-i-ett-verktygslåda för Meticulous. Låt oss komma igång med några enkla steg.",
-      "getStarted": "Kom igång"
+      "getStarted": "Kom igång",
+      "disclaimer": "Metic är inte anslutet till Meticulous Home."
     },
     "machine": {
       "title": "Anslut din maskin",

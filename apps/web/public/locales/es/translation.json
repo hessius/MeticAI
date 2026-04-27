@@ -561,7 +561,8 @@
     "geminiModel20Flash": "Gemini 2.0 Flash",
     "aiSettings": "Ajustes de IA",
     "versionAndChangelog": "Versión y registro de cambios",
-    "mqttBridge": "Puente MQTT"
+    "mqttBridge": "Puente MQTT",
+    "disclaimer": "Metic es un proyecto independiente de código abierto y no está afiliado, respaldado ni conectado con Meticulous Home, el fabricante de la máquina de espresso Meticulous."
   },
   "profileBreakdown": {
     "title": "Detalles del perfil",
@@ -1556,7 +1557,8 @@
     "welcome": {
       "title": "Bienvenido a Metic",
       "description": "Kit de herramientas todo en uno para el Meticulous. Vamos a configurar todo en unos pocos pasos.",
-      "getStarted": "Comenzar"
+      "getStarted": "Comenzar",
+      "disclaimer": "Metic no está afiliado a Meticulous Home."
     },
     "machine": {
       "title": "Conecta tu máquina",

@@ -820,6 +820,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {t('settings.aboutDescription2')}
               </p>
+              <p className="text-xs text-muted-foreground/70 leading-relaxed italic">
+                {t('settings.disclaimer')}
+              </p>
               <Button
                 variant="outline"
                 className="w-full"

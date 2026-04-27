@@ -282,6 +282,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <p className="text-muted-foreground max-w-sm">
           {t('onboarding.welcome.description')}
         </p>
+        <p className="text-xs text-muted-foreground/60 max-w-sm italic">
+          {t('onboarding.welcome.disclaimer')}
+        </p>
       </div>
       <Button size="lg" onClick={next} className="gap-2 mt-4">
         {t('onboarding.welcome.getStarted')}
