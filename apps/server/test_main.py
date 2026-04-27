@@ -4022,10 +4022,12 @@ class TestMachineProfilesEndpoint:
         profile1 = next(p for p in data["profiles"] if p["name"] == "Espresso Classic")
         assert profile1["in_history"] is True
         assert profile1["has_description"] is True
+        assert "derived_tags" in profile1
         
         # Check second profile has no history
         profile2 = next(p for p in data["profiles"] if p["name"] == "Light Roast")
         assert profile2["in_history"] is False
+        assert "derived_tags" in profile2
 
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
     def test_list_profiles_api_error(self, mock_list_profiles, client):
@@ -4129,6 +4131,77 @@ class TestMachineProfilesEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["profiles"][0]["in_history"] is True
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    @patch('api.routes.profiles.load_history', return_value=[])
+    def test_list_profiles_includes_derived_tags(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
+        """Test that profile list includes derived structural tags."""
+        # Create a profile with pressure stages (triggers Pressure-controlled + Pre-infusion tags)
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Classic Espresso"
+        mock_profile.error = None
+
+        # Build full profile with stages as objects (getattr-compatible)
+        dynamics = type('Dynamics', (), {'points': [[0, 2.0], [5, 4.0]], 'over': 'time', 'interpolation': 'linear'})()
+        stage1 = type('Stage', (), {'name': 'Preinfusion', 'type': 'pressure', 'dynamics': dynamics, 'limits': [], 'exit_triggers': []})()
+        dynamics2 = type('Dynamics', (), {'points': [[0, 9.0], [25, 8.5]], 'over': 'time', 'interpolation': 'linear'})()
+        stage2 = type('Stage', (), {'name': 'Extraction', 'type': 'pressure', 'dynamics': dynamics2, 'limits': [], 'exit_triggers': []})()
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.id = "profile-1"
+        full_profile.name = "Classic Espresso"
+        full_profile.author = "Barista"
+        full_profile.temperature = 92.0
+        full_profile.final_weight = 36.0
+        full_profile.stages = [stage1, stage2]
+        full_profile.variables = None
+        full_profile.display = None
+        full_profile.error = None
+
+        mock_list_profiles.return_value = [mock_profile]
+        mock_get_profile.return_value = full_profile
+
+        response = client.get("/api/machine/profiles")
+
+        assert response.status_code == 200
+        data = response.json()
+        profile = data["profiles"][0]
+        assert "derived_tags" in profile
+        assert isinstance(profile["derived_tags"], list)
+        assert "Pressure-controlled" in profile["derived_tags"]
+        assert "Pre-infusion" in profile["derived_tags"]
+        assert "High temp (91\u201393\u00b0C)" in profile["derived_tags"]
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    @patch('api.routes.profiles.load_history', return_value=[])
+    def test_list_profiles_derived_tags_empty_without_stages(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
+        """Test that profiles without stages still get derived_tags (possibly just temperature)."""
+        mock_profile = type('Profile', (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Simple"
+        mock_profile.error = None
+
+        full_profile = type('FullProfile', (), {})()
+        full_profile.id = "profile-1"
+        full_profile.name = "Simple"
+        full_profile.author = None
+        full_profile.temperature = 88.0
+        full_profile.final_weight = None
+        full_profile.error = None
+
+        mock_list_profiles.return_value = [mock_profile]
+        mock_get_profile.return_value = full_profile
+
+        response = client.get("/api/machine/profiles")
+
+        assert response.status_code == 200
+        profile = response.json()["profiles"][0]
+        assert "derived_tags" in profile
+        # Should at least have temperature tag
+        assert "Medium temp (88\u201390\u00b0C)" in profile["derived_tags"]
 
 
 class TestMachineProfileJsonEndpoint:

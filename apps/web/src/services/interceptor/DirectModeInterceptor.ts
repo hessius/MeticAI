@@ -2,6 +2,7 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { findSimilarProfiles, getRecommendations } from '@/lib/profileRecommendation'
+import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
 
 // ── Private helpers ─────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export function installDirectModeInterceptor(): void {
         ...p,
         in_history: true,
         has_description: !!(p.display?.description || p.display?.shortDescription),
+        derived_tags: deriveStructuralTags(p as unknown as AnalyzableProfile),
       }))
     }
     try { localStorage.setItem(PROFILE_LIST_CACHE_KEY, JSON.stringify(result)) } catch { /* ignore */ }

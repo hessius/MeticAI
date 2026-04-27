@@ -29,7 +29,7 @@ import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { ProfileImage } from '@/components/ProfileImage'
-import { extractTagsFromPreferences, getAllTagsFromEntries, getTagColorClass } from '@/lib/tags'
+import { extractTagsFromPreferences, getTagColorClass } from '@/lib/tags'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
@@ -45,6 +45,7 @@ interface MachineProfile {
   in_history: boolean
   has_description: boolean
   user_preferences?: string | null
+  derived_tags?: string[]
   display?: {
     description?: string
     shortDescription?: string
@@ -389,18 +390,25 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
     orphanedEntries.some((e) => e.profile_name === profileName)
 
   const availableTags = useMemo(() => {
-    return getAllTagsFromEntries(profiles)
+    const allTags = new Set<string>()
+    for (const profile of profiles) {
+      const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+      for (const tag of prefTags) allTags.add(tag)
+      for (const tag of profile.derived_tags ?? []) allTags.add(tag)
+    }
+    return Array.from(allTags).sort()
   }, [profiles])
 
   const filteredProfiles = useMemo(() => {
     if (selectedFilterTags.length === 0) return profiles
 
     return profiles.filter((profile) => {
-      const entryTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+      const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+      const merged = new Set([...prefTags, ...(profile.derived_tags ?? [])])
       if (filterMode === 'AND') {
-        return selectedFilterTags.every((tag) => entryTags.includes(tag))
+        return selectedFilterTags.every((tag) => merged.has(tag))
       }
-      return selectedFilterTags.some((tag) => entryTags.includes(tag))
+      return selectedFilterTags.some((tag) => merged.has(tag))
     })
   }, [profiles, selectedFilterTags, filterMode])
 
@@ -801,10 +809,11 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                               )}
                             </div>
                             {(() => {
-                              const entryTags = extractTagsFromPreferences(profile.user_preferences ?? null)
-                              return entryTags.length > 0 ? (
+                              const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+                              const allTags = [...new Set([...prefTags, ...(profile.derived_tags ?? [])])].sort()
+                              return allTags.length > 0 ? (
                                 <div className="flex flex-wrap gap-1 mt-2">
-                                  {entryTags.slice(0, 4).map((tag) => (
+                                  {allTags.slice(0, 4).map((tag) => (
                                     <Badge
                                       key={tag}
                                       className={`px-1.5 py-0.5 text-[10px] font-medium border ${getTagColorClass(tag, false)}`}
@@ -812,9 +821,9 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                                       {tag}
                                     </Badge>
                                   ))}
-                                  {entryTags.length > 4 && (
+                                  {allTags.length > 4 && (
                                     <Badge className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 border-transparent text-muted-foreground">
-                                      +{entryTags.length - 4}
+                                      +{allTags.length - 4}
                                     </Badge>
                                   )}
                                 </div>

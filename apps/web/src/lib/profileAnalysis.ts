@@ -229,3 +229,56 @@ export function extractNameTags(profile: AnalyzableProfile): Set<string> {
 
   return tags
 }
+
+// ── Temperature range grouping ─────────────────────────────────────────────
+
+/**
+ * Map a temperature to a human-readable range label matching PRESET_TAGS.
+ */
+export function temperatureRange(temp: number): string {
+  if (temp < 82) return 'Very low temp (<82°C)'
+  if (temp <= 84) return 'Low temp (82–84°C)'
+  if (temp <= 87) return 'Warm (85–87°C)'
+  if (temp <= 90) return 'Medium temp (88–90°C)'
+  if (temp <= 93) return 'High temp (91–93°C)'
+  return 'Very high temp (94°C+)'
+}
+
+// ── Structural tag derivation ──────────────────────────────────────────────
+
+/** Map internal fingerprint technique tags to PRESET_TAG labels. */
+const TECHNIQUE_TO_LABEL: Record<string, string> = {
+  'pressure-profile': 'Pressure-controlled',
+  'flow-profile': 'Flow-controlled',
+  'mixed-profile': 'Mixed-controlled',
+  'preinfusion': 'Pre-infusion',
+  'bloom': 'Bloom',
+  'pulse': 'Pulse',
+  'flat': 'Flat profile',
+  'lever': 'Lever',
+  'turbo': 'Turbo',
+  'ramp': 'Ramp',
+  'decline': 'Decline',
+  'taper': 'Taper',
+}
+
+/**
+ * Derive user-facing structural tags from a profile's stage data.
+ * Returns sorted PRESET_TAG labels (e.g. "Bloom", "Flow-controlled", "High temp (91–93°C)").
+ * Pure function — no side effects, no caching.
+ */
+export function deriveStructuralTags(profile: AnalyzableProfile): string[] {
+  const fp = extractFingerprint(profile)
+  const tags = new Set<string>()
+
+  for (const tt of fp.techniqueTags) {
+    const label = TECHNIQUE_TO_LABEL[tt]
+    if (label) tags.add(label)
+  }
+
+  if (fp.temperature != null) {
+    tags.add(temperatureRange(fp.temperature))
+  }
+
+  return [...tags].sort()
+}

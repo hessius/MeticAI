@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest'
 import {
   extractFingerprint,
   extractNameTags,
+  temperatureRange,
+  deriveStructuralTags,
   type AnalyzableProfile,
   type ProfileStage,
 } from './profileAnalysis'
@@ -265,6 +267,128 @@ describe('extractNameTags', () => {
     expect(tags.has('soak')).toBe(true)
     expect(tags.has('extraction')).toBe(true)
     expect(tags.has('hold')).toBe(true)
+  })
+})
+
+// ── temperatureRange tests ─────────────────────────────────────────────────
+
+describe('temperatureRange', () => {
+  it('maps < 82 to very low', () => {
+    expect(temperatureRange(80)).toBe('Very low temp (<82°C)')
+    expect(temperatureRange(81.9)).toBe('Very low temp (<82°C)')
+  })
+
+  it('maps 82–84 to low', () => {
+    expect(temperatureRange(82)).toBe('Low temp (82–84°C)')
+    expect(temperatureRange(84)).toBe('Low temp (82–84°C)')
+  })
+
+  it('maps 85–87 to warm', () => {
+    expect(temperatureRange(85)).toBe('Warm (85–87°C)')
+    expect(temperatureRange(87)).toBe('Warm (85–87°C)')
+  })
+
+  it('maps 88–90 to medium', () => {
+    expect(temperatureRange(88)).toBe('Medium temp (88–90°C)')
+    expect(temperatureRange(90)).toBe('Medium temp (88–90°C)')
+  })
+
+  it('maps 91–93 to high', () => {
+    expect(temperatureRange(91)).toBe('High temp (91–93°C)')
+    expect(temperatureRange(93)).toBe('High temp (91–93°C)')
+  })
+
+  it('maps 94+ to very high', () => {
+    expect(temperatureRange(94)).toBe('Very high temp (94°C+)')
+    expect(temperatureRange(100)).toBe('Very high temp (94°C+)')
+  })
+})
+
+// ── deriveStructuralTags tests ────────────────────────────────────────────
+
+describe('deriveStructuralTags', () => {
+  it('derives pressure-controlled + pre-infusion + temperature for pressure profile', () => {
+    const tags = deriveStructuralTags(PRESSURE_PROFILE)
+    expect(tags).toContain('Pressure-controlled')
+    expect(tags).toContain('Pre-infusion')
+    expect(tags).toContain('Ramp')
+    expect(tags).toContain('High temp (91–93°C)')
+  })
+
+  it('derives flow-controlled + bloom + pre-infusion for flow profile', () => {
+    const tags = deriveStructuralTags(FLOW_PROFILE)
+    expect(tags).toContain('Flow-controlled')
+    expect(tags).toContain('Bloom')
+    expect(tags).toContain('Pre-infusion')
+    expect(tags).toContain('Medium temp (88–90°C)')
+  })
+
+  it('derives flat profile + pressure-controlled for flat profile', () => {
+    const tags = deriveStructuralTags(FLAT_PROFILE)
+    expect(tags).toContain('Flat profile')
+    expect(tags).toContain('Pressure-controlled')
+    expect(tags).toContain('High temp (91–93°C)')
+  })
+
+  it('derives turbo + flow-controlled + very high temp for turbo profile', () => {
+    const tags = deriveStructuralTags(TURBO_PROFILE)
+    expect(tags).toContain('Turbo')
+    expect(tags).toContain('Flow-controlled')
+    expect(tags).toContain('Very high temp (94°C+)')
+  })
+
+  it('derives decline + pressure-controlled for lever profile', () => {
+    const tags = deriveStructuralTags(LEVER_PROFILE)
+    expect(tags).toContain('Decline')
+    expect(tags).toContain('Pressure-controlled')
+    expect(tags).toContain('Pre-infusion')
+    expect(tags).toContain('High temp (91–93°C)')
+    // Note: "Lever" is in profile NAME (extractNameTags), not stage names (extractFingerprint)
+  })
+
+  it('returns only flat + temperature for empty profile (no stages, no temperature)', () => {
+    const profile: AnalyzableProfile = { name: 'Empty', stages: [] }
+    const tags = deriveStructuralTags(profile)
+    // 0 stages: isFlat stays true (initial value), no temperature
+    expect(tags).toEqual(['Flat profile'])
+  })
+
+  it('includes flat + temperature tag when profile has no stages but has temperature', () => {
+    const profile: AnalyzableProfile = { name: 'Bare', stages: [], temperature: 90 }
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toEqual(['Flat profile', 'Medium temp (88–90°C)'])
+  })
+
+  it('returns sorted array', () => {
+    const tags = deriveStructuralTags(PRESSURE_PROFILE)
+    const sorted = [...tags].sort()
+    expect(tags).toEqual(sorted)
+  })
+
+  it('produces no duplicate tags', () => {
+    const tags = deriveStructuralTags(LEVER_PROFILE)
+    expect(new Set(tags).size).toBe(tags.length)
+  })
+
+  it('derives mixed-controlled for mixed profile', () => {
+    const stages = [
+      makeStage('Pressure Phase', 'pressure', [[0, 4], [5, 9]]),
+      makeStage('Flow Phase', 'flow', [[0, 2], [10, 2]]),
+    ]
+    const profile = makeProfile('Mixed', stages, 88)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Mixed-controlled')
+    expect(tags).toContain('Medium temp (88–90°C)')
+  })
+
+  it('derives pulse for many-stage profile', () => {
+    const stages = Array.from({ length: 6 }, (_, i) =>
+      makeStage(`Step ${i}`, 'pressure', [[0, 3], [1, 6]])
+    )
+    const profile = makeProfile('Pulse Test', stages, 92)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Pulse')
+    expect(tags).toContain('Pressure-controlled')
   })
 })
 
