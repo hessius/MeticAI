@@ -4173,6 +4173,8 @@ class TestMachineProfilesEndpoint:
         assert "Pressure-controlled" in profile["derived_tags"]
         assert "Pre-infusion" in profile["derived_tags"]
         assert "High temp (91\u201393\u00b0C)" in profile["derived_tags"]
+        assert "Normale (36\u201344g)" in profile["derived_tags"]
+        assert "Standard pressure (8\u20139 bar)" in profile["derived_tags"]
 
     @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
     @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
@@ -4202,6 +4204,63 @@ class TestMachineProfilesEndpoint:
         assert "derived_tags" in profile
         # Should at least have temperature tag
         assert "Medium temp (88\u201390\u00b0C)" in profile["derived_tags"]
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    @patch('api.routes.profiles.load_history', return_value=[])
+    def test_derived_tags_weight_range(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
+        """Test that derived tags include weight range labels."""
+        mock_profile = type('Profile', (), {'id': 'p1', 'name': 'Ristretto', 'error': None})()
+        dynamics = type('Dynamics', (), {'points': [[0, 9.0]], 'over': 'time', 'interpolation': 'linear'})()
+        stage = type('Stage', (), {'name': 'Main', 'type': 'pressure', 'dynamics': dynamics, 'limits': [], 'exit_triggers': []})()
+        full = type('Full', (), {
+            'id': 'p1', 'name': 'Ristretto', 'author': None, 'temperature': 93.0,
+            'final_weight': 25.0, 'stages': [stage], 'variables': None, 'display': None, 'error': None
+        })()
+        mock_list_profiles.return_value = [mock_profile]
+        mock_get_profile.return_value = full
+        response = client.get("/api/machine/profiles")
+        tags = response.json()["profiles"][0]["derived_tags"]
+        assert "Ristretto (\u226435g)" in tags
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    @patch('api.routes.profiles.load_history', return_value=[])
+    def test_derived_tags_adaptive_detection(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
+        """Test that profiles with $variable references get Adaptive tag."""
+        mock_profile = type('Profile', (), {'id': 'p1', 'name': 'Adaptive', 'error': None})()
+        dynamics = type('Dynamics', (), {'points': [[0, '$pressure']], 'over': 'time', 'interpolation': 'linear'})()
+        stage = type('Stage', (), {'name': 'Main', 'type': 'pressure', 'dynamics': dynamics, 'limits': [], 'exit_triggers': []})()
+        full = type('Full', (), {
+            'id': 'p1', 'name': 'Adaptive Profile', 'author': None, 'temperature': 93.0,
+            'final_weight': 40.0, 'stages': [stage], 'variables': None, 'display': None, 'error': None
+        })()
+        mock_list_profiles.return_value = [mock_profile]
+        mock_get_profile.return_value = full
+        response = client.get("/api/machine/profiles")
+        tags = response.json()["profiles"][0]["derived_tags"]
+        assert "Adaptive" in tags
+
+    @patch('api.routes.profiles.async_get_profile', new_callable=AsyncMock)
+    @patch('api.routes.profiles.async_list_profiles', new_callable=AsyncMock)
+    @patch('api.routes.profiles.load_history', return_value=[])
+    def test_derived_tags_structural_bloom(self, mock_load_history, mock_list_profiles, mock_get_profile, client):
+        """Test content-based bloom detection from zero-flow stage with time exit."""
+        mock_profile = type('Profile', (), {'id': 'p1', 'name': 'TestProfile', 'error': None})()
+        bloom_dyn = type('Dynamics', (), {'points': [[0, 0.0], [5, 0.0]], 'over': 'time', 'interpolation': 'linear'})()
+        time_exit = type('Exit', (), {'type': 'time', 'value': 30})()
+        bloom_stage = type('Stage', (), {'name': 'Phase1', 'type': 'flow', 'dynamics': bloom_dyn, 'limits': [], 'exit_triggers': [time_exit]})()
+        main_dyn = type('Dynamics', (), {'points': [[0, 3.0]], 'over': 'time', 'interpolation': 'linear'})()
+        main_stage = type('Stage', (), {'name': 'Phase2', 'type': 'flow', 'dynamics': main_dyn, 'limits': [], 'exit_triggers': []})()
+        full = type('Full', (), {
+            'id': 'p1', 'name': 'TestProfile', 'author': None, 'temperature': 90.0,
+            'final_weight': 40.0, 'stages': [bloom_stage, main_stage], 'variables': None, 'display': None, 'error': None
+        })()
+        mock_list_profiles.return_value = [mock_profile]
+        mock_get_profile.return_value = full
+        response = client.get("/api/machine/profiles")
+        tags = response.json()["profiles"][0]["derived_tags"]
+        assert "Bloom" in tags
 
 
 class TestMachineProfileJsonEndpoint:
