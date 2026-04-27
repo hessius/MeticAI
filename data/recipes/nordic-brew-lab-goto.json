@@ -1,0 +1,29 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "Go-To V60",
+    "author": "Pierre Tymms / Nordic Brew Lab",
+    "description": "Reliable everyday V60 with three progressive pours building to a final large pour. Balanced extraction with a medium-coarse grind targeting 2:45–3:00 total brew time.",
+    "compatibility": ["V60", "Origami", "April"],
+    "visualizer_hint": "pulse_block"
+  },
+  "equipment": {
+    "dripper": { "model": "V60", "material": "Ceramic" },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 18.0,
+    "water_g": 300.0,
+    "grind_setting": "Medium-Coarse"
+  },
+  "protocol": [
+    { "step": 1, "action": "bloom", "water_g": 60, "duration_s": 15, "notes": "Pour 60g to bloom — gentle spiral to saturate all grounds" },
+    { "step": 2, "action": "wait", "duration_s": 15, "notes": "Wait until 0:30 — let bloom degas" },
+    { "step": 3, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Pour to 120g — steady centre pour" },
+    { "step": 4, "action": "wait", "duration_s": 15, "notes": "Wait until 1:00" },
+    { "step": 5, "action": "pour", "water_g": 60, "duration_s": 15, "notes": "Pour to 180g — steady centre pour" },
+    { "step": 6, "action": "wait", "duration_s": 15, "notes": "Wait until 1:30" },
+    { "step": 7, "action": "pour", "water_g": 120, "duration_s": 20, "notes": "Pour to 300g — larger final pour, centre circles" },
+    { "step": 8, "action": "swirl", "duration_s": 5, "notes": "Gentle swirl to level the bed" }
+  ]
+}

@@ -1591,7 +1591,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                           <div className="min-w-0">
                             <p className="font-semibold text-sm text-foreground leading-tight">{recipe.metadata.name}</p>
                             {recipe.metadata.author && (
-                              <p className="text-xs text-muted-foreground">by {recipe.metadata.author}</p>
+                              <p className="text-[13px] text-muted-foreground">by {recipe.metadata.author}</p>
                             )}
                           </div>
                           <ArrowRight size={16} className="shrink-0 text-muted-foreground mt-0.5" />
