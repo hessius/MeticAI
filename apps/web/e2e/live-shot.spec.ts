@@ -25,7 +25,7 @@ test.describe('Live Shot View', () => {
 
   test('should navigate to run shot view', async ({ page }) => {
     // Navigate to Run / Schedule
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -49,7 +49,7 @@ test.describe('Run Shot View - Profile Selection', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -64,7 +64,7 @@ test.describe('Run Shot View - Profile Selection', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -79,7 +79,7 @@ test.describe('Run Shot View - Profile Selection', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -87,6 +87,6 @@ test.describe('Run Shot View - Profile Selection', () => {
     await page.locator('text=Metic').first().click()
 
     // Should be back on start
-    await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: /Profiles/i })).toBeVisible({ timeout: 5000 })
   })
 })

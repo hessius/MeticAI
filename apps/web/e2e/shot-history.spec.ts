@@ -24,7 +24,7 @@ test.describe('Run / Schedule View', () => {
   })
 
   test('should access run schedule view', async ({ page }) => {
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -38,7 +38,7 @@ test.describe('Run / Schedule View', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -53,7 +53,7 @@ test.describe('Run / Schedule View', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -67,7 +67,7 @@ test.describe('Run / Schedule View', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -89,7 +89,7 @@ test.describe('Shot Scheduling - Recurring', () => {
     await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 

@@ -10,7 +10,7 @@
  *
  * useGlobalSoundDelegation provides automatic click sounds for ALL
  * interactive elements via event delegation. Mount it once in App.tsx.
- * Use data-sound attributes to customise: "back", "close" → notify,
+ * Use data-sound attributes to customise: "back", "close" → click,
  * "adjust" → hover, "none" → suppress.
  */
 
@@ -103,7 +103,7 @@ export function useSoundEffects() {
  * since those use explicit toggleOn/toggleOff.
  *
  * Customise per-element with data-sound:
- *   "back" | "close"  → notify
+ *   "back" | "close"  → click (same as forward navigation)
  *   "adjust"           → hover
  *   "none"             → suppress (for elements with explicit non-click sounds)
  *   (default)          → click
@@ -143,7 +143,7 @@ export function useGlobalSoundDelegation() {
       switch (soundAttr) {
         case 'back':
         case 'close':
-          tiks.notify()
+          tiks.click()
           break
         case 'adjust':
           tiks.hover()

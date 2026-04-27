@@ -806,18 +806,76 @@ function App() {
   }
 
   const handleViewProfileByName = async (profileName: string) => {
-    if (isDemoMode() || isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
-      if (!response.ok) return
-      const data = await response.json()
-      const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
-      if (match) {
-        handleViewHistoryEntry(match)
+
+      if (isDemoMode()) return
+
+      if (isDirectMode() || isNativePlatform()) {
+        // In direct/Capacitor mode, look up profile from the machine's profile list
+        let profileId = profileName
+        let displayImage: string | undefined
+
+        // Try cache first
+        const cacheRes = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
+        if (cacheRes.ok) {
+          const cacheData = await cacheRes.json()
+          if (cacheData?.profile?.id) {
+            profileId = cacheData.profile.id
+            displayImage = cacheData.profile.display?.image
+          }
+        }
+
+        // If cache didn't resolve an actual ID, try the full profile list from machine
+        if (profileId === profileName) {
+          try {
+            const listRes = await fetch('/api/v1/profile/list')
+            if (listRes.ok) {
+              const profiles = await listRes.json()
+              const match = Array.isArray(profiles) && profiles.find(
+                (p: { name?: string; id?: string }) => p.name === profileName
+              )
+              if (match?.id) profileId = match.id
+            }
+          } catch { /* proceed with name as ID */ }
+        }
+
+        // Fetch profile JSON for the breakdown view
+        const jsonRes = await fetch(`/api/machine/profile/${encodeURIComponent(profileId)}/json`)
+        const jsonData = jsonRes.ok ? await jsonRes.json() : {}
+        const profileJson = jsonData?.profile ?? null
+
+        const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+        let reply = descCache?.get(profileId) ?? ''
+        if (!reply && profileJson) {
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          reply = buildStaticProfileDescription(profileJson)
+          descCache?.set(profileId, reply)
+        }
+
+        const entry: HistoryEntry = {
+          id: profileId,
+          profile_name: profileName,
+          created_at: new Date().toISOString(),
+          coffee_analysis: null,
+          user_preferences: null,
+          reply,
+          profile_json: profileJson,
+        }
+        const imageUrl = resolveDisplayImage(displayImage) ?? undefined
+        handleViewHistoryEntry(entry, imageUrl)
+      } else {
+        // Proxy mode: search history for matching entry
+        const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+        if (!response.ok) return
+        const data = await response.json()
+        const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
+        if (match) {
+          handleViewHistoryEntry(match)
+        }
       }
     } catch {
-      // Silently fail — profile may not exist in history
+      // Silently fail — profile may not exist
     }
   }
 
@@ -1150,7 +1208,8 @@ function App() {
                     className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
                     onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
                     tabIndex={islandExpanded ? 0 : -1}
-                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : undefined}
+                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : t('a11y.appLogo', 'Metic logo')}
+                    aria-hidden={islandExpanded ? undefined : true}
                     style={{
                       width: 32,
                       height: 32,
@@ -1348,6 +1407,7 @@ function App() {
                     onSubmit={handleSubmit}
                     onBack={handleBackToStart}
                     onViewHistory={() => setViewState('profile-catalogue')}
+                    onViewProfile={handleViewProfileByName}
                   />
                 </FeatureErrorBoundary>
               )}
@@ -1355,6 +1415,7 @@ function App() {
               {viewState === 'history-detail' && selectedHistoryEntry && (
                 <FeatureErrorBoundary feature="Profile Detail">
                   <ProfileDetailView
+                    key={selectedHistoryEntry.id}
                     entry={selectedHistoryEntry}
                     onBack={() => {
                       setViewState('profile-catalogue')

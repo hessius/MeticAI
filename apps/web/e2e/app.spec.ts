@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { navigateToForm, isAiAvailableInForm } from './helpers'
 
 /**
  * E2E Tests for Metic Web Application
  *
- * Note: Tests that require the "Generate New Profile" button will be skipped
- * when AI features are unavailable (no API key configured in CI).
+ * Note: Tests that require the "Generate Profile" submit button to be enabled
+ * will be skipped when AI features are unavailable (no API key configured in CI).
  */
 
 test.describe('Metic Web Application E2E Tests', () => {
@@ -12,7 +13,7 @@ test.describe('Metic Web Application E2E Tests', () => {
     await page.goto('/')
     
     // Check that the page loaded with correct title
-    await expect(page).toHaveTitle('Metic — All-in-one toolkit for the Meticulous')
+    await expect(page).toHaveTitle('Metic.')
     
     // Check for the application title
     await expect(page.getByRole('heading', { name: /Metic/ })).toBeVisible()
@@ -20,24 +21,15 @@ test.describe('Metic Web Application E2E Tests', () => {
 
   test('should display form elements', async ({ page }) => {
     await page.goto('/')
+    await page.waitForSelector('text=Add Profile')
     
-    // Wait for the app to load and click "Generate New Profile" to access the form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-    
-    await generateButton.click()
+    await navigateToForm(page)
     
     // Now check for form elements
     // Check for file upload area
     await expect(page.getByText(/Tap to upload or take photo/)).toBeVisible()
     
-    // Check for textarea - use partial match since placeholder includes "e.g., " prefix and "..." suffix
+    // Check for textarea
     await expect(page.getByPlaceholder(/Balanced extraction/)).toBeVisible()
     
     // Check for tags
@@ -52,18 +44,15 @@ test.describe('Metic Web Application E2E Tests', () => {
 
   test('should enable submit button when text is entered', async ({ page }) => {
     await page.goto('/')
+    await page.waitForSelector('text=Add Profile')
     
-    // Navigate to form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    await navigateToForm(page)
     
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
+    // Skip test if AI is unavailable (submit button won't enable)
+    if (!(await isAiAvailableInForm(page))) {
       test.skip()
       return
     }
-    
-    await generateButton.click()
     
     const textarea = page.getByPlaceholder(/Balanced extraction/)
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
@@ -80,18 +69,15 @@ test.describe('Metic Web Application E2E Tests', () => {
 
   test('should enable submit button when a tag is selected', async ({ page }) => {
     await page.goto('/')
+    await page.waitForSelector('text=Add Profile')
     
-    // Navigate to form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    await navigateToForm(page)
     
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
+    // Skip test if AI is unavailable
+    if (!(await isAiAvailableInForm(page))) {
       test.skip()
       return
     }
-    
-    await generateButton.click()
     
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
     
@@ -107,18 +93,9 @@ test.describe('Metic Web Application E2E Tests', () => {
 
   test('should allow selecting multiple tags', async ({ page }) => {
     await page.goto('/')
+    await page.waitForSelector('text=Add Profile')
     
-    // Navigate to form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-    
-    await generateButton.click()
+    await navigateToForm(page)
     
     // Select multiple tags
     await page.getByText('Light Body').first().click()
@@ -133,18 +110,9 @@ test.describe('Metic Web Application E2E Tests', () => {
 
   test('should be able to deselect tags', async ({ page }) => {
     await page.goto('/')
+    await page.waitForSelector('text=Add Profile')
     
-    // Navigate to form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-    
-    await generateButton.click()
+    await navigateToForm(page)
     
     const lightBodyTag = page.locator('[data-slot="badge"]:has-text("Light Body")')
     
@@ -165,37 +133,26 @@ test.describe('Metic Web Application E2E Tests', () => {
     await expect(page.getByRole('heading', { name: /Metic/ })).toBeVisible()
     
     // Navigate to form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    await page.waitForSelector('text=Add Profile')
+    await navigateToForm(page)
     
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-    
-    await generateButton.click()
-    
-    // Test mobile view
+    // Test mobile view — header h1 is only on start view, check form heading instead
     await page.setViewportSize({ width: 375, height: 667 })
-    await expect(page.getByRole('heading', { name: /Metic/ })).toBeVisible()
+    await expect(page.getByText(/New Profile/)).toBeVisible()
     await expect(page.getByPlaceholder(/Balanced extraction/)).toBeVisible()
   })
 
   test('should show form validation', async ({ page }) => {
     await page.goto('/')
+    await page.waitForSelector('text=Add Profile')
     
-    // Navigate to form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    await navigateToForm(page)
     
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
+    // Skip test if AI is unavailable
+    if (!(await isAiAvailableInForm(page))) {
       test.skip()
       return
     }
-    
-    await generateButton.click()
     
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
     
@@ -215,18 +172,15 @@ test.describe('Metic Web Application E2E Tests', () => {
 test.describe('User Flows', () => {
   test('complete coffee preference submission flow', async ({ page }) => {
     await page.goto('/')
+    await page.waitForSelector('text=Add Profile')
     
-    // Navigate to form
-    await page.waitForSelector('text=Generate New Profile')
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
+    await navigateToForm(page)
     
-    // Skip test if button is disabled (AI unavailable in CI)
-    if (await generateButton.isDisabled()) {
+    // Skip test if AI is unavailable
+    if (!(await isAiAvailableInForm(page))) {
       test.skip()
       return
     }
-    
-    await generateButton.click()
     
     // Fill in preferences
     await page.getByPlaceholder(/Balanced extraction/).fill('I prefer fruity and bright espresso with floral notes')
