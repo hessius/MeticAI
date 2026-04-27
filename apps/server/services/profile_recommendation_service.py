@@ -61,7 +61,7 @@ def _cache_key(tags: list[str], limit: int) -> str:
 # Structural fingerprint extraction
 # ---------------------------------------------------------------------------
 
-def _extract_fingerprint(profile: object) -> dict:
+def extract_fingerprint(profile: object) -> dict:
     """Extract a structural fingerprint from a full profile.
 
     Returns a dict with:
@@ -281,7 +281,7 @@ def _score_profile(
     reasons: list[str] = []
     score = 0.0
 
-    cand_fp = _extract_fingerprint(candidate)
+    cand_fp = extract_fingerprint(candidate)
     cand_tags = _extract_name_tags(candidate)
 
     # --- Stage structure (35 points) ---
@@ -454,7 +454,7 @@ class ProfileRecommendationService:
         if source is None:
             return []
 
-        source_fp = _extract_fingerprint(source)
+        source_fp = extract_fingerprint(source)
         source_tags = _extract_name_tags(source)
 
         scored: list[dict] = []

@@ -819,6 +819,8 @@ ul:not([class]) li::before,
 .tag-process      { background-color: var(--color-indigo-200);  border-color: var(--color-indigo-500);  color: var(--color-indigo-950); }
 .tag-technique    { background-color: var(--color-cyan-200);    border-color: var(--color-cyan-500);    color: var(--color-cyan-950); }
 .tag-temperature  { background-color: var(--color-lime-200);    border-color: var(--color-lime-600);    color: var(--color-lime-950); }
+.tag-weight       { background-color: var(--color-fuchsia-200);  border-color: var(--color-fuchsia-500); color: var(--color-fuchsia-950); }
+.tag-pressure     { background-color: var(--color-red-200);      border-color: var(--color-red-500);     color: var(--color-red-950); }
 .tag-default      { background-color: var(--color-gray-200);    border-color: var(--color-gray-500);    color: var(--color-gray-950); }
 
 @media (hover: hover) {
@@ -832,6 +834,8 @@ ul:not([class]) li::before,
   .tag-process:hover      { background-color: var(--color-indigo-300);  border-color: var(--color-indigo-600); }
   .tag-technique:hover    { background-color: var(--color-cyan-300);    border-color: var(--color-cyan-600); }
   .tag-temperature:hover  { background-color: var(--color-lime-300);    border-color: var(--color-lime-700); }
+  .tag-weight:hover       { background-color: var(--color-fuchsia-300);  border-color: var(--color-fuchsia-600); }
+  .tag-pressure:hover     { background-color: var(--color-red-300);      border-color: var(--color-red-600); }
 }
 
 .dark .tag-body         { background-color: color-mix(in oklab, var(--color-amber-500)   20%, transparent); border-color: color-mix(in oklab, var(--color-amber-500)   40%, transparent); color: var(--color-amber-200); }
@@ -844,6 +848,8 @@ ul:not([class]) li::before,
 .dark .tag-process      { background-color: color-mix(in oklab, var(--color-indigo-500)  20%, transparent); border-color: color-mix(in oklab, var(--color-indigo-500)  40%, transparent); color: var(--color-indigo-200); }
 .dark .tag-technique    { background-color: color-mix(in oklab, var(--color-cyan-500)    20%, transparent); border-color: color-mix(in oklab, var(--color-cyan-500)    40%, transparent); color: var(--color-cyan-200); }
 .dark .tag-temperature  { background-color: color-mix(in oklab, var(--color-lime-500)    20%, transparent); border-color: color-mix(in oklab, var(--color-lime-500)    40%, transparent); color: var(--color-lime-200); }
+.dark .tag-weight       { background-color: color-mix(in oklab, var(--color-fuchsia-500)  20%, transparent); border-color: color-mix(in oklab, var(--color-fuchsia-500) 40%, transparent); color: var(--color-fuchsia-200); }
+.dark .tag-pressure     { background-color: color-mix(in oklab, var(--color-red-500)      20%, transparent); border-color: color-mix(in oklab, var(--color-red-500)     40%, transparent); color: var(--color-red-200); }
 .dark .tag-default      { background-color: color-mix(in oklab, var(--color-gray-500)    20%, transparent); border-color: color-mix(in oklab, var(--color-gray-500)    40%, transparent); color: var(--color-gray-200); }
 
 @media (hover: hover) {
@@ -857,6 +863,8 @@ ul:not([class]) li::before,
   .dark .tag-process:hover      { background-color: color-mix(in oklab, var(--color-indigo-500)  30%, transparent); border-color: color-mix(in oklab, var(--color-indigo-500)  55%, transparent); }
   .dark .tag-technique:hover    { background-color: color-mix(in oklab, var(--color-cyan-500)    30%, transparent); border-color: color-mix(in oklab, var(--color-cyan-500)    55%, transparent); }
   .dark .tag-temperature:hover  { background-color: color-mix(in oklab, var(--color-lime-500)    30%, transparent); border-color: color-mix(in oklab, var(--color-lime-500)    55%, transparent); }
+  .dark .tag-weight:hover       { background-color: color-mix(in oklab, var(--color-fuchsia-500)  30%, transparent); border-color: color-mix(in oklab, var(--color-fuchsia-500) 55%, transparent); }
+  .dark .tag-pressure:hover     { background-color: color-mix(in oklab, var(--color-red-500)      30%, transparent); border-color: color-mix(in oklab, var(--color-red-500)     55%, transparent); }
 }
 
 /* Selected tag states */
@@ -870,6 +878,8 @@ ul:not([class]) li::before,
 .tag-process-selected      { background-color: var(--color-indigo-600);  border-color: var(--color-indigo-700); }
 .tag-technique-selected    { background-color: var(--color-cyan-600);    border-color: var(--color-cyan-700); }
 .tag-temperature-selected  { background-color: var(--color-lime-600);    border-color: var(--color-lime-700); }
+.tag-weight-selected       { background-color: var(--color-fuchsia-600);  border-color: var(--color-fuchsia-700); }
+.tag-pressure-selected     { background-color: var(--color-red-600);      border-color: var(--color-red-700); }
 
 .dark .tag-body-selected         { background-color: var(--color-amber-500);   border-color: var(--color-amber-400); }
 .dark .tag-flavor-selected       { background-color: var(--color-rose-500);    border-color: var(--color-rose-400); }
@@ -881,6 +891,8 @@ ul:not([class]) li::before,
 .dark .tag-process-selected      { background-color: var(--color-indigo-500);  border-color: var(--color-indigo-400); }
 .dark .tag-technique-selected    { background-color: var(--color-cyan-500);    border-color: var(--color-cyan-400); }
 .dark .tag-temperature-selected  { background-color: var(--color-lime-500);    border-color: var(--color-lime-400); }
+.dark .tag-weight-selected       { background-color: var(--color-fuchsia-500);  border-color: var(--color-fuchsia-400); }
+.dark .tag-pressure-selected     { background-color: var(--color-red-500);      border-color: var(--color-red-400); }
 
 /* Score badge color classes for match percentage */
 .score-high    { background-color: var(--color-emerald-100); border-color: var(--color-emerald-500); color: var(--color-emerald-800); }

@@ -39,7 +39,7 @@ from services.meticulous_service import (
 )
 from services.cache_service import _get_cached_image, _set_cached_image
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
-from services.profile_recommendation_service import recommendation_service
+from services.profile_recommendation_service import recommendation_service, extract_fingerprint
 from services.history_service import HISTORY_FILE, load_history, save_history, compute_content_hash, update_entry_sync_fields, get_entry_by_id as _get_entry_by_id, _history_lock
 from services.analysis_service import _perform_local_shot_analysis, _generate_profile_description, generate_estimated_target_curves
 from services.settings_service import load_settings
@@ -51,6 +51,190 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 IMAGE_CACHE_DIR = DATA_DIR / "image_cache"
+
+# Technique tag → PRESET_TAG label mapping (mirrors TypeScript TECHNIQUE_TO_LABEL)
+_TECHNIQUE_TO_LABEL = {
+    "pressure-profile": "Pressure-controlled",
+    "flow-profile": "Flow-controlled",
+    "mixed-profile": "Mixed-controlled",
+    "preinfusion": "Pre-infusion",
+    "bloom": "Bloom",
+    "pulse": "Pulse",
+    "flat": "Flat profile",
+    "lever": "Lever",
+    "turbo": "Turbo",
+    "ramp": "Ramp",
+    "decline": "Decline",
+    "taper": "Taper",
+}
+
+
+def _temperature_range(temp: float) -> str:
+    """Map temperature to a labelled range matching TypeScript temperatureRange()."""
+    if temp < 82:
+        return "Very low temp (<82°C)"
+    if temp <= 84:
+        return "Low temp (82\u201384°C)"
+    if temp <= 87:
+        return "Warm (85\u201387°C)"
+    if temp <= 90:
+        return "Medium temp (88\u201390°C)"
+    if temp <= 93:
+        return "High temp (91\u201393°C)"
+    return "Very high temp (94°C+)"
+
+
+def _weight_range(weight: float) -> str:
+    """Map target weight (grams) to an espresso size label matching TypeScript weightRange()."""
+    if weight <= 35:
+        return "Ristretto (\u226435g)"
+    if weight <= 44:
+        return "Normale (36\u201344g)"
+    if weight <= 54:
+        return "Lungo (45\u201354g)"
+    return "Allong\u00e9 (55g+)"
+
+
+def _pressure_range(pressure: float) -> str:
+    """Map peak pressure (bar) to a range label matching TypeScript pressureRange()."""
+    if pressure <= 4:
+        return "Low pressure (\u22644 bar)"
+    if pressure <= 7:
+        return "Medium pressure (5\u20137 bar)"
+    if pressure <= 9:
+        return "Standard pressure (8\u20139 bar)"
+    return "High pressure (10+ bar)"
+
+
+def _derive_structural_tags(profile_obj: object) -> list[str]:
+    """Derive user-facing structural tags from a profile object using extract_fingerprint.
+
+    Must be called on the raw Meticulous profile object (with attributes),
+    NOT on a dict — extract_fingerprint uses getattr().
+    """
+    try:
+        fp = extract_fingerprint(profile_obj)
+    except (AttributeError, TypeError, KeyError) as exc:
+        logger.debug("Failed to extract fingerprint for structural tags: %s", exc)
+        return []
+
+    tags: set[str] = set()
+    for tt in fp.get("technique_tags", set()):
+        label = _TECHNIQUE_TO_LABEL.get(tt)
+        if label:
+            tags.add(label)
+
+    temp = fp.get("temperature")
+    if temp is not None:
+        try:
+            tags.add(_temperature_range(float(temp)))
+        except (TypeError, ValueError):
+            pass
+
+    final_weight = fp.get("final_weight")
+    if final_weight is not None:
+        try:
+            tags.add(_weight_range(float(final_weight)))
+        except (TypeError, ValueError):
+            pass
+
+    peak_pressure = fp.get("peak_pressure", 0)
+    try:
+        pp = float(peak_pressure)
+        if pp > 0:
+            tags.add(_pressure_range(pp))
+    except (TypeError, ValueError):
+        pass
+
+    # Adaptive detection: check for $variable references in stages
+    stages = getattr(profile_obj, "stages", None) or []
+    is_adaptive = False
+    for stage in stages:
+        dynamics = getattr(stage, "dynamics", None)
+        if dynamics:
+            for point in getattr(dynamics, "points", []) or []:
+                if len(point) >= 2:
+                    if isinstance(point[0], str) and point[0].startswith("$"):
+                        is_adaptive = True
+                    if isinstance(point[1], str) and point[1].startswith("$"):
+                        is_adaptive = True
+        for limit_obj in getattr(stage, "limits", []) or []:
+            val = getattr(limit_obj, "value", None)
+            if isinstance(val, str) and val.startswith("$"):
+                is_adaptive = True
+        for exit_obj in getattr(stage, "exit_triggers", []) or []:
+            val = getattr(exit_obj, "value", None)
+            if isinstance(val, str) and val.startswith("$"):
+                is_adaptive = True
+    if is_adaptive:
+        tags.add("Adaptive")
+
+    # Structural bloom detection (content-based)
+    if "Bloom" not in tags:
+        for stage in stages:
+            stype = (getattr(stage, "type", "") or "").lower()
+            dynamics = getattr(stage, "dynamics", None)
+            pts = getattr(dynamics, "points", []) or [] if dynamics else []
+            exits = getattr(stage, "exit_triggers", []) or []
+            has_time_exit = any((getattr(e, "type", "") or "").lower() == "time" for e in exits)
+            if stype == "flow" and has_time_exit and pts:
+                try:
+                    y_vals = [abs(float(p[1])) for p in pts if len(p) >= 2 and not (isinstance(p[1], str) and p[1].startswith("$"))]
+                    if y_vals and all(v <= 0.1 for v in y_vals):
+                        tags.add("Bloom")
+                        break
+                except (TypeError, ValueError):
+                    pass
+            if stype == "power" and has_time_exit and pts:
+                try:
+                    y_vals = [abs(float(p[1])) for p in pts if len(p) >= 2 and not (isinstance(p[1], str) and p[1].startswith("$"))]
+                    if y_vals and all(v <= 5 for v in y_vals):
+                        tags.add("Bloom")
+                        break
+                except (TypeError, ValueError):
+                    pass
+
+    # Structural pre-infusion detection (content-based)
+    if "Pre-infusion" not in tags and len(stages) >= 2:
+        first = stages[0]
+        ftype = (getattr(first, "type", "") or "").lower()
+        if ftype == "power":
+            tags.add("Pre-infusion")
+        else:
+            dynamics = getattr(first, "dynamics", None)
+            pts = getattr(dynamics, "points", []) or [] if dynamics else []
+            try:
+                y_vals = [float(p[1]) for p in pts if len(p) >= 2 and not (isinstance(p[1], str) and p[1].startswith("$"))]
+                max_y = max(y_vals) if y_vals else float("inf")
+                if (ftype == "pressure" and max_y <= 4) or (ftype == "flow" and max_y <= 2):
+                    tags.add("Pre-infusion")
+            except (TypeError, ValueError):
+                pass
+
+    return sorted(tags)
+
+
+def _derive_structural_tags_from_dict(profile_dict: dict) -> list[str]:
+    """Derive structural tags from a profile stored as a plain dict.
+
+    Used for offline/history fallback where profile_json is a dict.
+    Wraps the dict in a SimpleNamespace so extract_fingerprint's getattr() calls work.
+    """
+    from types import SimpleNamespace
+
+    def _to_ns(obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return SimpleNamespace(**{k: _to_ns(v) for k, v in obj.items()})
+        if isinstance(obj, list):
+            return [_to_ns(item) for item in obj]
+        return obj
+
+    try:
+        ns = _to_ns(profile_dict)
+        return _derive_structural_tags(ns)
+    except (AttributeError, TypeError, KeyError) as exc:
+        logger.debug("Failed to derive structural tags from dict: %s", exc)
+        return []
 
 # Simple placeholder SVG for profiles without images (coffee bean icon)
 PLACEHOLDER_SVG = b'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256">
@@ -1704,7 +1888,8 @@ async def list_machine_profiles(request: Request):
                     "final_weight": getattr(full_profile, 'final_weight', getattr(partial_profile, 'final_weight', None)),
                     "in_history": in_history,
                     "has_description": False,
-                    "description": None
+                    "description": None,
+                    "derived_tags": _derive_structural_tags(full_profile),
                 }
                 stages = getattr(full_profile, 'stages', None)
                 variables = getattr(full_profile, 'variables', None)
@@ -1749,6 +1934,7 @@ async def list_machine_profiles(request: Request):
                     "has_description": False,
                     "description": None,
                     "user_preferences": None,
+                    "derived_tags": _derive_structural_tags(partial_profile),
                 }
                 profiles.append(profile_dict)
         
@@ -1789,6 +1975,7 @@ async def list_machine_profiles(request: Request):
                     "in_history": True,
                     "has_description": bool(entry.get("reply")),
                     "user_preferences": entry.get("user_preferences"),
+                    "derived_tags": _derive_structural_tags_from_dict(pj) if pj else [],
                 })
             return {
                 "status": "success",

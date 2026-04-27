@@ -45,6 +45,18 @@ export const PRESET_TAGS = [
   { label: 'Medium temp (88–90°C)', category: 'temperature' },
   { label: 'High temp (91–93°C)', category: 'temperature' },
   { label: 'Very high temp (94°C+)', category: 'temperature' },
+  // Weight range tags
+  { label: 'Ristretto (≤35g)', category: 'weight' },
+  { label: 'Normale (36–44g)', category: 'weight' },
+  { label: 'Lungo (45–54g)', category: 'weight' },
+  { label: 'Allongé (55g+)', category: 'weight' },
+  // Pressure range tags
+  { label: 'Low pressure (≤4 bar)', category: 'pressure' },
+  { label: 'Medium pressure (5–7 bar)', category: 'pressure' },
+  { label: 'Standard pressure (8–9 bar)', category: 'pressure' },
+  { label: 'High pressure (10+ bar)', category: 'pressure' },
+  // Structural tags
+  { label: 'Adaptive', category: 'technique' },
 ] as const
 
 export type TagCategory = typeof PRESET_TAGS[number]['category']
@@ -63,6 +75,8 @@ export const CATEGORY_COLORS: Record<TagCategory, string> = {
   process: 'tag-process',
   technique: 'tag-technique',
   temperature: 'tag-temperature',
+  weight: 'tag-weight',
+  pressure: 'tag-pressure',
 }
 
 export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
@@ -76,6 +90,8 @@ export const CATEGORY_COLORS_SELECTED: Record<TagCategory, string> = {
   process: 'tag-process-selected text-white shadow-sm',
   technique: 'tag-technique-selected text-white shadow-sm',
   temperature: 'tag-temperature-selected text-white shadow-sm',
+  weight: 'tag-weight-selected text-white shadow-sm',
+  pressure: 'tag-pressure-selected text-white shadow-sm',
 }
 
 // Get category for a tag label
@@ -133,10 +149,10 @@ export function getMatchReasonColorClass(reason: string): string {
   if (lower.includes('temp')) return 'tag-temperature'
 
   // Weight reasons
-  if (lower.startsWith('target weight')) return 'tag-extraction'
+  if (lower.startsWith('target weight') || lower.includes('ristretto') || lower.includes('normale') || lower.includes('lungo') || lower.includes('allongé')) return 'tag-weight'
 
   // Pressure reasons
-  if (lower.startsWith('peak pressure')) return 'tag-process'
+  if (lower.startsWith('peak pressure') || lower.includes('pressure (')) return 'tag-pressure'
 
   // "Matching:" prefix — try to detect the category from the first matched tag
   if (lower.startsWith('matching:')) {
