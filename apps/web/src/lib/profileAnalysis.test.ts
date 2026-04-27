@@ -10,6 +10,8 @@ import {
   extractFingerprint,
   extractNameTags,
   temperatureRange,
+  weightRange,
+  pressureRange,
   deriveStructuralTags,
   type AnalyzableProfile,
   type ProfileStage,
@@ -313,6 +315,8 @@ describe('deriveStructuralTags', () => {
     expect(tags).toContain('Pre-infusion')
     expect(tags).toContain('Ramp')
     expect(tags).toContain('High temp (91–93°C)')
+    expect(tags).toContain('Normale (36–44g)')
+    expect(tags).toContain('Standard pressure (8–9 bar)')
   })
 
   it('derives flow-controlled + bloom + pre-infusion for flow profile', () => {
@@ -321,6 +325,7 @@ describe('deriveStructuralTags', () => {
     expect(tags).toContain('Bloom')
     expect(tags).toContain('Pre-infusion')
     expect(tags).toContain('Medium temp (88–90°C)')
+    expect(tags).toContain('Normale (36–44g)')
   })
 
   it('derives flat profile + pressure-controlled for flat profile', () => {
@@ -328,6 +333,8 @@ describe('deriveStructuralTags', () => {
     expect(tags).toContain('Flat profile')
     expect(tags).toContain('Pressure-controlled')
     expect(tags).toContain('High temp (91–93°C)')
+    expect(tags).toContain('Normale (36–44g)')
+    expect(tags).toContain('Medium pressure (5–7 bar)')
   })
 
   it('derives turbo + flow-controlled + very high temp for turbo profile', () => {
@@ -335,6 +342,7 @@ describe('deriveStructuralTags', () => {
     expect(tags).toContain('Turbo')
     expect(tags).toContain('Flow-controlled')
     expect(tags).toContain('Very high temp (94°C+)')
+    expect(tags).toContain('Ristretto (≤35g)')
   })
 
   it('derives decline + pressure-controlled for lever profile', () => {
@@ -343,34 +351,54 @@ describe('deriveStructuralTags', () => {
     expect(tags).toContain('Pressure-controlled')
     expect(tags).toContain('Pre-infusion')
     expect(tags).toContain('High temp (91–93°C)')
-    // Note: "Lever" is in profile NAME (extractNameTags), not stage names (extractFingerprint)
+    expect(tags).toContain('Normale (36–44g)')
+    expect(tags).toContain('Standard pressure (8–9 bar)')
   })
 
   it('returns only flat tag for explicitly empty stages array (no temperature)', () => {
     const profile: AnalyzableProfile = { name: 'Empty', stages: [] }
     const tags = deriveStructuralTags(profile)
-    // Explicit empty stages: isFlat stays true (initial value), no temperature
     expect(tags).toEqual(['Flat profile'])
   })
 
-  it('includes flat + temperature tag when stages is empty array with temperature', () => {
-    const profile: AnalyzableProfile = { name: 'Bare', stages: [], temperature: 90 }
+  it('includes flat + temperature + weight tag when stages is empty array', () => {
+    const profile: AnalyzableProfile = { name: 'Bare', stages: [], temperature: 90, final_weight: 40 }
     const tags = deriveStructuralTags(profile)
-    expect(tags).toEqual(['Flat profile', 'Medium temp (88–90°C)'])
+    expect(tags).toContain('Flat profile')
+    expect(tags).toContain('Medium temp (88–90°C)')
+    expect(tags).toContain('Normale (36–44g)')
   })
 
-  it('returns empty tags when stages is undefined and no temperature (partial profile)', () => {
+  it('returns empty tags when stages is undefined and no data (partial profile)', () => {
     const profile: AnalyzableProfile = { name: 'Partial' }
     const tags = deriveStructuralTags(profile)
-    // No stages data → cannot determine techniques; no temperature → no tags
     expect(tags).toEqual([])
   })
 
-  it('returns only temperature tag when stages is undefined but temperature is set', () => {
-    const profile: AnalyzableProfile = { name: 'Partial', temperature: 94 }
+  it('returns temp + weight tags for partial profile', () => {
+    const profile: AnalyzableProfile = { name: 'Partial', temperature: 94, final_weight: 50 }
     const tags = deriveStructuralTags(profile)
-    // Partial profile from list endpoint: only temperature tag
-    expect(tags).toEqual(['Very high temp (94°C+)'])
+    expect(tags).toContain('Very high temp (94°C+)')
+    expect(tags).toContain('Lungo (45–54g)')
+  })
+
+  it('name-based bloom fallback for partial profile', () => {
+    const profile: AnalyzableProfile = { name: 'Ramp Bloom Special', temperature: 90 }
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Bloom')
+    expect(tags).toContain('Medium temp (88–90°C)')
+  })
+
+  it('name-based pre-infusion fallback for partial profile', () => {
+    const profile: AnalyzableProfile = { name: 'Slow Preinfusion for High Extraction', temperature: 90 }
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Pre-infusion')
+  })
+
+  it('name-based soak fallback for partial profile', () => {
+    const profile: AnalyzableProfile = { name: 'Long Soak Profile' }
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Bloom')
   })
 
   it('returns sorted array', () => {
@@ -403,6 +431,167 @@ describe('deriveStructuralTags', () => {
     const tags = deriveStructuralTags(profile)
     expect(tags).toContain('Pulse')
     expect(tags).toContain('Pressure-controlled')
+  })
+
+  // ── Structural bloom detection ──
+  it('detects bloom from zero-flow stage with time exit', () => {
+    const bloomStage: ProfileStage = {
+      name: 'Stage 1',
+      type: 'flow',
+      dynamics: { points: [[0, 0.0], [300, 0.0]], over: 'time', interpolation: 'linear' },
+      exit_triggers: [{ type: 'time', value: 300, relative: true, comparison: '>=' }],
+    }
+    const extractionStage = makeStage('Stage 2', 'flow', [[0, 2.5], [20, 2.0]])
+    const profile = makeProfile('No Bloom In Name', [bloomStage, extractionStage], 90)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Bloom')
+  })
+
+  it('detects bloom from low-power stage with time exit', () => {
+    const bloomStage: ProfileStage = {
+      name: 'Stage 1',
+      type: 'power',
+      dynamics: { points: [[0, 0], [30, 0]], over: 'time', interpolation: 'linear' },
+      exit_triggers: [{ type: 'time', value: 30, relative: true, comparison: '>=' }],
+    }
+    const extractionStage = makeStage('Stage 2', 'pressure', [[0, 6], [20, 6]])
+    const profile = makeProfile('No Bloom Name', [bloomStage, extractionStage], 88)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Bloom')
+  })
+
+  // ── Structural pre-infusion detection ──
+  it('detects pre-infusion from power-type first stage', () => {
+    const fillStage: ProfileStage = {
+      name: 'Fill',
+      type: 'power',
+      dynamics: { points: [[0, 100]], over: 'time', interpolation: 'linear' },
+      exit_triggers: [{ type: 'pressure', value: 1.0, relative: false, comparison: '>=' }],
+    }
+    const extractionStage = makeStage('Extract', 'pressure', [[0, 9], [20, 9]])
+    const profile = makeProfile('No PI Name', [fillStage, extractionStage], 88)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Pre-infusion')
+  })
+
+  it('detects pre-infusion from low-pressure first stage', () => {
+    const piStage = makeStage('Stage 1', 'pressure', [[0, 2], [5, 3]])
+    const mainStage = makeStage('Stage 2', 'pressure', [[0, 9], [20, 8]])
+    const profile = makeProfile('No PI Name', [piStage, mainStage], 90)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Pre-infusion')
+  })
+
+  it('detects pre-infusion from low-flow first stage', () => {
+    const piStage = makeStage('Stage 1', 'flow', [[0, 1.5], [5, 1.5]])
+    const mainStage = makeStage('Stage 2', 'pressure', [[0, 9], [20, 8]])
+    const profile = makeProfile('No PI Name', [piStage, mainStage], 90)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Pre-infusion')
+  })
+
+  it('does not detect pre-infusion when first stage has high pressure', () => {
+    const mainStage = makeStage('Stage 1', 'pressure', [[0, 9], [20, 8]])
+    const secondStage = makeStage('Stage 2', 'pressure', [[0, 6], [10, 6]])
+    const profile = makeProfile('High Start', [mainStage, secondStage], 90)
+    const tags = deriveStructuralTags(profile)
+    expect(tags).not.toContain('Pre-infusion')
+  })
+
+  // ── Adaptive detection ──
+  it('detects adaptive tag from $variable in dynamics', () => {
+    const adaptiveStage: ProfileStage = {
+      name: 'Hold',
+      type: 'flow',
+      dynamics: { points: [[0, '$flow_Hold_Rate']], over: 'time', interpolation: 'curve' },
+    }
+    const profile: AnalyzableProfile = {
+      name: 'Adaptive Test',
+      stages: [adaptiveStage],
+      temperature: 88,
+    }
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Adaptive')
+  })
+
+  it('detects adaptive tag from $variable in limits', () => {
+    const stage: ProfileStage = {
+      name: 'Ramp',
+      type: 'flow',
+      dynamics: { points: [[0, 8], [20, 8]], over: 'time', interpolation: 'curve' },
+      limits: [{ type: 'pressure', value: '$pressure_Peak' }],
+    }
+    const profile: AnalyzableProfile = { name: 'Var Limit', stages: [stage], temperature: 88 }
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Adaptive')
+  })
+
+  it('detects adaptive tag from $variable in exit_triggers', () => {
+    const stage: ProfileStage = {
+      name: 'Fill',
+      type: 'power',
+      dynamics: { points: [[0, 100]], over: 'time', interpolation: 'linear' },
+      exit_triggers: [{ type: 'pressure', value: '$pressure_1', relative: false, comparison: '>=' }],
+    }
+    const secondStage = makeStage('Extract', 'pressure', [[0, 9], [20, 9]])
+    const profile: AnalyzableProfile = { name: 'Var Exit', stages: [stage, secondStage], temperature: 84 }
+    const tags = deriveStructuralTags(profile)
+    expect(tags).toContain('Adaptive')
+    expect(tags).toContain('Pre-infusion')
+  })
+
+  it('does not detect adaptive for profiles without $variables', () => {
+    const tags = deriveStructuralTags(PRESSURE_PROFILE)
+    expect(tags).not.toContain('Adaptive')
+  })
+})
+
+// ── weightRange tests ─────────────────────────────────────────────────────
+
+describe('weightRange', () => {
+  it('maps ≤35g to Ristretto', () => {
+    expect(weightRange(20)).toBe('Ristretto (≤35g)')
+    expect(weightRange(35)).toBe('Ristretto (≤35g)')
+  })
+
+  it('maps 36-44g to Normale', () => {
+    expect(weightRange(36)).toBe('Normale (36–44g)')
+    expect(weightRange(44)).toBe('Normale (36–44g)')
+  })
+
+  it('maps 45-54g to Lungo', () => {
+    expect(weightRange(45)).toBe('Lungo (45–54g)')
+    expect(weightRange(54)).toBe('Lungo (45–54g)')
+  })
+
+  it('maps 55g+ to Allongé', () => {
+    expect(weightRange(55)).toBe('Allongé (55g+)')
+    expect(weightRange(100)).toBe('Allongé (55g+)')
+    expect(weightRange(300)).toBe('Allongé (55g+)')
+  })
+})
+
+// ── pressureRange tests ───────────────────────────────────────────────────
+
+describe('pressureRange', () => {
+  it('maps ≤4 bar to Low', () => {
+    expect(pressureRange(2)).toBe('Low pressure (≤4 bar)')
+    expect(pressureRange(4)).toBe('Low pressure (≤4 bar)')
+  })
+
+  it('maps 5-7 bar to Medium', () => {
+    expect(pressureRange(5)).toBe('Medium pressure (5–7 bar)')
+    expect(pressureRange(7)).toBe('Medium pressure (5–7 bar)')
+  })
+
+  it('maps 8-9 bar to Standard', () => {
+    expect(pressureRange(8)).toBe('Standard pressure (8–9 bar)')
+    expect(pressureRange(9)).toBe('Standard pressure (8–9 bar)')
+  })
+
+  it('maps 10+ bar to High', () => {
+    expect(pressureRange(10)).toBe('High pressure (10+ bar)')
+    expect(pressureRange(12)).toBe('High pressure (10+ bar)')
   })
 })
 

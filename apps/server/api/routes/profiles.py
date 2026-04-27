@@ -84,6 +84,28 @@ def _temperature_range(temp: float) -> str:
     return "Very high temp (94°C+)"
 
 
+def _weight_range(weight: float) -> str:
+    """Map target weight (grams) to an espresso size label matching TypeScript weightRange()."""
+    if weight <= 35:
+        return "Ristretto (\u226435g)"
+    if weight <= 44:
+        return "Normale (36\u201344g)"
+    if weight <= 54:
+        return "Lungo (45\u201354g)"
+    return "Allong\u00e9 (55g+)"
+
+
+def _pressure_range(pressure: float) -> str:
+    """Map peak pressure (bar) to a range label matching TypeScript pressureRange()."""
+    if pressure <= 4:
+        return "Low pressure (\u22644 bar)"
+    if pressure <= 7:
+        return "Medium pressure (5\u20137 bar)"
+    if pressure <= 9:
+        return "Standard pressure (8\u20139 bar)"
+    return "High pressure (10+ bar)"
+
+
 def _derive_structural_tags(profile_obj: object) -> list[str]:
     """Derive user-facing structural tags from a profile object using extract_fingerprint.
 
@@ -108,6 +130,86 @@ def _derive_structural_tags(profile_obj: object) -> list[str]:
             tags.add(_temperature_range(float(temp)))
         except (TypeError, ValueError):
             pass
+
+    final_weight = fp.get("final_weight")
+    if final_weight is not None:
+        try:
+            tags.add(_weight_range(float(final_weight)))
+        except (TypeError, ValueError):
+            pass
+
+    peak_pressure = fp.get("peak_pressure", 0)
+    try:
+        pp = float(peak_pressure)
+        if pp > 0:
+            tags.add(_pressure_range(pp))
+    except (TypeError, ValueError):
+        pass
+
+    # Adaptive detection: check for $variable references in stages
+    stages = getattr(profile_obj, "stages", None) or []
+    is_adaptive = False
+    for stage in stages:
+        dynamics = getattr(stage, "dynamics", None)
+        if dynamics:
+            for point in getattr(dynamics, "points", []) or []:
+                if len(point) >= 2:
+                    if isinstance(point[0], str) and point[0].startswith("$"):
+                        is_adaptive = True
+                    if isinstance(point[1], str) and point[1].startswith("$"):
+                        is_adaptive = True
+        for limit_obj in getattr(stage, "limits", []) or []:
+            val = getattr(limit_obj, "value", None)
+            if isinstance(val, str) and val.startswith("$"):
+                is_adaptive = True
+        for exit_obj in getattr(stage, "exit_triggers", []) or []:
+            val = getattr(exit_obj, "value", None)
+            if isinstance(val, str) and val.startswith("$"):
+                is_adaptive = True
+    if is_adaptive:
+        tags.add("Adaptive")
+
+    # Structural bloom detection (content-based)
+    if "Bloom" not in tags:
+        for stage in stages:
+            stype = (getattr(stage, "type", "") or "").lower()
+            dynamics = getattr(stage, "dynamics", None)
+            pts = getattr(dynamics, "points", []) or [] if dynamics else []
+            exits = getattr(stage, "exit_triggers", []) or []
+            has_time_exit = any((getattr(e, "type", "") or "").lower() == "time" for e in exits)
+            if stype == "flow" and has_time_exit and pts:
+                try:
+                    y_vals = [abs(float(p[1])) for p in pts if len(p) >= 2 and not (isinstance(p[1], str) and p[1].startswith("$"))]
+                    if y_vals and all(v <= 0.1 for v in y_vals):
+                        tags.add("Bloom")
+                        break
+                except (TypeError, ValueError):
+                    pass
+            if stype == "power" and has_time_exit and pts:
+                try:
+                    y_vals = [abs(float(p[1])) for p in pts if len(p) >= 2 and not (isinstance(p[1], str) and p[1].startswith("$"))]
+                    if y_vals and all(v <= 5 for v in y_vals):
+                        tags.add("Bloom")
+                        break
+                except (TypeError, ValueError):
+                    pass
+
+    # Structural pre-infusion detection (content-based)
+    if "Pre-infusion" not in tags and len(stages) >= 2:
+        first = stages[0]
+        ftype = (getattr(first, "type", "") or "").lower()
+        if ftype == "power":
+            tags.add("Pre-infusion")
+        else:
+            dynamics = getattr(first, "dynamics", None)
+            pts = getattr(dynamics, "points", []) or [] if dynamics else []
+            try:
+                y_vals = [float(p[1]) for p in pts if len(p) >= 2 and not (isinstance(p[1], str) and p[1].startswith("$"))]
+                max_y = max(y_vals) if y_vals else float("inf")
+                if (ftype == "pressure" and max_y <= 4) or (ftype == "flow" and max_y <= 2):
+                    tags.add("Pre-infusion")
+            except (TypeError, ValueError):
+                pass
 
     return sorted(tags)
 

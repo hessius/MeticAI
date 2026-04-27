@@ -265,6 +265,8 @@ function buildUserFingerprint(
     hasPulse: techniqueTags.has('pulse'),
     isFlat: techniqueTags.has('flat'),
     peakPressure: 0,
+    maxFlow: 0,
+    isAdaptive: false,
     stageCount,
     techniqueTags,
     temperature: null,

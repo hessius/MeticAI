@@ -41,6 +41,8 @@ export interface ProfileFingerprint {
   hasPulse: boolean
   isFlat: boolean
   peakPressure: number
+  maxFlow: number
+  isAdaptive: boolean
   stageCount: number
   techniqueTags: Set<string>
   temperature: number | null
@@ -76,24 +78,29 @@ export function extractFingerprint(profile: AnalyzableProfile): ProfileFingerpri
 
   const stageTypes: string[] = []
   let peakPressure = 0
+  let maxFlow = 0
   let hasPreinfusion = false
   let hasBloom = false
   let hasPulse = false
   let isFlat = true
+  let isAdaptive = false
   const techniqueTags = new Set<string>()
+
+  /** Check if a value is a $variable reference */
+  const isVarRef = (v: unknown): boolean => typeof v === 'string' && v.startsWith('$')
 
   for (const stage of stages) {
     const stype = (stage.type ?? '').toLowerCase()
     stageTypes.push(stype)
     const sname = (stage.name ?? '').toLowerCase()
 
-    // Preinfusion detection
+    // Preinfusion detection (name-based)
     if (sname.includes('preinfusion') || sname.includes('pre-infusion') || sname.includes('pre infusion')) {
       hasPreinfusion = true
       techniqueTags.add('preinfusion')
     }
 
-    // Bloom detection
+    // Bloom detection (name-based)
     if (sname.includes('bloom') || sname.includes('soak')) {
       hasBloom = true
       techniqueTags.add('bloom')
@@ -105,15 +112,21 @@ export function extractFingerprint(profile: AnalyzableProfile): ProfileFingerpri
       techniqueTags.add('pulse')
     }
 
-    // Extract peak pressure from dynamics points
+    // Extract peak pressure and max flow from dynamics points
     const dynamics = stage.dynamics
     if (dynamics) {
       const points = dynamics.points ?? []
       for (const point of points) {
         if (Array.isArray(point) && point.length >= 2) {
+          // Check for $variable references → adaptive
+          if (isVarRef(point[0]) || isVarRef(point[1])) {
+            isAdaptive = true
+            continue
+          }
           const yVal = Number(point[1])
-          if (!isNaN(yVal) && stype === 'pressure' && yVal > peakPressure) {
-            peakPressure = yVal
+          if (!isNaN(yVal)) {
+            if (stype === 'pressure' && yVal > peakPressure) peakPressure = yVal
+            if (stype === 'flow' && yVal > maxFlow) maxFlow = yVal
           }
         }
       }
@@ -122,7 +135,7 @@ export function extractFingerprint(profile: AnalyzableProfile): ProfileFingerpri
       if (points.length >= 2) {
         const yValues: number[] = []
         for (const p of points) {
-          if (Array.isArray(p) && p.length >= 2) {
+          if (Array.isArray(p) && p.length >= 2 && !isVarRef(p[1])) {
             const val = Number(p[1])
             if (!isNaN(val)) yValues.push(val)
           }
@@ -136,9 +149,10 @@ export function extractFingerprint(profile: AnalyzableProfile): ProfileFingerpri
       }
     }
 
-    // Extract pressure limits
+    // Extract pressure limits (also check for variable refs)
     const limits = stage.limits ?? []
     for (const limitObj of limits) {
+      if (isVarRef(limitObj.value)) { isAdaptive = true; continue }
       const ltype = (limitObj.type ?? '').toLowerCase()
       const lval = limitObj.value
       if (ltype === 'pressure' && lval != null) {
@@ -149,10 +163,77 @@ export function extractFingerprint(profile: AnalyzableProfile): ProfileFingerpri
       }
     }
 
+    // Check exit triggers for variable refs
+    const exits = stage.exit_triggers ?? []
+    for (const ex of exits) {
+      if (isVarRef(ex.value)) { isAdaptive = true }
+    }
+
     // Stage name technique keywords
     for (const kw of ['lever', 'turbo', 'ramp', 'decline', 'taper']) {
       if (sname.includes(kw)) {
         techniqueTags.add(kw)
+      }
+    }
+  }
+
+  // ── Structural bloom detection (content-based, not name-based) ──
+  // A stage with all dynamics points at near-zero flow/pressure AND a time-based exit
+  if (!hasBloom) {
+    for (const stage of stages) {
+      const stype = (stage.type ?? '').toLowerCase()
+      const pts = stage.dynamics?.points ?? []
+      const exits = stage.exit_triggers ?? []
+      const hasTimeExit = exits.some(e => (e.type ?? '').toLowerCase() === 'time')
+
+      // Zero/near-zero flow stage with time exit = bloom/soak
+      if (stype === 'flow' && hasTimeExit && pts.length > 0) {
+        const yVals = pts
+          .filter(p => Array.isArray(p) && p.length >= 2 && !isVarRef(p[1]))
+          .map(p => Math.abs(Number(p[1])))
+          .filter(v => !isNaN(v))
+        if (yVals.length > 0 && yVals.every(v => v <= 0.1)) {
+          hasBloom = true
+          techniqueTags.add('bloom')
+          break
+        }
+      }
+      // Power stage with power ≤ 5 (near-zero pump) and time exit = bloom
+      if (stype === 'power' && hasTimeExit && pts.length > 0) {
+        const yVals = pts
+          .filter(p => Array.isArray(p) && p.length >= 2 && !isVarRef(p[1]))
+          .map(p => Math.abs(Number(p[1])))
+          .filter(v => !isNaN(v))
+        if (yVals.length > 0 && yVals.every(v => v <= 5)) {
+          hasBloom = true
+          techniqueTags.add('bloom')
+          break
+        }
+      }
+    }
+  }
+
+  // ── Structural pre-infusion detection (content-based) ──
+  // First stage(s) with low pressure/flow or power-type pump fill, before higher-energy stages
+  if (!hasPreinfusion && stages.length >= 2) {
+    const first = stages[0]
+    const ftype = (first.type ?? '').toLowerCase()
+
+    // Power-type first stage = pump fill pre-infusion
+    if (ftype === 'power') {
+      hasPreinfusion = true
+      techniqueTags.add('preinfusion')
+    } else {
+      const pts = first.dynamics?.points ?? []
+      const yVals = pts
+        .filter(p => Array.isArray(p) && p.length >= 2 && !isVarRef(p[1]))
+        .map(p => Number(p[1]))
+        .filter(v => !isNaN(v))
+      const maxY = yVals.length > 0 ? Math.max(...yVals) : Infinity
+      // Low pressure first stage (≤ 4 bar) or low flow first stage (≤ 2 ml/s)
+      if ((ftype === 'pressure' && maxY <= 4) || (ftype === 'flow' && maxY <= 2)) {
+        hasPreinfusion = true
+        techniqueTags.add('preinfusion')
       }
     }
   }
@@ -194,6 +275,8 @@ export function extractFingerprint(profile: AnalyzableProfile): ProfileFingerpri
     hasPulse,
     isFlat: isFlat && stages.length <= 2,
     peakPressure: Math.round(peakPressure * 10) / 10,
+    maxFlow: Math.round(maxFlow * 10) / 10,
+    isAdaptive,
     stageCount: stages.length,
     techniqueTags,
     temperature,
@@ -244,6 +327,30 @@ export function temperatureRange(temp: number): string {
   return 'Very high temp (94°C+)'
 }
 
+// ── Weight range grouping ──────────────────────────────────────────────────
+
+/**
+ * Map a target weight (grams) to an espresso size label.
+ */
+export function weightRange(weight: number): string {
+  if (weight <= 35) return 'Ristretto (≤35g)'
+  if (weight <= 44) return 'Normale (36–44g)'
+  if (weight <= 54) return 'Lungo (45–54g)'
+  return 'Allongé (55g+)'
+}
+
+// ── Pressure range grouping ────────────────────────────────────────────────
+
+/**
+ * Map peak pressure (bar) to a human-readable range label.
+ */
+export function pressureRange(pressure: number): string {
+  if (pressure <= 4) return 'Low pressure (≤4 bar)'
+  if (pressure <= 7) return 'Medium pressure (5–7 bar)'
+  if (pressure <= 9) return 'Standard pressure (8–9 bar)'
+  return 'High pressure (10+ bar)'
+}
+
 // ── Structural tag derivation ──────────────────────────────────────────────
 
 /** Map internal fingerprint technique tags to PRESET_TAG labels. */
@@ -264,30 +371,52 @@ const TECHNIQUE_TO_LABEL: Record<string, string> = {
 
 /**
  * Derive user-facing structural tags from a profile's stage data.
- * Returns sorted PRESET_TAG labels (e.g. "Bloom", "Flow-controlled", "High temp (91–93°C)").
+ * Returns sorted PRESET_TAG labels.
  * Pure function — no side effects, no caching.
  *
  * When `profile.stages` is `undefined` (e.g. partial data from a list endpoint),
- * only temperature tags are derived. When `stages` is an explicit empty array `[]`,
- * the profile is treated as flat (intentionally empty).
+ * only temperature and weight tags are derived, plus name-based bloom/pre-infusion
+ * fallback. When `stages` is present, full fingerprint analysis runs.
  */
 export function deriveStructuralTags(profile: AnalyzableProfile): string[] {
   const tags = new Set<string>()
 
-  // Only run fingerprint/technique analysis when stage data is available.
-  // Without stages we can't determine control mode, techniques, or flatness.
   if (profile.stages !== undefined) {
+    // Full fingerprint analysis — stages available
     const fp = extractFingerprint(profile)
+
+    // Technique tags (bloom, pre-infusion, pulse, control mode, etc.)
     for (const tt of fp.techniqueTags) {
       const label = TECHNIQUE_TO_LABEL[tt]
       if (label) tags.add(label)
     }
+
+    // Pressure range (from peak pressure across all stages)
+    if (fp.peakPressure > 0) {
+      tags.add(pressureRange(fp.peakPressure))
+    }
+
+    // Adaptive/parametric profile
+    if (fp.isAdaptive) {
+      tags.add('Adaptive')
+    }
+  } else {
+    // Partial profile — name-based fallback for bloom/pre-infusion
+    const name = (profile.name ?? '').toLowerCase()
+    if (name.includes('bloom') || name.includes('soak')) tags.add('Bloom')
+    if (name.includes('preinfusion') || name.includes('pre-infusion') || name.includes('pre infusion')) tags.add('Pre-infusion')
   }
 
-  // Temperature can come from the profile directly (available even in list responses)
+  // Temperature — available even in partial profiles
   const temp = profile.temperature
   if (temp != null) {
     tags.add(temperatureRange(temp))
+  }
+
+  // Weight range — available even in partial profiles
+  const weight = profile.final_weight
+  if (weight != null) {
+    tags.add(weightRange(weight))
   }
 
   return [...tags].sort()
