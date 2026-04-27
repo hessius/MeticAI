@@ -266,18 +266,28 @@ const TECHNIQUE_TO_LABEL: Record<string, string> = {
  * Derive user-facing structural tags from a profile's stage data.
  * Returns sorted PRESET_TAG labels (e.g. "Bloom", "Flow-controlled", "High temp (91–93°C)").
  * Pure function — no side effects, no caching.
+ *
+ * When `profile.stages` is `undefined` (e.g. partial data from a list endpoint),
+ * only temperature tags are derived. When `stages` is an explicit empty array `[]`,
+ * the profile is treated as flat (intentionally empty).
  */
 export function deriveStructuralTags(profile: AnalyzableProfile): string[] {
-  const fp = extractFingerprint(profile)
   const tags = new Set<string>()
 
-  for (const tt of fp.techniqueTags) {
-    const label = TECHNIQUE_TO_LABEL[tt]
-    if (label) tags.add(label)
+  // Only run fingerprint/technique analysis when stage data is available.
+  // Without stages we can't determine control mode, techniques, or flatness.
+  if (profile.stages !== undefined) {
+    const fp = extractFingerprint(profile)
+    for (const tt of fp.techniqueTags) {
+      const label = TECHNIQUE_TO_LABEL[tt]
+      if (label) tags.add(label)
+    }
   }
 
-  if (fp.temperature != null) {
-    tags.add(temperatureRange(fp.temperature))
+  // Temperature can come from the profile directly (available even in list responses)
+  const temp = profile.temperature
+  if (temp != null) {
+    tags.add(temperatureRange(temp))
   }
 
   return [...tags].sort()

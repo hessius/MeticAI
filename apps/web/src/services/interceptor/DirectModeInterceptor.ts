@@ -46,9 +46,7 @@ export function installDirectModeInterceptor(): void {
         ...p,
         in_history: true,
         has_description: !!(p.display?.description || p.display?.shortDescription),
-        derived_tags: ('stages' in p)
-          ? deriveStructuralTags(p as AnalyzableProfile)
-          : [],
+        derived_tags: deriveStructuralTags(p as AnalyzableProfile),
       }))
     }
     try { localStorage.setItem(PROFILE_LIST_CACHE_KEY, JSON.stringify(result)) } catch { /* ignore */ }

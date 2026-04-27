@@ -346,17 +346,31 @@ describe('deriveStructuralTags', () => {
     // Note: "Lever" is in profile NAME (extractNameTags), not stage names (extractFingerprint)
   })
 
-  it('returns only flat tag for empty profile (no stages, no temperature)', () => {
+  it('returns only flat tag for explicitly empty stages array (no temperature)', () => {
     const profile: AnalyzableProfile = { name: 'Empty', stages: [] }
     const tags = deriveStructuralTags(profile)
-    // 0 stages: isFlat stays true (initial value), no temperature
+    // Explicit empty stages: isFlat stays true (initial value), no temperature
     expect(tags).toEqual(['Flat profile'])
   })
 
-  it('includes flat + temperature tag when profile has no stages but has temperature', () => {
+  it('includes flat + temperature tag when stages is empty array with temperature', () => {
     const profile: AnalyzableProfile = { name: 'Bare', stages: [], temperature: 90 }
     const tags = deriveStructuralTags(profile)
     expect(tags).toEqual(['Flat profile', 'Medium temp (88–90°C)'])
+  })
+
+  it('returns empty tags when stages is undefined and no temperature (partial profile)', () => {
+    const profile: AnalyzableProfile = { name: 'Partial' }
+    const tags = deriveStructuralTags(profile)
+    // No stages data → cannot determine techniques; no temperature → no tags
+    expect(tags).toEqual([])
+  })
+
+  it('returns only temperature tag when stages is undefined but temperature is set', () => {
+    const profile: AnalyzableProfile = { name: 'Partial', temperature: 94 }
+    const tags = deriveStructuralTags(profile)
+    // Partial profile from list endpoint: only temperature tag
+    expect(tags).toEqual(['Very high temp (94°C+)'])
   })
 
   it('returns sorted array', () => {
