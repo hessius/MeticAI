@@ -26,3 +26,4 @@ export {
   initializeStorage,
 } from './AppDatabase'
 export { useStorageMigration } from './useStorageMigration'
+export { capacitorStorage } from './CapacitorStorage'

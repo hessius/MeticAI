@@ -29,6 +29,11 @@ import { getServerUrl } from '@/lib/config'
 import { hasFeature } from '@/lib/featureFlags'
 import { format, addMinutes } from 'date-fns'
 import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
+import {
+  canCancelScheduledShot,
+  getSchedulePreheatInfo,
+  shouldScheduleProfileAfterPreheat,
+} from './RunShotView.helpers'
 
 interface MachineProfile {
   id: string
@@ -75,6 +80,7 @@ const PREHEAT_DURATION_MINUTES = 10
 
 export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName }: RunShotViewProps) {
   const { t } = useTranslation()
+  const scheduledShotsEnabled = hasFeature('scheduledShots')
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
       ? { id: initialProfileId, name: initialProfileName } 
@@ -161,7 +167,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       }
     }
     fetchProfiles()
-  }, [])
+  }, [initialProfileId, t])
 
   // Derive profile variables from the selected profile data (already fetched
   // in the profile list). Synthesise final_weight / temperature entries when
@@ -238,6 +244,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
 
   // Fetch recurring schedules
   useEffect(() => {
+    if (!scheduledShotsEnabled) return
+
     const fetchRecurringSchedules = async () => {
       try {
         const serverUrl = await getServerUrl()
@@ -251,7 +259,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       }
     }
     fetchRecurringSchedules()
-  }, [])
+  }, [scheduledShotsEnabled])
 
   const handleRunNow = async () => {
     if (!selectedProfile && !preheat) {
@@ -302,14 +310,18 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           preheatTimeoutRef.current = null
         }, PREHEAT_DURATION_MINUTES * 60 * 1000)
         
-        if (selectedProfile) {
+        const profileToSchedule = selectedProfile
+        if (profileToSchedule && shouldScheduleProfileAfterPreheat({
+          scheduledShotsEnabled,
+          hasSelectedProfile: true,
+        })) {
           // Schedule the profile to run after preheat
           const shotTime = addMinutes(new Date(), PREHEAT_DURATION_MINUTES)
           const scheduleResponse = await fetch(`${serverUrl}/api/machine/schedule-shot`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              profile_id: selectedProfile.id,
+              profile_id: profileToSchedule.id,
               scheduled_time: shotTime.toISOString(),
               preheat: false // Already preheating
             })
@@ -326,7 +338,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             throw new Error(errorMessage)
           }
 
-          toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
+          toast.success(t('runShot.toasts.profileWillRun', { name: profileToSchedule.name }))
 
           // Stay on this view — only navigate to live on actual shot start
         }
@@ -469,6 +481,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }, [saveModeNewName, t])
 
   const handleSchedule = async () => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     if (!selectedProfile && !preheat) {
       toast.error(t('runShot.selectProfileOrPreheat'))
       return
@@ -507,7 +524,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       const data = await response.json()
       setScheduledShots(prev => [...prev, data.scheduled_shot])
       
-      const preheatInfo = preheat ? ` (preheat starts ${PREHEAT_DURATION_MINUTES} min before)` : ''
+      const preheatInfo = getSchedulePreheatInfo({ preheat, minutes: PREHEAT_DURATION_MINUTES, t })
       toast.success(t('runShot.toasts.shotScheduled', { time: format(scheduledTime, 'HH:mm'), preheatInfo }))
       setScheduleMode(false)
     } catch (err) {
@@ -519,6 +536,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleCancelScheduled = async (scheduleId: string) => {
+    if (!canCancelScheduledShot({ scheduledShotsEnabled })) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/schedule-shot/${scheduleId}`, {
@@ -548,6 +570,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleSaveRecurring = async () => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     try {
       const serverUrl = await getServerUrl()
       
@@ -608,6 +635,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleDeleteRecurring = async (scheduleId: string) => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     if (!confirm(t('runShot.deleteScheduleConfirm'))) return
     
     try {
@@ -627,6 +659,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleToggleRecurring = async (schedule: RecurringSchedule) => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/recurring-schedules/${schedule.id}`, {
@@ -857,7 +894,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         </div>
 
         {/* Schedule Toggle */}
-        {hasFeature('scheduledShots') && <div className="flex items-center justify-between">
+        {scheduledShotsEnabled && <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="schedule" className="text-sm font-medium flex items-center gap-2">
               <CalendarBlank size={18} className={scheduleMode ? 'text-primary' : 'text-muted-foreground'} />
@@ -970,7 +1007,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           ? t('common.loading') 
           : scheduleMode 
             ? t('runShot.scheduleShot')
-            : preheat && selectedProfile 
+            : preheat && selectedProfile && scheduledShotsEnabled
               ? t('runShot.preheatAndRun') 
               : preheat 
                 ? t('runShot.startPreheat') 
@@ -980,7 +1017,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       {/* Help Text */}
       <p className="text-xs text-muted-foreground text-center">
         {!selectedProfile && preheat && t('runShot.preheatOnlyHelper')}
-        {selectedProfile && preheat && !scheduleMode && t('runShot.preheatStartsNow')}
+        {selectedProfile && preheat && scheduledShotsEnabled && !scheduleMode && t('runShot.preheatStartsNow')}
+        {selectedProfile && preheat && !scheduledShotsEnabled && t('runShot.preheatOnlyHelper')}
         {scheduleMode && preheat && t('runShot.preheatStartsBefore')}
       </p>
       </div>{/* end left column */}
@@ -1000,7 +1038,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       )}
 
       {/* Scheduled Shots */}
-      {scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (
+      {scheduledShotsEnabled && scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (
         <Card className="p-6 space-y-4">
           <h3 className="text-base font-medium">{t('runShot.scheduledShots')}</h3>
           <div className="space-y-2">
@@ -1036,7 +1074,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       )}
 
       {/* Recurring Schedules */}
-      {hasFeature('scheduledShots') && <Card className="p-6 space-y-4">
+      {scheduledShotsEnabled && <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Repeat size={20} className="text-primary" />

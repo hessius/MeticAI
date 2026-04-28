@@ -15,6 +15,7 @@ export const STORAGE_KEYS = {
   // -- Direct mode caches --
   PROFILE_LIST_CACHE: 'meticai-direct-profile-list',
   DESCRIPTION_CACHE: 'meticai-direct-desc-cache',
+  ANALYSIS_CACHE: 'meticai-direct-analysis-cache',
   POUR_OVER_PREFS: 'meticai-direct-pour-over-prefs',
 
   // -- Machine connection --

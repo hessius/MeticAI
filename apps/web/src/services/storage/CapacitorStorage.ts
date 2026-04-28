@@ -12,12 +12,16 @@
  * AppDatabase — that works fine in WKWebView for reasonable data sizes.
  */
 
-import { isNativePlatform } from '@/lib/machineMode'
-
 interface StorageAdapter {
   get(key: string): Promise<string | null>
   set(key: string, value: string): Promise<void>
   remove(key: string): Promise<void>
+}
+
+function isCapacitorNativePlatform(): boolean {
+  if (typeof window === 'undefined') return false
+  const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+  return !!cap?.isNativePlatform?.()
 }
 
 // ---------------------------------------------------------------------------
@@ -82,13 +86,13 @@ const localStorageAdapter: StorageAdapter = {
  * Uses Capacitor Preferences on native, localStorage on web.
  */
 export const capacitorStorage: StorageAdapter = {
-  get: (key) => isNativePlatform()
+  get: (key) => isCapacitorNativePlatform()
     ? capacitorAdapter.get(key)
     : localStorageAdapter.get(key),
-  set: (key, value) => isNativePlatform()
+  set: (key, value) => isCapacitorNativePlatform()
     ? capacitorAdapter.set(key, value)
     : localStorageAdapter.set(key, value),
-  remove: (key) => isNativePlatform()
+  remove: (key) => isCapacitorNativePlatform()
     ? capacitorAdapter.remove(key)
     : localStorageAdapter.remove(key),
 }

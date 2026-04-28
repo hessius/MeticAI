@@ -121,6 +121,13 @@
       "aiDisabled": "AI profile generation is currently disabled. Enable AI in Settings and ensure an API key is configured."
     }
   },
+  "pwaInstall": {
+    "title": "Install MeticAI",
+    "description": "Add MeticAI to this device for a faster app-like direct mode.",
+    "install": "Install",
+    "installing": "Installing...",
+    "dismiss": "Not now"
+  },
   "navigation": {
     "generateNewProfile": "New Profile",
     "addProfile": "Add Profile",
@@ -251,10 +258,12 @@
     "preheatDescription": "Preheat machine for 10 minutes",
     "runLaterDescription": "Run later at a specific time",
     "preheatStartsAt": "Preheat will start at {{time}}",
+    "preheatStartsBefore": " (preheat starts {{minutes}} min before)",
     "noRecurringSchedules": "No recurring schedules yet. Create one to automatically preheat or run shots at set times.",
     "deleteScheduleConfirm": "Are you sure you want to delete this recurring schedule?",
     "selectProfileOrPreheat": "Please select a profile or enable preheat",
     "scheduledTimeError": "Scheduled time must be at least 10 minutes from now when preheat is enabled",
+    "schedulingUnavailable": "Scheduling is not available in this mode",
     "createSchedule": "Create Schedule",
     "updateSchedule": "Update Schedule",
     "runNow": "Run Now",
@@ -427,6 +436,8 @@
     "meticulousIp": "Meticulous Machine IP",
     "meticulousIpPlaceholder": "e.g., 192.168.1.100",
     "meticulousIpDescription": "The IP address of your Meticulous espresso machine on your local network",
+    "invalidMachineUrl": "Enter a complete machine IP, hostname, or URL.",
+    "machineUrlLoadFailed": "Could not load the saved machine URL. Using the default fallback.",
     "detect": "Detect",
     "machineFound": "Found {{hostname}}",
     "discovery": {
@@ -1531,7 +1542,8 @@
     "failed": "Update failed",
     "timeout": "Update did not complete within expected time. Please refresh manually.",
     "triggerFailed": "Failed to trigger update",
-    "checkFailed": "Failed to check for updates"
+    "checkFailed": "Failed to check for updates",
+    "unavailableInMode": "Updates are only available in Docker/proxy mode."
   },
   "generation": {
     "progress": {
