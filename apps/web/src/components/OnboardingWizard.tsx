@@ -34,7 +34,8 @@ import {
 } from '@phosphor-icons/react'
 import { MeticLogo } from '@/components/MeticLogo'
 import { STORAGE_KEYS } from '@/lib/constants'
-import { setMachineUrl, isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
@@ -111,6 +112,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   // Ref for IP input auto-focus
   const ipInputRef = useRef<HTMLInputElement>(null)
+  const mountedRef = useRef(true)
+  const autoConnectingUrlRef = useRef<string | null>(null)
 
   const stepIndex = STEPS.indexOf(step)
   const progress = ((stepIndex) / (STEPS.length - 1)) * 100
@@ -130,6 +133,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setTimeout(() => ipInputRef.current?.focus(), 200)
     }
   }, [step])
+
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
 
   // Start machine discovery immediately on mount so results are ready
   // by the time user reaches the machine step.
@@ -172,35 +179,53 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     runDiscovery({ cancelled: false })
   }, [runDiscovery])
 
+  const saveMachineUrl = useCallback(async (url: string): Promise<boolean> => {
+    try {
+      await persistMachineUrl(url)
+      return true
+    } catch (error) {
+      console.error('Failed to save machine URL:', error)
+      setConnectionStatus('error')
+      toast.error(t('onboarding.machine.saveFailed'))
+      return false
+    }
+  }, [t])
+
   // Auto-fill and test when discovery completes and user reaches machine step
   useEffect(() => {
     if (step !== 'machine' || discovering || connectionStatus === 'success') return undefined
     if (discoveredMachines.length === 1 && !machineIp.trim()) {
       const machine = discoveredMachines[0]
+      if (autoConnectingUrlRef.current === machine.url) return undefined
+      autoConnectingUrlRef.current = machine.url
       // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-fill from discovered machine
       setMachineIp(machine.host)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMachineName(machine.name)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setConnectionStatus('testing')
-      let cancelled = false
-      testMachineConnection(machine.url).then((ok) => {
-        if (cancelled) return
+      testMachineConnection(machine.url).then(async (ok) => {
+        if (!mountedRef.current || autoConnectingUrlRef.current !== machine.url) return
         if (ok) {
+          const saved = await saveMachineUrl(machine.url)
+          if (!mountedRef.current || autoConnectingUrlRef.current !== machine.url) return
+          if (!saved) return
           setConnectionStatus('success')
-          setMachineUrl(machine.url)
           toast.success(t('onboarding.machine.autoDiscovered'))
         } else {
+          autoConnectingUrlRef.current = null
           setConnectionStatus('idle')
         }
       }).catch(() => {
-        if (!cancelled) setConnectionStatus('idle')
+        if (mountedRef.current && autoConnectingUrlRef.current === machine.url) {
+          autoConnectingUrlRef.current = null
+          setConnectionStatus('idle')
+        }
       })
-      return () => { cancelled = true }
     }
     return undefined
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, discovering, discoveredMachines])
+  }, [step, discovering, discoveredMachines, saveMachineUrl, t])
 
   // ── Navigation ──────────────────────────────────────────────────────────
 
@@ -232,9 +257,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     try {
       const ok = await testMachineConnection(parsed.url)
       if (ok) {
+        const saved = await saveMachineUrl(parsed.url)
+        if (!saved) return
         setConnectionStatus('success')
         setMachineName(parsed.name)
-        setMachineUrl(parsed.url)
         toast.success(t('onboarding.machine.connected'))
       } else {
         setConnectionStatus('error')
@@ -244,7 +270,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setConnectionStatus('error')
       toast.error(t('onboarding.machine.unreachable'))
     }
-  }, [machineIp, t])
+  }, [machineIp, saveMachineUrl, t])
 
   // ── Save & complete ─────────────────────────────────────────────────────
 
@@ -258,7 +284,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
     // Language already applied via i18n.changeLanguage
     // Theme already applied via useThemePreference
-    // Machine URL already set via setMachineUrl on connection test
+    // Machine URL already persisted during the connection test
 
     // Request notification permission (non-blocking)
     requestPermission()
@@ -343,19 +369,25 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   key={m.url}
                   variant="outline"
                   className="w-full justify-start gap-2"
-                  onClick={() => {
+                  onClick={async () => {
                     setMachineIp(m.host)
                     setMachineName(m.name)
                     setConnectionStatus('testing')
-                    testMachineConnection(m.url).then((ok) => {
+                    try {
+                      const ok = await testMachineConnection(m.url)
                       if (ok) {
+                        const saved = await saveMachineUrl(m.url)
+                        if (!saved) return
                         setConnectionStatus('success')
-                        setMachineUrl(m.url)
                         toast.success(t('onboarding.machine.connected'))
                       } else {
                         setConnectionStatus('error')
+                        toast.error(t('onboarding.machine.unreachable'))
                       }
-                    })
+                    } catch {
+                      setConnectionStatus('error')
+                      toast.error(t('onboarding.machine.unreachable'))
+                    }
                   }}
                 >
                   <WifiHigh size={16} weight="duotone" className="text-green-500" />

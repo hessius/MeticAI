@@ -968,6 +968,24 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(body.profiles[0]).not.toHaveProperty('profile')
     })
 
+    it('rejects direct variable override runs instead of silently ignoring overrides', async () => {
+      const machineFetch = installInterceptor()
+      const form = new FormData()
+      form.append('overrides_json', JSON.stringify({ temperature: 94 }))
+
+      const response = await window.fetch('/api/machine/run-profile-with-overrides/profile-1', {
+        method: 'POST',
+        body: form,
+      })
+
+      expect(response.status).toBe(501)
+      await expect(readJson(response)).resolves.toEqual({
+        detail: 'Variable overrides are not supported in direct mode',
+      })
+      expect(machineFetch).not.toHaveBeenCalledWith('/api/v1/profile/load/profile-1')
+      expect(machineFetch).not.toHaveBeenCalledWith('/api/v1/action/start')
+    })
+
     it('renames visible direct machine profiles through the machine API', async () => {
       const profileIdent = nestedMachineProfiles()[0]
       let savedProfile: Record<string, unknown> | null = null
@@ -1204,6 +1222,45 @@ describe('DirectModeInterceptor regression harness', () => {
           expect.objectContaining({ stage_name: 'Ramp', target_pressure: 8 }),
         ]),
       )
+    })
+
+    it('preserves flat profile.image in direct profile info and image proxy routes', async () => {
+      vi.useRealTimers()
+      localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://machine.local:8080')
+      const flatImageProfiles: ProfileIdent[] = [{
+        ...nestedMachineProfiles()[0],
+        profile: {
+          ...nestedMachineProfiles()[0].profile,
+          display: { description: 'Flat image profile' },
+          image: '/profile/flat-profile.png',
+        } as ProfileIdent['profile'] & { image: string },
+      }]
+      let imageFetches = 0
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': flatImageProfiles,
+        'GET /profile/flat-profile.png': ({ url }: FetchCall) => {
+          imageFetches += 1
+          return url === 'http://machine.local:8080/profile/flat-profile.png'
+            ? new Response('flat-image-bytes', { headers: { 'Content-Type': 'image/png' } })
+            : jsonResponse({ detail: `wrong image URL: ${url}` }, 599)
+        },
+      }))
+
+      const profileResponse = await window.fetch('/api/profile/Turbo%20Bloom')
+      const imageResponse = await window.fetch('/api/profile/Turbo%20Bloom/image-proxy')
+
+      expect(profileResponse.status).toBe(200)
+      await expect(readJson(profileResponse)).resolves.toEqual({
+        status: 'success',
+        profile: expect.objectContaining({
+          id: 'profile-1',
+          name: 'Turbo Bloom',
+          image: '/profile/flat-profile.png',
+        }),
+      })
+      expect(imageResponse.status).toBe(200)
+      await expect(imageResponse.text()).resolves.toBe('flat-image-bytes')
+      expect(imageFetches).toBe(1)
     })
 
     it('proxies and caches profile images from a cold direct profile cache', async () => {
@@ -1450,7 +1507,7 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(response.status).toBe(200)
       await expect(readJson(response)).resolves.toEqual({
         profile_id: expect.any(String),
-        profile_name: 'MeticAI Recipe: James Hoffmann V2',
+        profile_name: 'MeticAI Recipe: Better 1-Cup V60',
       })
     })
   })

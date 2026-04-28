@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hasFeature, type FeatureFlags } from '@/lib/featureFlags'
-import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { isDirectMode, isNativePlatform, isDemoMode } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 
 const disabledDirectFeatures = new Set<keyof FeatureFlags>([
@@ -51,6 +51,7 @@ vi.mock('@/components/LanguageSelector', () => ({
 
 vi.mock('@/lib/machineMode', () => ({
   isDirectMode: vi.fn(() => true),
+  isDemoMode: vi.fn(() => false),
   isNativePlatform: vi.fn(() => false),
   getDefaultMachineUrl: vi.fn(() => localStorage.getItem('meticai-machine-url') || 'http://meticulous.local:8080'),
   setMachineUrl: vi.fn((url: string) => localStorage.setItem('meticai-machine-url', url)),
@@ -74,6 +75,7 @@ import { SettingsView } from './SettingsView'
 
 const mockedHasFeature = vi.mocked(hasFeature)
 const mockedIsDirectMode = vi.mocked(isDirectMode)
+const mockedIsDemoMode = vi.mocked(isDemoMode)
 const mockedIsNativePlatform = vi.mocked(isNativePlatform)
 
 describe('SettingsView direct-mode backend guards', () => {
@@ -83,6 +85,7 @@ describe('SettingsView direct-mode backend guards', () => {
     vi.clearAllMocks()
     delete (window as unknown as { Capacitor?: unknown }).Capacitor
     mockedIsDirectMode.mockReturnValue(true)
+    mockedIsDemoMode.mockReturnValue(false)
     mockedIsNativePlatform.mockReturnValue(false)
     discoveryMocks.discoverMachines.mockReset()
     discoveryMocks.testMachineConnection.mockReset()

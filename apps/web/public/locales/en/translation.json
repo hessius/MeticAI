@@ -1580,6 +1580,7 @@
       "invalidIp": "Please enter a valid IP address or hostname",
       "connected": "Machine connected successfully!",
       "unreachable": "Could not reach the machine. Check the IP and make sure you're on the same network.",
+      "saveFailed": "Could not save the machine address. Please try again.",
       "successMessage": "Connected to {{name}}",
       "errorMessage": "Could not reach the machine. Check the address and make sure you're on the same Wi-Fi network.",
       "hint": "Tip: find the IP in your machine's Wi-Fi settings, or check your router's DHCP leases. Type \"demo\" to try without a machine.",

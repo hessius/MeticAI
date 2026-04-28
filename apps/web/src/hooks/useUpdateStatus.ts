@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getServerUrl } from '@/lib/config'
+import { hasFeature } from '@/lib/featureFlags'
 
 interface UpdateStatus {
   update_available: boolean
@@ -38,6 +39,10 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
 
   // Read cached status from the server
   const readCachedStatus = useCallback(async (): Promise<{ updateAvailable: boolean; error: string | null }> => {
+    if (!hasFeature('watchtowerUpdate')) {
+      return { updateAvailable: false, error: null }
+    }
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/status`)
@@ -62,6 +67,13 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
 
   // Trigger a fresh update check (queries GitHub Releases API, bypasses cache)
   const checkForUpdates = useCallback(async (): Promise<{ updateAvailable: boolean; error: string | null }> => {
+    if (!hasFeature('watchtowerUpdate')) {
+      const errorMessage = t('update.unavailableInMode')
+      setError(errorMessage)
+      setUpdateAvailable(false)
+      return { updateAvailable: false, error: errorMessage }
+    }
+
     setIsChecking(true)
     setError(null)
 
@@ -96,6 +108,8 @@ export function useUpdateStatus(): UseUpdateStatusReturn {
 
   // Read cached status on mount and periodically
   useEffect(() => {
+    if (!hasFeature('watchtowerUpdate')) return
+
     // eslint-disable-next-line react-hooks/set-state-in-effect -- triggering initial cache read on mount
     readCachedStatus()
 

@@ -60,7 +60,9 @@ describe('MachineServiceProvider native URL resolution', () => {
       expect(adapterMocks.createDirectAdapter).toHaveBeenCalledWith('http://native-preferences:8080')
     })
     expect(adapterMocks.createDirectAdapter).not.toHaveBeenCalledWith('http://stale-web-url:8080')
-    expect(adapterMocks.connect).toHaveBeenCalledWith('http://native-preferences:8080')
+    await waitFor(() => {
+      expect(adapterMocks.connect).toHaveBeenCalledWith('http://native-preferences:8080')
+    })
   })
 
   it('recovers with a native-safe fallback when URL resolution fails', async () => {

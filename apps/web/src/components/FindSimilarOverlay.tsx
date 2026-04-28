@@ -15,7 +15,7 @@ import { Sparkle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getMatchReasonColorClass, getScoreColorClass } from '@/lib/tags'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
-import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { getProfileImageValue, resolveDisplayImageAsync } from '@/hooks/useProfileImageSrc'
 
 interface Recommendation {
   profile_name: string
@@ -45,9 +45,10 @@ function ProfileImage({ name, serverUrl }: { name: string; serverUrl: string }) 
     if (isDirectMode() || isNativePlatform()) {
       fetch(`/api/profile/${encodeURIComponent(name)}`)
         .then(r => r.ok ? r.json() : null)
-        .then(data => {
+        .then(async data => {
+          const imageSrc = await resolveDisplayImageAsync(getProfileImageValue(data?.profile))
           if (!cancelled) {
-            setSrc(resolveDisplayImage(data?.profile?.display?.image))
+            setSrc(imageSrc)
           }
         })
         .catch(() => { if (!cancelled) setError(true) })

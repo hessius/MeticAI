@@ -26,8 +26,10 @@ import {
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
-import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { hasFeature } from '@/lib/featureFlags'
+import { useResolvedMachineUrl } from '@/services/machine/useResolvedMachineUrl'
 import { ProfileImage } from '@/components/ProfileImage'
 import { extractTagsFromPreferences, getTagColorClass } from '@/lib/tags'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
@@ -42,6 +44,7 @@ interface MachineProfile {
   author?: string
   temperature?: number
   final_weight?: number
+  image?: string
   in_history: boolean
   has_description: boolean
   user_preferences?: string | null
@@ -74,6 +77,8 @@ interface ProfileCatalogueViewProps {
 
 export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
+  const directImageMode = isDirectMode() || isNativePlatform()
+  const resolvedMachineUrl = useResolvedMachineUrl(directImageMode)
 
   // Read static description cache (populated by main.tsx in direct mode)
   const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
@@ -199,6 +204,8 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
   // Fetch sync status badge count
   const fetchSyncStatus = useCallback(async () => {
+    if (!hasFeature('cloudSync')) return
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/profiles/sync/status`)
@@ -214,6 +221,8 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
   // Run full sync
   const handleSync = async () => {
+    if (!hasFeature('cloudSync')) return
+
     setIsSyncing(true)
     try {
       const serverUrl = await getServerUrl()
@@ -244,7 +253,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchOrphaned()
     fetchHistoryEntries()
-    fetchSyncStatus()
+    if (hasFeature('cloudSync')) fetchSyncStatus()
   }, [fetchProfiles, fetchOrphaned, fetchHistoryEntries, fetchSyncStatus])
 
   // Fetch profile images when profile list changes
@@ -257,12 +266,12 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   // Auto-sync is now handled globally in App.tsx — just refresh data periodically
   // when the catalogue view is visible
   useEffect(() => {
-    if (!autoSyncEnabled) return
+    if (!hasFeature('cloudSync') || !autoSyncEnabled) return
     const refreshInterval = setInterval(() => {
       fetchProfiles()
       fetchOrphaned()
       fetchHistoryEntries()
-      fetchSyncStatus()
+      if (hasFeature('cloudSync')) fetchSyncStatus()
     }, 5 * 60 * 1000)
     return () => clearInterval(refreshInterval)
   }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchHistoryEntries, fetchSyncStatus])
@@ -470,28 +479,34 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                 {t('profileCatalogue.bulkDelete.button')}
               </Button>
             )}
+            {hasFeature('cloudSync') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSync}
+                disabled={isSyncing || isLoading}
+                className="relative"
+              >
+                <ArrowsClockwise className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                {t('profileCatalogue.sync.button')}
+                {syncBadgeCount > 0 && !isSyncing && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 h-5 min-w-[20px] px-1 text-xs"
+                  >
+                    {syncBadgeCount}
+                  </Badge>
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={handleSync}
-              disabled={isSyncing || isLoading}
-              className="relative"
-            >
-              <ArrowsClockwise className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-              {t('profileCatalogue.sync.button')}
-              {syncBadgeCount > 0 && !isSyncing && (
-                <Badge
-                  variant="destructive"
-                  className="absolute -top-2 -right-2 h-5 min-w-[20px] px-1 text-xs"
-                >
-                  {syncBadgeCount}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { fetchProfiles(); fetchOrphaned(); fetchSyncStatus() }}
+                onClick={() => {
+                  fetchProfiles()
+                  fetchOrphaned()
+                  if (hasFeature('cloudSync')) fetchSyncStatus()
+                }}
               disabled={isLoading}
             >
               <ArrowsClockwise className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -599,7 +614,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
         </AnimatePresence>
 
         {/* Auto-sync toggle */}
-        <div className="flex items-center gap-2 px-1">
+        {hasFeature('cloudSync') && <div className="flex items-center gap-2 px-1">
           <Switch
             id="auto-sync-toggle"
             checked={autoSyncEnabled}
@@ -616,10 +631,10 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           <Label htmlFor="auto-sync-toggle" className="text-sm cursor-pointer">
             {t('profileCatalogue.sync.autoSync')}
           </Label>
-        </div>
+        </div>}
 
         {/* AI description during auto-sync toggle */}
-        {autoSyncEnabled && (
+        {hasFeature('cloudSync') && autoSyncEnabled && (
           <div className="flex items-center gap-2 px-1 pl-6">
             <Switch
               id="auto-sync-ai-desc-toggle"
@@ -722,9 +737,9 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                     <div className="flex items-start gap-4">
                       {/* Profile image — prefer machine's direct URL over image-proxy cache */}
                       <ProfileImage imageUrl={
-                        ((isDirectMode() || isNativePlatform())
-                          ? resolveDisplayImage(profile.display?.image)
-                          : profile.display?.image
+                        (directImageMode
+                          ? (resolvedMachineUrl ? resolveDisplayImage(getProfileImageValue(profile), resolvedMachineUrl) : null)
+                          : getProfileImageValue(profile)
                         ) ?? getImageUrl(profile.name) ?? undefined
                       } />
                       

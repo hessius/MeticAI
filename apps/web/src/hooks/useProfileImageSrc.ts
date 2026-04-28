@@ -9,17 +9,41 @@
 import { useState, useEffect } from 'react'
 import { isDirectMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { getServerUrl } from '@/lib/config'
+import { resolveMachineUrl } from '@/services/machine/machineUrl'
+
+interface ProfileImageFields {
+  image?: string | null
+  display?: { image?: string | null } | null
+}
+
+export function getProfileImageValue(profile: ProfileImageFields | null | undefined): string | null {
+  return profile?.display?.image ?? profile?.image ?? null
+}
+
+function joinMachineUrl(baseUrl: string, relativePath: string): string {
+  return `${baseUrl.replace(/\/$/, '')}/${relativePath.replace(/^\//, '')}`
+}
 
 /**
  * Resolve a profile's display.image value to a usable <img src> URL.
  * Handles: data URIs, absolute URLs, machine-relative paths.
  */
-export function resolveDisplayImage(displayImage: string | undefined | null): string | null {
+export function resolveDisplayImage(
+  displayImage: string | undefined | null,
+  machineBaseUrl: string = getDefaultMachineUrl(),
+): string | null {
   if (!displayImage) return null
   if (displayImage.startsWith('data:image/')) return displayImage
   if (displayImage.startsWith('http://') || displayImage.startsWith('https://')) return displayImage
   // Relative path on machine — prepend machine base URL
-  return `${getDefaultMachineUrl()}${displayImage}`
+  return joinMachineUrl(machineBaseUrl, displayImage)
+}
+
+export async function resolveDisplayImageAsync(displayImage: string | undefined | null): Promise<string | null> {
+  if (!displayImage) return null
+  if (displayImage.startsWith('data:image/')) return displayImage
+  if (displayImage.startsWith('http://') || displayImage.startsWith('https://')) return displayImage
+  return resolveDisplayImage(displayImage, await resolveMachineUrl())
 }
 
 /**
@@ -42,7 +66,7 @@ export function useProfileImageSrc(profileName: string | null | undefined): stri
           const res = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
           if (!res.ok) return null
           const data = await res.json()
-          return resolveDisplayImage(data?.profile?.display?.image)
+          return resolveDisplayImageAsync(getProfileImageValue(data?.profile))
         } catch {
           return null
         }

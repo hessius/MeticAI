@@ -47,7 +47,7 @@ import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
-import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { getProfileImageValue, resolveDisplayImageAsync } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
 import { 
@@ -153,7 +153,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
 
   // Fetch sync badge count
   useEffect(() => {
-    if (!onManageMachine) return
+    if (!onManageMachine || !hasFeature('cloudSync')) return
     const loadSyncStatus = async () => {
       try {
         const serverUrl = await getServerUrl()
@@ -848,10 +848,11 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         )
         if (response.ok) {
           const data = await response.json()
-          if (data.profile?.image || data.profile?.display?.image) {
+          const displayImage = getProfileImageValue(data.profile)
+          if (displayImage) {
             if (isDirectMode() || isNativePlatform()) {
               // Direct/Capacitor: use actual image URL (fetch interceptor doesn't handle <img src>)
-              const resolved = resolveDisplayImage(data.profile?.display?.image)
+              const resolved = await resolveDisplayImageAsync(displayImage)
               if (resolved) setProfileImage(resolved)
             } else {
               // Proxy mode: use the proxy endpoint to get the actual image with cache buster

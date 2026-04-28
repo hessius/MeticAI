@@ -12315,7 +12315,7 @@ class TestRecipeAdapter:
         from services.recipe_adapter import load_recipe
         recipe = load_recipe("4-6-method")
         assert recipe["slug"] == "4-6-method"
-        assert recipe["metadata"]["name"] == "Tetsu Kasuya 4:6 (Stronger)"
+        assert recipe["metadata"]["name"] == "4:6 Method (Stronger)"
         assert recipe["ingredients"]["coffee_g"] == 20.0
         assert recipe["ingredients"]["water_g"] == 300.0
         assert len(recipe["protocol"]) == 9
@@ -12333,7 +12333,7 @@ class TestRecipeAdapter:
         assert isinstance(recipes, list)
         assert len(recipes) >= 4
         names = {r["metadata"]["name"] for r in recipes}
-        assert any("Tetsu Kasuya 4:6" in n for n in names)
+        assert any("4:6 Method" in n for n in names)
 
     def test_list_recipes_each_has_slug(self):
         """Every recipe returned by list_recipes has a slug field."""
@@ -12347,7 +12347,7 @@ class TestRecipeAdapter:
         recipe = load_recipe("4-6-method")
         profile = adapt_recipe_to_profile(recipe)
 
-        assert profile["name"] == "MeticAI Recipe: Tetsu Kasuya 4:6 (Stronger)"
+        assert profile["name"] == "MeticAI Recipe: 4:6 Method (Stronger)"
         assert profile["final_weight"] == 300.0
         assert len(profile["stages"]) == 9
 
@@ -12474,12 +12474,12 @@ class TestRecipeEndpoints:
             assert "protocol" in recipe
 
     def test_get_recipe_by_slug_returns_correct_data(self, client):
-        """GET /api/recipes/4-6-method returns Tetsu Kasuya 4:6 with 9 steps."""
+        """GET /api/recipes/4-6-method returns the stronger 4:6 recipe with 9 steps."""
         response = client.get("/api/recipes/4-6-method")
         assert response.status_code == 200
         data = response.json()
         assert data["slug"] == "4-6-method"
-        assert data["metadata"]["name"] == "Tetsu Kasuya 4:6 (Stronger)"
+        assert data["metadata"]["name"] == "4:6 Method (Stronger)"
         assert data["ingredients"]["water_g"] == 300.0
         assert len(data["protocol"]) == 9
 
@@ -12519,7 +12519,7 @@ class TestPrepareRecipeEndpoint:
         async def _fake_load_ephemeral(profile_json, params, previous_profile_name=None):
             return {
                 "profile_id": "test-uuid-1234",
-                "profile_name": "MeticAI Recipe: Tetsu Kasuya 4:6",
+                "profile_name": "MeticAI Recipe: 4:6 Method",
             }
 
         mock_temp_svc.load_ephemeral = _fake_load_ephemeral

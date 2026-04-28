@@ -163,6 +163,37 @@ describe('RunShotView scheduled-shot guards', () => {
     expect(helpers.canCancelScheduledShot?.({ scheduledShotsEnabled: true })).toBe(true)
   })
 
+  it('shows variable adjustments only when direct override execution is supported', () => {
+    const helpers = runShotHelpers as typeof runShotHelpers & {
+      canShowVariableAdjustments?: (args: {
+        scheduledShotsEnabled: boolean
+        hasSelectedProfile: boolean
+        variableCount: number
+      }) => boolean
+    }
+
+    expect(helpers.canShowVariableAdjustments?.({
+      scheduledShotsEnabled: false,
+      hasSelectedProfile: true,
+      variableCount: 2,
+    })).toBe(false)
+    expect(helpers.canShowVariableAdjustments?.({
+      scheduledShotsEnabled: true,
+      hasSelectedProfile: true,
+      variableCount: 2,
+    })).toBe(true)
+    expect(helpers.canShowVariableAdjustments?.({
+      scheduledShotsEnabled: true,
+      hasSelectedProfile: false,
+      variableCount: 2,
+    })).toBe(false)
+    expect(helpers.canShowVariableAdjustments?.({
+      scheduledShotsEnabled: true,
+      hasSelectedProfile: true,
+      variableCount: 0,
+    })).toBe(false)
+  })
+
   it('formats scheduled-shot preheat info through i18n', () => {
     const helpers = runShotHelpers as typeof runShotHelpers & {
       getSchedulePreheatInfo?: (args: {

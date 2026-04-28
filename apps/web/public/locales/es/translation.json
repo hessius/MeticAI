@@ -253,6 +253,7 @@
     "preheatStartsAt": "El precalentamiento comenzará a las {{time}}",
     "noRecurringSchedules": "Aún no hay programaciones recurrentes. Crea una para precalentar o ejecutar disparos automáticamente a horas establecidas.",
     "deleteScheduleConfirm": "¿Estás seguro de que quieres eliminar esta programación recurrente?",
+    "schedulingUnavailable": "La programación no está disponible en este modo",
     "selectProfileOrPreheat": "Por favor selecciona un perfil o activa el precalentamiento",
     "scheduledTimeError": "La hora programada debe ser al menos 10 minutos a partir de ahora cuando el precalentamiento está activado",
     "createSchedule": "Crear programación",
@@ -427,6 +428,8 @@
     "meticulousIp": "IP de máquina Meticulous",
     "meticulousIpPlaceholder": "ej. 192.168.1.100",
     "meticulousIpDescription": "La dirección IP de tu máquina de espresso Meticulous en tu red local",
+    "invalidMachineUrl": "Ingresa una IP, nombre de host o URL completa de la máquina.",
+    "machineUrlLoadFailed": "No se pudo cargar la URL guardada de la máquina. Se usará el valor predeterminado.",
     "detect": "Detectar",
     "machineFound": "{{hostname}} encontrado",
     "discovery": {
@@ -1524,7 +1527,8 @@
     "failed": "Error de actualización",
     "timeout": "La actualización no se completó en el tiempo esperado. Por favor, actualice manualmente.",
     "triggerFailed": "No se pudo iniciar la actualización",
-    "checkFailed": "No se pudo buscar actualizaciones"
+    "checkFailed": "No se pudo buscar actualizaciones",
+    "unavailableInMode": "Las actualizaciones solo están disponibles en modo Docker/proxy."
   },
   "sync": {
     "fetchProfileFailed": "Error al obtener perfil",
@@ -1568,6 +1572,7 @@
       "invalidIp": "Ingresa una dirección IP o nombre de host válido",
       "connected": "¡Máquina conectada exitosamente!",
       "unreachable": "No se pudo alcanzar la máquina. Verifica la IP y asegúrate de estar en la misma red.",
+      "saveFailed": "No se pudo guardar la dirección de la máquina. Inténtalo de nuevo.",
       "successMessage": "Conectado a {{name}}",
       "errorMessage": "No se pudo conectar con la máquina. Verifica la dirección y que estés en la misma red Wi-Fi.",
       "hint": "Consejo: encuentra la IP en los ajustes Wi-Fi de la máquina o en la lista DHCP de tu router. Escribe \"demo\" para probar sin máquina.",

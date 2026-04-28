@@ -31,6 +31,7 @@ import { format, addMinutes } from 'date-fns'
 import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
 import {
   canCancelScheduledShot,
+  canShowVariableAdjustments,
   getSchedulePreheatInfo,
   shouldScheduleProfileAfterPreheat,
 } from './RunShotView.helpers'
@@ -728,6 +729,12 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
     }
   }
 
+  const showVariableAdjustments = canShowVariableAdjustments({
+    scheduledShotsEnabled,
+    hasSelectedProfile: Boolean(selectedProfile),
+    variableCount: profileVariables.length,
+  })
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -861,7 +868,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       </Card>
 
       {/* Variable Adjustments — left column when scheduling available */}
-      {hasFeature('scheduledShots') && selectedProfile && profileVariables.length > 0 && (
+      {showVariableAdjustments && selectedProfile && (
         <VariableAdjustPanel
           profileVariables={profileVariables}
           profileStages={selectedProfile.stages}
@@ -1025,17 +1032,6 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
 
       {/* Right column: Schedules / Variable Adjustments */}
       <div className="space-y-6 desktop-panel-right">
-
-      {/* Variable Adjustments — right column when scheduling unavailable */}
-      {!hasFeature('scheduledShots') && selectedProfile && profileVariables.length > 0 && (
-        <VariableAdjustPanel
-          profileVariables={profileVariables}
-          profileStages={selectedProfile.stages}
-          overrides={overrides}
-          onOverridesChange={setOverrides}
-          onReset={() => setOverrides({})}
-        />
-      )}
 
       {/* Scheduled Shots */}
       {scheduledShotsEnabled && scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (

@@ -88,6 +88,12 @@ const CAPACITOR_FLAGS: FeatureFlags = {
   pwaInstall: false,         // Already a native app
 }
 
+export const MODE_CAPABILITY_MATRIX: Record<'proxy' | 'directPwa' | 'capacitor', FeatureFlags> = {
+  proxy: PROXY_FLAGS,
+  directPwa: DIRECT_FLAGS,
+  capacitor: CAPACITOR_FLAGS,
+}
+
 /** Demo mode — simulated machine, most features enabled client-side */
 const DEMO_FLAGS: FeatureFlags = {
   machineDiscovery: false,   // No real machine to discover
@@ -128,7 +134,7 @@ export function getFeatureFlags(): FeatureFlags {
 }
 
 export function hasFeature(feature: keyof FeatureFlags): boolean {
-  return getFeatureFlags()[feature]
+  return getFeatureFlags()[feature] ?? false
 }
 
 /** Reset cached flags — call after mode changes (e.g. demo toggle) */

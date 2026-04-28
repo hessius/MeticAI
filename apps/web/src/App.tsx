@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { hasFeature } from '@/lib/featureFlags'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
@@ -44,7 +45,7 @@ import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAuto
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
 import { useSmartGreeting } from '@/hooks/useSmartGreeting'
-import { useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { useProfileImageSrc, getProfileImageValue, resolveDisplayImageAsync } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
@@ -202,7 +203,7 @@ function App() {
           setMqttEnabled(data.mqttEnabled !== false)
           const hasGeminiKey = Boolean((data.geminiApiKey || '').trim())
           setIsAiConfigured(data.geminiApiKeyConfigured === true || hasGeminiKey)
-          syncAutoSyncFromServer(data)
+          if (hasFeature('cloudSync')) syncAutoSyncFromServer(data)
         }
       } catch {
         // default false if unreachable
@@ -258,6 +259,8 @@ function App() {
       clearInterval(autoSyncIntervalRef.current)
       autoSyncIntervalRef.current = null
     }
+
+    if (!hasFeature('cloudSync')) return
 
     // Re-read prefs on every AI_PREFS_CHANGED_EVENT via aiEnabled dep
     const autoSyncEnabled = getAutoSync()
@@ -822,7 +825,7 @@ function App() {
           const cacheData = await cacheRes.json()
           if (cacheData?.profile?.id) {
             profileId = cacheData.profile.id
-            displayImage = cacheData.profile.display?.image
+            displayImage = getProfileImageValue(cacheData.profile) ?? undefined
           }
         }
 
@@ -862,7 +865,7 @@ function App() {
           reply,
           profile_json: profileJson,
         }
-        const imageUrl = resolveDisplayImage(displayImage) ?? undefined
+        const imageUrl = await resolveDisplayImageAsync(displayImage) ?? undefined
         handleViewHistoryEntry(entry, imageUrl)
       } else {
         // Proxy mode: search history for matching entry
@@ -879,7 +882,7 @@ function App() {
     }
   }
 
-  const handleViewMachineProfile = async (profile: { id: string; name: string; display?: { image?: string; description?: string } }) => {
+  const handleViewMachineProfile = async (profile: { id: string; name: string; image?: string; display?: { image?: string; description?: string } }) => {
     try {
       const serverUrl = await getServerUrl()
       const res = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
@@ -904,9 +907,10 @@ function App() {
         reply,
         profile_json: profileJson,
       }
+      const profileImage = getProfileImageValue(profile)
       const imageUrl = (isDirectMode() || isNativePlatform())
-        ? resolveDisplayImage(profile.display?.image) ?? undefined
-        : profile.display?.image || undefined
+        ? await resolveDisplayImageAsync(profileImage) ?? undefined
+        : profileImage || undefined
       previousViewStateRef.current = 'profile-catalogue'
       handleViewHistoryEntry(entry, imageUrl)
     } catch {

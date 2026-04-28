@@ -2,7 +2,7 @@ import { render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode, HTMLAttributes } from 'react'
 import { hasFeature, type FeatureFlags } from '@/lib/featureFlags'
-import { isDirectMode } from '@/lib/machineMode'
+import { isDemoMode, isDirectMode, isNativePlatform } from '@/lib/machineMode'
 
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
@@ -25,7 +25,10 @@ vi.mock('@/lib/config', () => ({
 }))
 
 vi.mock('@/lib/machineMode', () => ({
+  getDefaultMachineUrl: vi.fn(() => 'http://meticulous.local:8080'),
+  isDemoMode: vi.fn(() => false),
   isDirectMode: vi.fn(() => true),
+  isNativePlatform: vi.fn(() => false),
 }))
 
 vi.mock('@/lib/featureFlags', () => ({
@@ -86,6 +89,10 @@ vi.mock('@/hooks/useMachineTelemetry', () => ({
   }),
 }))
 
+vi.mock('@/hooks/useSmartGreeting', () => ({
+  useSmartGreeting: () => null,
+}))
+
 vi.mock('@/hooks/useLastShot', () => ({
   useLastShot: () => ({ lastShot: null }),
 }))
@@ -135,6 +142,10 @@ vi.mock('@/components/ProfileImportDialog', () => ({
   ProfileImportDialog: () => null,
 }))
 
+vi.mock('@/components/ControlCenter', () => ({
+  ControlCenter: () => null,
+}))
+
 vi.mock('@/components/FeatureErrorBoundary', () => ({
   FeatureErrorBoundary: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
@@ -150,11 +161,15 @@ vi.mock('sonner', () => ({
 import App from './App'
 
 const mockedHasFeature = vi.mocked(hasFeature)
+const mockedIsDemoMode = vi.mocked(isDemoMode)
 const mockedIsDirectMode = vi.mocked(isDirectMode)
+const mockedIsNativePlatform = vi.mocked(isNativePlatform)
 
 describe('App cloud sync guard', () => {
   beforeEach(() => {
+    mockedIsDemoMode.mockReturnValue(false)
     mockedIsDirectMode.mockReturnValue(true)
+    mockedIsNativePlatform.mockReturnValue(false)
     mockedHasFeature.mockImplementation((feature: keyof FeatureFlags) => feature !== 'cloudSync')
     localStorage.setItem('meticai-auto-sync', 'true')
     localStorage.setItem('meticai-auto-sync-ai-description', 'true')
