@@ -34,13 +34,10 @@ export function CatalogueServiceProvider({ children, service }: CatalogueService
     if (service) return service
     if (mode === 'demo') return createDemoCatalogueService()
     if (mode === 'direct') {
-      if (!machineUrl) return null
       return createDirectCatalogueService(machineUrl)
     }
     return createProxyCatalogueService()
   }, [mode, service, machineUrl])
-
-  if (!value) return null
 
   return (
     <CatalogueServiceContext.Provider value={value}>

@@ -34,13 +34,10 @@ export function ShotDataServiceProvider({ children, service }: ShotDataServicePr
     if (service) return service
     if (mode === 'demo') return createDemoShotDataService()
     if (mode === 'direct') {
-      if (!machineUrl) return null
       return createDirectShotDataService(machineUrl)
     }
     return createProxyShotDataService()
   }, [mode, service, machineUrl])
-
-  if (!value) return null
 
   return (
     <ShotDataServiceContext.Provider value={value}>

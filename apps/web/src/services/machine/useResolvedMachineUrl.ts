@@ -3,9 +3,9 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { getDefaultMachineUrl } from '@/lib/machineMode'
 import { getMachineUrlFallback, MACHINE_URL_CHANGED, resolveMachineUrl } from './machineUrl'
 
-export function useResolvedMachineUrl(enabled: boolean): string | null {
-  const [machineUrl, setMachineUrl] = useState<string | null>(() =>
-    enabled ? null : getDefaultMachineUrl()
+export function useResolvedMachineUrl(enabled: boolean): string {
+  const [machineUrl, setMachineUrl] = useState<string>(() =>
+    enabled ? getMachineUrlFallback() : getDefaultMachineUrl()
   )
 
   useEffect(() => {

@@ -45,7 +45,7 @@ describe('MachineServiceProvider native URL resolution', () => {
     localStorage.clear()
   })
 
-  it('waits for native Preferences URL resolution instead of connecting to stale localStorage', async () => {
+  it('starts with fallback URL then resolves to native Preferences URL without using stale localStorage', async () => {
     localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://stale-web-url:8080')
 
     render(
@@ -54,8 +54,11 @@ describe('MachineServiceProvider native URL resolution', () => {
       </MachineServiceProvider>,
     )
 
-    expect(adapterMocks.createDirectAdapter).not.toHaveBeenCalled()
+    // Provider renders immediately with the safe fallback (not stale localStorage)
+    expect(adapterMocks.createDirectAdapter).toHaveBeenCalledWith('http://meticulous.local:8080')
+    expect(adapterMocks.createDirectAdapter).not.toHaveBeenCalledWith('http://stale-web-url:8080')
 
+    // After async resolution, adapter is recreated with the native Preferences URL
     await waitFor(() => {
       expect(adapterMocks.createDirectAdapter).toHaveBeenCalledWith('http://native-preferences:8080')
     })

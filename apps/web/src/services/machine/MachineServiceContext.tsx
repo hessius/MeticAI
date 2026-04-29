@@ -64,7 +64,6 @@ export function MachineServiceProvider({
       return createDemoAdapter()
     }
     if (mode === 'direct') {
-      if (!machineUrl) return null
       return createDirectAdapter(machineUrl)
     }
     return meticAIAdapter
@@ -72,14 +71,12 @@ export function MachineServiceProvider({
 
   // Connect/disconnect the active adapter
   useEffect(() => {
-    if (!value || !machineUrl) return
+    if (!value) return
     value.connect(machineUrl).catch((err) => {
       console.error('[MachineService] Failed to connect:', err)
     })
     return () => value.disconnect()
   }, [value, machineUrl])
-
-  if (!value) return null
 
   return (
     <MachineServiceContext.Provider value={value}>
