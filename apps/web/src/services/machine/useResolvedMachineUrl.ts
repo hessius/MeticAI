@@ -1,41 +1,35 @@
 import { useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { getDefaultMachineUrl } from '@/lib/machineMode'
-import { getMachineUrlFallback, MACHINE_URL_CHANGED, resolveMachineUrl } from './machineUrl'
+import { MACHINE_URL_CHANGED, resolveMachineUrl } from './machineUrl'
 
+/**
+ * Reactive hook that tracks the machine URL.
+ *
+ * Uses synchronous localStorage reads (same as base branch) for instant
+ * reactivity, plus an async Capacitor Preferences check on mount so
+ * native apps pick up URLs persisted across reinstalls.
+ */
 export function useResolvedMachineUrl(enabled: boolean): string {
-  const [machineUrl, setMachineUrl] = useState<string>(() =>
-    enabled ? getMachineUrlFallback() : getDefaultMachineUrl()
-  )
+  const [machineUrl, setMachineUrl] = useState<string>(getDefaultMachineUrl)
 
   useEffect(() => {
-    let cancelled = false
+    if (!enabled) return
+    if (typeof window === 'undefined') return
 
-    const loadMachineUrl = async () => {
-      if (!enabled) {
-        if (!cancelled) setMachineUrl(getDefaultMachineUrl())
-        return
-      }
+    // On mount, also check Capacitor Preferences (may have URL not in localStorage)
+    resolveMachineUrl()
+      .then(url => setMachineUrl(url))
+      .catch(() => {})
 
-      try {
-        const resolved = await resolveMachineUrl()
-        if (!cancelled) setMachineUrl(resolved)
-      } catch (err) {
-        console.warn('[MachineService] Failed to resolve machine URL:', err)
-        if (!cancelled) setMachineUrl(getMachineUrlFallback())
-      }
-    }
-
-    void loadMachineUrl()
-
-    if (typeof window === 'undefined') {
-      return () => {
-        cancelled = true
-      }
-    }
-
+    // Sync handler — reads localStorage directly, exactly like the base branch.
+    // setMachineUrl() in machineMode.ts writes here before firing the event,
+    // so the value is always available synchronously.
     const handler = () => {
-      void loadMachineUrl()
+      try {
+        const stored = localStorage.getItem(STORAGE_KEYS.MACHINE_URL)
+        if (stored && stored !== machineUrl) setMachineUrl(stored)
+      } catch { /* noop */ }
     }
     const storageHandler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEYS.MACHINE_URL) handler()
@@ -43,13 +37,11 @@ export function useResolvedMachineUrl(enabled: boolean): string {
 
     window.addEventListener(MACHINE_URL_CHANGED, handler)
     window.addEventListener('storage', storageHandler)
-
     return () => {
-      cancelled = true
       window.removeEventListener(MACHINE_URL_CHANGED, handler)
       window.removeEventListener('storage', storageHandler)
     }
-  }, [enabled])
+  }, [enabled, machineUrl])
 
   return machineUrl
 }
