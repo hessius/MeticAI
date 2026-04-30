@@ -163,32 +163,27 @@ describe('RunShotView scheduled-shot guards', () => {
     expect(helpers.canCancelScheduledShot?.({ scheduledShotsEnabled: true })).toBe(true)
   })
 
-  it('shows variable adjustments only when direct override execution is supported', () => {
+  it('shows variable adjustments when profile has variables', () => {
     const helpers = runShotHelpers as typeof runShotHelpers & {
       canShowVariableAdjustments?: (args: {
-        scheduledShotsEnabled: boolean
         hasSelectedProfile: boolean
         variableCount: number
       }) => boolean
     }
 
     expect(helpers.canShowVariableAdjustments?.({
-      scheduledShotsEnabled: false,
-      hasSelectedProfile: true,
-      variableCount: 2,
-    })).toBe(false)
-    expect(helpers.canShowVariableAdjustments?.({
-      scheduledShotsEnabled: true,
       hasSelectedProfile: true,
       variableCount: 2,
     })).toBe(true)
     expect(helpers.canShowVariableAdjustments?.({
-      scheduledShotsEnabled: true,
+      hasSelectedProfile: true,
+      variableCount: 2,
+    })).toBe(true)
+    expect(helpers.canShowVariableAdjustments?.({
       hasSelectedProfile: false,
       variableCount: 2,
     })).toBe(false)
     expect(helpers.canShowVariableAdjustments?.({
-      scheduledShotsEnabled: true,
       hasSelectedProfile: true,
       variableCount: 0,
     })).toBe(false)

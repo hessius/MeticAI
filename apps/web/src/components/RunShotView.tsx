@@ -730,7 +730,6 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const showVariableAdjustments = canShowVariableAdjustments({
-    scheduledShotsEnabled,
     hasSelectedProfile: Boolean(selectedProfile),
     variableCount: profileVariables.length,
   })

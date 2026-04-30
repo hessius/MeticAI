@@ -17,15 +17,13 @@ export function canCancelScheduledShot({
 }
 
 export function canShowVariableAdjustments({
-  scheduledShotsEnabled,
   hasSelectedProfile,
   variableCount,
 }: {
-  scheduledShotsEnabled: boolean
   hasSelectedProfile: boolean
   variableCount: number
 }): boolean {
-  return scheduledShotsEnabled && hasSelectedProfile && variableCount > 0
+  return hasSelectedProfile && variableCount > 0
 }
 
 export function getSchedulePreheatInfo({
