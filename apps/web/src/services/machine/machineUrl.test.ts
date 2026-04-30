@@ -74,14 +74,14 @@ describe('machineUrl persistence', () => {
     expect(await resolveMachineUrl()).toBe('http://10.0.0.2:8080')
   })
 
-  it('does not use stale web localStorage as a native fallback when Preferences are empty', async () => {
-    localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://stale-web-url:8080')
+  it('uses localStorage as sync fallback on native when Preferences are empty', async () => {
+    localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://10.0.0.5:8080')
     ;(window as unknown as { Capacitor?: { isNativePlatform: () => boolean } }).Capacitor = {
       isNativePlatform: () => true,
     }
     const { resolveMachineUrl } = await import('./machineUrl')
 
-    await expect(resolveMachineUrl()).resolves.toBe('http://meticulous.local:8080')
+    await expect(resolveMachineUrl()).resolves.toBe('http://10.0.0.5:8080')
     expect(preferencesMock.get).toHaveBeenCalledWith({ key: STORAGE_KEYS.MACHINE_URL })
   })
 })

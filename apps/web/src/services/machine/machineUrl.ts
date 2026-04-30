@@ -30,16 +30,18 @@ export async function resolveMachineUrl(): Promise<string> {
   const stored = await getStoredMachineUrl()
   if (stored) return stored
 
-  // Fallback to localStorage — setMachineUrl() writes here synchronously
-  // during onboarding, before the async Capacitor Preferences write completes.
-  if (typeof window !== 'undefined') {
-    try {
-      const lsUrl = localStorage.getItem(STORAGE_KEYS.MACHINE_URL)
-      if (lsUrl) return lsUrl
-    } catch { /* localStorage unavailable */ }
+  if (isNativeRuntime()) {
+    // On native, also check localStorage — setMachineUrl() writes here
+    // synchronously during onboarding, before the async Capacitor
+    // Preferences write completes.
+    if (typeof window !== 'undefined') {
+      try {
+        const lsUrl = localStorage.getItem(STORAGE_KEYS.MACHINE_URL)
+        if (lsUrl) return lsUrl
+      } catch { /* localStorage unavailable */ }
+    }
+    return getMachineUrlFallback()
   }
-
-  if (isNativeRuntime()) return getMachineUrlFallback()
 
   return getDefaultMachineUrl()
 }
