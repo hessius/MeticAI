@@ -1,8 +1,10 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
-import { isNativePlatform } from '@/lib/machineMode'
+import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { resolveMachineUrl } from '@/services/machine/machineUrl'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
+import { deriveStructuralTags } from '@/lib/profileAnalysis'
+import type { AnalyzableProfile } from '@/lib/profileAnalysis'
 import {
   addDirectDialInIteration,
   clearDirectHistory,
@@ -649,6 +651,7 @@ export function installDirectModeInterceptor(): void {
         ...p,
         in_history: true,
         has_description: !!(p.display?.description || p.display?.shortDescription),
+        derived_tags: deriveStructuralTags(p as AnalyzableProfile),
       }))
     }
     try { localStorage.setItem(PROFILE_LIST_CACHE_KEY, JSON.stringify(result)) } catch { /* ignore */ }
@@ -2531,6 +2534,146 @@ export function installDirectModeInterceptor(): void {
           return jsonResponse({ status: 'error', detail: (e as Error).message }, 500)
         }
       })()
+    }
+
+    // POST /api/profile/:id/regenerate-description → use BrowserAIService
+    const regenDescMatch = url.match(/\/api\/profile\/([^/]+)\/regenerate-description$/)
+    if (regenDescMatch && method === 'POST') {
+      return (async () => {
+        try {
+          const entryId = decodeURIComponent(regenDescMatch[1])
+          let profileJson: Record<string, unknown> | null = null
+          let profileName = entryId
+
+          // Strategy 1: Try entryId as a history entry
+          try {
+            const history = await _loadVisibleHistory()
+            const histEntry = history.find(e => e.id === entryId)
+            if (histEntry) {
+              profileName = getHistoryProfileName(histEntry)
+              const cached = _profileCache.get(profileName)
+              if (cached) {
+                const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+                if (r.ok) profileJson = await r.json()
+              }
+            }
+          } catch { /* History lookup failed */ }
+
+          // Strategy 2: Try entryId as a profile name via cache
+          if (!profileJson) {
+            const cached = _profileCache.get(entryId)
+            if (cached) {
+              const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+              if (r.ok) { profileJson = await r.json(); profileName = entryId }
+            }
+          }
+
+          // Strategy 3: Try entryId as a machine profile ID directly
+          if (!profileJson) {
+            const r = await _fetch(`/api/v1/profile/get/${entryId}`)
+            if (r.ok) profileJson = await r.json()
+          }
+
+          if (!profileJson) {
+            return jsonResponse({ status: 'error', detail: 'History entry not found' }, 404)
+          }
+
+          // Try AI description first, fall back to static
+          const aiService = createBrowserAIService()
+          if (aiService.isConfigured()) {
+            try {
+              const { GoogleGenAI } = await import('@google/genai')
+              const key = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+              if (!key) throw new Error('No API key')
+              const client = new GoogleGenAI({ apiKey: key })
+              const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
+              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
+              const response = await client.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              })
+              const description = response.text?.trim()
+              if (description && !description.includes('generated without AI')) {
+                return jsonResponse({ status: 'success', description })
+              }
+            } catch { /* AI generation failed — fall back to static */ }
+          }
+
+          // Static fallback
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          const description = buildStaticProfileDescription(profileJson as Parameters<typeof buildStaticProfileDescription>[0])
+          return jsonResponse({ status: 'success', description })
+        } catch {
+          return jsonResponse({ status: 'error', detail: 'Failed to regenerate description' }, 500)
+        }
+      })()
+    }
+
+    // ── Settings & status endpoints ─────────────────────────────────────
+
+    // GET/POST /api/settings → read/write from localStorage in direct mode
+    if (url.match(/\/api\/settings$/) && method === 'GET') {
+      return Promise.resolve(jsonResponse({
+        geminiApiKey: localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || '',
+        geminiApiKeyConfigured: Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()),
+        meticulousIp: getDefaultMachineUrl() || '',
+        authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
+        geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || '',
+        mqttEnabled: true,
+      }))
+    }
+    if (url.match(/\/api\/settings$/) && method === 'POST') {
+      return (async () => {
+        try {
+          const request = input instanceof Request ? input : new Request(input, init)
+          const body = JSON.parse(await request.text())
+          if (body.geminiApiKey !== undefined) localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, body.geminiApiKey)
+          if (body.authorName !== undefined) localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, body.authorName)
+          if (body.geminiModel !== undefined) localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, body.geminiModel)
+          return jsonResponse({ status: 'ok' })
+        } catch (e) {
+          return jsonResponse({ status: 'error', detail: (e as Error).message }, 500)
+        }
+      })()
+    }
+
+    // GET /api/health → always healthy in direct mode
+    if (url.match(/\/api\/health$/)) {
+      return Promise.resolve(jsonResponse({ status: 'ok', mode: 'direct' }))
+    }
+
+    // GET /api/version → return app version
+    if (url.match(/\/api\/version$/)) {
+      return Promise.resolve(jsonResponse({
+        version: (globalThis as Record<string, unknown>).__APP_VERSION__ || 'unknown',
+        mode: 'direct',
+      }))
+    }
+
+    // GET /api/network-ip → return configured machine IP
+    if (url.match(/\/api\/network-ip$/)) {
+      const machineIp = localStorage.getItem(STORAGE_KEYS.MACHINE_IP) || ''
+      return Promise.resolve(jsonResponse({ ip: machineIp }))
+    }
+
+    // GET /api/machine/detect → not needed in direct mode
+    if (url.match(/\/api\/machine\/detect/)) {
+      return Promise.resolve(jsonResponse({ detail: 'Machine detection not available in direct mode' }, 501))
+    }
+
+    // ── Backend-only admin routes — return sensible stubs ──────────────
+
+    if (url.match(/\/api\/update-method/)) {
+      return Promise.resolve(jsonResponse({ method: 'manual', can_trigger_update: false }))
+    }
+    if (url.match(/\/api\/tailscale-status/)) {
+      return Promise.resolve(jsonResponse({ enabled: false, installed: false }))
+    }
+    if (url.match(/\/api\/changelog/)) {
+      return Promise.resolve(jsonResponse({ releases: [] }))
+    }
+    if (url.match(/\/api\/(check-updates|restart|beta-channel|feedback)/)) {
+      return Promise.resolve(jsonResponse({ detail: 'Server administration not available in direct/app mode' }, 501))
     }
 
     // Unknown route — return 501 Not Implemented instead of silent empty response
