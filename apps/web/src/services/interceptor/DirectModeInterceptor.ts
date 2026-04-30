@@ -2639,6 +2639,8 @@ export function installDirectModeInterceptor(): void {
               })
               const description = response.text?.trim()
               if (description && !description.includes('generated without AI')) {
+                _descriptionCache.set(profileName, description)
+                _persistDescriptionCache()
                 return jsonResponse({ status: 'success', description })
               }
             } catch { /* AI generation failed — fall back to static */ }
@@ -2647,6 +2649,8 @@ export function installDirectModeInterceptor(): void {
           // Static fallback
           const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
           const description = buildStaticProfileDescription(profileJson as Parameters<typeof buildStaticProfileDescription>[0])
+          _descriptionCache.set(profileName, description)
+          _persistDescriptionCache()
           return jsonResponse({ status: 'success', description })
         } catch {
           return jsonResponse({ status: 'error', detail: 'Failed to regenerate description' }, 500)

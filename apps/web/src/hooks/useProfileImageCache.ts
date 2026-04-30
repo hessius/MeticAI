@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
-import { getProfileImageValue, resolveDisplayImageAsync } from '@/hooks/useProfileImageSrc'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 
 interface CacheEntry {
   url: string
@@ -156,7 +156,7 @@ export function useProfileImageCache() {
                 let imageUrl: string
                 if (isDirectMode() || isNativePlatform()) {
                   // Direct/Capacitor: use actual image URL (fetch interceptor doesn't handle <img src>)
-                  const resolved = await resolveDisplayImageAsync(getProfileImageValue(data.profile))
+                  const resolved = resolveDisplayImage(getProfileImageValue(data.profile))
                   if (!resolved) return
                   imageUrl = resolved
                 } else {

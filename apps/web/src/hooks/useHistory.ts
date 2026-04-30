@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getServerUrl } from '@/lib/config'
+import { isNativePlatform } from '@/lib/machineMode'
 
 export interface HistoryEntry {
   id: string
@@ -108,16 +109,38 @@ export function useHistory() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
 
-    const blob = new Blob([JSON.stringify(entry.profile_json, null, 2)], {
-      type: 'application/json'
-    })
-    
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${safeName || 'profile'}.json`
-    link.click()
-    URL.revokeObjectURL(url)
+    const jsonString = JSON.stringify(entry.profile_json, null, 2)
+
+    if (isNativePlatform()) {
+      const { Share } = await import('@capacitor/share')
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      try {
+        const filename = `${safeName || 'profile'}.json`
+        const result = await Filesystem.writeFile({
+          path: filename,
+          data: btoa(unescape(encodeURIComponent(jsonString))),
+          directory: Directory.Cache,
+        })
+        await Share.share({
+          title: entry.profile_name,
+          url: result.uri,
+        })
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        await Share.share({
+          title: entry.profile_name,
+          text: jsonString,
+        })
+      }
+    } else {
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${safeName || 'profile'}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+    }
   }, [t])
 
   return {

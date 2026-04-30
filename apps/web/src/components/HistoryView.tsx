@@ -47,7 +47,7 @@ import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
-import { getProfileImageValue, resolveDisplayImageAsync } from '@/hooks/useProfileImageSrc'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
 import { 
@@ -860,7 +860,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           if (displayImage) {
             if (isDirectMode() || isNativePlatform()) {
               // Direct/Capacitor: use actual image URL (fetch interceptor doesn't handle <img src>)
-              const resolved = await resolveDisplayImageAsync(displayImage)
+              const resolved = resolveDisplayImage(displayImage)
               if (resolved) setProfileImage(resolved)
             } else {
               // Proxy mode: use the proxy endpoint to get the actual image with cache buster
@@ -1006,12 +1006,16 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       // Close dialog and update image immediately
       const newCacheBuster = Date.now()
       setShowPreviewDialog(false)
-      setPreviewImage(null)
       setImageCacheBuster(newCacheBuster)
       // Invalidate the image cache so the catalogue will re-fetch
       invalidateImageCache(entry.profile_name)
-      // Immediately set the new profile image URL with cache buster
-      setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${newCacheBuster}`)
+      // On native/direct: use the data URI directly (proxy may not serve it back)
+      if (isDirectMode() || isNativePlatform()) {
+        setProfileImage(previewImage)
+      } else {
+        setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${newCacheBuster}`)
+      }
+      setPreviewImage(null)
       setImageUploadSuccess(true)
       toast.success(t('history.imageApplied'))
       setTimeout(() => setImageUploadSuccess(false), 3000)
@@ -1115,6 +1119,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       }
 
       setCurrentReply(regenerated.description)
+      // Persist the description to the entry so it survives view reopens
+      onEntryUpdated?.({ ...entry, reply: regenerated.description })
       toast.success(t('history.aiDescriptionGenerated'))
     } catch (err) {
       console.error('Failed to regenerate description:', err)
@@ -1186,10 +1192,18 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       
       setIsCapturing(false)
       
-      const link = document.createElement('a')
-      link.download = `${safeFilename}.png`
-      link.href = dataUrl
-      link.click()
+      // On native, use share sheet (WKWebView can't open data: URLs via <a> clicks)
+      if (isNativePlatform()) {
+        const { shareImageDataUri } = await import('@/hooks/useNativeShare')
+        await shareImageDataUri(dataUrl, `${safeFilename}.png`, {
+          title: entry.profile_name,
+        })
+      } else {
+        const link = document.createElement('a')
+        link.download = `${safeFilename}.png`
+        link.href = dataUrl
+        link.click()
+      }
     } catch (error) {
       console.error('Error saving results:', error)
       setIsCapturing(false)
@@ -1571,7 +1585,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           )}
           {/* Edit details button */}
           {entry.profile_json && !editingSection && (
-            <div className="flex justify-end mb-2">
+            <div className="flex justify-end -mb-1">
               <Button
                 variant="ghost"
                 size="sm"
