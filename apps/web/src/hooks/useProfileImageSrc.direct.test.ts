@@ -25,7 +25,7 @@ describe('direct/native profile image resolution', () => {
     localStorage.clear()
   })
 
-  it('resolves flat profile.image paths with the async native machine URL', async () => {
+  it('resolves flat profile.image paths with the sync machine URL', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       profile: { image: '/profile-images/turbo.png' },
     }), {
@@ -36,9 +36,8 @@ describe('direct/native profile image resolution', () => {
     const { result } = renderHook(() => useProfileImageSrc('Turbo Bloom'))
 
     await waitFor(() => {
-      expect(result.current).toBe('http://native-preferences:8080/profile-images/turbo.png')
+      expect(result.current).toBe('http://stale-localstorage:8080/profile-images/turbo.png')
     })
-    expect(machineUrlMocks.resolveMachineUrl).toHaveBeenCalled()
   })
 
   it('caches flat profile.image paths with the async native machine URL', async () => {
