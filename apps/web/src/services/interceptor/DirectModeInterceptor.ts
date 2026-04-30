@@ -614,9 +614,21 @@ export function installDirectModeInterceptor(): void {
   const _isNative = isNativePlatform()
 
   function _fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    if (_isNative && typeof input === 'string' && input.startsWith('/api/')) {
+    if (_isNative) {
       const machineBase = getDefaultMachineUrl()
-      return _originalFetch(`${machineBase}${input}`, init)
+      if (typeof input === 'string' && input.startsWith('/api/')) {
+        return _originalFetch(`${machineBase}${input}`, init)
+      }
+      if (input instanceof URL && input.pathname.startsWith('/api/')) {
+        return _originalFetch(new URL(input.pathname + input.search, machineBase), init)
+      }
+      if (input instanceof Request) {
+        const reqUrl = new URL(input.url)
+        if (reqUrl.pathname.startsWith('/api/')) {
+          const prefixed = new URL(reqUrl.pathname + reqUrl.search, machineBase).toString()
+          return _originalFetch(new Request(prefixed, input), init)
+        }
+      }
     }
     return _originalFetch(input, init)
   }
@@ -966,57 +978,10 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/machine/run-profile-with-overrides/:id → load profile → start (overrides applied by patching profile on machine)
+    // POST /api/machine/run-profile-with-overrides/:id → not supported in direct mode
     const runOverridesMatch = url.match(/\/api\/machine\/run-profile-with-overrides\/([^/?]+)/)
     if (runOverridesMatch && method === 'POST') {
-      const profileId = decodeURIComponent(runOverridesMatch[1])
-      return (async () => {
-        // Parse overrides from the FormData body
-        const request = input instanceof Request ? input : new Request(input, init)
-        const formData = await request.formData()
-        const overridesJson = formData.get('overrides_json') as string | null
-        const overrides: Record<string, number> = overridesJson ? JSON.parse(overridesJson) : {}
-
-        // If there are overrides, apply them to the profile on the machine first
-        if (Object.keys(overrides).length > 0) {
-          const profileResp = await _fetch(`/api/v1/profile/get/${profileId}`)
-          if (profileResp.ok) {
-            const profileData = await profileResp.json() as { variables?: Array<{ key: string; value: number }> }
-            if (profileData.variables) {
-              for (const v of profileData.variables) {
-                if (v.key in overrides) v.value = overrides[v.key]
-              }
-              await _fetch(`/api/v1/profile/save`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(profileData),
-              })
-            }
-          }
-        }
-
-        // Load + start (same logic as run-profile)
-        let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
-        if (!loadResp.ok) {
-          await _fetch('/api/v1/action/stop')
-          for (let attempt = 0; attempt < 10; attempt++) {
-            await new Promise(r => setTimeout(r, 2000))
-            loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
-            if (loadResp.ok) break
-            const body = await loadResp.json().catch(() => ({})) as {error?: string}
-            if (body.error !== 'machine is busy') {
-              return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
-            }
-          }
-          if (!loadResp.ok) {
-            return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
-          }
-        }
-        const startResp = await _fetch('/api/v1/action/start')
-        return startResp.ok
-          ? jsonResponse({ status: 'success', message: 'Profile started with overrides' })
-          : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
-      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to run profile with overrides' }, 500))
+      return jsonResponse({ detail: 'Variable overrides are not supported in direct mode' }, 501)
     }
 
     // POST /api/machine/command/start → GET /api/v1/action/start
@@ -1542,9 +1507,9 @@ export function installDirectModeInterceptor(): void {
         }
         const imagePath = getDirectProfileImagePath(profile)
         if (!imagePath) return new Response('', { status: 404 })
-        const machineBase = await resolveMachineUrl()
+        const machineBase = getDefaultMachineUrl()
         const imageUrl = new URL(imagePath, machineBase).toString()
-        const imageResponse = await _fetch(imageUrl)
+        const imageResponse = await _originalFetch(imageUrl)
         if (!imageResponse.ok) return new Response('', { status: imageResponse.status })
         const imageBlob = await imageResponse.blob()
         await saveDirectProfileImage(profile.id, imageBlob)
