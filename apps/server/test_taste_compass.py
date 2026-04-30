@@ -9,9 +9,7 @@ Covers:
 
 import os
 import sys
-import hashlib
 
-import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault("TEST_MODE", "true")
@@ -23,6 +21,7 @@ from services.gemini_service import compute_taste_hash
 # ============================================================================
 # build_taste_context tests
 # ============================================================================
+
 
 class TestBuildTasteContext:
     """Tests for prompt_builder.build_taste_context."""
@@ -100,6 +99,7 @@ class TestDescribeAxisValue:
 # compute_taste_hash tests
 # ============================================================================
 
+
 class TestComputeTasteHash:
     """Tests for gemini_service.compute_taste_hash."""
 
@@ -151,6 +151,7 @@ class TestComputeTasteHash:
 # Cache differentiation integration test
 # ============================================================================
 
+
 class TestCacheDifferentiation:
     """Test that the cache key generation works for taste-aware analysis."""
 
@@ -184,6 +185,7 @@ class TestCacheDifferentiation:
 # ============================================================================
 # Backward compatibility
 # ============================================================================
+
 
 class TestBackwardCompatibility:
     """Verify that the new taste params don't break existing behavior."""

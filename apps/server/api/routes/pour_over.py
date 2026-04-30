@@ -31,9 +31,15 @@ logger = logging.getLogger(__name__)
 class PrepareRequest(BaseModel):
     target_weight: float = Field(..., gt=0, description="Target brew weight in grams")
     bloom_enabled: bool = Field(True, description="Include bloom stage")
-    bloom_seconds: float = Field(30.0, gt=0, le=300, description="Bloom duration in seconds")
-    dose_grams: Optional[float] = Field(None, gt=0, description="Dose in grams (informational)")
-    brew_ratio: Optional[float] = Field(None, gt=0, description="Brew ratio (informational)")
+    bloom_seconds: float = Field(
+        30.0, gt=0, le=300, description="Bloom duration in seconds"
+    )
+    dose_grams: Optional[float] = Field(
+        None, gt=0, description="Dose in grams (informational)"
+    )
+    brew_ratio: Optional[float] = Field(
+        None, gt=0, description="Brew ratio (informational)"
+    )
 
 
 class PrepareResponse(BaseModel):
@@ -127,7 +133,9 @@ async def prepare_recipe(body: PrepareRecipeRequest):
     try:
         profile_json = adapt_recipe_to_profile(recipe)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to adapt recipe: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Failed to adapt recipe: {exc}"
+        ) from exc
 
     previous_profile_name = None
     try:

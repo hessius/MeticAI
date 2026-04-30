@@ -36,9 +36,13 @@ def pytest_collection_modifyitems(config, items):
     skip_integration = pytest.mark.skip(
         reason="Integration tests require TEST_INTEGRATION=true environment variable"
     )
-    
-    integration_enabled = os.environ.get("TEST_INTEGRATION", "").lower() in ("true", "1", "yes")
-    
+
+    integration_enabled = os.environ.get("TEST_INTEGRATION", "").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
     for item in items:
         if "integration" in item.keywords and not integration_enabled:
             item.add_marker(skip_integration)
@@ -64,16 +68,16 @@ def integration_api(meticulous_ip):
     """Get a Meticulous API client for integration tests."""
     # Set the IP in environment for the service to pick up
     os.environ["METICULOUS_IP"] = meticulous_ip
-    
+
     # Import after setting env var
     from services.meticulous_service import get_meticulous_api, reset_meticulous_api
-    
+
     # Reset to pick up the new IP
     reset_meticulous_api()
-    
+
     api = get_meticulous_api()
     yield api
-    
+
     # Cleanup - reset the API client
     reset_meticulous_api()
 
@@ -82,16 +86,16 @@ def integration_api(meticulous_ip):
 def wait_for_machine(integration_api):
     """Wait for machine to be in a stable state before running test."""
     import httpx
-    
+
     base_url = integration_api.base_url
-    
+
     # Use /api/v1/settings as liveness check (machine has no /api/v1/machine/state)
     try:
         response = httpx.get(f"{base_url}/api/v1/settings", timeout=5.0)
         response.raise_for_status()
     except Exception as e:
         pytest.skip(f"Machine not reachable: {e}")
-    
+
     return integration_api
 
 
@@ -109,22 +113,27 @@ def mqtt_port():
 
 class IntegrationTestHelpers:
     """Helper utilities for integration tests."""
-    
+
     @staticmethod
-    def wait_for_weight_stable(api, timeout: float = 5.0, tolerance: float = 0.1) -> float:
+    def wait_for_weight_stable(
+        api, timeout: float = 5.0, tolerance: float = 0.1
+    ) -> float:
         """Wait for scale weight to stabilize using Socket.IO status events."""
-        import threading
-        
+
         start_time = time.time()
         last_weight = None
         stable_count = 0
         result = {"weight": None, "error": None}
-        
+
         def on_status(data):
             nonlocal last_weight, stable_count
             try:
-                weight = data.get("sensors", {}).get("w", 0) if isinstance(data, dict) else getattr(getattr(data, "sensors", None), "w", 0)
-                
+                weight = (
+                    data.get("sensors", {}).get("w", 0)
+                    if isinstance(data, dict)
+                    else getattr(getattr(data, "sensors", None), "w", 0)
+                )
+
                 if last_weight is not None and abs(weight - last_weight) < tolerance:
                     stable_count += 1
                     if stable_count >= 3:
@@ -134,26 +143,26 @@ class IntegrationTestHelpers:
                 last_weight = weight
             except Exception:
                 pass
-        
+
         api.sio.on("status", on_status)
         try:
             if not api.sio.connected:
                 api.connect_to_socket(retries=2)
-            
+
             while time.time() - start_time < timeout:
                 if result["weight"] is not None:
                     return result["weight"]
                 time.sleep(0.2)
-            
+
             raise TimeoutError("Weight did not stabilize within timeout")
         finally:
             api.sio.on("status", None)
-    
+
     @staticmethod
     def wait_for_connection(host: str, port: int, timeout: float = 10.0) -> bool:
         """Wait for a TCP connection to become available."""
         import socket
-        
+
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
@@ -161,7 +170,7 @@ class IntegrationTestHelpers:
                     return True
             except (socket.error, socket.timeout):
                 time.sleep(0.5)
-        
+
         return False
 
 

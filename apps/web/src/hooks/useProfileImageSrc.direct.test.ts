@@ -40,7 +40,7 @@ describe('direct/native profile image resolution', () => {
     })
   })
 
-  it('caches flat profile.image paths with the async native machine URL', async () => {
+  it('caches flat profile.image paths with the sync machine URL', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       profile: { image: '/profile-images/cache.png' },
     }), {
@@ -55,7 +55,7 @@ describe('direct/native profile image resolution', () => {
       images = await result.current.fetchImagesForProfiles(['Cached Bloom'])
     })
 
-    expect(images['Cached Bloom']).toBe('http://native-preferences:8080/profile-images/cache.png')
-    expect(result.current.getImageUrl('Cached Bloom')).toBe('http://native-preferences:8080/profile-images/cache.png')
+    expect(images['Cached Bloom']).toBe('http://stale-localstorage:8080/profile-images/cache.png')
+    expect(result.current.getImageUrl('Cached Bloom')).toBe('http://stale-localstorage:8080/profile-images/cache.png')
   })
 })

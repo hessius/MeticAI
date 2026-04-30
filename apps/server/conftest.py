@@ -35,7 +35,7 @@ def cleanup_test_data():
 @pytest.fixture(autouse=True)
 def _reset_in_memory_caches():
     """Reset all in-memory service caches between tests.
-    
+
     This prevents stale data from leaking across test boundaries when
     tests write directly to on-disk files and expect fresh reads.
     """
@@ -58,6 +58,7 @@ def _reset_in_memory_caches():
 
     # Also reset settings file on disk to defaults to prevent cross-test leaks
     from config import DATA_DIR
+
     settings_file = DATA_DIR / "settings.json"
     if settings_file.exists():
         settings_file.unlink()
@@ -85,7 +86,7 @@ def mock_validate_profile():
 def _reset_generation_progress():
     """Clear in-memory generation state between tests."""
     from services.generation_progress import _active_generations
+
     _active_generations.clear()
     yield
     _active_generations.clear()
-

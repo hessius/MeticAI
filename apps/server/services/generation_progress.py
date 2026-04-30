@@ -13,6 +13,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 
 class GenerationPhase(str, Enum):
     """Phases of profile generation."""
+
     QUEUED = "queued"
     ANALYZING = "analyzing"
     GENERATING = "generating"
@@ -27,11 +28,12 @@ class GenerationPhase(str, Enum):
 @dataclass
 class ProgressEvent:
     """A single progress event."""
+
     phase: GenerationPhase
     message: str
-    attempt: int = 0          # retry attempt number (0 = first try)
-    max_attempts: int = 3     # total attempts allowed
-    elapsed: float = 0.0      # seconds since generation started
+    attempt: int = 0  # retry attempt number (0 = first try)
+    max_attempts: int = 3  # total attempts allowed
+    elapsed: float = 0.0  # seconds since generation started
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
@@ -39,6 +41,7 @@ class ProgressEvent:
 @dataclass
 class GenerationState:
     """Tracks the state of an in-progress generation."""
+
     generation_id: str
     created_at: float = field(default_factory=time.monotonic)
     events: list = field(default_factory=list)
@@ -79,7 +82,9 @@ class GenerationState:
             except asyncio.TimeoutError:
                 # Yield keepalive so the SSE connection stays open for
                 # long-running generations (retries, slow models, etc.)
-                yield ProgressEvent(phase=GenerationPhase.KEEPALIVE, message="keepalive")
+                yield ProgressEvent(
+                    phase=GenerationPhase.KEEPALIVE, message="keepalive"
+                )
                 continue
             finally:
                 # Remove the waiter so emit() doesn't set results on orphans

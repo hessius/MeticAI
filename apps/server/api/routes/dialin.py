@@ -5,12 +5,10 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from models.dialin import (
     CoffeeDetails,
-    DialInSession,
     SessionStatus,
     TasteFeedback,
 )
@@ -23,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Request body models ────────────────────────────────────────────────────────
+
 
 class CreateSessionRequest(BaseModel):
     coffee: CoffeeDetails
@@ -39,6 +38,7 @@ class UpdateRecommendationsRequest(BaseModel):
 
 
 # ── Sessions ───────────────────────────────────────────────────────────────────
+
 
 @router.post("/dialin/sessions", status_code=201)
 @router.post("/api/dialin/sessions", status_code=201)
@@ -76,6 +76,7 @@ async def get_session(session_id: str):
 
 
 # ── Iterations ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/dialin/sessions/{session_id}/iterations", status_code=201)
 @router.post("/api/dialin/sessions/{session_id}/iterations", status_code=201)
@@ -117,6 +118,7 @@ async def update_recommendations(
 
 # ── AI Recommendations ─────────────────────────────────────────────────────────
 
+
 @router.post("/dialin/sessions/{session_id}/recommend")
 @router.post("/api/dialin/sessions/{session_id}/recommend")
 async def generate_recommendations(session_id: str):
@@ -142,9 +144,7 @@ async def generate_recommendations(session_id: str):
                 process=coffee.process.value if coffee.process else None,
                 roast_date=coffee.roast_date,
                 profile_name=session.profile_name,
-                iterations=[
-                    it.model_dump(mode="json") for it in session.iterations
-                ],
+                iterations=[it.model_dump(mode="json") for it in session.iterations],
             )
             model = get_vision_model()
             response = await model.async_generate_content(prompt)
@@ -168,7 +168,9 @@ async def generate_recommendations(session_id: str):
                 )
                 return {"recommendations": recommendations[:6], "source": "ai"}
         except Exception as exc:
-            logger.warning("Gemini dial-in recommendation failed, falling back to rules: %s", exc)
+            logger.warning(
+                "Gemini dial-in recommendation failed, falling back to rules: %s", exc
+            )
 
     # Rule-based fallback
     x = latest.taste.x if latest.taste.x is not None else 0.0
@@ -197,6 +199,7 @@ async def generate_recommendations(session_id: str):
 
 
 # ── Session lifecycle ──────────────────────────────────────────────────────────
+
 
 @router.post("/dialin/sessions/{session_id}/complete")
 @router.post("/api/dialin/sessions/{session_id}/complete")

@@ -24,6 +24,7 @@ _MAX_CACHE_SIZE = 50
 # LRU cache (unchanged)
 # ---------------------------------------------------------------------------
 
+
 class _LRUCache:
     """Thread-safe LRU cache with a fixed max size."""
 
@@ -60,6 +61,7 @@ def _cache_key(tags: list[str], limit: int) -> str:
 # ---------------------------------------------------------------------------
 # Structural fingerprint extraction
 # ---------------------------------------------------------------------------
+
 
 def extract_fingerprint(profile: object) -> dict:
     """Extract a structural fingerprint from a full profile.
@@ -199,19 +201,63 @@ def extract_fingerprint(profile: object) -> dict:
 # Keyword tag extraction (from profile name + stage names)
 # ---------------------------------------------------------------------------
 
-_NAME_KEYWORDS = frozenset([
-    "fruity", "chocolate", "nutty", "floral", "caramel", "berry", "citrus",
-    "sweet", "balanced", "creamy", "syrupy", "light", "medium", "dark",
-    "modern", "italian", "lever", "turbo", "bloom", "long", "short",
-    "pre-infusion", "pulse", "acidity", "funky", "thin", "mouthfeel",
-    "ristretto", "lungo", "allonge", "espresso", "filter",
-])
+_NAME_KEYWORDS = frozenset(
+    [
+        "fruity",
+        "chocolate",
+        "nutty",
+        "floral",
+        "caramel",
+        "berry",
+        "citrus",
+        "sweet",
+        "balanced",
+        "creamy",
+        "syrupy",
+        "light",
+        "medium",
+        "dark",
+        "modern",
+        "italian",
+        "lever",
+        "turbo",
+        "bloom",
+        "long",
+        "short",
+        "pre-infusion",
+        "pulse",
+        "acidity",
+        "funky",
+        "thin",
+        "mouthfeel",
+        "ristretto",
+        "lungo",
+        "allonge",
+        "espresso",
+        "filter",
+    ]
+)
 
-_STAGE_KEYWORDS = frozenset([
-    "preinfusion", "pre-infusion", "bloom", "ramp", "soak", "infusion",
-    "extraction", "decline", "taper", "hold", "pulse", "turbo", "lever",
-    "flat", "pressure", "flow",
-])
+_STAGE_KEYWORDS = frozenset(
+    [
+        "preinfusion",
+        "pre-infusion",
+        "bloom",
+        "ramp",
+        "soak",
+        "infusion",
+        "extraction",
+        "decline",
+        "taper",
+        "hold",
+        "pulse",
+        "turbo",
+        "lever",
+        "flat",
+        "pressure",
+        "flow",
+    ]
+)
 
 
 def _extract_name_tags(profile: object) -> set[str]:
@@ -245,9 +291,14 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 # Proximity helpers
 # ---------------------------------------------------------------------------
 
-def _proximity_score(a: float | None, b: float | None,
-                     full_range: float, partial_range: float,
-                     max_points: float) -> tuple[float, str | None]:
+
+def _proximity_score(
+    a: float | None,
+    b: float | None,
+    full_range: float,
+    partial_range: float,
+    max_points: float,
+) -> tuple[float, str | None]:
     """Score how close two numeric values are. Returns (score, reason_or_None)."""
     if a is None or b is None:
         return 0.0, None
@@ -263,6 +314,7 @@ def _proximity_score(a: float | None, b: float | None,
 # ---------------------------------------------------------------------------
 # Main scoring function
 # ---------------------------------------------------------------------------
+
 
 def _score_profile(
     user_tags: set[str],
@@ -292,8 +344,10 @@ def _score_profile(
         if user_fingerprint["control_mode"] == cand_fp["control_mode"]:
             struct_score += 12
             reasons.append(f"{cand_fp['control_mode'].capitalize()}-controlled")
-        elif (user_fingerprint["control_mode"] != "unknown"
-              and cand_fp["control_mode"] != "unknown"):
+        elif (
+            user_fingerprint["control_mode"] != "unknown"
+            and cand_fp["control_mode"] != "unknown"
+        ):
             # Partial credit for mixed vs pressure/flow
             if "mixed" in (user_fingerprint["control_mode"], cand_fp["control_mode"]):
                 struct_score += 4
@@ -375,6 +429,7 @@ def _score_profile(
 # Service class
 # ---------------------------------------------------------------------------
 
+
 class ProfileRecommendationService:
     """Local-only profile recommendation engine — zero AI tokens."""
 
@@ -425,12 +480,14 @@ class ProfileRecommendationService:
         scored: list[dict] = []
         for p in profiles:
             s, reasons, explanation = _score_profile(user_tags, user_fingerprint, p)
-            scored.append({
-                "profile_name": getattr(p, "name", "Unknown"),
-                "score": s,
-                "explanation": explanation,
-                "match_reasons": reasons,
-            })
+            scored.append(
+                {
+                    "profile_name": getattr(p, "name", "Unknown"),
+                    "score": s,
+                    "explanation": explanation,
+                    "match_reasons": reasons,
+                }
+            )
 
         scored.sort(key=lambda x: x["score"], reverse=True)
         return [s for s in scored if s["score"] > 0][:limit]
@@ -462,12 +519,14 @@ class ProfileRecommendationService:
             if getattr(p, "name", "") == source_profile_name:
                 continue
             s, reasons, explanation = _score_profile(source_tags, source_fp, p)
-            scored.append({
-                "profile_name": getattr(p, "name", "Unknown"),
-                "score": s,
-                "explanation": explanation,
-                "match_reasons": reasons,
-            })
+            scored.append(
+                {
+                    "profile_name": getattr(p, "name", "Unknown"),
+                    "score": s,
+                    "explanation": explanation,
+                    "match_reasons": reasons,
+                }
+            )
 
         scored.sort(key=lambda x: x["score"], reverse=True)
         return [s for s in scored if s["score"] > 0][:limit]
@@ -501,11 +560,16 @@ class ProfileRecommendationService:
 
         # Map user tags to structural features
         tag_to_technique = {
-            "preinfusion": "preinfusion", "pre-infusion": "preinfusion",
-            "bloom": "bloom", "soak": "bloom",
+            "preinfusion": "preinfusion",
+            "pre-infusion": "preinfusion",
+            "bloom": "bloom",
+            "soak": "bloom",
             "pulse": "pulse",
-            "lever": "lever", "turbo": "turbo",
-            "ramp": "ramp", "decline": "decline", "taper": "taper",
+            "lever": "lever",
+            "turbo": "turbo",
+            "ramp": "ramp",
+            "decline": "decline",
+            "taper": "taper",
             "flat": "flat",
             "pressure": "pressure-profile",
             "flow": "flow-profile",

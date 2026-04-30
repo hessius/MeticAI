@@ -5,10 +5,10 @@ for easier management and testing.
 
 Usage:
     from config import config, DATA_DIR, MAX_UPLOAD_SIZE
-    
+
     # Access via config object
     api_key = config.GEMINI_API_KEY
-    
+
     # Or use exported constants
     upload_limit = MAX_UPLOAD_SIZE
 
@@ -39,10 +39,10 @@ import re
 
 class Config:
     """Central configuration for MeticAI server."""
-    
+
     # Test Mode
     TEST_MODE = os.environ.get("TEST_MODE") == "true"
-    
+
     # Data Directories
     if TEST_MODE:
         data_dir_env = os.environ.get("DATA_DIR")
@@ -53,30 +53,27 @@ class Config:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
     else:
         DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
-    
+
     LOG_DIR = Path(os.environ.get("LOG_DIR", "/app/logs"))
-    
+
     # API Keys and Endpoints
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
     METICULOUS_IP = os.environ.get("METICULOUS_IP", "")
     PI_IP = os.environ.get("PI_IP", "")
-    
+
     # Application Settings
     UPDATE_CHECK_INTERVAL = 7200  # 2 hours in seconds
     MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
-    
+
     # Cache Settings
     LLM_CACHE_TTL_SECONDS = 259200  # 3 days (72 hours)
     SHOT_CACHE_STALE_SECONDS = 3600  # 1 hour
-    
+
     # Stage Status Constants
     STAGE_STATUS_RETRACTING = "retracting"
-    
+
     # Regex Patterns (pre-compiled for performance)
-    VERSION_PATTERN = re.compile(
-        r'^\s*version\s*=\s*["\']([^"\']+)["\']', 
-        re.MULTILINE
-    )
+    VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
 
 
 # Convenience access to config
