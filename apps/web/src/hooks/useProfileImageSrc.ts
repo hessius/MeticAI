@@ -66,7 +66,7 @@ export function useProfileImageSrc(profileName: string | null | undefined): stri
           const res = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
           if (!res.ok) return null
           const data = await res.json()
-          return resolveDisplayImageAsync(getProfileImageValue(data?.profile))
+          return resolveDisplayImage(getProfileImageValue(data?.profile))
         } catch {
           return null
         }

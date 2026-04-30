@@ -1543,6 +1543,9 @@ export function installDirectModeInterceptor(): void {
         const name = decodeURIComponent(profileEditMatch[1])
         const profile = await _findProfileByName(name)
         if (!profile) return jsonResponse({ detail: `Profile '${name}' not found on machine` }, 404)
+        // Fetch full profile (with stages) — the list cache doesn't include stages
+        const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+        const fullProfile = fullResp.ok ? await fullResp.json() as CachedProfile : profile
         const request = input instanceof Request ? input : new Request(input, init)
         const body = await request.json() as {
           name?: string
@@ -1551,7 +1554,7 @@ export function installDirectModeInterceptor(): void {
           variables?: Array<{ key?: string; value?: unknown }>
           author?: string
         }
-        const updated: CachedProfile = JSON.parse(JSON.stringify(profile))
+        const updated: CachedProfile = JSON.parse(JSON.stringify(fullProfile))
         if (body.name !== undefined) {
           if (typeof body.name !== 'string' || !body.name.trim()) {
             return jsonResponse({ detail: 'Profile name must be a non-empty string' }, 400)
@@ -1641,10 +1644,6 @@ export function installDirectModeInterceptor(): void {
     if (historyNotesMatch && (method === 'GET' || method === 'PATCH' || method === 'PUT')) {
       return (async () => {
         const entryId = decodeURIComponent(historyNotesMatch[1])
-        const history = await _loadVisibleHistory()
-        if (!history.some((entry) => entry.id === entryId)) {
-          return jsonResponse({ detail: 'History entry not found' }, 404)
-        }
         if (method === 'GET') {
           const notes = await getDirectHistoryNotes(entryId)
           return jsonResponse({ status: 'success', ...notes })
