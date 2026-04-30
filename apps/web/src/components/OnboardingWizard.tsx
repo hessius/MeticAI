@@ -34,7 +34,7 @@ import {
 } from '@phosphor-icons/react'
 import { MeticLogo } from '@/components/MeticLogo'
 import { STORAGE_KEYS } from '@/lib/constants'
-import { isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { isDemoMode, isNativePlatform, setMachineUrl } from '@/lib/machineMode'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
@@ -179,17 +179,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     runDiscovery({ cancelled: false })
   }, [runDiscovery])
 
-  const saveMachineUrl = useCallback(async (url: string): Promise<boolean> => {
-    try {
-      await persistMachineUrl(url)
-      return true
-    } catch (error) {
-      console.error('Failed to save machine URL:', error)
-      setConnectionStatus('error')
-      toast.error(t('onboarding.machine.saveFailed'))
-      return false
-    }
-  }, [t])
+  const saveMachineUrl = useCallback((url: string): void => {
+    // Sync localStorage write for immediate availability (proven on base branch)
+    setMachineUrl(url)
+    // Also persist to Capacitor Preferences in the background for durability
+    persistMachineUrl(url).catch((err) =>
+      console.warn('Background persist failed (localStorage already set):', err),
+    )
+  }, [])
 
   // Auto-fill and test when discovery completes and user reaches machine step
   useEffect(() => {
@@ -204,12 +201,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setMachineName(machine.name)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setConnectionStatus('testing')
-      testMachineConnection(machine.url).then(async (ok) => {
+      testMachineConnection(machine.url).then((ok) => {
         if (!mountedRef.current || autoConnectingUrlRef.current !== machine.url) return
         if (ok) {
-          const saved = await saveMachineUrl(machine.url)
-          if (!mountedRef.current || autoConnectingUrlRef.current !== machine.url) return
-          if (!saved) return
+          saveMachineUrl(machine.url)
           setConnectionStatus('success')
           toast.success(t('onboarding.machine.autoDiscovered'))
         } else {
@@ -257,10 +252,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     try {
       const ok = await testMachineConnection(parsed.url)
       if (ok) {
-        const saved = await saveMachineUrl(parsed.url)
-        if (!saved) return
         setConnectionStatus('success')
         setMachineName(parsed.name)
+        saveMachineUrl(parsed.url)
         toast.success(t('onboarding.machine.connected'))
       } else {
         setConnectionStatus('error')
@@ -368,7 +362,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <Button
                   key={m.url}
                   variant="outline"
-                  className="w-full justify-start gap-2"
+                  className="w-full justify-start gap-2 whitespace-normal text-left"
                   onClick={async () => {
                     setMachineIp(m.host)
                     setMachineName(m.name)
@@ -376,9 +370,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     try {
                       const ok = await testMachineConnection(m.url)
                       if (ok) {
-                        const saved = await saveMachineUrl(m.url)
-                        if (!saved) return
                         setConnectionStatus('success')
+                        saveMachineUrl(m.url)
                         toast.success(t('onboarding.machine.connected'))
                       } else {
                         setConnectionStatus('error')
@@ -390,8 +383,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     }
                   }}
                 >
-                  <WifiHigh size={16} weight="duotone" className="text-green-500" />
-                  {m.name} ({m.host}:{m.port})
+                  <WifiHigh size={16} weight="duotone" className="text-green-500 shrink-0" />
+                  <span className="break-all">{m.name} ({m.host}:{m.port})</span>
                 </Button>
               ))}
             </div>
