@@ -45,7 +45,7 @@ import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAuto
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
 import { useSmartGreeting } from '@/hooks/useSmartGreeting'
-import { useProfileImageSrc, getProfileImageValue, resolveDisplayImageAsync } from '@/hooks/useProfileImageSrc'
+import { useProfileImageSrc, getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
@@ -865,7 +865,7 @@ function App() {
           reply,
           profile_json: profileJson,
         }
-        const imageUrl = await resolveDisplayImageAsync(displayImage) ?? undefined
+        const imageUrl = resolveDisplayImage(displayImage) ?? undefined
         handleViewHistoryEntry(entry, imageUrl)
       } else {
         // Proxy mode: search history for matching entry
@@ -909,7 +909,7 @@ function App() {
       }
       const profileImage = getProfileImageValue(profile)
       const imageUrl = (isDirectMode() || isNativePlatform())
-        ? await resolveDisplayImageAsync(profileImage) ?? undefined
+        ? resolveDisplayImage(profileImage) ?? undefined
         : profileImage || undefined
       previousViewStateRef.current = 'profile-catalogue'
       handleViewHistoryEntry(entry, imageUrl)

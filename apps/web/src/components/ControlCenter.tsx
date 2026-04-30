@@ -194,8 +194,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               display: p.display,
               // In direct/native mode, resolve machine-relative image URLs.
               // In proxy mode, leave null — the image cache uses /api/profile/{name}/image-proxy.
-              resolvedImageUrl: isDirect && resolvedMachineUrl
-                ? resolveDisplayImage(getProfileImageValue(p), resolvedMachineUrl)
+              resolvedImageUrl: isDirect
+                ? resolveDisplayImage(getProfileImageValue(p), resolvedMachineUrl || undefined)
                 : null,
             }))
           setMachineProfiles(profiles)

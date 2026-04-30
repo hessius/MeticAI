@@ -1,6 +1,7 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
+import { resolveMachineUrl } from '@/services/machine/machineUrl'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
@@ -1507,7 +1508,7 @@ export function installDirectModeInterceptor(): void {
         }
         const imagePath = getDirectProfileImagePath(profile)
         if (!imagePath) return new Response('', { status: 404 })
-        const machineBase = getDefaultMachineUrl()
+        const machineBase = await resolveMachineUrl()
         const imageUrl = new URL(imagePath, machineBase).toString()
         const imageResponse = await _originalFetch(imageUrl)
         if (!imageResponse.ok) return new Response('', { status: imageResponse.status })
