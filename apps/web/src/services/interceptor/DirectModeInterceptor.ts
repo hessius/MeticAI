@@ -1545,7 +1545,13 @@ export function installDirectModeInterceptor(): void {
         if (!profile) return jsonResponse({ detail: `Profile '${name}' not found on machine` }, 404)
         // Fetch full profile (with stages) — the list cache doesn't include stages
         const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
-        const fullProfile = fullResp.ok ? await fullResp.json() as CachedProfile : profile
+        let fullProfile = profile
+        if (fullResp.ok) {
+          try {
+            const parsed = await fullResp.json() as CachedProfile
+            if (typeof parsed?.id === 'string') fullProfile = parsed
+          } catch { /* use cached profile */ }
+        }
         const request = input instanceof Request ? input : new Request(input, init)
         const body = await request.json() as {
           name?: string
