@@ -126,7 +126,7 @@ describe('OnboardingWizard direct/native machine URL persistence', () => {
       key: STORAGE_KEYS.MACHINE_URL,
       value: 'http://192.168.1.50:8080',
     }))
-    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBeNull()
+    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBe('http://192.168.1.50:8080')
   })
 
   it('auto-connects a single discovered native machine without cancelling persistence', async () => {
