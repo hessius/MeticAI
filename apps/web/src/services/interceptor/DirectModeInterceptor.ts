@@ -1,7 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
-import { resolveMachineUrl } from '@/services/machine/machineUrl'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
@@ -614,24 +613,10 @@ export function installDirectModeInterceptor(): void {
   // the machine base URL since same-origin is the WebView, not the machine.
   const _isNative = isNativePlatform()
 
-  function _nativeMachineApiUrl(inputUrl: string, pathname: string): string | null {
-    if (!_isNative || !pathname.startsWith('/api/')) return null
-    const parsed = new URL(inputUrl || '/', window.location.origin)
-    if (parsed.origin !== window.location.origin && !inputUrl.startsWith('/api/')) return null
-    return `${parsed.pathname}${parsed.search}`
-  }
-
-  async function _fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const { url, pathname } = getDirectRequestContext(input, init)
-    const nativeApiPath = _nativeMachineApiUrl(url, pathname)
-    if (nativeApiPath) {
-      const machineBase = await resolveMachineUrl()
-      const targetUrl = `${machineBase}${nativeApiPath}`
-      if (input instanceof Request) {
-        const request = init ? new Request(input, init) : input
-        return _originalFetch(new Request(targetUrl, request))
-      }
-      return _originalFetch(targetUrl, init)
+  function _fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    if (_isNative && typeof input === 'string' && input.startsWith('/api/')) {
+      const machineBase = getDefaultMachineUrl()
+      return _originalFetch(`${machineBase}${input}`, init)
     }
     return _originalFetch(input, init)
   }
@@ -713,22 +698,37 @@ export function installDirectModeInterceptor(): void {
   }
 
   // Background prefetch: refresh profile list on startup so catalogue loads instantly
-  setTimeout(() => {
-    _fetch('/api/v1/profile/list')
-      .then(r => r.ok ? r.json() : null)
-        .then((data: unknown[] | null) => {
-        if (data) {
-          const processed = _processProfileList(data)
-          // Kick off background description generation
-          _generateDescriptionsInBackground(processed.profiles)
-        }
-      })
-      .catch(() => { /* non-critical */ })
-  }, 2000)
+  // Only run after onboarding is complete — before that, no machine URL is configured
+  if (localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
+    setTimeout(() => {
+      _fetch('/api/v1/profile/list')
+        .then(r => r.ok ? r.json() : null)
+        .then((data: CachedProfile[] | null) => {
+          if (data) {
+            _processProfileList(data)
+            _generateDescriptionsInBackground(data)
+          }
+        })
+        .catch(() => { /* non-critical */ })
+    }, 2000)
+  }
 
   async function _loadProfilesFromMachine(): Promise<CachedProfile[]> {
     const response = await _fetch('/api/v1/profile/list')
-    if (!response.ok) return []
+    if (!response.ok) {
+      const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          if (parsed?.profiles) {
+            _profileCache.clear()
+            for (const p of parsed.profiles) _profileCache.set(p.name, p)
+            return parsed.profiles
+          }
+        } catch { /* corrupted cache */ }
+      }
+      return []
+    }
     const raw = await response.json()
     const result = _processProfileList(Array.isArray(raw) ? raw : [])
     return result.profiles
@@ -966,10 +966,57 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/machine/run-profile-with-overrides/:id → unsupported in direct mode
+    // POST /api/machine/run-profile-with-overrides/:id → load profile → start (overrides applied by patching profile on machine)
     const runOverridesMatch = url.match(/\/api\/machine\/run-profile-with-overrides\/([^/?]+)/)
     if (runOverridesMatch && method === 'POST') {
-      return jsonResponse({ detail: 'Variable overrides are not supported in direct mode' }, 501)
+      const profileId = decodeURIComponent(runOverridesMatch[1])
+      return (async () => {
+        // Parse overrides from the FormData body
+        const request = input instanceof Request ? input : new Request(input, init)
+        const formData = await request.formData()
+        const overridesJson = formData.get('overrides_json') as string | null
+        const overrides: Record<string, number> = overridesJson ? JSON.parse(overridesJson) : {}
+
+        // If there are overrides, apply them to the profile on the machine first
+        if (Object.keys(overrides).length > 0) {
+          const profileResp = await _fetch(`/api/v1/profile/get/${profileId}`)
+          if (profileResp.ok) {
+            const profileData = await profileResp.json() as { variables?: Array<{ key: string; value: number }> }
+            if (profileData.variables) {
+              for (const v of profileData.variables) {
+                if (v.key in overrides) v.value = overrides[v.key]
+              }
+              await _fetch(`/api/v1/profile/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(profileData),
+              })
+            }
+          }
+        }
+
+        // Load + start (same logic as run-profile)
+        let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+        if (!loadResp.ok) {
+          await _fetch('/api/v1/action/stop')
+          for (let attempt = 0; attempt < 10; attempt++) {
+            await new Promise(r => setTimeout(r, 2000))
+            loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+            if (loadResp.ok) break
+            const body = await loadResp.json().catch(() => ({})) as {error?: string}
+            if (body.error !== 'machine is busy') {
+              return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+            }
+          }
+          if (!loadResp.ok) {
+            return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
+          }
+        }
+        const startResp = await _fetch('/api/v1/action/start')
+        return startResp.ok
+          ? jsonResponse({ status: 'success', message: 'Profile started with overrides' })
+          : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to run profile with overrides' }, 500))
     }
 
     // POST /api/machine/command/start → GET /api/v1/action/start
@@ -1260,9 +1307,16 @@ export function installDirectModeInterceptor(): void {
 
     // GET /api/machine/profiles → /api/v1/profile/list (add in_history/has_description, populate cache)
     if (url.match(/\/api\/machine\/profiles$/)) {
-      return _loadProfilesFromMachine().then((profiles) => (
-        jsonResponse(_processProfileList(profiles))
-      )).catch(() => {
+      return _fetch('/api/v1/profile/list').then(r => {
+        if (!r.ok) {
+          const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
+          if (cached) {
+            try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
+          }
+          return jsonResponse({ profiles: [] })
+        }
+        return r.json().then((data: CachedProfile[]) => jsonResponse(_processProfileList(data)))
+      }).catch(() => {
         const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
         if (cached) {
           try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
@@ -1588,6 +1642,7 @@ export function installDirectModeInterceptor(): void {
           final_weight: profile.final_weight,
           image: getDirectProfileImagePath(profile),
           accent_color: profile.display?.accentColor,
+          display: profile.display,
         }
         if (includeStages) {
           responseProfile.stages = profile.stages ?? []
@@ -1617,7 +1672,7 @@ export function installDirectModeInterceptor(): void {
 
     // /api/history/{id}/notes → direct local notes storage
     const historyNotesMatch = pathname.match(/^\/api\/history\/([^/]+)\/notes$/)
-    if (historyNotesMatch && (method === 'GET' || method === 'PATCH')) {
+    if (historyNotesMatch && (method === 'GET' || method === 'PATCH' || method === 'PUT')) {
       return (async () => {
         const entryId = decodeURIComponent(historyNotesMatch[1])
         const history = await _loadVisibleHistory()
@@ -1838,7 +1893,7 @@ export function installDirectModeInterceptor(): void {
 
     // GET/PATCH/DELETE /api/shots/{date}/{filename}/annotation → direct local annotation storage
     const shotAnnotationMatch = pathname.match(/^\/api\/shots\/([^/]+)\/([^/]+)\/annotation$/)
-    if (shotAnnotationMatch && (method === 'GET' || method === 'PATCH' || method === 'DELETE')) {
+    if (shotAnnotationMatch && (method === 'GET' || method === 'PATCH' || method === 'PUT' || method === 'DELETE')) {
       return (async () => {
         const date = decodeURIComponent(shotAnnotationMatch[1])
         const filename = decodeURIComponent(shotAnnotationMatch[2])
@@ -2677,7 +2732,6 @@ export function installDirectModeInterceptor(): void {
     }
 
     // Unknown route — return 501 Not Implemented instead of silent empty response
-    console.warn('[DirectMode] Unhandled route:', pathname)
     return Promise.resolve(jsonResponse({ error: 'Not implemented in direct mode', path: pathname }, 501))
   }
 }
