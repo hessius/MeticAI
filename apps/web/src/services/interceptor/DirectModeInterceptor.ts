@@ -785,8 +785,18 @@ export function installDirectModeInterceptor(): void {
     const profile = await _findProfileByName(profileName)
     if (!profile) throw new DirectStorageValidationError(`Profile '${profileName}' not found on machine`)
 
+    // Fetch full profile (with stages) — the list cache may not include them
+    let fullProfile = profile
+    try {
+      const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+      if (fullResp.ok) {
+        const parsed = await fullResp.json() as CachedProfile
+        if (typeof parsed?.id === 'string') fullProfile = parsed
+      }
+    } catch { /* use cached profile */ }
+
     const imageBlob = dataUriToBlob(imageDataUri)
-    const updated = cloneProfileForSave(profile)
+    const updated = cloneProfileForSave(fullProfile)
     updated.display = {
       ...(isRecord(updated.display) ? updated.display : {}),
       image: imageDataUri,
@@ -1590,6 +1600,15 @@ export function installDirectModeInterceptor(): void {
         if (!saveResponse.ok) return jsonResponse({ detail: 'Failed to save profile to machine' }, 502)
         _profileCache.delete(name)
         _profileCache.set(updated.name, updated)
+
+        // Regenerate static description for the edited profile
+        try {
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          const desc = buildStaticProfileDescription(machineProfile as Parameters<typeof buildStaticProfileDescription>[0])
+          _descriptionCache.set(updated.id, desc)
+          _persistDescriptionCache()
+        } catch { /* non-critical */ }
+
         return jsonResponse({ status: 'success', profile: machineProfile })
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to edit profile' }, 500))
     }

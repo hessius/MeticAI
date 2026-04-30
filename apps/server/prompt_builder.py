@@ -351,7 +351,7 @@ PROFILE_EMPHASIS_TECHNIQUES: List[str] = [
 # =============================================================================
 
 CORE_SAFETY_CONSTRAINTS: List[str] = [
-    "No text, words, letters, or numbers.",
+    "The image must contain absolutely no text, words, letters, numbers, labels, watermarks, signatures, or typography of any kind — purely visual art only.",
     "No realistic human faces.",
     "Abstract artistic interpretation.",
 ]

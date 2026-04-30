@@ -16,7 +16,7 @@ describe('prompt builders', () => {
     it('should include the no-text safety constraint', () => {
       const prompt = buildImagePrompt('Berry Blast', 'abstract', ['fruity'])
       expect(prompt).toContain('no text')
-      expect(prompt).toContain('No text, words, letters, or numbers')
+      expect(prompt).toContain('absolutely no text, words, letters, numbers, labels, watermarks, signatures, or typography')
     })
 
     it('should include the profile name', () => {

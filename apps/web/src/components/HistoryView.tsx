@@ -781,7 +781,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
 
     setIsSavingEdit(true)
     try {
-      await profileService.updateProfile(
+      const result = await profileService.updateProfile(
         entry.profile_name,
         payload as { name?: string; temperature?: number; final_weight?: number; variables?: { key: string; value: number | string }[] }
       )
@@ -789,17 +789,25 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       toast.success(t('profileEdit.saved'))
       setEditingSection(null)
 
-      // Stay on page: re-fetch the updated history entry
-      try {
-        const serverUrl = await getServerUrl()
-        const res = await fetch(`${serverUrl}/api/history/${entry.id}`)
-        if (res.ok) {
-          const updated = await res.json()
-          onEntryUpdated?.(updated)
-        }
-      } catch {
-        // Non-critical — entry still shows previous data
+      // Update entry in-place with the saved profile data for immediate UI refresh
+      const updatedProfile = result.profile ?? null
+      const updated: HistoryEntry = {
+        ...entry,
+        profile_name: updatedProfile?.name ?? entry.profile_name,
+        profile_json: updatedProfile ?? entry.profile_json,
       }
+
+      // Regenerate the static description for the updated profile
+      if (updatedProfile) {
+        try {
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          updated.reply = buildStaticProfileDescription(updatedProfile as Parameters<typeof buildStaticProfileDescription>[0])
+        } catch {
+          // Keep existing description
+        }
+      }
+
+      onEntryUpdated?.(updated)
     } catch (err) {
       console.error('Failed to save profile edit:', err)
       toast.error(err instanceof Error ? err.message : t('profileEdit.saveFailed'))
