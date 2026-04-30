@@ -405,6 +405,7 @@ app.include_router(dialin.router)
 # Imports used by lifespan()
 # ============================================================================
 from services.scheduling_state import (
+    _scheduled_shots,  # noqa: F401 — accessed by tests via main._scheduled_shots
     _scheduled_tasks,
     _recurring_schedules,
     restore_scheduled_shots as _restore_scheduled_shots,
