@@ -229,6 +229,8 @@ interface ProfileBreakdownProps {
   editVariables?: { key: string; name: string; value: string; type: string }[]
   onVariableChange?: (key: string, value: string) => void
   disabled?: boolean
+  /** Optional action element rendered inline with the title (e.g. edit button) */
+  headerAction?: React.ReactNode
 }
 
 function getTypeIcon(type: string) {
@@ -492,7 +494,7 @@ function formatLimits(limits?: StageLimit[], variables?: ProfileVariable[]): str
   }).join(', ')
 }
 
-export function ProfileBreakdown({ profile, className = '', currentStage, editMode, editTemperature, onTemperatureChange, editFinalWeight, onFinalWeightChange, editVariables, onVariableChange, disabled }: ProfileBreakdownProps) {
+export function ProfileBreakdown({ profile, className = '', currentStage, editMode, editTemperature, onTemperatureChange, editFinalWeight, onFinalWeightChange, editVariables, onVariableChange, disabled, headerAction }: ProfileBreakdownProps) {
   const { t } = useTranslation()
   const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -584,9 +586,12 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
       transition={{ delay: 0.1 }}
       className={`space-y-3 ${className}`}
     >
-      <Label className="text-sm font-semibold tracking-wide text-primary">
-        {t('profileBreakdown.title')}
-      </Label>
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold tracking-wide text-primary">
+          {t('profileBreakdown.title')}
+        </Label>
+        {headerAction}
+      </div>
       
       <div className="p-4 bg-secondary/60 rounded-xl border border-primary/20 space-y-4">
         {/* Temperature and Target Weight */}

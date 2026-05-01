@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { hasFeature } from '@/lib/featureFlags'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
@@ -44,7 +45,7 @@ import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAuto
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
 import { useSmartGreeting } from '@/hooks/useSmartGreeting'
-import { useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { useProfileImageSrc, getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
@@ -74,7 +75,10 @@ import { useSoundEffects, useGlobalSoundDelegation } from '@/hooks/useSoundEffec
 function App() {
   const { t } = useTranslation()
   useStorageMigration()
-  const [isInitializing, setIsInitializing] = useState(true)
+  const [isInitializing, setIsInitializing] = useState(() => {
+    // On native/direct, never block render waiting for network
+    return !(isDemoMode() || isDirectMode())
+  })
   const [viewState, setViewState] = useState<ViewState>(() => {
     // Show onboarding on first launch in native/direct mode
     if ((isNativePlatform() || isDirectMode()) && !localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
@@ -202,7 +206,7 @@ function App() {
           setMqttEnabled(data.mqttEnabled !== false)
           const hasGeminiKey = Boolean((data.geminiApiKey || '').trim())
           setIsAiConfigured(data.geminiApiKeyConfigured === true || hasGeminiKey)
-          syncAutoSyncFromServer(data)
+          if (hasFeature('cloudSync')) syncAutoSyncFromServer(data)
         }
       } catch {
         // default false if unreachable
@@ -258,6 +262,8 @@ function App() {
       clearInterval(autoSyncIntervalRef.current)
       autoSyncIntervalRef.current = null
     }
+
+    if (!hasFeature('cloudSync')) return
 
     // Re-read prefs on every AI_PREFS_CHANGED_EVENT via aiEnabled dep
     const autoSyncEnabled = getAutoSync()
@@ -770,6 +776,9 @@ function App() {
       case 'history-detail':
         setViewState('profile-catalogue')
         break
+      case 'profile-catalogue':
+        handleBackToStart()
+        break
       case 'settings':
       case 'pour-over':
       case 'live-shot':
@@ -822,7 +831,7 @@ function App() {
           const cacheData = await cacheRes.json()
           if (cacheData?.profile?.id) {
             profileId = cacheData.profile.id
-            displayImage = cacheData.profile.display?.image
+            displayImage = getProfileImageValue(cacheData.profile) ?? undefined
           }
         }
 
@@ -846,12 +855,22 @@ function App() {
         const profileJson = jsonData?.profile ?? null
 
         const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
-        let reply = descCache?.get(profileId) ?? ''
+        let reply = descCache?.get(profileId) ?? descCache?.get(profileName) ?? ''
         if (!reply && profileJson) {
           const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
           reply = buildStaticProfileDescription(profileJson)
           descCache?.set(profileId, reply)
         }
+
+        // Fetch any saved notes
+        let notes: string | undefined
+        try {
+          const notesRes = await fetch(`/api/history/${encodeURIComponent(profileId)}/notes`)
+          if (notesRes.ok) {
+            const notesData = await notesRes.json()
+            notes = notesData.notes || undefined
+          }
+        } catch { /* non-critical */ }
 
         const entry: HistoryEntry = {
           id: profileId,
@@ -860,6 +879,7 @@ function App() {
           coffee_analysis: null,
           user_preferences: null,
           reply,
+          notes,
           profile_json: profileJson,
         }
         const imageUrl = resolveDisplayImage(displayImage) ?? undefined
@@ -879,42 +899,68 @@ function App() {
     }
   }
 
-  const handleViewMachineProfile = async (profile: { id: string; name: string; display?: { image?: string; description?: string } }) => {
+  const handleViewMachineProfile = async (profile: { id: string; name: string; image?: string; display?: { image?: string; description?: string } }) => {
+    // Navigate immediately with cached data — fetch full profile in background
+    const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+    const reply = descCache?.get(profile.id) ?? descCache?.get(profile.name) ?? ''
+    const profileImage = getProfileImageValue(profile)
+    const imageUrl = (isDirectMode() || isNativePlatform())
+      ? resolveDisplayImage(profileImage) ?? undefined
+      : profileImage || undefined
+
+    const entry: HistoryEntry = {
+      id: profile.id,
+      profile_name: profile.name,
+      created_at: new Date().toISOString(),
+      coffee_analysis: null,
+      user_preferences: null,
+      reply,
+      profile_json: null,
+    }
+    previousViewStateRef.current = 'profile-catalogue'
+    handleViewHistoryEntry(entry, imageUrl)
+
+    // Fetch full profile and notes in background, then update entry
     try {
       const serverUrl = await getServerUrl()
-      const res = await fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`)
-      const data = res.ok ? await res.json() : {}
-      const profileJson = data.profile ?? null
+      const [jsonRes, notesRes] = await Promise.all([
+        fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`),
+        fetch(`${serverUrl}/api/history/${encodeURIComponent(profile.id)}/notes`).catch(() => null),
+      ])
+      const jsonData = jsonRes.ok ? await jsonRes.json() : {}
+      const profileJson = jsonData.profile ?? null
 
-      // Use cached static description if available, else generate on the fly
-      const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
-      let reply = descCache?.get(profile.id) ?? ''
-      if (!reply && profileJson) {
-        const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
-        reply = buildStaticProfileDescription(profileJson)
-        descCache?.set(profile.id, reply)
+      let notes: string | undefined
+      if (notesRes?.ok) {
+        const notesData = await notesRes.json()
+        notes = notesData.notes || undefined
       }
 
-      const entry: HistoryEntry = {
+      // Generate description if we didn't have one cached
+      let updatedReply = reply
+      if (!updatedReply && profileJson) {
+        const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+        updatedReply = buildStaticProfileDescription(profileJson)
+        descCache?.set(profile.id, updatedReply)
+      }
+
+      const updated: HistoryEntry = {
         id: profile.id,
         profile_name: profile.name,
-        created_at: new Date().toISOString(),
+        created_at: entry.created_at,
         coffee_analysis: null,
         user_preferences: null,
-        reply,
+        reply: updatedReply,
+        notes,
         profile_json: profileJson,
       }
-      const imageUrl = (isDirectMode() || isNativePlatform())
-        ? resolveDisplayImage(profile.display?.image) ?? undefined
-        : profile.display?.image || undefined
-      previousViewStateRef.current = 'profile-catalogue'
-      handleViewHistoryEntry(entry, imageUrl)
+      setSelectedHistoryEntry(updated)
     } catch {
-      toast.error(t('profileCatalogue.loadFailed'))
+      // Non-critical — view already shows basic info
     }
   }
 
-  const handleDownloadJson = () => {
+  const handleDownloadJson = async () => {
     const jsonData = selectedHistoryEntry?.profile_json || currentProfileJson
     if (!jsonData) {
       toast.error(t('results.noProfileJson'))
@@ -930,16 +976,41 @@ function App() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
 
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
-      type: 'application/json'
-    })
-    
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${safeName || 'profile'}.json`
-    link.click()
-    URL.revokeObjectURL(url)
+    const jsonString = JSON.stringify(jsonData, null, 2)
+
+    if (isNativePlatform()) {
+      // On native, use Share API (WKWebView can't open blob: URLs)
+      const { Share } = await import('@capacitor/share')
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      try {
+        // Write to temp file and share
+        const filename = `${safeName || 'profile'}.json`
+        const result = await Filesystem.writeFile({
+          path: filename,
+          data: btoa(unescape(encodeURIComponent(jsonString))),
+          directory: Directory.Cache,
+        })
+        await Share.share({
+          title: profileName,
+          files: [result.uri],
+        })
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        // Fallback: share as text
+        await Share.share({
+          title: profileName,
+          text: jsonString,
+        })
+      }
+    } else {
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${safeName || 'profile'}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+    }
     
     toast.success(t('results.profileJsonDownloaded'))
   }
@@ -1160,7 +1231,7 @@ function App() {
                   {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
                 </Button>
               )}
-              {isDesktop && (
+              {isDesktop && !isNativePlatform() && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1356,6 +1427,7 @@ function App() {
                   onPourOver={() => setViewState('pour-over')}
                   onDialIn={() => setViewState('dial-in')}
                   onShotAnalysis={() => setViewState('shot-analysis')}
+                  onSettings={() => setViewState('settings')}
                   controlCenter={
                     showControlCenter && isMobile ? (
                       <ControlCenter
@@ -1577,8 +1649,8 @@ function App() {
 
             {/* Mobile Control Center — now rendered inside StartView */}
 
-            {/* Desktop-only footer — home view, non-demo */}
-            {!isMobile && isHome && !isDemoMode() && (
+            {/* Desktop-only footer — home view, non-demo, single-column only */}
+            {!isMobile && isHome && !isDemoMode() && !showRightColumn && (
               <footer className="text-center py-4 mt-2">
                 <a
                   href="https://buymeacoffee.com/HSUS"

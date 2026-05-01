@@ -70,7 +70,7 @@ test.describe('Accessibility - Automated Scans', () => {
   test('should pass axe scan on settings view', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('text=Add Profile')
-    const settingsButton = page.getByRole('button', { name: /Settings/i })
+    const settingsButton = page.getByRole('button', { name: /Settings/i }).first()
     if (await settingsButton.isVisible()) {
       await settingsButton.click()
       await page.waitForTimeout(500)

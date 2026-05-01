@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import os
 import sys
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 os.environ.setdefault("METICULOUS_IP", "127.0.0.1")
@@ -27,9 +28,16 @@ from services.profile_recommendation_service import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_stage(name: str, stype: str, points: list, over: str = "time",
-                interpolation: str = "linear", exit_triggers: list | None = None,
-                limits: list | None = None):
+
+def _make_stage(
+    name: str,
+    stype: str,
+    points: list,
+    over: str = "time",
+    interpolation: str = "linear",
+    exit_triggers: list | None = None,
+    limits: list | None = None,
+):
     """Create a mock Stage object."""
     dynamics = SimpleNamespace(points=points, over=over, interpolation=interpolation)
     return SimpleNamespace(
@@ -42,9 +50,13 @@ def _make_stage(name: str, stype: str, points: list, over: str = "time",
     )
 
 
-def _make_profile(name: str, stages: list | None = None,
-                  temperature: float = 93.0, final_weight: float = 36.0,
-                  variables: list | None = None):
+def _make_profile(
+    name: str,
+    stages: list | None = None,
+    temperature: float = 93.0,
+    final_weight: float = 36.0,
+    variables: list | None = None,
+):
     """Create a mock Profile object."""
     return SimpleNamespace(
         name=name,
@@ -119,6 +131,7 @@ LEVER_PROFILE = _make_profile(
 # Jaccard tests
 # ---------------------------------------------------------------------------
 
+
 class TestJaccard:
     def test_both_empty(self):
         assert _jaccard(set(), set()) == 0.0
@@ -136,6 +149,7 @@ class TestJaccard:
 # ---------------------------------------------------------------------------
 # Proximity score tests
 # ---------------------------------------------------------------------------
+
 
 class TestProximityScore:
     def test_identical_values(self):
@@ -162,6 +176,7 @@ class TestProximityScore:
 # ---------------------------------------------------------------------------
 # Fingerprint extraction tests
 # ---------------------------------------------------------------------------
+
 
 class TestExtractFingerprint:
     def test_pressure_profile(self):
@@ -207,7 +222,9 @@ class TestExtractFingerprint:
         assert fp["peak_pressure"] == 0
 
     def test_pulse_detection_many_stages(self):
-        stages = [_make_stage(f"Step {i}", "pressure", [[0, 3], [1, 6]]) for i in range(6)]
+        stages = [
+            _make_stage(f"Step {i}", "pressure", [[0, 3], [1, 6]]) for i in range(6)
+        ]
         profile = _make_profile("Pulse Profile", stages=stages)
         fp = extract_fingerprint(profile)
         assert fp["has_pulse"] is True
@@ -217,6 +234,7 @@ class TestExtractFingerprint:
 # ---------------------------------------------------------------------------
 # Tag extraction tests
 # ---------------------------------------------------------------------------
+
 
 class TestExtractNameTags:
     def test_keywords_in_name(self):
@@ -242,11 +260,14 @@ class TestExtractNameTags:
 # Scoring tests
 # ---------------------------------------------------------------------------
 
+
 class TestScoreProfile:
     def test_similar_pressure_profiles_score_high(self):
         source_fp = extract_fingerprint(PRESSURE_PROFILE)
         source_tags = _extract_name_tags(PRESSURE_PROFILE)
-        score, reasons, explanation = _score_profile(source_tags, source_fp, LEVER_PROFILE)
+        score, reasons, explanation = _score_profile(
+            source_tags, source_fp, LEVER_PROFILE
+        )
         # Both pressure-controlled with preinfusion
         assert score > 30
 
@@ -261,10 +282,18 @@ class TestScoreProfile:
         # Two profiles with similar weight should score higher
         p_close = _make_profile("Test A", stages=[], temperature=93, final_weight=37)
         p_far = _make_profile("Test B", stages=[], temperature=93, final_weight=60)
-        source_fp = {"final_weight": 36, "peak_pressure": 0, "temperature": 93,
-                     "control_mode": "unknown", "stage_count": 0, "is_flat": False,
-                     "technique_tags": set(), "has_preinfusion": False,
-                     "has_bloom": False, "has_pulse": False}
+        source_fp = {
+            "final_weight": 36,
+            "peak_pressure": 0,
+            "temperature": 93,
+            "control_mode": "unknown",
+            "stage_count": 0,
+            "is_flat": False,
+            "technique_tags": set(),
+            "has_preinfusion": False,
+            "has_bloom": False,
+            "has_pulse": False,
+        }
         score_close, _, _ = _score_profile(set(), source_fp, p_close)
         score_far, _, _ = _score_profile(set(), source_fp, p_far)
         assert score_close > score_far
@@ -272,10 +301,18 @@ class TestScoreProfile:
     def test_temperature_similarity(self):
         p_close = _make_profile("Test A", stages=[], temperature=93, final_weight=36)
         p_far = _make_profile("Test B", stages=[], temperature=80, final_weight=36)
-        source_fp = {"final_weight": 36, "peak_pressure": 0, "temperature": 93,
-                     "control_mode": "unknown", "stage_count": 0, "is_flat": False,
-                     "technique_tags": set(), "has_preinfusion": False,
-                     "has_bloom": False, "has_pulse": False}
+        source_fp = {
+            "final_weight": 36,
+            "peak_pressure": 0,
+            "temperature": 93,
+            "control_mode": "unknown",
+            "stage_count": 0,
+            "is_flat": False,
+            "technique_tags": set(),
+            "has_preinfusion": False,
+            "has_bloom": False,
+            "has_pulse": False,
+        }
         score_close, _, _ = _score_profile(set(), source_fp, p_close)
         score_far, _, _ = _score_profile(set(), source_fp, p_far)
         assert score_close > score_far
@@ -297,6 +334,7 @@ class TestScoreProfile:
 # ---------------------------------------------------------------------------
 # LRU Cache tests
 # ---------------------------------------------------------------------------
+
 
 class TestLRUCache:
     def test_get_set(self):
@@ -323,6 +361,7 @@ class TestLRUCache:
 # Service integration tests
 # ---------------------------------------------------------------------------
 
+
 class TestRecommendationService:
     @pytest.fixture
     def service(self):
@@ -336,7 +375,9 @@ class TestRecommendationService:
             new_callable=AsyncMock,
             return_value=profiles,
         ):
-            results = await service.get_recommendations(tags=["preinfusion", "bloom"], limit=5)
+            results = await service.get_recommendations(
+                tags=["preinfusion", "bloom"], limit=5
+            )
 
         assert isinstance(results, list)
         for r in results:
@@ -418,18 +459,28 @@ class TestRecommendationService:
     @pytest.mark.asyncio
     async def test_structural_ranking_pressure(self, service):
         """Pressure-controlled profiles should rank higher when searching for pressure-like tags."""
-        profiles = [PRESSURE_PROFILE, FLOW_PROFILE, FLAT_PROFILE, TURBO_PROFILE, LEVER_PROFILE]
+        profiles = [
+            PRESSURE_PROFILE,
+            FLOW_PROFILE,
+            FLAT_PROFILE,
+            TURBO_PROFILE,
+            LEVER_PROFILE,
+        ]
         with patch(
             "services.profile_recommendation_service.async_fetch_all_profiles",
             new_callable=AsyncMock,
             return_value=profiles,
         ):
-            results = await service.get_recommendations(tags=["preinfusion", "pressure"], limit=5)
+            results = await service.get_recommendations(
+                tags=["preinfusion", "pressure"], limit=5
+            )
 
         if results:
             # First result should be a pressure-controlled profile
             top_names = [r["profile_name"] for r in results[:2]]
-            assert any("Italian" in n or "Lever" in n or "Simple" in n for n in top_names)
+            assert any(
+                "Italian" in n or "Lever" in n or "Simple" in n for n in top_names
+            )
 
     @pytest.mark.asyncio
     async def test_find_similar_structural(self, service):
@@ -444,6 +495,10 @@ class TestRecommendationService:
 
         if results:
             # Lever should rank higher than flow/turbo for a pressure profile
-            lever_score = next((r["score"] for r in results if "Lever" in r["profile_name"]), 0)
-            turbo_score = next((r["score"] for r in results if "Turbo" in r["profile_name"]), 0)
+            lever_score = next(
+                (r["score"] for r in results if "Lever" in r["profile_name"]), 0
+            )
+            turbo_score = next(
+                (r["score"] for r in results if "Turbo" in r["profile_name"]), 0
+            )
             assert lever_score > turbo_score

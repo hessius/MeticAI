@@ -67,7 +67,7 @@ export class AIServiceError extends Error {
   constructor(public readonly code: AIErrorCode, cause?: unknown) {
     super(code)
     this.name = 'AIServiceError'
-    if (cause instanceof Error) this.cause = cause
+    if (cause !== undefined) Object.defineProperty(this, 'cause', { value: cause })
   }
 }
 

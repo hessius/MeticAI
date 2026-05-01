@@ -18,8 +18,8 @@ test.describe('Settings View', () => {
   })
 
   test('should navigate to settings page', async ({ page }) => {
-    // Click settings button - it has text "Settings"  
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    // Click settings button - use first() since desktop layout may show both header icon and grid button
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Verify settings view loaded - should show configuration section
@@ -28,7 +28,7 @@ test.describe('Settings View', () => {
 
   test('should display configuration section', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Wait for page to load and scroll to ensure Configuration section is visible
@@ -41,7 +41,7 @@ test.describe('Settings View', () => {
 
   test('should display about section', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // About Metic section is collapsible — check it exists
@@ -54,7 +54,7 @@ test.describe('Settings View', () => {
 
   test('should display version information', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Version Info section should be visible
@@ -63,7 +63,7 @@ test.describe('Settings View', () => {
 
   test('should allow saving settings', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Settings now auto-save, so verify configuration fields exist instead
@@ -72,7 +72,7 @@ test.describe('Settings View', () => {
 
   test('should navigate back from settings', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Verify we're in settings
@@ -92,6 +92,6 @@ test.describe('Settings View', () => {
     }
 
     // Should be back on home - look for Settings button again
-    await expect(page.getByRole('button', { name: /^Settings$/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: /^Settings$/i }).first()).toBeVisible({ timeout: 5000 })
   })
 })

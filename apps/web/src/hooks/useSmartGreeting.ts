@@ -206,6 +206,14 @@ function shotProfileName(shot: { profile?: { name?: string }; name: string }): s
   return shot.profile?.name ?? shot.name ?? 'Unknown'
 }
 
+// Well-known temporary profile names created by pour-over / recipe features.
+const TEMP_PROFILE_NAMES = new Set(['MeticAI Ratio Pour-Over'])
+const TEMP_PROFILE_PREFIXES = ['MeticAI Recipe: ', 'MeticAI Override: ']
+
+function isTempProfileName(name: string): boolean {
+  return TEMP_PROFILE_NAMES.has(name) || TEMP_PROFILE_PREFIXES.some(p => name.startsWith(p))
+}
+
 // ---------------------------------------------------------------------------
 // Greeting rules — sorted by priority (lower = higher priority)
 // ---------------------------------------------------------------------------
@@ -217,13 +225,16 @@ export const GREETING_RULES: GreetingRule[] = [
     priority: 10,
     match: (ctx) => {
       if (ctx.minutesSinceLastShot === null || ctx.minutesSinceLastShot >= 15 || !ctx.lastShot) return null
+      const profileName = shotProfileName(ctx.lastShot)
+      // Skip temporary profiles (pour-over, recipes) — they are not real espresso shots
+      if (isTempProfileName(profileName)) return null
       return {
         id: 'justBrewed',
-        message: ctx.t('smartGreeting.justBrewed', { profile: shotProfileName(ctx.lastShot) }),
+        message: ctx.t('smartGreeting.justBrewed', { profile: profileName }),
         action: {
           label: ctx.t('smartGreeting.analyzeAction'),
           target: 'shot-analysis',
-          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file?.split('/').slice(1).join('/') || ctx.lastShot.file || '', profileName: shotProfileName(ctx.lastShot) },
+          context: { date: ctx.lastShot.file?.split('/')[0] ?? '', filename: ctx.lastShot.file?.split('/').slice(1).join('/') || ctx.lastShot.file || '', profileName },
         },
       }
     },

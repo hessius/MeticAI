@@ -35,9 +35,10 @@ import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
 import { useHaptics } from '@/hooks/useHaptics'
-import { useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { getProfileImageValue, useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { isDirectMode, isNativePlatform as isNativePlatformFn } from '@/lib/machineMode'
+import { useResolvedMachineUrl } from '@/services/machine/useResolvedMachineUrl'
 import { toast } from 'sonner'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
 import { ProfileDropdown, type DropdownProfile } from './ProfileDropdown'
@@ -109,6 +110,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const [machineProfiles, setMachineProfiles] = useState<DropdownProfile[]>([])
   const { impact } = useHaptics()
   const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
+  const directImageMode = isDirectMode() || isNativePlatformFn()
+  const resolvedMachineUrl = useResolvedMachineUrl(directImageMode)
 
   // Shared state derivation + command executor
   const {
@@ -177,24 +180,28 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             id: string
             name?: string
             author?: string
+            image?: string
             display?: { description?: string; shortDescription?: string; image?: string }
           }
-          const isDirect = isDirectMode() || isNativePlatformFn()
+          const isDirect = directImageMode
           const profiles: DropdownProfile[] = (data.profiles ?? [])
             .filter((p: RawProfile) => p.name)
             .map((p: RawProfile) => ({
               id: p.id,
               name: p.name!,
               author: p.author,
+              image: p.image,
               display: p.display,
               // In direct/native mode, resolve machine-relative image URLs.
               // In proxy mode, leave null — the image cache uses /api/profile/{name}/image-proxy.
-              resolvedImageUrl: isDirect ? resolveDisplayImage(p.display?.image) : null,
+              resolvedImageUrl: isDirect
+                ? resolveDisplayImage(getProfileImageValue(p), resolvedMachineUrl || undefined)
+                : null,
             }))
           setMachineProfiles(profiles)
           // In proxy mode, batch-fetch images only for profiles without a display image
           if (!isDirect) {
-            const needsImage = profiles.filter(p => !p.display?.image).map(p => p.name)
+            const needsImage = profiles.filter(p => !getProfileImageValue(p)).map(p => p.name)
             if (needsImage.length > 0) fetchImagesForProfiles(needsImage)
           }
         }
@@ -204,7 +211,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, fetchImagesForProfiles])
+  }, [isConnected, fetchImagesForProfiles, directImageMode, resolvedMachineUrl])
 
   // Derive profileAuthor from machineProfiles when activeProfile changes
   useEffect(() => {
@@ -489,7 +496,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                     const res = await machine.loadProfile(pendingProfile)
                     if (!res.success) {
                       toast.error(res.message ?? t('controlCenter.toasts.error'))
-                      return
+                      return { success: false }
                     }
                     await new Promise(r => setTimeout(r, 300))
                   }

@@ -253,6 +253,7 @@
     "preheatStartsAt": "Il preriscaldamento inizierà alle {{time}}",
     "noRecurringSchedules": "Nessuna programmazione ricorrente ancora. Creane una per preriscaldare o eseguire estrazioni automaticamente a orari prestabiliti.",
     "deleteScheduleConfirm": "Sei sicuro di voler eliminare questa programmazione ricorrente?",
+    "schedulingUnavailable": "La programmazione non è disponibile in questa modalità",
     "selectProfileOrPreheat": "Seleziona un profilo o attiva il preriscaldamento",
     "scheduledTimeError": "L'ora programmata deve essere almeno 10 minuti da ora quando il preriscaldamento è attivato",
     "createSchedule": "Crea programmazione",
@@ -427,6 +428,8 @@
     "meticulousIp": "IP macchina Meticulous",
     "meticulousIpPlaceholder": "es. 192.168.1.100",
     "meticulousIpDescription": "L'indirizzo IP della tua macchina espresso Meticulous sulla rete locale",
+    "invalidMachineUrl": "Inserisci un IP macchina, nome host o URL completo.",
+    "machineUrlLoadFailed": "Impossibile caricare l'URL macchina salvato. Verrà usato il fallback predefinito.",
     "detect": "Rileva",
     "machineFound": "{{hostname}} trovato",
     "discovery": {
@@ -1524,7 +1527,8 @@
     "failed": "Aggiornamento fallito",
     "timeout": "L'aggiornamento non è stato completato nel tempo previsto. Aggiornare manualmente.",
     "triggerFailed": "Impossibile avviare l'aggiornamento",
-    "checkFailed": "Impossibile verificare gli aggiornamenti"
+    "checkFailed": "Impossibile verificare gli aggiornamenti",
+    "unavailableInMode": "Gli aggiornamenti sono disponibili solo in modalità Docker/proxy."
   },
   "sync": {
     "fetchProfileFailed": "Impossibile recuperare il profilo",
@@ -1568,6 +1572,7 @@
       "invalidIp": "Inserisci un indirizzo IP o hostname valido",
       "connected": "Macchina connessa con successo!",
       "unreachable": "Impossibile raggiungere la macchina. Controlla l'IP e assicurati di essere sulla stessa rete.",
+      "saveFailed": "Impossibile salvare l'indirizzo della macchina. Riprova.",
       "successMessage": "Connesso a {{name}}",
       "errorMessage": "Impossibile raggiungere la macchina. Controlla l'indirizzo e assicurati di essere sulla stessa rete Wi-Fi.",
       "hint": "Suggerimento: trova l'IP nelle impostazioni Wi-Fi della macchina o nella lista DHCP del router. Scrivi \"demo\" per provare senza macchina.",

@@ -34,8 +34,9 @@ import {
   Heart
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
+import { getMachineUrlFallback, persistMachineUrl, resolveMachineUrl } from '@/services/machine/machineUrl'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable, AI_PREFS_CHANGED_EVENT } from '@/lib/aiPreferences'
 import { getSoundsEnabled, setSoundsEnabled } from '@/lib/soundPreferences'
 import { useSoundEffects } from '@/hooks/useSoundEffects'
@@ -108,6 +109,23 @@ const PROGRESS_UPDATE_INTERVAL = 500
 const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
 const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
+function normalizeMachineUrl(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (/^\d{1,3}(?:\.\d{1,3}){0,2}$/.test(trimmed)) return null
+
+  try {
+    const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    if (!url.hostname) return null
+
+    const port = url.port || '8080'
+    return `${url.protocol}//${url.hostname}:${port}`
+  } catch {
+    return null
+  }
+}
+
 export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
   const { t } = useTranslation()
   const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
@@ -129,6 +147,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [machineUrlError, setMachineUrlError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   
   // Machine auto-detect
@@ -216,13 +235,30 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
 
   // Load current settings on mount
   useEffect(() => {
+    let cancelled = false
+
+    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), ms)
+        ),
+      ])
+
     const loadSettings = async () => {
       if (isLocalMode()) {
         try {
-          const storedKey = await secureGetItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
+          const [storedKey, machineUrl] = await withTimeout(
+            Promise.all([
+              secureGetItem(STORAGE_KEYS.GEMINI_API_KEY).then(v => v || ''),
+              resolveMachineUrl(),
+            ]),
+            5000,
+          )
+          if (cancelled) return
           setSettings({
             geminiApiKey: storedKey,
-            meticulousIp: new URL(getDefaultMachineUrl()).hostname,
+            meticulousIp: machineUrl,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
             mqttEnabled: true,
@@ -230,11 +266,14 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             geminiApiKeyConfigured: Boolean(storedKey.trim()),
           })
         } catch (err) {
+          if (cancelled) return
           console.error('Failed to load secure settings, falling back to localStorage:', err)
           const fallbackKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
+          const fallbackUrl = getMachineUrlFallback()
+          setMachineUrlError(t('settings.machineUrlLoadFailed'))
           setSettings({
             geminiApiKey: fallbackKey,
-            meticulousIp: new URL(getDefaultMachineUrl()).hostname,
+            meticulousIp: fallbackUrl,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
             mqttEnabled: true,
@@ -242,12 +281,13 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             geminiApiKeyConfigured: Boolean(fallbackKey.trim()),
           })
         }
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
         return
       }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/settings`)
+        if (cancelled) return
         if (response.ok) {
           const data = await response.json()
           setSettings({
@@ -263,11 +303,12 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       } catch (err) {
         console.error('Failed to load settings:', err)
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
     
     const loadUpdateMethod = async () => {
+      if (!hasFeature('watchtowerUpdate')) return
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/update-method`)
@@ -281,6 +322,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     }
     
     const loadTailscaleStatus = async () => {
+      if (!hasFeature('tailscaleConfig')) return
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/tailscale-status`)
@@ -296,6 +338,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     loadSettings()
     loadUpdateMethod()
     loadTailscaleStatus()
+
+    return () => { cancelled = true }
   }, [secureGetItem])
 
   // Load version info
@@ -327,6 +371,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
 
   // Load release notes when changelog is expanded (using server-side cache)
   const loadReleaseNotes = useCallback(async () => {
+    if (!hasFeature('watchtowerUpdate')) return
     if (releaseNotes.length > 0) return // Already loaded
     
     setChangelogLoading(true)
@@ -396,6 +441,15 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     saveTimerRef.current = setTimeout(async () => {
       try {
         if (isLocalMode()) {
+          if (nextSettings.meticulousIp) {
+            const normalizedMachineUrl = normalizeMachineUrl(nextSettings.meticulousIp)
+            if (normalizedMachineUrl) {
+              await persistMachineUrl(normalizedMachineUrl)
+              setMachineUrlError('')
+            } else {
+              setMachineUrlError(t('settings.invalidMachineUrl'))
+            }
+          }
           if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
             try {
               await secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
@@ -463,16 +517,19 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     try {
       if (isLocalMode()) {
         // In direct/demo mode, use client-side discovery instead of server endpoint
-        const { discoverMachines } = await import('@/services/machine/discovery')
+        const { discoverMachines, testMachineConnection } = await import('@/services/machine/discovery')
         const machines = await discoverMachines()
         if (machines.length > 0) {
           const machine = machines[0]
-          setDetectResult({ found: true, ip: machine.host, hostname: machine.name })
-          handleChange('meticulousIp', machine.host)
-          // Exit demo mode by storing the real machine URL
-          if (isDemoMode()) {
-            localStorage.setItem(STORAGE_KEYS.MACHINE_URL, machine.url)
-            window.location.reload()
+          const verified = await testMachineConnection(machine.url)
+          if (verified) {
+            setDetectResult({ found: true, ip: machine.host, hostname: machine.name })
+            await persistMachineUrl(machine.url)
+            setMachineUrlError('')
+            setSettings(prev => ({ ...prev, meticulousIp: machine.url }))
+            if (isDemoMode()) window.location.reload()
+          } else {
+            setDetectResult({ found: false, guidance_key: 'notFound' })
           }
         } else {
           setDetectResult({ found: false, guidance_key: 'notFound' })
@@ -900,8 +957,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Meticulous IP — hidden in direct mode (IP is implicit), shown in native, proxy, or demo mode */}
-            {(!isLocalMode() || isNativePlatform() || isDemoMode()) && (
+            {/* Meticulous machine URL */}
+            {(!isLocalMode() || isDirectMode() || isNativePlatform() || isDemoMode()) && (
             <div className="space-y-2">
               <Label htmlFor="meticulousIp" className="text-sm font-medium">
                 {t('settings.meticulousIp')}
@@ -915,23 +972,25 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   placeholder={t('settings.meticulousIpPlaceholder')}
                   className="flex-1"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  onClick={handleDetectMachine}
-                  disabled={isDetecting}
-                  className="shrink-0"
-                >
-                  {isDetecting ? (
-                    <ArrowsClockwise className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <WifiHigh className="w-4 h-4 mr-1" />
-                      {t('settings.detect')}
-                    </>
-                  )}
-                </Button>
+                {hasFeature('machineDiscovery') && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="default"
+                    onClick={handleDetectMachine}
+                    disabled={isDetecting}
+                    className="shrink-0"
+                  >
+                    {isDetecting ? (
+                      <ArrowsClockwise className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <WifiHigh className="w-4 h-4 mr-1" />
+                        {t('settings.detect')}
+                      </>
+                    )}
+                  </Button>
+                )}
                 {settings.meticulousIp && (
                   <Button
                     type="button"
@@ -965,6 +1024,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     </div>
                   )}
                 </div>
+              )}
+              {machineUrlError && (
+                <p className="text-xs text-destructive">{machineUrlError}</p>
               )}
               <p className="text-xs text-muted-foreground">
                 {t('settings.meticulousIpDescription')}
@@ -1676,7 +1738,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         </div>
 
         {/* Changelog (collapsible) */}
-        <div className="space-y-3 pt-2 border-t border-border/50">
+        {hasFeature('watchtowerUpdate') && <div className="space-y-3 pt-2 border-t border-border/50">
           <button
             onClick={() => setChangelogExpanded(!changelogExpanded)}
             className="w-full flex items-center justify-between text-left"
@@ -1731,7 +1793,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </div>}
 
         {/* Updates — hidden in direct/PWA mode (no Watchtower) */}
         {hasFeature('watchtowerUpdate') && (

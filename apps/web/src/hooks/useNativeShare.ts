@@ -24,12 +24,22 @@ async function shareImageDataUri(dataUri: string, filename: string, options?: { 
   const isNative = Capacitor.isNativePlatform()
 
   if (isNative) {
-    // On iOS, Share.share with url: dataUri works for images
+    // Write image to a temp file — Share.share({ url: dataUri }) shares the raw
+    // base64 text instead of the image on iOS.
+    const { Filesystem, Directory } = await import('@capacitor/filesystem')
+    const base64 = dataUri.replace(/^data:image\/\w+;base64,/, '')
+    const result = await Filesystem.writeFile({
+      path: filename,
+      data: base64,
+      directory: Directory.Cache,
+    })
     await Share.share({
       title: options?.title,
       text: options?.text,
-      url: dataUri,
+      files: [result.uri],
     })
+    // Clean up temp file after share completes
+    Filesystem.deleteFile({ path: filename, directory: Directory.Cache }).catch(() => {})
     return
   }
 

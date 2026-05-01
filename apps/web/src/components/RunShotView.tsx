@@ -12,7 +12,6 @@ import {
   Play, 
   Clock, 
   Fire,
-  Coffee,
   CalendarBlank,
   X,
   SpinnerGap,
@@ -27,8 +26,18 @@ import {
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { hasFeature } from '@/lib/featureFlags'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { format, addMinutes } from 'date-fns'
 import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
+import { ProfileImage } from './ProfileImage'
+import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import {
+  canCancelScheduledShot,
+  canShowVariableAdjustments,
+  getSchedulePreheatInfo,
+  shouldScheduleProfileAfterPreheat,
+} from './RunShotView.helpers'
 
 interface MachineProfile {
   id: string
@@ -38,6 +47,8 @@ interface MachineProfile {
   final_weight?: number
   variables?: ProfileVariable[]
   stages?: Record<string, unknown>[]
+  image?: string
+  display?: { image?: string; description?: string; shortDescription?: string }
 }
 
 interface ScheduledShot {
@@ -75,6 +86,9 @@ const PREHEAT_DURATION_MINUTES = 10
 
 export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName }: RunShotViewProps) {
   const { t } = useTranslation()
+  const scheduledShotsEnabled = hasFeature('scheduledShots')
+  const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
+  const directImageMode = isDirectMode() || isNativePlatform()
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
       ? { id: initialProfileId, name: initialProfileName } 
@@ -161,7 +175,14 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       }
     }
     fetchProfiles()
-  }, [])
+  }, [initialProfileId, t])
+
+  // Fetch profile images for the cached image lookup
+  useEffect(() => {
+    if (profiles.length > 0) {
+      fetchImagesForProfiles(profiles.map(p => p.name))
+    }
+  }, [profiles, fetchImagesForProfiles])
 
   // Derive profile variables from the selected profile data (already fetched
   // in the profile list). Synthesise final_weight / temperature entries when
@@ -169,10 +190,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   // at least basic adjustable parameters.
   useEffect(() => {
     if (!selectedProfile) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state when profile clears
-      setProfileVariables([])
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOverrides({})
+      setProfileVariables([]) // eslint-disable-line react-hooks/set-state-in-effect -- resetting derived state
+      setOverrides({}) // eslint-disable-line react-hooks/set-state-in-effect
       return
     }
 
@@ -238,6 +257,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
 
   // Fetch recurring schedules
   useEffect(() => {
+    if (!scheduledShotsEnabled) return
+
     const fetchRecurringSchedules = async () => {
       try {
         const serverUrl = await getServerUrl()
@@ -251,7 +272,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       }
     }
     fetchRecurringSchedules()
-  }, [])
+  }, [scheduledShotsEnabled])
 
   const handleRunNow = async () => {
     if (!selectedProfile && !preheat) {
@@ -302,14 +323,18 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           preheatTimeoutRef.current = null
         }, PREHEAT_DURATION_MINUTES * 60 * 1000)
         
-        if (selectedProfile) {
+        const profileToSchedule = selectedProfile
+        if (profileToSchedule && shouldScheduleProfileAfterPreheat({
+          scheduledShotsEnabled,
+          hasSelectedProfile: true,
+        })) {
           // Schedule the profile to run after preheat
           const shotTime = addMinutes(new Date(), PREHEAT_DURATION_MINUTES)
           const scheduleResponse = await fetch(`${serverUrl}/api/machine/schedule-shot`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              profile_id: selectedProfile.id,
+              profile_id: profileToSchedule.id,
               scheduled_time: shotTime.toISOString(),
               preheat: false // Already preheating
             })
@@ -326,7 +351,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             throw new Error(errorMessage)
           }
 
-          toast.success(t('runShot.toasts.profileWillRun', { name: selectedProfile.name }))
+          toast.success(t('runShot.toasts.profileWillRun', { name: profileToSchedule.name }))
 
           // Stay on this view — only navigate to live on actual shot start
         }
@@ -469,6 +494,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }, [saveModeNewName, t])
 
   const handleSchedule = async () => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     if (!selectedProfile && !preheat) {
       toast.error(t('runShot.selectProfileOrPreheat'))
       return
@@ -507,7 +537,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       const data = await response.json()
       setScheduledShots(prev => [...prev, data.scheduled_shot])
       
-      const preheatInfo = preheat ? ` (preheat starts ${PREHEAT_DURATION_MINUTES} min before)` : ''
+      const preheatInfo = getSchedulePreheatInfo({ preheat, minutes: PREHEAT_DURATION_MINUTES, t })
       toast.success(t('runShot.toasts.shotScheduled', { time: format(scheduledTime, 'HH:mm'), preheatInfo }))
       setScheduleMode(false)
     } catch (err) {
@@ -519,6 +549,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleCancelScheduled = async (scheduleId: string) => {
+    if (!canCancelScheduledShot({ scheduledShotsEnabled })) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/schedule-shot/${scheduleId}`, {
@@ -548,6 +583,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleSaveRecurring = async () => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     try {
       const serverUrl = await getServerUrl()
       
@@ -608,6 +648,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleDeleteRecurring = async (scheduleId: string) => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     if (!confirm(t('runShot.deleteScheduleConfirm'))) return
     
     try {
@@ -627,6 +672,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   }
 
   const handleToggleRecurring = async (schedule: RecurringSchedule) => {
+    if (!scheduledShotsEnabled) {
+      toast.error(t('runShot.schedulingUnavailable'))
+      return
+    }
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/recurring-schedules/${schedule.id}`, {
@@ -690,6 +740,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         return 'bg-gray-500'
     }
   }
+
+  const showVariableAdjustments = canShowVariableAdjustments({
+    hasSelectedProfile: Boolean(selectedProfile),
+    variableCount: profileVariables.length,
+  })
 
   return (
     <motion.div
@@ -762,7 +817,16 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         
         {selectedProfile ? (
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <Coffee size={24} className="text-primary" weight="duotone" />
+            <ProfileImage
+              imageUrl={
+                (directImageMode
+                  ? (resolveDisplayImage(getProfileImageValue(selectedProfile)) || undefined)
+                  : undefined
+                ) ?? getImageUrl(selectedProfile.name) ?? undefined
+              }
+              alt={selectedProfile.name}
+              size="md"
+            />
             <div>
               <p className="font-medium">{selectedProfile.name}</p>
               {selectedProfile.temperature != null && selectedProfile.final_weight != null && (
@@ -810,10 +874,24 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
                           : 'hover:bg-muted/50'
                       }`}
                     >
-                      <p className="font-medium">{profile.name}</p>
-                      {profile.author && (
-                        <p className="text-xs text-muted-foreground">by {profile.author}</p>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <ProfileImage
+                          imageUrl={
+                            (directImageMode
+                              ? (resolveDisplayImage(getProfileImageValue(profile)) || undefined)
+                              : undefined
+                            ) ?? getImageUrl(profile.name) ?? undefined
+                          }
+                          alt={profile.name}
+                          size="sm"
+                        />
+                        <div>
+                          <p className="font-medium">{profile.name}</p>
+                          {profile.author && (
+                            <p className="text-xs text-muted-foreground">by {profile.author}</p>
+                          )}
+                        </div>
+                      </div>
                     </button>
                   ))
                 )}
@@ -824,7 +902,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       </Card>
 
       {/* Variable Adjustments — left column when scheduling available */}
-      {hasFeature('scheduledShots') && selectedProfile && profileVariables.length > 0 && (
+      {showVariableAdjustments && selectedProfile && (
         <VariableAdjustPanel
           profileVariables={profileVariables}
           profileStages={selectedProfile.stages}
@@ -857,7 +935,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         </div>
 
         {/* Schedule Toggle */}
-        {hasFeature('scheduledShots') && <div className="flex items-center justify-between">
+        {scheduledShotsEnabled && <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="schedule" className="text-sm font-medium flex items-center gap-2">
               <CalendarBlank size={18} className={scheduleMode ? 'text-primary' : 'text-muted-foreground'} />
@@ -970,7 +1048,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           ? t('common.loading') 
           : scheduleMode 
             ? t('runShot.scheduleShot')
-            : preheat && selectedProfile 
+            : preheat && selectedProfile && scheduledShotsEnabled
               ? t('runShot.preheatAndRun') 
               : preheat 
                 ? t('runShot.startPreheat') 
@@ -980,7 +1058,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       {/* Help Text */}
       <p className="text-xs text-muted-foreground text-center">
         {!selectedProfile && preheat && t('runShot.preheatOnlyHelper')}
-        {selectedProfile && preheat && !scheduleMode && t('runShot.preheatStartsNow')}
+        {selectedProfile && preheat && scheduledShotsEnabled && !scheduleMode && t('runShot.preheatStartsNow')}
+        {selectedProfile && preheat && !scheduledShotsEnabled && t('runShot.preheatOnlyHelper')}
         {scheduleMode && preheat && t('runShot.preheatStartsBefore')}
       </p>
       </div>{/* end left column */}
@@ -988,19 +1067,8 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       {/* Right column: Schedules / Variable Adjustments */}
       <div className="space-y-6 desktop-panel-right">
 
-      {/* Variable Adjustments — right column when scheduling unavailable */}
-      {!hasFeature('scheduledShots') && selectedProfile && profileVariables.length > 0 && (
-        <VariableAdjustPanel
-          profileVariables={profileVariables}
-          profileStages={selectedProfile.stages}
-          overrides={overrides}
-          onOverridesChange={setOverrides}
-          onReset={() => setOverrides({})}
-        />
-      )}
-
       {/* Scheduled Shots */}
-      {scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (
+      {scheduledShotsEnabled && scheduledShots.filter(s => s.status !== 'completed' && s.status !== 'cancelled').length > 0 && (
         <Card className="p-6 space-y-4">
           <h3 className="text-base font-medium">{t('runShot.scheduledShots')}</h3>
           <div className="space-y-2">
@@ -1036,7 +1104,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
       )}
 
       {/* Recurring Schedules */}
-      {hasFeature('scheduledShots') && <Card className="p-6 space-y-4">
+      {scheduledShotsEnabled && <Card className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Repeat size={20} className="text-primary" />

@@ -253,6 +253,7 @@
     "preheatStartsAt": "Vorheizen beginnt um {{time}}",
     "noRecurringSchedules": "Noch keine wiederkehrenden Zeitpläne. Erstelle einen, um automatisch vorzuheizen oder Bezüge zu festgelegten Zeiten auszuführen.",
     "deleteScheduleConfirm": "Bist du sicher, dass du diesen wiederkehrenden Zeitplan löschen möchtest?",
+    "schedulingUnavailable": "Zeitplanung ist in diesem Modus nicht verfügbar",
     "selectProfileOrPreheat": "Bitte wähle ein Profil aus oder aktiviere das Vorheizen",
     "scheduledTimeError": "Die geplante Zeit muss mindestens 10 Minuten ab jetzt sein, wenn Vorheizen aktiviert ist",
     "createSchedule": "Zeitplan erstellen",
@@ -427,6 +428,8 @@
     "meticulousIp": "Meticulous Maschinen-IP",
     "meticulousIpPlaceholder": "z.B. 192.168.1.100",
     "meticulousIpDescription": "Die IP-Adresse deiner Meticulous Espressomaschine in deinem lokalen Netzwerk",
+    "invalidMachineUrl": "Geben Sie eine vollständige Maschinen-IP, einen Hostnamen oder eine URL ein.",
+    "machineUrlLoadFailed": "Die gespeicherte Maschinen-URL konnte nicht geladen werden. Der Standard-Fallback wird verwendet.",
     "detect": "Erkennen",
     "machineFound": "{{hostname}} gefunden",
     "discovery": {
@@ -1524,7 +1527,8 @@
     "failed": "Aktualisierung fehlgeschlagen",
     "timeout": "Aktualisierung wurde nicht innerhalb der erwarteten Zeit abgeschlossen. Bitte manuell aktualisieren.",
     "triggerFailed": "Aktualisierung konnte nicht ausgelöst werden",
-    "checkFailed": "Suche nach Aktualisierungen fehlgeschlagen"
+    "checkFailed": "Suche nach Aktualisierungen fehlgeschlagen",
+    "unavailableInMode": "Updates sind nur im Docker-/Proxy-Modus verfügbar."
   },
   "sync": {
     "fetchProfileFailed": "Fehler beim Abrufen des Profils",
@@ -1568,6 +1572,7 @@
       "invalidIp": "Bitte gib eine gültige IP-Adresse oder einen Hostnamen ein",
       "connected": "Maschine erfolgreich verbunden!",
       "unreachable": "Maschine nicht erreichbar. Überprüfe die IP und stelle sicher, dass du im selben Netzwerk bist.",
+      "saveFailed": "Maschinenadresse konnte nicht gespeichert werden. Bitte versuche es erneut.",
       "successMessage": "Verbunden mit {{name}}",
       "errorMessage": "Maschine nicht erreichbar. Überprüfen Sie die Adresse und stellen Sie sicher, dass Sie im selben WLAN sind.",
       "hint": "Tipp: Die IP finden Sie in den WLAN-Einstellungen der Maschine oder in der DHCP-Liste Ihres Routers. Geben Sie „demo\" ein, um ohne Maschine zu testen.",

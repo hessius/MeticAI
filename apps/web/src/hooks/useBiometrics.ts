@@ -15,7 +15,7 @@ export interface BiometryInfo {
 }
 
 // Lazy-load the plugin to prevent module-level errors from crashing the host chunk
-let _pluginPromise: Promise<typeof import('@aparajita/capacitor-biometric-auth')> | null = null
+let _pluginPromise: Promise<typeof import('@aparajita/capacitor-biometric-auth') | null> | null = null
 function getPlugin() {
   if (!_pluginPromise) {
     _pluginPromise = import('@aparajita/capacitor-biometric-auth').catch(() => null)

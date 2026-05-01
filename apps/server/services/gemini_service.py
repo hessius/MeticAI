@@ -26,6 +26,7 @@ def get_model_name() -> str:
     value = os.environ.get("GEMINI_MODEL", "").strip()
     return value or _DEFAULT_MODEL
 
+
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
 _GEMINI_NOISE_PREFIXES = (
     "YOLO mode is enabled",
@@ -335,66 +336,66 @@ PROFILING_KNOWLEDGE_DISTILLED = """\
 
 def parse_gemini_error(error_text: str) -> str:
     """Parse Gemini SDK/API error output and return a user-friendly message.
-    
+
     Extracts the meaningful error message from verbose error details
     for display to end users.
-    
+
     Args:
         error_text: Raw stderr output from the Gemini CLI
-        
+
     Returns:
         A clean, user-friendly error message
     """
     error_text_lower = error_text.lower()
-    
+
     # Check for deprecated / unavailable model errors (404 NOT_FOUND)
     if (
-        'no longer available' in error_text_lower
-        or ('not_found' in error_text_lower and 'model' in error_text_lower)
-        or ('404' in error_text_lower and 'model' in error_text_lower)
-        or 'deprecated' in error_text_lower
+        "no longer available" in error_text_lower
+        or ("not_found" in error_text_lower and "model" in error_text_lower)
+        or ("404" in error_text_lower and "model" in error_text_lower)
+        or "deprecated" in error_text_lower
     ):
         return (
             "The AI model is no longer available. Please update MeticAI to the "
             "latest version, or set a custom GEMINI_MODEL in your environment."
         )
-    
+
     # Check for quota errors
-    if 'quota' in error_text_lower or 'exhausted' in error_text_lower:
+    if "quota" in error_text_lower or "exhausted" in error_text_lower:
         return (
             "Daily API quota exhausted. The free Gemini API has usage limits. "
             "Please wait until tomorrow for your quota to reset, or upgrade to "
             "a paid API plan at https://aistudio.google.com/"
         )
-    
+
     # Check for rate limiting
-    if 'rate limit' in error_text_lower or 'too many requests' in error_text_lower:
+    if "rate limit" in error_text_lower or "too many requests" in error_text_lower:
         return (
             "Rate limit exceeded. Too many requests in a short time. "
             "Please wait a minute and try again."
         )
-    
+
     # Check for authentication errors
     if (
-        'api key' in error_text_lower
-        or 'api_key' in error_text_lower
-        or 'authentication' in error_text_lower
-        or 'unauthorized' in error_text_lower
-        or 'auth method' in error_text_lower
-        or 'set an auth' in error_text_lower
+        "api key" in error_text_lower
+        or "api_key" in error_text_lower
+        or "authentication" in error_text_lower
+        or "unauthorized" in error_text_lower
+        or "auth method" in error_text_lower
+        or "set an auth" in error_text_lower
     ):
         return (
             "Gemini API key is not configured. Please go to Settings and "
             "enter a valid GEMINI_API_KEY, then try again."
         )
-    
+
     # Check for long-running generation / model stall patterns
     # (must come before the general network/connection check which also
     # matches 'timeout' — we want the more specific message here.)
     if (
-        'timed out after' in error_text_lower
-        or 'deadline exceeded' in error_text_lower
-        or 'took too long' in error_text_lower
+        "timed out after" in error_text_lower
+        or "deadline exceeded" in error_text_lower
+        or "took too long" in error_text_lower
     ):
         return (
             "Profile generation timed out. Please retry; if this repeats, "
@@ -402,7 +403,11 @@ def parse_gemini_error(error_text: str) -> str:
         )
 
     # Check for network/connection errors
-    if 'network' in error_text_lower or 'connection' in error_text_lower or 'timeout' in error_text_lower:
+    if (
+        "network" in error_text_lower
+        or "connection" in error_text_lower
+        or "timeout" in error_text_lower
+    ):
         return (
             "Network error connecting to Gemini API. Please check your "
             "internet connection and try again."
@@ -410,68 +415,76 @@ def parse_gemini_error(error_text: str) -> str:
 
     # Check for schema/validation failures produced during profile creation
     if (
-        'validation' in error_text_lower
-        or 'schema' in error_text_lower
-        or 'invalid profile' in error_text_lower
-        or 'failed to validate' in error_text_lower
+        "validation" in error_text_lower
+        or "schema" in error_text_lower
+        or "invalid profile" in error_text_lower
+        or "failed to validate" in error_text_lower
     ):
         return (
             "The AI generated a profile that failed schema validation. "
             "Please retry; if this keeps happening, simplify preferences "
             "or try a stronger model."
         )
-    
+
     # Check for MCP/Meticulous connection errors
-    if 'mcp' in error_text_lower or 'meticulous' in error_text_lower:
-        if 'connection refused' in error_text_lower or 'cannot connect' in error_text_lower:
+    if "mcp" in error_text_lower or "meticulous" in error_text_lower:
+        if (
+            "connection refused" in error_text_lower
+            or "cannot connect" in error_text_lower
+        ):
             return (
                 "Cannot connect to the Meticulous machine. Please ensure your "
                 "espresso machine is powered on and connected to the network."
             )
-    
+
     # Check for content safety errors
-    if 'safety' in error_text_lower or 'blocked' in error_text_lower:
+    if "safety" in error_text_lower or "blocked" in error_text_lower:
         return (
             "Request was blocked by content safety filters. "
             "Please try rephrasing your preferences."
         )
-    
+
     # Try to extract a clean error message from stack trace
     # Look for common error patterns
     patterns = [
-        r'Error:\s*(.+?)(?:\n|$)',
-        r'error:\s*(.+?)(?:\n|$)',
-        r'Exception:\s*(.+?)(?:\n|$)',
+        r"Error:\s*(.+?)(?:\n|$)",
+        r"error:\s*(.+?)(?:\n|$)",
+        r"Exception:\s*(.+?)(?:\n|$)",
     ]
-    
+
     for pattern in patterns:
         match = re.search(pattern, error_text, re.IGNORECASE)
         if match:
             extracted = match.group(1).strip()
             # Don't return if it's just a file path or technical detail
-            if len(extracted) > 10 and not extracted.startswith('/') and not extracted.startswith('file:'):
+            if (
+                len(extracted) > 10
+                and not extracted.startswith("/")
+                and not extracted.startswith("file:")
+            ):
                 return extracted[:200]  # Limit length
-    
+
     # Fallback: strip noise lines before returning
     clean_error = error_text
     for prefix in _GEMINI_NOISE_PREFIXES:
-        clean_error = '\n'.join(
-            line for line in clean_error.split('\n')
+        clean_error = "\n".join(
+            line
+            for line in clean_error.split("\n")
             if not line.strip().startswith(prefix)
         )
     clean_error = clean_error.strip()
-    
+
     if not clean_error:
         return "Profile generation failed unexpectedly. Please try again."
     if len(clean_error) > 150:
         return f"Profile generation failed. Technical details: {clean_error[:100]}..."
-    
+
     return f"Profile generation failed: {clean_error}"
 
 
 def reset_vision_model():
     """Reset the cached Gemini client.
-    
+
     Call this when the GEMINI_API_KEY changes so the next call to
     get_gemini_client() will re-create with the new key.
     """
@@ -500,7 +513,7 @@ def is_ai_available() -> bool:
 
 def get_vision_model():
     """Return a wrapper that provides the old model.generate_content() interface.
-    
+
     This exists for backward compatibility. Callers can do:
         model = get_vision_model()
         response = model.generate_content([prompt, image])
@@ -511,17 +524,17 @@ def get_vision_model():
 
 class _GeminiModelWrapper:
     """Thin wrapper around google.genai.Client to provide the old GenerativeModel interface."""
-    
+
     def __init__(self, client: genai.Client):
         self._client = client
-    
+
     def generate_content(self, contents):
         """Call generate_content on the Gemini API (synchronous).
-        
+
         Args:
             contents: A string, list of strings, PIL images, or mixed list
                      (same format accepted by both old and new SDK).
-        
+
         Returns:
             GenerateContentResponse with .text attribute.
         """
@@ -532,14 +545,12 @@ class _GeminiModelWrapper:
 
     async def async_generate_content(self, contents):
         """Non-blocking wrapper around generate_content.
-        
+
         Runs the synchronous Gemini SDK call in a thread pool executor
         so it doesn't block the asyncio event loop.
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None, self.generate_content, contents
-        )
+        return await loop.run_in_executor(None, self.generate_content, contents)
 
 
 def get_author_instruction() -> str:
@@ -554,12 +565,12 @@ def get_author_instruction() -> str:
 
 def build_advanced_customization_section(advanced_customization: Optional[str]) -> str:
     """Build the advanced customization section for the prompt.
-    
+
     These are MANDATORY equipment and extraction parameters that MUST be followed.
     """
     if not advanced_customization:
         return ""
-    
+
     return (
         f"⚠️ MANDATORY EQUIPMENT & EXTRACTION PARAMETERS (MUST BE USED EXACTLY):\n"
         f"{advanced_customization}\n\n"
@@ -576,6 +587,7 @@ def build_advanced_customization_section(advanced_customization: Optional[str]) 
 # =============================================================================
 # Taste Compass — cache key helpers
 # =============================================================================
+
 
 def compute_taste_hash(
     taste_x: float | None,

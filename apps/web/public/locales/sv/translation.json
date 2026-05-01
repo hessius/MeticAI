@@ -253,6 +253,7 @@
     "preheatStartsAt": "Förvärmning startar kl {{time}}",
     "noRecurringSchedules": "Inga återkommande scheman ännu. Skapa ett för att automatiskt förvärma eller köra körningar vid inställda tider.",
     "deleteScheduleConfirm": "Är du säker på att du vill ta bort detta återkommande schema?",
+    "schedulingUnavailable": "Schemaläggning är inte tillgänglig i detta läge",
     "selectProfileOrPreheat": "Vänligen välj en profil eller aktivera förvärmning",
     "scheduledTimeError": "Schemalagd tid måste vara minst 10 minuter från nu när förvärmning är aktiverad",
     "createSchedule": "Skapa schema",
@@ -427,6 +428,8 @@
     "meticulousIp": "Meticulous maskin-IP",
     "meticulousIpPlaceholder": "t.ex. 192.168.1.100",
     "meticulousIpDescription": "IP-adressen för din Meticulous espressomaskin på ditt lokala nätverk",
+    "invalidMachineUrl": "Ange en komplett maskin-IP, ett värdnamn eller en URL.",
+    "machineUrlLoadFailed": "Kunde inte läsa in den sparade maskin-URL:en. Standardfallback används.",
     "detect": "Identifiera",
     "machineFound": "Hittade {{hostname}}",
     "discovery": {
@@ -1524,7 +1527,8 @@
     "failed": "Uppdatering misslyckades",
     "timeout": "Uppdateringen slutfördes inte inom förväntad tid. Vänligen uppdatera manuellt.",
     "triggerFailed": "Kunde inte starta uppdateringen",
-    "checkFailed": "Kunde inte söka efter uppdateringar"
+    "checkFailed": "Kunde inte söka efter uppdateringar",
+    "unavailableInMode": "Uppdateringar är endast tillgängliga i Docker/proxy-läge."
   },
   "sync": {
     "fetchProfileFailed": "Kunde inte hämta profil",
@@ -1568,6 +1572,7 @@
       "invalidIp": "Ange en giltig IP-adress eller värdnamn",
       "connected": "Maskinen ansluten!",
       "unreachable": "Kunde inte nå maskinen. Kontrollera IP-adressen och att du är på samma nätverk.",
+      "saveFailed": "Kunde inte spara maskinadressen. Försök igen.",
       "successMessage": "Ansluten till {{name}}",
       "errorMessage": "Kunde inte nå maskinen. Kontrollera adressen och att du är på samma Wi-Fi-nätverk.",
       "hint": "Tips: hitta IP-adressen i maskinens Wi-Fi-inställningar, eller kolla routerns DHCP-lista. Skriv \"demo\" för att prova utan maskin.",

@@ -19,7 +19,9 @@ export function useSecureStorage() {
       }
       try {
         const value = await SecureStorage.getItem(key)
-        return value ?? null
+        if (value != null) return value
+        // Keychain returned null — check localStorage mirror (e.g. set during onboarding)
+        return localStorage.getItem(key)
       } catch {
         // Keychain read failed — fall back to localStorage mirror
         return localStorage.getItem(key)

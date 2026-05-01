@@ -1,7 +1,7 @@
 {
     "name": "meticai-espresso-pro",
     "private": true,
-    "version": "2.4.0-beta.1",
+    "version": "2.4.0-beta.2",
     "type": "module",
     "scripts": {
         "dev": "vite",
@@ -34,6 +34,7 @@
         "@capacitor/browser": "^8.0.3",
         "@capacitor/clipboard": "^8.0.1",
         "@capacitor/core": "^8.3.0",
+        "@capacitor/filesystem": "^8.1.2",
         "@capacitor/haptics": "^8.0.2",
         "@capacitor/ios": "^8.3.0",
         "@capacitor/local-notifications": "^8.0.2",

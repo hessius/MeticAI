@@ -25,17 +25,20 @@ except (PermissionError, OSError) as e:
     logger.warning(
         f"Failed to create log directory at {os.environ.get('LOG_DIR', '/app/logs')}, "
         f"using temporary directory: {log_dir}",
-        extra={"original_error": str(e)}
+        extra={"original_error": str(e)},
     )
+
 
 async def check_for_updates_task():
     """Background task to check for updates by running update.sh --check-only."""
     script_path = Path("/app/update.sh")
-    
+
     if not script_path.exists():
-        logger.warning("Update script not found at /app/update.sh - skipping update check")
+        logger.warning(
+            "Update script not found at /app/update.sh - skipping update check"
+        )
         return
-    
+
     try:
         logger.info("Running scheduled update check...")
         # Run update script with --check-only flag
@@ -46,16 +49,18 @@ async def check_for_updates_task():
             capture_output=True,
             text=True,
             cwd="/app",
-            timeout=120  # 2 minutes timeout for check
+            timeout=120,  # 2 minutes timeout for check
         )
-        
+
         if result.returncode == 0:
             logger.info("Update check completed successfully")
         else:
-            logger.warning(f"Update check returned non-zero exit code: {result.returncode}")
+            logger.warning(
+                f"Update check returned non-zero exit code: {result.returncode}"
+            )
             if result.stderr:
                 logger.warning(f"stderr: {result.stderr}")
-                
+
     except subprocess.TimeoutExpired:
         logger.error("Update check timed out after 2 minutes")
     except Exception as e:
@@ -67,7 +72,7 @@ async def periodic_update_checker():
     # Initial check on startup (with small delay to let app fully start)
     await asyncio.sleep(10)
     await check_for_updates_task()
-    
+
     # Then check periodically
     while True:
         await asyncio.sleep(UPDATE_CHECK_INTERVAL)
@@ -85,6 +90,7 @@ def _write_s6_env(var_name: str, value: str) -> None:
     Thin wrapper around the shared utility for use during lifespan hydration.
     """
     from utils.s6_env import update_s6_env
+
     update_s6_env(var_name, value)
 
 
@@ -137,6 +143,7 @@ async def lifespan(app: FastAPI):
     # Load them now so that all services see them.
     try:
         from services.settings_service import load_settings
+
         stored = load_settings()
         _ENV_SETTINGS_MAP = {
             "geminiApiKey": "GEMINI_API_KEY",
@@ -147,12 +154,17 @@ async def lifespan(app: FastAPI):
         for settings_key, env_var in _ENV_SETTINGS_MAP.items():
             stored_value = stored.get(settings_key, "")
             # Skip masked/placeholder values (e.g. "********************")
-            if stored_value and not os.environ.get(env_var) and not _is_masked(stored_value):
+            if (
+                stored_value
+                and not os.environ.get(env_var)
+                and not _is_masked(stored_value)
+            ):
                 os.environ[env_var] = stored_value
                 # Also update s6 container environment so child services see it
                 _write_s6_env(env_var, stored_value)
                 logger.info(
-                    "Hydrated %s from stored settings", env_var,
+                    "Hydrated %s from stored settings",
+                    env_var,
                     extra={"source": "settings.json"},
                 )
     except Exception as e:
@@ -164,29 +176,31 @@ async def lifespan(app: FastAPI):
         f"(runs on startup and every {UPDATE_CHECK_INTERVAL} seconds)"
     )
     update_task = asyncio.create_task(periodic_update_checker())
-    
+
     # Restore scheduled shots from persistence
     logger.info("Restoring scheduled shots from persistence")
     await _restore_scheduled_shots()
-    
+
     # Load recurring schedules and schedule next occurrences
     logger.info("Loading recurring schedules from persistence")
     await _load_recurring_schedules()
     for schedule_id, schedule in _recurring_schedules.items():
         if schedule.get("enabled", True):
             await _schedule_next_recurring(schedule_id, schedule)
-    
+
     # Start recurring schedule checker (runs every hour to ensure schedules stay current)
     recurring_task = asyncio.create_task(_recurring_schedule_checker())
-    
+
     # Start MQTT subscriber for live telemetry
     from services.mqtt_service import get_mqtt_subscriber
+
     mqtt_sub = get_mqtt_subscriber()
     mqtt_sub.start(asyncio.get_running_loop())
-    
+
     # Clean up any orphaned temp profiles from previous sessions
     try:
         from services.temp_profile_service import cleanup_stale
+
         stale_result = await cleanup_stale()
         if stale_result.get("deleted", 0) > 0:
             logger.info(
@@ -199,12 +213,13 @@ async def lifespan(app: FastAPI):
     # Restore dial-in sessions from persistence
     try:
         from services.dialin_service import _load as load_dialin_sessions
+
         await load_dialin_sessions()
     except Exception as e:
         logger.warning("Failed to restore dial-in sessions at startup: %s", e)
-    
+
     yield
-    
+
     # Cleanup on shutdown
     update_task.cancel()
     recurring_task.cancel()
@@ -212,25 +227,26 @@ async def lifespan(app: FastAPI):
         await update_task
     except asyncio.CancelledError:
         logger.info("Periodic update checker stopped")
-    
+
     try:
         await recurring_task
     except asyncio.CancelledError:
         logger.info("Recurring schedule checker stopped")
-    
+
     # Cancel all scheduled shot tasks
     for task in _scheduled_tasks.values():
         task.cancel()
-    
+
     # Wait for all tasks to complete
     if _scheduled_tasks:
         await asyncio.gather(*_scheduled_tasks.values(), return_exceptions=True)
         logger.info("All scheduled shot tasks cancelled")
-    
+
     # Close the singleton httpx client
     from services.meticulous_service import close_http_client
+
     await close_http_client()
-    
+
     # Stop MQTT subscriber
     mqtt_sub.stop()
 
@@ -253,7 +269,9 @@ _MACHINE_UNREACHABLE_MSG = (
 
 
 @app.exception_handler(requests.exceptions.ConnectionError)
-async def _requests_connection_error(_request: Request, exc: requests.exceptions.ConnectionError):
+async def _requests_connection_error(
+    _request: Request, exc: requests.exceptions.ConnectionError
+):
     logger.warning(f"Machine connection failed (requests): {exc}")
     return JSONResponse(status_code=503, content={"detail": _MACHINE_UNREACHABLE_MSG})
 
@@ -271,7 +289,21 @@ async def _httpx_connect_timeout(_request: Request, exc: httpx.ConnectTimeout):
 
 
 # Import route modules
-from api.routes import coffee, system, history, shots, profiles, scheduling, bridge, websocket, commands, pour_over, recipes, dialin
+from api.routes import (
+    coffee,
+    system,
+    history,
+    shots,
+    profiles,
+    scheduling,
+    bridge,
+    websocket,
+    commands,
+    pour_over,
+    recipes,
+    dialin,
+)
+
 
 # Middleware for request logging and tracking
 @app.middleware("http")
@@ -279,11 +311,11 @@ async def log_requests(request: Request, call_next):
     """Log all requests with context and timing."""
     request_id = str(uuid.uuid4())
     start_time = time.time()
-    
+
     # Extract request metadata
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
-    
+
     # Log incoming request
     logger.info(
         f"Incoming request: {request.method} {request.url.path}",
@@ -292,19 +324,19 @@ async def log_requests(request: Request, call_next):
             "endpoint": request.url.path,
             "method": request.method,
             "client_ip": client_ip,
-            "user_agent": user_agent
-        }
+            "user_agent": user_agent,
+        },
     )
-    
+
     # Store request_id in request state for use in endpoints
     request.state.request_id = request_id
-    
+
     try:
         response = await call_next(request)
-        
+
         # Calculate duration
         duration_ms = int((time.time() - start_time) * 1000)
-        
+
         # Log response
         logger.info(
             f"Request completed: {request.method} {request.url.path} - {response.status_code}",
@@ -315,15 +347,15 @@ async def log_requests(request: Request, call_next):
                 "status_code": response.status_code,
                 "duration_ms": duration_ms,
                 "client_ip": client_ip,
-                "user_agent": user_agent
-            }
+                "user_agent": user_agent,
+            },
         )
-        
+
         return response
     except Exception as e:
         # Calculate duration even for errors
         duration_ms = int((time.time() - start_time) * 1000)
-        
+
         # Log error with full context
         logger.error(
             f"Request failed: {request.method} {request.url.path} - {str(e)}",
@@ -335,12 +367,13 @@ async def log_requests(request: Request, call_next):
                 "client_ip": client_ip,
                 "user_agent": user_agent,
                 "duration_ms": duration_ms,
-                "error_type": type(e).__name__
-            }
+                "error_type": type(e).__name__,
+            },
         )
-        
+
         # Re-raise to let FastAPI handle it
         raise
+
 
 # Configure CORS middleware to allow web app interactions.
 # allow_credentials=True is incompatible with allow_origins=["*"] per the CORS
@@ -372,10 +405,10 @@ app.include_router(dialin.router)
 # Imports used by lifespan()
 # ============================================================================
 from services.scheduling_state import (
-    _scheduled_shots, _scheduled_tasks, _recurring_schedules,
+    _scheduled_shots,  # noqa: F401 — accessed by tests via main._scheduled_shots
+    _scheduled_tasks,
+    _recurring_schedules,
     restore_scheduled_shots as _restore_scheduled_shots,
     load_recurring_schedules as _load_recurring_schedules,
 )
-from api.routes.profiles import (
-    _schedule_next_recurring, _recurring_schedule_checker
-)
+from api.routes.profiles import _schedule_next_recurring, _recurring_schedule_checker

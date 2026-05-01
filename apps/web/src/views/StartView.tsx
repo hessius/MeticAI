@@ -3,7 +3,7 @@ import { scaleIn, gentleSpring } from '@/lib/animations'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Coffee, Play, Drop, ChartLine, Crosshair } from '@phosphor-icons/react'
+import { Plus, Coffee, Play, Drop, ChartLine, Crosshair, Gear } from '@phosphor-icons/react'
 import { useIsMobile } from '@/hooks/use-mobile'
 
 interface StartViewProps {
@@ -15,6 +15,7 @@ interface StartViewProps {
   onDialIn: () => void
   onPourOver: () => void
   onShotAnalysis: () => void
+  onSettings?: () => void
   controlCenter?: React.ReactNode
   lastShotBanner?: React.ReactNode
 }
@@ -27,6 +28,7 @@ export function StartView({
   onDialIn,
   onPourOver,
   onShotAnalysis,
+  onSettings,
   controlCenter,
   lastShotBanner,
 }: StartViewProps) {
@@ -97,6 +99,19 @@ export function StartView({
           <ChartLine size={20} className="shrink-0 hidden md:block mr-2" weight="bold" />
           {t('navigation.shotAnalysis')}
         </Button>
+
+        {/* Settings — desktop two-column only */}
+        {!isMobile && onSettings && (
+          <Button
+            onClick={onSettings}
+            variant="frosted"
+            className="w-full h-[5.5rem] md:h-16 flex flex-col items-center justify-center gap-1.5 md:flex-row md:gap-2 text-sm md:text-base whitespace-normal md:whitespace-nowrap !rounded-lg"
+          >
+            <Gear size={28} className="shrink-0 md:hidden" weight="fill" />
+            <Gear size={20} className="shrink-0 hidden md:block mr-2" weight="fill" />
+            {t('navigation.settings')}
+          </Button>
+        )}
       </div>
     </div>
   )

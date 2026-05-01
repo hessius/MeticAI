@@ -1,4 +1,5 @@
 """Machine status and scheduling endpoints."""
+
 from fastapi import APIRouter, Form, Request, HTTPException
 from datetime import datetime, timezone
 import json
@@ -39,24 +40,26 @@ async def _schedule_next_recurring(schedule_id: str, schedule: dict):
     """Schedule the next occurrence of a recurring schedule."""
     next_occurrence = _get_next_occurrence(schedule)
     if next_occurrence is None:
-        logger.warning(f"Could not calculate next occurrence for schedule {schedule_id}")
+        logger.warning(
+            f"Could not calculate next occurrence for schedule {schedule_id}"
+        )
         return
-    
+
     # Calculate delay until next occurrence
     now = datetime.now(timezone.utc)
     delay_seconds = (next_occurrence - now).total_seconds()
-    
+
     if delay_seconds <= 0:
         logger.warning(f"Next occurrence for {schedule_id} is in the past, skipping")
         return
-    
+
     # Create a unique shot ID for this occurrence
     shot_id = f"recurring-{schedule_id}-{next_occurrence.isoformat()}"
-    
+
     # Get schedule details
     profile_id = schedule.get("profile_id")
     preheat = schedule.get("preheat", True)
-    
+
     # Add to scheduled shots (lock protects dict mutation)
     async with _get_state_lock():
         _scheduled_shots[shot_id] = {
@@ -66,31 +69,28 @@ async def _schedule_next_recurring(schedule_id: str, schedule: dict):
             "preheat": preheat,
             "status": "scheduled",
             "recurring_schedule_id": schedule_id,
-            "created_at": now.isoformat()
+            "created_at": now.isoformat(),
         }
-    
+
     await _save_scheduled_shots()
-    
+
     logger.info(
         f"Scheduled recurring shot {shot_id} for {next_occurrence.isoformat()}",
-        extra={"schedule_id": schedule_id, "shot_id": shot_id}
+        extra={"schedule_id": schedule_id, "shot_id": shot_id},
     )
 
 
 @router.get("/api/machine/status")
 async def get_machine_status(request: Request):
     """Get the current status of the Meticulous machine.
-    
+
     Returns machine state, current profile, and whether preheating is active.
     """
     request_id = request.state.request_id
-    
+
     try:
-        logger.info(
-            "Fetching machine status",
-            extra={"request_id": request_id}
-        )
-        
+        logger.info("Fetching machine status", extra={"request_id": request_id})
+
         # Get current shot/status (live machine state)
         try:
             status = await async_session_get("/api/v1/status")
@@ -101,53 +101,56 @@ async def get_machine_status(request: Request):
         except Exception as e:
             logger.warning(f"Could not fetch machine status: {e}")
             status_data = {"state": "unknown", "error": str(e)}
-        
+
         # Get settings to check preheat state
         try:
             settings = await async_get_settings()
-            if hasattr(settings, 'error') and settings.error:
+            if hasattr(settings, "error") and settings.error:
                 settings_data = {}
-            elif hasattr(settings, 'model_dump'):
+            elif hasattr(settings, "model_dump"):
                 settings_data = settings.model_dump()
             else:
                 settings_data = dict(settings) if settings else {}
         except Exception as e:
             logger.warning(f"Could not fetch settings: {e}")
             settings_data = {}
-        
+
         # Get last loaded profile
         try:
             last_profile = await async_get_last_profile()
-            if hasattr(last_profile, 'error') and last_profile.error:
+            if hasattr(last_profile, "error") and last_profile.error:
                 last_profile_data = None
-            elif hasattr(last_profile, 'profile'):
+            elif hasattr(last_profile, "profile"):
                 last_profile_data = {
-                    "id": last_profile.profile.id if hasattr(last_profile.profile, 'id') else None,
-                    "name": last_profile.profile.name if hasattr(last_profile.profile, 'name') else None
+                    "id": last_profile.profile.id
+                    if hasattr(last_profile.profile, "id")
+                    else None,
+                    "name": last_profile.profile.name
+                    if hasattr(last_profile.profile, "name")
+                    else None,
                 }
             else:
                 last_profile_data = None
         except Exception as e:
             logger.warning(f"Could not fetch last profile: {e}")
             last_profile_data = None
-        
+
         return {
             "status": "success",
             "machine_status": status_data,
             "settings": settings_data,
             "current_profile": last_profile_data,
-            "scheduled_shots": list(_scheduled_shots.values())
+            "scheduled_shots": list(_scheduled_shots.values()),
         }
-        
+
     except Exception as e:
         logger.error(
             f"Failed to get machine status: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id}
+            extra={"request_id": request_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
@@ -172,13 +175,12 @@ async def start_preheat(request: Request):
     try:
         logger.info(
             "Starting machine preheat",
-            extra={"request_id": request_id, "profile_id": profile_id}
+            extra={"request_id": request_id, "profile_id": profile_id},
         )
 
         if get_meticulous_api() is None:
             raise HTTPException(
-                status_code=503,
-                detail="Meticulous machine not connected"
+                status_code=503, detail="Meticulous machine not connected"
             )
 
         # Pre-select the profile so the machine shows it during preheat
@@ -196,23 +198,19 @@ async def start_preheat(request: Request):
         # Use ActionType.PREHEAT to start the preheat cycle
         try:
             from meticulous.api_types import ActionType
+
             result = await async_execute_action(ActionType.PREHEAT)
 
-            if hasattr(result, 'error') and result.error:
+            if hasattr(result, "error") and result.error:
                 raise HTTPException(
-                    status_code=502,
-                    detail=f"Failed to start preheat: {result.error}"
+                    status_code=502, detail=f"Failed to start preheat: {result.error}"
                 )
         except ImportError:
             # Fallback: direct API call
-            result = await async_session_post(
-                "/api/v1/action",
-                {"action": "preheat"}
-            )
+            result = await async_session_post("/api/v1/action", {"action": "preheat"})
             if result.status_code != 200:
                 raise HTTPException(
-                    status_code=502,
-                    detail=f"Failed to start preheat: {result.text}"
+                    status_code=502, detail=f"Failed to start preheat: {result.text}"
                 )
 
         return {
@@ -228,69 +226,68 @@ async def start_preheat(request: Request):
         logger.error(
             f"Failed to start preheat: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id}
+            extra={"request_id": request_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
 @router.post("/api/machine/run-profile/{profile_id}")
 async def run_profile(profile_id: str, request: Request):
     """Load and run a profile immediately.
-    
+
     This loads the profile into the machine and starts extraction.
     """
     request_id = request.state.request_id
-    
+
     try:
         logger.info(
             f"Running profile: {profile_id}",
-            extra={"request_id": request_id, "profile_id": profile_id}
+            extra={"request_id": request_id, "profile_id": profile_id},
         )
-        
+
         if get_meticulous_api() is None:
             raise HTTPException(
-                status_code=503,
-                detail="Meticulous machine not connected"
+                status_code=503, detail="Meticulous machine not connected"
             )
-        
+
         # Load the profile
         load_result = await async_load_profile_by_id(profile_id)
-        if hasattr(load_result, 'error') and load_result.error:
+        if hasattr(load_result, "error") and load_result.error:
             raise HTTPException(
-                status_code=502,
-                detail=f"Failed to load profile: {load_result.error}"
+                status_code=502, detail=f"Failed to load profile: {load_result.error}"
             )
-        
+
         # Start the extraction
         from meticulous.api_types import ActionType
+
         action_result = await async_execute_action(ActionType.START)
-        if hasattr(action_result, 'error') and action_result.error:
+        if hasattr(action_result, "error") and action_result.error:
             raise HTTPException(
                 status_code=502,
-                detail=f"Failed to start profile: {action_result.error}"
+                detail=f"Failed to start profile: {action_result.error}",
             )
-        
+
         return {
             "status": "success",
-            "message": f"Profile started",
+            "message": "Profile started",
             "profile_id": profile_id,
-            "action": action_result.action if hasattr(action_result, 'action') else "start"
+            "action": action_result.action
+            if hasattr(action_result, "action")
+            else "start",
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
             f"Failed to run profile: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id, "profile_id": profile_id}
+            extra={"request_id": request_id, "profile_id": profile_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
@@ -327,7 +324,9 @@ async def run_profile_with_overrides(
         raise HTTPException(status_code=422, detail=f"Invalid save_mode: {save_mode}")
 
     if save_mode == "save_new" and not new_name.strip():
-        raise HTTPException(status_code=422, detail="new_name is required when save_mode is save_new")
+        raise HTTPException(
+            status_code=422, detail="new_name is required when save_mode is save_new"
+        )
 
     # Reject info_ variable overrides
     info_keys = [k for k in overrides_dict if k.startswith("info_")]
@@ -340,19 +339,28 @@ async def run_profile_with_overrides(
     try:
         logger.info(
             "Running profile with overrides: %s (%d override(s), save_mode=%s)",
-            profile_id, len(overrides_dict), save_mode,
+            profile_id,
+            len(overrides_dict),
+            save_mode,
             extra={"request_id": request_id},
         )
 
         if get_meticulous_api() is None:
-            raise HTTPException(status_code=503, detail="Meticulous machine not connected")
+            raise HTTPException(
+                status_code=503, detail="Meticulous machine not connected"
+            )
 
         # Fetch the original profile
         original_profile = await async_get_profile(profile_id)
         if original_profile is None:
-            raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Profile {profile_id} not found"
+            )
         if hasattr(original_profile, "error") and original_profile.error:
-            raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found: {original_profile.error}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile {profile_id} not found: {original_profile.error}",
+            )
 
         # Normalise to dict
         if hasattr(original_profile, "__dict__"):
@@ -360,14 +368,18 @@ async def run_profile_with_overrides(
         elif isinstance(original_profile, dict):
             profile_data = original_profile
         else:
-            raise HTTPException(status_code=500, detail="Unexpected profile format from machine")
+            raise HTTPException(
+                status_code=500, detail="Unexpected profile format from machine"
+            )
 
         original_name = profile_data.get("name", "Unknown Profile")
 
         # --- Save-as-new: persist BEFORE loading so the machine reports ---
         # --- the new name and the profile/image is available immediately ---
         if save_mode == "save_new" and overrides_dict:
-            new_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
+            new_profile = temp_profile_service.apply_variable_overrides(
+                profile_data, overrides_dict
+            )
             new_profile.pop("id", None)
             new_profile["name"] = new_name.strip()
             try:
@@ -382,7 +394,9 @@ async def run_profile_with_overrides(
 
         if overrides_dict:
             # Apply overrides to a deep copy
-            modified_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
+            modified_profile = temp_profile_service.apply_variable_overrides(
+                profile_data, overrides_dict
+            )
 
             # When saving as new, use the new name for the ephemeral load so
             # the machine broadcasts the correct active_profile via WebSocket.
@@ -404,13 +418,19 @@ async def run_profile_with_overrides(
 
         # Start extraction
         from meticulous.api_types import ActionType
+
         action_result = await async_execute_action(ActionType.START)
         if hasattr(action_result, "error") and action_result.error:
-            raise HTTPException(status_code=502, detail=f"Failed to start profile: {action_result.error}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to start profile: {action_result.error}",
+            )
 
         # Handle save-to-original after starting (non-blocking)
         if save_mode == "save_original" and overrides_dict:
-            saved_profile = temp_profile_service.apply_variable_overrides(profile_data, overrides_dict)
+            saved_profile = temp_profile_service.apply_variable_overrides(
+                profile_data, overrides_dict
+            )
             saved_profile["id"] = profile_id
             saved_profile["name"] = original_name
             try:
@@ -421,7 +441,9 @@ async def run_profile_with_overrides(
 
         return {
             "status": "success",
-            "message": "Profile started with overrides" if overrides_dict else "Profile started",
+            "message": "Profile started with overrides"
+            if overrides_dict
+            else "Profile started",
             "profile_id": result["profile_id"],
             "profile_name": result["profile_name"],
             "overrides_applied": len(overrides_dict),
@@ -433,69 +455,68 @@ async def run_profile_with_overrides(
     except Exception as e:
         logger.error(
             "Failed to run profile with overrides: %s",
-            str(e), exc_info=True,
+            str(e),
+            exc_info=True,
             extra={"request_id": request_id, "profile_id": profile_id},
         )
-        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+        raise HTTPException(
+            status_code=500, detail={"status": "error", "error": str(e)}
+        )
 
 
 @router.post("/api/machine/schedule-shot")
 async def schedule_shot(request: Request):
     """Schedule a shot to run at a specific time.
-    
+
     Request body:
     - profile_id: str - The profile ID to run
     - scheduled_time: str - ISO format datetime when to run the shot
     - preheat: bool - Whether to preheat before the shot (default: false)
-    
+
     If preheat is enabled, preheating will start 10 minutes before scheduled_time.
     """
     request_id = request.state.request_id
-    
+
     try:
         body = await request.json()
         profile_id = body.get("profile_id")
         scheduled_time_str = body.get("scheduled_time")
         preheat = body.get("preheat", False)
-        
+
         if not scheduled_time_str:
-            raise HTTPException(
-                status_code=400,
-                detail="scheduled_time is required"
-            )
-        
+            raise HTTPException(status_code=400, detail="scheduled_time is required")
+
         # Validate that we have either a profile or preheat enabled
         if not profile_id and not preheat:
             raise HTTPException(
-                status_code=400,
-                detail="Either profile_id or preheat must be provided"
+                status_code=400, detail="Either profile_id or preheat must be provided"
             )
-        
+
         # Parse the scheduled time
         try:
-            scheduled_time = datetime.fromisoformat(scheduled_time_str.replace('Z', '+00:00'))
+            scheduled_time = datetime.fromisoformat(
+                scheduled_time_str.replace("Z", "+00:00")
+            )
             # Ensure timezone-aware datetime
             if scheduled_time.tzinfo is None:
                 scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
         except ValueError:
             raise HTTPException(
-                status_code=400,
-                detail="Invalid scheduled_time format. Use ISO format."
+                status_code=400, detail="Invalid scheduled_time format. Use ISO format."
             )
-        
+
         # Calculate delays
         now = datetime.now(timezone.utc)
         shot_delay = (scheduled_time - now).total_seconds()
-        
+
         if shot_delay < 0:
             raise HTTPException(
-                status_code=400,
-                detail="scheduled_time must be in the future"
+                status_code=400, detail="scheduled_time must be in the future"
             )
-        
+
         # Generate a unique ID for this scheduled shot
         schedule_id = str(uuid.uuid4())
-        
+
         # Store the scheduled shot info
         scheduled_shot = {
             "id": schedule_id,
@@ -503,14 +524,14 @@ async def schedule_shot(request: Request):
             "scheduled_time": scheduled_time_str,
             "preheat": preheat,
             "status": "scheduled",
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         async with _get_state_lock():
             _scheduled_shots[schedule_id] = scheduled_shot
-        
+
         # Persist to disk
         await _save_scheduled_shots()
-        
+
         logger.info(
             f"Scheduling shot: {schedule_id}",
             extra={
@@ -518,18 +539,18 @@ async def schedule_shot(request: Request):
                 "schedule_id": schedule_id,
                 "profile_id": profile_id,
                 "scheduled_time": scheduled_time_str,
-                "preheat": preheat
-            }
+                "preheat": preheat,
+            },
         )
-        
+
         # Create async task to execute at scheduled time
         async def _execute_shot_task():
             try:
                 task_start_time = datetime.now(timezone.utc)
-                
+
                 # Track whether we've already waited the full delay
                 full_delay_waited = False
-                
+
                 # If preheat is enabled, start it 10 minutes before
                 if preheat:
                     preheat_delay = shot_delay - (PREHEAT_DURATION_MINUTES * 60)
@@ -538,14 +559,17 @@ async def schedule_shot(request: Request):
                         async with _get_state_lock():
                             _scheduled_shots[schedule_id]["status"] = "preheating"
                         await _save_scheduled_shots()
-                        
+
                         # Start preheat using ActionType.PREHEAT
                         try:
                             from meticulous.api_types import ActionType as AT
+
                             await async_execute_action(AT.PREHEAT)
                         except Exception as e:
-                            logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
-                        
+                            logger.warning(
+                                f"Preheat failed for scheduled shot {schedule_id}: {e}"
+                            )
+
                         # Wait for remaining time until shot
                         await asyncio.sleep(PREHEAT_DURATION_MINUTES * 60)
                         full_delay_waited = True
@@ -556,25 +580,31 @@ async def schedule_shot(request: Request):
                         await _save_scheduled_shots()
                         try:
                             from meticulous.api_types import ActionType as AT
+
                             await async_execute_action(AT.PREHEAT)
                         except Exception as e:
-                            logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
-                
+                            logger.warning(
+                                f"Preheat failed for scheduled shot {schedule_id}: {e}"
+                            )
+
                 # If we haven't already waited the full delay, calculate remaining time
                 if not full_delay_waited:
-                    elapsed = (datetime.now(timezone.utc) - task_start_time).total_seconds()
+                    elapsed = (
+                        datetime.now(timezone.utc) - task_start_time
+                    ).total_seconds()
                     remaining_delay = max(0, shot_delay - elapsed)
                     await asyncio.sleep(remaining_delay)
-                
+
                 async with _get_state_lock():
                     _scheduled_shots[schedule_id]["status"] = "running"
                 await _save_scheduled_shots()
-                
+
                 # Load and run the profile (if profile_id was provided)
                 if profile_id:
                     load_result = await async_load_profile_by_id(profile_id)
-                    if not (hasattr(load_result, 'error') and load_result.error):
+                    if not (hasattr(load_result, "error") and load_result.error):
                         from meticulous.api_types import ActionType
+
                         await async_execute_action(ActionType.START)
                         async with _get_state_lock():
                             _scheduled_shots[schedule_id]["status"] = "completed"
@@ -589,7 +619,7 @@ async def schedule_shot(request: Request):
                     async with _get_state_lock():
                         _scheduled_shots[schedule_id]["status"] = "completed"
                     await _save_scheduled_shots()
-                    
+
             except asyncio.CancelledError:
                 async with _get_state_lock():
                     _scheduled_shots[schedule_id]["status"] = "cancelled"
@@ -605,29 +635,28 @@ async def schedule_shot(request: Request):
                 async with _get_state_lock():
                     if schedule_id in _scheduled_tasks:
                         del _scheduled_tasks[schedule_id]
-        
+
         # Start the background task
         task = asyncio.create_task(_execute_shot_task())
         async with _get_state_lock():
             _scheduled_tasks[schedule_id] = task
-        
+
         return {
             "status": "success",
             "schedule_id": schedule_id,
-            "scheduled_shot": scheduled_shot
+            "scheduled_shot": scheduled_shot,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
             f"Failed to schedule shot: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id}
+            extra={"request_id": request_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
@@ -635,47 +664,43 @@ async def schedule_shot(request: Request):
 async def cancel_scheduled_shot(schedule_id: str, request: Request):
     """Cancel a scheduled shot."""
     request_id = request.state.request_id
-    
+
     try:
         async with _get_state_lock():
             if schedule_id not in _scheduled_shots:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Scheduled shot not found"
-                )
-            
+                raise HTTPException(status_code=404, detail="Scheduled shot not found")
+
             # Cancel the task if it exists
             if schedule_id in _scheduled_tasks:
                 _scheduled_tasks[schedule_id].cancel()
                 del _scheduled_tasks[schedule_id]
-            
+
             _scheduled_shots[schedule_id]["status"] = "cancelled"
-        
+
         # Persist to disk
         await _save_scheduled_shots()
-        
+
         logger.info(
             f"Cancelled scheduled shot: {schedule_id}",
-            extra={"request_id": request_id, "schedule_id": schedule_id}
+            extra={"request_id": request_id, "schedule_id": schedule_id},
         )
-        
+
         return {
             "status": "success",
             "message": "Scheduled shot cancelled",
-            "schedule_id": schedule_id
+            "schedule_id": schedule_id,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
             f"Failed to cancel scheduled shot: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id, "schedule_id": schedule_id}
+            extra={"request_id": request_id, "schedule_id": schedule_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
@@ -683,7 +708,7 @@ async def cancel_scheduled_shot(schedule_id: str, request: Request):
 async def list_scheduled_shots(request: Request):
     """List all scheduled shots."""
     request_id = request.state.request_id
-    
+
     try:
         # Clean up completed/cancelled shots older than 1 hour
         now = datetime.now(timezone.utc)
@@ -691,33 +716,31 @@ async def list_scheduled_shots(request: Request):
             to_remove = []
             for schedule_id, shot in _scheduled_shots.items():
                 if shot["status"] in ["completed", "cancelled", "failed"]:
-                    created_at = datetime.fromisoformat(shot["created_at"].replace('Z', '+00:00'))
+                    created_at = datetime.fromisoformat(
+                        shot["created_at"].replace("Z", "+00:00")
+                    )
                     if (now - created_at).total_seconds() > 3600:
                         to_remove.append(schedule_id)
-            
+
             for schedule_id in to_remove:
                 del _scheduled_shots[schedule_id]
-            
+
             result = list(_scheduled_shots.values())
-        
+
         # Persist changes if any shots were removed
         if to_remove:
             await _save_scheduled_shots()
-        
-        return {
-            "status": "success",
-            "scheduled_shots": result
-        }
-        
+
+        return {"status": "success", "scheduled_shots": result}
+
     except Exception as e:
         logger.error(
             f"Failed to list scheduled shots: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id}
+            extra={"request_id": request_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
@@ -725,14 +748,15 @@ async def list_scheduled_shots(request: Request):
 # Recurring Schedule Endpoints
 # ==============================================================================
 
+
 @router.get("/api/machine/recurring-schedules")
 async def list_recurring_schedules(request: Request):
     """List all recurring schedules."""
     request_id = request.state.request_id
-    
+
     try:
         logger.debug("Listing recurring schedules", extra={"request_id": request_id})
-        
+
         # Enrich schedules with next occurrence
         enriched_schedules = []
         for schedule_id, schedule in _recurring_schedules.items():
@@ -741,21 +765,24 @@ async def list_recurring_schedules(request: Request):
             if next_time:
                 schedule_copy["next_occurrence"] = next_time.isoformat()
             enriched_schedules.append(schedule_copy)
-        
-        return {
-            "status": "success",
-            "recurring_schedules": enriched_schedules
-        }
-        
+
+        return {"status": "success", "recurring_schedules": enriched_schedules}
+
     except Exception as e:
-        logger.error(f"Failed to list recurring schedules: {e}", exc_info=True, extra={"request_id": request_id})
-        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+        logger.error(
+            f"Failed to list recurring schedules: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500, detail={"status": "error", "error": str(e)}
+        )
 
 
 @router.post("/api/machine/recurring-schedules")
 async def create_recurring_schedule(request: Request):
     """Create a new recurring schedule.
-    
+
     Request body:
     - name: str - Display name for the schedule
     - time: str - Time in HH:MM format (24-hour)
@@ -767,107 +794,137 @@ async def create_recurring_schedule(request: Request):
     - enabled: bool - Whether the schedule is active (default: true)
     """
     request_id = request.state.request_id
-    
+
     try:
         body = await request.json()
-        
+
         # Validate required fields
         time_str = body.get("time")
         if not time_str:
-            raise HTTPException(status_code=400, detail="time is required (HH:MM format)")
-        
+            raise HTTPException(
+                status_code=400, detail="time is required (HH:MM format)"
+            )
+
         # Validate time format
         try:
             hour, minute = map(int, time_str.split(":"))
             if not (0 <= hour <= 23 and 0 <= minute <= 59):
                 raise ValueError("Invalid time")
         except (ValueError, AttributeError):
-            raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
-        
+            raise HTTPException(
+                status_code=400, detail="Invalid time format. Use HH:MM (24-hour)"
+            )
+
         recurrence_type = body.get("recurrence_type", "daily")
         valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
         if recurrence_type not in valid_types:
-            raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
-        
+            raise HTTPException(
+                status_code=400, detail=f"recurrence_type must be one of: {valid_types}"
+            )
+
         # Validate type-specific fields
         if recurrence_type == "interval":
             interval_days = body.get("interval_days", 1)
             if not isinstance(interval_days, int) or interval_days < 1:
-                raise HTTPException(status_code=400, detail="interval_days must be a positive integer")
-        
+                raise HTTPException(
+                    status_code=400, detail="interval_days must be a positive integer"
+                )
+
         if recurrence_type == "specific_days":
             days_of_week = body.get("days_of_week", [])
-            if not isinstance(days_of_week, list) or not all(isinstance(d, int) and 0 <= d <= 6 for d in days_of_week):
-                raise HTTPException(status_code=400, detail="days_of_week must be a list of integers 0-6")
+            if not isinstance(days_of_week, list) or not all(
+                isinstance(d, int) and 0 <= d <= 6 for d in days_of_week
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="days_of_week must be a list of integers 0-6",
+                )
             if not days_of_week:
-                raise HTTPException(status_code=400, detail="days_of_week cannot be empty for specific_days type")
-        
+                raise HTTPException(
+                    status_code=400,
+                    detail="days_of_week cannot be empty for specific_days type",
+                )
+
         profile_id = body.get("profile_id")
         preheat = body.get("preheat", True)
-        
+
         if not profile_id and not preheat:
-            raise HTTPException(status_code=400, detail="Either profile_id or preheat must be provided")
-        
+            raise HTTPException(
+                status_code=400, detail="Either profile_id or preheat must be provided"
+            )
+
         # Generate unique ID
         schedule_id = str(uuid.uuid4())
-        
+
         # Create schedule object
         schedule = {
             "name": body.get("name", f"Schedule {time_str}"),
             "time": time_str,
             "recurrence_type": recurrence_type,
-            "interval_days": body.get("interval_days", 1) if recurrence_type == "interval" else None,
-            "days_of_week": body.get("days_of_week", []) if recurrence_type == "specific_days" else None,
+            "interval_days": body.get("interval_days", 1)
+            if recurrence_type == "interval"
+            else None,
+            "days_of_week": body.get("days_of_week", [])
+            if recurrence_type == "specific_days"
+            else None,
             "profile_id": profile_id,
             "preheat": preheat,
             "enabled": body.get("enabled", True),
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         async with _get_state_lock():
             _recurring_schedules[schedule_id] = schedule
         await _save_recurring_schedules()
-        
+
         # Schedule the next occurrence immediately
         if schedule["enabled"]:
             await _schedule_next_recurring(schedule_id, schedule)
-        
+
         logger.info(
             f"Created recurring schedule: {schedule_id}",
-            extra={"request_id": request_id, "schedule": schedule}
+            extra={"request_id": request_id, "schedule": schedule},
         )
-        
+
         next_time = _get_next_occurrence(schedule)
-        
+
         return {
             "status": "success",
             "message": "Recurring schedule created",
             "schedule_id": schedule_id,
             "schedule": {**schedule, "id": schedule_id},
-            "next_occurrence": next_time.isoformat() if next_time else None
+            "next_occurrence": next_time.isoformat() if next_time else None,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to create recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
-        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+        logger.error(
+            f"Failed to create recurring schedule: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500, detail={"status": "error", "error": str(e)}
+        )
 
 
 @router.put("/api/machine/recurring-schedules/{schedule_id}")
 async def update_recurring_schedule(schedule_id: str, request: Request):
     """Update an existing recurring schedule."""
     request_id = request.state.request_id
-    
+
     try:
         body = await request.json()
-        
+
         async with _get_state_lock():
             if schedule_id not in _recurring_schedules:
-                raise HTTPException(status_code=404, detail="Recurring schedule not found")
-            
+                raise HTTPException(
+                    status_code=404, detail="Recurring schedule not found"
+                )
+
             schedule = _recurring_schedules[schedule_id]
-            
+
             # Update allowed fields
             if "name" in body:
                 schedule["name"] = body["name"]
@@ -879,11 +936,23 @@ async def update_recurring_schedule(schedule_id: str, request: Request):
                         raise ValueError("Invalid time")
                     schedule["time"] = time_str
                 except (ValueError, AttributeError):
-                    raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (24-hour)")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid time format. Use HH:MM (24-hour)",
+                    )
             if "recurrence_type" in body:
-                valid_types = ["daily", "weekdays", "weekends", "interval", "specific_days"]
+                valid_types = [
+                    "daily",
+                    "weekdays",
+                    "weekends",
+                    "interval",
+                    "specific_days",
+                ]
                 if body["recurrence_type"] not in valid_types:
-                    raise HTTPException(status_code=400, detail=f"recurrence_type must be one of: {valid_types}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"recurrence_type must be one of: {valid_types}",
+                    )
                 schedule["recurrence_type"] = body["recurrence_type"]
             if "interval_days" in body:
                 schedule["interval_days"] = body["interval_days"]
@@ -895,68 +964,91 @@ async def update_recurring_schedule(schedule_id: str, request: Request):
                 schedule["preheat"] = body["preheat"]
             if "enabled" in body:
                 schedule["enabled"] = body["enabled"]
-            
+
             schedule["updated_at"] = datetime.now(timezone.utc).isoformat()
-        
+
         await _save_recurring_schedules()
-        
+
         # If enabled, ensure next occurrence is scheduled
         if schedule.get("enabled", True):
             await _schedule_next_recurring(schedule_id, schedule)
-        
-        logger.info(f"Updated recurring schedule: {schedule_id}", extra={"request_id": request_id})
-        
+
+        logger.info(
+            f"Updated recurring schedule: {schedule_id}",
+            extra={"request_id": request_id},
+        )
+
         next_time = _get_next_occurrence(schedule)
-        
+
         return {
             "status": "success",
             "message": "Recurring schedule updated",
             "schedule": {**schedule, "id": schedule_id},
-            "next_occurrence": next_time.isoformat() if next_time else None
+            "next_occurrence": next_time.isoformat() if next_time else None,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
-        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+        logger.error(
+            f"Failed to update recurring schedule: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500, detail={"status": "error", "error": str(e)}
+        )
 
 
 @router.delete("/api/machine/recurring-schedules/{schedule_id}")
 async def delete_recurring_schedule(schedule_id: str, request: Request):
     """Delete a recurring schedule."""
     request_id = request.state.request_id
-    
+
     try:
         async with _get_state_lock():
             if schedule_id not in _recurring_schedules:
-                raise HTTPException(status_code=404, detail="Recurring schedule not found")
-            
+                raise HTTPException(
+                    status_code=404, detail="Recurring schedule not found"
+                )
+
             # Cancel any pending shots for this schedule
             for shot_id, shot in list(_scheduled_shots.items()):
-                if shot.get("recurring_schedule_id") == schedule_id and shot.get("status") == "scheduled":
+                if (
+                    shot.get("recurring_schedule_id") == schedule_id
+                    and shot.get("status") == "scheduled"
+                ):
                     if shot_id in _scheduled_tasks:
                         _scheduled_tasks[shot_id].cancel()
                         del _scheduled_tasks[shot_id]
                     _scheduled_shots[shot_id]["status"] = "cancelled"
-        
+
         await _save_scheduled_shots()
-        
+
         # Delete the recurring schedule
         async with _get_state_lock():
             del _recurring_schedules[schedule_id]
         await _save_recurring_schedules()
-        
-        logger.info(f"Deleted recurring schedule: {schedule_id}", extra={"request_id": request_id})
-        
+
+        logger.info(
+            f"Deleted recurring schedule: {schedule_id}",
+            extra={"request_id": request_id},
+        )
+
         return {
             "status": "success",
             "message": "Recurring schedule deleted",
-            "schedule_id": schedule_id
+            "schedule_id": schedule_id,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete recurring schedule: {e}", exc_info=True, extra={"request_id": request_id})
-        raise HTTPException(status_code=500, detail={"status": "error", "error": str(e)})
+        logger.error(
+            f"Failed to delete recurring schedule: {e}",
+            exc_info=True,
+            extra={"request_id": request_id},
+        )
+        raise HTTPException(
+            status_code=500, detail={"status": "error", "error": str(e)}
+        )

@@ -43,7 +43,9 @@ def _get_state_lock() -> asyncio.Lock:
     except RuntimeError:
         running_loop = None
 
-    if _state_lock is None or (running_loop is not None and running_loop is not _state_lock_loop):
+    if _state_lock is None or (
+        running_loop is not None and running_loop is not _state_lock_loop
+    ):
         _state_lock = asyncio.Lock()
         _state_lock_loop = running_loop
     return _state_lock
@@ -157,13 +159,18 @@ async def create_session(
         if len(_sessions) >= MAX_SESSIONS:
             # Drop oldest completed sessions first, then oldest abandoned
             oldest = sorted(
-                ((sid, s) for sid, s in _sessions.items()
-                 if s.status != SessionStatus.ACTIVE),
+                (
+                    (sid, s)
+                    for sid, s in _sessions.items()
+                    if s.status != SessionStatus.ACTIVE
+                ),
                 key=lambda x: x[1].updated_at,
             )
             if oldest:
                 del _sessions[oldest[0][0]]
-                logger.warning("Evicted oldest non-active session to stay within bounds")
+                logger.warning(
+                    "Evicted oldest non-active session to stay within bounds"
+                )
 
         _sessions[session.id] = session
         await _persist()

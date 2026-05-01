@@ -396,6 +396,9 @@ export function createDemoAdapter(): MachineService {
     // -- Settings/Device --
     async getSettings(): Promise<MachineSettings> {
       return {
+        heat_on_boot: false,
+        hostname_override: '',
+        profile_order: [],
         allow_debug_sending: false,
         auto_preheat: 0,
         auto_purge_after_shot: true,
@@ -428,7 +431,6 @@ export function createDemoAdapter(): MachineService {
         firmware: 'demo-1.0.0',
         mainVoltage: 230,
         color: 'black',
-        model_version: 'Demo',
         serial: 'DEMO-000000',
         batch_number: 'DEMO',
         build_date: '2025-01-01',
@@ -438,14 +440,11 @@ export function createDemoAdapter(): MachineService {
         manufacturing: false,
         upgrade_first_boot: false,
         version_history: ['demo-1.0.0'],
+        repository_info: {},
       }
     },
 
-    // -- Methods that may exist on extended interface --
-    async rateShot() {
-      return ok('Rating saved')
-    },
-  } satisfies MachineService & { rateShot: () => Promise<CommandResult> }
+  } satisfies MachineService
 
   return adapter
 }

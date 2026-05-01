@@ -126,8 +126,9 @@ const STYLE_MODIFIERS: Record<string, Record<string, string[]>> = {
 }
 
 const CORE_SAFETY_CONSTRAINTS = [
-  'No text, words, letters, or numbers.',
-  'No realistic human faces.',
+  'The image must contain absolutely no text, words, letters, numbers, labels, watermarks, signatures, or typography of any kind — purely visual art only.',
+  'No people, human figures, faces, body parts, or portraits of any kind.',
+  'No photographs — the output must be an artistic illustration, not a photo.',
   'Abstract artistic interpretation.',
 ]
 

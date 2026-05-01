@@ -5,10 +5,8 @@ Uses the ProfileValidator from the MCP server when the JSON schema is available,
 and falls back to basic structural validation otherwise.
 """
 
-import json
 import os
 import sys
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from logging_config import get_logger
@@ -34,8 +32,8 @@ try:
 
     from meticulous_mcp.profile_validator import (  # type: ignore[import-untyped]
         ProfileValidator as _PV,
-        ProfileValidationError,
     )
+
     _ProfileValidator = _PV
     _FULL_VALIDATOR_AVAILABLE = True
     logger.debug("Full OEPF ProfileValidator loaded from MCP server")
@@ -48,8 +46,13 @@ _SCHEMA_PATHS = [
     "/app/espresso-profile-schema/schema.json",
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "schema.json"),
     os.path.join(
-        os.path.dirname(__file__), "..", "..", "mcp-server",
-        "meticulous-mcp", "espresso-profile-schema", "schema.json"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "mcp-server",
+        "meticulous-mcp",
+        "espresso-profile-schema",
+        "schema.json",
     ),
 ]
 
@@ -94,7 +97,9 @@ def _get_validator():
     if _FULL_VALIDATOR_AVAILABLE and schema_path:
         try:
             _validator_instance = _ProfileValidator(schema_path=schema_path)
-            logger.info("OEPF ProfileValidator initialized with schema at %s", schema_path)
+            logger.info(
+                "OEPF ProfileValidator initialized with schema at %s", schema_path
+            )
             return _validator_instance
         except Exception as e:
             logger.warning("Failed to initialize full ProfileValidator: %s", e)
@@ -126,15 +131,17 @@ def _basic_validate(profile: Dict[str, Any]) -> Tuple[bool, List[str]]:
 
     for i, stage in enumerate(profile.get("stages", [])):
         if not isinstance(stage, dict):
-            errors.append(f"Stage {i+1}: must be a JSON object")
+            errors.append(f"Stage {i + 1}: must be a JSON object")
             continue
 
-        sname = stage.get("name", f"Stage {i+1}")
+        sname = stage.get("name", f"Stage {i + 1}")
         stype = stage.get("type")
 
         # Stage type validation
         if stype not in ("power", "flow", "pressure"):
-            errors.append(f"Stage '{sname}': type must be 'power', 'flow', or 'pressure', got '{stype}'")
+            errors.append(
+                f"Stage '{sname}': type must be 'power', 'flow', or 'pressure', got '{stype}'"
+            )
 
         # Exit triggers required
         triggers = stage.get("exit_triggers", [])
@@ -166,8 +173,7 @@ def _basic_validate(profile: Dict[str, Any]) -> Tuple[bool, List[str]]:
                 errors.append(f"Stage '{sname}': flow stage must have a pressure limit")
         elif stype == "pressure":
             has_flow_limit = any(
-                isinstance(lim, dict) and lim.get("type") == "flow"
-                for lim in limits
+                isinstance(lim, dict) and lim.get("type") == "flow" for lim in limits
             )
             if not has_flow_limit:
                 errors.append(f"Stage '{sname}': pressure stage must have a flow limit")
@@ -177,11 +183,15 @@ def _basic_validate(profile: Dict[str, Any]) -> Tuple[bool, List[str]]:
         if isinstance(dynamics, dict):
             over = dynamics.get("over")
             if over and over not in ("time", "weight", "piston_position"):
-                errors.append(f"Stage '{sname}': dynamics.over must be 'time', 'weight', or 'piston_position'")
+                errors.append(
+                    f"Stage '{sname}': dynamics.over must be 'time', 'weight', or 'piston_position'"
+                )
 
             interp = dynamics.get("interpolation")
             if interp and interp not in ("linear", "curve"):
-                errors.append(f"Stage '{sname}': interpolation must be 'linear' or 'curve'")
+                errors.append(
+                    f"Stage '{sname}': interpolation must be 'linear' or 'curve'"
+                )
 
     # Unused adjustable variables check
     variables = profile.get("variables", [])
@@ -239,6 +249,7 @@ def validate_profile(profile: Dict[str, Any]) -> ValidationResult:
     else:
         try:
             from meticulous_mcp.profile_validator import ValidationLevel  # type: ignore[import-untyped]
+
             is_valid, errors = validator.validate(profile, level=ValidationLevel.STRICT)
         except Exception as e:
             logger.warning("Full validation failed, falling back to basic: %s", e)

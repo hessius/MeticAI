@@ -50,6 +50,7 @@ import { SPEED_OPTIONS } from './types'
 import {
   getChartData,
   getStageRanges,
+  getStageRangesFromTargetCurves,
   mergeWithTargetCurves,
   getComparisonChartData,
   getCombinedChartData,
@@ -405,28 +406,33 @@ export function ShotDetail({
   }
 
   // ---- Memoised chart data (shared between mobile and desktop) ------------
+  const profileTargetCurves = analysisResult?.profile_target_curves
   const replayChartData = useMemo(() => {
     if (!shotData) return null
     const chartData = getChartData(shotData)
-    const stageRanges = getStageRanges(chartData)
+    const rawStageRanges = getStageRanges(chartData)
     const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
     const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
-    const mergedData = mergeWithTargetCurves(chartData, analysisResult?.profile_target_curves)
+    // Derive stages from target curves when shot data lacks stage info
+    const stageRanges = rawStageRanges.length === 0 && profileTargetCurves?.length
+      ? getStageRangesFromTargetCurves(profileTargetCurves, dataMaxTime)
+      : rawStageRanges
+    const mergedData = mergeWithTargetCurves(chartData, profileTargetCurves)
     const maxPressure = Math.max(
       ...chartData.map(d => d.pressure || 0),
-      ...(analysisResult?.profile_target_curves?.map(d => d.target_pressure || 0) || []),
+      ...(profileTargetCurves?.map(d => d.target_pressure || 0) || []),
       12,
     )
     const maxFlow = Math.max(
       ...chartData.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)),
-      ...(analysisResult?.profile_target_curves?.map(d => d.target_flow || 0) || []),
+      ...(profileTargetCurves?.map(d => d.target_flow || 0) || []),
       8,
     )
     const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
     const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
     const maxRightAxis = Math.ceil(maxWeight * 1.1)
     return { chartData, stageRanges, hasGravFlow, dataMaxTime, mergedData, maxLeftAxis, maxRightAxis }
-  }, [shotData, analysisResult?.profile_target_curves])
+  }, [shotData, profileTargetCurves])
 
   const compareChartMemo = useMemo(() => {
     if (!shotData || !comparisonShotData) return null
@@ -443,9 +449,13 @@ export function ShotDetail({
   const analyzeChartMemo = useMemo(() => {
     if (!shotData || !analysisResult) return null
     const chartData = getChartData(shotData)
-    const stageRanges = getStageRanges(chartData)
+    const rawStageRanges = getStageRanges(chartData)
     const hasTargetCurves = !!(analysisResult.profile_target_curves && analysisResult.profile_target_curves.length > 0)
     const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
+    // Derive stages from target curves when shot data lacks stage info
+    const stageRanges = rawStageRanges.length === 0 && analysisResult.profile_target_curves?.length
+      ? getStageRangesFromTargetCurves(analysisResult.profile_target_curves, dataMaxTime)
+      : rawStageRanges
     const maxPressure = Math.max(
       ...chartData.map(d => d.pressure || 0),
       ...(analysisResult.profile_target_curves?.map(d => d.target_pressure || 0) || []),
@@ -1429,6 +1439,35 @@ export function ShotDetail({
 
                           {!aiConfigured && !hideAiWhenUnavailable && (
                             <p className="text-[11px] text-muted-foreground text-center">{t('shotHistory.aiUnavailable')}</p>
+                          )}
+
+                          {/* Export analysis as image */}
+                          {canShare && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 w-full"
+                              onClick={async () => {
+                                if (!analysisCardRef.current) return
+                                try {
+                                  const el = analysisCardRef.current
+                                  const rect = el.getBoundingClientRect()
+                                  const dataUrl = await domToPng(el, {
+                                    scale: 2,
+                                    backgroundColor: '#09090b',
+                                    width: rect.width + 40,
+                                    height: el.scrollHeight + 40,
+                                    style: { padding: '20px', boxSizing: 'content-box' },
+                                  })
+                                  await shareImageDataUri(dataUrl, `shot_analysis_${Date.now()}.png`, { title: profileName })
+                                } catch (err) {
+                                  console.error('Failed to export analysis:', err)
+                                }
+                              }}
+                            >
+                              <ShareNetwork size={14} weight="bold" />
+                              {t('shotHistory.exportAsImage')}
+                            </Button>
                           )}
                         </div>
                       </div>

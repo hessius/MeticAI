@@ -4,7 +4,7 @@ declare const BASE_KV_SERVICE_URL: string
 declare const __APP_VERSION__: string
 
 interface ImportMetaEnv {
-  readonly VITE_MACHINE_MODE?: 'direct' | 'proxy'
+  readonly VITE_MACHINE_MODE?: 'direct' | 'proxy' | 'capacitor'
   readonly VITE_DEFAULT_MACHINE_URL?: string
 }
 

@@ -1,20 +1,716 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
-import { findSimilarProfiles, getRecommendations } from '@/lib/profileRecommendation'
+import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
+import {
+  addDirectDialInIteration,
+  clearDirectHistory,
+  completeDirectDialInSession,
+  createDirectDialInSession,
+  DirectStorageValidationError,
+  deleteDirectDialInSession,
+  deleteDirectHistoryEntry,
+  deleteDirectShotAnnotation,
+  generateDirectDialInRecommendations,
+  getDirectAnnotationSummaries,
+  getDirectDeletedHistoryIds,
+  getDirectDialInSession,
+  getDirectHistoryNotes,
+  getDirectProfileImage,
+  getDirectPourOverPreferences,
+  getDirectShotAnnotation,
+  listDirectDialInSessions,
+  saveDirectHistoryNotes,
+  saveDirectPourOverPreferences,
+  saveDirectProfileImage,
+  saveDirectShotAnnotation,
+  updateDirectDialInRecommendations,
+} from './directModeStorage'
 
 // ── Private helpers ─────────────────────────────────────────────────────────
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
+interface CachedProfile {
+  id: string
+  name: string
+  change_id?: string
+  author?: string
+  temperature?: number
+  final_weight?: number
+  variables?: Array<Record<string, unknown>>
+  stages?: Array<Record<string, unknown>>
+  display?: { image?: string; description?: string; shortDescription?: string; accentColor?: string }
+  [key: string]: unknown
 }
 
-interface CachedProfile { id: string; name: string; display?: { image?: string; description?: string; shortDescription?: string; accentColor?: string } }
+interface MachineHistoryEntry {
+  id: string
+  time: number
+  name?: string
+  file?: string
+  profile?: Record<string, unknown>
+  data?: Array<{ shot?: { weight?: number }; time?: number; profile_time?: number }>
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function normalizeProfileIdent(value: unknown): CachedProfile | null {
+  if (!isRecord(value)) return null
+  const nestedProfile = isRecord(value.profile) ? value.profile : value
+  const id = nestedProfile.id
+  const name = nestedProfile.name
+  if (typeof id !== 'string' || typeof name !== 'string') return null
+  const normalized: CachedProfile = {
+    ...nestedProfile,
+    id,
+    name,
+  }
+  if (typeof value.change_id === 'string') normalized.change_id = value.change_id
+  return normalized
+}
+
+function stripDirectProfileMetadata(profile: CachedProfile): Record<string, unknown> {
+  const machineProfile: Record<string, unknown> = { ...profile }
+  delete machineProfile.change_id
+  delete machineProfile.in_history
+  delete machineProfile.has_description
+  return machineProfile
+}
+
+function getDirectProfileImagePath(profile: CachedProfile): string | undefined {
+  if (typeof profile.display?.image === 'string' && profile.display.image.trim()) {
+    return profile.display.image
+  }
+  if (typeof profile.image === 'string' && profile.image.trim()) {
+    return profile.image
+  }
+  return undefined
+}
+
+function normalizeHistoryEntry(entry: MachineHistoryEntry, notes: {
+  notes: string | null
+  notes_updated_at: string | null
+} = { notes: null, notes_updated_at: null }, description = '') {
+  return {
+    id: entry.id,
+    created_at: new Date(entry.time * 1000).toISOString(),
+    profile_name: typeof entry.profile?.name === 'string' ? entry.profile.name : entry.name ?? 'Unknown',
+    coffee_analysis: null,
+    user_preferences: null,
+    reply: description,
+    profile_json: entry.profile ?? null,
+    notes: notes.notes,
+    notes_updated_at: notes.notes_updated_at,
+  }
+}
+
+function getHistoryEntryDate(entry: MachineHistoryEntry): string {
+  return new Date(entry.time * 1000).toISOString().split('T')[0]
+}
+
+function getHistoryEntryFilename(entry: MachineHistoryEntry): string {
+  return entry.file ?? `${entry.id}.json`
+}
+
+function getHistoryProfileName(entry: MachineHistoryEntry): string {
+  return typeof entry.profile?.name === 'string' ? entry.profile.name : entry.name ?? 'Unknown'
+}
+
+function getHistoryProfileId(entry: MachineHistoryEntry): string {
+  return typeof entry.profile?.id === 'string' ? entry.profile.id : entry.id
+}
+
+function getHistoryMetrics(entry: MachineHistoryEntry): {
+  final_weight: number | null
+  total_time: number | null
+} {
+  const lastPoint = entry.data?.[entry.data.length - 1]
+  const totalTimeMs = lastPoint?.profile_time ?? lastPoint?.time
+  return {
+    final_weight: lastPoint?.shot?.weight ?? (typeof entry.profile?.final_weight === 'number' ? entry.profile.final_weight : null),
+    total_time: totalTimeMs ? totalTimeMs / 1000 : null,
+  }
+}
+
+function normalizeLastShot(entry: MachineHistoryEntry) {
+  return {
+    profile_name: getHistoryProfileName(entry),
+    date: getHistoryEntryDate(entry),
+    filename: getHistoryEntryFilename(entry),
+    timestamp: entry.time,
+    ...getHistoryMetrics(entry),
+  }
+}
+
+function hasRecentShotAnnotation(annotation?: { has_annotation: boolean; rating: number | null }): boolean {
+  return annotation !== undefined && (annotation.has_annotation || annotation.rating !== null)
+}
+
+function safeNumber(value: unknown, fallback = 0): number {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : fallback
+}
+
+function optionalNumber(value: unknown): number | null {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : null
+}
+
+function roundScore(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+const DIRECT_PROFILE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+
+class DirectImageValidationError extends Error {
+  constructor(message: string, public readonly status = 400) {
+    super(message)
+    this.name = 'DirectImageValidationError'
+  }
+}
+
+function blobBytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
+function isSupportedImageBytes(bytes: Uint8Array, mimeType: string): boolean {
+  const normalizedType = mimeType.toLowerCase()
+  if (normalizedType === 'image/png') {
+    return bytes.length >= 8
+      && bytes[0] === 0x89
+      && bytes[1] === 0x50
+      && bytes[2] === 0x4e
+      && bytes[3] === 0x47
+      && bytes[4] === 0x0d
+      && bytes[5] === 0x0a
+      && bytes[6] === 0x1a
+      && bytes[7] === 0x0a
+  }
+  if (normalizedType === 'image/jpeg' || normalizedType === 'image/jpg') {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+  }
+  if (normalizedType === 'image/gif') {
+    const header = String.fromCharCode(...bytes.slice(0, 6))
+    return header === 'GIF87a' || header === 'GIF89a'
+  }
+  if (normalizedType === 'image/webp') {
+    return bytes.length >= 12
+      && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+      && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
+  }
+  return false
+}
+
+function validateImageBytes(bytes: Uint8Array, mimeType: string): void {
+  if (bytes.byteLength > DIRECT_PROFILE_IMAGE_MAX_BYTES) {
+    throw new DirectImageValidationError('Image too large. Maximum size is 10MB', 413)
+  }
+  if (!mimeType.startsWith('image/')) {
+    throw new DirectImageValidationError('File must be an image')
+  }
+  if (!isSupportedImageBytes(bytes, mimeType)) {
+    throw new DirectImageValidationError('Invalid image data')
+  }
+}
+
+async function blobToDataUri(blob: Blob): Promise<string> {
+  if (blob.size > DIRECT_PROFILE_IMAGE_MAX_BYTES) {
+    throw new DirectImageValidationError('Image too large. Maximum size is 10MB', 413)
+  }
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  validateImageBytes(bytes, blob.type || 'application/octet-stream')
+  return `data:${blob.type || 'application/octet-stream'};base64,${blobBytesToBase64(bytes)}`
+}
+
+function estimateBase64DecodedBytes(payload: string): number {
+  const normalizedPayload = payload.replace(/\s/g, '')
+  const padding = normalizedPayload.endsWith('==') ? 2 : normalizedPayload.endsWith('=') ? 1 : 0
+  return Math.floor(normalizedPayload.length / 4) * 3 - padding
+}
+
+function dataUriToBlob(dataUri: string): Blob {
+  const match = dataUri.match(/^data:([^;,]+)(;base64)?,(.*)$/)
+  if (!match) throw new DirectImageValidationError('Invalid image data - must be a data URI')
+  const mimeType = match[1] || 'application/octet-stream'
+  const payload = match[3]
+  if (!mimeType.startsWith('image/')) throw new DirectImageValidationError('Invalid image data - must be a data URI')
+  if (match[2] && estimateBase64DecodedBytes(payload) > DIRECT_PROFILE_IMAGE_MAX_BYTES) {
+    throw new DirectImageValidationError('Image too large. Maximum size is 10MB', 413)
+  }
+  let binary: string
+  try {
+    binary = match[2] ? atob(payload) : decodeURIComponent(payload)
+  } catch (err) {
+    throw new DirectImageValidationError(`Failed to decode image data: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  validateImageBytes(bytes, mimeType)
+  return new Blob([bytes], { type: mimeType })
+}
+
+async function readJsonRequestBody(input: RequestInfo | URL, init?: RequestInit): Promise<unknown> {
+  const request = input instanceof Request ? input.clone() : new Request(input, init)
+  const body = await request.text()
+  return body.trim() ? JSON.parse(body) : {}
+}
+
+function normalizeTerm(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function termMatches(query: string, candidate: string): boolean {
+  const queryTerm = normalizeTerm(query)
+  const candidateTerm = normalizeTerm(candidate)
+  if (!queryTerm || !candidateTerm) return false
+  return candidateTerm.includes(queryTerm) || queryTerm.includes(candidateTerm)
+}
+
+function resolveProfileValue(value: unknown, variables: Array<Record<string, unknown>>): number {
+  if (typeof value === 'string' && value.startsWith('$')) {
+    const key = value.slice(1)
+    const variable = variables.find((item) => item.key === key || item.name === key)
+    return safeNumber(variable?.value)
+  }
+  return safeNumber(value)
+}
+
+function generateEstimatedTargetCurves(profile: CachedProfile): Array<Record<string, unknown>> {
+  const stages = profile.stages ?? []
+  const variables = profile.variables ?? []
+  const defaultStageDuration = 10
+  const weightStageMaxEstimate = 15
+  const durations = stages.map((stage) => {
+    const triggers = Array.isArray(stage.exit_triggers) ? stage.exit_triggers : []
+    let timeTrigger: number | null = null
+    let hasWeightTrigger = false
+    for (const trigger of triggers) {
+      if (!isRecord(trigger)) continue
+      if (trigger.type === 'time') timeTrigger = resolveProfileValue(trigger.value, variables) || defaultStageDuration
+      if (trigger.type === 'weight') hasWeightTrigger = true
+    }
+    if (timeTrigger === null) return defaultStageDuration
+    return hasWeightTrigger ? Math.min(timeTrigger, weightStageMaxEstimate) : timeTrigger
+  })
+
+  const curves: Array<Record<string, unknown>> = []
+  let runningTime = 0
+  stages.forEach((stage, index) => {
+    const stageName = typeof stage.name === 'string' ? stage.name : `Stage ${index + 1}`
+    const stageType = typeof stage.type === 'string' ? stage.type : 'flow'
+    const duration = durations[index] ?? defaultStageDuration
+    const dynamics = isRecord(stage.dynamics) ? stage.dynamics : {}
+    const points = Array.isArray(stage.dynamics_points)
+      ? stage.dynamics_points
+      : Array.isArray(dynamics.points)
+        ? dynamics.points
+        : []
+    if (points.length === 0) {
+      runningTime += duration
+      return
+    }
+    const key = stageType === 'pressure'
+      ? 'target_pressure'
+      : stageType === 'power'
+        ? 'target_power'
+        : 'target_flow'
+    const stageStart = runningTime
+    const stageEnd = runningTime + duration
+    if (points.length === 1 && Array.isArray(points[0])) {
+      const value = resolveProfileValue(points[0][1] ?? points[0][0], variables)
+      curves.push(
+        { time: Number(stageStart.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
+        { time: Number(stageEnd.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
+      )
+    } else {
+      const maxX = Math.max(...points.filter(Array.isArray).map((point) => safeNumber(point[0])))
+      const scale = maxX > 0 ? duration / maxX : 1
+      for (const point of points) {
+        if (!Array.isArray(point)) continue
+        const value = resolveProfileValue(point[1] ?? point[0], variables)
+        curves.push({
+          time: Number((stageStart + safeNumber(point[0]) * scale).toFixed(2)),
+          stage_name: stageName,
+          [key]: Math.round(value * 10) / 10,
+        })
+      }
+    }
+    runningTime = stageEnd
+  })
+  return curves.sort((a, b) => safeNumber(a.time) - safeNumber(b.time))
+}
+
+/**
+ * Generate target curves aligned to actual shot stage timings.
+ * Uses shot data to build weight-to-time mappings for weight-based dynamics.
+ */
+function generateShotAlignedTargetCurves(
+  profile: CachedProfile,
+  shotStages: Map<string, { startTime: number; endTime: number }>,
+  shotDataEntries?: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const stages = profile.stages ?? []
+  const variables = profile.variables ?? []
+  const curves: Array<Record<string, unknown>> = []
+
+  // Build per-stage weight→time mapping from shot data for weight-based dynamics
+  const stageWeightToTime = new Map<string, Array<[number, number]>>()
+  if (shotDataEntries) {
+    for (const entry of shotDataEntries) {
+      const status = String((entry as Record<string, unknown>).status ?? '').trim().toLowerCase()
+      if (!status || status === 'retracting') continue
+      const timeSec = safeNumber((entry as Record<string, unknown>).time) / 1000
+      const shot = (entry as Record<string, Record<string, unknown>>).shot ?? {}
+      const weight = safeNumber(shot.weight)
+      if (!stageWeightToTime.has(status)) stageWeightToTime.set(status, [])
+      stageWeightToTime.get(status)!.push([weight, timeSec])
+    }
+  }
+
+  for (const stage of stages) {
+    const stageName = typeof stage.name === 'string' ? stage.name : ''
+    const stageType = typeof stage.type === 'string' ? stage.type : 'flow'
+    const dynamics = isRecord(stage.dynamics) ? stage.dynamics : {}
+    const points = Array.isArray(stage.dynamics_points)
+      ? stage.dynamics_points
+      : Array.isArray(dynamics.points)
+        ? dynamics.points
+        : []
+    if (points.length === 0) continue
+
+    // Match stage to shot timing (case-insensitive)
+    let timing: { startTime: number; endTime: number } | undefined
+    const stageKey = (typeof stage.key === 'string' ? stage.key : '').toLowerCase().trim()
+    const stageNameLower = stageName.toLowerCase().trim()
+    for (const [shotStageName, t] of shotStages) {
+      const normalised = shotStageName.toLowerCase().trim()
+      if (normalised === stageNameLower || normalised === stageKey) { timing = t; break }
+    }
+    if (!timing) continue
+    const stageStart = timing.startTime
+    const stageDuration = timing.endTime - timing.startTime
+    if (stageDuration <= 0) continue
+
+    const key = stageType === 'pressure' ? 'target_pressure'
+      : stageType === 'power' ? 'target_power'
+        : 'target_flow'
+
+    const dynamicsOver = typeof stage.dynamics_over === 'string'
+      ? stage.dynamics_over
+      : typeof dynamics.over === 'string' ? dynamics.over : 'time'
+
+    if (dynamicsOver === 'weight' && stageWeightToTime.has(stageNameLower)) {
+      // Weight-based dynamics: interpolate time from weight
+      const wtPairs = stageWeightToTime.get(stageNameLower)!
+      for (const point of points) {
+        if (!Array.isArray(point)) continue
+        const targetWeight = safeNumber(point[0])
+        const value = resolveProfileValue(point[1] ?? point[0], variables)
+        // Find the time when this weight was reached
+        let interpTime = stageStart
+        for (let i = 0; i < wtPairs.length - 1; i++) {
+          const [w0, t0] = wtPairs[i]
+          const [w1, t1] = wtPairs[i + 1]
+          if (w0 <= targetWeight && targetWeight <= w1 && w1 > w0) {
+            interpTime = t0 + (targetWeight - w0) / (w1 - w0) * (t1 - t0)
+            break
+          }
+        }
+        curves.push({
+          time: Number(interpTime.toFixed(2)),
+          stage_name: stageName,
+          [key]: Math.round(value * 10) / 10,
+        })
+      }
+    } else {
+      // Time-based dynamics
+      if (points.length === 1 && Array.isArray(points[0])) {
+        const value = resolveProfileValue(points[0][1] ?? points[0][0], variables)
+        curves.push(
+          { time: Number(stageStart.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
+          { time: Number(timing.endTime.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
+        )
+      } else {
+        const maxX = Math.max(...points.filter(Array.isArray).map((p: unknown[]) => safeNumber(p[0])))
+        const scale = maxX > 0 ? stageDuration / maxX : 1
+        for (const point of points) {
+          if (!Array.isArray(point)) continue
+          const value = resolveProfileValue(point[1] ?? point[0], variables)
+          curves.push({
+            time: Number((stageStart + safeNumber(point[0]) * scale).toFixed(2)),
+            stage_name: stageName,
+            [key]: Math.round(value * 10) / 10,
+          })
+        }
+      }
+    }
+  }
+  return curves.sort((a, b) => safeNumber(a.time) - safeNumber(b.time))
+}
+
+type ProfileFingerprint = {
+  controlMode: 'pressure' | 'flow' | 'mixed' | 'unknown'
+  techniqueTags: Set<string>
+  stageCount: number
+  isFlat: boolean
+  peakPressure: number
+  temperature: number | null
+  finalWeight: number | null
+}
+
+type ProfileRecommendation = {
+  profile_name: string
+  score: number
+  explanation: string
+  match_reasons: string[]
+}
+
+function getProfileStages(profile: CachedProfile): Array<Record<string, unknown>> {
+  return Array.isArray(profile.stages) ? profile.stages : []
+}
+
+function getProfileTextTerms(profile: CachedProfile): string[] {
+  const terms = [
+    profile.name,
+    profile.display?.description,
+    profile.display?.shortDescription,
+    ...getProfileStages(profile).map((stage) => String(stage.name ?? '')),
+  ]
+  return terms
+    .flatMap((term) => normalizeTerm(String(term ?? '')).split(/\s+/))
+    .filter(Boolean)
+}
+
+function extractProfileFingerprint(profile: CachedProfile): ProfileFingerprint {
+  const stages = getProfileStages(profile)
+  const stageTypes: string[] = []
+  const techniqueTags = new Set<string>()
+  let peakPressure = 0
+  let isFlat = stages.length <= 2
+
+  for (const stage of stages) {
+    const stageType = typeof stage.type === 'string' ? stage.type.toLowerCase() : ''
+    const stageName = typeof stage.name === 'string' ? stage.name.toLowerCase() : ''
+    if (stageType) stageTypes.push(stageType)
+    for (const keyword of ['preinfusion', 'pre-infusion', 'bloom', 'soak', 'pulse', 'lever', 'turbo', 'ramp', 'decline', 'taper']) {
+      if (stageName.includes(keyword)) techniqueTags.add(keyword === 'soak' ? 'bloom' : keyword.replace('pre-infusion', 'preinfusion'))
+    }
+
+    const dynamics = isRecord(stage.dynamics) ? stage.dynamics : {}
+    const points = Array.isArray(stage.dynamics_points)
+      ? stage.dynamics_points
+      : Array.isArray(dynamics.points)
+        ? dynamics.points
+        : []
+    const values = points
+      .filter(Array.isArray)
+      .map((point) => resolveProfileValue(point[1] ?? point[0], profile.variables ?? []))
+      .filter(Number.isFinite)
+    if (stageType === 'pressure') peakPressure = Math.max(peakPressure, ...values, 0)
+    if (values.length > 1 && new Set(values.map((value) => roundScore(value))).size > 1) isFlat = false
+  }
+
+  const pressureStages = stageTypes.filter((type) => type === 'pressure').length
+  const flowStages = stageTypes.filter((type) => type === 'flow').length
+  const controlMode = pressureStages > 0 && flowStages > 0
+    ? 'mixed'
+    : pressureStages > 0
+      ? 'pressure'
+      : flowStages > 0
+        ? 'flow'
+        : 'unknown'
+  if (controlMode !== 'unknown') techniqueTags.add(`${controlMode}-profile`)
+  if (isFlat) techniqueTags.add('flat')
+
+  return {
+    controlMode,
+    techniqueTags,
+    stageCount: stages.length,
+    isFlat,
+    peakPressure: roundScore(peakPressure),
+    temperature: optionalNumber(profile.temperature),
+    finalWeight: optionalNumber(profile.final_weight),
+  }
+}
+
+function buildTagFingerprint(tags: string[]): ProfileFingerprint {
+  const normalizedTags = tags.map(normalizeTerm)
+  const techniqueTags = new Set<string>()
+  const tagMap: Record<string, string> = {
+    preinfusion: 'preinfusion',
+    bloom: 'bloom',
+    soak: 'bloom',
+    pulse: 'pulse',
+    lever: 'lever',
+    turbo: 'turbo',
+    ramp: 'ramp',
+    decline: 'decline',
+    taper: 'taper',
+    flat: 'flat',
+    pressure: 'pressure-profile',
+    flow: 'flow-profile',
+  }
+  for (const tag of normalizedTags) {
+    for (const [needle, technique] of Object.entries(tagMap)) {
+      if (tag.includes(needle)) techniqueTags.add(technique)
+    }
+  }
+  const controlMode = techniqueTags.has('pressure-profile')
+    ? 'pressure'
+    : techniqueTags.has('flow-profile')
+      ? 'flow'
+      : 'unknown'
+  return {
+    controlMode,
+    techniqueTags,
+    stageCount: techniqueTags.has('pulse') ? 5 : techniqueTags.has('bloom') || techniqueTags.has('preinfusion') ? 3 : 2,
+    isFlat: techniqueTags.has('flat'),
+    peakPressure: 0,
+    temperature: null,
+    finalWeight: null,
+  }
+}
+
+function scoreProfile(tags: string[], target: ProfileFingerprint, candidate: CachedProfile): ProfileRecommendation {
+  const candidateFingerprint = extractProfileFingerprint(candidate)
+  const candidateTerms = getProfileTextTerms(candidate)
+  const reasons: string[] = []
+  let score = 0
+
+  for (const tag of tags) {
+    if (candidateTerms.some((term) => termMatches(tag, term))) {
+      score += 20
+      reasons.push(`Matching: ${tag}`)
+    }
+  }
+
+  if (target.controlMode !== 'unknown' && candidateFingerprint.controlMode === target.controlMode) {
+    score += 15
+    reasons.push(`${candidateFingerprint.controlMode}-controlled`)
+  } else if (target.controlMode !== 'unknown' && candidateFingerprint.controlMode === 'mixed') {
+    score += 6
+  }
+
+  const techniqueOverlap = [...target.techniqueTags].filter((tag) => candidateFingerprint.techniqueTags.has(tag))
+  if (techniqueOverlap.length > 0) {
+    score += Math.min(25, techniqueOverlap.length * 10)
+    reasons.push(`Techniques: ${techniqueOverlap.join(', ')}`)
+  }
+
+  if (target.stageCount && candidateFingerprint.stageCount) {
+    const diff = Math.abs(target.stageCount - candidateFingerprint.stageCount)
+    if (diff === 0) score += 8
+    else if (diff === 1) score += 4
+  }
+
+  if (target.temperature !== null && candidateFingerprint.temperature !== null) {
+    score += Math.max(0, 10 - Math.abs(target.temperature - candidateFingerprint.temperature) * 2)
+  }
+  if (target.finalWeight !== null && candidateFingerprint.finalWeight !== null) {
+    score += Math.max(0, 10 - Math.abs(target.finalWeight - candidateFingerprint.finalWeight))
+  }
+
+  return {
+    profile_name: candidate.name,
+    score: Math.min(roundScore(score), 100),
+    explanation: reasons.join('; '),
+    match_reasons: [...new Set(reasons)],
+  }
+}
+
+function recommendProfilesFromTags(profiles: CachedProfile[], tags: string[], limit: number): ProfileRecommendation[] {
+  const target = buildTagFingerprint(tags)
+  return profiles
+    .map((profile) => scoreProfile(tags, target, profile))
+    .filter((recommendation) => recommendation.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+}
+
+function findSimilarProfiles(profiles: CachedProfile[], profileName: string, limit: number): ProfileRecommendation[] {
+  const source = profiles.find((profile) => profile.name === profileName)
+  if (!source) return []
+  const target = extractProfileFingerprint(source)
+  const tags = getProfileTextTerms(source)
+  return profiles
+    .filter((profile) => profile.name !== profileName)
+    .map((profile) => scoreProfile(tags, target, profile))
+    .filter((recommendation) => recommendation.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+}
+
+function parseRecommendationsJson(analysisText: string): Array<Record<string, unknown>> {
+  const match = analysisText.match(/RECOMMENDATIONS_JSON:\s*\n\s*(\[[\s\S]*?\])\s*\n\s*END_RECOMMENDATIONS_JSON/)
+  if (!match) return []
+  try {
+    const parsed = JSON.parse(match[1])
+    return Array.isArray(parsed) ? parsed.filter(isRecord) : []
+  } catch {
+    return []
+  }
+}
+
+function isRecommendationPatchable(recommendation: Record<string, unknown>, variables: Array<Record<string, unknown>>): boolean {
+  const variable = String(recommendation.variable ?? '')
+  const stage = String(recommendation.stage ?? '')
+  if (stage === 'global' && (variable === 'temperature' || variable === 'final_weight')) return true
+  if (['exit_weight', 'exit_time', 'exit_pressure', 'exit_flow', 'exit_volume', 'limit_pressure', 'limit_flow', 'limit_weight'].includes(variable) && stage && stage !== 'global') return true
+  const profileVariable = variables.find((item) => item.key === variable) ?? variables.find((item) => (
+    termMatches(variable, String(item.key ?? '')) || termMatches(variable, String(item.name ?? ''))
+  ))
+  if (!profileVariable) return true
+  if (String(profileVariable.key ?? '').startsWith('info_')) return false
+  if (profileVariable.adjustable === false) return false
+  return true
+}
+
+function getCachedAnalysisText(profileName: string, shotFilename: string): string | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.ANALYSIS_CACHE) ?? '{}') as Record<string, unknown>
+    const cacheValue = parsed[`${profileName}::${shotFilename}`]
+    if (typeof cacheValue === 'string') return cacheValue
+    if (isRecord(cacheValue) && typeof cacheValue.analysis === 'string') return cacheValue.analysis
+  } catch {
+    return null
+  }
+  return null
+}
+
+function cloneProfileForSave(profile: CachedProfile): CachedProfile {
+  return JSON.parse(JSON.stringify(stripDirectProfileMetadata(profile))) as CachedProfile
+}
+
+function imageErrorStatus(err: unknown, defaultStatus = 500): number {
+  if (err instanceof DirectImageValidationError) return err.status
+  if (err instanceof DirectStorageValidationError) return err.message.includes('not found') ? 404 : 400
+  return defaultStatus
+}
+
+function updateStageValue(
+  stages: Array<Record<string, unknown>> | undefined,
+  stageName: string,
+  collectionKey: 'exit_triggers' | 'limits',
+  typeMap: Record<string, string>,
+  variable: string,
+  value: number,
+): { applied: boolean; reason?: string } {
+  const targetType = typeMap[variable]
+  if (!targetType || !stages) return { applied: false }
+  const stage = stages.find((item) => String(item.name ?? '').toLowerCase() === stageName.toLowerCase())
+  if (!stage) return { applied: false }
+  const collection = Array.isArray(stage[collectionKey]) ? stage[collectionKey] as Array<Record<string, unknown>> : []
+  const target = collection.find((item) => item.type === targetType)
+  if (!target) return { applied: false, reason: `no ${targetType} ${collectionKey === 'limits' ? 'limit' : 'exit trigger'} in stage '${stageName}'` }
+  target.value = value
+  return { applied: true }
+}
+
 
 // ── Exported installer ──────────────────────────────────────────────────────
 
@@ -26,10 +722,21 @@ export function installDirectModeInterceptor(): void {
   const _isNative = isNativePlatform()
 
   function _fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    if (_isNative && typeof input === 'string' && input.startsWith('/api/')) {
+    if (_isNative) {
       const machineBase = getDefaultMachineUrl()
-      console.debug(`[DirectMode] ${init?.method || 'GET'} ${machineBase}${input}`)
-      return _originalFetch(`${machineBase}${input}`, init)
+      if (typeof input === 'string' && input.startsWith('/api/')) {
+        return _originalFetch(`${machineBase}${input}`, init)
+      }
+      if (input instanceof URL && input.pathname.startsWith('/api/')) {
+        return _originalFetch(new URL(input.pathname + input.search, machineBase), init)
+      }
+      if (input instanceof Request) {
+        const reqUrl = new URL(input.url)
+        if (reqUrl.pathname.startsWith('/api/')) {
+          const prefixed = new URL(reqUrl.pathname + reqUrl.search, machineBase).toString()
+          return _originalFetch(new Request(prefixed, input), init)
+        }
+      }
     }
     return _originalFetch(input, init)
   }
@@ -38,11 +745,14 @@ export function installDirectModeInterceptor(): void {
   const _profileCache = new Map<string, CachedProfile>()
   const PROFILE_LIST_CACHE_KEY = STORAGE_KEYS.PROFILE_LIST_CACHE
 
-  function _processProfileList(data: CachedProfile[]) {
+  function _processProfileList(data: unknown[]) {
+    const profiles = data
+      .map(normalizeProfileIdent)
+      .filter((profile): profile is CachedProfile => profile !== null)
     _profileCache.clear()
-    for (const p of data) _profileCache.set(p.name, p)
+    for (const p of profiles) _profileCache.set(p.name, p)
     const result = {
-      profiles: data.map(p => ({
+      profiles: profiles.map(p => ({
         ...p,
         in_history: true,
         has_description: !!(p.display?.description || p.display?.shortDescription),
@@ -69,24 +779,6 @@ export function installDirectModeInterceptor(): void {
   // keyed by profile ID.  Persisted to localStorage and exposed on window so
   // App.tsx can read descriptions when navigating to profile detail.
   const DESC_CACHE_KEY = STORAGE_KEYS.DESCRIPTION_CACHE
-
-  // Short-lived in-memory cache for /api/v1/profile/list used by recommendation engine
-  let _rawProfileListCache: { data: AnalyzableProfile[]; ts: number } | null = null
-  const RAW_PROFILE_LIST_TTL = 30_000 // 30 seconds
-
-  async function _getCachedProfileList(): Promise<AnalyzableProfile[]> {
-    if (_rawProfileListCache && Date.now() - _rawProfileListCache.ts < RAW_PROFILE_LIST_TTL) {
-      return _rawProfileListCache.data
-    }
-    const res = await _fetch('/api/v1/profile/list')
-    if (!res.ok) return []
-    const profiles: AnalyzableProfile[] = await res.json()
-    if (profiles?.length) {
-      _rawProfileListCache = { data: profiles, ts: Date.now() }
-    }
-    return profiles ?? []
-  }
-
   const _descriptionCache = new Map<string, string>()
   try {
     const stored = localStorage.getItem(DESC_CACHE_KEY)
@@ -141,12 +833,136 @@ export function installDirectModeInterceptor(): void {
     }, 2000)
   }
 
+  async function _loadProfilesFromMachine(): Promise<CachedProfile[]> {
+    const response = await _fetch('/api/v1/profile/list')
+    if (!response.ok) {
+      const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          if (parsed?.profiles) {
+            _profileCache.clear()
+            for (const p of parsed.profiles) _profileCache.set(p.name, p)
+            return parsed.profiles
+          }
+        } catch { /* corrupted cache */ }
+      }
+      return []
+    }
+    const raw = await response.json()
+    const result = _processProfileList(Array.isArray(raw) ? raw : [])
+    return result.profiles
+  }
+
+  async function _findProfileByName(profileName: string): Promise<CachedProfile | null> {
+    const cached = _profileCache.get(profileName)
+    if (cached) return cached
+    const profiles = await _loadProfilesFromMachine()
+    return profiles.find((profile) => profile.name === profileName) ?? null
+  }
+
+  async function _loadHistory(): Promise<MachineHistoryEntry[]> {
+    const response = await _fetch('/api/v1/history')
+    if (!response.ok) return []
+    const raw = await response.json()
+    return Array.isArray(raw)
+      ? raw as MachineHistoryEntry[]
+      : (isRecord(raw) && Array.isArray(raw.history) ? raw.history as MachineHistoryEntry[] : [])
+  }
+
+  async function _loadVisibleHistory(): Promise<MachineHistoryEntry[]> {
+    const [history, deletedIds] = await Promise.all([_loadHistory(), getDirectDeletedHistoryIds()])
+    return history.filter((entry) => !deletedIds.has(entry.id))
+  }
+
+  async function _findVisibleShot(date: string, filename: string): Promise<MachineHistoryEntry | null> {
+    const history = await _loadVisibleHistory()
+    return history.find((entry) => (
+      getHistoryEntryDate(entry) === date && getHistoryEntryFilename(entry) === filename
+    )) ?? null
+  }
+
+  async function _saveProfileImageData(profileName: string, imageDataUri: string): Promise<{
+    profile: CachedProfile
+    imageBlob: Blob
+  }> {
+    if (!imageDataUri.startsWith('data:image/')) {
+      throw new DirectStorageValidationError('Invalid image data - must be a data URI')
+    }
+    const profile = await _findProfileByName(profileName)
+    if (!profile) throw new DirectStorageValidationError(`Profile '${profileName}' not found on machine`)
+
+    // Fetch full profile (with stages) — the list cache may not include them
+    let fullProfile = profile
+    try {
+      const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+      if (fullResp.ok) {
+        const parsed = await fullResp.json() as CachedProfile
+        if (typeof parsed?.id === 'string') fullProfile = parsed
+      }
+    } catch { /* use cached profile */ }
+
+    const imageBlob = dataUriToBlob(imageDataUri)
+
+    // Save full-res image to IndexedDB (primary source for image-proxy)
+    await saveDirectProfileImage(profile.id, imageBlob)
+
+    // Save a compressed thumbnail to the machine profile so the image
+    // persists across app reinstalls. AI-generated images can be several MB;
+    // the machine rejects oversized payloads, so we downscale to ≤300px.
+    const updated = cloneProfileForSave(fullProfile)
+    try {
+      const thumbnailUri = await _compressImageForMachine(imageDataUri, 300)
+      updated.display = {
+        ...(isRecord(updated.display) ? updated.display : {}),
+        image: thumbnailUri,
+      }
+    } catch {
+      // If compression fails, keep the original display.image value
+      updated.display = isRecord(fullProfile.display) ? { ...fullProfile.display } : {}
+    }
+    try {
+      const saveResponse = await _fetch('/api/v1/profile/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      })
+      if (!saveResponse.ok) console.warn('[direct-mode] Machine profile save returned', saveResponse.status)
+    } catch (e) {
+      console.warn('[direct-mode] Failed to save profile image to machine:', e)
+    }
+
+    const cached: CachedProfile = { ...profile, display: { ...(isRecord(profile.display) ? profile.display : {}), image: imageDataUri } }
+    _profileCache.set(cached.name, cached)
+    return { profile: cached, imageBlob }
+  }
+
+  /** Compress an image data URI to a JPEG thumbnail ≤ maxSize px. */
+  async function _compressImageForMachine(dataUri: string, maxSize: number): Promise<string> {
+    const img = new Image()
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000)
+      img.onload = () => { clearTimeout(timeout); resolve() }
+      img.onerror = () => { clearTimeout(timeout); reject(new Error('Image load error')) }
+      img.src = dataUri
+    })
+    const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
+    const w = Math.round(img.width * scale)
+    const h = Math.round(img.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/jpeg', 0.7)
+  }
+
   // ── Pour-over profile adapters (ported from backend pour_over_adapter.py / recipe_adapter.py) ──
 
   const _POUR_OVER_BASE = {
-    name: 'Metic Ratio Pour-Over',
+    name: 'MeticAI Ratio Pour-Over',
     id: '', // will be replaced
-    author: 'Metic',
+    author: 'MeticAI',
     author_id: '',
     display: { accentColor: '#566656' },
     temperature: 0,
@@ -224,7 +1040,7 @@ export function installDirectModeInterceptor(): void {
     profile.id = _uuid()
     profile.author_id = _uuid()
     const recipeName = recipe.metadata?.name ?? 'Recipe'
-    profile.name = `Metic Recipe: ${recipeName}`
+    profile.name = `MeticAI Recipe: ${recipeName}`
     const totalWater = Number(recipe.ingredients?.water_g ?? 0)
     const coffeeG = Number(recipe.ingredients?.coffee_g ?? 0) || null
     profile.final_weight = totalWater
@@ -274,24 +1090,17 @@ export function installDirectModeInterceptor(): void {
     return profile
   }
 
-  window.fetch = function directModeFetch(input: RequestInfo | URL, init?: RequestInit) {
-    const url = typeof input === 'string'
-      ? input
-      : input instanceof URL
-        ? input.href
-        : input instanceof Request ? input.url : ''
+  window.fetch = function directModeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const { url, method, pathname } = getDirectRequestContext(input, init)
+    const isDialInAliasPath = pathname === '/dialin/sessions' || pathname.startsWith('/dialin/sessions/')
+    const dialInPathname = isDialInAliasPath ? `/api${pathname}` : pathname
 
     // Allow Meticulous machine API (/api/v1/...) and external/non-api URLs
-    // Only intercept relative URLs or same-origin — let external hosts pass through
-    const isExternal = url.startsWith('http://') || url.startsWith('https://')
-    if (isExternal || !url.match(/\/api\/(?!v\d)/)) {
+    if (!isMeticAIProxyApiPath(url) && !isDialInAliasPath) {
       return _fetch(input, init)
     }
 
     // ── Translate key MeticAI proxy endpoints to Meticulous native API ──
-
-    const method = init?.method?.toUpperCase() || 'GET'
-    const pathname = new URL(url, window.location.origin).pathname
 
     // POST /api/machine/run-profile/:id → load profile → start
     const runMatch = url.match(/\/api\/machine\/run-profile\/([^/?]+)/)
@@ -323,32 +1132,151 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/machine/run-profile-with-overrides/:id → same as run-profile (overrides not supported in direct mode)
+    // POST /api/machine/run-profile-with-overrides/:id → apply overrides + ephemeral load + start
     const runOverridesMatch = url.match(/\/api\/machine\/run-profile-with-overrides\/([^/?]+)/)
     if (runOverridesMatch && method === 'POST') {
       const profileId = decodeURIComponent(runOverridesMatch[1])
       return (async () => {
-        let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
-        if (!loadResp.ok) {
-          await _fetch('/api/v1/action/stop')
-          for (let attempt = 0; attempt < 10; attempt++) {
-            await new Promise(r => setTimeout(r, 2000))
-            loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
-            if (loadResp.ok) break
-            const body = await loadResp.json().catch(() => ({})) as {error?: string}
-            if (body.error !== 'machine is busy') {
-              return jsonResponse({ status: 'error', detail: body.error || 'Load failed' }, 502)
+        // Parse FormData from the request body
+        const request = input instanceof Request ? input : new Request(input, init)
+        const formData = await request.formData()
+        const overridesRaw = formData.get('overrides_json') as string | null
+        const saveMode = (formData.get('save_mode') as string) || 'none'
+        const newName = (formData.get('new_name') as string) || ''
+
+        let overridesDict: Record<string, number>
+        try {
+          overridesDict = overridesRaw ? JSON.parse(overridesRaw) : {}
+        } catch {
+          return jsonResponse({ detail: 'Invalid overrides JSON' }, 422)
+        }
+
+        if (!['none', 'save_original', 'save_new'].includes(saveMode)) {
+          return jsonResponse({ detail: `Invalid save_mode: ${saveMode}` }, 422)
+        }
+        if (saveMode === 'save_new' && !newName.trim()) {
+          return jsonResponse({ detail: 'new_name is required when save_mode is save_new' }, 422)
+        }
+
+        // Reject info_ variable overrides
+        const infoKeys = Object.keys(overridesDict).filter(k => k.startsWith('info_'))
+        if (infoKeys.length > 0) {
+          return jsonResponse({ detail: `Cannot override info variables: ${infoKeys.join(', ')}` }, 422)
+        }
+
+        // Fetch the original profile
+        const profileResp = await _fetch(`/api/v1/profile/get/${profileId}`)
+        if (!profileResp.ok) {
+          return jsonResponse({ detail: `Profile ${profileId} not found` }, 404)
+        }
+        const profileData = await profileResp.json() as Record<string, unknown>
+        const originalName = (profileData.name as string) || 'Unknown Profile'
+
+        // Apply variable overrides (deep copy)
+        function applyOverrides(profile: Record<string, unknown>, overrides: Record<string, number>): Record<string, unknown> {
+          const modified = JSON.parse(JSON.stringify(profile)) as Record<string, unknown>
+          if (!Object.keys(overrides).length) return modified
+          const topLevelKeys = new Set(['final_weight', 'temperature'])
+          const variables = modified.variables as Array<Record<string, unknown>> | undefined
+          if (variables) {
+            const adjustableKeys = new Set(
+              variables.filter(v => typeof v.key === 'string' && !(v.key as string).startsWith('info_')).map(v => v.key as string)
+            )
+            for (const [key, value] of Object.entries(overrides)) {
+              if (!adjustableKeys.has(key) && !topLevelKeys.has(key)) continue
+              if (adjustableKeys.has(key)) {
+                for (const v of variables) {
+                  if (v.key === key) { v.value = value; break }
+                }
+              }
             }
           }
-          if (!loadResp.ok) {
-            return jsonResponse({ status: 'error', detail: 'Machine busy — try again' }, 409)
+          // Also update top-level fields
+          for (const key of ['final_weight', 'temperature']) {
+            if (key in overrides) modified[key] = overrides[key]
+          }
+          return modified
+        }
+
+        const hasOverrides = Object.keys(overridesDict).length > 0
+
+        // Handle save_new: save a copy with the new name first
+        if (saveMode === 'save_new' && hasOverrides) {
+          const newProfile = applyOverrides(profileData, overridesDict)
+          delete newProfile.id
+          newProfile.name = newName.trim()
+          const saveResp = await _fetch('/api/v1/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newProfile),
+          })
+          if (!saveResp.ok) {
+            return jsonResponse({ detail: 'Failed to save new profile' }, 502)
           }
         }
+
+        // Build the profile to load (ephemeral)
+        if (hasOverrides) {
+          const modified = applyOverrides(profileData, overridesDict)
+          if (saveMode === 'save_new') {
+            modified.name = newName.trim()
+            delete modified.id
+          }
+          // Ephemeral load: POST /api/v1/profile/load (loads into memory without persisting)
+          const loadResp = await _fetch('/api/v1/profile/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(modified),
+          })
+          if (!loadResp.ok) {
+            return jsonResponse({ detail: 'Failed to load modified profile' }, 502)
+          }
+        } else {
+          // No overrides — just load the original by ID
+          let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+          if (!loadResp.ok) {
+            await _fetch('/api/v1/action/stop')
+            for (let attempt = 0; attempt < 10; attempt++) {
+              await new Promise(r => setTimeout(r, 2000))
+              loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+              if (loadResp.ok) break
+            }
+            if (!loadResp.ok) {
+              return jsonResponse({ detail: 'Machine busy — try again' }, 409)
+            }
+          }
+        }
+
+        // Start extraction
         const startResp = await _fetch('/api/v1/action/start')
-        return startResp.ok
-          ? jsonResponse({ status: 'success', message: 'Profile started (overrides ignored in direct mode)' })
-          : jsonResponse({ status: 'error', detail: 'Failed to start' }, 502)
-      })()
+        if (!startResp.ok) {
+          return jsonResponse({ detail: 'Failed to start profile' }, 502)
+        }
+
+        // Handle save_original: save overrides back to original profile after starting
+        if (saveMode === 'save_original' && hasOverrides) {
+          const saved = applyOverrides(profileData, overridesDict)
+          saved.id = profileId
+          saved.name = originalName
+          _fetch('/api/v1/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(saved),
+          }).catch(err => console.warn('[direct-mode] Failed to save overrides to original:', err))
+        }
+
+        return jsonResponse({
+          status: 'success',
+          message: hasOverrides ? 'Profile started with overrides' : 'Profile started',
+          profile_id: profileId,
+          profile_name: saveMode === 'save_new' ? newName.trim() : originalName,
+          overrides_applied: Object.keys(overridesDict).length,
+          save_mode: saveMode,
+        })
+      })().catch(err => {
+        console.error('[direct-mode] run-profile-with-overrides error:', err)
+        return jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to run profile with overrides' }, 500)
+      })
     }
 
     // POST /api/machine/command/start → GET /api/v1/action/start
@@ -370,7 +1298,7 @@ export function installDirectModeInterceptor(): void {
       return new Response(init?.body || '{}').json().then((body: {name?: string}) => {
         if (!body.name) return jsonResponse({ success: false, message: 'No profile name' }, 400)
         // Find profile ID by name, then load it
-        return _fetch('/api/v1/profile/list').then(r => r.json()).then((profiles: {name: string; id: string}[]) => {
+        return _loadProfilesFromMachine().then((profiles) => {
           const match = profiles.find(p => p.name === body.name)
           if (!match) return jsonResponse({ success: false, message: 'Profile not found' }, 404)
           return _fetch(`/api/v1/profile/load/${match.id}`).then(r =>
@@ -378,6 +1306,100 @@ export function installDirectModeInterceptor(): void {
           )
         })
       }).catch(() => jsonResponse({ success: false }, 502))
+    }
+
+    // /api/dialin/* → local direct/capacitor session store with backend-compatible shapes.
+    if (dialInPathname === '/api/dialin/sessions' && method === 'POST') {
+      return (async () => {
+        try {
+          const session = await createDirectDialInSession(await readJsonRequestBody(input, init))
+          return jsonResponse(session, 201)
+        } catch (err) {
+          const status = err instanceof DirectStorageValidationError ? err.status : 400
+          const detail = err instanceof Error ? err.message : 'Invalid dial-in session'
+          return jsonResponse({ detail }, status)
+        }
+      })()
+    }
+
+    if (dialInPathname === '/api/dialin/sessions' && method === 'GET') {
+      return (async () => {
+        try {
+          const status = new URL(url, window.location.origin).searchParams.get('status')
+          return jsonResponse({ sessions: await listDirectDialInSessions(status) })
+        } catch (err) {
+          const status = err instanceof DirectStorageValidationError ? err.status : 400
+          const detail = err instanceof Error ? err.message : 'Failed to list dial-in sessions'
+          return jsonResponse({ detail }, status)
+        }
+      })()
+    }
+
+    const dialInRecommendMatch = dialInPathname.match(/^\/api\/dialin\/sessions\/([^/]+)\/recommend$/)
+    if (dialInRecommendMatch && method === 'POST') {
+      return generateDirectDialInRecommendations(decodeURIComponent(dialInRecommendMatch[1]))
+        .then((result) => jsonResponse(result))
+        .catch((err) => {
+          const status = err instanceof DirectStorageValidationError ? err.status : 500
+          const detail = err instanceof Error ? err.message : 'Failed to generate recommendations'
+          return jsonResponse({ detail }, status)
+        })
+    }
+
+    const dialInCompleteMatch = dialInPathname.match(/^\/api\/dialin\/sessions\/([^/]+)\/complete$/)
+    if (dialInCompleteMatch && method === 'POST') {
+      return completeDirectDialInSession(decodeURIComponent(dialInCompleteMatch[1]))
+        .then((session) => jsonResponse(session))
+        .catch((err) => {
+          const status = err instanceof DirectStorageValidationError ? err.status : 500
+          const detail = err instanceof Error ? err.message : 'Failed to complete session'
+          return jsonResponse({ detail }, status)
+        })
+    }
+
+    const dialInRecommendationsMatch = dialInPathname.match(/^\/api\/dialin\/sessions\/([^/]+)\/iterations\/(\d+)\/recommendations$/)
+    if (dialInRecommendationsMatch && method === 'PUT') {
+      return (async () => {
+        try {
+          const iteration = await updateDirectDialInRecommendations(
+            decodeURIComponent(dialInRecommendationsMatch[1]),
+            Number(dialInRecommendationsMatch[2]),
+            await readJsonRequestBody(input, init),
+          )
+          return jsonResponse(iteration)
+        } catch (err) {
+          const status = err instanceof DirectStorageValidationError ? err.status : 500
+          const detail = err instanceof Error ? err.message : 'Failed to update recommendations'
+          return jsonResponse({ detail }, status)
+        }
+      })()
+    }
+
+    const dialInIterationsMatch = dialInPathname.match(/^\/api\/dialin\/sessions\/([^/]+)\/iterations$/)
+    if (dialInIterationsMatch && method === 'POST') {
+      return (async () => {
+        try {
+          const iteration = await addDirectDialInIteration(
+            decodeURIComponent(dialInIterationsMatch[1]),
+            await readJsonRequestBody(input, init),
+          )
+          return jsonResponse(iteration, 201)
+        } catch (err) {
+          const status = err instanceof DirectStorageValidationError ? err.status : 500
+          const detail = err instanceof Error ? err.message : 'Failed to add iteration'
+          return jsonResponse({ detail }, status)
+        }
+      })()
+    }
+
+    const dialInSessionMatch = dialInPathname.match(/^\/api\/dialin\/sessions\/([^/]+)$/)
+    if (dialInSessionMatch && method === 'GET') {
+      return getDirectDialInSession(decodeURIComponent(dialInSessionMatch[1]))
+        .then((session) => session ? jsonResponse(session) : jsonResponse({ detail: 'Session not found' }, 404))
+    }
+    if (dialInSessionMatch && method === 'DELETE') {
+      return deleteDirectDialInSession(decodeURIComponent(dialInSessionMatch[1]))
+        .then((deleted) => deleted ? jsonResponse({ deleted: true }) : jsonResponse({ detail: 'Session not found' }, 404))
     }
 
     // POST /api/profile/import → save to machine (file import) or no-op (machine import)
@@ -422,228 +1444,6 @@ export function installDirectModeInterceptor(): void {
       }))
     }
 
-    // POST /api/profile/:id/regenerate-description → use BrowserAIService
-    const regenDescMatch = url.match(/\/api\/profile\/([^/]+)\/regenerate-description$/)
-    if (regenDescMatch && method === 'POST') {
-      return (async () => {
-        try {
-          const entryId = decodeURIComponent(regenDescMatch[1])
-
-          // The caller may pass a history entry ID or a profile name.
-          // Try multiple resolution strategies to find the profile JSON.
-          let profileJson: Record<string, unknown> | null = null
-          let profileName = entryId
-
-          // Strategy 1: Try entryId as a history entry — fetch from machine history
-          try {
-            const histResp = await _fetch('/api/v1/history')
-            if (histResp.ok) {
-              const raw = await histResp.json() as unknown
-              type MachineHistEntry = { id: string; name: string; profile?: { name?: string } }
-              const list: MachineHistEntry[] = Array.isArray(raw) ? raw : ((raw as { history?: MachineHistEntry[] }).history ?? [])
-              const histEntry = list.find(e => e.id === entryId)
-              if (histEntry) {
-                profileName = histEntry.profile?.name ?? histEntry.name ?? entryId
-                // Fetch the full profile by name from profile cache
-                const cached = _profileCache.get(profileName)
-                if (cached) {
-                  const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
-                  if (r.ok) profileJson = await r.json()
-                }
-              }
-            }
-          } catch {
-            // History lookup failed — try other strategies
-          }
-
-          // Strategy 2: Try entryId as a profile name via cache
-          if (!profileJson) {
-            const cached = _profileCache.get(entryId)
-            if (cached) {
-              const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
-              if (r.ok) {
-                profileJson = await r.json()
-                profileName = entryId
-              }
-            }
-          }
-
-          // Strategy 3: Try entryId as a machine profile ID directly
-          if (!profileJson) {
-            const r = await _fetch(`/api/v1/profile/get/${entryId}`)
-            if (r.ok) profileJson = await r.json()
-          }
-
-          if (!profileJson) {
-            return jsonResponse({ status: 'error', detail: 'History entry not found' }, 404)
-          }
-
-          // Try AI description first, fall back to static
-          const aiService = createBrowserAIService()
-          if (aiService.isConfigured()) {
-            try {
-              const { GoogleGenAI } = await import('@google/genai')
-              const key = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
-              if (!key) throw new Error('No API key')
-              const client = new GoogleGenAI({ apiKey: key })
-              const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
-              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
-              const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              })
-              const description = response.text?.trim()
-              if (description && !description.includes('generated without AI')) {
-                return jsonResponse({ status: 'success', description })
-              }
-            } catch {
-              // AI generation failed — fall back to static
-            }
-          }
-
-          // Static fallback
-          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
-          const description = buildStaticProfileDescription(profileJson as Parameters<typeof buildStaticProfileDescription>[0])
-          return jsonResponse({ status: 'success', description })
-        } catch {
-          return jsonResponse({ status: 'error', detail: 'Failed to regenerate description' }, 500)
-        }
-      })()
-    }
-
-    // POST /api/profile/:name/generate-image → use BrowserAIService.generateImage
-    const genImageMatch = url.match(/\/api\/profile\/([^/]+)\/generate-image/)
-    if (genImageMatch && method === 'POST') {
-      return (async () => {
-        try {
-          const profileName = decodeURIComponent(genImageMatch[1])
-          const queryString = url.split('?')[1] || ''
-          const params = new URLSearchParams(queryString)
-          const style = params.get('style') || 'abstract'
-          const tags = params.get('tags')?.split(',').filter(Boolean) || []
-          const preview = params.get('preview') === 'true'
-
-          const aiService = createBrowserAIService()
-          if (!aiService.isConfigured()) {
-            return jsonResponse({ status: 'error', detail: 'AI features are unavailable. Please configure a Gemini API key in Settings.' }, 503)
-          }
-
-          const imageBlob = await aiService.generateImage({ profileName, style, tags })
-
-          // Convert Blob to data URI
-          const buffer = await imageBlob.arrayBuffer()
-          const bytes = new Uint8Array(buffer)
-          let binary = ''
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-          const base64 = btoa(binary)
-          const imageDataUri = `data:image/png;base64,${base64}`
-
-          if (preview) {
-            return jsonResponse({
-              status: 'preview',
-              message: `Preview image generated for profile '${profileName}'`,
-              style,
-              image_data: imageDataUri,
-            })
-          }
-
-          // Save: update the profile on the machine with the new image
-          let cached = _profileCache.get(profileName)
-          if (!cached) {
-            for (const [key, val] of _profileCache) {
-              if (key.toLowerCase() === profileName.toLowerCase()) { cached = val; break }
-            }
-          }
-          if (!cached) {
-            return jsonResponse({ status: 'error', detail: `Profile '${profileName}' not found on machine` }, 404)
-          }
-          const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
-          if (!r.ok) {
-            return jsonResponse({ status: 'error', detail: 'Failed to fetch profile from machine' }, 502)
-          }
-          const fullProfile = await r.json() as Record<string, unknown>
-          const display = (fullProfile.display || {}) as Record<string, unknown>
-          display.image = imageDataUri
-          fullProfile.display = display
-          const saveResp = await _fetch('/api/v1/profile/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fullProfile),
-          })
-          if (!saveResp.ok) {
-            return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
-          }
-          return jsonResponse({
-            status: 'success',
-            message: `Image generated for profile '${profileName}'`,
-            profile_id: cached.id,
-            style,
-          })
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Image generation failed'
-          return jsonResponse({ status: 'error', detail: msg }, 500)
-        }
-      })()
-    }
-
-    // POST /api/profile/:name/apply-image → save approved preview image to machine profile
-    const applyImageMatch = url.match(/\/api\/profile\/([^/]+)\/apply-image/)
-    if (applyImageMatch && method === 'POST') {
-      return (async () => {
-        try {
-          const profileName = decodeURIComponent(applyImageMatch[1])
-          const bodyStr = typeof init?.body === 'string' ? init.body : '{}'
-          const body = JSON.parse(bodyStr) as { image_data?: string }
-          const imageData = body.image_data
-          if (!imageData) {
-            console.error('[DirectMode] apply-image: no image_data in body')
-            return jsonResponse({ status: 'error', detail: 'No image data provided' }, 400)
-          }
-
-          // Case-insensitive profile cache lookup
-          let cached = _profileCache.get(profileName)
-          if (!cached) {
-            for (const [key, val] of _profileCache) {
-              if (key.toLowerCase() === profileName.toLowerCase()) { cached = val; break }
-            }
-          }
-          if (!cached) {
-            console.error(`[DirectMode] apply-image: profile '${profileName}' not in cache (${_profileCache.size} entries)`)
-            return jsonResponse({ status: 'error', detail: `Profile '${profileName}' not found on machine` }, 404)
-          }
-          const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
-          if (!r.ok) {
-            console.error(`[DirectMode] apply-image: profile/get/${cached.id} returned ${r.status}`)
-            return jsonResponse({ status: 'error', detail: 'Failed to fetch profile from machine' }, 502)
-          }
-          const fullProfile = await r.json() as Record<string, unknown>
-          const display = (fullProfile.display || {}) as Record<string, unknown>
-          display.image = imageData
-          fullProfile.display = display
-          const saveResp = await _fetch('/api/v1/profile/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fullProfile),
-          })
-          if (!saveResp.ok) {
-            let detail = 'Failed to save profile to machine'
-            try { const errBody = await saveResp.json(); detail = errBody?.message || errBody?.error || detail } catch { /* ignore */ }
-            console.error(`[DirectMode] apply-image: profile/save returned ${saveResp.status}: ${detail}`)
-            return jsonResponse({ status: 'error', detail }, 502)
-          }
-          return jsonResponse({
-            status: 'success',
-            message: `Image applied to profile '${profileName}'`,
-            profile_id: cached.id,
-          })
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Failed to apply image'
-          console.error('[DirectMode] apply-image error:', msg)
-          return jsonResponse({ status: 'error', detail: msg }, 500)
-        }
-      })()
-    }
-
 
     // POST /api/import-from-url -> fetch URL, parse profile JSON, save to machine
     if (url.match(/\/api\/import-from-url/) && method === 'POST') {
@@ -662,6 +1462,78 @@ export function installDirectModeInterceptor(): void {
           return jsonResponse({ status: 'success', entry_id: 'direct-' + Date.now(), profile_name: profileJson.name as string, has_description: false, uploaded_to_machine: true })
         } catch { return jsonResponse({ status: 'error', detail: 'Import from URL failed' }, 500) }
       })()
+    }
+
+    // POST /api/profiles/recommend → deterministic direct profile recommendations
+    if (pathname === '/api/profiles/recommend' && method === 'POST') {
+      return (async () => {
+        const request = input instanceof Request ? input : new Request(input, init)
+        const form = await request.formData()
+        const tags = form.getAll('tags').map((tag) => String(tag)).filter(Boolean)
+        const limit = Math.max(1, safeNumber(form.get('limit'), 5))
+        const profiles = await _loadProfilesFromMachine()
+        const recommendations = recommendProfilesFromTags(profiles, tags, limit)
+        return jsonResponse({ status: 'success', recommendations, count: recommendations.length })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get recommendations' }, 500))
+    }
+
+    // POST /api/profiles/find-similar → deterministic direct profile similarity
+    if (pathname === '/api/profiles/find-similar' && method === 'POST') {
+      return (async () => {
+        const request = input instanceof Request ? input : new Request(input, init)
+        const form = await request.formData()
+        const profileName = String(form.get('profile_name') ?? '')
+        const limit = Math.max(1, safeNumber(form.get('limit'), 10))
+        const profiles = await _loadProfilesFromMachine()
+        const recommendations = findSimilarProfiles(profiles, profileName, limit)
+        return jsonResponse({ status: 'success', recommendations, count: recommendations.length })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to find similar profiles' }, 500))
+    }
+
+    // PATCH /api/machine/profile/:id → rename a machine profile through profile/save
+    const renameMatch = pathname.match(/^\/api\/machine\/profile\/([^/?]+)$/)
+    if (renameMatch && method === 'PATCH') {
+      return (async () => {
+        const profileId = decodeURIComponent(renameMatch[1])
+        const request = input instanceof Request ? input : new Request(input, init)
+        let body: { name?: unknown }
+        try {
+          body = await request.json() as { name?: unknown }
+        } catch {
+          return jsonResponse({ detail: 'Invalid profile update body' }, 400)
+        }
+
+        const newName = typeof body.name === 'string' ? body.name.trim() : ''
+        if (!newName) {
+          return jsonResponse({ detail: "At least one field to update is required (e.g., 'name')" }, 400)
+        }
+
+        const profileResp = await _fetch(`/api/v1/profile/get/${encodeURIComponent(profileId)}`)
+        if (!profileResp.ok) {
+          return jsonResponse({ detail: `Profile not found: ${profileId}` }, 404)
+        }
+
+        const profileJson = await profileResp.json() as Record<string, unknown>
+        const oldName = typeof profileJson.name === 'string' && profileJson.name ? profileJson.name : profileId
+        const updatedProfile = { ...profileJson, name: newName }
+        const saveResp = await _fetch('/api/v1/profile/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedProfile),
+        })
+        if (!saveResp.ok) {
+          return jsonResponse({ detail: 'Failed to save profile to machine' }, 502)
+        }
+        _profileCache.clear()
+        localStorage.removeItem(PROFILE_LIST_CACHE_KEY)
+        return jsonResponse({
+          status: 'success',
+          message: `Profile renamed from '${oldName}' to '${newName}'`,
+          profile_id: profileId,
+          old_name: oldName,
+          new_name: newName,
+        })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to rename profile' }, 500))
     }
 
     // DELETE /api/machine/profile/:id → DELETE /api/v1/profile/delete/:id
@@ -697,7 +1569,6 @@ export function installDirectModeInterceptor(): void {
     if (url.match(/\/api\/machine\/profiles$/)) {
       return _fetch('/api/v1/profile/list').then(r => {
         if (!r.ok) {
-          // Return cached data if fetch fails
           const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
           if (cached) {
             try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
@@ -723,27 +1594,351 @@ export function installDirectModeInterceptor(): void {
       }).catch(() => jsonResponse({}))
     }
 
-    // GET /api/profile/{name}/image-proxy → proxy to machine image URL from cache
-    const imageProxyMatch = url.match(/\/api\/profile\/([^/]+)\/image-proxy/)
-    if (imageProxyMatch) {
-      const name = decodeURIComponent(imageProxyMatch[1])
-      const cached = _profileCache.get(name)
-      if (cached?.display?.image) {
-        // Redirect to the machine's static image URL
-        return _fetch(cached.display.image)
-      }
-      return Promise.resolve(new Response('', { status: 404 }))
+    // POST /api/profile/{name}/image → upload a direct image and persist it to the machine profile
+    const profileImageUploadMatch = pathname.match(/^\/api\/profile\/([^/]+)\/image$/)
+    if (profileImageUploadMatch && method === 'POST') {
+      return (async () => {
+        const name = decodeURIComponent(profileImageUploadMatch[1])
+        const request = input instanceof Request ? input : new Request(input, init)
+        const form = await request.formData()
+        const file = form.get('file')
+        if (!(file instanceof Blob) || !file.type.startsWith('image/')) {
+          return jsonResponse({ detail: 'File must be an image' }, 400)
+        }
+        const imageDataUri = await blobToDataUri(file)
+        const { profile } = await _saveProfileImageData(name, imageDataUri)
+        return jsonResponse({
+          status: 'success',
+          message: `Image uploaded for profile '${name}'`,
+          profile_id: profile.id,
+          image_size: imageDataUri.length,
+        })
+      })().catch((err) => {
+        const status = imageErrorStatus(err)
+        return jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to upload profile image' }, status)
+      })
     }
 
-    // GET /api/profile/{name} → lookup from cache, return {profile: {...}}
-    const profileByNameMatch = url.match(/\/api\/profile\/([^/]+)$/)
+    // POST /api/profile/{name}/generate-image → BrowserAI direct profile image generation
+    const profileGenerateImageMatch = pathname.match(/^\/api\/profile\/([^/]+)\/generate-image$/)
+    if (profileGenerateImageMatch && method === 'POST') {
+      return (async () => {
+        const name = decodeURIComponent(profileGenerateImageMatch[1])
+        const parsedUrl = new URL(url, window.location.origin)
+        const style = parsedUrl.searchParams.get('style') || 'abstract'
+        const tags = (parsedUrl.searchParams.get('tags') || '').split(',').map((tag) => tag.trim()).filter(Boolean)
+        const preview = parsedUrl.searchParams.get('preview') === 'true'
+        const aiService = createBrowserAIService()
+        if (!aiService.isConfigured()) {
+          return jsonResponse({ detail: 'AI features are unavailable. Please configure a Gemini API key in Settings.' }, 503)
+        }
+        const imageBlob = await aiService.generateImage({ profileName: name, style, tags, preview })
+        const imageDataUri = await blobToDataUri(imageBlob)
+        if (preview) {
+          return jsonResponse({
+            status: 'preview',
+            message: `Preview image generated for profile '${name}'`,
+            style,
+            image_data: imageDataUri,
+          })
+        }
+        const { profile } = await _saveProfileImageData(name, imageDataUri)
+        return jsonResponse({
+          status: 'success',
+          message: `Image generated for profile '${name}'`,
+          profile_id: profile.id,
+          style,
+        })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to generate profile image' }, imageErrorStatus(err)))
+    }
+
+    // POST /api/profile/{name}/apply-image → persist a generated preview image to the machine profile
+    const profileApplyImageMatch = pathname.match(/^\/api\/profile\/([^/]+)\/apply-image$/)
+    if (profileApplyImageMatch && method === 'POST') {
+      return (async () => {
+        const name = decodeURIComponent(profileApplyImageMatch[1])
+        const request = input instanceof Request ? input : new Request(input, init)
+        const body = await request.json() as { image_data?: string }
+        if (!body.image_data) return jsonResponse({ detail: 'Invalid image data - must be a data URI' }, 400)
+        const { profile } = await _saveProfileImageData(name, body.image_data)
+        return jsonResponse({
+          status: 'success',
+          message: `Image applied to profile '${name}'`,
+          profile_id: profile.id,
+        })
+      })().catch((err) => {
+        const status = imageErrorStatus(err)
+        return jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to apply profile image' }, status)
+      })
+    }
+
+    // POST /api/profile/{name}/apply-recommendations → patch profile variables and save directly
+    const profileApplyRecommendationsMatch = pathname.match(/^\/api\/profile\/([^/]+)\/apply-recommendations$/)
+    if (profileApplyRecommendationsMatch && method === 'POST') {
+      return (async () => {
+        const name = decodeURIComponent(profileApplyRecommendationsMatch[1])
+        const request = input instanceof Request ? input : new Request(input, init)
+        const form = await request.formData()
+        const rawRecommendations = String(form.get('recommendations') ?? '[]')
+        const parsed = JSON.parse(rawRecommendations)
+        if (!Array.isArray(parsed)) return jsonResponse({ detail: 'recommendations must be a JSON array' }, 400)
+        const profile = await _findProfileByName(name)
+        if (!profile) return jsonResponse({ detail: `Profile '${name}' not found on machine` }, 404)
+
+        // Fetch full profile (with stages/variables) — the list cache may not include them
+        let fullProfile = profile
+        try {
+          const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+          if (fullResp.ok) {
+            const fullData = await fullResp.json() as CachedProfile
+            if (fullData && fullData.id) fullProfile = fullData
+          }
+        } catch { /* use cached profile as fallback */ }
+
+        const updated = cloneProfileForSave(fullProfile)
+        const applied: Array<Record<string, unknown>> = []
+        const skipped: Array<Record<string, unknown>> = []
+
+        for (const recommendation of parsed) {
+          if (!isRecord(recommendation)) {
+            skipped.push({ variable: '?', reason: 'invalid entry (not an object)' })
+            continue
+          }
+          const variable = String(recommendation.variable ?? '')
+          const stage = String(recommendation.stage ?? '')
+          const recommendedValue = optionalNumber(recommendation.recommended_value)
+          if (recommendedValue === null) {
+            skipped.push({ variable, reason: 'invalid recommended_value' })
+            continue
+          }
+          if (stage === 'global' && variable === 'temperature') {
+            updated.temperature = recommendedValue
+            applied.push({ variable, stage, value: recommendedValue })
+            continue
+          }
+          if (stage === 'global' && variable === 'final_weight') {
+            updated.final_weight = recommendedValue
+            applied.push({ variable, stage, value: recommendedValue })
+            continue
+          }
+          const profileVariable = updated.variables?.find((item) => item.key === variable)
+          if (profileVariable) {
+            if (String(profileVariable.key ?? '').startsWith('info_') || profileVariable.adjustable === false) {
+              skipped.push({ variable, reason: 'info-only / not adjustable' })
+            } else {
+              profileVariable.value = recommendedValue
+              applied.push({ variable, stage, value: recommendedValue })
+            }
+            continue
+          }
+          const exitTriggerResult = updateStageValue(
+            updated.stages,
+            stage,
+            'exit_triggers',
+            {
+              exit_weight: 'weight',
+              exit_time: 'time',
+              exit_pressure: 'pressure',
+              exit_flow: 'flow',
+              exit_volume: 'volume',
+            },
+            variable,
+            recommendedValue,
+          )
+          if (exitTriggerResult.applied) {
+            applied.push({ variable, stage, value: recommendedValue })
+            continue
+          }
+          if (exitTriggerResult.reason) {
+            skipped.push({ variable, reason: exitTriggerResult.reason })
+            continue
+          }
+          const limitResult = updateStageValue(
+            updated.stages,
+            stage,
+            'limits',
+            {
+              limit_pressure: 'pressure',
+              limit_flow: 'flow',
+              limit_weight: 'weight',
+            },
+            variable,
+            recommendedValue,
+          )
+          if (limitResult.applied) {
+            applied.push({ variable, stage, value: recommendedValue })
+            continue
+          }
+          if (limitResult.reason) {
+            skipped.push({ variable, reason: limitResult.reason })
+            continue
+          }
+          skipped.push({ variable, reason: 'variable not found in profile' })
+        }
+
+        if (applied.length === 0) {
+          return jsonResponse({
+            status: 'no_changes',
+            message: 'No applicable recommendations to apply',
+            applied,
+            skipped,
+          })
+        }
+        const saveResponse = await _fetch('/api/v1/profile/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated),
+        })
+        if (!saveResponse.ok) return jsonResponse({ detail: 'Failed to save profile to machine' }, 502)
+        _profileCache.set(updated.name, updated)
+        return jsonResponse({ status: 'success', profile: updated, applied, skipped })
+      })().catch((err) => {
+        const detail = err instanceof SyntaxError ? `Invalid recommendations JSON: ${err.message}` : err instanceof Error ? err.message : 'Failed to apply recommendations'
+        return jsonResponse({ detail }, err instanceof SyntaxError ? 400 : 500)
+      })
+    }
+
+    // GET /api/profile/{name}/image-proxy → proxy to machine image URL from cache
+    const imageProxyMatch = pathname.match(/^\/api\/profile\/([^/]+)\/image-proxy$/)
+    if (imageProxyMatch) {
+      const name = decodeURIComponent(imageProxyMatch[1])
+      return (async () => {
+        const profile = await _findProfileByName(name)
+        if (!profile) return new Response('', { status: 404 })
+        const cachedImage = await getDirectProfileImage(profile.id)
+        if (cachedImage) {
+          return new Response(cachedImage, {
+            headers: { 'Content-Type': cachedImage.type || 'application/octet-stream' },
+          })
+        }
+        const imagePath = getDirectProfileImagePath(profile)
+        if (!imagePath) return new Response('', { status: 404 })
+        const machineBase = getDefaultMachineUrl()
+        const imageUrl = new URL(imagePath, machineBase).toString()
+        const imageResponse = await _originalFetch(imageUrl)
+        if (!imageResponse.ok) return new Response('', { status: imageResponse.status })
+        const imageBlob = await imageResponse.blob()
+        await saveDirectProfileImage(profile.id, imageBlob)
+        return new Response(imageBlob, {
+          headers: {
+            'Content-Type': imageResponse.headers.get('Content-Type') ?? imageBlob.type ?? 'application/octet-stream',
+          },
+        })
+      })().catch(() => new Response('', { status: 404 }))
+    }
+
+    // GET /api/profile/{name}/target-curves → estimated profile target curves
+    const targetCurvesMatch = pathname.match(/^\/api\/profile\/([^/]+)\/target-curves$/)
+    if (targetCurvesMatch && method === 'GET') {
+      return (async () => {
+        const name = decodeURIComponent(targetCurvesMatch[1])
+        const profile = await _findProfileByName(name)
+        if (!profile) return jsonResponse({ detail: `Profile '${name}' not found` }, 404)
+        return jsonResponse({
+          status: 'success',
+          target_curves: generateEstimatedTargetCurves(profile),
+        })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get target curves' }, 500))
+    }
+
+    // PUT /api/profile/{name}/edit → edit and save the machine profile directly
+    const profileEditMatch = pathname.match(/^\/api\/profile\/([^/]+)\/edit$/)
+    if (profileEditMatch && method === 'PUT') {
+      return (async () => {
+        const name = decodeURIComponent(profileEditMatch[1])
+        const profile = await _findProfileByName(name)
+        if (!profile) return jsonResponse({ detail: `Profile '${name}' not found on machine` }, 404)
+        // Fetch full profile (with stages) — the list cache doesn't include stages
+        const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+        let fullProfile = profile
+        if (fullResp.ok) {
+          try {
+            const parsed = await fullResp.json() as CachedProfile
+            if (typeof parsed?.id === 'string') fullProfile = parsed
+          } catch { /* use cached profile */ }
+        }
+        const request = input instanceof Request ? input : new Request(input, init)
+        const body = await request.json() as {
+          name?: string
+          temperature?: number
+          final_weight?: number
+          variables?: Array<{ key?: string; value?: unknown }>
+          author?: string
+        }
+        const updated: CachedProfile = JSON.parse(JSON.stringify(fullProfile))
+        if (body.name !== undefined) {
+          if (typeof body.name !== 'string' || !body.name.trim()) {
+            return jsonResponse({ detail: 'Profile name must be a non-empty string' }, 400)
+          }
+          updated.name = body.name.trim()
+        }
+        if (body.temperature !== undefined) updated.temperature = Number(body.temperature)
+        if (body.final_weight !== undefined) updated.final_weight = Number(body.final_weight)
+        if (body.author !== undefined) updated.author = body.author
+        if (body.variables !== undefined && Array.isArray(updated.variables)) {
+          const incoming = new Map(
+            body.variables
+              .filter((variable) => typeof variable.key === 'string' && 'value' in variable)
+              .map((variable) => [variable.key as string, variable.value]),
+          )
+          updated.variables = updated.variables.map((variable) => {
+            const key = typeof variable.key === 'string' ? variable.key : null
+            return key && incoming.has(key) ? { ...variable, value: incoming.get(key) } : variable
+          })
+        }
+        const machineProfile = stripDirectProfileMetadata(updated)
+        const saveResponse = await _fetch('/api/v1/profile/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(machineProfile),
+        })
+        if (!saveResponse.ok) return jsonResponse({ detail: 'Failed to save profile to machine' }, 502)
+        _profileCache.delete(name)
+        _profileCache.set(updated.name, updated)
+
+        // Regenerate static description for the edited profile
+        try {
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          const desc = buildStaticProfileDescription(machineProfile as Parameters<typeof buildStaticProfileDescription>[0])
+          _descriptionCache.set(updated.id, desc)
+          _persistDescriptionCache()
+        } catch { /* non-critical */ }
+
+        return jsonResponse({ status: 'success', profile: machineProfile })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to edit profile' }, 500))
+    }
+
+    // GET /api/profile/{name} → fetch profile metadata and optional stage details
+    const profileByNameMatch = pathname.match(/^\/api\/profile\/([^/]+)$/)
     if (profileByNameMatch && method === 'GET') {
       const name = decodeURIComponent(profileByNameMatch[1])
-      const cached = _profileCache.get(name)
-      if (cached) {
-        return Promise.resolve(jsonResponse({ profile: { name: cached.name, id: cached.id, display: cached.display } }))
-      }
-      return Promise.resolve(jsonResponse({}))
+      return (async () => {
+        const profile = await _findProfileByName(name)
+        if (!profile) {
+          return jsonResponse({
+            status: 'not_found',
+            profile: null,
+            message: `Profile '${name}' not found on machine`,
+          })
+        }
+        const parsedUrl = new URL(url, window.location.origin)
+        const includeStages = parsedUrl.searchParams.get('include_stages') === 'true'
+        const responseProfile: Record<string, unknown> = {
+          id: profile.id,
+          name: profile.name,
+          author: profile.author,
+          temperature: profile.temperature,
+          final_weight: profile.final_weight,
+          image: getDirectProfileImagePath(profile),
+          accent_color: profile.display?.accentColor,
+          display: profile.display,
+        }
+        if (includeStages) {
+          responseProfile.stages = profile.stages ?? []
+          responseProfile.variables = profile.variables ?? []
+        }
+        return jsonResponse({ status: 'success', profile: responseProfile })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get profile info' }, 500))
     }
 
     // /api/machine/status → synthetic response (real state comes via Socket.IO)
@@ -756,105 +1951,83 @@ export function installDirectModeInterceptor(): void {
 
     // /api/last-shot → /api/v1/history/last (translate to MeticAI format)
     if (url.match(/\/api\/last-shot/)) {
-      return _fetch('/api/v1/history/last').then(r => {
-        if (!r.ok) return jsonResponse({})
-        return r.json().then((e: {id?: string; time?: number; name?: string; profile?: {name?: string}}) =>
-          jsonResponse({
-            id: e.id,
-            created_at: e.time ? new Date(e.time * 1000).toISOString() : null,
-            profile_name: e.profile?.name ?? e.name ?? 'Unknown',
-            coffee_analysis: null,
-            user_preferences: null,
-            reply: '',
-            profile_json: e.profile ?? null,
-          })
-        )
-      }).catch(() => jsonResponse({}))
-    }
-
-    // /api/history/:id — single history entry operations (must come before broad /api/history)
-    const historyIdMatch = pathname.match(/^\/api\/history\/([^/]+)$/)
-    if (historyIdMatch) {
-      const entryId = decodeURIComponent(historyIdMatch[1])
-
-      // DELETE /api/history/:id → delete shot from machine history
-      if (method === 'DELETE') {
-        return _fetch(`/api/v1/history/${encodeURIComponent(entryId)}`, { method: 'DELETE' }).then(r =>
-          r.ok
-            ? jsonResponse({ status: 'ok' })
-            : jsonResponse({ detail: 'Failed to delete history entry' }, 502)
-        ).catch(() => jsonResponse({ detail: 'Failed to delete history entry' }, 502))
-      }
-
-      // GET /api/history/:id → look up single entry from full history
-      return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse({ detail: 'Not found' }, 404)
-        return r.json().then((raw: unknown) => {
-          type MachineHistEntry = {
-            id: string; time: number; name: string;
-            profile?: {name?: string; final_weight?: number; temperature?: number};
-            data?: {shot?: {weight?: number}; time?: number}[];
-          }
-          const list: MachineHistEntry[] = Array.isArray(raw) ? raw : ((raw as {history?: MachineHistEntry[]}).history ?? [])
-          const entry = list.find(e => e.id === entryId)
-          if (!entry) return jsonResponse({ detail: 'Not found' }, 404)
-          return jsonResponse({
-            id: entry.id,
-            created_at: new Date(entry.time * 1000).toISOString(),
-            profile_name: entry.profile?.name ?? entry.name ?? 'Unknown',
-            coffee_analysis: null,
-            user_preferences: null,
-            reply: '',
-            profile_json: entry.profile ?? null,
-            notes: null,
-          })
-        })
-      }).catch(() => jsonResponse({ detail: 'Not found' }, 404))
-    }
-
-    // PUT /api/history/:id/notes → store notes in localStorage
-    const historyNotesMatch = pathname.match(/^\/api\/history\/([^/]+)\/notes$/)
-    if (historyNotesMatch && method === 'PUT') {
       return (async () => {
-        try {
-          const body = await new Response(init?.body).json() as { notes?: string }
-          const noteKey = `meticai-note-${decodeURIComponent(historyNotesMatch[1])}`
-          if (body.notes) {
-            localStorage.setItem(noteKey, body.notes)
-          } else {
-            localStorage.removeItem(noteKey)
-          }
-          return jsonResponse({ status: 'ok' })
-        } catch {
-          return jsonResponse({ detail: 'Invalid request' }, 400)
+        const history = await _loadVisibleHistory()
+        const entry = [...history].sort((a, b) => b.time - a.time)[0]
+        if (!entry) return jsonResponse({ detail: 'No shots found' }, 404)
+        return jsonResponse(normalizeLastShot(entry))
+      })().catch(() => jsonResponse({ detail: 'No shots found' }, 404))
+    }
+
+    // /api/history/{id}/notes → direct local notes storage
+    const historyNotesMatch = pathname.match(/^\/api\/history\/([^/]+)\/notes$/)
+    if (historyNotesMatch && (method === 'GET' || method === 'PATCH' || method === 'PUT')) {
+      return (async () => {
+        const entryId = decodeURIComponent(historyNotesMatch[1])
+        if (method === 'GET') {
+          const notes = await getDirectHistoryNotes(entryId)
+          return jsonResponse({ status: 'success', ...notes })
         }
-      })()
+        const request = input instanceof Request ? input : new Request(input, init)
+        const body = await request.json() as { notes?: string }
+        return jsonResponse(await saveDirectHistoryNotes(entryId, body.notes ?? ''))
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to update history notes' }, 500))
+    }
+
+    // /api/history/{id} → detail route before the broad list handler
+    const historyDetailMatch = pathname.match(/^\/api\/history\/([^/]+)$/)
+    if (historyDetailMatch && method === 'GET') {
+      return (async () => {
+        const entryId = decodeURIComponent(historyDetailMatch[1])
+        const history = await _loadVisibleHistory()
+        const entry = history.find((candidate) => candidate.id === entryId)
+        if (!entry) return jsonResponse({ detail: 'History entry not found' }, 404)
+        const profileName = typeof entry.profile?.name === 'string' ? entry.profile.name : entry.name ?? ''
+        const profileId = typeof entry.profile?.id === 'string' ? entry.profile.id : ''
+        const desc = _descriptionCache.get(profileName) || _descriptionCache.get(profileId) || ''
+        return jsonResponse(normalizeHistoryEntry(entry, await getDirectHistoryNotes(entryId), desc))
+      })().catch(() => jsonResponse({ detail: 'Failed to retrieve history entry' }, 500))
+    }
+
+    // DELETE /api/history/{id} → local direct tombstone; machine history is immutable.
+    if (historyDetailMatch && method === 'DELETE') {
+      return (async () => {
+        const entryId = decodeURIComponent(historyDetailMatch[1])
+        const history = await _loadVisibleHistory()
+        if (!history.some((candidate) => candidate.id === entryId)) {
+          return jsonResponse({ detail: 'History entry not found' }, 404)
+        }
+        await deleteDirectHistoryEntry(entryId)
+        return jsonResponse({ status: 'success', message: 'History entry deleted' })
+      })().catch(() => jsonResponse({ detail: 'Failed to delete history entry' }, 500))
     }
 
     // /api/history → /api/v1/history (translate machine history to MeticAI format)
-    if (url.match(/\/api\/history/)) {
-      return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse({ entries: [], total: 0, limit: 50, offset: 0 })
-        return r.json().then((raw: unknown) => {
-          type MachineHistEntry = {
-            id: string; time: number; name: string;
-            profile?: {name?: string; final_weight?: number; temperature?: number};
-            data?: {shot?: {weight?: number}; time?: number}[];
-          }
-          const list: MachineHistEntry[] = Array.isArray(raw) ? raw : ((raw as {history?: MachineHistEntry[]}).history ?? [])
-          const entries = list.map(e => ({
-            id: e.id,
-            created_at: new Date(e.time * 1000).toISOString(),
-            profile_name: e.profile?.name ?? e.name ?? 'Unknown',
-            coffee_analysis: null,
-            user_preferences: null,
-            reply: '',
-            profile_json: e.profile ?? null,
-            notes: null,
-          }))
-          return jsonResponse({ entries, total: entries.length, limit: 50, offset: 0 })
-        })
-      }).catch(() => jsonResponse({ entries: [], total: 0, limit: 50, offset: 0 }))
+    if (pathname === '/api/history' && method === 'GET') {
+      return (async () => {
+        const parsedUrl = new URL(url, window.location.origin)
+        const limit = safeNumber(parsedUrl.searchParams.get('limit'), 50)
+        const offset = safeNumber(parsedUrl.searchParams.get('offset'), 0)
+        const history = await _loadVisibleHistory()
+        const entries = await Promise.all(
+          history.slice(offset, offset + limit).map(async (entry) => {
+            const profileName = typeof entry.profile?.name === 'string' ? entry.profile.name : entry.name ?? ''
+            const profileId = typeof entry.profile?.id === 'string' ? entry.profile.id : ''
+            const desc = _descriptionCache.get(profileName) || _descriptionCache.get(profileId) || ''
+            return normalizeHistoryEntry(entry, await getDirectHistoryNotes(entry.id), desc)
+          }),
+        )
+        return jsonResponse({ entries, total: history.length, limit, offset })
+      })().catch(() => jsonResponse({ entries: [], total: 0, limit: 50, offset: 0 }))
+    }
+
+    // DELETE /api/history → local direct tombstones for all currently visible machine shots.
+    if (pathname === '/api/history' && method === 'DELETE') {
+      return (async () => {
+        const history = await _loadVisibleHistory()
+        await clearDirectHistory(history.map((entry) => entry.id))
+        return jsonResponse({ status: 'success', message: 'All history cleared' })
+      })().catch(() => jsonResponse({ detail: 'Failed to clear history' }, 500))
     }
 
     // POST /api/machine/preheat → GET /api/v1/action/preheat
@@ -869,10 +2042,10 @@ export function installDirectModeInterceptor(): void {
     // POST /api/machine/schedule-shot → not supported in direct mode
     // (feature flag scheduledShots=false already hides the UI, but be explicit)
     if (url.match(/\/api\/machine\/schedule-shot/) && method === 'POST') {
-      return jsonResponse({
+      return Promise.resolve(jsonResponse({
         status: 'error',
-        detail: 'Scheduled shots are not supported in direct mode. Use the machine UI or Metic Docker mode.',
-      }, 501)
+        detail: 'Scheduled shots are not supported in direct mode. Use the machine UI or MeticAI Docker mode.',
+      }, 501))
     }
 
     // /api/machine/profiles/orphaned → empty list (no MeticAI DB in direct mode)
@@ -882,30 +2055,26 @@ export function installDirectModeInterceptor(): void {
 
     // GET /api/shots/recent/by-profile → /api/v1/history (group entries by profile)
     if (url.match(/\/api\/shots\/recent\/by-profile/)) {
-      return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse({ profiles: [] })
-        return r.json().then((raw: unknown) => {
-          type HistEntry = {
-            id: string; time: number; name: string; file?: string;
-            profile?: { name?: string; id?: string; final_weight?: number };
-            data?: { shot?: { weight?: number }; time?: number; profile_time?: number }[];
-          }
-          const list: HistEntry[] = Array.isArray(raw) ? raw : ((raw as { history?: HistEntry[] }).history ?? [])
-          const groups = new Map<string, { profile_name: string; profile_id: string; shots: unknown[]; shot_count: number }>()
-          for (const e of list) {
-            const pName = e.profile?.name ?? e.name ?? 'Unknown'
-            const pId = e.profile?.id ?? e.id
-            const lastPt = e.data?.[e.data.length - 1]
-            const totalTimeMs = lastPt?.profile_time ?? lastPt?.time
+      return (async () => {
+        const list = await _loadVisibleHistory()
+        const annotations = (await getDirectAnnotationSummaries()).annotations
+        const groups = new Map<string, { profile_name: string; profile_id: string; shots: unknown[]; shot_count: number }>()
+        for (const e of list) {
+            const pName = getHistoryProfileName(e)
+            const pId = getHistoryProfileId(e)
+            const shotDate = getHistoryEntryDate(e)
+            const shotFilename = getHistoryEntryFilename(e)
+            const metrics = getHistoryMetrics(e)
+            const annotation = annotations[`${shotDate}/${shotFilename}`]
             const shot = {
               profile_name: pName,
               profile_id: pId,
-              date: new Date(e.time * 1000).toISOString().split('T')[0],
-              filename: e.file ?? `${e.id}.json`,
+              date: shotDate,
+              filename: shotFilename,
               timestamp: e.time,
-              final_weight: lastPt?.shot?.weight ?? e.profile?.final_weight ?? null,
-              total_time: totalTimeMs ? totalTimeMs / 1000 : null,
-              has_annotation: false,
+              final_weight: metrics.final_weight,
+              total_time: metrics.total_time,
+              has_annotation: hasRecentShotAnnotation(annotation),
             }
             if (!groups.has(pName)) {
               groups.set(pName, { profile_name: pName, profile_id: pId, shots: [], shot_count: 0 })
@@ -914,70 +2083,55 @@ export function installDirectModeInterceptor(): void {
             g.shots.push(shot)
             g.shot_count++
           }
-          return jsonResponse({ profiles: Array.from(groups.values()) })
-        })
-      }).catch(() => jsonResponse({ profiles: [] }))
+        return jsonResponse({ profiles: Array.from(groups.values()) })
+      })().catch(() => jsonResponse({ profiles: [] }))
     }
 
     // GET /api/shots/recent → /api/v1/history (translate entries to RecentShot format)
     if (url.match(/\/api\/shots\/recent/)) {
-      return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse({ shots: [] })
-        return r.json().then((raw: unknown) => {
-          type HistEntry = {
-            id: string; time: number; name: string; file?: string;
-            profile?: { name?: string; id?: string; final_weight?: number };
-            data?: { shot?: { weight?: number }; time?: number; profile_time?: number }[];
-          }
-          const list: HistEntry[] = Array.isArray(raw) ? raw : ((raw as { history?: HistEntry[] }).history ?? [])
-          const shots = list.map(e => {
-            const lastPt = e.data?.[e.data.length - 1]
-            const totalTimeMs = lastPt?.profile_time ?? lastPt?.time
+      return (async () => {
+        const list = await _loadVisibleHistory()
+        const annotations = (await getDirectAnnotationSummaries()).annotations
+        const shots = list.map(e => {
+            const shotDate = getHistoryEntryDate(e)
+            const shotFilename = getHistoryEntryFilename(e)
+            const metrics = getHistoryMetrics(e)
+            const annotation = annotations[`${shotDate}/${shotFilename}`]
             return {
-              profile_name: e.profile?.name ?? e.name ?? 'Unknown',
-              profile_id: e.profile?.id ?? e.id,
-              date: new Date(e.time * 1000).toISOString().split('T')[0],
-              filename: e.file ?? `${e.id}.json`,
+              profile_name: getHistoryProfileName(e),
+              profile_id: getHistoryProfileId(e),
+              date: shotDate,
+              filename: shotFilename,
               timestamp: e.time,
-              final_weight: lastPt?.shot?.weight ?? e.profile?.final_weight ?? null,
-              total_time: totalTimeMs ? totalTimeMs / 1000 : null,
-              has_annotation: false,
+              final_weight: metrics.final_weight,
+              total_time: metrics.total_time,
+              has_annotation: hasRecentShotAnnotation(annotation),
             }
           })
-          return jsonResponse({ shots })
-        })
-      }).catch(() => jsonResponse({ shots: [] }))
+        return jsonResponse({ shots })
+      })().catch(() => jsonResponse({ shots: [] }))
     }
 
     // GET /api/shots/by-profile/:profileName → /api/v1/history (filter by profile name)
     const byProfileMatch = url.match(/\/api\/shots\/by-profile\/([^?]+)/)
     if (byProfileMatch) {
       const profileName = decodeURIComponent(byProfileMatch[1])
-      return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse({ profile_name: profileName, shots: [], count: 0, limit: 20 })
-        return r.json().then((raw: unknown) => {
-          type HistEntry = {
-            id: string; time: number; name: string; file?: string;
-            profile?: { name?: string; id?: string; final_weight?: number; temperature?: number; author?: string; stages?: unknown[] };
-            data?: { shot?: { pressure?: number; flow?: number; weight?: number }; time?: number; profile_time?: number; sensors?: { external_1?: number } }[];
-          }
-          const all: HistEntry[] = Array.isArray(raw) ? raw : ((raw as { history?: HistEntry[] }).history ?? [])
-          const filtered = all.filter(e => (e.profile?.name ?? e.name) === profileName)
+      return (async () => {
+          const all = await _loadVisibleHistory()
+          const filtered = all.filter(e => getHistoryProfileName(e) === profileName)
           const shots = filtered.map(e => {
-            const lastPt = e.data?.[e.data.length - 1]
-            const totalTimeMs = lastPt?.profile_time ?? lastPt?.time
+            const metrics = getHistoryMetrics(e)
             return {
-              date: new Date(e.time * 1000).toISOString().split('T')[0],
-              filename: e.file ?? `${e.id}.json`,
+              date: getHistoryEntryDate(e),
+              filename: getHistoryEntryFilename(e),
               timestamp: String(e.time),
-              profile_name: e.profile?.name ?? e.name ?? 'Unknown',
-              final_weight: lastPt?.shot?.weight ?? e.profile?.final_weight ?? null,
-              total_time: totalTimeMs ? totalTimeMs / 1000 : null,
+              profile_name: getHistoryProfileName(e),
+              final_weight: metrics.final_weight,
+              total_time: metrics.total_time,
             }
           })
           return jsonResponse({ profile_name: profileName, shots, count: shots.length, limit: 20 })
-        })
-      }).catch(() => jsonResponse({ profile_name: profileName, shots: [], count: 0, limit: 20 }))
+      })().catch(() => jsonResponse({ profile_name: profileName, shots: [], count: 0, limit: 20 }))
     }
 
     // GET /api/shots/data/:date/:filename → /api/v1/history (find entry and convert data)
@@ -985,20 +2139,13 @@ export function installDirectModeInterceptor(): void {
     if (shotDataMatch) {
       const shotDate = decodeURIComponent(shotDataMatch[1])
       const shotFilename = decodeURIComponent(shotDataMatch[2])
-      return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse({}, 404)
-        return r.json().then((raw: unknown) => {
+      return (async () => {
           type HistEntry = {
             id: string; time: number; name: string; file?: string;
             profile?: { name?: string; id?: string; final_weight?: number; temperature?: number; author?: string; stages?: { name: string; type: string; key?: string }[] };
             data?: { shot?: { pressure?: number; flow?: number; weight?: number }; time?: number; profile_time?: number; sensors?: { external_1?: number } }[];
           }
-          const all: HistEntry[] = Array.isArray(raw) ? raw : ((raw as { history?: HistEntry[] }).history ?? [])
-          const entry = all.find(e => {
-            const eDate = new Date(e.time * 1000).toISOString().split('T')[0]
-            const eFile = e.file ?? `${e.id}.json`
-            return eDate === shotDate && eFile === shotFilename
-          })
+          const entry = await _findVisibleShot(shotDate, shotFilename) as HistEntry | null
           if (!entry) return jsonResponse({ detail: 'Shot not found' }, 404)
           const pts = entry.data ?? []
           const timeArr: number[] = []
@@ -1032,67 +2179,34 @@ export function installDirectModeInterceptor(): void {
             }
           }
           return jsonResponse(shotData)
+      })().catch(() => jsonResponse({ detail: 'Failed to load shot data' }, 500))
+    }
+
+    // GET/PATCH/DELETE /api/shots/{date}/{filename}/annotation → direct local annotation storage
+    const shotAnnotationMatch = pathname.match(/^\/api\/shots\/([^/]+)\/([^/]+)\/annotation$/)
+    if (shotAnnotationMatch && (method === 'GET' || method === 'PATCH' || method === 'PUT' || method === 'DELETE')) {
+      return (async () => {
+        const date = decodeURIComponent(shotAnnotationMatch[1])
+        const filename = decodeURIComponent(shotAnnotationMatch[2])
+        if (method === 'GET') return jsonResponse(await getDirectShotAnnotation(date, filename))
+        if (method === 'DELETE') return jsonResponse(await deleteDirectShotAnnotation(date, filename))
+        const request = input instanceof Request ? input : new Request(input, init)
+        const body = await request.json() as { annotation?: string; rating?: number | null }
+        return jsonResponse(await saveDirectShotAnnotation(date, filename, body))
+      })().catch((err) => {
+        const status = err instanceof DirectStorageValidationError ? 422 : 500
+        return jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to update annotation' }, status)
+      })
+    }
+
+    // GET /api/shots/annotations → IndexedDB-backed direct annotation summaries
+    if (url.match(/\/api\/shots\/annotations/)) {
+      return getDirectAnnotationSummaries()
+        .then((summaries) => jsonResponse(summaries))
+        .catch((err) => {
+          console.error('[DirectMode] Failed to load annotations:', err)
+          return jsonResponse({ error: 'Failed to load annotations' }, 500)
         })
-      }).catch(() => jsonResponse({ detail: 'Failed to load shot data' }, 500))
-    }
-
-    // GET/PUT/DELETE /api/shots/:date/:filename/annotation → localStorage-backed annotation CRUD
-    const annotationMatch = pathname.match(/^\/api\/shots\/([^/]+)\/([^/]+)\/annotation$/)
-    if (annotationMatch) {
-      const annotDate = decodeURIComponent(annotationMatch[1])
-      const annotFile = decodeURIComponent(annotationMatch[2])
-      const annotKey = `meticai-annotation-${annotDate}/${annotFile}`
-
-      if (method === 'GET') {
-        const stored = localStorage.getItem(annotKey)
-        if (stored) {
-          try { return Promise.resolve(jsonResponse(JSON.parse(stored))) }
-          catch { /* fall through to empty */ }
-        }
-        return Promise.resolve(jsonResponse({ taste_notes: null, rating: null, notes: null }))
-      }
-
-      if (method === 'PUT' || method === 'POST') {
-        return (async () => {
-          try {
-            const body = await new Response(init?.body).json()
-            localStorage.setItem(annotKey, JSON.stringify(body))
-            return jsonResponse({ status: 'ok', ...body })
-          } catch {
-            return jsonResponse({ detail: 'Invalid annotation data' }, 400)
-          }
-        })()
-      }
-
-      if (method === 'DELETE') {
-        localStorage.removeItem(annotKey)
-        return Promise.resolve(jsonResponse({ status: 'ok' }))
-      }
-    }
-
-    // GET /api/shots/annotations → return all annotations from localStorage
-    const annotationsAllMatch = url.match(/\/api\/shots\/annotations/)
-    if (annotationsAllMatch) {
-      const annotations: Record<string, unknown> = {}
-      const PREFIX = 'meticai-annotation-'
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key?.startsWith(PREFIX)) {
-          try {
-            const annotKey = key.slice(PREFIX.length)
-            // Support both legacy separator (-) and current (/)
-            const parsed = JSON.parse(localStorage.getItem(key)!)
-            annotations[annotKey] = parsed
-            // Migrate legacy keys that used '-' separator to '/' separator
-            if (!annotKey.includes('/') && annotKey.match(/^\d{4}-\d{2}-\d{2}-/)) {
-              const legacyDate = annotKey.slice(0, 10)
-              const legacyFile = annotKey.slice(11)
-              annotations[`${legacyDate}/${legacyFile}`] = parsed
-            }
-          } catch { /* skip corrupted entries */ }
-        }
-      }
-      return Promise.resolve(jsonResponse({ annotations }))
     }
 
     // GET /api/shots/llm-analysis-cache → no cache in direct mode
@@ -1102,16 +2216,12 @@ export function installDirectModeInterceptor(): void {
 
     // GET /api/shots/dates → derive from history
     if (url.match(/\/api\/shots\/dates/) && method === 'GET') {
-      return _fetch('/api/v1/history').then(r => {
-        if (!r.ok) return jsonResponse([])
-        return r.json().then((raw: unknown) => {
-          type HE = { time: number }
-          const all: HE[] = Array.isArray(raw) ? raw : ((raw as { history?: HE[] }).history ?? [])
-          const dates = [...new Set(all.map(e => new Date(e.time * 1000).toISOString().split('T')[0]))]
-          dates.sort((a, b) => b.localeCompare(a))
-          return jsonResponse(dates)
-        })
-      }).catch(() => jsonResponse([]))
+      return (async () => {
+        const history = await _loadVisibleHistory()
+        const dates = [...new Set(history.map(getHistoryEntryDate))]
+        dates.sort((a, b) => b.localeCompare(a))
+        return jsonResponse({ dates })
+      })().catch(() => jsonResponse({ dates: [] }))
     }
 
     // POST /api/shots/analyze → compute structured LocalAnalysisResult from shot telemetry
@@ -1123,10 +2233,6 @@ export function installDirectModeInterceptor(): void {
           const shotFilename = (body.get('shot_filename') as string) || ''
           const profileName = (body.get('profile_name') as string) || 'Unknown'
 
-          // Fetch shot data from machine
-          const histResp = await _fetch('/api/v1/history')
-          if (!histResp.ok) return jsonResponse({ status: 'error', message: 'Failed to load history' })
-          const raw = await histResp.json() as unknown
           /* eslint-disable @typescript-eslint/no-explicit-any */
           type HistStage = { name: string; type: string; key?: string; dynamics?: any; exit_triggers?: any[]; limits?: any[] }
           type HistVar = { key: string; name: string; type: string; value: number }
@@ -1136,12 +2242,7 @@ export function installDirectModeInterceptor(): void {
             data?: { shot?: { pressure?: number; flow?: number; weight?: number; gravimetric_flow?: number }; time?: number; profile_time?: number; status?: string }[];
           }
           /* eslint-enable @typescript-eslint/no-explicit-any */
-          const all: HistEntry[] = Array.isArray(raw) ? raw : ((raw as { history?: HistEntry[] }).history ?? [])
-          const entry = all.find(e => {
-            const eDate = new Date(e.time * 1000).toISOString().split('T')[0]
-            const eFile = e.file ?? `${e.id}.json`
-            return eDate === shotDate && eFile === shotFilename
-          })
+          const entry = await _findVisibleShot(shotDate, shotFilename) as HistEntry | null
           if (!entry) return jsonResponse({ status: 'error', message: 'Shot not found' })
 
           // ── Helper functions (matching server analysis_service.py) ──
@@ -1444,64 +2545,17 @@ export function installDirectModeInterceptor(): void {
               stage_count: profileStages.length,
             },
             profile_target_curves: (() => {
-              // Generate target curves from profile stages aligned with actual shot stage times
-              const curves: { time: number; target_pressure?: number; target_flow?: number; stage_name: string }[] = []
-              for (const ps of profileStages) {
-                const stageName = (ps.name ?? '').trim()
-                const stageType = ps.type ?? 'unknown'
-                let sd: StageStats | undefined
-                for (const [k, v] of shotStages) {
-                  if (k.trim().toLowerCase() === stageName.toLowerCase()) { sd = v; break }
-                }
-                if (!sd) continue
-                const dp = ps.dynamics?.points ?? []
-                if (dp.length === 0) continue
-                const over = (ps.dynamics?.over ?? 'time')
-                // Build weight-to-time pairs for this stage for weight-based dynamics
-                const wTimePairs: [number, number][] = []
-                if (over === 'weight') {
-                  for (const pt2 of pts) {
-                    const t2 = (pt2.time ?? 0) / 1000
-                    if (t2 >= sd.startTime && t2 <= sd.endTime) {
-                      wTimePairs.push([pt2.shot?.weight ?? 0, t2])
-                    }
-                  }
-                }
-                const numPoints = Math.max(2, Math.ceil(sd.duration * 2))
-                for (let i2 = 0; i2 < numPoints; i2++) {
-                  const frac = numPoints > 1 ? i2 / (numPoints - 1) : 0
-                  const t = sd.startTime + frac * sd.duration
-                  // Interpolate target value from dynamics points
-                  let val: number
-                  if (dp.length === 1) {
-                    val = _resolveVar(dp[0][1] ?? dp[0][0], vars)
-                  } else {
-                    const xAxis = over === 'weight'
-                      ? (wTimePairs.length > 0 ? (() => { for (const wp of wTimePairs) { if (wp[1] >= t) return wp[0] }; return wTimePairs[wTimePairs.length - 1][0] })() : 0)
-                      : (t - sd.startTime)
-                    // Find surrounding dynamics points for interpolation
-                    let lo = 0, hi = dp.length - 1
-                    for (let j = 0; j < dp.length - 1; j++) {
-                      if (_sf(dp[j][0]) <= xAxis && _sf(dp[j + 1][0]) >= xAxis) { lo = j; hi = j + 1; break }
-                    }
-                    if (xAxis <= _sf(dp[0][0])) { val = _resolveVar(dp[0][1], vars) }
-                    else if (xAxis >= _sf(dp[dp.length - 1][0])) { val = _resolveVar(dp[dp.length - 1][1], vars) }
-                    else {
-                      const x0 = _sf(dp[lo][0]), x1 = _sf(dp[hi][0])
-                      const y0 = _resolveVar(dp[lo][1], vars), y1 = _resolveVar(dp[hi][1], vars)
-                      const ratio = x1 !== x0 ? (xAxis - x0) / (x1 - x0) : 0
-                      val = y0 + ratio * (y1 - y0)
-                    }
-                  }
-                  curves.push({
-                    time: _round1(t),
-                    ...(stageType === 'pressure' ? { target_pressure: _round1(val) } : {}),
-                    ...(stageType === 'flow' ? { target_flow: _round1(val) } : {}),
-                    stage_name: stageName,
-                  })
-                }
+              // Generate shot-aligned target curves from profile dynamics
+              if (!entry.profile) return []
+              const stageTimings = new Map<string, { startTime: number; endTime: number }>()
+              for (const [name, stats] of shotStages) {
+                stageTimings.set(name, { startTime: stats.startTime, endTime: stats.endTime })
               }
-              return curves
+              return generateShotAlignedTargetCurves(
+                entry.profile as unknown as CachedProfile,
+                stageTimings,
+                pts as unknown as Array<Record<string, unknown>>,
+              )
             })(),
           }
           return jsonResponse({ status: 'success', analysis })
@@ -1512,7 +2566,7 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/shots/analyze-llm → alias for shot analysis
+    // POST /api/shots/analyze-llm → full LLM analysis with actual shot data
     if (url.match(/\/api\/shots\/analyze-llm/) && method === 'POST') {
       return (async () => {
         try {
@@ -1521,13 +2575,262 @@ export function installDirectModeInterceptor(): void {
             return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
           }
           const body = init?.body as FormData
-          const result = await aiService.analyzeShot({
-            profileName: (body.get('profile_name') as string) || 'Unknown',
-            shotDate: (body.get('shot_date') as string) || '',
-            shotFilename: (body.get('shot_filename') as string) || '',
-            profileDescription: (body.get('profile_description') as string) || undefined,
+          const pName = (body.get('profile_name') as string) || 'Unknown'
+          const shotDate = (body.get('shot_date') as string) || ''
+          const shotFilename = (body.get('shot_filename') as string) || ''
+          const profileDescription = (body.get('profile_description') as string) || undefined
+
+          // 1. Fetch the actual shot data
+          const entry = await _findVisibleShot(shotDate, shotFilename) as {
+            profile?: { name?: string; final_weight?: number; temperature?: number; stages?: Array<Record<string, unknown>>; variables?: Array<Record<string, unknown>> }
+            data?: Array<Record<string, unknown>>
+          } | null
+          if (!entry) return jsonResponse({ status: 'error', message: 'Shot not found' })
+
+          // 2. Compute shot summary metrics directly from shot data
+          const pts = entry.data ?? []
+          if (!pts.length) return jsonResponse({ status: 'error', message: 'Shot has no telemetry data' })
+          let totalTime = 0
+          let finalWeight = 0
+          let maxPressure = 0
+          let maxFlow = 0
+          const targetWeight = entry.profile?.final_weight ?? null
+          // Stage-level stats
+          type ShotStageInfo = { name: string; duration: number; avgPressure: number; avgFlow: number; weightGain: number; endWeight: number }
+          const stageInfos: ShotStageInfo[] = []
+          {
+            let curStage: string | null = null
+            let stageStart = 0
+            let pressureSum = 0
+            let flowSum = 0
+            let count = 0
+            let stageStartWeight = 0
+            const flushStage = (endTime: number, endWeight2: number) => {
+              if (!curStage || count === 0) return
+              stageInfos.push({
+                name: curStage,
+                duration: Math.round((endTime - stageStart) * 10) / 10,
+                avgPressure: Math.round(pressureSum / count * 10) / 10,
+                avgFlow: Math.round(flowSum / count * 10) / 10,
+                weightGain: Math.round((endWeight2 - stageStartWeight) * 10) / 10,
+                endWeight: Math.round(endWeight2 * 10) / 10,
+              })
+            }
+            for (const pt of pts) {
+              const status = String((pt as Record<string, unknown>).status ?? '').trim()
+              if (!status || status.toLowerCase() === 'retracting') continue
+              const timeSec = safeNumber((pt as Record<string, unknown>).profile_time ?? (pt as Record<string, unknown>).time) / 1000
+              const shot = ((pt as Record<string, Record<string, unknown>>).shot ?? {})
+              const p = safeNumber(shot.pressure)
+              const f = safeNumber(shot.flow) || safeNumber(shot.gravimetric_flow)
+              const w = safeNumber(shot.weight)
+              if (status !== curStage) {
+                flushStage(timeSec, finalWeight)
+                curStage = status
+                stageStart = timeSec
+                pressureSum = 0
+                flowSum = 0
+                count = 0
+                stageStartWeight = w
+              }
+              pressureSum += p
+              flowSum += f
+              count++
+              if (p > maxPressure) maxPressure = p
+              if (f > maxFlow) maxFlow = f
+              finalWeight = w
+              totalTime = timeSec
+            }
+            flushStage(totalTime, finalWeight)
+          }
+
+          const localAnalysis = {
+            shot_summary: {
+              total_time_s: Math.round(totalTime * 10) / 10,
+              final_weight_g: Math.round(finalWeight * 10) / 10,
+              target_weight_g: targetWeight,
+              weight_deviation_pct: targetWeight ? Math.round(((finalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
+              max_pressure_bar: Math.round(maxPressure * 10) / 10,
+              max_flow_mls: Math.round(maxFlow * 10) / 10,
+            },
+            stages: stageInfos.map(s => ({
+              name: s.name,
+              duration_s: s.duration,
+              avg_pressure: s.avgPressure,
+              avg_flow: s.avgFlow,
+              weight_gain: s.weightGain,
+              cumulative_weight_at_end: s.endWeight,
+            })),
+          }
+
+          // 3. Build profile context
+          const shotProfile = entry.profile
+          const profileStagesLlm = shotProfile?.stages ?? []
+          const profileVars = shotProfile?.variables ?? []
+          const cleanStages = profileStagesLlm.map(s => ({
+            name: s.name, type: s.type, key: s.key,
+            dynamics_points: s.dynamics_points,
+            dynamics_over: s.dynamics_over,
+            exit_triggers: s.exit_triggers,
+            limits: s.limits,
+          }))
+
+          // 4. Sample key data points from the shot for graph context
+          const dataEntries = entry.data ?? []
+          const graphSamples: Array<Record<string, unknown>> = []
+          if (dataEntries.length > 0) {
+            const indices = [0]
+            const n = dataEntries.length
+            for (const pct of [0.25, 0.5, 0.75]) {
+              const idx = Math.floor(n * pct)
+              if (!indices.includes(idx)) indices.push(idx)
+            }
+            indices.push(n - 1)
+            for (const idx of [...new Set(indices)].sort((a, b) => a - b)) {
+              const e = dataEntries[idx] as Record<string, unknown>
+              const shot = (e.shot ?? {}) as Record<string, unknown>
+              graphSamples.push({
+                time_s: Math.round(safeNumber(e.profile_time ?? e.time) / 100) / 10,
+                pressure: Math.round(safeNumber(shot.pressure) * 10) / 10,
+                flow: Math.round((safeNumber(shot.flow) || safeNumber(shot.gravimetric_flow)) * 10) / 10,
+                weight: Math.round(safeNumber(shot.weight) * 10) / 10,
+                stage: String(e.status ?? ''),
+              })
+            }
+          }
+
+          // 5. Build the comprehensive prompt (matching server format)
+          const prompt = `You are an expert espresso barista and profiling specialist analyzing a shot from a Meticulous Espresso Machine.
+
+## Profile Being Used
+Name: ${pName}
+Temperature: ${shotProfile?.temperature ?? 'Not set'}°C
+Target Weight: ${shotProfile?.final_weight ?? 'Not set'}g
+
+### Profile Description
+${profileDescription || 'No description provided - analyze the profile structure to understand intent.'}
+
+### Profile Variables
+${JSON.stringify(profileVars, null, 2)}
+
+### Profile Stages
+${JSON.stringify(cleanStages, null, 2)}
+
+## Full Local Analysis
+This is the complete algorithmic analysis of the shot. Use this data to inform your expert analysis.
+
+IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total weight when that stage ended.
+If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated
+correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
+A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
+
+${JSON.stringify(localAnalysis, null, 2)}
+
+### Graph Sample Points
+${JSON.stringify(graphSamples, null, 2)}
+
+---
+
+Based on this data, provide a detailed expert analysis.
+
+CRITICAL FORMATTING RULES:
+1. You MUST use EXACTLY these 5 section headers with the exact format shown (## followed by number, period, space, then title)
+2. Each section MUST have the subsection headers shown (bold text with colon, like **What Happened:**)
+3. ALL content under subsections MUST be bullet points starting with "- "
+4. Keep bullet points concise (1-2 sentences max per bullet)
+5. Do NOT add extra sections or subsections beyond what's specified
+
+## 1. Shot Performance
+
+**What Happened:**
+- [Stage-by-stage description of the extraction]
+- [Notable events: pressure spikes, flow restrictions, early/late stage exits]
+- [Final weight accuracy relative to target]
+
+**Assessment:** [Choose exactly one: Good / Acceptable / Needs Improvement / Problematic]
+
+## 2. Root Cause Analysis
+
+**Primary Factors:**
+- [Most likely cause with brief explanation]
+- [Second most likely cause if applicable]
+
+**Secondary Considerations:**
+- [Other contributing factors]
+- [Environmental or equipment factors if relevant]
+
+## 3. Setup Recommendations
+
+**Priority Changes:**
+- [Most important change - be specific with numbers when possible]
+- [Second priority change]
+
+**Additional Suggestions:**
+- [Other tweaks to consider]
+
+## 4. Profile Recommendations
+
+**Recommended Adjustments:**
+- [Specific profile changes: timing, triggers, targets]
+- [Variable value changes if applicable]
+
+**Reasoning:**
+- [Why these changes would improve the shot]
+
+## 5. Profile Design Observations
+
+**Strengths:**
+- [Well-designed aspects of this profile]
+
+**Potential Improvements:**
+- [Exit trigger or safety limit suggestions]
+- [Robustness improvements]
+
+Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
+
+## Structured Recommendations (MANDATORY)
+
+After your analysis sections, you MUST output a structured JSON block with specific, actionable profile variable recommendations.
+Use EXACTLY this format — the markers are parsed programmatically:
+
+RECOMMENDATIONS_JSON:
+[
+  {
+    "variable": "<variable key from the profile, e.g. 'pressure', 'temperature'>",
+    "current_value": <current numeric value>,
+    "recommended_value": <suggested numeric value>,
+    "stage": "<stage name this applies to, or 'global' for top-level settings>",
+    "confidence": "<high|medium|low>",
+    "reason": "<one-sentence explanation>"
+  }
+]
+END_RECOMMENDATIONS_JSON
+
+Rules for recommendations:
+- Only include recommendations where you have a SPECIFIC numeric change to suggest
+- Use actual variable keys from the Profile Variables section above
+- For top-level settings (temperature, final_weight), use stage="global"
+- For stage-specific changes, use the stage name from Profile Stages
+- confidence: "high" = strong evidence from data, "medium" = likely beneficial, "low" = worth trying
+- If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
+`
+
+          // 6. Call Gemini
+          const { GoogleGenAI: GenAI } = await import('@google/genai')
+          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) ?? ''
+          if (!apiKey) return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
+          const client = new GenAI({ apiKey })
+          const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
+          const response = await client.models.generateContent({
+            model: modelId,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
           })
-          return jsonResponse({ status: 'success', llm_analysis: result.llm_analysis, cached: false })
+          const analysisText = response.text ?? ''
+          return jsonResponse({
+            status: 'success',
+            llm_analysis: analysisText,
+            cached: false,
+          })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Analysis failed'
           return jsonResponse({ status: 'error', message: msg })
@@ -1535,9 +2838,36 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/shots/analyze-recommendations → stub (no backend for recommendations in direct mode)
+    // POST /api/shots/analyze-recommendations → parse cached/direct analysis locally
     if (url.match(/\/api\/shots\/analyze-recommendations/) && method === 'POST') {
-      return Promise.resolve(jsonResponse({ recommendations: [] }))
+      return (async () => {
+        const request = input instanceof Request ? input : new Request(input, init)
+        const form = await request.formData()
+        const profileName = String(form.get('profile_name') ?? '')
+        const shotFilename = String(form.get('shot_filename') ?? '')
+        const analysisText = String(form.get('analysis') ?? '') || getCachedAnalysisText(profileName, shotFilename)
+        if (!analysisText) {
+          return jsonResponse({
+            detail: {
+              status: 'no_analysis',
+              message: 'No cached analysis found. Run a full analysis first.',
+            },
+          }, 404)
+        }
+        const profile = await _findProfileByName(profileName)
+        const variables = profile?.variables ?? []
+        const recommendations = parseRecommendationsJson(analysisText).map((recommendation) => ({
+          ...recommendation,
+          is_patchable: isRecommendationPatchable(recommendation, variables),
+        }))
+        return jsonResponse({
+          status: 'success',
+          profile_name: profileName,
+          recommendations,
+          total: recommendations.length,
+          patchable_count: recommendations.filter((recommendation) => recommendation.is_patchable).length,
+        })
+      })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to extract recommendations' }, 500))
     }
 
     // GET /api/generate/progress → no SSE in direct mode (generation is synchronous via BrowserAIService)
@@ -1598,12 +2928,48 @@ export function installDirectModeInterceptor(): void {
                     return val
                   }
                   // Keep only OEPF-valid variables (array form with valid type)
+                  // Info/information variables get converted to info_ prefixed keys with emoji names
                   const validTypes = ['power', 'flow', 'pressure', 'weight', 'time', 'piston_position']
-                  let vars: Array<Record<string, unknown>> = []
+                  const infoTypeAliases = ['info', 'information', 'display', 'readonly', 'read_only']
+                  const emojiRegex = /^\p{Extended_Pictographic}/u
+                  const infoEmojiMap: Record<string, string> = {
+                    dose: '☕', ratio: '📏', grind: '⚙️', roast: '🔥', bean: '🫘',
+                    beans: '🫘', origin: '🌍', water: '💧', yield: '⚖️', output: '⚖️',
+                    notes: '📝', method: '📋', recipe: '📋', default: 'ℹ️',
+                  }
+                  function ensureEmojiPrefix(name: string): string {
+                    if (emojiRegex.test(name)) return name
+                    const lower = name.toLowerCase()
+                    for (const [keyword, emoji] of Object.entries(infoEmojiMap)) {
+                      if (keyword !== 'default' && lower.includes(keyword)) return `${emoji} ${name}`
+                    }
+                    return `ℹ️ ${name}`
+                  }
+                  const vars: Array<Record<string, unknown>> = []
                   if (Array.isArray(p.variables)) {
-                    vars = (p.variables as Array<Record<string, unknown>>).filter(v =>
-                      typeof v.value === 'number' && typeof v.type === 'string' && validTypes.includes(v.type as string)
-                    )
+                    for (const v of (p.variables as Array<Record<string, unknown>>)) {
+                      if (typeof v.value !== 'number') continue
+                      const varType = String(v.type ?? '')
+                      const varKey = String(v.key ?? v.name ?? '')
+                      const varName = String(v.name ?? v.key ?? '')
+                      if (validTypes.includes(varType)) {
+                        // Valid OEPF adjustable variable — keep as-is
+                        vars.push(v)
+                      } else if (infoTypeAliases.includes(varType.toLowerCase()) || varKey.startsWith('info_')) {
+                        // Information variable — convert to info_ key with emoji prefix
+                        // Preserve original type if valid, otherwise default to 'power'
+                        const preservedType = validTypes.includes(varType) ? varType : 'power'
+                        const infoKey = varKey.startsWith('info_') ? varKey : `info_${slugify(varKey || varName)}`
+                        if (!infoKey || infoKey === 'info_') continue // skip empty keys
+                        vars.push({
+                          ...v,
+                          key: infoKey,
+                          name: ensureEmojiPrefix(varName),
+                          type: preservedType,
+                        })
+                      }
+                      // Variables with unknown types that aren't info types are dropped
+                    }
                   }
                   // Convert stages
                   const stages = Array.isArray(p.stages) ? (p.stages as Array<Record<string, unknown>>).map((s, i) => {
@@ -1667,7 +3033,7 @@ export function installDirectModeInterceptor(): void {
                   return {
                     name: p.name || 'AI Generated Profile',
                     id: uuid(),
-                    author: typeof p.author === 'string' ? p.author : 'Metic',
+                    author: typeof p.author === 'string' ? p.author : 'MeticAI',
                     author_id: uuid(),
                     previous_authors: [],
                     display: { accentColor: '#6366f1' },
@@ -1679,39 +3045,27 @@ export function installDirectModeInterceptor(): void {
                   }
                 }
                 const oepf = toOEPF(raw)
-                await _fetch('/api/v1/profile/save', {
+                const saveResponse = await _fetch('/api/v1/profile/save', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(oepf),
                 })
+                // Cache the AI-generated description only if the profile saved successfully
+                if (saveResponse.ok && oepf.id && result.analysis) {
+                  _descriptionCache.set(oepf.id, result.analysis)
+                  _persistDescriptionCache()
+                }
               } catch (e) {
                 console.warn('[direct-mode] Failed to save profile to machine:', e)
               }
             }
           }
 
-          // Clean up the response for display:
-          // - Strip raw JSON blocks (already parsed into profile)
-          // - Strip Coffee Analysis section if no image was provided
-          let cleanedAnalysis = result.analysis
-            .replace(/```json\s*[\s\S]*?```/g, '')  // remove JSON blocks
-            .replace(/PROFILE JSON:?\s*/gi, '')      // remove JSON labels
-            .trim()
-
-          // If no image was uploaded, remove Coffee Analysis section entirely
-          if (!image) {
-            cleanedAnalysis = cleanedAnalysis
-              .replace(/Coffee Analysis:[\s\S]*?(?=\n(?:Profile Created|Description|Preparation|Why This Works|Special Notes):|\n*$)/gi, '')
-              .trim()
-          }
-
-          // Remove any duplicate empty lines
-          cleanedAnalysis = cleanedAnalysis.replace(/\n{3,}/g, '\n\n')
-
           return jsonResponse({
             status: result.status,
-            analysis: image ? cleanedAnalysis : '',
-            reply: cleanedAnalysis,
+            // Only include analysis (shown as "Coffee Analysis" card) when an image was provided
+            analysis: image ? result.analysis : '',
+            reply: result.analysis,
           })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -1727,7 +3081,7 @@ export function installDirectModeInterceptor(): void {
 
     // POST /api/profiles/sync → no-op in direct mode
     if (url.match(/\/api\/profiles\/sync/) && method === 'POST') {
-      return Promise.resolve(jsonResponse({ synced: 0, updated: [], created: [], orphaned: [] }))
+      return Promise.resolve(jsonResponse({ status: 'success', new: [], updated: [], orphaned: [] }))
     }
 
     // GET /api/recipes → bundled pour-over recipes (sorted alphabetically by name)
@@ -1746,32 +3100,33 @@ export function installDirectModeInterceptor(): void {
     }
 
     // GET /api/pour-over/preferences → stored preferences
-    const POUR_OVER_PREFS_KEY = STORAGE_KEYS.POUR_OVER_PREFS
     if (url.match(/\/api\/pour-over\/preferences$/) && method === 'GET') {
-      const defaultModePrefs = { autoStart: true, bloomEnabled: true, bloomSeconds: 30, bloomWeightMultiplier: 2, machineIntegration: false, doseGrams: null, brewRatio: null }
-      const defaultPrefs = {
-        free: defaultModePrefs,
-        ratio: { ...defaultModePrefs, doseGrams: 18, brewRatio: 15 },
-        recipe: { machineIntegration: false, autoStart: true, progressionMode: 'weight' }
-      }
-      try {
-        const stored = localStorage.getItem(POUR_OVER_PREFS_KEY)
-        if (stored) return Promise.resolve(jsonResponse(JSON.parse(stored)))
-      } catch { /* ignore */ }
-      return Promise.resolve(jsonResponse(defaultPrefs))
+      return getDirectPourOverPreferences()
+        .then((prefs) => jsonResponse(prefs))
+        .catch((err) => {
+          const message = err instanceof DirectStorageValidationError
+            ? err.message
+            : 'Failed to load pour-over preferences'
+          console.error('[DirectMode] Failed to load pour-over preferences:', err)
+          return jsonResponse({ detail: message }, 500)
+        })
     }
 
-    // PUT /api/pour-over/preferences → persist to localStorage
+    // PUT /api/pour-over/preferences → persist to direct settings storage
     if (url.match(/\/api\/pour-over\/preferences$/) && method === 'PUT') {
       return (async () => {
         try {
           const request = input instanceof Request ? input : new Request(input, init)
           const body = await request.text()
           const prefs = JSON.parse(body)
-          localStorage.setItem(POUR_OVER_PREFS_KEY, JSON.stringify(prefs))
-          return jsonResponse(prefs)
-        } catch {
-          return jsonResponse({ error: 'Invalid preferences' }, 400)
+          const saved = await saveDirectPourOverPreferences(prefs)
+          return jsonResponse(saved)
+        } catch (err) {
+          if (err instanceof DirectStorageValidationError || err instanceof SyntaxError) {
+            return jsonResponse({ detail: 'Invalid preferences' }, 400)
+          }
+          console.error('[DirectMode] Failed to save pour-over preferences:', err)
+          return jsonResponse({ detail: 'Failed to save preferences' }, 500)
         }
       })()
     }
@@ -1790,33 +3145,33 @@ export function installDirectModeInterceptor(): void {
             doseGrams: req.dose_grams ?? null,
             brewRatio: req.brew_ratio ?? null,
           })
-          await _fetch(`/api/v1/profile/load`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
-            .then(r => { if (!r.ok) throw new Error(`Machine rejected profile: ${r.status}`) })
-          return jsonResponse({ status: 'ready' })
+          const loadResponse = await _fetch(`/api/v1/profile/load`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
+          if (!loadResponse.ok) return jsonResponse({ status: 'error', detail: 'Failed to load pour-over profile' }, 502)
+          return jsonResponse({ profile_id: profile.id, profile_name: profile.name })
         } catch (e) {
           return jsonResponse({ status: 'error', detail: (e as Error).message }, 500)
         }
       })()
     }
 
-    // POST /api/pour-over/cleanup → purge the machine and return ok
-    if (url.match(/\/api\/pour-over\/cleanup$/) && method === 'POST') {
+    // POST /api/pour-over/cleanup, force-cleanup → restore previous profile
+    if (url.match(/\/api\/pour-over\/(cleanup|force-cleanup)$/)) {
       return (async () => {
-        let purged = false
         try {
-          const purgeResp = await _fetch('/api/v1/action/purge', { method: 'POST' })
-          purged = purgeResp.ok
-          if (!purged) console.warn(`[DirectMode] pour-over cleanup: purge returned ${purgeResp.status}`)
-        } catch {
-          console.warn('[DirectMode] pour-over cleanup: purge action failed (non-fatal)')
+          const previousProfileName = sessionStorage.getItem('meticai-previous-profile')
+          sessionStorage.removeItem('meticai-previous-profile')
+          if (previousProfileName) {
+            const profiles = await _loadProfilesFromMachine()
+            const match = profiles.find(p => p.name === previousProfileName)
+            if (match) {
+              await _fetch(`/api/v1/profile/load/${match.id}`)
+            }
+          }
+        } catch (e) {
+          console.warn('[DirectModeInterceptor] Failed to restore previous profile after pour-over cleanup:', e)
         }
-        return jsonResponse({ status: 'ok', purged })
+        return jsonResponse({ status: 'ok' })
       })()
-    }
-
-    // POST /api/pour-over/force-cleanup → skip purge, just acknowledge
-    if (url.match(/\/api\/pour-over\/force-cleanup$/) && method === 'POST') {
-      return Promise.resolve(jsonResponse({ status: 'ok' }))
     }
 
     // GET /api/pour-over/active → no active session tracking in direct mode
@@ -1831,19 +3186,99 @@ export function installDirectModeInterceptor(): void {
           const request = input instanceof Request ? input : new Request(input, init)
           const body = await request.text()
           const { recipe_slug } = JSON.parse(body)
+          // Find recipe in our bundled list
           const recipesResp = await window.fetch(url.replace(/\/pour-over\/prepare-recipe$/, '/recipes'))
           const recipes = await recipesResp.json()
           const recipe = recipes.find((r: { slug: string }) => r.slug === recipe_slug)
           if (!recipe) return jsonResponse({ status: 'error', detail: `Recipe '${recipe_slug}' not found` }, 404)
           const profile = _adaptRecipeToProfile(recipe)
-          await _fetch(`/api/v1/profile/load`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
-            .then(r => { if (!r.ok) throw new Error(`Machine rejected recipe profile: ${r.status}`) })
-          return jsonResponse({ status: 'ready' })
+          const loadResponse = await _fetch(`/api/v1/profile/load`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) })
+          if (!loadResponse.ok) return jsonResponse({ status: 'error', detail: 'Failed to load recipe profile' }, 502)
+          return jsonResponse({ profile_id: profile.id, profile_name: profile.name })
         } catch (e) {
           return jsonResponse({ status: 'error', detail: (e as Error).message }, 500)
         }
       })()
     }
+
+    // POST /api/profile/:id/regenerate-description → use BrowserAIService
+    const regenDescMatch = url.match(/\/api\/profile\/([^/]+)\/regenerate-description$/)
+    if (regenDescMatch && method === 'POST') {
+      return (async () => {
+        try {
+          const entryId = decodeURIComponent(regenDescMatch[1])
+          let profileJson: Record<string, unknown> | null = null
+          let profileName = entryId
+
+          // Strategy 1: Try entryId as a history entry
+          try {
+            const history = await _loadVisibleHistory()
+            const histEntry = history.find(e => e.id === entryId)
+            if (histEntry) {
+              profileName = getHistoryProfileName(histEntry)
+              const cached = _profileCache.get(profileName)
+              if (cached) {
+                const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+                if (r.ok) profileJson = await r.json()
+              }
+            }
+          } catch { /* History lookup failed */ }
+
+          // Strategy 2: Try entryId as a profile name via cache
+          if (!profileJson) {
+            const cached = _profileCache.get(entryId)
+            if (cached) {
+              const r = await _fetch(`/api/v1/profile/get/${cached.id}`)
+              if (r.ok) { profileJson = await r.json(); profileName = entryId }
+            }
+          }
+
+          // Strategy 3: Try entryId as a machine profile ID directly
+          if (!profileJson) {
+            const r = await _fetch(`/api/v1/profile/get/${entryId}`)
+            if (r.ok) profileJson = await r.json()
+          }
+
+          if (!profileJson) {
+            return jsonResponse({ status: 'error', detail: 'History entry not found' }, 404)
+          }
+
+          // Try AI description first, fall back to static
+          const aiService = createBrowserAIService()
+          if (aiService.isConfigured()) {
+            try {
+              const { GoogleGenAI } = await import('@google/genai')
+              const key = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+              if (!key) throw new Error('No API key')
+              const client = new GoogleGenAI({ apiKey: key })
+              const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
+              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
+              const response = await client.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              })
+              const description = response.text?.trim()
+              if (description && !description.includes('generated without AI')) {
+                _descriptionCache.set(profileName, description)
+                _persistDescriptionCache()
+                return jsonResponse({ status: 'success', description })
+              }
+            } catch { /* AI generation failed — fall back to static */ }
+          }
+
+          // Static fallback
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          const description = buildStaticProfileDescription(profileJson as Parameters<typeof buildStaticProfileDescription>[0])
+          _descriptionCache.set(profileName, description)
+          _persistDescriptionCache()
+          return jsonResponse({ status: 'success', description })
+        } catch {
+          return jsonResponse({ status: 'error', detail: 'Failed to regenerate description' }, 500)
+        }
+      })()
+    }
+
+    // ── Settings & status endpoints ─────────────────────────────────────
 
     // GET/POST /api/settings → read/write from localStorage in direct mode
     if (url.match(/\/api\/settings$/) && method === 'GET') {
@@ -1853,7 +3288,7 @@ export function installDirectModeInterceptor(): void {
         meticulousIp: getDefaultMachineUrl() || '',
         authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
         geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || '',
-        mqttEnabled: true, // Socket.IO always available on machine
+        mqttEnabled: true,
       }))
     }
     if (url.match(/\/api\/settings$/) && method === 'POST') {
@@ -1871,140 +3306,6 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // ── Dial-in sessions (IndexedDB-backed) ─────────────────────────────
-
-    // POST /api/dialin/sessions → create new session
-    if (url.match(/\/api\/dialin\/sessions$/) && method === 'POST') {
-      return (async () => {
-        try {
-          const { saveDialInSession } = await import('@/services/storage/AppDatabase')
-          const request = input instanceof Request ? input : new Request(input, init)
-          const body = JSON.parse(await request.text())
-          const id = `dialin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-          const session = {
-            id,
-            coffee: body.coffee || {},
-            profile_name: body.profile_name || null,
-            iterations: [],
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-          await saveDialInSession({ id, coffee: session.coffee, steps: [] })
-          return jsonResponse(session)
-        } catch (e) {
-          return jsonResponse({ detail: (e as Error).message }, 500)
-        }
-      })()
-    }
-
-    // GET /api/dialin/sessions/:id → get session
-    const dialinGetMatch = url.match(/\/api\/dialin\/sessions\/([^/]+)$/)
-    if (dialinGetMatch && method === 'GET') {
-      return (async () => {
-        try {
-          const { getDialInSession } = await import('@/services/storage/AppDatabase')
-          const session = await getDialInSession(dialinGetMatch[1])
-          if (!session) return jsonResponse({ detail: 'Session not found' }, 404)
-          return jsonResponse({
-            id: session.id,
-            coffee: session.coffee,
-            iterations: session.steps || [],
-            status: 'active',
-            created_at: new Date(session.createdAt).toISOString(),
-            updated_at: new Date(session.createdAt).toISOString(),
-          })
-        } catch (e) {
-          return jsonResponse({ detail: (e as Error).message }, 500)
-        }
-      })()
-    }
-
-    // POST /api/dialin/sessions/:id/iterations → add taste iteration
-    const dialinIterMatch = url.match(/\/api\/dialin\/sessions\/([^/]+)\/iterations$/)
-    if (dialinIterMatch && method === 'POST') {
-      return (async () => {
-        try {
-          const { getDialInSession, saveDialInSession } = await import('@/services/storage/AppDatabase')
-          const request = input instanceof Request ? input : new Request(input, init)
-          const body = JSON.parse(await request.text())
-          const session = await getDialInSession(dialinIterMatch[1])
-          if (!session) return jsonResponse({ detail: 'Session not found' }, 404)
-          const steps = [...(session.steps || []), { ...body, timestamp: new Date().toISOString() }]
-          await saveDialInSession({ ...session, steps })
-          return jsonResponse({ status: 'ok', iteration_number: steps.length })
-        } catch (e) {
-          return jsonResponse({ detail: (e as Error).message }, 500)
-        }
-      })()
-    }
-
-    // POST /api/dialin/sessions/:id/recommend → AI recommendations (falls back client-side)
-    if (url.match(/\/api\/dialin\/sessions\/[^/]+\/recommend$/) && method === 'POST') {
-      // Return 501 so the client-side fallback in DialInRecommendStep kicks in
-      return Promise.resolve(jsonResponse({ detail: 'AI recommendations use client-side fallback in direct mode' }, 501))
-    }
-
-    // POST /api/dialin/sessions/:id/complete → mark session complete
-    if (url.match(/\/api\/dialin\/sessions\/[^/]+\/complete$/) && method === 'POST') {
-      return Promise.resolve(jsonResponse({ status: 'completed' }))
-    }
-
-    // ── Profile recommendations (client-side engine) ───────────────────────
-
-    // POST /api/profiles/find-similar → client-side recommendation engine
-    if (url.match(/\/api\/profiles\/find-similar/) && method === 'POST') {
-      return (async () => {
-        try {
-          let profileName = ''
-          let limit = 10
-          const body = init?.body
-          if (body instanceof FormData) {
-            profileName = body.get('profile_name')?.toString() ?? ''
-            const parsed = parseInt(body.get('limit')?.toString() ?? '10', 10)
-            if (Number.isFinite(parsed)) limit = Math.min(100, Math.max(1, parsed))
-          }
-
-          const profiles = await _getCachedProfileList()
-          if (!profiles.length) return jsonResponse({ recommendations: [] })
-
-          const source = profiles.find(p => p.name === profileName)
-          if (!source) return jsonResponse({ recommendations: [] })
-
-          const recommendations = findSimilarProfiles(source, profiles, limit)
-          return jsonResponse({ recommendations })
-        } catch {
-          return jsonResponse({ recommendations: [] })
-        }
-      })()
-    }
-
-    // POST /api/profiles/recommend → client-side recommendation engine
-    if (url.match(/\/api\/profiles\/recommend/) && method === 'POST') {
-      return (async () => {
-        try {
-          let tags: string[] = []
-          let limit = 5
-          const body = init?.body
-          if (body instanceof FormData) {
-            tags = body.getAll('tags').map(t => t.toString())
-            const parsed = parseInt(body.get('limit')?.toString() ?? '5', 10)
-            if (Number.isFinite(parsed)) limit = Math.min(100, Math.max(1, parsed))
-          }
-
-          const profiles = await _getCachedProfileList()
-          if (!profiles.length) return jsonResponse({ recommendations: [] })
-
-          const recommendations = getRecommendations(tags, profiles, limit)
-          return jsonResponse({ recommendations })
-        } catch {
-          return jsonResponse({ recommendations: [] })
-        }
-      })()
-    }
-
-    // ── Status/health endpoints ─────────────────────────────────────────
-
     // GET /api/health → always healthy in direct mode
     if (url.match(/\/api\/health$/)) {
       return Promise.resolve(jsonResponse({ status: 'ok', mode: 'direct' }))
@@ -2020,18 +3321,17 @@ export function installDirectModeInterceptor(): void {
 
     // GET /api/network-ip → return configured machine IP
     if (url.match(/\/api\/network-ip$/)) {
-      const machineIp = localStorage.getItem(STORAGE_KEYS.MACHINE_IP) || ''
+      const machineIp = localStorage.getItem(STORAGE_KEYS.MACHINE_URL) || ''
       return Promise.resolve(jsonResponse({ ip: machineIp }))
     }
 
-    // GET /api/machine/detect → not needed in direct mode (user configures IP manually)
+    // GET /api/machine/detect → not needed in direct mode
     if (url.match(/\/api\/machine\/detect/)) {
       return Promise.resolve(jsonResponse({ detail: 'Machine detection not available in direct mode' }, 501))
     }
 
     // ── Backend-only admin routes — return sensible stubs ──────────────
 
-    // Settings-adjacent routes that SettingsView loads on mount
     if (url.match(/\/api\/update-method/)) {
       return Promise.resolve(jsonResponse({ method: 'manual', can_trigger_update: false }))
     }
@@ -2041,13 +3341,11 @@ export function installDirectModeInterceptor(): void {
     if (url.match(/\/api\/changelog/)) {
       return Promise.resolve(jsonResponse({ releases: [] }))
     }
-
     if (url.match(/\/api\/(check-updates|restart|beta-channel|feedback)/)) {
       return Promise.resolve(jsonResponse({ detail: 'Server administration not available in direct/app mode' }, 501))
     }
 
     // Unknown route — return 501 Not Implemented instead of silent empty response
-    console.warn('[DirectMode] Unhandled route:', pathname)
     return Promise.resolve(jsonResponse({ error: 'Not implemented in direct mode', path: pathname }, 501))
   }
 }

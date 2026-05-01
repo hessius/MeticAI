@@ -18,6 +18,7 @@ export interface DropdownProfile {
   id: string
   name: string
   author?: string
+  image?: string
   display?: {
     description?: string
     shortDescription?: string

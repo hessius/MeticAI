@@ -61,8 +61,13 @@ export interface AppDBSchema extends DBSchema {
     value: {
       id: string
       coffee: Record<string, unknown>
-      steps: Record<string, unknown>[]
+      profile_name?: string
+      iterations: Record<string, unknown>[]
+      status: string
+      created_at: string
+      updated_at: string
       createdAt: number
+      steps?: Record<string, unknown>[]
     }
     indexes: { 'by-date': number }
   }
@@ -70,7 +75,10 @@ export interface AppDBSchema extends DBSchema {
     key: string
     value: {
       profileId: string
-      imageBlob: Blob
+      imageBlob?: Blob
+      imageData?: ArrayBuffer
+      contentType?: string
+      size?: number
       updatedAt: number
     }
   }
@@ -175,9 +183,9 @@ export async function setAnnotation(
   const existing = await tx.store.get(shotKey)
   await tx.store.put({
     shotKey,
-    rating: data.rating ?? existing?.rating ?? null,
-    notes: data.notes ?? existing?.notes ?? '',
-    tags: data.tags ?? existing?.tags ?? [],
+    rating: data.rating !== undefined ? data.rating : existing?.rating ?? null,
+    notes: data.notes !== undefined ? data.notes : existing?.notes ?? '',
+    tags: data.tags !== undefined ? data.tags : existing?.tags ?? [],
     updatedAt: Date.now(),
   })
   await tx.done
@@ -186,6 +194,13 @@ export async function setAnnotation(
 export async function getAllAnnotations() {
   const db = await getDB()
   return db.getAll('shot-annotations')
+}
+
+export async function deleteAnnotation(shotKey: string): Promise<boolean> {
+  const db = await getDB()
+  const existing = await db.get('shot-annotations', shotKey)
+  await db.delete('shot-annotations', shotKey)
+  return existing !== undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -268,12 +283,27 @@ export async function getDialInSession(id: string) {
 export async function saveDialInSession(session: {
   id: string
   coffee: Record<string, unknown>
-  steps: Record<string, unknown>[]
+  profile_name?: string
+  iterations?: Record<string, unknown>[]
+  status?: string
+  created_at?: string
+  updated_at?: string
+  createdAt?: number
+  steps?: Record<string, unknown>[]
 }): Promise<void> {
   const db = await getDB()
+  const now = new Date().toISOString()
+  const createdAt = session.created_at ? Date.parse(session.created_at) : session.createdAt ?? Date.now()
   await db.put('dial-in-sessions', {
-    ...session,
-    createdAt: Date.now(),
+    id: session.id,
+    coffee: session.coffee,
+    profile_name: session.profile_name,
+    iterations: session.iterations ?? [],
+    status: session.status ?? 'active',
+    created_at: session.created_at ?? now,
+    updated_at: session.updated_at ?? now,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    steps: session.steps,
   })
 }
 
@@ -282,9 +312,11 @@ export async function listDialInSessions() {
   return db.getAllFromIndex('dial-in-sessions', 'by-date')
 }
 
-export async function deleteDialInSession(id: string): Promise<void> {
+export async function deleteDialInSession(id: string): Promise<boolean> {
   const db = await getDB()
+  const existing = await db.get('dial-in-sessions', id)
   await db.delete('dial-in-sessions', id)
+  return existing !== undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -304,16 +336,23 @@ export async function getProfileImage(profileId: string): Promise<Blob | null> {
   // Touch timestamp for true LRU semantics (atomic with read)
   await tx.store.put({ ...entry, updatedAt: Date.now() })
   await tx.done
-  return entry.imageBlob
+  if (entry.imageBlob instanceof Blob) return entry.imageBlob
+  if (entry.imageData instanceof ArrayBuffer) {
+    return new Blob([entry.imageData], { type: entry.contentType ?? 'application/octet-stream' })
+  }
+  return null
 }
 
 let evictionPending = false
 
 export async function setProfileImage(profileId: string, imageBlob: Blob): Promise<void> {
   const db = await getDB()
+  const imageData = await imageBlob.arrayBuffer()
   await db.put('profile-images', {
     profileId,
-    imageBlob,
+    imageData,
+    contentType: imageBlob.type,
+    size: imageBlob.size,
     updatedAt: Date.now(),
   })
   // Debounced LRU eviction — coalesces rapid writes (e.g. bulk import)
@@ -332,7 +371,7 @@ async function evictProfileImages(): Promise<void> {
 
   let totalSize = 0
   for (const entry of all) {
-    totalSize += entry.imageBlob.size
+    totalSize += entry.size ?? entry.imageBlob?.size ?? entry.imageData?.byteLength ?? 0
   }
 
   if (totalSize <= MAX_IMAGE_CACHE_BYTES) return
@@ -342,7 +381,7 @@ async function evictProfileImages(): Promise<void> {
   const tx = db.transaction('profile-images', 'readwrite')
   for (const entry of all) {
     if (totalSize <= MAX_IMAGE_CACHE_BYTES) break
-    totalSize -= entry.imageBlob.size
+    totalSize -= entry.size ?? entry.imageBlob?.size ?? entry.imageData?.byteLength ?? 0
     await tx.store.delete(entry.profileId)
   }
   await tx.done

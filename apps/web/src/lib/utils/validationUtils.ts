@@ -114,7 +114,7 @@ export function validateFormData<T>(
  * Format Zod validation errors for display
  */
 export function formatValidationErrors(errors: z.ZodError): string[] {
-  return errors.errors.map((err) => {
+  return errors.issues.map((err: z.ZodIssue) => {
     const path = err.path.join('.');
     return `${path}: ${err.message}`;
   });

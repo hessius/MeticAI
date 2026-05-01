@@ -47,7 +47,7 @@ import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
-import { resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
 import { 
@@ -153,7 +153,7 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
 
   // Fetch sync badge count
   useEffect(() => {
-    if (!onManageMachine) return
+    if (!onManageMachine || !hasFeature('cloudSync')) return
     const loadSyncStatus = async () => {
       try {
         const serverUrl = await getServerUrl()
@@ -781,7 +781,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
 
     setIsSavingEdit(true)
     try {
-      await profileService.updateProfile(
+      const result = await profileService.updateProfile(
         entry.profile_name,
         payload as { name?: string; temperature?: number; final_weight?: number; variables?: { key: string; value: number | string }[] }
       )
@@ -789,17 +789,25 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       toast.success(t('profileEdit.saved'))
       setEditingSection(null)
 
-      // Stay on page: re-fetch the updated history entry
-      try {
-        const serverUrl = await getServerUrl()
-        const res = await fetch(`${serverUrl}/api/history/${entry.id}`)
-        if (res.ok) {
-          const updated = await res.json()
-          onEntryUpdated?.(updated)
-        }
-      } catch {
-        // Non-critical — entry still shows previous data
+      // Update entry in-place with the saved profile data for immediate UI refresh
+      const updatedProfile = result.profile ?? null
+      const updated: HistoryEntry = {
+        ...entry,
+        profile_name: updatedProfile?.name ?? entry.profile_name,
+        profile_json: updatedProfile ?? entry.profile_json,
       }
+
+      // Regenerate the static description for the updated profile
+      if (updatedProfile) {
+        try {
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          updated.reply = buildStaticProfileDescription(updatedProfile as Parameters<typeof buildStaticProfileDescription>[0])
+        } catch {
+          // Keep existing description
+        }
+      }
+
+      onEntryUpdated?.(updated)
     } catch (err) {
       console.error('Failed to save profile edit:', err)
       toast.error(err instanceof Error ? err.message : t('profileEdit.saveFailed'))
@@ -848,10 +856,11 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         )
         if (response.ok) {
           const data = await response.json()
-          if (data.profile?.image || data.profile?.display?.image) {
+          const displayImage = getProfileImageValue(data.profile)
+          if (displayImage) {
             if (isDirectMode() || isNativePlatform()) {
               // Direct/Capacitor: use actual image URL (fetch interceptor doesn't handle <img src>)
-              const resolved = resolveDisplayImage(data.profile?.display?.image)
+              const resolved = resolveDisplayImage(displayImage)
               if (resolved) setProfileImage(resolved)
             } else {
               // Proxy mode: use the proxy endpoint to get the actual image with cache buster
@@ -980,12 +989,41 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
     try {
       const serverUrl = await getServerUrl()
       
+      // Compress large generated images before saving — AI-generated PNGs can be
+      // several MB. WKWebView / the machine may reject oversized payloads.
+      let imageToSave = previewImage
+      if (previewImage.length > 500_000) {
+        try {
+          const img = new globalThis.Image()
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('compress timeout')), 5000)
+            img.onload = () => { clearTimeout(timeout); resolve() }
+            img.onerror = () => { clearTimeout(timeout); reject(new Error('compress error')) }
+            img.src = previewImage
+          })
+          const maxDim = 1024
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+          const w = Math.round(img.width * scale)
+          const h = Math.round(img.height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h)
+            imageToSave = canvas.toDataURL('image/jpeg', 0.85)
+          }
+        } catch {
+          // Compression failed — try with original
+        }
+      }
+      
       const response = await fetch(
         `${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/apply-image`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_data: previewImage })
+          body: JSON.stringify({ image_data: imageToSave })
         }
       )
       
@@ -997,12 +1035,16 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       // Close dialog and update image immediately
       const newCacheBuster = Date.now()
       setShowPreviewDialog(false)
-      setPreviewImage(null)
       setImageCacheBuster(newCacheBuster)
       // Invalidate the image cache so the catalogue will re-fetch
       invalidateImageCache(entry.profile_name)
-      // Immediately set the new profile image URL with cache buster
-      setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${newCacheBuster}`)
+      // On native/direct: use the data URI directly (proxy may not serve it back)
+      if (isDirectMode() || isNativePlatform()) {
+        setProfileImage(imageToSave)
+      } else {
+        setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${newCacheBuster}`)
+      }
+      setPreviewImage(null)
       setImageUploadSuccess(true)
       toast.success(t('history.imageApplied'))
       setTimeout(() => setImageUploadSuccess(false), 3000)
@@ -1040,6 +1082,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         throw new Error('Failed to save notes')
       }
       
+      // Persist to parent state so notes survive re-renders and navigation
+      onEntryUpdated?.({ ...entry, notes })
       toast.success(t('history.notesSaved'))
     } catch (err) {
       console.error('Failed to save notes:', err)
@@ -1106,6 +1150,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       }
 
       setCurrentReply(regenerated.description)
+      // Persist the description to the entry so it survives view reopens
+      onEntryUpdated?.({ ...entry, reply: regenerated.description })
       toast.success(t('history.aiDescriptionGenerated'))
     } catch (err) {
       console.error('Failed to regenerate description:', err)
@@ -1177,10 +1223,18 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       
       setIsCapturing(false)
       
-      const link = document.createElement('a')
-      link.download = `${safeFilename}.png`
-      link.href = dataUrl
-      link.click()
+      // On native, use share sheet (WKWebView can't open data: URLs via <a> clicks)
+      if (isNativePlatform()) {
+        const { shareImageDataUri } = await import('@/hooks/useNativeShare')
+        await shareImageDataUri(dataUrl, `${safeFilename}.png`, {
+          title: entry.profile_name,
+        })
+      } else {
+        const link = document.createElement('a')
+        link.download = `${safeFilename}.png`
+        link.href = dataUrl
+        link.click()
+      }
     } catch (error) {
       console.error('Error saving results:', error)
       setIsCapturing(false)
@@ -1560,36 +1614,33 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               </Button>
             </motion.div>
           )}
-          {/* Edit details button */}
-          {entry.profile_json && !editingSection && (
-            <div className="flex justify-end mb-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
-                onClick={() => handleStartEdit('details')}
-                title={t('profileEdit.editProfile')}
-              >
-                <PencilSimple size={14} weight="bold" />
-                {t('profileEdit.editProfile')}
-              </Button>
-            </div>
-          )}
-          {/* Profile Technical Breakdown (inline editing when editing details) */}
+          {/* Profile Technical Breakdown with inline edit button */}
           {entry.profile_json && (
-            <ProfileBreakdown
-              profile={entry.profile_json as ProfileData}
-              editMode={editingSection === 'details'}
-              editTemperature={editTemperature}
-              onTemperatureChange={setEditTemperature}
-              editFinalWeight={editFinalWeight}
-              onFinalWeightChange={setEditFinalWeight}
-              editVariables={editVariables}
-              onVariableChange={(key, value) => {
-                setEditVariables(prev => prev.map(v => v.key === key ? { ...v, value } : v))
-              }}
-              disabled={isSavingEdit}
-            />
+              <ProfileBreakdown
+                profile={entry.profile_json as ProfileData}
+                editMode={editingSection === 'details'}
+                editTemperature={editTemperature}
+                onTemperatureChange={setEditTemperature}
+                editFinalWeight={editFinalWeight}
+                onFinalWeightChange={setEditFinalWeight}
+                editVariables={editVariables}
+                onVariableChange={(key, value) => {
+                  setEditVariables(prev => prev.map(v => v.key === key ? { ...v, value } : v))
+                }}
+                disabled={isSavingEdit}
+                headerAction={!editingSection ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
+                    onClick={() => handleStartEdit('details')}
+                    title={t('profileEdit.editProfile')}
+                  >
+                    <PencilSimple size={14} weight="bold" />
+                    {t('profileEdit.editProfile')}
+                  </Button>
+                ) : undefined}
+              />
           )}
           {/* Find Similar Button — only for profiles with real AI descriptions */}
           {!isCapturing && extractDescription(currentReply) && (
@@ -1823,7 +1874,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               )}
               <p className="text-center text-white/80 mt-4 text-sm font-medium">{cleanProfileName(entry.profile_name)}</p>
               {/* Image actions in lightbox */}
-              <div className="flex gap-2 mt-4 justify-center">
+              <div className="flex flex-wrap gap-2 mt-4 justify-center">
                 {profileImage && (
                   <Button
                     variant="outline"

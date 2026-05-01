@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 # Recipe search paths (mirroring the pour_over_adapter pattern)
 _RECIPES_DATA_PATH = DATA_DIR / "recipes"
-_RECIPES_FALLBACK_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data" / "recipes"
+_RECIPES_FALLBACK_PATH = (
+    Path(__file__).resolve().parent.parent.parent.parent / "data" / "recipes"
+)
 _RECIPES_DOCKER_PATH = Path("/app/defaults/recipes")
 
 _SEARCH_DIRS = (_RECIPES_DATA_PATH, _RECIPES_FALLBACK_PATH, _RECIPES_DOCKER_PATH)

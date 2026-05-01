@@ -253,6 +253,7 @@
     "preheatStartsAt": "Le préchauffage commencera à {{time}}",
     "noRecurringSchedules": "Aucune programmation récurrente pour le moment. Créez-en une pour préchauffer ou exécuter des extractions automatiquement à des heures définies.",
     "deleteScheduleConfirm": "Êtes-vous sûr de vouloir supprimer cette programmation récurrente ?",
+    "schedulingUnavailable": "La programmation n'est pas disponible dans ce mode",
     "selectProfileOrPreheat": "Veuillez sélectionner un profil ou activer le préchauffage",
     "scheduledTimeError": "L'heure programmée doit être au moins 10 minutes à partir de maintenant lorsque le préchauffage est activé",
     "createSchedule": "Créer une programmation",
@@ -427,6 +428,8 @@
     "meticulousIp": "IP de la machine Meticulous",
     "meticulousIpPlaceholder": "ex. 192.168.1.100",
     "meticulousIpDescription": "L'adresse IP de votre machine espresso Meticulous sur votre réseau local",
+    "invalidMachineUrl": "Saisissez une IP, un nom d'hôte ou une URL complète de la machine.",
+    "machineUrlLoadFailed": "Impossible de charger l'URL de machine enregistrée. Le repli par défaut sera utilisé.",
     "detect": "Détecter",
     "machineFound": "{{hostname}} trouvé",
     "discovery": {
@@ -1524,7 +1527,8 @@
     "failed": "Échec de la mise à jour",
     "timeout": "La mise à jour ne s'est pas terminée dans le temps prévu. Veuillez actualiser manuellement.",
     "triggerFailed": "Impossible de déclencher la mise à jour",
-    "checkFailed": "Impossible de vérifier les mises à jour"
+    "checkFailed": "Impossible de vérifier les mises à jour",
+    "unavailableInMode": "Les mises à jour ne sont disponibles qu'en mode Docker/proxy."
   },
   "sync": {
     "fetchProfileFailed": "Échec de la récupération du profil",
@@ -1568,6 +1572,7 @@
       "invalidIp": "Entrez une adresse IP ou un nom d'hôte valide",
       "connected": "Machine connectée avec succès !",
       "unreachable": "Impossible d'atteindre la machine. Vérifiez l'IP et assurez-vous d'être sur le même réseau.",
+      "saveFailed": "Impossible d'enregistrer l'adresse de la machine. Veuillez réessayer.",
       "successMessage": "Connecté à {{name}}",
       "errorMessage": "Machine inaccessible. Vérifiez l'adresse et assurez-vous d'être sur le même réseau Wi-Fi.",
       "hint": "Astuce : trouvez l'IP dans les paramètres Wi-Fi de la machine ou dans la liste DHCP de votre routeur. Tapez « demo » pour essayer sans machine.",

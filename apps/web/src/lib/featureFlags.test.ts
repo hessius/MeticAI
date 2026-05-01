@@ -8,7 +8,13 @@ vi.mock('@/lib/machineMode', () => ({
 }))
 
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
-import { getFeatureFlags, hasFeature, resetFeatureFlags } from '@/lib/featureFlags'
+import {
+  MODE_CAPABILITY_MATRIX,
+  getFeatureFlags,
+  hasFeature,
+  resetFeatureFlags,
+  type FeatureFlags,
+} from '@/lib/featureFlags'
 
 const mockedIsDirectMode = vi.mocked(isDirectMode)
 const mockedIsNativePlatform = vi.mocked(isNativePlatform)
@@ -97,7 +103,7 @@ describe('featureFlags', () => {
       mockedIsDirectMode.mockReturnValue(true)
     })
 
-    it('should enable machineDiscovery (mDNS via native plugin)', () => {
+    it('should enable machineDiscovery through native discovery in Settings', () => {
       expect(getFeatureFlags().machineDiscovery).toBe(true)
     })
 
@@ -127,7 +133,7 @@ describe('featureFlags', () => {
     it('should take precedence over direct mode', () => {
       // Both native and direct are true — native should win
       const flags = getFeatureFlags()
-      // Native enables machineDiscovery; direct disables it
+      // Native still wins for app-install behavior and enables native Settings discovery.
       expect(flags.machineDiscovery).toBe(true)
       // Native disables pwaInstall; direct enables it
       expect(flags.pwaInstall).toBe(false)
@@ -182,6 +188,10 @@ describe('featureFlags', () => {
   // Exhaustive flag coverage
   // -------------------------------------------------------------------
   describe('exhaustive flag coverage', () => {
+    it('exposes an explicit capability matrix for proxy, direct PWA, and Capacitor', () => {
+      expect(Object.keys(MODE_CAPABILITY_MATRIX).sort()).toEqual(['capacitor', 'directPwa', 'proxy'])
+    })
+
     it('proxy, direct, and capacitor flags should have the same keys', () => {
       // Proxy
       mockedIsDirectMode.mockReturnValue(false)
@@ -203,6 +213,14 @@ describe('featureFlags', () => {
 
       expect(proxyKeys).toEqual(directKeys)
       expect(proxyKeys).toEqual(capacitorKeys)
+    })
+
+    it('every matrix mode defines every FeatureFlags key explicitly', () => {
+      const expectedKeys = Object.keys(getFeatureFlags()).sort()
+
+      for (const [mode, flags] of Object.entries(MODE_CAPABILITY_MATRIX)) {
+        expect(Object.keys(flags).sort(), mode).toEqual(expectedKeys)
+      }
     })
 
     it('every FeatureFlags key should be a boolean', () => {
@@ -300,7 +318,7 @@ describe('featureFlags', () => {
   describe('hasFeature edge cases', () => {
     it('unknown feature name returns false', () => {
       // Cast to bypass TypeScript — simulates runtime misuse
-      expect(hasFeature('nonExistentFeature' as keyof import('@/lib/featureFlags').FeatureFlags)).toBe(undefined)
+      expect(hasFeature('nonExistentFeature' as keyof FeatureFlags)).toBe(false)
     })
 
     it('returns correct value for every flag in proxy mode', () => {

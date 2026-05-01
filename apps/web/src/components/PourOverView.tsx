@@ -799,6 +799,10 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
     setMachineLifecycle('preparing')
     try {
+      // Save current active profile so cleanup can restore it
+      if (machineState.active_profile) {
+        sessionStorage.setItem('meticai-previous-profile', machineState.active_profile)
+      }
       await preparePourOver({
         target_weight: parsedTargetWeight,
         bloom_enabled: bloomEnabled,
@@ -884,6 +888,10 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (!meticulousIntegration || machineLifecycle !== 'idle' || !selectedRecipe) return
     setMachineLifecycle('preparing')
     try {
+      // Save current active profile so cleanup can restore it
+      if (machineState.active_profile) {
+        sessionStorage.setItem('meticai-previous-profile', machineState.active_profile)
+      }
       await prepareRecipe(selectedRecipe.slug)
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
@@ -1289,7 +1297,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               const timing = recipeTimings[recipeCurrentStep]
               const isPourStep = timing.action === 'bloom' || timing.action === 'pour'
               const prevCw = recipeCurrentStep > 0
-                ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).at(-1)?.cumulativeWeight ?? 0
+                ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).slice(-1)[0]?.cumulativeWeight ?? 0
                 : 0
               const pourProgress = isPourStep && timing.cumulativeWeight > prevCw
                 ? Math.min(100, ((weight - prevCw) / (timing.cumulativeWeight - prevCw)) * 100)

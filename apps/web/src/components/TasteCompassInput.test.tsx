@@ -33,10 +33,10 @@ vi.mock('react-i18next', () => ({
 }))
 
 describe('TasteCompassInput', () => {
-  let onChange: ReturnType<typeof vi.fn>
+  let onChange: (data: TasteData) => void
 
   beforeEach(() => {
-    onChange = vi.fn()
+    onChange = vi.fn() as unknown as (data: TasteData) => void
   })
 
   it('renders the compass title', () => {
@@ -95,7 +95,7 @@ describe('TasteCompassInput', () => {
     await user.click(screen.getByText('taste.positiveDescriptors.sweet'))
 
     expect(onChange).toHaveBeenCalledTimes(1)
-    const call = onChange.mock.calls[0][0] as TasteData
+    const call = vi.mocked(onChange).mock.calls[0][0] as TasteData
     expect(call.descriptors).toContain('sweet')
     expect(call.hasInput).toBe(true)
   })
@@ -113,7 +113,7 @@ describe('TasteCompassInput', () => {
     await user.click(screen.getByText('taste.positiveDescriptors.sweet'))
 
     expect(onChange).toHaveBeenCalledTimes(1)
-    const call = onChange.mock.calls[0][0] as TasteData
+    const call = vi.mocked(onChange).mock.calls[0][0] as TasteData
     expect(call.descriptors).not.toContain('sweet')
   })
 
@@ -130,7 +130,7 @@ describe('TasteCompassInput', () => {
     await user.click(screen.getByText('Reset'))
 
     expect(onChange).toHaveBeenCalledTimes(1)
-    const call = onChange.mock.calls[0][0] as TasteData
+    const call = vi.mocked(onChange).mock.calls[0][0] as TasteData
     expect(call.x).toBe(0)
     expect(call.y).toBe(0)
     expect(call.descriptors).toEqual([])

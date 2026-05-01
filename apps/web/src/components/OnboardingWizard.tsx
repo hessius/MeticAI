@@ -34,13 +34,15 @@ import {
 } from '@phosphor-icons/react'
 import { MeticLogo } from '@/components/MeticLogo'
 import { STORAGE_KEYS } from '@/lib/constants'
-import { setMachineUrl, isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { isDemoMode, isNativePlatform, setMachineUrl } from '@/lib/machineMode'
+import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
+import { useSecureStorage } from '@/hooks/useSecureStorage'
 import { toast } from 'sonner'
 
 // ---------------------------------------------------------------------------
@@ -81,6 +83,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const announce = useScreenReaderAnnouncement()
   const { impact } = useHaptics()
   const { requestPermission } = useBrewNotifications()
+  const { setItem: secureSetItem } = useSecureStorage()
 
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [direction, setDirection] = useState(1) // 1 = forward, -1 = back
@@ -111,6 +114,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   // Ref for IP input auto-focus
   const ipInputRef = useRef<HTMLInputElement>(null)
+  const mountedRef = useRef(true)
+  const autoConnectingUrlRef = useRef<string | null>(null)
 
   const stepIndex = STEPS.indexOf(step)
   const progress = ((stepIndex) / (STEPS.length - 1)) * 100
@@ -130,6 +135,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setTimeout(() => ipInputRef.current?.focus(), 200)
     }
   }, [step])
+
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
 
   // Start machine discovery immediately on mount so results are ready
   // by the time user reaches the machine step.
@@ -172,35 +181,48 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     runDiscovery({ cancelled: false })
   }, [runDiscovery])
 
+  const saveMachineUrl = useCallback((url: string): void => {
+    // Sync localStorage write for immediate availability (proven on base branch)
+    setMachineUrl(url)
+    // Also persist to Capacitor Preferences in the background for durability
+    persistMachineUrl(url).catch((err) =>
+      console.warn('Background persist failed (localStorage already set):', err),
+    )
+  }, [])
+
   // Auto-fill and test when discovery completes and user reaches machine step
   useEffect(() => {
     if (step !== 'machine' || discovering || connectionStatus === 'success') return undefined
     if (discoveredMachines.length === 1 && !machineIp.trim()) {
       const machine = discoveredMachines[0]
+      if (autoConnectingUrlRef.current === machine.url) return undefined
+      autoConnectingUrlRef.current = machine.url
       // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-fill from discovered machine
       setMachineIp(machine.host)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMachineName(machine.name)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setConnectionStatus('testing')
-      let cancelled = false
       testMachineConnection(machine.url).then((ok) => {
-        if (cancelled) return
+        if (!mountedRef.current || autoConnectingUrlRef.current !== machine.url) return
         if (ok) {
+          saveMachineUrl(machine.url)
           setConnectionStatus('success')
-          setMachineUrl(machine.url)
           toast.success(t('onboarding.machine.autoDiscovered'))
         } else {
+          autoConnectingUrlRef.current = null
           setConnectionStatus('idle')
         }
       }).catch(() => {
-        if (!cancelled) setConnectionStatus('idle')
+        if (mountedRef.current && autoConnectingUrlRef.current === machine.url) {
+          autoConnectingUrlRef.current = null
+          setConnectionStatus('idle')
+        }
       })
-      return () => { cancelled = true }
     }
     return undefined
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, discovering, discoveredMachines])
+  }, [step, discovering, discoveredMachines, saveMachineUrl, t])
 
   // ── Navigation ──────────────────────────────────────────────────────────
 
@@ -234,7 +256,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       if (ok) {
         setConnectionStatus('success')
         setMachineName(parsed.name)
-        setMachineUrl(parsed.url)
+        saveMachineUrl(parsed.url)
         toast.success(t('onboarding.machine.connected'))
       } else {
         setConnectionStatus('error')
@@ -244,7 +266,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setConnectionStatus('error')
       toast.error(t('onboarding.machine.unreachable'))
     }
-  }, [machineIp, t])
+  }, [machineIp, saveMachineUrl, t])
 
   // ── Save & complete ─────────────────────────────────────────────────────
 
@@ -254,11 +276,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, authorName.trim())
     }
     if (geminiKey.trim()) {
+      // Write to both localStorage (immediate) and secure storage (Keychain on native)
       localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
+      secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
     }
     // Language already applied via i18n.changeLanguage
     // Theme already applied via useThemePreference
-    // Machine URL already set via setMachineUrl on connection test
+    // Machine URL already persisted during the connection test
 
     // Request notification permission (non-blocking)
     requestPermission()
@@ -270,7 +294,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
 
     onComplete()
-  }, [authorName, geminiKey, onComplete, requestPermission])
+  }, [authorName, geminiKey, onComplete, requestPermission, secureSetItem])
 
   // ── Step renderers ──────────────────────────────────────────────────────
 
@@ -342,24 +366,29 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <Button
                   key={m.url}
                   variant="outline"
-                  className="w-full justify-start gap-2"
-                  onClick={() => {
+                  className="w-full justify-start gap-2 whitespace-normal text-left"
+                  onClick={async () => {
                     setMachineIp(m.host)
                     setMachineName(m.name)
                     setConnectionStatus('testing')
-                    testMachineConnection(m.url).then((ok) => {
+                    try {
+                      const ok = await testMachineConnection(m.url)
                       if (ok) {
                         setConnectionStatus('success')
-                        setMachineUrl(m.url)
+                        saveMachineUrl(m.url)
                         toast.success(t('onboarding.machine.connected'))
                       } else {
                         setConnectionStatus('error')
+                        toast.error(t('onboarding.machine.unreachable'))
                       }
-                    })
+                    } catch {
+                      setConnectionStatus('error')
+                      toast.error(t('onboarding.machine.unreachable'))
+                    }
                   }}
                 >
-                  <WifiHigh size={16} weight="duotone" className="text-green-500" />
-                  {m.name} ({m.host}:{m.port})
+                  <WifiHigh size={16} weight="duotone" className="text-green-500 shrink-0" />
+                  <span className="break-all">{m.name} ({m.host}:{m.port})</span>
                 </Button>
               ))}
             </div>
