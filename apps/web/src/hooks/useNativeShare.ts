@@ -35,7 +35,6 @@ async function shareImageDataUri(dataUri: string, filename: string, options?: { 
     })
     await Share.share({
       title: options?.title,
-      text: options?.text,
       files: [result.uri],
     })
     // Clean up temp file after share completes

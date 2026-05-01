@@ -1684,7 +1684,18 @@ export function installDirectModeInterceptor(): void {
         if (!Array.isArray(parsed)) return jsonResponse({ detail: 'recommendations must be a JSON array' }, 400)
         const profile = await _findProfileByName(name)
         if (!profile) return jsonResponse({ detail: `Profile '${name}' not found on machine` }, 404)
-        const updated = cloneProfileForSave(profile)
+
+        // Fetch full profile (with stages/variables) — the list cache may not include them
+        let fullProfile = profile
+        try {
+          const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+          if (fullResp.ok) {
+            const fullData = await fullResp.json() as CachedProfile
+            if (fullData && fullData.id) fullProfile = fullData
+          }
+        } catch { /* use cached profile as fallback */ }
+
+        const updated = cloneProfileForSave(fullProfile)
         const applied: Array<Record<string, unknown>> = []
         const skipped: Array<Record<string, unknown>> = []
 

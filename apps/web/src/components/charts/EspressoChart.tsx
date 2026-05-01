@@ -138,7 +138,7 @@ export function EspressoChart({
     : [0, xMax ?? Math.ceil(Math.max(...data.map(d => d.time), 1))]
 
   return (
-    <div className={className} role="img" aria-label={liveMode ? t('a11y.chart.espressoShotLive') : t('a11y.chart.espressoShot')}>
+    <div className={`${className} select-none`} role="img" aria-label={liveMode ? t('a11y.chart.espressoShotLive') : t('a11y.chart.espressoShot')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
       <div className={heightClass}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
