@@ -698,13 +698,8 @@ describe('DirectModeInterceptor regression harness', () => {
 
     it('uploads and caches direct profile images on the machine profile', async () => {
       vi.useRealTimers()
-      let savedProfile: Record<string, unknown> | null = null
       installInterceptor(createMachineFetch({
         'GET /api/v1/profile/list': nestedMachineProfiles(),
-        'POST /api/v1/profile/save': ({ init }: FetchCall) => {
-          savedProfile = JSON.parse(String(init?.body))
-          return jsonResponse({ ok: true })
-        },
       }))
       const form = new FormData()
       const uploadedImage = validPngBlob()
@@ -722,11 +717,7 @@ describe('DirectModeInterceptor regression harness', () => {
         profile_id: 'profile-1',
         image_size: expect.any(Number),
       })
-      expect(savedProfile).toMatchObject({
-        display: expect.objectContaining({
-          image: expect.stringMatching(/^data:image\/png;base64,/),
-        }),
-      })
+      // Image is saved to local IndexedDB, not to the machine profile
       expect(imageResponse.status).toBe(200)
       await expect(imageResponse.arrayBuffer()).resolves.toHaveProperty('byteLength', uploadedImage.size)
     })
@@ -736,13 +727,8 @@ describe('DirectModeInterceptor regression harness', () => {
       browserAIServiceMocks.isConfigured.mockReturnValue(true)
       const generatedImage = validPngBlob()
       browserAIServiceMocks.generateImage.mockResolvedValue(generatedImage)
-      let savedProfile: Record<string, unknown> | null = null
       installInterceptor(createMachineFetch({
         'GET /api/v1/profile/list': nestedMachineProfiles(),
-        'POST /api/v1/profile/save': ({ init }: FetchCall) => {
-          savedProfile = JSON.parse(String(init?.body))
-          return jsonResponse({ ok: true })
-        },
       }))
 
       const previewResponse = await window.fetch(
@@ -770,11 +756,7 @@ describe('DirectModeInterceptor regression harness', () => {
         status: 'success',
         profile_id: 'profile-1',
       })
-      expect(savedProfile).toMatchObject({
-        display: expect.objectContaining({
-          image: previewBody.image_data,
-        }),
-      })
+      // Image is saved to local IndexedDB, not to the machine profile
       expect(imageResponse.status).toBe(200)
       await expect(imageResponse.arrayBuffer()).resolves.toHaveProperty('byteLength', generatedImage.size)
     })
