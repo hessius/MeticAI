@@ -3154,9 +3154,24 @@ Rules for recommendations:
       })()
     }
 
-    // POST /api/pour-over/cleanup, force-cleanup → no-op (profile is ephemeral, no purge in pour-over)
+    // POST /api/pour-over/cleanup, force-cleanup → restore previous profile
     if (url.match(/\/api\/pour-over\/(cleanup|force-cleanup)$/)) {
-      return Promise.resolve(jsonResponse({ status: 'ok' }))
+      return (async () => {
+        try {
+          const previousProfileName = sessionStorage.getItem('meticai-previous-profile')
+          sessionStorage.removeItem('meticai-previous-profile')
+          if (previousProfileName) {
+            const profiles = await _loadProfilesFromMachine()
+            const match = profiles.find(p => p.name === previousProfileName)
+            if (match) {
+              await _fetch(`/api/v1/profile/load/${match.id}`)
+            }
+          }
+        } catch (e) {
+          console.warn('[DirectModeInterceptor] Failed to restore previous profile after pour-over cleanup:', e)
+        }
+        return jsonResponse({ status: 'ok' })
+      })()
     }
 
     // GET /api/pour-over/active → no active session tracking in direct mode

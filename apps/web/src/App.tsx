@@ -1231,7 +1231,7 @@ function App() {
                   {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
                 </Button>
               )}
-              {isDesktop && (
+              {isDesktop && !isNativePlatform() && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1427,6 +1427,7 @@ function App() {
                   onPourOver={() => setViewState('pour-over')}
                   onDialIn={() => setViewState('dial-in')}
                   onShotAnalysis={() => setViewState('shot-analysis')}
+                  onSettings={() => setViewState('settings')}
                   controlCenter={
                     showControlCenter && isMobile ? (
                       <ControlCenter
@@ -1648,8 +1649,8 @@ function App() {
 
             {/* Mobile Control Center — now rendered inside StartView */}
 
-            {/* Desktop-only footer — home view, non-demo */}
-            {!isMobile && isHome && !isDemoMode() && (
+            {/* Desktop-only footer — home view, non-demo, single-column only */}
+            {!isMobile && isHome && !isDemoMode() && !showRightColumn && (
               <footer className="text-center py-4 mt-2">
                 <a
                   href="https://buymeacoffee.com/HSUS"

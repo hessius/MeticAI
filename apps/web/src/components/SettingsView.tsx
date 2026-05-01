@@ -235,11 +235,27 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
 
   // Load current settings on mount
   useEffect(() => {
+    let cancelled = false
+
+    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), ms)
+        ),
+      ])
+
     const loadSettings = async () => {
       if (isLocalMode()) {
         try {
-          const storedKey = await secureGetItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
-          const machineUrl = await resolveMachineUrl()
+          const [storedKey, machineUrl] = await withTimeout(
+            Promise.all([
+              secureGetItem(STORAGE_KEYS.GEMINI_API_KEY).then(v => v || ''),
+              resolveMachineUrl(),
+            ]),
+            5000,
+          )
+          if (cancelled) return
           setSettings({
             geminiApiKey: storedKey,
             meticulousIp: machineUrl,
@@ -250,6 +266,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             geminiApiKeyConfigured: Boolean(storedKey.trim()),
           })
         } catch (err) {
+          if (cancelled) return
           console.error('Failed to load secure settings, falling back to localStorage:', err)
           const fallbackKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
           const fallbackUrl = getMachineUrlFallback()
@@ -264,12 +281,13 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             geminiApiKeyConfigured: Boolean(fallbackKey.trim()),
           })
         }
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
         return
       }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/settings`)
+        if (cancelled) return
         if (response.ok) {
           const data = await response.json()
           setSettings({
@@ -285,7 +303,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       } catch (err) {
         console.error('Failed to load settings:', err)
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
     
@@ -320,6 +338,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     loadSettings()
     loadUpdateMethod()
     loadTailscaleStatus()
+
+    return () => { cancelled = true }
   }, [secureGetItem])
 
   // Load version info

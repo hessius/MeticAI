@@ -42,6 +42,7 @@ import { useThemePreference, type ThemePreference } from '@/hooks/useThemePrefer
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
 import { useHaptics } from '@/hooks/useHaptics'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
+import { useSecureStorage } from '@/hooks/useSecureStorage'
 import { toast } from 'sonner'
 
 // ---------------------------------------------------------------------------
@@ -82,6 +83,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const announce = useScreenReaderAnnouncement()
   const { impact } = useHaptics()
   const { requestPermission } = useBrewNotifications()
+  const { setItem: secureSetItem } = useSecureStorage()
 
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [direction, setDirection] = useState(1) // 1 = forward, -1 = back
@@ -274,7 +276,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, authorName.trim())
     }
     if (geminiKey.trim()) {
+      // Write to both localStorage (immediate) and secure storage (Keychain on native)
       localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
+      secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
     }
     // Language already applied via i18n.changeLanguage
     // Theme already applied via useThemePreference
@@ -290,7 +294,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
 
     onComplete()
-  }, [authorName, geminiKey, onComplete, requestPermission])
+  }, [authorName, geminiKey, onComplete, requestPermission, secureSetItem])
 
   // ── Step renderers ──────────────────────────────────────────────────────
 

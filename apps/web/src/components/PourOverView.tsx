@@ -799,6 +799,10 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
     setMachineLifecycle('preparing')
     try {
+      // Save current active profile so cleanup can restore it
+      if (machineState.active_profile) {
+        sessionStorage.setItem('meticai-previous-profile', machineState.active_profile)
+      }
       await preparePourOver({
         target_weight: parsedTargetWeight,
         bloom_enabled: bloomEnabled,
@@ -884,6 +888,10 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (!meticulousIntegration || machineLifecycle !== 'idle' || !selectedRecipe) return
     setMachineLifecycle('preparing')
     try {
+      // Save current active profile so cleanup can restore it
+      if (machineState.active_profile) {
+        sessionStorage.setItem('meticai-previous-profile', machineState.active_profile)
+      }
       await prepareRecipe(selectedRecipe.slug)
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
