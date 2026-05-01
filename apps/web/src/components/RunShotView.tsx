@@ -12,7 +12,6 @@ import {
   Play, 
   Clock, 
   Fire,
-  Coffee,
   CalendarBlank,
   X,
   SpinnerGap,
@@ -27,8 +26,12 @@ import {
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { hasFeature } from '@/lib/featureFlags'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { format, addMinutes } from 'date-fns'
 import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
+import { ProfileImage } from './ProfileImage'
+import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import {
   canCancelScheduledShot,
   canShowVariableAdjustments,
@@ -44,6 +47,8 @@ interface MachineProfile {
   final_weight?: number
   variables?: ProfileVariable[]
   stages?: Record<string, unknown>[]
+  image?: string
+  display?: { image?: string; description?: string; shortDescription?: string }
 }
 
 interface ScheduledShot {
@@ -82,6 +87,8 @@ const PREHEAT_DURATION_MINUTES = 10
 export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName }: RunShotViewProps) {
   const { t } = useTranslation()
   const scheduledShotsEnabled = hasFeature('scheduledShots')
+  const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
+  const directImageMode = isDirectMode() || isNativePlatform()
   const [selectedProfile, setSelectedProfile] = useState<MachineProfile | null>(
     initialProfileId && initialProfileName 
       ? { id: initialProfileId, name: initialProfileName } 
@@ -170,16 +177,21 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
     fetchProfiles()
   }, [initialProfileId, t])
 
+  // Fetch profile images for the cached image lookup
+  useEffect(() => {
+    if (profiles.length > 0) {
+      fetchImagesForProfiles(profiles.map(p => p.name))
+    }
+  }, [profiles, fetchImagesForProfiles])
+
   // Derive profile variables from the selected profile data (already fetched
   // in the profile list). Synthesise final_weight / temperature entries when
   // they are not present in the explicit variables array so every profile has
   // at least basic adjustable parameters.
   useEffect(() => {
     if (!selectedProfile) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state when profile clears
-      setProfileVariables([])
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOverrides({})
+      setProfileVariables([]) // eslint-disable-line react-hooks/set-state-in-effect -- resetting derived state
+      setOverrides({}) // eslint-disable-line react-hooks/set-state-in-effect
       return
     }
 
@@ -805,7 +817,16 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         
         {selectedProfile ? (
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <Coffee size={24} className="text-primary" weight="duotone" />
+            <ProfileImage
+              imageUrl={
+                (directImageMode
+                  ? (resolveDisplayImage(getProfileImageValue(selectedProfile)) || undefined)
+                  : undefined
+                ) ?? getImageUrl(selectedProfile.name) ?? undefined
+              }
+              alt={selectedProfile.name}
+              size="md"
+            />
             <div>
               <p className="font-medium">{selectedProfile.name}</p>
               {selectedProfile.temperature != null && selectedProfile.final_weight != null && (
@@ -853,10 +874,24 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
                           : 'hover:bg-muted/50'
                       }`}
                     >
-                      <p className="font-medium">{profile.name}</p>
-                      {profile.author && (
-                        <p className="text-xs text-muted-foreground">by {profile.author}</p>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <ProfileImage
+                          imageUrl={
+                            (directImageMode
+                              ? (resolveDisplayImage(getProfileImageValue(profile)) || undefined)
+                              : undefined
+                            ) ?? getImageUrl(profile.name) ?? undefined
+                          }
+                          alt={profile.name}
+                          size="sm"
+                        />
+                        <div>
+                          <p className="font-medium">{profile.name}</p>
+                          {profile.author && (
+                            <p className="text-xs text-muted-foreground">by {profile.author}</p>
+                          )}
+                        </div>
+                      </div>
                     </button>
                   ))
                 )}

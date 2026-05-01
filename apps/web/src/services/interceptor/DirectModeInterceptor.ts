@@ -1025,10 +1025,151 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/machine/run-profile-with-overrides/:id → not supported in direct mode
+    // POST /api/machine/run-profile-with-overrides/:id → apply overrides + ephemeral load + start
     const runOverridesMatch = url.match(/\/api\/machine\/run-profile-with-overrides\/([^/?]+)/)
     if (runOverridesMatch && method === 'POST') {
-      return Promise.resolve(jsonResponse({ detail: 'Variable overrides are not supported in direct mode' }, 501))
+      const profileId = decodeURIComponent(runOverridesMatch[1])
+      return (async () => {
+        // Parse FormData from the request body
+        const request = input instanceof Request ? input : new Request(input, init)
+        const formData = await request.formData()
+        const overridesRaw = formData.get('overrides_json') as string | null
+        const saveMode = (formData.get('save_mode') as string) || 'none'
+        const newName = (formData.get('new_name') as string) || ''
+
+        let overridesDict: Record<string, number>
+        try {
+          overridesDict = overridesRaw ? JSON.parse(overridesRaw) : {}
+        } catch {
+          return jsonResponse({ detail: 'Invalid overrides JSON' }, 422)
+        }
+
+        if (!['none', 'save_original', 'save_new'].includes(saveMode)) {
+          return jsonResponse({ detail: `Invalid save_mode: ${saveMode}` }, 422)
+        }
+        if (saveMode === 'save_new' && !newName.trim()) {
+          return jsonResponse({ detail: 'new_name is required when save_mode is save_new' }, 422)
+        }
+
+        // Reject info_ variable overrides
+        const infoKeys = Object.keys(overridesDict).filter(k => k.startsWith('info_'))
+        if (infoKeys.length > 0) {
+          return jsonResponse({ detail: `Cannot override info variables: ${infoKeys.join(', ')}` }, 422)
+        }
+
+        // Fetch the original profile
+        const profileResp = await _fetch(`/api/v1/profile/get/${profileId}`)
+        if (!profileResp.ok) {
+          return jsonResponse({ detail: `Profile ${profileId} not found` }, 404)
+        }
+        const profileData = await profileResp.json() as Record<string, unknown>
+        const originalName = (profileData.name as string) || 'Unknown Profile'
+
+        // Apply variable overrides (deep copy)
+        function applyOverrides(profile: Record<string, unknown>, overrides: Record<string, number>): Record<string, unknown> {
+          const modified = JSON.parse(JSON.stringify(profile)) as Record<string, unknown>
+          if (!Object.keys(overrides).length) return modified
+          const topLevelKeys = new Set(['final_weight', 'temperature'])
+          const variables = modified.variables as Array<Record<string, unknown>> | undefined
+          if (variables) {
+            const adjustableKeys = new Set(
+              variables.filter(v => typeof v.key === 'string' && !(v.key as string).startsWith('info_')).map(v => v.key as string)
+            )
+            for (const [key, value] of Object.entries(overrides)) {
+              if (!adjustableKeys.has(key) && !topLevelKeys.has(key)) continue
+              if (adjustableKeys.has(key)) {
+                for (const v of variables) {
+                  if (v.key === key) { v.value = value; break }
+                }
+              }
+            }
+          }
+          // Also update top-level fields
+          for (const key of ['final_weight', 'temperature']) {
+            if (key in overrides) modified[key] = overrides[key]
+          }
+          return modified
+        }
+
+        const hasOverrides = Object.keys(overridesDict).length > 0
+
+        // Handle save_new: save a copy with the new name first
+        if (saveMode === 'save_new' && hasOverrides) {
+          const newProfile = applyOverrides(profileData, overridesDict)
+          delete newProfile.id
+          newProfile.name = newName.trim()
+          const saveResp = await _fetch('/api/v1/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newProfile),
+          })
+          if (!saveResp.ok) {
+            return jsonResponse({ detail: 'Failed to save new profile' }, 502)
+          }
+        }
+
+        // Build the profile to load (ephemeral)
+        if (hasOverrides) {
+          const modified = applyOverrides(profileData, overridesDict)
+          if (saveMode === 'save_new') {
+            modified.name = newName.trim()
+            delete modified.id
+          }
+          // Ephemeral load: POST /api/v1/profile/load (loads into memory without persisting)
+          const loadResp = await _fetch('/api/v1/profile/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(modified),
+          })
+          if (!loadResp.ok) {
+            return jsonResponse({ detail: 'Failed to load modified profile' }, 502)
+          }
+        } else {
+          // No overrides — just load the original by ID
+          let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+          if (!loadResp.ok) {
+            await _fetch('/api/v1/action/stop')
+            for (let attempt = 0; attempt < 10; attempt++) {
+              await new Promise(r => setTimeout(r, 2000))
+              loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
+              if (loadResp.ok) break
+            }
+            if (!loadResp.ok) {
+              return jsonResponse({ detail: 'Machine busy — try again' }, 409)
+            }
+          }
+        }
+
+        // Start extraction
+        const startResp = await _fetch('/api/v1/action/start')
+        if (!startResp.ok) {
+          return jsonResponse({ detail: 'Failed to start profile' }, 502)
+        }
+
+        // Handle save_original: save overrides back to original profile after starting
+        if (saveMode === 'save_original' && hasOverrides) {
+          const saved = applyOverrides(profileData, overridesDict)
+          saved.id = profileId
+          saved.name = originalName
+          _fetch('/api/v1/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(saved),
+          }).catch(err => console.warn('[direct-mode] Failed to save overrides to original:', err))
+        }
+
+        return jsonResponse({
+          status: 'success',
+          message: hasOverrides ? 'Profile started with overrides' : 'Profile started',
+          profile_id: profileId,
+          profile_name: saveMode === 'save_new' ? newName.trim() : originalName,
+          overrides_applied: Object.keys(overridesDict).length,
+          save_mode: saveMode,
+        })
+      })().catch(err => {
+        console.error('[direct-mode] run-profile-with-overrides error:', err)
+        return jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to run profile with overrides' }, 500)
+      })
     }
 
     // POST /api/machine/command/start → GET /api/v1/action/start
