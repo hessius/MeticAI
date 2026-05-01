@@ -785,31 +785,14 @@ export function installDirectModeInterceptor(): void {
     const profile = await _findProfileByName(profileName)
     if (!profile) throw new DirectStorageValidationError(`Profile '${profileName}' not found on machine`)
 
-    // Fetch full profile (with stages) — the list cache may not include them
-    let fullProfile = profile
-    try {
-      const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
-      if (fullResp.ok) {
-        const parsed = await fullResp.json() as CachedProfile
-        if (typeof parsed?.id === 'string') fullProfile = parsed
-      }
-    } catch { /* use cached profile */ }
-
     const imageBlob = dataUriToBlob(imageDataUri)
-    const updated = cloneProfileForSave(fullProfile)
-    updated.display = {
-      ...(isRecord(updated.display) ? updated.display : {}),
-      image: imageDataUri,
-    }
-    const saveResponse = await _fetch('/api/v1/profile/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    })
-    if (!saveResponse.ok) throw new Error('Failed to save profile to machine')
 
+    // Save image to local IndexedDB — this is the primary source for image-proxy.
+    // Do NOT embed the data URI in display.image when saving to the machine:
+    // AI-generated images can be several MB and the machine rejects oversized payloads.
     await saveDirectProfileImage(profile.id, imageBlob)
-    const cached: CachedProfile = { ...profile, display: updated.display }
+
+    const cached: CachedProfile = { ...profile, display: { ...(isRecord(profile.display) ? profile.display : {}), image: imageDataUri } }
     _profileCache.set(cached.name, cached)
     return { profile: cached, imageBlob }
   }

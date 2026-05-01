@@ -7,6 +7,16 @@ vi.mock('@capacitor/share', () => ({
   Share: { share: (...args: unknown[]) => mockShare(...args) },
 }))
 
+const mockWriteFile = vi.fn()
+const mockDeleteFile = vi.fn()
+vi.mock('@capacitor/filesystem', () => ({
+  Filesystem: {
+    writeFile: (...args: unknown[]) => mockWriteFile(...args),
+    deleteFile: (...args: unknown[]) => mockDeleteFile(...args),
+  },
+  Directory: { Cache: 'CACHE' },
+}))
+
 let mockIsNative = false
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: () => mockIsNative },
@@ -157,16 +167,23 @@ describe('shareImageDataUri', () => {
     vi.restoreAllMocks()
   })
 
-  it('calls Share.share({ url: dataUri }) on native', async () => {
+  it('writes to temp file and shares file URL on native', async () => {
     mockIsNative = true
+    mockWriteFile.mockResolvedValue({ uri: 'file:///tmp/shot.png' })
     mockShare.mockResolvedValue(undefined)
+    mockDeleteFile.mockResolvedValue(undefined)
 
     await shareImageDataUri(dataUri, filename, opts)
 
+    expect(mockWriteFile).toHaveBeenCalledWith({
+      path: filename,
+      data: 'abc123',
+      directory: 'CACHE',
+    })
     expect(mockShare).toHaveBeenCalledWith({
       title: opts.title,
       text: opts.text,
-      url: dataUri,
+      url: 'file:///tmp/shot.png',
     })
   })
 
