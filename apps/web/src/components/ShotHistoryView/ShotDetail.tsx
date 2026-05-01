@@ -406,6 +406,7 @@ export function ShotDetail({
   }
 
   // ---- Memoised chart data (shared between mobile and desktop) ------------
+  const profileTargetCurves = analysisResult?.profile_target_curves
   const replayChartData = useMemo(() => {
     if (!shotData) return null
     const chartData = getChartData(shotData)
@@ -413,25 +414,25 @@ export function ShotDetail({
     const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
     const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
     // Derive stages from target curves when shot data lacks stage info
-    const stageRanges = rawStageRanges.length === 0 && analysisResult?.profile_target_curves?.length
-      ? getStageRangesFromTargetCurves(analysisResult.profile_target_curves, dataMaxTime)
+    const stageRanges = rawStageRanges.length === 0 && profileTargetCurves?.length
+      ? getStageRangesFromTargetCurves(profileTargetCurves, dataMaxTime)
       : rawStageRanges
-    const mergedData = mergeWithTargetCurves(chartData, analysisResult?.profile_target_curves)
+    const mergedData = mergeWithTargetCurves(chartData, profileTargetCurves)
     const maxPressure = Math.max(
       ...chartData.map(d => d.pressure || 0),
-      ...(analysisResult?.profile_target_curves?.map(d => d.target_pressure || 0) || []),
+      ...(profileTargetCurves?.map(d => d.target_pressure || 0) || []),
       12,
     )
     const maxFlow = Math.max(
       ...chartData.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)),
-      ...(analysisResult?.profile_target_curves?.map(d => d.target_flow || 0) || []),
+      ...(profileTargetCurves?.map(d => d.target_flow || 0) || []),
       8,
     )
     const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
     const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
     const maxRightAxis = Math.ceil(maxWeight * 1.1)
     return { chartData, stageRanges, hasGravFlow, dataMaxTime, mergedData, maxLeftAxis, maxRightAxis }
-  }, [shotData, analysisResult?.profile_target_curves])
+  }, [shotData, profileTargetCurves])
 
   const compareChartMemo = useMemo(() => {
     if (!shotData || !comparisonShotData) return null
