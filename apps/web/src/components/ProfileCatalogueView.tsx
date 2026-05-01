@@ -188,10 +188,10 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
       setHistoryEntries(
         entries
-          .filter((entry): entry is HistoryEntrySummary => (
-            typeof entry?.id === 'string' && typeof entry?.profile_name === 'string'
+          .filter((entry: unknown): entry is HistoryEntrySummary => (
+            typeof (entry as Record<string, unknown>)?.id === 'string' && typeof (entry as Record<string, unknown>)?.profile_name === 'string'
           ))
-          .map((entry) => ({
+          .map((entry: HistoryEntrySummary) => ({
             id: entry.id,
             profile_name: entry.profile_name,
             created_at: typeof entry.created_at === 'string' ? entry.created_at : undefined,

@@ -1289,7 +1289,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               const timing = recipeTimings[recipeCurrentStep]
               const isPourStep = timing.action === 'bloom' || timing.action === 'pour'
               const prevCw = recipeCurrentStep > 0
-                ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).at(-1)?.cumulativeWeight ?? 0
+                ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).slice(-1)[0]?.cumulativeWeight ?? 0
                 : 0
               const pourProgress = isPourStep && timing.cumulativeWeight > prevCw
                 ? Math.min(100, ((weight - prevCw) / (timing.cumulativeWeight - prevCw)) * 100)

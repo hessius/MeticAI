@@ -22,7 +22,7 @@ describe('machineMode', () => {
   beforeEach(() => {
     vi.resetModules()
     // Clear any lingering Capacitor stub
-    delete (window as Record<string, unknown>).Capacitor
+    delete (window as unknown as Record<string, unknown>).Capacitor
     localStorage.clear()
   })
 
@@ -33,7 +33,7 @@ describe('machineMode', () => {
       writable: true,
       configurable: true,
     })
-    delete (window as Record<string, unknown>).Capacitor
+    delete (window as unknown as Record<string, unknown>).Capacitor
     localStorage.clear()
   })
 
@@ -57,7 +57,7 @@ describe('machineMode', () => {
   }
 
   function stubCapacitor() {
-    ;(window as Record<string, unknown>).Capacitor = {
+    ;(window as unknown as Record<string, unknown>).Capacitor = {
       isNativePlatform: () => true,
     }
   }
@@ -181,7 +181,7 @@ describe('machineMode', () => {
     })
 
     it('should return false when Capacitor exists but isNativePlatform returns false', async () => {
-      ;(window as Record<string, unknown>).Capacitor = {
+      ;(window as unknown as Record<string, unknown>).Capacitor = {
         isNativePlatform: () => false,
       }
       const { isNativePlatform } = await import('@/lib/machineMode')

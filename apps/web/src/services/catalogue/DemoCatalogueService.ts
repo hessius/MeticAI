@@ -30,8 +30,8 @@ export function createDemoCatalogueService(): CatalogueService {
       userPreferences: null,
       display: p.display ? {
         description: p.display.description,
-        shortDescription: p.display.short_description,
-        accentColor: p.display.accent_color,
+        shortDescription: p.display.shortDescription,
+        accentColor: p.display.accentColor,
         image: p.display.image,
       } : undefined,
     }

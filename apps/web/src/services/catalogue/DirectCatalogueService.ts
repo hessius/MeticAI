@@ -49,7 +49,7 @@ export function createDirectCatalogueService(baseUrl: string): CatalogueService 
     name: 'DirectCatalogueService',
 
     listProfiles: async (): Promise<CatalogueProfile[]> => {
-      const profiles = unwrap(await api.listProfiles()) as ProfileIdent[]
+      const profiles = unwrap(await api.listProfiles()) as unknown as ProfileIdent[]
       return profiles.map(identToCatalogueProfile)
     },
 

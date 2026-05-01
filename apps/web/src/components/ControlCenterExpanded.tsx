@@ -61,7 +61,7 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
   const [brightnessValue, setBrightnessValue] = useState<number>(
     machineState.brightness ?? 75,
   )
-  const [deviceInfo, setDeviceInfo] = useState<Partial<DeviceInfo> | null>(null)
+  const [deviceInfo, setDeviceInfo] = useState<(DeviceInfo & Record<string, unknown>) | null>(null)
 
   // Shared state derivation + command executor
   const {
@@ -76,7 +76,7 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
     ;(async () => {
       try {
         const info = await machine.getDeviceInfo()
-        if (!cancelled && info) setDeviceInfo(info)
+        if (!cancelled && info) setDeviceInfo(info as DeviceInfo & Record<string, unknown>)
       } catch {
         // Silently ignore — section just won't show
       }
@@ -288,7 +288,7 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
               {deviceInfo?.serial && (
                 <Row label={t('controlCenter.labels.serial')} value={deviceInfo.serial} />
               )}
-              {deviceInfo?.model_version && (
+              {typeof deviceInfo?.model_version === 'string' && deviceInfo.model_version && (
                 <Row label={t('controlCenter.labels.model')} value={deviceInfo.model_version} />
               )}
             </div>

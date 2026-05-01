@@ -496,7 +496,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                     const res = await machine.loadProfile(pendingProfile)
                     if (!res.success) {
                       toast.error(res.message ?? t('controlCenter.toasts.error'))
-                      return
+                      return { success: false }
                     }
                     await new Promise(r => setTimeout(r, 300))
                   }

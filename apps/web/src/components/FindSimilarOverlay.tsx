@@ -15,7 +15,6 @@ import { Sparkle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getMatchReasonColorClass, getScoreColorClass } from '@/lib/tags'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
-import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 
 interface Recommendation {
   profile_name: string
@@ -37,26 +36,16 @@ function ProfileImage({ name, serverUrl }: { name: string; serverUrl: string }) 
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting state when name changes
     setError(false)
     setSrc(null)
 
     if (isDirectMode() || isNativePlatform()) {
-      fetch(`/api/profile/${encodeURIComponent(name)}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          const imageSrc = resolveDisplayImage(getProfileImageValue(data?.profile))
-          if (!cancelled) {
-            setSrc(imageSrc)
-          }
-        })
-        .catch(() => { if (!cancelled) setError(true) })
+      // Use image-proxy which checks IndexedDB first, then falls back to machine URL
+      setSrc(`/api/profile/${encodeURIComponent(name)}/image-proxy`)
     } else if (serverUrl) {
       setSrc(`${serverUrl}/api/profile/${encodeURIComponent(name)}/image-proxy`)
     }
-
-    return () => { cancelled = true }
   }, [name, serverUrl])
 
   if (!src || error) {

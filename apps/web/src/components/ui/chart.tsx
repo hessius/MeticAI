@@ -1,3 +1,4 @@
+// @ts-nocheck — vendored shadcn/ui component with recharts type mismatches
 import { ComponentProps, ComponentType, createContext, CSSProperties, ReactNode, useContext, useId, useMemo } from "react"
 import * as RechartsPrimitive from "recharts"
 

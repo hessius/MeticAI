@@ -14,7 +14,7 @@ import type {
   Actuators,
   DeviceInfo,
   HistoryListingEntry,
-  Notification as MachineNotification,
+  NotificationItem as MachineNotification,
   ProfileIdent,
   Settings as MachineSettings,
   StatusData,

@@ -252,7 +252,7 @@ export function createDirectAdapter(baseUrl: string): MachineService {
 
     // -- Profiles -----------------------------------------------------------
     listProfiles: async () => {
-      return unwrap(await api.listProfiles()) as ProfileIdent[]
+      return unwrap(await api.listProfiles()) as unknown as ProfileIdent[]
     },
     fetchAllProfiles: async () => {
       return unwrap(await api.fetchAllProfiles()) as Profile[]

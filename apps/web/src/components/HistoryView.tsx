@@ -1583,36 +1583,37 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               </Button>
             </motion.div>
           )}
-          {/* Edit details button */}
-          {entry.profile_json && !editingSection && (
-            <div className="flex justify-end -mb-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
-                onClick={() => handleStartEdit('details')}
-                title={t('profileEdit.editProfile')}
-              >
-                <PencilSimple size={14} weight="bold" />
-                {t('profileEdit.editProfile')}
-              </Button>
-            </div>
-          )}
-          {/* Profile Technical Breakdown (inline editing when editing details) */}
+          {/* Profile Technical Breakdown with inline edit button */}
           {entry.profile_json && (
-            <ProfileBreakdown
-              profile={entry.profile_json as ProfileData}
-              editMode={editingSection === 'details'}
-              editTemperature={editTemperature}
-              onTemperatureChange={setEditTemperature}
-              editFinalWeight={editFinalWeight}
-              onFinalWeightChange={setEditFinalWeight}
-              editVariables={editVariables}
-              onVariableChange={(key, value) => {
-                setEditVariables(prev => prev.map(v => v.key === key ? { ...v, value } : v))
-              }}
-              disabled={isSavingEdit}
-            />
+            <div>
+              {!editingSection && (
+                <div className="flex justify-end mb-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
+                    onClick={() => handleStartEdit('details')}
+                    title={t('profileEdit.editProfile')}
+                  >
+                    <PencilSimple size={14} weight="bold" />
+                    {t('profileEdit.editProfile')}
+                  </Button>
+                </div>
+              )}
+              <ProfileBreakdown
+                profile={entry.profile_json as ProfileData}
+                editMode={editingSection === 'details'}
+                editTemperature={editTemperature}
+                onTemperatureChange={setEditTemperature}
+                editFinalWeight={editFinalWeight}
+                onFinalWeightChange={setEditFinalWeight}
+                editVariables={editVariables}
+                onVariableChange={(key, value) => {
+                  setEditVariables(prev => prev.map(v => v.key === key ? { ...v, value } : v))
+                }}
+                disabled={isSavingEdit}
+              />
+            </div>
           )}
           {/* Find Similar Button — only for profiles with real AI descriptions */}
           {!isCapturing && extractDescription(currentReply) && (
@@ -1846,7 +1847,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
               )}
               <p className="text-center text-white/80 mt-4 text-sm font-medium">{cleanProfileName(entry.profile_name)}</p>
               {/* Image actions in lightbox */}
-              <div className="flex gap-2 mt-4 justify-center">
+              <div className="flex flex-wrap gap-2 mt-4 justify-center">
                 {profileImage && (
                   <Button
                     variant="outline"

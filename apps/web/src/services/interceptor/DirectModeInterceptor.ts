@@ -785,16 +785,68 @@ export function installDirectModeInterceptor(): void {
     const profile = await _findProfileByName(profileName)
     if (!profile) throw new DirectStorageValidationError(`Profile '${profileName}' not found on machine`)
 
+    // Fetch full profile (with stages) — the list cache may not include them
+    let fullProfile = profile
+    try {
+      const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+      if (fullResp.ok) {
+        const parsed = await fullResp.json() as CachedProfile
+        if (typeof parsed?.id === 'string') fullProfile = parsed
+      }
+    } catch { /* use cached profile */ }
+
     const imageBlob = dataUriToBlob(imageDataUri)
 
-    // Save image to local IndexedDB — this is the primary source for image-proxy.
-    // Do NOT embed the data URI in display.image when saving to the machine:
-    // AI-generated images can be several MB and the machine rejects oversized payloads.
+    // Save full-res image to IndexedDB (primary source for image-proxy)
     await saveDirectProfileImage(profile.id, imageBlob)
+
+    // Save a compressed thumbnail to the machine profile so the image
+    // persists across app reinstalls. AI-generated images can be several MB;
+    // the machine rejects oversized payloads, so we downscale to ≤300px.
+    const updated = cloneProfileForSave(fullProfile)
+    try {
+      const thumbnailUri = await _compressImageForMachine(imageDataUri, 300)
+      updated.display = {
+        ...(isRecord(updated.display) ? updated.display : {}),
+        image: thumbnailUri,
+      }
+    } catch {
+      // If compression fails, keep the original display.image value
+      updated.display = isRecord(fullProfile.display) ? { ...fullProfile.display } : {}
+    }
+    try {
+      const saveResponse = await _fetch('/api/v1/profile/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      })
+      if (!saveResponse.ok) console.warn('[direct-mode] Machine profile save returned', saveResponse.status)
+    } catch (e) {
+      console.warn('[direct-mode] Failed to save profile image to machine:', e)
+    }
 
     const cached: CachedProfile = { ...profile, display: { ...(isRecord(profile.display) ? profile.display : {}), image: imageDataUri } }
     _profileCache.set(cached.name, cached)
     return { profile: cached, imageBlob }
+  }
+
+  /** Compress an image data URI to a JPEG thumbnail ≤ maxSize px. */
+  async function _compressImageForMachine(dataUri: string, maxSize: number): Promise<string> {
+    const img = new Image()
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = reject
+      img.src = dataUri
+    })
+    const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
+    const w = Math.round(img.width * scale)
+    const h = Math.round(img.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/jpeg', 0.7)
   }
 
   // ── Pour-over profile adapters (ported from backend pour_over_adapter.py / recipe_adapter.py) ──
@@ -975,7 +1027,7 @@ export function installDirectModeInterceptor(): void {
     // POST /api/machine/run-profile-with-overrides/:id → not supported in direct mode
     const runOverridesMatch = url.match(/\/api\/machine\/run-profile-with-overrides\/([^/?]+)/)
     if (runOverridesMatch && method === 'POST') {
-      return jsonResponse({ detail: 'Variable overrides are not supported in direct mode' }, 501)
+      return Promise.resolve(jsonResponse({ detail: 'Variable overrides are not supported in direct mode' }, 501))
     }
 
     // POST /api/machine/command/start → GET /api/v1/action/start
@@ -2442,7 +2494,8 @@ export function installDirectModeInterceptor(): void {
 
           return jsonResponse({
             status: result.status,
-            analysis: result.analysis,
+            // Only include analysis (shown as "Coffee Analysis" card) when an image was provided
+            analysis: image ? result.analysis : '',
             reply: result.analysis,
           })
         } catch (err) {
@@ -2684,7 +2737,7 @@ export function installDirectModeInterceptor(): void {
 
     // GET /api/network-ip → return configured machine IP
     if (url.match(/\/api\/network-ip$/)) {
-      const machineIp = localStorage.getItem(STORAGE_KEYS.MACHINE_IP) || ''
+      const machineIp = localStorage.getItem(STORAGE_KEYS.MACHINE_URL) || ''
       return Promise.resolve(jsonResponse({ ip: machineIp }))
     }
 
