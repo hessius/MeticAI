@@ -1585,21 +1585,6 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           )}
           {/* Profile Technical Breakdown with inline edit button */}
           {entry.profile_json && (
-            <div>
-              {!editingSection && (
-                <div className="flex justify-end mb-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
-                    onClick={() => handleStartEdit('details')}
-                    title={t('profileEdit.editProfile')}
-                  >
-                    <PencilSimple size={14} weight="bold" />
-                    {t('profileEdit.editProfile')}
-                  </Button>
-                </div>
-              )}
               <ProfileBreakdown
                 profile={entry.profile_json as ProfileData}
                 editMode={editingSection === 'details'}
@@ -1612,8 +1597,19 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                   setEditVariables(prev => prev.map(v => v.key === key ? { ...v, value } : v))
                 }}
                 disabled={isSavingEdit}
+                headerAction={!editingSection ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
+                    onClick={() => handleStartEdit('details')}
+                    title={t('profileEdit.editProfile')}
+                  >
+                    <PencilSimple size={14} weight="bold" />
+                    {t('profileEdit.editProfile')}
+                  </Button>
+                ) : undefined}
               />
-            </div>
           )}
           {/* Find Similar Button — only for profiles with real AI descriptions */}
           {!isCapturing && extractDescription(currentReply) && (

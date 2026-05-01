@@ -2401,12 +2401,48 @@ export function installDirectModeInterceptor(): void {
                     return val
                   }
                   // Keep only OEPF-valid variables (array form with valid type)
+                  // Info/information variables get converted to info_ prefixed keys with emoji names
                   const validTypes = ['power', 'flow', 'pressure', 'weight', 'time', 'piston_position']
-                  let vars: Array<Record<string, unknown>> = []
+                  const infoTypeAliases = ['info', 'information', 'display', 'readonly', 'read_only']
+                  const emojiRegex = /^\p{Extended_Pictographic}/u
+                  const infoEmojiMap: Record<string, string> = {
+                    dose: '☕', ratio: '📏', grind: '⚙️', roast: '🔥', bean: '🫘',
+                    beans: '🫘', origin: '🌍', water: '💧', yield: '⚖️', output: '⚖️',
+                    notes: '📝', method: '📋', recipe: '📋', default: 'ℹ️',
+                  }
+                  function ensureEmojiPrefix(name: string): string {
+                    if (emojiRegex.test(name)) return name
+                    const lower = name.toLowerCase()
+                    for (const [keyword, emoji] of Object.entries(infoEmojiMap)) {
+                      if (keyword !== 'default' && lower.includes(keyword)) return `${emoji} ${name}`
+                    }
+                    return `ℹ️ ${name}`
+                  }
+                  const vars: Array<Record<string, unknown>> = []
                   if (Array.isArray(p.variables)) {
-                    vars = (p.variables as Array<Record<string, unknown>>).filter(v =>
-                      typeof v.value === 'number' && typeof v.type === 'string' && validTypes.includes(v.type as string)
-                    )
+                    for (const v of (p.variables as Array<Record<string, unknown>>)) {
+                      if (typeof v.value !== 'number') continue
+                      const varType = String(v.type ?? '')
+                      const varKey = String(v.key ?? v.name ?? '')
+                      const varName = String(v.name ?? v.key ?? '')
+                      if (validTypes.includes(varType)) {
+                        // Valid OEPF adjustable variable — keep as-is
+                        vars.push(v)
+                      } else if (infoTypeAliases.includes(varType.toLowerCase()) || varKey.startsWith('info_')) {
+                        // Information variable — convert to info_ key with emoji prefix
+                        // Preserve original type if valid, otherwise default to 'power'
+                        const preservedType = validTypes.includes(varType) ? varType : 'power'
+                        const infoKey = varKey.startsWith('info_') ? varKey : `info_${slugify(varKey || varName)}`
+                        if (!infoKey || infoKey === 'info_') continue // skip empty keys
+                        vars.push({
+                          ...v,
+                          key: infoKey,
+                          name: ensureEmojiPrefix(varName),
+                          type: preservedType,
+                        })
+                      }
+                      // Variables with unknown types that aren't info types are dropped
+                    }
                   }
                   // Convert stages
                   const stages = Array.isArray(p.stages) ? (p.stages as Array<Record<string, unknown>>).map((s, i) => {
@@ -2482,11 +2518,16 @@ export function installDirectModeInterceptor(): void {
                   }
                 }
                 const oepf = toOEPF(raw)
-                await _fetch('/api/v1/profile/save', {
+                const saveResponse = await _fetch('/api/v1/profile/save', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(oepf),
                 })
+                // Cache the AI-generated description only if the profile saved successfully
+                if (saveResponse.ok && oepf.id && result.analysis) {
+                  _descriptionCache.set(oepf.id, result.analysis)
+                  _persistDescriptionCache()
+                }
               } catch (e) {
                 console.warn('[direct-mode] Failed to save profile to machine:', e)
               }
