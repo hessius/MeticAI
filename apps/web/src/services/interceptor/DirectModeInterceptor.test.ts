@@ -950,8 +950,13 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(body.profiles[0]).not.toHaveProperty('profile')
     })
 
-    it('rejects direct variable override runs instead of silently ignoring overrides', async () => {
-      const machineFetch = installInterceptor()
+    it('applies variable overrides and runs the profile via ephemeral load', async () => {
+      const profileData = nestedMachineProfiles()[0].profile
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/get/profile-1': profileData,
+        'POST /api/v1/profile/load': { ok: true },
+        'GET /api/v1/action/start': { ok: true },
+      }))
       const form = new FormData()
       form.append('overrides_json', JSON.stringify({ temperature: 94 }))
 
@@ -960,12 +965,10 @@ describe('DirectModeInterceptor regression harness', () => {
         body: form,
       })
 
-      expect(response.status).toBe(501)
-      await expect(readJson(response)).resolves.toEqual({
-        detail: 'Variable overrides are not supported in direct mode',
-      })
-      expect(machineFetch).not.toHaveBeenCalledWith('/api/v1/profile/load/profile-1')
-      expect(machineFetch).not.toHaveBeenCalledWith('/api/v1/action/start')
+      expect(response.status).toBe(200)
+      const body = await readJson<Record<string, unknown>>(response)
+      expect(body.status).toBe('success')
+      expect(body.overrides_applied).toBe(1)
     })
 
     it('renames visible direct machine profiles through the machine API', async () => {
