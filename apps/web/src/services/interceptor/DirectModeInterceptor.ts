@@ -834,8 +834,9 @@ export function installDirectModeInterceptor(): void {
   async function _compressImageForMachine(dataUri: string, maxSize: number): Promise<string> {
     const img = new Image()
     await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = reject
+      const timeout = setTimeout(() => reject(new Error('Image load timeout')), 3000)
+      img.onload = () => { clearTimeout(timeout); resolve() }
+      img.onerror = () => { clearTimeout(timeout); reject(new Error('Image load error')) }
       img.src = dataUri
     })
     const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
