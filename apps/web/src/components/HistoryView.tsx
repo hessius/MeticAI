@@ -989,12 +989,41 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
     try {
       const serverUrl = await getServerUrl()
       
+      // Compress large generated images before saving — AI-generated PNGs can be
+      // several MB. WKWebView / the machine may reject oversized payloads.
+      let imageToSave = previewImage
+      if (previewImage.length > 500_000) {
+        try {
+          const img = new globalThis.Image()
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('compress timeout')), 5000)
+            img.onload = () => { clearTimeout(timeout); resolve() }
+            img.onerror = () => { clearTimeout(timeout); reject(new Error('compress error')) }
+            img.src = previewImage
+          })
+          const maxDim = 1024
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+          const w = Math.round(img.width * scale)
+          const h = Math.round(img.height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h)
+            imageToSave = canvas.toDataURL('image/jpeg', 0.85)
+          }
+        } catch {
+          // Compression failed — try with original
+        }
+      }
+      
       const response = await fetch(
         `${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/apply-image`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_data: previewImage })
+          body: JSON.stringify({ image_data: imageToSave })
         }
       )
       
@@ -1011,7 +1040,7 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       invalidateImageCache(entry.profile_name)
       // On native/direct: use the data URI directly (proxy may not serve it back)
       if (isDirectMode() || isNativePlatform()) {
-        setProfileImage(previewImage)
+        setProfileImage(imageToSave)
       } else {
         setProfileImage(`${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/image-proxy?t=${newCacheBuster}`)
       }
@@ -1053,6 +1082,8 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         throw new Error('Failed to save notes')
       }
       
+      // Persist to parent state so notes survive re-renders and navigation
+      onEntryUpdated?.({ ...entry, notes })
       toast.success(t('history.notesSaved'))
     } catch (err) {
       console.error('Failed to save notes:', err)

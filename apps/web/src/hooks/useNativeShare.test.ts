@@ -183,7 +183,7 @@ describe('shareImageDataUri', () => {
     expect(mockShare).toHaveBeenCalledWith({
       title: opts.title,
       text: opts.text,
-      url: 'file:///tmp/shot.png',
+      files: ['file:///tmp/shot.png'],
     })
   })
 

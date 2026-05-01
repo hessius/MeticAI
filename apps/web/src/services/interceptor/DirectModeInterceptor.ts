@@ -1,7 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
-import { resolveMachineUrl } from '@/services/machine/machineUrl'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
@@ -94,14 +93,14 @@ function getDirectProfileImagePath(profile: CachedProfile): string | undefined {
 function normalizeHistoryEntry(entry: MachineHistoryEntry, notes: {
   notes: string | null
   notes_updated_at: string | null
-} = { notes: null, notes_updated_at: null }) {
+} = { notes: null, notes_updated_at: null }, description = '') {
   return {
     id: entry.id,
     created_at: new Date(entry.time * 1000).toISOString(),
     profile_name: typeof entry.profile?.name === 'string' ? entry.profile.name : entry.name ?? 'Unknown',
     coffee_analysis: null,
     user_preferences: null,
-    reply: '',
+    reply: description,
     profile_json: entry.profile ?? null,
     notes: notes.notes,
     notes_updated_at: notes.notes_updated_at,
@@ -1695,7 +1694,7 @@ export function installDirectModeInterceptor(): void {
         }
         const imagePath = getDirectProfileImagePath(profile)
         if (!imagePath) return new Response('', { status: 404 })
-        const machineBase = await resolveMachineUrl()
+        const machineBase = getDefaultMachineUrl()
         const imageUrl = new URL(imagePath, machineBase).toString()
         const imageResponse = await _originalFetch(imageUrl)
         if (!imageResponse.ok) return new Response('', { status: imageResponse.status })
@@ -1864,7 +1863,10 @@ export function installDirectModeInterceptor(): void {
         const history = await _loadVisibleHistory()
         const entry = history.find((candidate) => candidate.id === entryId)
         if (!entry) return jsonResponse({ detail: 'History entry not found' }, 404)
-        return jsonResponse(normalizeHistoryEntry(entry, await getDirectHistoryNotes(entryId)))
+        const profileName = typeof entry.profile?.name === 'string' ? entry.profile.name : entry.name ?? ''
+        const profileId = typeof entry.profile?.id === 'string' ? entry.profile.id : ''
+        const desc = _descriptionCache.get(profileName) || _descriptionCache.get(profileId) || ''
+        return jsonResponse(normalizeHistoryEntry(entry, await getDirectHistoryNotes(entryId), desc))
       })().catch(() => jsonResponse({ detail: 'Failed to retrieve history entry' }, 500))
     }
 
@@ -1889,9 +1891,12 @@ export function installDirectModeInterceptor(): void {
         const offset = safeNumber(parsedUrl.searchParams.get('offset'), 0)
         const history = await _loadVisibleHistory()
         const entries = await Promise.all(
-          history.slice(offset, offset + limit).map(async (entry) => (
-            normalizeHistoryEntry(entry, await getDirectHistoryNotes(entry.id))
-          )),
+          history.slice(offset, offset + limit).map(async (entry) => {
+            const profileName = typeof entry.profile?.name === 'string' ? entry.profile.name : entry.name ?? ''
+            const profileId = typeof entry.profile?.id === 'string' ? entry.profile.id : ''
+            const desc = _descriptionCache.get(profileName) || _descriptionCache.get(profileId) || ''
+            return normalizeHistoryEntry(entry, await getDirectHistoryNotes(entry.id), desc)
+          }),
         )
         return jsonResponse({ entries, total: history.length, limit, offset })
       })().catch(() => jsonResponse({ entries: [], total: 0, limit: 50, offset: 0 }))

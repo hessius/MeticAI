@@ -123,7 +123,7 @@ export function useHistory() {
         })
         await Share.share({
           title: entry.profile_name,
-          url: result.uri,
+          files: [result.uri],
         })
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return

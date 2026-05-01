@@ -36,7 +36,7 @@ async function shareImageDataUri(dataUri: string, filename: string, options?: { 
     await Share.share({
       title: options?.title,
       text: options?.text,
-      url: result.uri,
+      files: [result.uri],
     })
     // Clean up temp file after share completes
     Filesystem.deleteFile({ path: filename, directory: Directory.Cache }).catch(() => {})

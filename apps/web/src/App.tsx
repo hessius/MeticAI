@@ -992,7 +992,7 @@ function App() {
         })
         await Share.share({
           title: profileName,
-          url: result.uri,
+          files: [result.uri],
         })
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return
