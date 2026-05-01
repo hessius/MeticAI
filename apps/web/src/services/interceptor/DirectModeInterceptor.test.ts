@@ -763,7 +763,7 @@ describe('DirectModeInterceptor regression harness', () => {
 
     it('does not let unapplied generated previews shadow the machine profile image', async () => {
       vi.useRealTimers()
-      localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://machine.local:8080')
+      machineModeMocks.getDefaultMachineUrl.mockReturnValue('http://machine.local:8080')
       browserAIServiceMocks.isConfigured.mockReturnValue(true)
       browserAIServiceMocks.generateImage.mockResolvedValue(validPngBlob())
       let imageFetches = 0
@@ -1211,7 +1211,7 @@ describe('DirectModeInterceptor regression harness', () => {
 
     it('preserves flat profile.image in direct profile info and image proxy routes', async () => {
       vi.useRealTimers()
-      localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://machine.local:8080')
+      machineModeMocks.getDefaultMachineUrl.mockReturnValue('http://machine.local:8080')
       const flatImageProfiles: ProfileIdent[] = [{
         ...nestedMachineProfiles()[0],
         profile: {
@@ -1250,7 +1250,7 @@ describe('DirectModeInterceptor regression harness', () => {
 
     it('proxies and caches profile images from a cold direct profile cache', async () => {
       vi.useRealTimers()
-      localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://machine.local:8080')
+      machineModeMocks.getDefaultMachineUrl.mockReturnValue('http://machine.local:8080')
       let imageFetches = 0
       installInterceptor(createMachineFetch({
         'GET /api/v1/profile/list': nestedMachineProfiles(),
