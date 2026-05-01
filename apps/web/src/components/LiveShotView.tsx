@@ -559,7 +559,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => cmd(() => machine.abortShot(), 'warmupCancelled')}>{t('common.confirm')}</AlertDialogAction>
+                            <AlertDialogAction onClick={() => { cmd(() => machine.abortShot(), 'warmupCancelled'); onBack() }}>{t('common.confirm')}</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>

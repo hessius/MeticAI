@@ -345,6 +345,114 @@ function generateEstimatedTargetCurves(profile: CachedProfile): Array<Record<str
   return curves.sort((a, b) => safeNumber(a.time) - safeNumber(b.time))
 }
 
+/**
+ * Generate target curves aligned to actual shot stage timings.
+ * Uses shot data to build weight-to-time mappings for weight-based dynamics.
+ */
+function generateShotAlignedTargetCurves(
+  profile: CachedProfile,
+  shotStages: Map<string, { startTime: number; endTime: number }>,
+  shotDataEntries?: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const stages = profile.stages ?? []
+  const variables = profile.variables ?? []
+  const curves: Array<Record<string, unknown>> = []
+
+  // Build per-stage weight→time mapping from shot data for weight-based dynamics
+  const stageWeightToTime = new Map<string, Array<[number, number]>>()
+  if (shotDataEntries) {
+    for (const entry of shotDataEntries) {
+      const status = String((entry as Record<string, unknown>).status ?? '').trim().toLowerCase()
+      if (!status || status === 'retracting') continue
+      const timeSec = safeNumber((entry as Record<string, unknown>).time) / 1000
+      const shot = (entry as Record<string, Record<string, unknown>>).shot ?? {}
+      const weight = safeNumber(shot.weight)
+      if (!stageWeightToTime.has(status)) stageWeightToTime.set(status, [])
+      stageWeightToTime.get(status)!.push([weight, timeSec])
+    }
+  }
+
+  for (const stage of stages) {
+    const stageName = typeof stage.name === 'string' ? stage.name : ''
+    const stageType = typeof stage.type === 'string' ? stage.type : 'flow'
+    const dynamics = isRecord(stage.dynamics) ? stage.dynamics : {}
+    const points = Array.isArray(stage.dynamics_points)
+      ? stage.dynamics_points
+      : Array.isArray(dynamics.points)
+        ? dynamics.points
+        : []
+    if (points.length === 0) continue
+
+    // Match stage to shot timing (case-insensitive)
+    let timing: { startTime: number; endTime: number } | undefined
+    const stageKey = (typeof stage.key === 'string' ? stage.key : '').toLowerCase().trim()
+    const stageNameLower = stageName.toLowerCase().trim()
+    for (const [shotStageName, t] of shotStages) {
+      const normalised = shotStageName.toLowerCase().trim()
+      if (normalised === stageNameLower || normalised === stageKey) { timing = t; break }
+    }
+    if (!timing) continue
+    const stageStart = timing.startTime
+    const stageDuration = timing.endTime - timing.startTime
+    if (stageDuration <= 0) continue
+
+    const key = stageType === 'pressure' ? 'target_pressure'
+      : stageType === 'power' ? 'target_power'
+        : 'target_flow'
+
+    const dynamicsOver = typeof stage.dynamics_over === 'string'
+      ? stage.dynamics_over
+      : typeof dynamics.over === 'string' ? dynamics.over : 'time'
+
+    if (dynamicsOver === 'weight' && stageWeightToTime.has(stageNameLower)) {
+      // Weight-based dynamics: interpolate time from weight
+      const wtPairs = stageWeightToTime.get(stageNameLower)!
+      for (const point of points) {
+        if (!Array.isArray(point)) continue
+        const targetWeight = safeNumber(point[0])
+        const value = resolveProfileValue(point[1] ?? point[0], variables)
+        // Find the time when this weight was reached
+        let interpTime = stageStart
+        for (let i = 0; i < wtPairs.length - 1; i++) {
+          const [w0, t0] = wtPairs[i]
+          const [w1, t1] = wtPairs[i + 1]
+          if (w0 <= targetWeight && targetWeight <= w1 && w1 > w0) {
+            interpTime = t0 + (targetWeight - w0) / (w1 - w0) * (t1 - t0)
+            break
+          }
+        }
+        curves.push({
+          time: Number(interpTime.toFixed(2)),
+          stage_name: stageName,
+          [key]: Math.round(value * 10) / 10,
+        })
+      }
+    } else {
+      // Time-based dynamics
+      if (points.length === 1 && Array.isArray(points[0])) {
+        const value = resolveProfileValue(points[0][1] ?? points[0][0], variables)
+        curves.push(
+          { time: Number(stageStart.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
+          { time: Number(timing.endTime.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
+        )
+      } else {
+        const maxX = Math.max(...points.filter(Array.isArray).map((p: unknown[]) => safeNumber(p[0])))
+        const scale = maxX > 0 ? stageDuration / maxX : 1
+        for (const point of points) {
+          if (!Array.isArray(point)) continue
+          const value = resolveProfileValue(point[1] ?? point[0], variables)
+          curves.push({
+            time: Number((stageStart + safeNumber(point[0]) * scale).toFixed(2)),
+            stage_name: stageName,
+            [key]: Math.round(value * 10) / 10,
+          })
+        }
+      }
+    }
+  }
+  return curves.sort((a, b) => safeNumber(a.time) - safeNumber(b.time))
+}
+
 type ProfileFingerprint = {
   controlMode: 'pressure' | 'flow' | 'mixed' | 'unknown'
   techniqueTags: Set<string>
@@ -2425,6 +2533,19 @@ export function installDirectModeInterceptor(): void {
               temperature: entry.profile?.temperature ?? null,
               stage_count: profileStages.length,
             },
+            profile_target_curves: (() => {
+              // Generate shot-aligned target curves from profile dynamics
+              if (!entry.profile) return []
+              const stageTimings = new Map<string, { startTime: number; endTime: number }>()
+              for (const [name, stats] of shotStages) {
+                stageTimings.set(name, { startTime: stats.startTime, endTime: stats.endTime })
+              }
+              return generateShotAlignedTargetCurves(
+                entry.profile as unknown as CachedProfile,
+                stageTimings,
+                pts as unknown as Array<Record<string, unknown>>,
+              )
+            })(),
           }
           return jsonResponse({ status: 'success', analysis })
         } catch (err) {
@@ -2434,7 +2555,7 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // POST /api/shots/analyze-llm → alias for shot analysis
+    // POST /api/shots/analyze-llm → full LLM analysis with actual shot data
     if (url.match(/\/api\/shots\/analyze-llm/) && method === 'POST') {
       return (async () => {
         try {
@@ -2443,13 +2564,262 @@ export function installDirectModeInterceptor(): void {
             return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
           }
           const body = init?.body as FormData
-          const result = await aiService.analyzeShot({
-            profileName: (body.get('profile_name') as string) || 'Unknown',
-            shotDate: (body.get('shot_date') as string) || '',
-            shotFilename: (body.get('shot_filename') as string) || '',
-            profileDescription: (body.get('profile_description') as string) || undefined,
+          const pName = (body.get('profile_name') as string) || 'Unknown'
+          const shotDate = (body.get('shot_date') as string) || ''
+          const shotFilename = (body.get('shot_filename') as string) || ''
+          const profileDescription = (body.get('profile_description') as string) || undefined
+
+          // 1. Fetch the actual shot data
+          const entry = await _findVisibleShot(shotDate, shotFilename) as {
+            profile?: { name?: string; final_weight?: number; temperature?: number; stages?: Array<Record<string, unknown>>; variables?: Array<Record<string, unknown>> }
+            data?: Array<Record<string, unknown>>
+          } | null
+          if (!entry) return jsonResponse({ status: 'error', message: 'Shot not found' })
+
+          // 2. Compute shot summary metrics directly from shot data
+          const pts = entry.data ?? []
+          if (!pts.length) return jsonResponse({ status: 'error', message: 'Shot has no telemetry data' })
+          let totalTime = 0
+          let finalWeight = 0
+          let maxPressure = 0
+          let maxFlow = 0
+          const targetWeight = entry.profile?.final_weight ?? null
+          // Stage-level stats
+          type ShotStageInfo = { name: string; duration: number; avgPressure: number; avgFlow: number; weightGain: number; endWeight: number }
+          const stageInfos: ShotStageInfo[] = []
+          {
+            let curStage: string | null = null
+            let stageStart = 0
+            let pressureSum = 0
+            let flowSum = 0
+            let count = 0
+            let stageStartWeight = 0
+            const flushStage = (endTime: number, endWeight2: number) => {
+              if (!curStage || count === 0) return
+              stageInfos.push({
+                name: curStage,
+                duration: Math.round((endTime - stageStart) * 10) / 10,
+                avgPressure: Math.round(pressureSum / count * 10) / 10,
+                avgFlow: Math.round(flowSum / count * 10) / 10,
+                weightGain: Math.round((endWeight2 - stageStartWeight) * 10) / 10,
+                endWeight: Math.round(endWeight2 * 10) / 10,
+              })
+            }
+            for (const pt of pts) {
+              const status = String((pt as Record<string, unknown>).status ?? '').trim()
+              if (!status || status.toLowerCase() === 'retracting') continue
+              const timeSec = safeNumber((pt as Record<string, unknown>).profile_time ?? (pt as Record<string, unknown>).time) / 1000
+              const shot = ((pt as Record<string, Record<string, unknown>>).shot ?? {})
+              const p = safeNumber(shot.pressure)
+              const f = safeNumber(shot.flow) || safeNumber(shot.gravimetric_flow)
+              const w = safeNumber(shot.weight)
+              if (status !== curStage) {
+                flushStage(timeSec, finalWeight)
+                curStage = status
+                stageStart = timeSec
+                pressureSum = 0
+                flowSum = 0
+                count = 0
+                stageStartWeight = w
+              }
+              pressureSum += p
+              flowSum += f
+              count++
+              if (p > maxPressure) maxPressure = p
+              if (f > maxFlow) maxFlow = f
+              finalWeight = w
+              totalTime = timeSec
+            }
+            flushStage(totalTime, finalWeight)
+          }
+
+          const localAnalysis = {
+            shot_summary: {
+              total_time_s: Math.round(totalTime * 10) / 10,
+              final_weight_g: Math.round(finalWeight * 10) / 10,
+              target_weight_g: targetWeight,
+              weight_deviation_pct: targetWeight ? Math.round(((finalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
+              max_pressure_bar: Math.round(maxPressure * 10) / 10,
+              max_flow_mls: Math.round(maxFlow * 10) / 10,
+            },
+            stages: stageInfos.map(s => ({
+              name: s.name,
+              duration_s: s.duration,
+              avg_pressure: s.avgPressure,
+              avg_flow: s.avgFlow,
+              weight_gain: s.weightGain,
+              cumulative_weight_at_end: s.endWeight,
+            })),
+          }
+
+          // 3. Build profile context
+          const shotProfile = entry.profile
+          const profileStagesLlm = shotProfile?.stages ?? []
+          const profileVars = shotProfile?.variables ?? []
+          const cleanStages = profileStagesLlm.map(s => ({
+            name: s.name, type: s.type, key: s.key,
+            dynamics_points: s.dynamics_points,
+            dynamics_over: s.dynamics_over,
+            exit_triggers: s.exit_triggers,
+            limits: s.limits,
+          }))
+
+          // 4. Sample key data points from the shot for graph context
+          const dataEntries = entry.data ?? []
+          const graphSamples: Array<Record<string, unknown>> = []
+          if (dataEntries.length > 0) {
+            const indices = [0]
+            const n = dataEntries.length
+            for (const pct of [0.25, 0.5, 0.75]) {
+              const idx = Math.floor(n * pct)
+              if (!indices.includes(idx)) indices.push(idx)
+            }
+            indices.push(n - 1)
+            for (const idx of [...new Set(indices)].sort((a, b) => a - b)) {
+              const e = dataEntries[idx] as Record<string, unknown>
+              const shot = (e.shot ?? {}) as Record<string, unknown>
+              graphSamples.push({
+                time_s: Math.round(safeNumber(e.profile_time ?? e.time) / 100) / 10,
+                pressure: Math.round(safeNumber(shot.pressure) * 10) / 10,
+                flow: Math.round((safeNumber(shot.flow) || safeNumber(shot.gravimetric_flow)) * 10) / 10,
+                weight: Math.round(safeNumber(shot.weight) * 10) / 10,
+                stage: String(e.status ?? ''),
+              })
+            }
+          }
+
+          // 5. Build the comprehensive prompt (matching server format)
+          const prompt = `You are an expert espresso barista and profiling specialist analyzing a shot from a Meticulous Espresso Machine.
+
+## Profile Being Used
+Name: ${pName}
+Temperature: ${shotProfile?.temperature ?? 'Not set'}°C
+Target Weight: ${shotProfile?.final_weight ?? 'Not set'}g
+
+### Profile Description
+${profileDescription || 'No description provided - analyze the profile structure to understand intent.'}
+
+### Profile Variables
+${JSON.stringify(profileVars, null, 2)}
+
+### Profile Stages
+${JSON.stringify(cleanStages, null, 2)}
+
+## Full Local Analysis
+This is the complete algorithmic analysis of the shot. Use this data to inform your expert analysis.
+
+IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total weight when that stage ended.
+If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated
+correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
+A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
+
+${JSON.stringify(localAnalysis, null, 2)}
+
+### Graph Sample Points
+${JSON.stringify(graphSamples, null, 2)}
+
+---
+
+Based on this data, provide a detailed expert analysis.
+
+CRITICAL FORMATTING RULES:
+1. You MUST use EXACTLY these 5 section headers with the exact format shown (## followed by number, period, space, then title)
+2. Each section MUST have the subsection headers shown (bold text with colon, like **What Happened:**)
+3. ALL content under subsections MUST be bullet points starting with "- "
+4. Keep bullet points concise (1-2 sentences max per bullet)
+5. Do NOT add extra sections or subsections beyond what's specified
+
+## 1. Shot Performance
+
+**What Happened:**
+- [Stage-by-stage description of the extraction]
+- [Notable events: pressure spikes, flow restrictions, early/late stage exits]
+- [Final weight accuracy relative to target]
+
+**Assessment:** [Choose exactly one: Good / Acceptable / Needs Improvement / Problematic]
+
+## 2. Root Cause Analysis
+
+**Primary Factors:**
+- [Most likely cause with brief explanation]
+- [Second most likely cause if applicable]
+
+**Secondary Considerations:**
+- [Other contributing factors]
+- [Environmental or equipment factors if relevant]
+
+## 3. Setup Recommendations
+
+**Priority Changes:**
+- [Most important change - be specific with numbers when possible]
+- [Second priority change]
+
+**Additional Suggestions:**
+- [Other tweaks to consider]
+
+## 4. Profile Recommendations
+
+**Recommended Adjustments:**
+- [Specific profile changes: timing, triggers, targets]
+- [Variable value changes if applicable]
+
+**Reasoning:**
+- [Why these changes would improve the shot]
+
+## 5. Profile Design Observations
+
+**Strengths:**
+- [Well-designed aspects of this profile]
+
+**Potential Improvements:**
+- [Exit trigger or safety limit suggestions]
+- [Robustness improvements]
+
+Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
+
+## Structured Recommendations (MANDATORY)
+
+After your analysis sections, you MUST output a structured JSON block with specific, actionable profile variable recommendations.
+Use EXACTLY this format — the markers are parsed programmatically:
+
+RECOMMENDATIONS_JSON:
+[
+  {
+    "variable": "<variable key from the profile, e.g. 'pressure', 'temperature'>",
+    "current_value": <current numeric value>,
+    "recommended_value": <suggested numeric value>,
+    "stage": "<stage name this applies to, or 'global' for top-level settings>",
+    "confidence": "<high|medium|low>",
+    "reason": "<one-sentence explanation>"
+  }
+]
+END_RECOMMENDATIONS_JSON
+
+Rules for recommendations:
+- Only include recommendations where you have a SPECIFIC numeric change to suggest
+- Use actual variable keys from the Profile Variables section above
+- For top-level settings (temperature, final_weight), use stage="global"
+- For stage-specific changes, use the stage name from Profile Stages
+- confidence: "high" = strong evidence from data, "medium" = likely beneficial, "low" = worth trying
+- If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
+`
+
+          // 6. Call Gemini
+          const { GoogleGenAI: GenAI } = await import('@google/genai')
+          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) ?? ''
+          if (!apiKey) return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
+          const client = new GenAI({ apiKey })
+          const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
+          const response = await client.models.generateContent({
+            model: modelId,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
           })
-          return jsonResponse({ status: 'success', llm_analysis: result.llm_analysis, cached: false })
+          const analysisText = response.text ?? ''
+          return jsonResponse({
+            status: 'success',
+            llm_analysis: analysisText,
+            cached: false,
+          })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Analysis failed'
           return jsonResponse({ status: 'error', message: msg })
