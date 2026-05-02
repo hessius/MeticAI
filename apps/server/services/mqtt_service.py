@@ -17,7 +17,7 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Callable, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +33,36 @@ HEALTH_TOPIC = "meticulous_espresso/health"
 # ---------------------------------------------------------------------------
 # Sensor key → value type coercion
 # ---------------------------------------------------------------------------
-_FLOAT_SENSORS = frozenset({
-    "boiler_temperature", "brew_head_temperature",
-    "external_temp_1", "external_temp_2",
-    "pressure", "flow_rate", "shot_weight", "shot_timer",
-    "preheat_countdown", "target_temperature", "target_weight",
-    "power",
-})
+_FLOAT_SENSORS = frozenset(
+    {
+        "boiler_temperature",
+        "brew_head_temperature",
+        "external_temp_1",
+        "external_temp_2",
+        "pressure",
+        "flow_rate",
+        "shot_weight",
+        "shot_timer",
+        "preheat_countdown",
+        "target_temperature",
+        "target_weight",
+        "power",
+    }
+)
 
-_BOOL_SENSORS = frozenset({
-    "brewing", "connected",
-})
+_BOOL_SENSORS = frozenset(
+    {
+        "brewing",
+        "connected",
+    }
+)
 
-_INT_SENSORS = frozenset({
-    "total_shots", "voltage",
-})
+_INT_SENSORS = frozenset(
+    {
+        "total_shots",
+        "voltage",
+    }
+)
 
 
 def _coerce_value(sensor_key: str, raw: str) -> Any:
@@ -70,6 +85,7 @@ def _coerce_value(sensor_key: str, raw: str) -> Any:
 # ============================================================================
 # MQTTSubscriber — singleton
 # ============================================================================
+
 
 class MQTTSubscriber:
     """Thread-safe MQTT subscriber that keeps the latest sensor snapshot.
@@ -195,7 +211,7 @@ class MQTTSubscriber:
 
         # Sensor topics: meticulous_espresso/sensor/{key}/state
         if topic.startswith(TOPIC_PREFIX) and topic.endswith("/state"):
-            sensor_key = topic[len(TOPIC_PREFIX):-len("/state")]
+            sensor_key = topic[len(TOPIC_PREFIX) : -len("/state")]
             value = _coerce_value(sensor_key, payload)
             with self._lock:
                 self.snapshot[sensor_key] = value

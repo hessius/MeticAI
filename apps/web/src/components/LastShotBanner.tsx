@@ -83,6 +83,7 @@ export function LastShotBanner({ lastShot, onAnalyze }: LastShotBannerProps) {
           </div>
           <button
             className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            data-sound="close"
             onClick={lastShot.dismiss}
             aria-label={t('common.dismiss')}
           >

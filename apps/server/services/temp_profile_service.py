@@ -43,6 +43,7 @@ def is_temp_profile(name: str) -> bool:
         name.startswith(prefix) for prefix in TEMP_PROFILE_PREFIXES
     )
 
+
 # Async lock guarding _active state to prevent interleaved mutations
 # from concurrent calls to create_and_load / cleanup / force_cleanup.
 _lock: asyncio.Lock | None = None
@@ -95,10 +96,17 @@ def get_active() -> Optional[Dict[str, Any]]:
 
 
 # Variable types recognised by the Meticulous profile format.
-VARIABLE_TYPES = frozenset({
-    "pressure", "flow", "weight", "power", "time", "piston_position",
-    "temperature",
-})
+VARIABLE_TYPES = frozenset(
+    {
+        "pressure",
+        "flow",
+        "weight",
+        "power",
+        "time",
+        "piston_position",
+        "temperature",
+    }
+)
 
 
 def apply_variable_overrides(
@@ -187,7 +195,9 @@ async def create_and_load(
         HTTPException: If profile creation or loading fails.
     """
     async with _get_lock():
-        return await _create_and_load_locked(profile_json, params, previous_profile_id, previous_profile_name)
+        return await _create_and_load_locked(
+            profile_json, params, previous_profile_id, previous_profile_name
+        )
 
 
 async def _create_and_load_locked(
@@ -200,9 +210,7 @@ async def _create_and_load_locked(
     # Force-cleanup any lingering temp profile (without restoring — we're about
     # to load a new temp profile, so we inherit the tracked previous profile)
     if _active is not None:
-        logger.warning(
-            "Replacing already-active temp profile %s", _active.profile_name
-        )
+        logger.warning("Replacing already-active temp profile %s", _active.profile_name)
         # Inherit the previous profile from the one being replaced so we can
         # still restore the original profile when the new temp finishes.
         if previous_profile_id is None:
@@ -240,13 +248,15 @@ async def _create_and_load_locked(
     # Load the profile on the machine (makes it the active/selected profile)
     await async_load_profile_by_id(profile_id)
 
-    _set_active(ActiveTempProfile(
-        profile_id=profile_id,
-        profile_name=name,
-        original_params=params or {},
-        previous_profile_id=previous_profile_id,
-        previous_profile_name=previous_profile_name,
-    ))
+    _set_active(
+        ActiveTempProfile(
+            profile_id=profile_id,
+            profile_name=name,
+            original_params=params or {},
+            previous_profile_id=previous_profile_id,
+            previous_profile_name=previous_profile_name,
+        )
+    )
 
     logger.info("Temp profile created and loaded: %s (%s)", name, profile_id)
     return {"profile_id": profile_id, "profile_name": name}
@@ -291,14 +301,16 @@ async def load_ephemeral(
         # Ephemeral load — the profile is NOT saved to the catalogue
         await async_load_profile_from_json(profile_json)
 
-        _set_active(ActiveTempProfile(
-            profile_id=profile_id,
-            profile_name=name,
-            original_params=params or {},
-            previous_profile_id=previous_profile_id,
-            previous_profile_name=previous_profile_name,
-            ephemeral=True,
-        ))
+        _set_active(
+            ActiveTempProfile(
+                profile_id=profile_id,
+                profile_name=name,
+                original_params=params or {},
+                previous_profile_id=previous_profile_id,
+                previous_profile_name=previous_profile_name,
+                ephemeral=True,
+            )
+        )
 
         logger.info("Ephemeral profile loaded: %s (%s)", name, profile_id)
         return {"profile_id": profile_id, "profile_name": name}
@@ -329,6 +341,7 @@ async def cleanup() -> Dict[str, str]:
         # Purge first (flush water)
         try:
             from api.routes.commands import _do_publish, _get_snapshot
+
             snapshot = _get_snapshot()
             if not snapshot.get("brewing"):
                 _do_publish("purge")
@@ -344,20 +357,21 @@ async def cleanup() -> Dict[str, str]:
                 logger.error("Failed to delete temp profile %s: %s", profile_id, exc)
                 return {"status": "delete_failed", "error": str(exc)}
         else:
-            logger.info("Ephemeral profile cleaned up (no delete needed): %s", profile_name)
+            logger.info(
+                "Ephemeral profile cleaned up (no delete needed): %s", profile_name
+            )
 
         # Restore the previously-active profile, or deselect if none tracked
         try:
             from api.routes.commands import _do_publish
+
             _do_publish("select_profile", previous_profile_name or "")
             if previous_profile_name:
                 logger.info("Restored previous profile: %s", previous_profile_name)
             else:
                 logger.info("No previous profile — sent deselect after cleanup")
         except Exception as exc:
-            logger.warning(
-                "Failed to restore/deselect profile after cleanup: %s", exc
-            )
+            logger.warning("Failed to restore/deselect profile after cleanup: %s", exc)
 
         return {"status": "cleaned_up", "deleted_profile": profile_name}
 
@@ -393,12 +407,15 @@ async def _force_cleanup_inner(restore: bool = True) -> Dict[str, str]:
             logger.error("Failed to force-delete temp profile %s: %s", profile_id, exc)
             return {"status": "delete_failed", "error": str(exc)}
     else:
-        logger.info("Ephemeral profile force-cleaned (no delete needed): %s", profile_name)
+        logger.info(
+            "Ephemeral profile force-cleaned (no delete needed): %s", profile_name
+        )
 
     # Restore the previously-active profile, or deselect if none tracked
     if restore:
         try:
             from api.routes.commands import _do_publish
+
             _do_publish("select_profile", previous_profile_name or "")
             if previous_profile_name:
                 logger.info("Restored previous profile: %s", previous_profile_name)

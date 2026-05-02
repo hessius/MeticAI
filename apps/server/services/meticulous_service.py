@@ -56,6 +56,7 @@ def _wrap_machine_call(fn):
 
     return wrapper
 
+
 # Lazy-loaded Meticulous API client
 _meticulous_api = None
 
@@ -113,12 +114,14 @@ def get_meticulous_api():
 
     if _meticulous_api is None:
         from meticulous.api import Api
+
         _meticulous_api = Api(base_url=desired_base_url)
         return _meticulous_api
 
     current_base_url = str(getattr(_meticulous_api, "base_url", "")).rstrip("/")
     if current_base_url != desired_base_url:
         from meticulous.api import Api
+
         logger.info(
             "Meticulous API target changed, reinitializing client",
             extra={
@@ -133,7 +136,7 @@ def get_meticulous_api():
 
 def reset_meticulous_api():
     """Reset the cached API client so the next call picks up new settings.
-    
+
     Called when METICULOUS_IP is changed via the settings UI.
     """
     global _meticulous_api
@@ -149,10 +152,10 @@ async def execute_scheduled_shot(
     profile_id: Optional[str],
     scheduled_shots_dict: dict,
     scheduled_tasks_dict: dict,
-    preheat_duration_minutes: int = 10
+    preheat_duration_minutes: int = 10,
 ):
     """Execute a scheduled shot with optional preheating.
-    
+
     Args:
         schedule_id: Unique identifier for this scheduled shot
         shot_delay: Seconds to wait before executing the shot
@@ -163,44 +166,54 @@ async def execute_scheduled_shot(
         preheat_duration_minutes: Minutes to preheat (default: 10)
     """
     from meticulous.api_types import ActionType
-    
+
     loop = asyncio.get_running_loop()
-    
+
     try:
         api = get_meticulous_api()
-        
+
         # If preheat is enabled, start it before the scheduled time
         if preheat:
             preheat_delay = shot_delay - (preheat_duration_minutes * 60)
             if preheat_delay > 0:
                 await asyncio.sleep(preheat_delay)
                 scheduled_shots_dict[schedule_id]["status"] = "preheating"
-                
+
                 # Start preheat using ActionType.PREHEAT
                 try:
-                    await loop.run_in_executor(None, api.execute_action, ActionType.PREHEAT)
+                    await loop.run_in_executor(
+                        None, api.execute_action, ActionType.PREHEAT
+                    )
                 except Exception as e:
-                    logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
-                
+                    logger.warning(
+                        f"Preheat failed for scheduled shot {schedule_id}: {e}"
+                    )
+
                 # Wait for remaining time until shot
                 await asyncio.sleep(preheat_duration_minutes * 60)
             else:
                 # Not enough time for full preheat, start immediately
                 scheduled_shots_dict[schedule_id]["status"] = "preheating"
                 try:
-                    await loop.run_in_executor(None, api.execute_action, ActionType.PREHEAT)
+                    await loop.run_in_executor(
+                        None, api.execute_action, ActionType.PREHEAT
+                    )
                 except Exception as e:
-                    logger.warning(f"Preheat failed for scheduled shot {schedule_id}: {e}")
+                    logger.warning(
+                        f"Preheat failed for scheduled shot {schedule_id}: {e}"
+                    )
                 await asyncio.sleep(shot_delay)
         else:
             await asyncio.sleep(shot_delay)
-        
+
         scheduled_shots_dict[schedule_id]["status"] = "running"
-        
+
         # Load and run the profile (if profile_id was provided)
         if profile_id:
-            load_result = await loop.run_in_executor(None, api.load_profile_by_id, profile_id)
-            if not (hasattr(load_result, 'error') and load_result.error):
+            load_result = await loop.run_in_executor(
+                None, api.load_profile_by_id, profile_id
+            )
+            if not (hasattr(load_result, "error") and load_result.error):
                 await loop.run_in_executor(None, api.execute_action, ActionType.START)
                 scheduled_shots_dict[schedule_id]["status"] = "completed"
             else:
@@ -209,7 +222,7 @@ async def execute_scheduled_shot(
         else:
             # Preheat only mode - mark as completed
             scheduled_shots_dict[schedule_id]["status"] = "completed"
-            
+
     except asyncio.CancelledError:
         scheduled_shots_dict[schedule_id]["status"] = "cancelled"
     except Exception as e:
@@ -226,7 +239,7 @@ def decompress_shot_data(compressed_data: bytes) -> dict:
     """Decompress zstandard-compressed shot data."""
     dctx = zstandard.ZstdDecompressor()
     decompressed = dctx.decompress(compressed_data)
-    return json.loads(decompressed.decode('utf-8'))
+    return json.loads(decompressed.decode("utf-8"))
 
 
 @_wrap_machine_call
@@ -234,13 +247,13 @@ async def fetch_shot_data(date_str: str, filename: str) -> dict:
     """Fetch and decompress shot data from the Meticulous machine."""
     api = get_meticulous_api()
     url = f"{api.base_url}/api/v1/history/files/{date_str}/{filename}"
-    
+
     client = _get_http_client()
     response = await client.get(url)
     response.raise_for_status()
-    
+
     # Check if it's compressed (zstd)
-    if filename.endswith('.zst'):
+    if filename.endswith(".zst"):
         return decompress_shot_data(response.content)
     else:
         return response.json()
@@ -252,12 +265,16 @@ async def fetch_shot_data(date_str: str, filename: str) -> dict:
 # The pyMeticulous library is fully synchronous. These helpers offload each
 # blocking call to a thread-pool executor so the FastAPI event loop stays free.
 
+
 @_wrap_machine_call
 async def async_list_profiles():
     """list_profiles() offloaded to a thread, with short-lived TTL cache."""
     global _profile_list_cache, _profile_list_cache_time
     now = time.monotonic()
-    if _profile_list_cache is not None and (now - _profile_list_cache_time) < _PROFILE_CACHE_TTL:
+    if (
+        _profile_list_cache is not None
+        and (now - _profile_list_cache_time) < _PROFILE_CACHE_TTL
+    ):
         return _profile_list_cache
     api = get_meticulous_api()
     loop = asyncio.get_running_loop()
@@ -285,7 +302,10 @@ async def async_fetch_all_profiles():
     """
     global _full_profile_cache, _full_profile_cache_time
     now = time.monotonic()
-    if _full_profile_cache is not None and (now - _full_profile_cache_time) < _PROFILE_CACHE_TTL:
+    if (
+        _full_profile_cache is not None
+        and (now - _full_profile_cache_time) < _PROFILE_CACHE_TTL
+    ):
         return _full_profile_cache
     api = get_meticulous_api()
     loop = asyncio.get_running_loop()
@@ -338,13 +358,11 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
             uuid.UUID(existing_id)  # Validates UUID format
         except (ValueError, AttributeError):
             # Non-UUID ID - replace with a proper UUID to avoid 404 on fetch
-            logger.warning(
-                "Replacing non-UUID profile ID with UUID: %s", existing_id
-            )
+            logger.warning("Replacing non-UUID profile ID with UUID: %s", existing_id)
             existing_id = ""
     if not existing_id:
         data["id"] = str(uuid.uuid4())
-    data.setdefault("author", "MeticAI")
+    data.setdefault("author", "Metic")
     if "author_id" not in data or not data["author_id"]:
         data["author_id"] = str(uuid.uuid4())
     data.setdefault("temperature", 90.0)
@@ -358,11 +376,11 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
     # Info variables (key starts with "info_") MUST have an emoji prefix in name.
     # This distinguishes them from adjustable variables (no emoji, used in stages).
     emoji_pattern = re.compile(
-        r'^[\U0001F300-\U0001F9FF'   # Supplemental Symbols and Pictographs
-        r'\U0001F600-\U0001F64F'      # Emoticons
-        r'\U0001F680-\U0001F6FF'      # Transport and Map Symbols  
-        r'\U00002600-\U000026FF'      # Misc symbols
-        r'\U00002700-\U000027BF]'     # Dingbats
+        r"^[\U0001F300-\U0001F9FF"  # Supplemental Symbols and Pictographs
+        r"\U0001F600-\U0001F64F"  # Emoticons
+        r"\U0001F680-\U0001F6FF"  # Transport and Map Symbols
+        r"\U00002600-\U000026FF"  # Misc symbols
+        r"\U00002700-\U000027BF]"  # Dingbats
     )
     for var in data.get("variables") or []:
         key = var.get("key", "")
@@ -438,6 +456,7 @@ def _normalize_profile_for_machine(profile_json: Dict[str, Any]) -> Dict[str, An
 
 class DuplicateProfileNameError(ValueError):
     """Raised when attempting to create a profile with a name that already exists."""
+
     pass
 
 
@@ -474,7 +493,7 @@ async def async_create_profile(profile_json):
         except Exception as e:
             # Don't block creation if we can't check duplicates
             logger.warning("Could not check for duplicate profile names: %s", e)
-    
+
     normalised = _normalize_profile_for_machine(profile_json)
     base_url = _resolve_meticulous_base_url()
     client = _get_http_client()
@@ -494,7 +513,7 @@ async def async_create_profile(profile_json):
                 "profile_keys": list(normalised.keys()),
                 "stage_count": len(normalised.get("stages", [])),
                 "stage_keys": [s.get("key") for s in normalised.get("stages", [])],
-            }
+            },
         )
     response.raise_for_status()
     invalidate_profile_list_cache()
@@ -536,7 +555,7 @@ async def async_load_profile_from_json(profile_json: Dict[str, Any]):
             extra={
                 "status": response.status_code,
                 "profile_name": normalised.get("name"),
-            }
+            },
         )
     response.raise_for_status()
     return response.json()

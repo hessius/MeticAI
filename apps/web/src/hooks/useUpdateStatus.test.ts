@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useUpdateStatus } from './useUpdateStatus'
 
+vi.mock('@/lib/config', () => ({
+  getServerUrl: vi.fn(async () => ''),
+}))
+
+vi.mock('@/lib/featureFlags', () => ({
+  hasFeature: vi.fn((feature: string) => feature === 'watchtowerUpdate' || feature === 'bridgeStatus'),
+}))
+
 describe('useUpdateStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks()

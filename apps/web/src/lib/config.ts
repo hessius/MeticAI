@@ -1,3 +1,5 @@
+import { isDirectMode, isDemoMode } from './machineMode';
+
 /**
  * Configuration loader for application settings
  * Reads configuration from config.json file
@@ -19,8 +21,17 @@ export async function loadConfig(): Promise<AppConfig> {
     return cachedConfig;
   }
 
+  // In direct/native mode, no config.json exists — use defaults immediately.
+  // For native (Capacitor), serverUrl is the stored machine URL so that
+  // hooks using getServerUrl() make requests to the machine, not the WebView.
+  if (isDirectMode() || isDemoMode()) {
+    cachedConfig = getDefaultConfig();
+    return cachedConfig;
+  }
+
   try {
-    const response = await fetch('/config.json');
+    const base = import.meta.env.BASE_URL || '/';
+    const response = await fetch(`${base}config.json`);
     if (!response.ok) {
       // Expected when running without a config file — use defaults silently
       cachedConfig = getDefaultConfig();
@@ -46,13 +57,16 @@ export async function loadConfig(): Promise<AppConfig> {
 }
 
 /**
- * Returns the default configuration
- * @returns AppConfig The default configuration
+ * Returns the default configuration.
+ *
+ * serverUrl is always empty so that API calls use relative paths.
+ * In native mode (Capacitor), the DirectModeInterceptor catches these
+ * relative URLs and routes them to the machine or provides local stubs.
+ * Returning the machine URL here would create absolute URLs that bypass
+ * the interceptor — causing proxy endpoints to hit the machine directly.
  */
 function getDefaultConfig(): AppConfig {
-  return {
-    serverUrl: ''
-  };
+  return { serverUrl: '' };
 }
 
 /**
@@ -62,4 +76,11 @@ function getDefaultConfig(): AppConfig {
 export async function getServerUrl(): Promise<string> {
   const config = await loadConfig();
   return config.serverUrl ?? '';
+}
+
+/**
+ * Invalidate cached config (e.g., when machine URL changes in native mode).
+ */
+export function resetConfig(): void {
+  cachedConfig = null;
 }

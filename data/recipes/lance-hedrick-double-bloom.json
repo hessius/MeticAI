@@ -1,0 +1,70 @@
+{
+  "version": "1.1.0",
+  "metadata": {
+    "name": "One and Done Double Bloom",
+    "author": "Lance Hedrick",
+    "description": "Double bloom technique for maximum extraction clarity. Two short blooms fully saturate the bed before a single aggressive centre pour. Grind finer than typical (target 2:00–2:30 draw down). Use 93–96°C for light roasts, 90–93°C for medium, lower for darker roasts. 1:15 ratio.",
+    "compatibility": [
+      "V60",
+      "Origami",
+      "April"
+    ],
+    "visualizer_hint": "pulse_block"
+  },
+  "equipment": {
+    "dripper": {
+      "model": "V60",
+      "material": "Plastic"
+    },
+    "filter_type": "Paper"
+  },
+  "ingredients": {
+    "coffee_g": 15.0,
+    "water_g": 225.0,
+    "grind_setting": "Fine"
+  },
+  "protocol": [
+    {
+      "step": 1,
+      "action": "bloom",
+      "water_g": 45,
+      "duration_s": 10,
+      "flow_rate": "steady",
+      "notes": "Pour 45g (3× dose) at 5–10 ml/s — first bloom to wet all grounds"
+    },
+    {
+      "step": 2,
+      "action": "wait",
+      "duration_s": 20,
+      "notes": "Wait until 0:30 — let first bloom degas"
+    },
+    {
+      "step": 3,
+      "action": "pour",
+      "water_g": 45,
+      "duration_s": 10,
+      "flow_rate": "steady",
+      "notes": "Pour to 90g at 5–10 ml/s — second bloom for full saturation"
+    },
+    {
+      "step": 4,
+      "action": "wait",
+      "duration_s": 20,
+      "notes": "Wait until 1:00 — let second bloom settle"
+    },
+    {
+      "step": 5,
+      "action": "pour",
+      "water_g": 135,
+      "duration_s": 15,
+      "flow_rate": "fast",
+      "notes": "Pour to 225g at 9–10 ml/s in coin-sized circles in the centre — single aggressive main pour"
+    },
+    {
+      "step": 6,
+      "action": "swirl",
+      "duration_s": 5,
+      "notes": "Gentle Rao spin to level the bed"
+    }
+  ]
+}

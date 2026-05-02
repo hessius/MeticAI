@@ -8,7 +8,7 @@
  *  • Quick-action buttons (idle) or live shot metrics (brewing)
  *  • An expand toggle that reveals ControlCenterExpanded
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import {
   Scales,
   CaretDown,
   CaretUp,
+  CaretUpDown,
   Eye,
   XCircle,
   Thermometer,
@@ -33,7 +34,14 @@ import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
 import { relativeTime } from '@/lib/timeUtils'
 import { getServerUrl } from '@/lib/config'
+import { useHaptics } from '@/hooks/useHaptics'
+import { getProfileImageValue, useProfileImageSrc, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { isDirectMode, isNativePlatform as isNativePlatformFn } from '@/lib/machineMode'
+import { useResolvedMachineUrl } from '@/services/machine/useResolvedMachineUrl'
+import { toast } from 'sonner'
 import { ControlCenterExpanded } from './ControlCenterExpanded'
+import { ProfileDropdown, type DropdownProfile } from './ProfileDropdown'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -96,9 +104,14 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const prevShotsRef = useRef<number | null>(null)
-  const [profileImgUrl, setProfileImgUrl] = useState<string | null>(null)
+  const profileSectionRef = useRef<HTMLDivElement>(null)
   const [profileImgError, setProfileImgError] = useState(false)
   const [profileAuthor, setProfileAuthor] = useState<string | null>(null)
+  const [machineProfiles, setMachineProfiles] = useState<DropdownProfile[]>([])
+  const { impact } = useHaptics()
+  const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
+  const directImageMode = isDirectMode() || isNativePlatformFn()
+  const resolvedMachineUrl = useResolvedMachineUrl(directImageMode)
 
   // Shared state derivation + command executor
   const {
@@ -106,52 +119,123 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
     canStart, canAbortWarmup, cmd,
   } = useMachineActions(machineState)
   const machine = useMachineService()
+  const isConnected = machineState.connected ?? false
 
   // Build the profile image URL when active_profile changes
-  // Suppress MeticAI-managed temp profiles — they're transient and deleted after cleanup.
+  // Suppress Metic-managed temp profiles — they're transient and deleted after cleanup.
   const activeProfile = (machineState.active_profile &&
-    !machineState.active_profile.startsWith('MeticAI '))
+    !machineState.active_profile.startsWith('Metic '))
     ? machineState.active_profile : null
 
-  // Reset dependent state when active profile is cleared
+  // Pending profile — selected in UI but not yet loaded on machine.
+  // Only sent to the machine when the user explicitly presses Start.
+  const [pendingProfile, setPendingProfile] = useState<string | null>(null)
+
+  // The profile to display in the UI (pending overrides active)
+  const displayProfile = pendingProfile ?? activeProfile
+
+  // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
+  const activeProfileImgUrl = useProfileImageSrc(activeProfile)
+
+  // When a pending profile is selected, resolve its image from the dropdown cache
+  const pendingProfileMeta = useMemo(() => {
+    if (!pendingProfile) return null
+    return machineProfiles.find(p => p.name === pendingProfile) ?? null
+  }, [pendingProfile, machineProfiles])
+
+  const profileImgUrl = pendingProfileMeta?.resolvedImageUrl ?? activeProfileImgUrl
+
+  // Clear pending once the machine reports it as active
   useEffect(() => {
-    if (!activeProfile) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state when profile clears
-      setProfileImgUrl(null)
+    if (activeProfile && activeProfile === pendingProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPendingProfile(null)
+    }
+  }, [activeProfile, pendingProfile])
+
+  // Reset dependent state when displayed profile changes
+  useEffect(() => {
+    if (!displayProfile) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileImgError(false)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileAuthor(null)
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setProfileImgError(false)
     }
-  }, [activeProfile])
+  }, [displayProfile])
 
+  // Fetch profiles (for author + change selector) — on mount and when connection is established
   useEffect(() => {
+    if (!isConnected) return
     let cancelled = false
-    if (!activeProfile) {
-      return
-    }
     ;(async () => {
-      const base = await getServerUrl()
-      if (!cancelled) {
-        setProfileImgUrl(`${base}/api/profile/${encodeURIComponent(activeProfile!)}/image-proxy`)
-        setProfileImgError(false)
-      }
-      // Fetch profile author from machine profiles
       try {
+        const base = await getServerUrl()
         const res = await fetch(`${base}/api/machine/profiles`)
         if (res.ok && !cancelled) {
           const data = await res.json()
-          const match = (data.profiles ?? []).find(
-            (p: { name: string; author?: string }) => p.name === activeProfile
-          )
-          setProfileAuthor(match?.author ?? null)
+          interface RawProfile {
+            id: string
+            name?: string
+            author?: string
+            image?: string
+            display?: { description?: string; shortDescription?: string; image?: string }
+          }
+          const isDirect = directImageMode
+          const profiles: DropdownProfile[] = (data.profiles ?? [])
+            .filter((p: RawProfile) => p.name)
+            .map((p: RawProfile) => ({
+              id: p.id,
+              name: p.name!,
+              author: p.author,
+              image: p.image,
+              display: p.display,
+              // In direct/native mode, resolve machine-relative image URLs.
+              // In proxy mode, leave null — the image cache uses /api/profile/{name}/image-proxy.
+              resolvedImageUrl: isDirect
+                ? resolveDisplayImage(getProfileImageValue(p), resolvedMachineUrl || undefined)
+                : null,
+            }))
+          setMachineProfiles(profiles)
+          // In proxy mode, batch-fetch images only for profiles without a display image
+          if (!isDirect) {
+            const needsImage = profiles.filter(p => !getProfileImageValue(p)).map(p => p.name)
+            if (needsImage.length > 0) fetchImagesForProfiles(needsImage)
+          }
         }
       } catch {
-        // Silently ignore — author just won't show
+        // Silently ignore
       }
     })()
     return () => { cancelled = true }
-  }, [activeProfile])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, fetchImagesForProfiles, directImageMode, resolvedMachineUrl])
+
+  // Derive profileAuthor from machineProfiles when activeProfile changes
+  useEffect(() => {
+    if (!activeProfile) return
+    const match = machineProfiles.find(p => p.name === activeProfile)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProfileAuthor(match?.author ?? null)
+  }, [activeProfile, machineProfiles])
+
+  // Merge display images with cached fallbacks for the dropdown
+  const dropdownProfiles = useMemo<DropdownProfile[]>(() =>
+    machineProfiles.map(p => ({
+      ...p,
+      resolvedImageUrl: p.resolvedImageUrl || getImageUrl(p.name) || null,
+    })),
+    [machineProfiles, getImageUrl],
+  )
+
+  // Profile change handler — UI-only, does NOT touch the machine
+  const handleSelectProfile = useCallback((name: string) => {
+    impact('light')
+    setPendingProfile(name === activeProfile ? null : name)
+    toast.success(t('controlCenter.toasts.profileSelected', { name }))
+  }, [t, activeProfile, impact])
 
   // 🎉 Confetti celebration for every 100th shot
   useEffect(() => {
@@ -182,6 +266,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
           <Skeleton className="h-9 flex-1" />
           <Skeleton className="h-9 flex-1" />
         </div>
+        <div className="border-t border-border/30" />
+        <Skeleton className="h-4 w-16 mx-auto" />
       </Card>
     )
   }
@@ -199,38 +285,17 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   }
 
   return (
-    <Card className={`p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
-      {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Coffee size={18} weight="duotone" className="text-primary" />
-          <span className="text-sm font-semibold text-foreground">Meticulous</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {(() => {
-            const { dot, key } = connectionDot(machineState)
-            return (
-              <>
-                <span className="text-[10px] text-muted-foreground">
-                  {t(`controlCenter.connection.${key}`)}
-                </span>
-                <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
-              </>
-            )
-          })()}
-        </div>
-      </div>
-
+    <Card className={`frosted-card p-4 space-y-3 ${machineState._stale ? 'border-amber-500/30' : ''}`}>
       {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>
-          {/* Temperature + state */}
+          {/* Temperature + connection status — single row */}
           <div className="flex items-end justify-between">
             <div className="flex items-baseline gap-1.5">
               <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
               <span className="text-2xl font-bold tabular-nums text-foreground">
-                {machineState.brew_head_temperature != null
-                  ? machineState.brew_head_temperature.toFixed(1)
+                {machineState.boiler_temperature != null
+                  ? machineState.boiler_temperature.toFixed(1)
                   : '—'}
               </span>
               <span className="text-sm text-muted-foreground">°C</span>
@@ -241,8 +306,20 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground">{t('controlCenter.labels.status')}</span>
-              {stateBadge(machineState.state, false, t)}
+              {(() => {
+                const { dot, key } = connectionDot(machineState)
+                return (
+                  <>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t(`controlCenter.connection.${key}`)}
+                    </span>
+                    {machineState.state && machineState._wsConnected && (
+                      stateBadge(machineState.state, false, t)
+                    )}
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
+                  </>
+                )
+              })()}
             </div>
           </div>
 
@@ -261,36 +338,128 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             )
           })()}
 
-          {/* Active profile with image + author */}
-          {activeProfile && (
+          {/* Active profile with image + author + change button */}
+          {displayProfile && (
+            <div className="space-y-1" ref={profileSectionRef}>
+              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {pendingProfile
+                  ? t('controlCenter.sections.selectedProfile')
+                  : t('controlCenter.sections.activeProfile')}
+              </h4>
+              {dropdownProfiles.length > 0 && (isIdle || isPreheating || isReady) && isConnected ? (
+                <ProfileDropdown
+                  profiles={dropdownProfiles}
+                  activeProfile={displayProfile}
+                  onSelectProfile={handleSelectProfile}
+                  anchorRef={profileSectionRef}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                      {profileImgUrl && !profileImgError ? (
+                        <img
+                          src={profileImgUrl}
+                          alt={displayProfile ?? ''}
+                          className="h-full w-full object-cover"
+                          onError={() => setProfileImgError(true)}
+                        />
+                      ) : (
+                        <Coffee size={24} className="text-muted-foreground" weight="duotone" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="overflow-hidden">
+                        <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
+                          style={{
+                            animation: displayProfile && displayProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                          }}
+                        >
+                          {displayProfile}
+                        </span>
+                      </div>
+                      {(pendingProfileMeta?.author ?? profileAuthor) && (
+                        <span className="text-xs text-muted-foreground truncate block">
+                          {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
+                        </span>
+                      )}
+                    </div>
+                    <CaretUpDown size={16} weight="bold" className="shrink-0 text-muted-foreground" />
+                  </div>
+                </ProfileDropdown>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                    {profileImgUrl && !profileImgError ? (
+                      <img
+                        src={profileImgUrl}
+                        alt={displayProfile ?? ''}
+                        className="h-full w-full object-cover"
+                        onError={() => setProfileImgError(true)}
+                      />
+                    ) : (
+                      <Coffee size={24} className="text-muted-foreground" weight="duotone" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="overflow-hidden">
+                      <span className="text-sm text-foreground font-semibold block whitespace-nowrap"
+                        style={{
+                          animation: displayProfile && displayProfile.length > 25 ? 'marquee 8s linear infinite' : 'none',
+                        }}
+                      >
+                        {displayProfile}
+                      </span>
+                    </div>
+                    {(pendingProfileMeta?.author ?? profileAuthor) && (
+                      <span className="text-xs text-muted-foreground truncate block">
+                        {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Empty state when no profile is active — always show when connected */}
+          {!displayProfile && isConnected && (
             <div className="space-y-1">
               <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {t('controlCenter.sections.activeProfile')}
               </h4>
-              <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-                {profileImgUrl && !profileImgError ? (
-                  <img
-                    src={profileImgUrl}
-                    alt={activeProfile ?? ''}
-                    className="h-full w-full object-cover"
-                    onError={() => setProfileImgError(true)}
-                  />
-                ) : (
-                  <Coffee size={14} className="text-muted-foreground" weight="duotone" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-xs text-foreground font-medium truncate block">
-                  {activeProfile}
-                </span>
-                {profileAuthor && (
-                  <span className="text-[10px] text-muted-foreground truncate block">
-                    {t('controlCenter.labels.by')} {profileAuthor}
-                  </span>
-                )}
-              </div>
-              </div>
+              {dropdownProfiles.length > 0 ? (
+                <ProfileDropdown
+                  profiles={dropdownProfiles}
+                  activeProfile=""
+                  onSelectProfile={handleSelectProfile}
+                  anchorRef={profileSectionRef}
+                >
+                  <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/30 p-3 cursor-pointer hover:border-muted-foreground/50 transition-colors">
+                    <div className="h-12 w-12 rounded-xl bg-muted shrink-0 flex items-center justify-center">
+                      <Coffee size={24} className="text-muted-foreground/50" weight="duotone" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm text-muted-foreground font-medium block">
+                        {t('controlCenter.noProfileSelected')}
+                      </span>
+                      <span className="text-xs text-muted-foreground/70 block">
+                        {t('controlCenter.tapToSelect')}
+                      </span>
+                    </div>
+                    <CaretUpDown size={16} weight="bold" className="shrink-0 text-muted-foreground/50" />
+                  </div>
+                </ProfileDropdown>
+              ) : (
+                <div className="flex items-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/30 p-3">
+                  <div className="h-12 w-12 rounded-xl bg-muted shrink-0 flex items-center justify-center">
+                    <Coffee size={24} className="text-muted-foreground/50" weight="duotone" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm text-muted-foreground font-medium block">
+                      {t('controlCenter.noProfileSelected')}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -314,13 +483,26 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
 
           {/* Quick actions — adapt to preheat/ready/idle state */}
           <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
-            {/* Start button — available during idle, preheating, or ready */}
+            {/* Start button — loads pending profile first if needed, then starts */}
             <Button
               variant="dark-brew"
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!canStart}
-              onClick={() => cmd(() => isReady ? machine.continueShot() : machine.startShot(), 'startingShot')}
+              onClick={() => {
+                impact('medium')
+                cmd(async () => {
+                  if (pendingProfile && pendingProfile !== activeProfile) {
+                    const res = await machine.loadProfile(pendingProfile)
+                    if (!res.success) {
+                      toast.error(res.message ?? t('controlCenter.toasts.error'))
+                      return { success: false }
+                    }
+                    await new Promise(r => setTimeout(r, 300))
+                  }
+                  return isReady ? machine.continueShot() : machine.startShot()
+                }, 'startingShot')
+              }}
             >
               <Play size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.start')}
@@ -332,7 +514,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!machineState.connected}
-                onClick={() => cmd(() => machine.abortShot(), isPreheating ? 'preheatCancelled' : 'warmupCancelled')}
+                onClick={() => { impact('medium'); cmd(() => machine.abortShot(), isPreheating ? 'preheatCancelled' : 'warmupCancelled') }}
               >
                 <XCircle size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.abortPreheat')}
@@ -343,7 +525,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 size="sm"
                 className="flex-1 min-w-0 h-9 text-xs"
                 disabled={!isIdle || !machineState.connected}
-                onClick={() => cmd(() => machine.preheat(), 'preheating')}
+                onClick={() => { impact('medium'); cmd(() => machine.preheat(), 'preheating') }}
               >
                 <Fire size={14} weight="fill" className="mr-1 shrink-0" />
                 {t('controlCenter.actions.preheat')}
@@ -354,7 +536,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               size="sm"
               className="flex-1 min-w-0 h-9 text-xs"
               disabled={!machineState.connected}
-              onClick={() => cmd(() => machine.tareScale(), 'tared')}
+              onClick={() => { impact('light'); cmd(() => machine.tareScale(), 'tared') }}
             >
               <Scales size={14} weight="fill" className="mr-1 shrink-0" />
               {t('controlCenter.actions.tare')}
@@ -383,7 +565,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             {stateBadge(machineState.state, true, t)}
             <span className="text-xs text-muted-foreground tabular-nums">
               <Thermometer size={12} className="inline mr-0.5" weight="duotone" />
-              {machineState.brew_head_temperature?.toFixed(1) ?? '—'}°C
+              {machineState.boiler_temperature?.toFixed(1) ?? '—'}°C
             </span>
           </div>
 
@@ -430,7 +612,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               variant="destructive"
               size="sm"
               className="h-9 text-xs"
-              onClick={() => cmd(() => machine.stopShot(), 'stopping')}
+              onClick={() => { impact('heavy'); cmd(() => machine.stopShot(), 'stopping') }}
             >
               <Stop size={14} weight="fill" className="mr-1" />
               {t('controlCenter.actions.stop')}
@@ -471,7 +653,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <ControlCenterExpanded machineState={machineState} profileAuthor={profileAuthor} />
+            <ControlCenterExpanded machineState={machineState} />
           </motion.div>
         )}
       </AnimatePresence>

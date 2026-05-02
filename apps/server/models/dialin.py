@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 class RoastLevel(str, Enum):
     """Coffee roast level."""
+
     LIGHT = "light"
     MEDIUM_LIGHT = "medium-light"
     MEDIUM = "medium"
@@ -20,6 +21,7 @@ class RoastLevel(str, Enum):
 
 class CoffeeProcess(str, Enum):
     """Coffee processing method."""
+
     WASHED = "washed"
     NATURAL = "natural"
     HONEY = "honey"
@@ -29,6 +31,7 @@ class CoffeeProcess(str, Enum):
 
 class SessionStatus(str, Enum):
     """Dial-in session lifecycle status."""
+
     ACTIVE = "active"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
@@ -36,6 +39,7 @@ class SessionStatus(str, Enum):
 
 class CoffeeDetails(BaseModel):
     """Describes the coffee being dialled in."""
+
     roast_level: RoastLevel
     origin: Optional[str] = None
     process: Optional[CoffeeProcess] = None
@@ -44,6 +48,7 @@ class CoffeeDetails(BaseModel):
 
 class TasteFeedback(BaseModel):
     """User taste feedback from the Espresso Compass widget."""
+
     x: float = Field(..., ge=-1, le=1, description="Sour (-1) to Bitter (1)")
     y: float = Field(..., ge=-1, le=1, description="Weak (-1) to Strong (1)")
     descriptors: list[str] = Field(default_factory=list)
@@ -52,6 +57,7 @@ class TasteFeedback(BaseModel):
 
 class DialInIteration(BaseModel):
     """A single shot-taste-adjust iteration within a session."""
+
     iteration_number: int
     shot_ref: Optional[str] = None
     taste: TasteFeedback
@@ -61,6 +67,7 @@ class DialInIteration(BaseModel):
 
 class DialInSession(BaseModel):
     """A complete dial-in guide session."""
+
     id: str
     coffee: CoffeeDetails
     profile_name: Optional[str] = None

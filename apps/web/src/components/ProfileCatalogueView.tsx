@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,14 +19,23 @@ import {
   CheckCircle,
   SpinnerGap,
   FileJs,
-  X
+  X,
+  Plus,
+  Funnel
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { hasFeature } from '@/lib/featureFlags'
+import { useResolvedMachineUrl } from '@/services/machine/useResolvedMachineUrl'
+import { ProfileImage } from '@/components/ProfileImage'
+import { extractTagsFromPreferences, getTagColorClass } from '@/lib/tags'
 import { DeleteProfileDialog } from './DeleteProfileDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { OrphanResolutionDialog } from './OrphanResolutionDialog'
+import { ProfileImportDialog } from './ProfileImportDialog'
 import { SyncReport, SyncResults } from './SyncReport'
 
 interface MachineProfile {
@@ -35,8 +44,17 @@ interface MachineProfile {
   author?: string
   temperature?: number
   final_weight?: number
+  image?: string
   in_history: boolean
   has_description: boolean
+  user_preferences?: string | null
+  derived_tags?: string[]
+  display?: {
+    description?: string
+    shortDescription?: string
+    accentColor?: string
+    image?: string
+  }
 }
 
 interface OrphanedEntry {
@@ -46,87 +64,38 @@ interface OrphanedEntry {
   has_profile_json: boolean
 }
 
+interface HistoryEntrySummary {
+  id: string
+  profile_name: string
+  created_at?: string
+}
+
 interface ProfileCatalogueViewProps {
   onBack: () => void
+  onViewProfile?: (profile: MachineProfile) => void
 }
 
-const SWIPE_THRESHOLD = -80
-
-function SwipeableCard({
-  children,
-  onSwipeDelete,
-  isCoarse,
-}: {
-  children: React.ReactNode
-  onSwipeDelete: () => void
-  isCoarse: boolean
-}) {
-  const x = useMotionValue(0)
-  const deleteOpacity = useTransform(x, [-120, -60], [1, 0])
-  const deleteScale = useTransform(x, [-120, -60], [1, 0.8])
-
-  if (!isCoarse) {
-    return <>{children}</>
-  }
-
-  const handleDragEnd = (_: never, info: PanInfo) => {
-    if (info.offset.x < SWIPE_THRESHOLD) {
-      onSwipeDelete()
-    }
-  }
-
-  return (
-    <div className="relative overflow-hidden rounded-lg">
-      {/* Delete action revealed behind card */}
-      <motion.div
-        className="absolute inset-y-0 right-0 flex items-center justify-center w-20 bg-destructive text-destructive-foreground rounded-r-lg"
-        style={{ opacity: deleteOpacity, scale: deleteScale }}
-      >
-        <Trash className="w-6 h-6" />
-      </motion.div>
-
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: -120, right: 0 }}
-        dragElastic={0.1}
-        onDragEnd={handleDragEnd}
-        style={{ x }}
-        className="relative z-10"
-      >
-        {children}
-      </motion.div>
-    </div>
-  )
-}
-
-function ProfileImage({ imageUrl }: { imageUrl?: string }) {
-  const [error, setError] = useState(false)
-
-  return (
-    <div className="w-10 h-10 rounded-full overflow-hidden border border-border/30 shrink-0 bg-secondary/60">
-      {imageUrl && !error ? (
-        <img
-          src={imageUrl}
-          alt=""
-          className="w-full h-full object-cover"
-          onError={() => setError(true)}
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Coffee size={18} className="text-muted-foreground/40" weight="fill" />
-        </div>
-      )}
-    </div>
-  )
-}
-
-export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
+export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
+  const directImageMode = isDirectMode() || isNativePlatform()
+  const resolvedMachineUrl = useResolvedMachineUrl(directImageMode)
+
+  // Read static description cache (populated by main.tsx in direct mode)
+  const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+  const getShortDescription = (profile: MachineProfile): string | undefined => {
+    if (profile.display?.shortDescription) return profile.display.shortDescription
+    const full = descCache?.get(profile.id)
+    if (!full) return undefined
+    const m = full.match(/Description:\s*([\s\S]*?)(?:\n\n|Preparation:)/i)
+    return m?.[1]?.trim() || undefined
+  }
   
   // State
   const [profiles, setProfiles] = useState<MachineProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   
   // Rename state
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -143,6 +112,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   // Orphan state
   const [orphanedEntries, setOrphanedEntries] = useState<OrphanedEntry[]>([])
   const [orphanDialogOpen, setOrphanDialogOpen] = useState(false)
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntrySummary[]>([])
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
@@ -157,6 +127,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   // Bulk delete dialog state
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
+  // Filter state
+  const [selectedFilterTags, setSelectedFilterTags] = useState<string[]>([])
+  const [filterMode, setFilterMode] = useState<'AND' | 'OR'>('OR')
+  const [showFilters, setShowFilters] = useState(false)
+
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
 
@@ -164,16 +139,6 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
 
   // Detect coarse pointer (touch device)
-  const [isCoarsePointer, setIsCoarsePointer] = useState(false)
-  useEffect(() => {
-    const mql = window.matchMedia('(pointer: coarse)')
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync initial media query state
-    setIsCoarsePointer(mql.matches)
-    const handler = (e: MediaQueryListEvent) => setIsCoarsePointer(e.matches)
-    mql.addEventListener('change', handler)
-    return () => mql.removeEventListener('change', handler)
-  }, [])
-  
   // Fetch profiles from machine
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true)
@@ -187,7 +152,8 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
       }
       
       const data = await response.json()
-      setProfiles(data.profiles || [])
+      setIsOffline(data.offline === true)
+      setProfiles(Array.isArray(data?.profiles) ? data.profiles : [])
     } catch (err) {
       const message = err instanceof Error ? err.message : t('profileCatalogue.fetchFailed')
       setError(message)
@@ -210,8 +176,36 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     }
   }, [])
 
+  // Fetch history entries for reliable profile-name -> history-id resolution
+  const fetchHistoryEntries = useCallback(async () => {
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+      if (!response.ok) return
+
+      const data = await response.json()
+      const entries = Array.isArray(data?.entries) ? data.entries : []
+
+      setHistoryEntries(
+        entries
+          .filter((entry: unknown): entry is HistoryEntrySummary => (
+            typeof (entry as Record<string, unknown>)?.id === 'string' && typeof (entry as Record<string, unknown>)?.profile_name === 'string'
+          ))
+          .map((entry: HistoryEntrySummary) => ({
+            id: entry.id,
+            profile_name: entry.profile_name,
+            created_at: typeof entry.created_at === 'string' ? entry.created_at : undefined,
+          }))
+      )
+    } catch {
+      // Non-critical — silently ignore
+    }
+  }, [])
+
   // Fetch sync status badge count
   const fetchSyncStatus = useCallback(async () => {
+    if (!hasFeature('cloudSync')) return
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/profiles/sync/status`)
@@ -227,6 +221,8 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
 
   // Run full sync
   const handleSync = async () => {
+    if (!hasFeature('cloudSync')) return
+
     setIsSyncing(true)
     try {
       const serverUrl = await getServerUrl()
@@ -256,9 +252,9 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     fetchProfiles()
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchOrphaned()
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchSyncStatus()
-  }, [fetchProfiles, fetchOrphaned, fetchSyncStatus])
+    fetchHistoryEntries()
+    if (hasFeature('cloudSync')) fetchSyncStatus()
+  }, [fetchProfiles, fetchOrphaned, fetchHistoryEntries, fetchSyncStatus])
 
   // Fetch profile images when profile list changes
   useEffect(() => {
@@ -270,24 +266,39 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   // Auto-sync is now handled globally in App.tsx — just refresh data periodically
   // when the catalogue view is visible
   useEffect(() => {
-    if (!autoSyncEnabled) return
+    if (!hasFeature('cloudSync') || !autoSyncEnabled) return
     const refreshInterval = setInterval(() => {
       fetchProfiles()
       fetchOrphaned()
-      fetchSyncStatus()
+      fetchHistoryEntries()
+      if (hasFeature('cloudSync')) fetchSyncStatus()
     }, 5 * 60 * 1000)
     return () => clearInterval(refreshInterval)
-  }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchSyncStatus])
+  }, [autoSyncEnabled, fetchProfiles, fetchOrphaned, fetchHistoryEntries, fetchSyncStatus])
 
   // Find history ID for a profile by name
   const findHistoryId = useCallback(
     (profileName: string): string | undefined => {
-      const orphan = orphanedEntries.find(
-        (e) => e.profile_name === profileName
+      const normalizedProfileName = profileName.trim().toLowerCase()
+      const matches = historyEntries.filter(
+        (entry) => entry.profile_name.trim().toLowerCase() === normalizedProfileName
       )
-      return orphan?.id
+
+      if (matches.length === 0) {
+        return undefined
+      }
+
+      const sortedMatches = [...matches].sort((a, b) => {
+        const aTime = a.created_at ? Date.parse(a.created_at) : Number.NEGATIVE_INFINITY
+        const bTime = b.created_at ? Date.parse(b.created_at) : Number.NEGATIVE_INFINITY
+        const aValid = Number.isFinite(aTime) ? aTime : Number.NEGATIVE_INFINITY
+        const bValid = Number.isFinite(bTime) ? bTime : Number.NEGATIVE_INFINITY
+        return bValid - aValid
+      })
+
+      return sortedMatches[0]?.id
     },
-    [orphanedEntries]
+    [historyEntries]
   )
   
   // Rename profile
@@ -340,6 +351,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
     setDeleteTarget(null)
     fetchProfiles()
     fetchOrphaned()
+    fetchHistoryEntries()
   }
   
   // Export profile JSON
@@ -386,15 +398,51 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
   const isOrphaned = (profileName: string): boolean =>
     orphanedEntries.some((e) => e.profile_name === profileName)
 
+  const availableTags = useMemo(() => {
+    const allTags = new Set<string>()
+    for (const profile of profiles) {
+      const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+      for (const tag of prefTags) allTags.add(tag)
+      for (const tag of profile.derived_tags ?? []) allTags.add(tag)
+    }
+    return Array.from(allTags).sort()
+  }, [profiles])
+
+  const filteredProfiles = useMemo(() => {
+    if (selectedFilterTags.length === 0) return profiles
+
+    return profiles.filter((profile) => {
+      const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+      const merged = new Set([...prefTags, ...(profile.derived_tags ?? [])])
+      if (filterMode === 'AND') {
+        return selectedFilterTags.every((tag) => merged.has(tag))
+      }
+      return selectedFilterTags.some((tag) => merged.has(tag))
+    })
+  }, [profiles, selectedFilterTags, filterMode])
+
+  const toggleFilterTag = (tag: string) => {
+    setSelectedFilterTags((prev) =>
+      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
+    )
+  }
+
+  const clearFilters = () => {
+    setSelectedFilterTags([])
+  }
+
+
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="min-h-screen">
+      <Card className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="space-y-3">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
+              data-sound="back"
               onClick={onBack}
               className="shrink-0"
               aria-label={t('a11y.goBack')}
@@ -431,38 +479,142 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                 {t('profileCatalogue.bulkDelete.button')}
               </Button>
             )}
+            {hasFeature('cloudSync') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSync}
+                disabled={isSyncing || isLoading}
+                className="relative"
+              >
+                <ArrowsClockwise className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                {t('profileCatalogue.sync.button')}
+                {syncBadgeCount > 0 && !isSyncing && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 h-5 min-w-[20px] px-1 text-xs"
+                  >
+                    {syncBadgeCount}
+                  </Badge>
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={handleSync}
-              disabled={isSyncing || isLoading}
-              className="relative"
-            >
-              <ArrowsClockwise className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-              {t('profileCatalogue.sync.button')}
-              {syncBadgeCount > 0 && !isSyncing && (
-                <Badge
-                  variant="destructive"
-                  className="absolute -top-2 -right-2 h-5 min-w-[20px] px-1 text-xs"
-                >
-                  {syncBadgeCount}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { fetchProfiles(); fetchOrphaned(); fetchSyncStatus() }}
+                onClick={() => {
+                  fetchProfiles()
+                  fetchOrphaned()
+                  if (hasFeature('cloudSync')) fetchSyncStatus()
+                }}
               disabled={isLoading}
             >
               <ArrowsClockwise className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               {t('profileCatalogue.refresh')}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowImportDialog(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {t('profileCatalogue.addButton')}
+            </Button>
+            <Button
+              variant={showFilters ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setShowFilters((v) => !v)}
+              className={selectedFilterTags.length > 0 ? 'text-primary' : ''}
+            >
+              <Funnel className="w-4 h-4 mr-2" weight={showFilters || selectedFilterTags.length > 0 ? 'fill' : 'regular'} />
+              {t('history.filterByTags')}
+              {selectedFilterTags.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1 text-xs">
+                  {filteredProfiles.length}/{profiles.length}
+                </Badge>
+              )}
+            </Button>
           </div>
         </div>
 
+        {/* Filter Section */}
+        <AnimatePresence>
+          {showFilters && availableTags.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="p-4 bg-secondary/40 rounded-xl border border-border/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-foreground/80">{t('history.filterByTags')}</Label>
+                  <div className="flex items-center gap-2">
+                    {selectedFilterTags.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilters}
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        {t('common.clear')}
+                      </Button>
+                    )}
+                    <div className="flex items-center bg-secondary rounded-lg p-0.5 border border-border/30">
+                      <button
+                        onClick={() => setFilterMode('OR')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                          filterMode === 'OR'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        OR
+                      </button>
+                      <button
+                        onClick={() => setFilterMode('AND')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                          filterMode === 'AND'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        AND
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableTags.map((tag) => {
+                    const isSelected = selectedFilterTags.includes(tag)
+                    return (
+                      <Badge
+                        key={tag}
+                        onClick={() => toggleFilterTag(tag)}
+                        className={`
+                          px-2.5 py-1 text-xs font-medium cursor-pointer transition-all duration-200 border
+                          ${getTagColorClass(tag, isSelected)}
+                        `}
+                      >
+                        {tag}
+                      </Badge>
+                    )
+                  })}
+                </div>
+                {selectedFilterTags.length > 0 && (
+                  <p className="text-xs text-muted-foreground/70">
+                    {filterMode === 'OR' ? t('history.filterHintOr') : t('history.filterHintAnd')}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Auto-sync toggle */}
-        <div className="flex items-center gap-2 px-1">
+        {hasFeature('cloudSync') && <div className="flex items-center gap-2 px-1">
           <Switch
             id="auto-sync-toggle"
             checked={autoSyncEnabled}
@@ -479,10 +631,10 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
           <Label htmlFor="auto-sync-toggle" className="text-sm cursor-pointer">
             {t('profileCatalogue.sync.autoSync')}
           </Label>
-        </div>
+        </div>}
 
         {/* AI description during auto-sync toggle */}
-        {autoSyncEnabled && (
+        {hasFeature('cloudSync') && autoSyncEnabled && (
           <div className="flex items-center gap-2 px-1 pl-6">
             <Switch
               id="auto-sync-ai-desc-toggle"
@@ -501,6 +653,16 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
               {t('profileCatalogue.sync.autoSyncAiDescription')}
             </Label>
           </div>
+        )}
+
+        {/* Offline banner */}
+        {isOffline && (
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <Warning className="w-4 h-4 text-amber-500" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              {t('profileCatalogue.offlineBanner')}
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Orphan warning banner */}
@@ -538,9 +700,28 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
           </Card>
         )}
         
+        {!isLoading && profiles.length > 0 && filteredProfiles.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="p-4 rounded-2xl bg-secondary/40 inline-block mb-4">
+              <Funnel className="w-10 h-10 text-muted-foreground/40" weight="duotone" />
+            </div>
+            <p className="text-foreground/80 font-medium">{t('history.noMatchingProfiles')}</p>
+            <p className="text-sm text-muted-foreground/60 mt-1.5">
+              {t('history.noMatchingDescription')}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="mt-4"
+            >
+              {t('history.clearFilters')}
+            </Button>
+          </div>
+        ) : (
         <div className="space-y-3">
           <AnimatePresence mode="popLayout">
-            {profiles.map((profile) => (
+            {filteredProfiles.map((profile) => (
               <motion.div
                 key={profile.id}
                 layout
@@ -549,14 +730,18 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                 exit={{ opacity: 0, x: -100 }}
                 transition={{ duration: 0.2 }}
               >
-                <SwipeableCard
-                  isCoarse={isCoarsePointer}
-                  onSwipeDelete={() => openDeleteDialog(profile)}
-                >
-                  <Card className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''}`}>
+                  <Card
+                    className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''} ${!isEditing ? 'cursor-pointer active:bg-accent/50 transition-colors' : ''}`}
+                    onClick={() => !isEditing && onViewProfile?.(profile)}
+                  >
                     <div className="flex items-start gap-4">
-                      {/* Profile image */}
-                      <ProfileImage imageUrl={getImageUrl(profile.name) ?? undefined} />
+                      {/* Profile image — prefer machine's direct URL over image-proxy cache */}
+                      <ProfileImage imageUrl={
+                        (directImageMode
+                          ? (resolvedMachineUrl ? resolveDisplayImage(getProfileImageValue(profile), resolvedMachineUrl) : null)
+                          : getProfileImageValue(profile)
+                        ) ?? getImageUrl(profile.name) ?? undefined
+                      } />
                       
                       {/* Profile info */}
                       <div className="flex-1 min-w-0">
@@ -619,12 +804,46 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                                 <span>{profile.final_weight}g</span>
                               )}
                             </div>
-                            {profile.in_history && (
-                              <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                {t('profileCatalogue.inHistory')}
-                              </span>
+                            {getShortDescription(profile) && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {getShortDescription(profile)}
+                              </p>
                             )}
+                            <div className="flex items-center gap-3 mt-1">
+                              {!isOrphaned(profile.name) && (
+                                <span className="inline-flex items-center text-xs text-blue-600 dark:text-blue-400">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  {t('profileCatalogue.onMachine')}
+                                </span>
+                              )}
+                              {profile.in_history && (
+                                <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  {t('profileCatalogue.inHistory')}
+                                </span>
+                              )}
+                            </div>
+                            {(() => {
+                              const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+                              const allTags = [...new Set([...prefTags, ...(profile.derived_tags ?? [])])].sort()
+                              return allTags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {allTags.slice(0, 4).map((tag) => (
+                                    <Badge
+                                      key={tag}
+                                      className={`px-1.5 py-0.5 text-[10px] font-medium border ${getTagColorClass(tag, false)}`}
+                                    >
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                  {allTags.length > 4 && (
+                                    <Badge className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 border-transparent text-muted-foreground">
+                                      +{allTags.length - 4}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : null
+                            })()}
                           </>
                         )}
                       </div>
@@ -664,11 +883,11 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
                       )}
                     </div>
                   </Card>
-                </SwipeableCard>
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
+        )}
 
         {/* Orphaned entries section */}
         {orphanedEntries.length > 0 && (
@@ -712,17 +931,19 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
             </AnimatePresence>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Dialogs */}
       <BulkDeleteDialog
         isOpen={bulkDeleteOpen}
         profiles={profiles}
+        resolveHistoryId={findHistoryId}
         onClose={() => setBulkDeleteOpen(false)}
         onDeleted={() => {
           setBulkDeleteOpen(false)
           fetchProfiles()
           fetchOrphaned()
+          fetchHistoryEntries()
           fetchSyncStatus()
         }}
       />
@@ -744,6 +965,7 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
           setOrphanDialogOpen(false)
           fetchProfiles()
           fetchOrphaned()
+          fetchHistoryEntries()
         }}
       />
 
@@ -755,8 +977,16 @@ export function ProfileCatalogueView({ onBack }: ProfileCatalogueViewProps) {
           setSyncResults(null)
           fetchProfiles()
           fetchOrphaned()
+          fetchHistoryEntries()
           fetchSyncStatus()
         }}
+      />
+
+      <ProfileImportDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImported={() => { setShowImportDialog(false); fetchProfiles(); fetchOrphaned(); fetchHistoryEntries() }}
+        onGenerateNew={() => setShowImportDialog(false)}
       />
     </div>
   )

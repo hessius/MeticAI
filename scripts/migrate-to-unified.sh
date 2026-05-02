@@ -1,8 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# MeticAI Migration Script (v1 → v2)
+# Metic Migration Script (v1 → v2)
 # ==============================================================================
-# Migrates existing MeticAI v1.x installations to the v2.0 unified container.
+# Migrates existing Metic v1.x installations to the v2.0 unified container.
 #
 # Supports three invocation scenarios:
 #   1. Manual install — user runs install.sh, it detects v1 and calls this
@@ -55,7 +55,7 @@ log_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 
 echo ""
-echo "☕ MeticAI Migration Tool (v1 → v2)"
+echo "☕ Metic Migration Tool (v1 → v2)"
 echo "====================================="
 if [[ "$IS_INTERACTIVE" == "true" ]]; then
     echo "  Mode: interactive"
@@ -72,7 +72,7 @@ fi
 
 # Check if old installation exists
 if [[ ! -d "$INSTALL_DIR" ]] && [[ ! -f "${INSTALL_DIR}/.env" ]]; then
-    log_warning "No existing MeticAI installation found at $INSTALL_DIR"
+    log_warning "No existing Metic installation found at $INSTALL_DIR"
     echo "Run the installer instead:"
     echo "  curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash"
     exit 0
@@ -269,7 +269,7 @@ fi
 log_info "Writing configuration..."
 
 cat > .env << ENVEOF
-# MeticAI Configuration
+# Metic Configuration
 # Migrated from v1 on $(date)
 
 # Required
@@ -312,7 +312,7 @@ cat > update.sh << 'SCRIPTEND'
 #!/bin/bash
 cd "$(dirname "$0")"
 source .env 2>/dev/null
-echo "Pulling latest MeticAI image..."
+echo "Pulling latest Metic image..."
 docker compose ${COMPOSE_FILES:--f docker-compose.yml} pull
 echo "Restarting..."
 docker compose ${COMPOSE_FILES:--f docker-compose.yml} up -d
@@ -325,11 +325,11 @@ cat > uninstall.sh << 'SCRIPTEND'
 cd "$(dirname "$0")"
 source .env 2>/dev/null
 echo ""
-echo "  MeticAI Uninstaller"
+echo "  Metic Uninstaller"
 echo "  ==================="
 echo ""
 INSTALL_PATH="$(pwd)"
-echo "This will stop MeticAI and remove all files from ${INSTALL_PATH}."
+echo "This will stop Metic and remove all files from ${INSTALL_PATH}."
 echo "Your data (profiles, history) is stored in a Docker volume and will be preserved."
 echo ""
 read -p "Are you sure? (y/N): " CONFIRM < /dev/tty
@@ -347,17 +347,17 @@ if [[ "$REMOVE_DATA" =~ ^[Yy]$ ]]; then
     docker volume rm meticai-tailscale-state 2>/dev/null || true
     echo "Data volumes removed"
 fi
-read -p "Also remove the MeticAI Docker image? (y/N): " REMOVE_IMAGE < /dev/tty
+read -p "Also remove the Metic Docker image? (y/N): " REMOVE_IMAGE < /dev/tty
 if [[ "$REMOVE_IMAGE" =~ ^[Yy]$ ]]; then
     docker rmi "ghcr.io/hessius/meticai:${METICAI_TAG:-latest}" 2>/dev/null || true
     echo "Image removed"
 fi
-if [[ -d "/Applications/MeticAI.app" ]]; then
+if [[ -d "/Applications/Metic.app" ]]; then
     echo "Removing macOS app shortcut..."
-    rm -rf "/Applications/MeticAI.app" 2>/dev/null || sudo rm -rf "/Applications/MeticAI.app" 2>/dev/null || true
+    rm -rf "/Applications/Metic.app" 2>/dev/null || sudo rm -rf "/Applications/Metic.app" 2>/dev/null || true
 fi
 echo ""
-echo "MeticAI has been uninstalled."
+echo "Metic has been uninstalled."
 echo "To remove the installation directory: rm -rf ${INSTALL_PATH}"
 echo ""
 SCRIPTEND
@@ -379,17 +379,17 @@ fi
 # ==============================================================================
 # Step 9: Pull and start the unified container
 # ==============================================================================
-log_info "Pulling MeticAI unified image..."
+log_info "Pulling Metic unified image..."
 docker compose ${COMPOSE_FILES} pull 2>&1 || true
 
-log_info "Starting MeticAI..."
+log_info "Starting Metic..."
 docker compose ${COMPOSE_FILES} up -d 2>&1 || true
 
 log_info "Waiting for services to start..."
 sleep 10
 
 if docker compose ${COMPOSE_FILES} ps 2>/dev/null | grep -qi "running\|healthy\|up"; then
-    log_success "MeticAI is running!"
+    log_success "Metic is running!"
 else
     log_warning "Container may still be starting. Check with: docker compose logs -f"
 fi
@@ -414,16 +414,16 @@ echo "======================================"
 echo "✅ Migration Complete!"
 echo "======================================"
 echo ""
-echo "Access MeticAI at: http://${IP}:3550"
+echo "Access Metic at: http://${IP}:3550"
 echo ""
 echo "Backup saved to: $BACKUP_DIR"
 echo ""
 echo "Useful commands:"
 echo "  cd ~/MeticAI"
-echo "  ./start.sh        Start MeticAI"
-echo "  ./stop.sh         Stop MeticAI"
+echo "  ./start.sh        Start Metic"
+echo "  ./stop.sh         Stop Metic"
 echo "  ./update.sh       Pull latest image & restart"
-echo "  ./uninstall.sh    Remove MeticAI"
+echo "  ./uninstall.sh    Remove Metic"
 echo "  docker compose logs -f   View live logs"
 echo ""
 if [[ -z "$GEMINI_API_KEY" ]]; then

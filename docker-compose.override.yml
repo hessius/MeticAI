@@ -1,5 +1,5 @@
 # ==============================================================================
-# MeticAI Compose Override — v1.x Migration Bridge
+# Metic Compose Override — v1.x Migration Bridge
 # ==============================================================================
 # Docker Compose automatically reads this file when no -f flags are specified.
 # This is what makes Watchtower start automatically during v1.x → v2.0 migration,

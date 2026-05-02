@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { MarkdownText } from "@/components/MarkdownText";
 import {
   type ParsedSection,
   getSectionStyle,
@@ -45,7 +46,7 @@ export function SectionCard({ section }: { section: ParsedSection }) {
                   <span className="text-primary shrink-0 leading-relaxed">
                     •
                   </span>
-                  <span className="leading-relaxed">{item}</span>
+                  <MarkdownText className="leading-relaxed inline" text={item} />
                 </li>
               ))}
             </ul>
@@ -56,9 +57,7 @@ export function SectionCard({ section }: { section: ParsedSection }) {
         ))}
 
         {section.subsections.length === 0 && (
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-            {section.content}
-          </div>
+          <MarkdownText className="text-sm text-muted-foreground leading-relaxed" text={section.content} />
         )}
       </CardContent>
     </Card>

@@ -1,4 +1,4 @@
-# MeticAI Project Conventions
+# Metic Project Conventions
 
 > **This is the single source of truth for all project rules and conventions.**
 > All agent configuration files (CLAUDE.md, AGENTS.md, GEMINI.md, copilot-instructions.md) reference this document.
@@ -30,7 +30,7 @@
 
 These are **non-negotiable**. Every PR, every push, every completion claim:
 
-1. **CI must be completely green.** The Test Suite has 6 jobs (Web Tests, Server Tests, Code Quality, Pester, Web E2E, Docker Build Test) plus a separate Build and Publish workflow. All must pass.
+1. **CI must be completely green.** The Test Suite has 5 jobs (Web Tests, Server Tests, Code Quality, Web E2E, Docker Build Test) plus a separate Build and Publish workflow. All must pass.
 2. **Zero tech debt.** Address all issues immediately. Never defer tasks to "later".
 3. **No deferred tasks.** If a task is in scope, it gets done now — not added to a backlog.
 4. **All code review comments addressed.** Including suppressed/collapsed threads. Don't dismiss without clear justification.
@@ -61,6 +61,8 @@ cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -x -q &
 cd ../web && bun run lint && bun run test:run && bun run build
 ```
 
+
+- After all tests pass, also rebuild the Docker dev container (`docker compose -f docker-compose.yml -f docker-compose.dev.yml build`) and the Capacitor iOS app (`npx cap sync ios` + Xcode build) before marking a task complete.
 ## Commits
 
 - **Format:** [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`.
@@ -135,12 +137,12 @@ cd ../web && bun run lint && bun run test:run && bun run build
 
 ## CI Structure
 
-- **Test Suite workflow:** 6 jobs — Web Tests, Server Tests, Code Quality, Pester, Web E2E, Docker Build Test.
+- **Test Suite workflow:** 5 jobs — Web Tests, Server Tests, Code Quality, Web E2E, Docker Build Test.
 - **Build and Publish workflow:** Separate, runs on merge to main.
 - **Bun setup in CI:** Uses 3-attempt retry pattern to handle transient download failures.
 - **Triggers:** Test Suite runs on PRs to `main`. Build and Publish on push to `main`.
 
 ---
 
-*Last updated: 2026-03-11 | Maintained by the MeticAI team and AI agents*
+*Last updated: 2026-03-11 | Maintained by the Metic team and AI agents*
 *To add a new convention, use the `learn_convention` extension tool or edit this file directly.*

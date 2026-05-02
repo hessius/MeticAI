@@ -45,6 +45,7 @@ export function ErrorView({ errorMessage, onRetry, onBack }: ErrorViewProps) {
             Retry
           </Button>
           <Button
+            data-sound="back"
             onClick={onBack}
             variant="outline"
             className="flex-1 h-12 text-sm font-semibold rounded-full border-[rgba(255,255,255,0.1)]"

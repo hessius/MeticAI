@@ -18,7 +18,7 @@ test.describe('Control Center', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 

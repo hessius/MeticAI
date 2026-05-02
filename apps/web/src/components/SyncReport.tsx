@@ -349,7 +349,7 @@ export function SyncReport({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" data-sound="close" onClick={onClose}>
             {t('common.close')}
           </Button>
         </DialogFooter>

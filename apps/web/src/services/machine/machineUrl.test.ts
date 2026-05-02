@@ -1,0 +1,97 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { STORAGE_KEYS } from '@/lib/constants'
+
+const preferenceValues = new Map<string, string>()
+const preferencesMock = vi.hoisted(() => ({
+  get: vi.fn(async ({ key }: { key: string }) => ({ value: preferenceValues.get(key) ?? null })),
+  set: vi.fn(async ({ key, value }: { key: string; value: string }) => {
+    preferenceValues.set(key, value)
+  }),
+  remove: vi.fn(async ({ key }: { key: string }) => {
+    preferenceValues.delete(key)
+  }),
+}))
+
+vi.mock('@capacitor/preferences', () => ({
+  Preferences: preferencesMock,
+}))
+
+describe('machineUrl persistence', () => {
+  const originalLocation = window.location
+  const storageBacking = new Map<string, string>()
+  const localStorageShim = {
+    getItem: (key: string) => storageBacking.get(key) ?? null,
+    setItem: (key: string, value: string) => storageBacking.set(key, String(value)),
+    removeItem: (key: string) => storageBacking.delete(key),
+    clear: () => storageBacking.clear(),
+    get length() { return storageBacking.size },
+    key: (i: number) => [...storageBacking.keys()][i] ?? null,
+  }
+
+  beforeEach(() => {
+    storageBacking.clear()
+    vi.stubGlobal('localStorage', localStorageShim)
+    vi.resetModules()
+    vi.unstubAllEnvs()
+    vi.clearAllMocks()
+    preferenceValues.clear()
+    delete (window as unknown as { Capacitor?: unknown }).Capacitor
+    Object.defineProperty(window, 'location', {
+      value: {
+        port: '3550',
+        protocol: 'http:',
+        host: 'localhost:3550',
+        hostname: 'localhost',
+      },
+      configurable: true,
+    })
+  })
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      configurable: true,
+    })
+    delete (window as unknown as { Capacitor?: unknown }).Capacitor
+    storageBacking.clear()
+  })
+
+  it('persists web direct machine URLs in localStorage', async () => {
+    const { getStoredMachineUrl, persistMachineUrl, resolveMachineUrl } = await import('./machineUrl')
+
+    await persistMachineUrl('http://192.168.1.42:8080')
+
+    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBe('http://192.168.1.42:8080')
+    expect(await getStoredMachineUrl()).toBe('http://192.168.1.42:8080')
+    expect(await resolveMachineUrl()).toBe('http://192.168.1.42:8080')
+    expect(preferencesMock.set).not.toHaveBeenCalled()
+  })
+
+  it('persists native machine URLs in Capacitor Preferences', async () => {
+    ;(window as unknown as { Capacitor?: { isNativePlatform: () => boolean } }).Capacitor = {
+      isNativePlatform: () => true,
+    }
+    const { getStoredMachineUrl, persistMachineUrl, resolveMachineUrl } = await import('./machineUrl')
+
+    await persistMachineUrl('http://10.0.0.2:8080')
+
+    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBe('http://10.0.0.2:8080')
+    expect(preferencesMock.set).toHaveBeenCalledWith({
+      key: STORAGE_KEYS.MACHINE_URL,
+      value: 'http://10.0.0.2:8080',
+    })
+    expect(await getStoredMachineUrl()).toBe('http://10.0.0.2:8080')
+    expect(await resolveMachineUrl()).toBe('http://10.0.0.2:8080')
+  })
+
+  it('uses localStorage as sync fallback on native when Preferences are empty', async () => {
+    localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://10.0.0.5:8080')
+    ;(window as unknown as { Capacitor?: { isNativePlatform: () => boolean } }).Capacitor = {
+      isNativePlatform: () => true,
+    }
+    const { resolveMachineUrl } = await import('./machineUrl')
+
+    await expect(resolveMachineUrl()).resolves.toBe('http://10.0.0.5:8080')
+    expect(preferencesMock.get).toHaveBeenCalledWith({ key: STORAGE_KEYS.MACHINE_URL })
+  })
+})

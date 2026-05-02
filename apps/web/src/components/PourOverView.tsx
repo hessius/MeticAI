@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useWakeLock } from '@/hooks/useWakeLock'
+import { useHaptics } from '@/hooks/useHaptics'
+import { useSoundEffects } from '@/hooks/useSoundEffects'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +14,7 @@ import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Pause, Play, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, BookOpen, Scales, Timer, Drop, Stop, Play, Pause, Target, CircleNotch, Coffee, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
@@ -190,19 +194,11 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, blo
     .map(point => `${toX(point.t).toFixed(2)},${toY(point.w).toFixed(2)}`)
     .join(' ')
 
-  // Smooth flow data using a wider rolling average and clamp outliers
+  // Flow data — already smoothed upstream via EMA at data collection time
   const flowPoints = points.filter(point => point.flow !== undefined && point.flow >= 0)
-  const SMOOTH_WINDOW = 15  // ~3-5 seconds at typical update rate
-  const smoothedFlowPoints = flowPoints.map((point, i) => {
-    const windowStart = Math.max(0, i - Math.floor(SMOOTH_WINDOW / 2))
-    const windowEnd = Math.min(flowPoints.length, i + Math.ceil(SMOOTH_WINDOW / 2))
-    const windowSlice = flowPoints.slice(windowStart, windowEnd)
-    const avgFlow = windowSlice.reduce((sum, p) => sum + Math.min(p.flow ?? 0, FLOW_CLAMP), 0) / windowSlice.length
-    return { t: point.t, flow: Math.min(avgFlow, FLOW_CLAMP) }
-  })
 
-  const flowPolyline = smoothedFlowPoints
-    .map(point => `${toX(point.t).toFixed(2)},${toFlowY(point.flow).toFixed(2)}`)
+  const flowPolyline = flowPoints
+    .map(point => `${toX(point.t).toFixed(2)},${toFlowY(Math.min(point.flow ?? 0, FLOW_CLAMP)).toFixed(2)}`)
     .join(' ')
 
   const targetY = targetWeight !== null ? toY(targetWeight) : null
@@ -377,6 +373,17 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<'free' | 'ratio' | 'recipe'>('free')
   const [isRunning, setIsRunning] = useState(false)
+
+  // Keep screen awake while pour over is active
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
+  const { notification: hapticsNotification } = useHaptics()
+  const { pourOverTarget: playPourOverTarget, pourOverDone: playPourOverDone, machineError: playMachineError } = useSoundEffects()
+  const { notifyPourOverComplete } = useBrewNotifications()
+  const prevTargetReachedRef = useRef(false)
+  useEffect(() => {
+    if (isRunning) requestWakeLock()
+    else releaseWakeLock()
+  }, [isRunning, requestWakeLock, releaseWakeLock])
   const [baseElapsedMs, setBaseElapsedMs] = useState(0)
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(baseElapsedMs)
@@ -411,6 +418,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const prevBrewingRef = useRef(false)
   // Always-current machine state string for async polling
   const machineStateRef = useRef(machineState.state)
+  // Always-current brewing flag for async polling
+  const brewingRef = useRef(machineState.brewing)
 
   // ── Server-side preferences persistence ──
   const prefsRef = useRef<PourOverPreferences | null>(null)
@@ -446,9 +455,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     setMode(newMode)
     if (!prefsRef.current) return
     if (newMode === 'recipe') {
-      setMeticulousIntegration(prefsRef.current.recipe.machineIntegration)
-      setAutoStartEnabled(prefsRef.current.recipe.autoStart ?? true)
-      setRecipeProgressionMode(prefsRef.current.recipe.progressionMode ?? 'weight')
+      setMeticulousIntegration(prefsRef.current.recipe?.machineIntegration ?? false)
+      setAutoStartEnabled(prefsRef.current.recipe?.autoStart ?? true)
+      setRecipeProgressionMode(prefsRef.current.recipe?.progressionMode ?? 'weight')
     } else {
       const mp = prefsRef.current[newMode]
       setAutoStartEnabled(mp.autoStart)
@@ -545,17 +554,22 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const previousWeightTimestampRef = useRef<number | null>(null)
   const trendStartTimestampRef = useRef<number | null>(null)
   const justTaredRef = useRef(false)
+  // EMA refs for graph smoothing — smooth weight before differentiating
+  // to prevent noise amplification, then smooth the flow result too.
+  const emaWeightRef = useRef<number | null>(null)
+  const prevEmaWeightRef = useRef<number | null>(null)
+  const emaFlowRef = useRef<number>(0)
   // Track continuous flow start time for auto-start confirmation
   const flowStartTimestampRef = useRef<number | null>(null)
   // Track weight when continuous flow started (for weight-based escape hatch)
   const flowStartWeightRef = useRef<number | null>(null)
-  // Require 800ms of continuous valid flow to trigger auto-start
-  // Filters momentary disturbances while remaining responsive to quick pours
-  const FLOW_CONFIRMATION_MS = 800
+  // Require 1500ms of continuous valid flow to trigger auto-start
+  // Filters grounds settling and momentary disturbances
+  const FLOW_CONFIRMATION_MS = 1500
   // If total weight gain since flow started exceeds this threshold,
   // trigger auto-start immediately regardless of elapsed time.
-  // 3g is unambiguously a pour, not grounds settling or scale drift.
-  const FLOW_WEIGHT_ESCAPE_G = 3
+  // 8g is unambiguously a pour, not grounds settling or scale drift.
+  const FLOW_WEIGHT_ESCAPE_G = 8
 
   const { cmd, isBrewing, isConnected, canStart, isClickToPurge } = useMachineActions(machineState)
   const machine = useMachineService()
@@ -563,7 +577,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // Keep machineStateRef in sync with the latest prop value
   useEffect(() => {
     machineStateRef.current = machineState.state
-  }, [machineState.state])
+    brewingRef.current = machineState.brewing
+  }, [machineState.state, machineState.brewing])
 
   /**
    * Poll machineStateRef until it matches `target` (case-insensitive),
@@ -599,6 +614,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     trendStartTimestampRef.current = null
     flowStartTimestampRef.current = null
     flowStartWeightRef.current = null
+    emaWeightRef.current = null
+    prevEmaWeightRef.current = null
+    emaFlowRef.current = 0
     setFlowRate(0)
     // Send tare command
     cmd(() => machine.tareScale(), 'tared')
@@ -666,11 +684,11 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     trendStartTimestampRef.current = null
   }
 
-  const weight = machineState.shot_weight ?? 0
+  const weight = Number(machineState.shot_weight) || 0
   const parsedDose = parsePositiveNumber(doseGrams)
   const parsedRatio = parsePositiveNumber(brewRatio)
   const targetWeight = parsedDose !== null && parsedRatio !== null ? parsedDose * parsedRatio : null
-  const bloomWeightTarget = parsedDose !== null && bloomEnabled
+  const bloomWeightTarget = parsedDose !== null && bloomEnabled && mode !== 'free'
     ? parsedDose * (parsePositiveNumber(bloomWeightMultiplier) ?? 2)
     : null
   const remainingWeight = targetWeight !== null ? Math.max(targetWeight - weight, 0) : null
@@ -678,6 +696,16 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const targetReached =
     (mode === 'ratio' && isRunning && targetWeight !== null && targetWeight > 0 && weight >= targetWeight) ||
     (mode === 'recipe' && isRunning && selectedRecipe !== null && weight >= selectedRecipe.ingredients.water_g)
+
+  // Haptic + sound + notification when pour-over target is reached
+  useEffect(() => {
+    if (targetReached && !prevTargetReachedRef.current) {
+      hapticsNotification('success')
+      playPourOverTarget()
+      notifyPourOverComplete()
+    }
+    prevTargetReachedRef.current = targetReached
+  }, [targetReached, hapticsNotification, playPourOverTarget, notifyPourOverComplete])
 
   const recipeTimings = useMemo((): RecipeStepTiming[] => {
     if (!selectedRecipe) return []
@@ -771,6 +799,10 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
     setMachineLifecycle('preparing')
     try {
+      // Save current active profile so cleanup can restore it
+      if (machineState.active_profile) {
+        sessionStorage.setItem('meticai-previous-profile', machineState.active_profile)
+      }
       await preparePourOver({
         target_weight: parsedTargetWeight,
         bloom_enabled: bloomEnabled,
@@ -781,16 +813,25 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
 
-      // Auto-start the shot:
-      // 1. First continue advances past the temperature control phase.
-      // 2. Wait for machine to reach "Click to start" (press-to-start state).
-      // 3. Second continue actually begins extraction.
-      await cmd(() => machine.continueShot(), 'started')
-      try {
-        await waitForState('click to start')
-      } catch {
-        // Timeout — machine may already be past this state; try anyway
+      // Auto-start: pour-over profiles have temperature=0 (no preheat), so the
+      // machine may already be at "click to start". Check state before each
+      // continue to avoid sending two continues (which would skip bloom).
+      const stateNow = (machineStateRef.current ?? '').toLowerCase()
+      if (stateNow !== 'click to start') {
+        // Need to advance past temperature control phase first
+        await cmd(() => machine.continueShot(), 'started')
+        // Wait for machine to reach "click to start" or start brewing
+        try {
+          await waitForState('click to start')
+        } catch {
+          // Timeout — check if machine started brewing (temp=0 profile)
+          if (brewingRef.current) {
+            // Already extracting — do NOT send second continue
+            return
+          }
+        }
       }
+      // Machine is at "click to start" — send continue to begin extraction
       await cmd(() => machine.continueShot(), 'started')
     } catch {
       setMachineLifecycle('error')
@@ -847,14 +888,21 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (!meticulousIntegration || machineLifecycle !== 'idle' || !selectedRecipe) return
     setMachineLifecycle('preparing')
     try {
+      // Save current active profile so cleanup can restore it
+      if (machineState.active_profile) {
+        sessionStorage.setItem('meticai-previous-profile', machineState.active_profile)
+      }
       await prepareRecipe(selectedRecipe.slug)
       setMachineLifecycle('ready')
       toast.success(t('pourOver.integration.profileReady'))
-      await cmd(() => machine.continueShot(), 'started')
-      try {
-        await waitForState('click to start')
-      } catch {
-        // Timeout — machine may already be past this state; try anyway
+      const stateNow = (machineStateRef.current ?? '').toLowerCase()
+      if (stateNow !== 'click to start') {
+        await cmd(() => machine.continueShot(), 'started')
+        try {
+          await waitForState('click to start')
+        } catch {
+          if (brewingRef.current) return
+        }
       }
       await cmd(() => machine.continueShot(), 'started')
     } catch {
@@ -878,6 +926,19 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     }
   }, [machineLifecycle, updateMachineIntegration, updateAutoStart])
 
+  // Sound effects for natural machine lifecycle events
+  const prevLifecycleRef = useRef<MachineLifecycle>(machineLifecycle)
+  useEffect(() => {
+    const prev = prevLifecycleRef.current
+    prevLifecycleRef.current = machineLifecycle
+
+    if (machineLifecycle === 'done' && prev === 'drawdown') {
+      playPourOverDone()
+    } else if (machineLifecycle === 'error') {
+      playMachineError()
+    }
+  }, [machineLifecycle, playPourOverDone, playMachineError])
+
   // Reset machine lifecycle when done (allow starting again)
   // Also tare the scale, reset the timer, and clear the graph
   const resetMachineLifecycle = useCallback(() => {
@@ -896,6 +957,9 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     previousWeightTimestampRef.current = null
     flowStartTimestampRef.current = null
     flowStartWeightRef.current = null
+    emaWeightRef.current = null
+    prevEmaWeightRef.current = null
+    emaFlowRef.current = 0
     setFlowRate(0)
     // Tare the scale
     justTaredRef.current = true
@@ -923,11 +987,27 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     const previousWeight = previousWeightRef.current
     const previousTimestamp = previousWeightTimestampRef.current
 
-    // Compute instantaneous flow rate (g/s)
+    // ── EMA-smoothed weight for graph + flow computation ──
+    // Smoothing raw weight before differentiating prevents noise amplification.
+    // α=0.3 gives ~1s settling at 3Hz updates; higher = more responsive but noisier.
+    const WEIGHT_EMA_ALPHA = 0.3
+    const FLOW_EMA_ALPHA = 0.15
+    prevEmaWeightRef.current = emaWeightRef.current
+    if (emaWeightRef.current === null) {
+      emaWeightRef.current = currentWeight
+    } else {
+      emaWeightRef.current = WEIGHT_EMA_ALPHA * currentWeight + (1 - WEIGHT_EMA_ALPHA) * emaWeightRef.current
+    }
+    const smoothedWeight = emaWeightRef.current
+
+    // Compute flow rate from smoothed weight (not raw) to avoid jitter
     let currentFlowRate = 0
-    if (previousWeight !== null && previousTimestamp !== null) {
+    if (prevEmaWeightRef.current !== null && previousTimestamp !== null) {
       const deltaSeconds = Math.max((now - previousTimestamp) / 1000, 0.01)
-      currentFlowRate = Math.max((currentWeight - previousWeight) / deltaSeconds, 0)
+      const rawFlow = Math.max((smoothedWeight - prevEmaWeightRef.current) / deltaSeconds, 0)
+      // Apply EMA to flow for extra smoothness
+      emaFlowRef.current = FLOW_EMA_ALPHA * rawFlow + (1 - FLOW_EMA_ALPHA) * emaFlowRef.current
+      currentFlowRate = emaFlowRef.current
     }
     setFlowRate(currentFlowRate)
 
@@ -940,7 +1020,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
       const trendTimeSeconds = (now - trendStartTimestampRef.current) / 1000
 
       setWeightTrend(prev => {
-        const next = [...prev, { t: trendTimeSeconds, w: currentWeight, flow: currentFlowRate }]
+        const next = [...prev, { t: trendTimeSeconds, w: smoothedWeight, flow: currentFlowRate }]
         // Keep enough points for a full 5-minute pour-over (~900 points at 3Hz)
         return next.slice(-900)
       })
@@ -995,13 +1075,13 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
 
   // ── Load recipes when entering recipe mode ──
   useEffect(() => {
-    if (mode !== 'recipe' || recipes.length > 0 || recipesLoading) return
+    if (mode !== 'recipe' || recipes.length > 0) return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag before async fetch
     setRecipesLoading(true)
     getRecipes()
       .then(r => { setRecipes(r); setRecipesLoading(false) })
-      .catch(() => setRecipesLoading(false))
-  }, [mode, recipes.length, recipesLoading])
+      .catch(() => { setRecipesLoading(false) })
+  }, [mode, recipes.length])
 
   // ── Recipe step auto-advance ──
   useEffect(() => {
@@ -1045,6 +1125,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('common.back')}
@@ -1072,7 +1153,14 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
           <div className="space-y-5">
             {/* ── 1. Weight + Timer + Flow rate (always visible) ── */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1">
+              <div
+                className="rounded-xl border border-border/60 bg-secondary/40 p-4 text-center space-y-1 cursor-pointer active:bg-secondary/60 transition-colors"
+                onClick={handleTare}
+                role="button"
+                tabIndex={0}
+                aria-label={t('controlCenter.actions.tare')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTare() } }}
+              >
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center justify-center gap-1">
                   <Scales size={14} weight="bold" />
                   {t('pourOver.weight')}
@@ -1209,7 +1297,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
               const timing = recipeTimings[recipeCurrentStep]
               const isPourStep = timing.action === 'bloom' || timing.action === 'pour'
               const prevCw = recipeCurrentStep > 0
-                ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).at(-1)?.cumulativeWeight ?? 0
+                ? recipeTimings.slice(0, recipeCurrentStep).filter(step => step.cumulativeWeight > 0).slice(-1)[0]?.cumulativeWeight ?? 0
                 : 0
               const pourProgress = isPourStep && timing.cumulativeWeight > prevCw
                 ? Math.min(100, ((weight - prevCw) / (timing.cumulativeWeight - prevCw)) * 100)
@@ -1358,7 +1446,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                     className="w-full h-11 rounded-xl"
                     disabled={machineLifecycle === 'purging'}
                   >
-                    <Pause size={18} weight="fill" className="mr-1.5" />
+                    <Stop size={18} weight="fill" className="mr-1.5" />
                     {t('pourOver.integration.stop')}
                   </Button>
                 )}
@@ -1511,7 +1599,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                           <div className="min-w-0">
                             <p className="font-semibold text-sm text-foreground leading-tight">{recipe.metadata.name}</p>
                             {recipe.metadata.author && (
-                              <p className="text-xs text-muted-foreground">by {recipe.metadata.author}</p>
+                              <p className="text-[13px] text-muted-foreground">by {recipe.metadata.author}</p>
                             )}
                           </div>
                           <ArrowRight size={16} className="shrink-0 text-muted-foreground mt-0.5" />
@@ -1646,7 +1734,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
                 </div>
               )}
 
-              {mode !== 'recipe' && bloomEnabled && parsedDose !== null && (
+              {mode !== 'recipe' && mode !== 'free' && bloomEnabled && parsedDose !== null && (
                 <div className="space-y-1.5">
                   <Label>{t('pourOver.bloomWeightMultiplier')}</Label>
                   <p className="text-xs text-muted-foreground">{t('pourOver.bloomWeightMultiplierDescription')}</p>

@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle, Info, Play, CaretLeft, Image, FileJs, Coffee } from '@phosphor-icons/react'
 import { MarkdownText, cleanProfileName } from '@/components/MarkdownText'
-import { MeticAILogo } from '@/components/MeticAILogo'
+import { MeticLogo } from '@/components/MeticLogo'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import type { APIResponse } from '@/types'
+import { hasFeature } from '@/lib/featureFlags'
 
 function parseProfileSections(text: string | undefined | null) {
   if (!text) return []
@@ -111,9 +112,9 @@ export function ResultsView({
         {isCapturing && (
           <div className="text-center mb-6">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <MeticAILogo size={40} variant="white" />
+              <MeticLogo size={40} variant="white" />
               <h1 className="text-4xl font-bold tracking-tight">
-                Metic<span className="text-primary">AI</span>
+                Metic
               </h1>
             </div>
             <p className="text-muted-foreground text-sm">{t('app.title')}</p>
@@ -134,6 +135,7 @@ export function ResultsView({
                 <Button
                   variant="ghost"
                   size="icon"
+                  data-sound="back"
                   onClick={onBack}
                   className="shrink-0"
                   title={t('results.backToForm')}
@@ -230,7 +232,7 @@ export function ResultsView({
                   className="w-full h-12 text-sm font-semibold"
                 >
                   <Play size={18} className="mr-1.5" weight="fill" />
-                  {t('results.runScheduleShot')}
+                  {hasFeature('scheduledShots') ? t('results.runScheduleShot') : t('results.runShot')}
                 </Button>
               )}
 

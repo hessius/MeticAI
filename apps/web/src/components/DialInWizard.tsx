@@ -193,7 +193,7 @@ export function DialInWizard({ onBack, aiConfigured = true }: DialInWizardProps)
       <Card className="p-6 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleStepBack} aria-label={t('a11y.goBack')}>
+          <Button variant="ghost" size="icon" data-sound="back" onClick={handleStepBack} aria-label={t('a11y.goBack')}>
             <ArrowLeft size={20} />
           </Button>
           <div className="flex-1">

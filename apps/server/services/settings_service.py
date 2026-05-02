@@ -2,7 +2,6 @@
 
 import json
 from typing import Optional
-from pathlib import Path
 
 from config import DATA_DIR
 from utils.file_utils import atomic_write_json
@@ -14,6 +13,7 @@ _settings_cache: Optional[dict] = None
 
 _DEFAULT_SETTINGS = {
     "geminiApiKey": "",
+    "geminiModel": "gemini-2.5-flash",
     "meticulousIp": "",
     "serverIp": "",
     "authorName": "",
@@ -22,7 +22,7 @@ _DEFAULT_SETTINGS = {
     "tailscaleAuthKey": "",
     "betaChannel": False,
     "autoSync": False,
-    "autoSyncAiDescription": False
+    "autoSyncAiDescription": False,
 }
 
 
@@ -35,7 +35,7 @@ def ensure_settings_file():
 
 def load_settings() -> dict:
     """Load settings, using in-memory copy when available.
-    
+
     Validates that the on-disk data is a dict and merges with defaults
     so missing keys always have a safe fallback value.
     """
@@ -44,7 +44,7 @@ def load_settings() -> dict:
         return _settings_cache
     ensure_settings_file()
     try:
-        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         data = None
@@ -66,7 +66,7 @@ def save_settings(settings: dict):
 
 
 def get_author_name() -> str:
-    """Get the configured author name, defaulting to 'MeticAI' if not set."""
+    """Get the configured author name, defaulting to 'Metic' if not set."""
     settings = load_settings()
     author = settings.get("authorName", "").strip()
-    return author if author else "MeticAI"
+    return author if author else "Metic"

@@ -1,4 +1,5 @@
 """Shot history and analysis endpoints."""
+
 from fastapi import APIRouter, Request, Form, HTTPException
 from typing import Optional
 import asyncio
@@ -11,16 +12,24 @@ import requests
 
 from services.meticulous_service import (
     fetch_shot_data,
-    async_list_profiles, async_get_history_dates,
-    async_get_shot_files, async_get_profile,
+    async_list_profiles,
+    async_get_history_dates,
+    async_get_shot_files,
+    async_get_profile,
     MachineUnreachableError,
 )
 from services.cache_service import (
-    get_cached_llm_analysis, save_llm_analysis_to_cache,
-    _get_cached_shots, _set_cached_shots
+    get_cached_llm_analysis,
+    save_llm_analysis_to_cache,
+    _get_cached_shots,
+    _set_cached_shots,
 )
 from services.analysis_service import _perform_local_shot_analysis
-from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE, compute_taste_hash
+from services.gemini_service import (
+    get_vision_model,
+    PROFILING_KNOWLEDGE,
+    compute_taste_hash,
+)
 from prompt_builder import build_taste_context
 
 router = APIRouter()
@@ -46,9 +55,13 @@ async def get_last_shot(request: Request):
     try:
         dates_result = await async_get_history_dates()
         if hasattr(dates_result, "error") and dates_result.error:
-            raise HTTPException(status_code=502, detail=f"Machine API error: {dates_result.error}")
+            raise HTTPException(
+                status_code=502, detail=f"Machine API error: {dates_result.error}"
+            )
 
-        dates = sorted([d.name for d in dates_result], reverse=True) if dates_result else []
+        dates = (
+            sorted([d.name for d in dates_result], reverse=True) if dates_result else []
+        )
         if not dates:
             raise HTTPException(status_code=404, detail="No shots found")
 
@@ -57,7 +70,11 @@ async def get_last_shot(request: Request):
             files_result = await async_get_shot_files(date)
             if hasattr(files_result, "error") and files_result.error:
                 continue
-            files = sorted([f.name for f in files_result], reverse=True) if files_result else []
+            files = (
+                sorted([f.name for f in files_result], reverse=True)
+                if files_result
+                else []
+            )
             if not files:
                 continue
 
@@ -90,7 +107,11 @@ async def get_last_shot(request: Request):
 
     except MachineUnreachableError:
         raise
-    except (requests.exceptions.ConnectionError, httpx.ConnectError, httpx.ConnectTimeout) as e:
+    except (
+        requests.exceptions.ConnectionError,
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+    ) as e:
         logger.warning(
             f"Machine unreachable while fetching last shot: {e}",
             extra={"request_id": request_id, "error_type": type(e).__name__},
@@ -121,228 +142,255 @@ def _prepare_profile_for_llm(profile_data: dict, description: str | None) -> dic
         "temperature": profile_data.get("temperature"),
         "final_weight": profile_data.get("final_weight"),
         "variables": profile_data.get("variables", []),
-        "stages": []
+        "stages": [],
     }
-    
+
     # Include stage structure but not full dynamics data
     for stage in profile_data.get("stages", []):
         clean_stage = {
             "name": stage.get("name"),
             "type": stage.get("type"),
             "exit_triggers": stage.get("exit_triggers", []),
-            "limits": stage.get("limits", [])
+            "limits": stage.get("limits", []),
         }
         # Add a summary of dynamics
         dynamics = stage.get("dynamics_points", [])
         if dynamics:
             if len(dynamics) == 1:
-                clean_stage["target"] = f"Constant at {dynamics[0][1] if len(dynamics[0]) > 1 else dynamics[0][0]}"
+                clean_stage["target"] = (
+                    f"Constant at {dynamics[0][1] if len(dynamics[0]) > 1 else dynamics[0][0]}"
+                )
             elif len(dynamics) >= 2:
                 start = dynamics[0][1] if len(dynamics[0]) > 1 else dynamics[0][0]
                 end = dynamics[-1][1] if len(dynamics[-1]) > 1 else dynamics[-1][0]
                 clean_stage["target"] = f"{start} → {end}"
         clean_profile["stages"].append(clean_stage)
-    
+
     return clean_profile
 
 
 @router.get("/api/shots/dates")
 async def get_shot_dates(request: Request):
     """Get all available shot dates from the machine.
-    
+
     Returns:
         List of dates with available shot history
     """
     request_id = request.state.request_id
-    
+
     try:
-        logger.info(
-            "Fetching shot history dates",
-            extra={"request_id": request_id}
-        )
-        
+        logger.info("Fetching shot history dates", extra={"request_id": request_id})
+
         result = await async_get_history_dates()
-        
+
         # Check for API error
-        if hasattr(result, 'error') and result.error:
+        if hasattr(result, "error") and result.error:
             raise HTTPException(
-                status_code=502,
-                detail=f"Machine API error: {result.error}"
+                status_code=502, detail=f"Machine API error: {result.error}"
             )
-        
+
         # Extract date names
         dates = [d.name for d in result] if result else []
-        
+
         return {"dates": sorted(dates, reverse=True)}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
             f"Failed to fetch shot dates: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id, "error_type": type(e).__name__}
+            extra={"request_id": request_id, "error_type": type(e).__name__},
         )
         raise HTTPException(
             status_code=500,
-            detail={"status": "error", "error": str(e), "message": "Failed to fetch shot dates from machine"}
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to fetch shot dates from machine",
+            },
         )
 
 
 @router.get("/api/shots/files/{date}")
 async def get_shot_files(request: Request, date: str):
     """Get shot files for a specific date.
-    
+
     Args:
         date: Date in YYYY-MM-DD format
-        
+
     Returns:
         List of shot filenames for that date
     """
     # Validate date format to prevent path traversal
-    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
-        raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
-    
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Expected YYYY-MM-DD."
+        )
+
     request_id = request.state.request_id
-    
+
     try:
         logger.info(
             "Fetching shot files for date",
-            extra={"request_id": request_id, "date": date}
+            extra={"request_id": request_id, "date": date},
         )
-        
+
         result = await async_get_shot_files(date)
-        
+
         # Check for API error
-        if hasattr(result, 'error') and result.error:
+        if hasattr(result, "error") and result.error:
             raise HTTPException(
-                status_code=502,
-                detail=f"Machine API error: {result.error}"
+                status_code=502, detail=f"Machine API error: {result.error}"
             )
-        
+
         # Extract filenames
         files = [f.name for f in result] if result else []
-        
+
         return {"date": date, "files": files}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
             f"Failed to fetch shot files: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id, "date": date, "error_type": type(e).__name__}
+            extra={
+                "request_id": request_id,
+                "date": date,
+                "error_type": type(e).__name__,
+            },
         )
         raise HTTPException(
             status_code=500,
-            detail={"status": "error", "error": str(e), "message": "Failed to fetch shot files from machine"}
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to fetch shot files from machine",
+            },
         )
 
 
 @router.get("/api/shots/data/{date}/{filename:path}")
 async def get_shot_data(request: Request, date: str, filename: str):
     """Get the actual shot data for a specific shot.
-    
+
     Args:
         date: Date in YYYY-MM-DD format
         filename: Shot filename (e.g., HH:MM:SS.shot.json.zst)
-        
+
     Returns:
         Decompressed shot data with telemetry
     """
     # Validate inputs to prevent path traversal / SSRF
-    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
-        raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
-    if '..' in filename or filename.startswith('/'):
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Expected YYYY-MM-DD."
+        )
+    if ".." in filename or filename.startswith("/"):
         raise HTTPException(status_code=400, detail="Invalid filename.")
-    
+
     request_id = request.state.request_id
-    
+
     try:
         logger.info(
             "Fetching shot data",
-            extra={"request_id": request_id, "date": date, "shot_file": filename}
+            extra={"request_id": request_id, "date": date, "shot_file": filename},
         )
-        
+
         shot_data = await fetch_shot_data(date, filename)
-        
-        return {
-            "date": date,
-            "filename": filename,
-            "data": shot_data
-        }
-        
+
+        return {"date": date, "filename": filename, "data": shot_data}
+
     except Exception as e:
         logger.error(
             f"Failed to fetch shot data: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id, "date": date, "shot_file": filename, "error_type": type(e).__name__}
+            extra={
+                "request_id": request_id,
+                "date": date,
+                "shot_file": filename,
+                "error_type": type(e).__name__,
+            },
         )
         raise HTTPException(
             status_code=500,
-            detail={"status": "error", "error": str(e), "message": "Failed to fetch shot data from machine"}
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to fetch shot data from machine",
+            },
         )
 
 
 @router.get("/api/shots/by-profile/{profile_name}")
 async def get_shots_by_profile(
-    request: Request, 
+    request: Request,
     profile_name: str,
     limit: int = 20,
     include_data: bool = False,
-    force_refresh: bool = False
+    force_refresh: bool = False,
 ):
     """Get all shots that used a specific profile.
-    
+
     This endpoint scans shot history to find all shots that match the given profile name.
     Results are cached server-side indefinitely, but marked stale after 60 minutes.
     When stale, cached data is still returned with is_stale=true so client can show it
     while fetching fresh data in the background.
-    
+
     Args:
         profile_name: Name of the profile to search for
         limit: Maximum number of shots to return (default: 20)
         include_data: Whether to include full telemetry data (default: False for performance)
         force_refresh: Skip cache and fetch fresh data (default: False)
-        
+
     Returns:
         List of shots matching the profile, with cache metadata (cached_at, is_stale)
     """
     request_id = request.state.request_id
-    
+
     try:
         logger.info(
             "Searching for shots by profile",
-            extra={"request_id": request_id, "profile_name": profile_name, "limit": limit, "force_refresh": force_refresh}
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "limit": limit,
+                "force_refresh": force_refresh,
+            },
         )
-        
+
         # Check server-side cache first (unless forcing refresh or requesting data)
         if not force_refresh and not include_data:
             cached_data, is_stale, cached_at = _get_cached_shots(profile_name, limit)
             if cached_data:
                 logger.info(
                     f"Returning cached shots for profile '{profile_name}' (stale={is_stale})",
-                    extra={"request_id": request_id, "count": cached_data.get("count", 0), "from_cache": True, "is_stale": is_stale}
+                    extra={
+                        "request_id": request_id,
+                        "count": cached_data.get("count", 0),
+                        "from_cache": True,
+                        "is_stale": is_stale,
+                    },
                 )
                 # Add cache metadata to response
                 cached_data["cached_at"] = cached_at
                 cached_data["is_stale"] = is_stale
                 return cached_data
-        
+
         # Get all available dates
         dates_result = await async_get_history_dates()
-        if hasattr(dates_result, 'error') and dates_result.error:
+        if hasattr(dates_result, "error") and dates_result.error:
             raise HTTPException(
-                status_code=502,
-                detail=f"Machine API error: {dates_result.error}"
+                status_code=502, detail=f"Machine API error: {dates_result.error}"
             )
-        
+
         dates = [d.name for d in dates_result] if dates_result else []
         matching_shots = []
-        
+
         # Concurrency limiter — avoid overwhelming the machine with requests
         sem = asyncio.Semaphore(6)
-        
+
         async def _fetch_and_match(date: str, filename: str):
             """Fetch a single shot and return info dict if it matches, else None."""
             async with sem:
@@ -351,28 +399,28 @@ async def get_shots_by_profile(
                 except Exception as e:
                     logger.warning(
                         f"Could not process shot {date}/{filename}: {str(e)}",
-                        extra={"request_id": request_id}
+                        extra={"request_id": request_id},
                     )
                     return None
-                
+
                 # Extract profile name from shot data
                 shot_profile_name = shot_data.get("profile_name", "")
                 if not shot_profile_name and isinstance(shot_data.get("profile"), dict):
                     shot_profile_name = shot_data.get("profile", {}).get("name", "")
-                
+
                 if shot_profile_name.lower() != profile_name.lower():
                     return None
-                
+
                 data_entries = shot_data.get("data", [])
                 final_weight = None
                 total_time_ms = None
-                
+
                 if data_entries:
                     last_entry = data_entries[-1]
                     if isinstance(last_entry.get("shot"), dict):
                         final_weight = last_entry["shot"].get("weight")
                     total_time_ms = last_entry.get("time")
-                
+
                 shot_info = {
                     "date": date,
                     "filename": filename,
@@ -381,43 +429,43 @@ async def get_shots_by_profile(
                     "final_weight": final_weight,
                     "total_time": total_time_ms / 1000 if total_time_ms else None,
                 }
-                
+
                 if include_data:
                     shot_info["data"] = shot_data
-                
+
                 return shot_info
-        
+
         # Search through dates (most recent first), fetch files concurrently per date
         for date in sorted(dates, reverse=True):
             if len(matching_shots) >= limit:
                 break
-                
+
             # Get file listing for this date (lightweight, sequential is fine)
             files_result = await async_get_shot_files(date)
-            if hasattr(files_result, 'error') and files_result.error:
+            if hasattr(files_result, "error") and files_result.error:
                 logger.warning(f"Could not get files for {date}: {files_result.error}")
                 continue
-            
+
             files = [f.name for f in files_result] if files_result else []
             if not files:
                 continue
-            
+
             # Fire off all shot fetches for this date concurrently
             tasks = [_fetch_and_match(date, fn) for fn in files]
             results = await asyncio.gather(*tasks)
-            
+
             # Collect matches (preserve chronological order)
             for result in results:
                 if result is not None:
                     matching_shots.append(result)
                     if len(matching_shots) >= limit:
                         break
-        
+
         logger.info(
             f"Found {len(matching_shots)} shots for profile '{profile_name}'",
-            extra={"request_id": request_id, "count": len(matching_shots)}
+            extra={"request_id": request_id, "count": len(matching_shots)},
         )
-        
+
         current_time = time.time()
         response_data = {
             "profile_name": profile_name,
@@ -425,26 +473,34 @@ async def get_shots_by_profile(
             "count": len(matching_shots),
             "limit": limit,
             "cached_at": current_time,
-            "is_stale": False
+            "is_stale": False,
         }
-        
+
         # Cache the result (only if not including full data, which is too large)
         if not include_data:
             _set_cached_shots(profile_name, response_data, limit)
-        
+
         return response_data
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
             f"Failed to search shots by profile: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id, "profile_name": profile_name, "error_type": type(e).__name__}
+            extra={
+                "request_id": request_id,
+                "profile_name": profile_name,
+                "error_type": type(e).__name__,
+            },
         )
         raise HTTPException(
             status_code=500,
-            detail={"status": "error", "error": str(e), "message": "Failed to search shots by profile"}
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Failed to search shots by profile",
+            },
         )
 
 
@@ -454,24 +510,24 @@ async def analyze_shot(
     profile_name: str = Form(...),
     shot_date: str = Form(...),
     shot_filename: str = Form(...),
-    profile_description: Optional[str] = Form(None)
+    profile_description: Optional[str] = Form(None),
 ):
     """Analyze a shot against its profile using local algorithmic analysis.
-    
+
     This endpoint fetches the shot data and profile information, then performs
     a detailed comparison of actual execution vs profile intent.
-    
+
     Args:
         profile_name: Name of the profile used for the shot
         shot_date: Date of the shot (YYYY-MM-DD)
         shot_filename: Filename of the shot
         profile_description: Optional description of the profile's intent (for future AI use)
-        
+
     Returns:
         Detailed analysis of shot performance against profile
     """
     request_id = request.state.request_id
-    
+
     try:
         logger.info(
             "Starting shot analysis",
@@ -479,83 +535,98 @@ async def analyze_shot(
                 "request_id": request_id,
                 "profile_name": profile_name,
                 "shot_date": shot_date,
-                "shot_filename": shot_filename
-            }
+                "shot_filename": shot_filename,
+            },
         )
-        
+
         # Fetch shot data
         shot_data = await fetch_shot_data(shot_date, shot_filename)
-        
+
         # Fetch profile from machine
         profiles_result = await async_list_profiles()
-        
-        logger.debug(f"Looking for profile '{profile_name}' in {len(profiles_result)} profiles")
-        
+
+        logger.debug(
+            f"Looking for profile '{profile_name}' in {len(profiles_result)} profiles"
+        )
+
         profile_data = None
         for partial_profile in profiles_result:
             # Compare ignoring case and whitespace
             if partial_profile.name.lower().strip() == profile_name.lower().strip():
-                logger.debug(f"Found matching profile: {partial_profile.name} (id={partial_profile.id})")
+                logger.debug(
+                    f"Found matching profile: {partial_profile.name} (id={partial_profile.id})"
+                )
                 full_profile = await async_get_profile(partial_profile.id)
-                if not (hasattr(full_profile, 'error') and full_profile.error):
+                if not (hasattr(full_profile, "error") and full_profile.error):
                     # Convert profile object to dict
                     profile_data = {
                         "name": full_profile.name,
-                        "temperature": getattr(full_profile, 'temperature', None),
-                        "final_weight": getattr(full_profile, 'final_weight', None),
+                        "temperature": getattr(full_profile, "temperature", None),
+                        "final_weight": getattr(full_profile, "final_weight", None),
                         "variables": [],
-                        "stages": []
+                        "stages": [],
                     }
-                    
+
                     # Extract variables if present
-                    if hasattr(full_profile, 'variables') and full_profile.variables:
+                    if hasattr(full_profile, "variables") and full_profile.variables:
                         for var in full_profile.variables:
                             var_dict = {
-                                "key": getattr(var, 'key', ''),
-                                "name": getattr(var, 'name', ''),
-                                "type": getattr(var, 'type', ''),
-                                "value": getattr(var, 'value', 0)
+                                "key": getattr(var, "key", ""),
+                                "name": getattr(var, "name", ""),
+                                "type": getattr(var, "type", ""),
+                                "value": getattr(var, "value", 0),
                             }
                             profile_data["variables"].append(var_dict)
-                    
+
                     # Extract full stage data including dynamics and triggers
-                    if hasattr(full_profile, 'stages') and full_profile.stages:
+                    if hasattr(full_profile, "stages") and full_profile.stages:
                         for stage in full_profile.stages:
                             stage_dict = {
-                                "name": getattr(stage, 'name', 'Unknown'),
-                                "key": getattr(stage, 'key', ''),
-                                "type": getattr(stage, 'type', 'unknown'),
+                                "name": getattr(stage, "name", "Unknown"),
+                                "key": getattr(stage, "key", ""),
+                                "type": getattr(stage, "type", "unknown"),
                             }
                             # Add dynamics - handle both direct attributes and dynamics object
-                            if hasattr(stage, 'dynamics') and stage.dynamics is not None:
+                            if (
+                                hasattr(stage, "dynamics")
+                                and stage.dynamics is not None
+                            ):
                                 dynamics = stage.dynamics
-                                if hasattr(dynamics, 'points') and dynamics.points:
-                                    stage_dict['dynamics_points'] = dynamics.points
-                                if hasattr(dynamics, 'over'):
-                                    stage_dict['dynamics_over'] = dynamics.over
-                                if hasattr(dynamics, 'interpolation'):
-                                    stage_dict['dynamics_interpolation'] = dynamics.interpolation
+                                if hasattr(dynamics, "points") and dynamics.points:
+                                    stage_dict["dynamics_points"] = dynamics.points
+                                if hasattr(dynamics, "over"):
+                                    stage_dict["dynamics_over"] = dynamics.over
+                                if hasattr(dynamics, "interpolation"):
+                                    stage_dict["dynamics_interpolation"] = (
+                                        dynamics.interpolation
+                                    )
                             else:
                                 # Fallback: check for direct attributes
-                                for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation']:
+                                for attr in [
+                                    "dynamics_points",
+                                    "dynamics_over",
+                                    "dynamics_interpolation",
+                                ]:
                                     val = getattr(stage, attr, None)
                                     if val is not None:
                                         stage_dict[attr] = val
                             # Add exit triggers and limits
-                            for attr in ['exit_triggers', 'limits']:
+                            for attr in ["exit_triggers", "limits"]:
                                 val = getattr(stage, attr, None)
                                 if val is not None:
                                     # Convert to list of dicts if needed
                                     if isinstance(val, list):
                                         stage_dict[attr] = [
-                                            dict(item) if hasattr(item, '__dict__') else item
+                                            dict(item)
+                                            if hasattr(item, "__dict__")
+                                            else item
                                             for item in val
                                         ]
                                     else:
                                         stage_dict[attr] = val
                             profile_data["stages"].append(stage_dict)
                 break
-        
+
         if not profile_data:
             # Fallback: try to get profile from shot data itself
             shot_profile = shot_data.get("profile", {})
@@ -564,27 +635,24 @@ async def analyze_shot(
             else:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Profile '{profile_name}' not found on machine or in shot data"
+                    detail=f"Profile '{profile_name}' not found on machine or in shot data",
                 )
-        
+
         # Perform local analysis
         analysis = _perform_local_shot_analysis(shot_data, profile_data)
-        
+
         logger.info(
             "Shot analysis completed successfully",
             extra={
                 "request_id": request_id,
                 "profile_name": profile_name,
                 "stages_analyzed": len(analysis.get("stage_analyses", [])),
-                "unreached_stages": len(analysis.get("unreached_stages", []))
-            }
+                "unreached_stages": len(analysis.get("unreached_stages", [])),
+            },
         )
-        
-        return {
-            "status": "success",
-            "analysis": analysis
-        }
-        
+
+        return {"status": "success", "analysis": analysis}
+
     except HTTPException:
         raise
     except Exception as e:
@@ -596,60 +664,54 @@ async def analyze_shot(
                 "profile_name": profile_name,
                 "shot_date": shot_date,
                 "shot_filename": shot_filename,
-                "error_type": type(e).__name__}
+                "error_type": type(e).__name__,
+            },
         )
         raise HTTPException(
             status_code=500,
-            detail={"status": "error", "error": str(e), "message": "Shot analysis failed"}
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "Shot analysis failed",
+            },
         )
 
 
 @router.get("/api/shots/llm-analysis-cache")
 async def get_llm_analysis_cache(
-    request: Request,
-    profile_name: str,
-    shot_date: str,
-    shot_filename: str
+    request: Request, profile_name: str, shot_date: str, shot_filename: str
 ):
     """Check if a cached LLM analysis exists for the given shot.
-    
+
     Returns the cached analysis if it exists and is not expired,
     otherwise returns null.
     """
     request_id = request.state.request_id
-    
+
     logger.info(
         "Checking LLM analysis cache",
         extra={
             "request_id": request_id,
             "profile_name": profile_name,
             "shot_date": shot_date,
-            "shot_filename": shot_filename
-        }
+            "shot_filename": shot_filename,
+        },
     )
-    
+
     cached = get_cached_llm_analysis(profile_name, shot_date, shot_filename)
-    
+
     if cached:
         logger.info(
             "LLM analysis cache hit",
-            extra={"request_id": request_id, "profile_name": profile_name}
+            extra={"request_id": request_id, "profile_name": profile_name},
         )
-        return {
-            "status": "success",
-            "cached": True,
-            "analysis": cached
-        }
+        return {"status": "success", "cached": True, "analysis": cached}
     else:
         logger.info(
             "LLM analysis cache miss",
-            extra={"request_id": request_id, "profile_name": profile_name}
+            extra={"request_id": request_id, "profile_name": profile_name},
         )
-        return {
-            "status": "success", 
-            "cached": False,
-            "analysis": None
-        }
+        return {"status": "success", "cached": False, "analysis": None}
 
 
 @router.post("/api/shots/analyze-llm")
@@ -665,15 +727,15 @@ async def analyze_shot_with_llm(
     taste_descriptors: Optional[str] = Form(None),
 ):
     """Analyze a shot using LLM with expert profiling knowledge.
-    
+
     This endpoint performs a deep analysis of shot execution, combining:
     - Local algorithmic analysis for data extraction
     - Expert espresso profiling knowledge
     - LLM reasoning for actionable recommendations
-    
+
     Results are cached server-side for 3 days.
     Use force_refresh=True to bypass cache and regenerate analysis.
-    
+
     Returns structured analysis answering:
     1. How did the shot go and why?
     2. What should change about the setup (grind, filter, basket, prep)?
@@ -690,8 +752,22 @@ async def analyze_shot_with_llm(
 
     # Parse and validate taste descriptors from comma-separated string
     _VALID_DESCRIPTORS = {
-        "sweet", "clean", "complex", "juicy", "smooth", "balanced", "floral", "fruity",
-        "astringent", "muddy", "flat", "chalky", "harsh", "watery", "burnt", "grassy",
+        "sweet",
+        "clean",
+        "complex",
+        "juicy",
+        "smooth",
+        "balanced",
+        "floral",
+        "fruity",
+        "astringent",
+        "muddy",
+        "flat",
+        "chalky",
+        "harsh",
+        "watery",
+        "burnt",
+        "grassy",
     }
     parsed_descriptors: list[str] | None = None
     if taste_descriptors:
@@ -703,8 +779,10 @@ async def analyze_shot_with_llm(
 
     # Compute taste hash for cache differentiation
     taste_hash = compute_taste_hash(taste_x, taste_y, parsed_descriptors)
-    cache_filename = f"{shot_filename}_taste_{taste_hash}" if taste_hash else shot_filename
-    
+    cache_filename = (
+        f"{shot_filename}_taste_{taste_hash}" if taste_hash else shot_filename
+    )
+
     try:
         logger.info(
             "Starting LLM shot analysis",
@@ -715,16 +793,18 @@ async def analyze_shot_with_llm(
                 "shot_filename": shot_filename,
                 "force_refresh": force_refresh,
                 "has_taste_data": taste_hash is not None,
-            }
+            },
         )
-        
+
         # Check cache first (unless force refresh)
         if not force_refresh:
-            cached_analysis = get_cached_llm_analysis(profile_name, shot_date, cache_filename)
+            cached_analysis = get_cached_llm_analysis(
+                profile_name, shot_date, cache_filename
+            )
             if cached_analysis:
                 logger.info(
                     "Returning cached LLM analysis",
-                    extra={"request_id": request_id, "profile_name": profile_name}
+                    extra={"request_id": request_id, "profile_name": profile_name},
                 )
                 return {
                     "status": "success",
@@ -732,68 +812,80 @@ async def analyze_shot_with_llm(
                     "shot_date": shot_date,
                     "shot_filename": shot_filename,
                     "llm_analysis": cached_analysis,
-                    "cached": True
+                    "cached": True,
                 }
-        
+
         # Fetch shot data
         shot_data = await fetch_shot_data(shot_date, shot_filename)
-        
+
         # Fetch profile from machine (with variables)
         profiles_result = await async_list_profiles()
-        
+
         profile_data = None
         for partial_profile in profiles_result:
             if partial_profile.name.lower() == profile_name.lower():
                 full_profile = await async_get_profile(partial_profile.id)
-                if not (hasattr(full_profile, 'error') and full_profile.error):
+                if not (hasattr(full_profile, "error") and full_profile.error):
                     profile_data = {
                         "name": full_profile.name,
-                        "temperature": getattr(full_profile, 'temperature', None),
-                        "final_weight": getattr(full_profile, 'final_weight', None),
+                        "temperature": getattr(full_profile, "temperature", None),
+                        "final_weight": getattr(full_profile, "final_weight", None),
                         "variables": [],
-                        "stages": []
+                        "stages": [],
                     }
-                    
+
                     # Extract variables
-                    if hasattr(full_profile, 'variables') and full_profile.variables:
+                    if hasattr(full_profile, "variables") and full_profile.variables:
                         for var in full_profile.variables:
-                            profile_data["variables"].append({
-                                "key": getattr(var, 'key', ''),
-                                "name": getattr(var, 'name', ''),
-                                "type": getattr(var, 'type', ''),
-                                "value": getattr(var, 'value', 0)
-                            })
-                    
+                            profile_data["variables"].append(
+                                {
+                                    "key": getattr(var, "key", ""),
+                                    "name": getattr(var, "name", ""),
+                                    "type": getattr(var, "type", ""),
+                                    "value": getattr(var, "value", 0),
+                                }
+                            )
+
                     # Extract stages with full details
-                    if hasattr(full_profile, 'stages') and full_profile.stages:
+                    if hasattr(full_profile, "stages") and full_profile.stages:
                         for stage in full_profile.stages:
                             stage_dict = {
-                                "name": getattr(stage, 'name', 'Unknown'),
-                                "key": getattr(stage, 'key', ''),
-                                "type": getattr(stage, 'type', 'unknown'),
+                                "name": getattr(stage, "name", "Unknown"),
+                                "key": getattr(stage, "key", ""),
+                                "type": getattr(stage, "type", "unknown"),
                             }
-                            for attr in ['dynamics_points', 'dynamics_over', 'dynamics_interpolation', 'exit_triggers', 'limits']:
+                            for attr in [
+                                "dynamics_points",
+                                "dynamics_over",
+                                "dynamics_interpolation",
+                                "exit_triggers",
+                                "limits",
+                            ]:
                                 val = getattr(stage, attr, None)
                                 if val is not None:
                                     if isinstance(val, list):
-                                        stage_dict[attr] = [dict(item) if hasattr(item, '__dict__') else item for item in val]
+                                        stage_dict[attr] = [
+                                            dict(item)
+                                            if hasattr(item, "__dict__")
+                                            else item
+                                            for item in val
+                                        ]
                                     else:
                                         stage_dict[attr] = val
                             profile_data["stages"].append(stage_dict)
                 break
-        
+
         if not profile_data:
             raise HTTPException(
-                status_code=404,
-                detail=f"Profile '{profile_name}' not found on machine"
+                status_code=404, detail=f"Profile '{profile_name}' not found on machine"
             )
-        
+
         # Run local analysis first to extract data
         local_analysis = _perform_local_shot_analysis(shot_data, profile_data)
-        
+
         # Prepare profile data (clean, no image)
         clean_profile = _prepare_profile_for_llm(profile_data, profile_description)
-        
+
         # Build the LLM prompt with FULL local analysis
         taste_context = build_taste_context(taste_x, taste_y, parsed_descriptors)
         has_taste = bool(taste_context)
@@ -824,18 +916,18 @@ async def analyze_shot_with_llm(
 {PROFILING_KNOWLEDGE}
 
 ## Profile Being Used
-Name: {clean_profile['name']}
-Temperature: {clean_profile.get('temperature', 'Not set')}°C
-Target Weight: {clean_profile.get('final_weight', 'Not set')}g
+Name: {clean_profile["name"]}
+Temperature: {clean_profile.get("temperature", "Not set")}°C
+Target Weight: {clean_profile.get("final_weight", "Not set")}g
 
 ### Profile Description
-{profile_description or 'No description provided - analyze the profile structure to understand intent.'}
+{profile_description or "No description provided - analyze the profile structure to understand intent."}
 
 ### Profile Variables
-{json.dumps(clean_profile.get('variables', []), indent=2)}
+{json.dumps(clean_profile.get("variables", []), indent=2)}
 
 ### Profile Stages
-{json.dumps(clean_profile.get('stages', []), indent=2)}
+{json.dumps(clean_profile.get("stages", []), indent=2)}
 
 ## Full Local Analysis
 This is the complete algorithmic analysis of the shot. Use this data to inform your expert analysis.
@@ -907,7 +999,9 @@ CRITICAL FORMATTING RULES:
 
 Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
 {taste_section_template}
-## Structured Recommendations (MANDATORY)
+---
+
+INTERNAL INSTRUCTION — Structured Recommendations (do NOT include this heading in your response):
 
 After your analysis sections, you MUST output a structured JSON block with specific, actionable profile variable recommendations.
 Use EXACTLY this format — the markers are parsed programmatically:
@@ -941,7 +1035,7 @@ Rules for recommendations:
 - confidence: "high" = strong evidence from data, "medium" = likely beneficial, "low" = worth trying
 - If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
 """
-        
+
         # Call LLM
         try:
             model = get_vision_model()
@@ -951,48 +1045,51 @@ Rules for recommendations:
                 detail={
                     "status": "error",
                     "message": str(e),
-                    "error": "AI features are unavailable until GEMINI_API_KEY is configured"
-                }
+                    "error": "AI features are unavailable until GEMINI_API_KEY is configured",
+                },
             ) from e
         response = await model.async_generate_content(prompt)
-        
+
         llm_analysis = response.text if response else "Analysis generation failed"
-        
+
         # Save to cache
-        save_llm_analysis_to_cache(profile_name, shot_date, cache_filename, llm_analysis)
-        
+        save_llm_analysis_to_cache(
+            profile_name, shot_date, cache_filename, llm_analysis
+        )
+
         logger.info(
             "LLM shot analysis completed and cached",
             extra={
                 "request_id": request_id,
                 "profile_name": profile_name,
-                "response_length": len(llm_analysis)
-            }
+                "response_length": len(llm_analysis),
+            },
         )
-        
+
         return {
             "status": "success",
             "profile_name": profile_name,
             "shot_date": shot_date,
             "shot_filename": shot_filename,
             "llm_analysis": llm_analysis,
-            "cached": False
+            "cached": False,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
             f"LLM shot analysis failed: {str(e)}",
             exc_info=True,
-            extra={
-                "request_id": request_id,
-                "profile_name": profile_name
-            }
+            extra={"request_id": request_id, "profile_name": profile_name},
         )
         raise HTTPException(
             status_code=500,
-            detail={"status": "error", "error": str(e), "message": "LLM shot analysis failed"}
+            detail={
+                "status": "error",
+                "error": str(e),
+                "message": "LLM shot analysis failed",
+            },
         )
 
 
@@ -1010,7 +1107,11 @@ def _cache_recent_shots(key: str, data: dict) -> None:
     """Insert into the recent-shots cache with bounded size."""
     if len(_recent_shots_cache) > _RECENT_SHOTS_MAX_ENTRIES:
         now = time.time()
-        expired = [k for k, v in _recent_shots_cache.items() if now - v["ts"] >= _RECENT_SHOTS_TTL]
+        expired = [
+            k
+            for k, v in _recent_shots_cache.items()
+            if now - v["ts"] >= _RECENT_SHOTS_TTL
+        ]
         for k in expired:
             del _recent_shots_cache[k]
         if len(_recent_shots_cache) > _RECENT_SHOTS_MAX_ENTRIES:
@@ -1041,9 +1142,13 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
 
         dates_result = await async_get_history_dates()
         if hasattr(dates_result, "error") and dates_result.error:
-            raise HTTPException(status_code=502, detail=f"Machine API error: {dates_result.error}")
+            raise HTTPException(
+                status_code=502, detail=f"Machine API error: {dates_result.error}"
+            )
 
-        dates = sorted([d.name for d in dates_result], reverse=True) if dates_result else []
+        dates = (
+            sorted([d.name for d in dates_result], reverse=True) if dates_result else []
+        )
 
         all_shots: list[dict] = []
         sem = asyncio.Semaphore(6)
@@ -1095,7 +1200,11 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
             files_result = await async_get_shot_files(date)
             if hasattr(files_result, "error") and files_result.error:
                 continue
-            files = sorted([f.name for f in files_result], reverse=True) if files_result else []
+            files = (
+                sorted([f.name for f in files_result], reverse=True)
+                if files_result
+                else []
+            )
             if not files:
                 continue
 
@@ -1131,7 +1240,9 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
 
 @router.get("/shots/recent/by-profile")
 @router.get("/api/shots/recent/by-profile")
-async def get_recent_shots_by_profile(request: Request, limit: int = 50, offset: int = 0):
+async def get_recent_shots_by_profile(
+    request: Request, limit: int = 50, offset: int = 0
+):
     """Same data as /shots/recent but grouped by profile.
 
     Response: { profiles: [{ profile_name, profile_id, shots: [...], shot_count }] }
@@ -1147,7 +1258,7 @@ async def get_recent_shots_by_profile(request: Request, limit: int = 50, offset:
     try:
         # Reuse the flat recent-shots logic
         flat_response = await get_recent_shots(request, limit=limit + offset, offset=0)
-        flat_shots = flat_response["shots"][offset:offset + limit]
+        flat_shots = flat_response["shots"][offset : offset + limit]
 
         # Group by profile_name
         grouped: dict[str, dict] = {}
@@ -1188,16 +1299,16 @@ async def get_recent_shots_by_profile(request: Request, limit: int = 50, offset:
 @router.get("/api/shots/{date}/{filename}/annotation")
 async def get_shot_annotation(date: str, filename: str, request: Request):
     """Get the user annotation for a specific shot.
-    
+
     Args:
         date: Shot date (e.g., "2024-01-15")
         filename: Shot filename (e.g., "shot_001.json")
-    
+
     Returns:
         Annotation text, rating, and updated_at if exists, null otherwise.
     """
     from services.shot_annotations_service import get_annotation
-    
+
     entry = get_annotation(date, filename)
     return {
         "status": "success",
@@ -1210,27 +1321,30 @@ async def get_shot_annotation(date: str, filename: str, request: Request):
 @router.patch("/api/shots/{date}/{filename}/annotation")
 async def update_shot_annotation(date: str, filename: str, request: Request):
     """Update the user annotation for a specific shot.
-    
+
     Args:
         date: Shot date (e.g., "2024-01-15")
         filename: Shot filename (e.g., "shot_001.json")
-        
+
     Body:
         annotation: Markdown text for the annotation (empty to clear)
         rating: Star rating 1-5 (null to leave unchanged, explicit null/0 to clear)
-    
+
     Returns:
         Updated annotation entry.
     """
     from services.shot_annotations_service import set_annotation, set_rating
-    
+
     request_id = request.state.request_id
-    
+
     try:
         try:
             body = await request.json()
         except (json.JSONDecodeError, ValueError):
-            raise HTTPException(status_code=400, detail={"status": "error", "error": "Invalid JSON body"})
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "error": "Invalid JSON body"},
+            )
 
         # If only rating is provided (no annotation key), update just the rating
         if "rating" in body and "annotation" not in body:
@@ -1239,7 +1353,7 @@ async def update_shot_annotation(date: str, filename: str, request: Request):
             annotation_text = body.get("annotation", "")
             rating = body.get("rating")
             result = set_annotation(date, filename, annotation_text, rating)
-        
+
         return {
             "status": "success",
             "annotation": result.get("annotation"),
@@ -1247,34 +1361,35 @@ async def update_shot_annotation(date: str, filename: str, request: Request):
             "updated_at": result.get("updated_at"),
         }
     except ValueError as e:
-        raise HTTPException(status_code=422, detail={"status": "error", "error": str(e)})
+        raise HTTPException(
+            status_code=422, detail={"status": "error", "error": str(e)}
+        )
     except Exception as e:
         logger.error(
             f"Failed to update shot annotation: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id}
+            extra={"request_id": request_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
 @router.delete("/api/shots/{date}/{filename}/annotation")
 async def delete_shot_annotation(date: str, filename: str, request: Request):
     """Delete the annotation for a specific shot.
-    
+
     Args:
         date: Shot date (e.g., "2024-01-15")
         filename: Shot filename (e.g., "shot_001.json")
-    
+
     Returns:
         Success status.
     """
     from services.shot_annotations_service import delete_annotation
-    
+
     request_id = request.state.request_id
-    
+
     try:
         deleted = delete_annotation(date, filename)
         return {
@@ -1285,23 +1400,22 @@ async def delete_shot_annotation(date: str, filename: str, request: Request):
         logger.error(
             f"Failed to delete shot annotation: {str(e)}",
             exc_info=True,
-            extra={"request_id": request_id}
+            extra={"request_id": request_id},
         )
         raise HTTPException(
-            status_code=500,
-            detail={"status": "error", "error": str(e)}
+            status_code=500, detail={"status": "error", "error": str(e)}
         )
 
 
 @router.get("/api/shots/annotations")
 async def get_all_shot_annotations(request: Request):
     """Get all shot annotations (for shot list indicators).
-    
+
     Returns:
         Dict mapping shot keys to annotation summaries.
     """
     from services.shot_annotations_service import get_all_annotations
-    
+
     annotations = get_all_annotations()
     # Return lightweight summaries for the shot list
     summaries = {}
@@ -1321,6 +1435,7 @@ async def get_all_shot_annotations(request: Request):
 # Recommendation Extraction
 # ============================================================================
 
+
 def _parse_recommendations_json(analysis_text: str) -> list[dict]:
     """Extract and parse the RECOMMENDATIONS_JSON block from analysis text."""
     match = re.search(
@@ -1339,7 +1454,9 @@ def _parse_recommendations_json(analysis_text: str) -> list[dict]:
         return []
 
 
-def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict]) -> bool:
+def _classify_recommendation_patchable(
+    rec: dict, profile_variables: list[dict]
+) -> bool:
     """Determine if a recommendation targets a patchable (adjustable) variable.
 
     A variable is patchable when:
@@ -1359,8 +1476,14 @@ def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict])
 
     # Stage exit triggers and limits are patchable
     stage_variables = {
-        "exit_weight", "exit_time", "exit_pressure", "exit_flow", "exit_volume",
-        "limit_pressure", "limit_flow", "limit_weight",
+        "exit_weight",
+        "exit_time",
+        "exit_pressure",
+        "exit_flow",
+        "exit_volume",
+        "limit_pressure",
+        "limit_flow",
+        "limit_weight",
     }
     if variable in stage_variables and stage and stage != "global":
         return True
@@ -1380,7 +1503,11 @@ def _classify_recommendation_patchable(rec: dict, profile_variables: list[dict])
     for var in profile_variables:
         var_key = var.get("key", "").lower().replace("_", " ").replace("-", " ")
         var_name = var.get("name", "").lower()
-        if variable_lower in var_key or var_key in variable_lower or variable_lower in var_name:
+        if (
+            variable_lower in var_key
+            or var_key in variable_lower
+            or variable_lower in var_name
+        ):
             if var.get("key", "").startswith("info_"):
                 return False
             if var.get("adjustable") is False:
@@ -1421,7 +1548,9 @@ async def analyze_recommendations(
         shot_date_match = re.match(r"(\d{4}-\d{2}-\d{2})", shot_filename)
         shot_date = shot_date_match.group(1) if shot_date_match else ""
 
-        cached_analysis = get_cached_llm_analysis(profile_name, shot_date, shot_filename)
+        cached_analysis = get_cached_llm_analysis(
+            profile_name, shot_date, shot_filename
+        )
 
         if not cached_analysis:
             raise HTTPException(
@@ -1451,20 +1580,26 @@ async def analyze_recommendations(
                     full_profile = await async_get_profile(p.id)
                     if hasattr(full_profile, "variables") and full_profile.variables:
                         for var in full_profile.variables:
-                            profile_variables.append({
-                                "key": getattr(var, "key", ""),
-                                "name": getattr(var, "name", ""),
-                                "type": getattr(var, "type", ""),
-                                "value": getattr(var, "value", 0),
-                                "adjustable": getattr(var, "adjustable", None),
-                            })
+                            profile_variables.append(
+                                {
+                                    "key": getattr(var, "key", ""),
+                                    "name": getattr(var, "name", ""),
+                                    "type": getattr(var, "type", ""),
+                                    "value": getattr(var, "value", 0),
+                                    "adjustable": getattr(var, "adjustable", None),
+                                }
+                            )
                     break
         except Exception:
-            logger.warning("Could not fetch profile for patchability check", exc_info=True)
+            logger.warning(
+                "Could not fetch profile for patchability check", exc_info=True
+            )
 
         # Annotate each recommendation
         for rec in recs:
-            rec["is_patchable"] = _classify_recommendation_patchable(rec, profile_variables)
+            rec["is_patchable"] = _classify_recommendation_patchable(
+                rec, profile_variables
+            )
 
         return {
             "status": "success",

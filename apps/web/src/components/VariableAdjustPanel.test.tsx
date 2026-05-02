@@ -37,12 +37,12 @@ const mockVariables: ProfileVariable[] = [
 ]
 
 describe('VariableAdjustPanel', () => {
-  let onOverridesChange: ReturnType<typeof vi.fn>
-  let onReset: ReturnType<typeof vi.fn>
+  let onOverridesChange: (overrides: Record<string, number>) => void
+  let onReset: () => void
 
   beforeEach(() => {
-    onOverridesChange = vi.fn()
-    onReset = vi.fn()
+    onOverridesChange = vi.fn() as unknown as (overrides: Record<string, number>) => void
+    onReset = vi.fn() as unknown as () => void
   })
 
   it('should render panel toggle with adjust label', () => {

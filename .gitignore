@@ -58,10 +58,6 @@ benchmark_results.jsonl
 # Web app (cloned dependency)
 meticai-web/
 
-# macOS Installer build artifacts
-macos-installer/build/
-*.dmg
-*.app
 .vscode/
 apps/server/data/
 
@@ -75,3 +71,12 @@ SESSION_HANDOFF.md
 .superpowers
 
 tasks.old.md
+
+# Old build artifacts
+apps/web/dist.old/
+
+# Playwright MCP (leftover logs)
+.playwright-mcp/
+
+# Reports (empty/generated)
+reports/

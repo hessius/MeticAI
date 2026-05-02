@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getServerUrl } from '@/lib/config'
+import { hasFeature } from '@/lib/featureFlags'
 
 interface TriggerUpdateResponse {
   status: 'success' | 'error'
@@ -83,6 +84,13 @@ export function useUpdateTrigger(): UseUpdateTriggerReturn {
   }, [checkUpdateStatus])
 
   const triggerUpdate = useCallback(async () => {
+    if (!hasFeature('watchtowerUpdate')) {
+      setIsUpdating(false)
+      setUpdateSuccess(false)
+      setUpdateError(t('update.unavailableInMode'))
+      return
+    }
+
     setIsUpdating(true)
     setUpdateError(null)
     setUpdateSuccess(false)

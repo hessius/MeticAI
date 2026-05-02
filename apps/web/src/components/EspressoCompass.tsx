@@ -121,6 +121,10 @@ function analyzeDescriptors(selected: string[]): Analysis | null {
   let titleKey = 'espressoCompass.analysis.sweetSpot'
   let statusColor = 'text-emerald-400'
 
+  // Sweet spot radius matches the visual circle (w-1/3 h-1/3 → radius ≈ 0.333)
+  const sweetRadius = 1 / 3
+  const distFromCenter = Math.sqrt(avgX * avgX + avgY * avgY)
+
   if (isUneven) {
     titleKey = 'espressoCompass.analysis.unevenExtraction'
     statusColor = 'text-amber-400'
@@ -150,7 +154,13 @@ function analyzeDescriptors(selected: string[]): Analysis | null {
       adviceKeys.push({ descKey: 'espressoCompass.analysis.weakDesc', adviceKey: 'espressoCompass.analysis.weakAdvice' })
     }
 
-    if (adviceKeys.length === 0) {
+    // If no specific issue was found but the dot is outside the visual sweet spot circle,
+    // don't call it "sweet spot" — use a near-miss message instead
+    if (adviceKeys.length === 0 && distFromCenter > sweetRadius) {
+      titleKey = 'espressoCompass.analysis.almostThere'
+      statusColor = 'text-amber-400'
+      adviceKeys.push({ descKey: 'espressoCompass.analysis.almostThereDesc', adviceKey: 'espressoCompass.analysis.almostThereAdvice' })
+    } else if (adviceKeys.length === 0) {
       adviceKeys.push({ descKey: 'espressoCompass.analysis.sweetSpotDesc', adviceKey: 'espressoCompass.analysis.sweetSpotAdvice' })
     }
   }
@@ -190,7 +200,7 @@ export function EspressoCompass({ onBack }: EspressoCompassProps) {
     >
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack} aria-label={t('common.back')}>
+        <Button variant="ghost" size="icon" data-sound="back" onClick={onBack} aria-label={t('common.back')}>
           <ArrowLeft size={20} />
         </Button>
         <div>
@@ -366,7 +376,7 @@ export function EspressoCompass({ onBack }: EspressoCompassProps) {
           <li dangerouslySetInnerHTML={{ __html: t('espressoCompass.ruleDontChangeDose') }} />
           <li>{t('espressoCompass.ruleYieldTime')}</li>
           <li>{t('espressoCompass.ruleEvenExtraction')}</li>
-          <li>{t('espressoCompass.rulePreciseControl')}</li>
+          <li dangerouslySetInnerHTML={{ __html: t('espressoCompass.rulePreciseControl') }} />
         </ul>
       </Card>
 

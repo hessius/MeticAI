@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { CaretDown, Sparkle, CheckCircle } from '@phosphor-icons/react'
+import { CaretDown, Sparkle } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { getMatchReasonColorClass, getScoreColorClass } from '@/lib/tags'
+import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 
 interface Recommendation {
   profile_name: string
@@ -21,6 +23,52 @@ interface ProfileRecommendationsProps {
   onUseProfile?: (profileName: string) => void
 }
 
+// Small wrapper that resolves a profile image in both proxy and direct modes
+function ProfileImage({ name, serverUrl }: { name: string; serverUrl: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting state when name changes
+    setError(false)
+    setSrc(null)
+
+    if (isDirectMode() || isNativePlatform()) {
+      fetch(`/api/profile/${encodeURIComponent(name)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const imageSrc = resolveDisplayImage(getProfileImageValue(data?.profile))
+          if (!cancelled) {
+            setSrc(imageSrc)
+          }
+        })
+        .catch(() => { if (!cancelled) setError(true) })
+    } else if (serverUrl) {
+      setSrc(`${serverUrl}/api/profile/${encodeURIComponent(name)}/image-proxy`)
+    }
+
+    return () => { cancelled = true }
+  }, [name, serverUrl])
+
+  if (!src || error) {
+    return (
+      <span className="text-[10px] font-bold text-muted-foreground/60 uppercase leading-none">
+        {name.split(/[\s-]+/).slice(0, 2).map(w => w[0]).join('')}
+      </span>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="w-full h-full object-cover"
+      onError={() => setError(true)}
+    />
+  )
+}
+
 export function ProfileRecommendations({
   tags,
   onUseProfile,
@@ -29,8 +77,13 @@ export function ProfileRecommendations({
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(true)
+  const [serverUrl, setServerUrl] = useState<string>('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    getServerUrl().then(setServerUrl)
+  }, [])
 
   const fetchRecommendations = useCallback(async (
     currentTags: string[],
@@ -41,11 +94,12 @@ export function ProfileRecommendations({
 
     setIsLoading(true)
     try {
-      const serverUrl = await getServerUrl()
+      const url = serverUrl || await getServerUrl()
+      if (!serverUrl && url) setServerUrl(url)
       const formData = new FormData()
       currentTags.forEach(tag => formData.append('tags', tag))
 
-      const response = await fetch(`${serverUrl}/api/profiles/recommend`, {
+      const response = await fetch(`${url}/api/profiles/recommend`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
@@ -58,6 +112,7 @@ export function ProfileRecommendations({
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
+      console.warn('[ProfileRecommendations] Failed to fetch recommendations:', err)
       if (!controller.signal.aborted) {
         setRecommendations([])
       }
@@ -66,7 +121,7 @@ export function ProfileRecommendations({
         setIsLoading(false)
       }
     }
-  }, [t])
+  }, [serverUrl, t])
 
   useEffect(() => {
     if (tags.length < 2) {
@@ -91,7 +146,16 @@ export function ProfileRecommendations({
     }
   }, [])
 
-  if (tags.length < 2 && recommendations.length === 0) return null
+  if (tags.length === 0 && recommendations.length === 0) return null
+
+  if (tags.length < 2 && recommendations.length === 0) {
+    return (
+      <div className="flex items-center gap-2 py-2 px-1 text-sm text-muted-foreground">
+        <Sparkle size={14} className="text-primary/60" />
+        <span>{t('profileRecommendations.selectMoreTags')}</span>
+      </div>
+    )
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -121,13 +185,12 @@ export function ProfileRecommendations({
             <div className="space-y-2" aria-busy="true" aria-label={t('a11y.recommendations.loading')}>
               {[1, 2, 3].map(i => (
                 <Card key={i} className="p-3">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
                     <div className="flex-1 space-y-1.5">
                       <Skeleton className="h-4 w-3/5" />
                       <Skeleton className="h-3 w-4/5" />
                     </div>
-                    <Skeleton className="h-6 w-12 rounded-full" />
                   </div>
                 </Card>
               ))}
@@ -151,51 +214,42 @@ export function ProfileRecommendations({
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2, delay: idx * 0.05 }}
                 >
-                  <Card className="p-3 hover:bg-secondary/40 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 shrink-0">
-                        <span className="text-xs font-bold text-primary">
-                          {Math.round(rec.score)}
-                        </span>
+                  <Card
+                    className={`p-2 sm:p-3 transition-colors ${onUseProfile ? 'cursor-pointer hover:bg-secondary/40' : ''}`}
+                    {...(onUseProfile ? {
+                      onClick: () => onUseProfile(rec.profile_name),
+                      role: 'button' as const,
+                      tabIndex: 0,
+                      onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onUseProfile(rec.profile_name) } },
+                      'aria-label': t('a11y.useProfile', { name: rec.profile_name }),
+                    } : {})}
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      {/* Profile Image */}
+                      <div className="w-10 h-10 rounded-lg bg-secondary/60 overflow-hidden shrink-0 flex items-center justify-center">
+                        <ProfileImage name={rec.profile_name} serverUrl={serverUrl} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium truncate">{rec.profile_name}</h4>
-                        {rec.explanation && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                            {rec.explanation}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <h4 className="text-sm font-medium truncate flex-1 min-w-0">{rec.profile_name}</h4>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs shrink-0 border ${getScoreColorClass(rec.score)}`}
+                          >
+                            {Math.round(rec.score)}%
+                          </Badge>
+                        </div>
                         {rec.match_reasons.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {rec.match_reasons.map((reason) => (
-                              <Badge
+                              <span
                                 key={reason}
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0"
+                                className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md border font-medium ${getMatchReasonColorClass(reason)}`}
                               >
                                 {reason}
-                              </Badge>
+                              </span>
                             ))}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Badge
-                          variant={rec.score >= 70 ? 'default' : rec.score >= 40 ? 'secondary' : 'outline'}
-                          className="text-xs"
-                        >
-                          {Math.round(rec.score)}%
-                        </Badge>
-                        {onUseProfile && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onUseProfile(rec.profile_name)}
-                            className="h-7 text-xs px-2"
-                          >
-                            <CheckCircle size={14} className="mr-1" />
-                            {t('profileRecommendations.useProfile')}
-                          </Button>
                         )}
                       </div>
                     </div>

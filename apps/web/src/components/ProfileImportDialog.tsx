@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +20,8 @@ import {
   Plus,
   MagicWand,
   DownloadSimple,
-  Info
+  Info,
+  LinkSimple
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 
@@ -51,14 +53,15 @@ interface ProfileImportDialogProps {
   isOpen: boolean
   aiConfigured?: boolean
   hideAiWhenUnavailable?: boolean
+  initialUrl?: string
   onClose: () => void
   onImported: () => void
   onGenerateNew: () => void
 }
 
-type ImportStep = 'choose' | 'file' | 'machine' | 'importing' | 'bulk-importing' | 'success' | 'bulk-success' | 'error'
+type ImportStep = 'choose' | 'file' | 'machine' | 'url' | 'importing' | 'bulk-importing' | 'success' | 'bulk-success' | 'error'
 
-export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUnavailable = false, onClose, onImported, onGenerateNew }: ProfileImportDialogProps) {
+export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUnavailable = false, initialUrl, onClose, onImported, onGenerateNew }: ProfileImportDialogProps) {
   const { t } = useTranslation()
   const [step, setStep] = useState<ImportStep>('choose')
   const [machineProfiles, setMachineProfiles] = useState<MachineProfile[]>([])
@@ -70,14 +73,19 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
   const [bulkProgress, setBulkProgress] = useState<BulkImportProgress | null>(null)
   const [bulkLogs, setBulkLogs] = useState<string[]>([])
   const [generateDescriptions, setGenerateDescriptions] = useState(aiConfigured)
+  const [importUrl, setImportUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const autoImportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleUrlImportRef = useRef<(urlOverride?: string) => Promise<void>>(async () => {})
 
   // Reset state when dialog opens
   useEffect(() => {
     if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting dialog state on open
-      setStep('choose')
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset state when dialog opens
+      setStep(initialUrl ? 'url' : 'choose')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setImportUrl(initialUrl || '')
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMachineProfiles([])
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -92,14 +100,23 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setBulkLogs([])
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setGenerateDescriptions(aiConfigured)
+      if (initialUrl) {
+        autoImportTimerRef.current = setTimeout(() => handleUrlImportRef.current(initialUrl), 100)
+      }
     } else {
-      // Cleanup abort controller when dialog closes
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setImportUrl('')
+      if (autoImportTimerRef.current) {
+        clearTimeout(autoImportTimerRef.current)
+        autoImportTimerRef.current = null
+      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
         abortControllerRef.current = null
       }
     }
-  }, [isOpen, aiConfigured])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, aiConfigured, initialUrl])
 
   const fetchMachineProfiles = async () => {
     setLoadingMachine(true)
@@ -125,6 +142,55 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setLoadingMachine(false)
     }
   }
+
+  const handleUrlImport = async (urlOverride?: string) => {
+    const urlToImport = urlOverride || importUrl.trim()
+    if (!urlToImport) return
+
+    try {
+      new URL(urlToImport)
+    } catch {
+      setError(t('profileImport.invalidUrl'))
+      setStep('error')
+      return
+    }
+
+    setStep('importing')
+    setImportProgress(t('profileImport.fetchingUrl'))
+    setError(null)
+
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/import-from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlToImport, generate_description: generateDescriptions }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: t('profileImport.importUrlFailed') }))
+        const errorMessage = typeof errorData.detail === 'string'
+          ? errorData.detail
+          : errorData.detail?.error || errorData.detail?.message || t('profileImport.importUrlFailed')
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+
+      if (result.status === 'exists') {
+        setError(t('profileImport.profileExists', { name: result.profile_name }))
+        setStep('error')
+        return
+      }
+
+      setImportedProfileName(result.profile_name)
+      setStep('success')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('profileImport.importUrlFailed'))
+      setStep('error')
+    }
+  }
+  useEffect(() => { handleUrlImportRef.current = handleUrlImport })
 
   const handleBulkImport = async () => {
     setStep('bulk-importing')
@@ -332,7 +398,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
               </div>
               <h2 className="text-lg font-bold tracking-tight">{t('profileImport.title')}</h2>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
+            <Button variant="ghost" size="icon" data-sound="close" onClick={handleClose} className="h-8 w-8">
               <X size={18} weight="bold" />
             </Button>
           </div>
@@ -355,16 +421,13 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                   {t('profileImport.generateNewProfile')}
                 </Button>
                 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border/30" />
-                  </div>
-                  <div className="relative flex justify-center">
-                    <span className="bg-card px-3 text-xs text-muted-foreground font-medium">{t('profileImport.orImport')}</span>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 border-t border-border/30" />
+                  <span className="text-xs text-muted-foreground font-medium">{t('profileImport.orImport')}</span>
+                  <div className="flex-1 border-t border-border/30" />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <Button
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
@@ -373,6 +436,16 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     <Upload size={28} weight="duotone" className="text-primary" />
                     <span className="text-sm font-medium">{t('profileImport.fromFile')}</span>
                     <span className="text-[10px] text-muted-foreground">{t('profileImport.jsonProfile')}</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep('url')}
+                    className="h-24 flex-col gap-2 border-border/50 hover:border-primary/50 hover:bg-primary/5"
+                  >
+                    <LinkSimple size={28} weight="duotone" className="text-primary" />
+                    <span className="text-sm font-medium">{t('profileImport.fromUrl')}</span>
+                    <span className="text-[10px] text-muted-foreground">{t('profileImport.jsonOrMet')}</span>
                   </Button>
                   
                   <Button
@@ -497,6 +570,23 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
               </motion.div>
             )}
 
+
+            {/* Step: Import from URL */}
+            {step === 'url' && (
+              <motion.div key="url" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
+                <Label className="text-sm font-medium">{t('profileImport.importFromUrl')}</Label>
+                <Input type="url" placeholder={t('profileImport.urlPlaceholder')} value={importUrl} onChange={(e) => setImportUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && importUrl.trim()) handleUrlImport() }} autoFocus />
+                <p className="text-[10px] text-muted-foreground">{t('profileImport.urlHint')}</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { setImportUrl(''); setStep('choose') }} className="flex-1">{t('profileImport.back')}</Button>
+                  <Button onClick={() => handleUrlImport()} disabled={!importUrl.trim()} className="flex-1">
+                    <DownloadSimple size={18} className="mr-2" weight="bold" />
+                    {t('profileImport.importButton')}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Step: Bulk Importing */}
             {step === 'bulk-importing' && (
               <motion.div
@@ -596,7 +686,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     <p className="text-sm text-muted-foreground mt-1">{importedProfileName}</p>
                   )}
                 </div>
-                <Button onClick={handleClose} className="w-full">
+                <Button data-sound="close" onClick={handleClose} className="w-full">
                   {t('profileImport.viewInCatalogue')}
                 </Button>
               </motion.div>
@@ -634,7 +724,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     )}
                   </div>
                 </div>
-                <Button onClick={handleClose} className="w-full">
+                <Button data-sound="close" onClick={handleClose} className="w-full">
                   {t('profileImport.viewInCatalogue')}
                 </Button>
               </motion.div>

@@ -12,9 +12,68 @@ beforeAll(() => {
   })
 })
 
+// Mock AudioContext for @rexa-developer/tiks (Web Audio API not available in happy-dom)
+class MockAudioContext {
+  state = 'running'
+  sampleRate = 44100
+  currentTime = 0
+  destination = { maxChannelCount: 2 }
+  createOscillator() {
+    return {
+      type: 'sine', frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      connect: vi.fn(), start: vi.fn(), stop: vi.fn(), disconnect: vi.fn(),
+    }
+  }
+  createGain() {
+    return { gain: { value: 1, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() }
+  }
+  createBiquadFilter() {
+    return { type: 'lowpass', frequency: { value: 0 }, Q: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() }
+  }
+  createBufferSource() {
+    return { buffer: null, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), disconnect: vi.fn() }
+  }
+  createBuffer(channels: number, length: number, sampleRate: number) {
+    return { numberOfChannels: channels, length, sampleRate, getChannelData: () => new Float32Array(length) }
+  }
+  resume() { return Promise.resolve() }
+  close() { return Promise.resolve() }
+}
+global.AudioContext = MockAudioContext as unknown as typeof AudioContext
+
+// Ensure localStorage is always a valid Storage-like object.
+// vi.unstubAllGlobals() can replace the environment's localStorage with the raw
+// Node.js global (which lacks .clear()/.getItem()/etc.), breaking subsequent tests.
+const _storageBacking = new Map<string, string>()
+const _localStorageShim = {
+  getItem: (key: string) => _storageBacking.get(key) ?? null,
+  setItem: (key: string, value: string) => _storageBacking.set(key, String(value)),
+  removeItem: (key: string) => { _storageBacking.delete(key) },
+  clear: () => _storageBacking.clear(),
+  get length() { return _storageBacking.size },
+  key: (i: number) => [..._storageBacking.keys()][i] ?? null,
+}
+
+beforeEach(() => {
+  if (typeof globalThis.localStorage?.clear !== 'function') {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: _localStorageShim,
+      writable: true,
+      configurable: true,
+    })
+  }
+})
+
 // Cleanup after each test
 afterEach(() => {
   cleanup()
+  if (typeof globalThis.localStorage?.clear !== 'function') {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: _localStorageShim,
+      writable: true,
+      configurable: true,
+    })
+  }
 })
 
 // Mock window.matchMedia
