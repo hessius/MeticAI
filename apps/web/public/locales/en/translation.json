@@ -100,7 +100,7 @@
     "retryAttempt": "retry {{attempt}}/{{max}}"
   },
   "app": {
-    "title": "All-in-one toolkit for the Meticulous",
+    "title": "The all-in-one toolkit for the Meticulous",
     "meticulousEspresso": "Meticulous Espresso",
     "tapToGoHome": "Tap to go home",
     "openOnMobile": "Open on mobile",
