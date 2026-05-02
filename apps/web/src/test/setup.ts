@@ -41,9 +41,39 @@ class MockAudioContext {
 }
 global.AudioContext = MockAudioContext as unknown as typeof AudioContext
 
+// Ensure localStorage is always a valid Storage-like object.
+// vi.unstubAllGlobals() can replace the environment's localStorage with the raw
+// Node.js global (which lacks .clear()/.getItem()/etc.), breaking subsequent tests.
+const _storageBacking = new Map<string, string>()
+const _localStorageShim = {
+  getItem: (key: string) => _storageBacking.get(key) ?? null,
+  setItem: (key: string, value: string) => _storageBacking.set(key, String(value)),
+  removeItem: (key: string) => { _storageBacking.delete(key) },
+  clear: () => _storageBacking.clear(),
+  get length() { return _storageBacking.size },
+  key: (i: number) => [..._storageBacking.keys()][i] ?? null,
+}
+
+beforeEach(() => {
+  if (typeof globalThis.localStorage?.clear !== 'function') {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: _localStorageShim,
+      writable: true,
+      configurable: true,
+    })
+  }
+})
+
 // Cleanup after each test
 afterEach(() => {
   cleanup()
+  if (typeof globalThis.localStorage?.clear !== 'function') {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: _localStorageShim,
+      writable: true,
+      configurable: true,
+    })
+  }
 })
 
 // Mock window.matchMedia
