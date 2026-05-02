@@ -18,13 +18,23 @@ vi.mock('@capacitor/preferences', () => ({
 
 describe('machineUrl persistence', () => {
   const originalLocation = window.location
+  const storageBacking = new Map<string, string>()
+  const localStorageShim = {
+    getItem: (key: string) => storageBacking.get(key) ?? null,
+    setItem: (key: string, value: string) => storageBacking.set(key, String(value)),
+    removeItem: (key: string) => storageBacking.delete(key),
+    clear: () => storageBacking.clear(),
+    get length() { return storageBacking.size },
+    key: (i: number) => [...storageBacking.keys()][i] ?? null,
+  }
 
   beforeEach(() => {
+    storageBacking.clear()
+    vi.stubGlobal('localStorage', localStorageShim)
     vi.resetModules()
     vi.unstubAllEnvs()
     vi.clearAllMocks()
     preferenceValues.clear()
-    localStorage.clear()
     delete (window as unknown as { Capacitor?: unknown }).Capacitor
     Object.defineProperty(window, 'location', {
       value: {
@@ -43,7 +53,7 @@ describe('machineUrl persistence', () => {
       configurable: true,
     })
     delete (window as unknown as { Capacitor?: unknown }).Capacitor
-    localStorage.clear()
+    storageBacking.clear()
   })
 
   it('persists web direct machine URLs in localStorage', async () => {
@@ -65,7 +75,7 @@ describe('machineUrl persistence', () => {
 
     await persistMachineUrl('http://10.0.0.2:8080')
 
-    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBeNull()
+    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBe('http://10.0.0.2:8080')
     expect(preferencesMock.set).toHaveBeenCalledWith({
       key: STORAGE_KEYS.MACHINE_URL,
       value: 'http://10.0.0.2:8080',

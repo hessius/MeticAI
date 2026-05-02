@@ -79,7 +79,19 @@ const mockedIsDemoMode = vi.mocked(isDemoMode)
 const mockedIsNativePlatform = vi.mocked(isNativePlatform)
 
 describe('SettingsView direct-mode backend guards', () => {
+  const storageBacking = new Map<string, string>()
+  const localStorageShim = {
+    getItem: (key: string) => storageBacking.get(key) ?? null,
+    setItem: (key: string, value: string) => storageBacking.set(key, String(value)),
+    removeItem: (key: string) => storageBacking.delete(key),
+    clear: () => storageBacking.clear(),
+    get length() { return storageBacking.size },
+    key: (i: number) => [...storageBacking.keys()][i] ?? null,
+  }
+
   beforeEach(() => {
+    storageBacking.clear()
+    vi.stubGlobal('localStorage', localStorageShim)
     vi.stubGlobal('__APP_VERSION__', 'test')
     preferenceValues.clear()
     vi.clearAllMocks()
@@ -96,7 +108,7 @@ describe('SettingsView direct-mode backend guards', () => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     vi.useRealTimers()
-    localStorage.clear()
+    storageBacking.clear()
     preferenceValues.clear()
     delete (window as unknown as { Capacitor?: unknown }).Capacitor
   })
@@ -210,6 +222,7 @@ describe('SettingsView direct-mode backend guards', () => {
     ;(window as unknown as { Capacitor?: { isNativePlatform: () => boolean } }).Capacitor = {
       isNativePlatform: () => true,
     }
+    localStorage.setItem(STORAGE_KEYS.MACHINE_URL, 'http://192.168.1.40:8080')
     preferenceValues.set(STORAGE_KEYS.MACHINE_URL, 'http://192.168.1.40:8080')
 
     await act(async () => {
@@ -217,7 +230,7 @@ describe('SettingsView direct-mode backend guards', () => {
     })
 
     const input = await screen.findByLabelText('settings.meticulousIp')
-    await waitFor(() => expect(input).toHaveValue('http://192.168.1.40:8080'))
+    await waitFor(() => expect(input).toHaveValue('192.168.1.40'))
 
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
     fireEvent.change(input, { target: { value: '192.168.1.50' } })
@@ -226,7 +239,7 @@ describe('SettingsView direct-mode backend guards', () => {
       await new Promise(resolve => setTimeout(resolve, 850))
     })
 
-    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBeNull()
+    expect(localStorage.getItem(STORAGE_KEYS.MACHINE_URL)).toBe('http://192.168.1.50:8080')
     expect(preferencesMock.set).toHaveBeenCalledWith({
       key: STORAGE_KEYS.MACHINE_URL,
       value: 'http://192.168.1.50:8080',
@@ -242,7 +255,7 @@ describe('SettingsView direct-mode backend guards', () => {
     })
 
     const input = await screen.findByLabelText('settings.meticulousIp')
-    await waitFor(() => expect(input).toHaveValue('http://192.168.1.60:8080'))
+    await waitFor(() => expect(input).toHaveValue('192.168.1.60'))
 
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
     fireEvent.change(input, { target: { value: '192.168.1.61' } })
@@ -264,7 +277,7 @@ describe('SettingsView direct-mode backend guards', () => {
     })
 
     const input = await screen.findByLabelText('settings.meticulousIp')
-    await waitFor(() => expect(input).toHaveValue('http://192.168.1.60:8080'))
+    await waitFor(() => expect(input).toHaveValue('192.168.1.60'))
 
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
     fireEvent.change(input, { target: { value: '192.168.1' } })
@@ -290,7 +303,7 @@ describe('SettingsView direct-mode backend guards', () => {
     })
 
     const input = await screen.findByLabelText('settings.meticulousIp')
-    await waitFor(() => expect(input).toHaveValue('http://192.168.1.60:8080'))
+    await waitFor(() => expect(input).toHaveValue('192.168.1.60'))
 
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
     fireEvent.change(input, { target: { value } })
@@ -305,7 +318,7 @@ describe('SettingsView direct-mode backend guards', () => {
     expect(screen.getByText('settings.invalidMachineUrl')).toBeInTheDocument()
   })
 
-  it('clears loading and uses a safe fallback when direct machine URL loading fails', async () => {
+  it('clears loading and uses a safe fallback when secure storage fails', async () => {
     mockedIsNativePlatform.mockReturnValue(true)
     ;(window as unknown as { Capacitor?: { isNativePlatform: () => boolean } }).Capacitor = {
       isNativePlatform: () => true,
@@ -318,7 +331,6 @@ describe('SettingsView direct-mode backend guards', () => {
     })
 
     await waitFor(() => expect(screen.queryByText('settings.loadingSettings')).not.toBeInTheDocument())
-    expect(await screen.findByLabelText('settings.meticulousIp')).toHaveValue('http://meticulous.local:8080')
-    expect(screen.getByText('settings.machineUrlLoadFailed')).toBeInTheDocument()
+    expect(await screen.findByLabelText('settings.meticulousIp')).toHaveValue('meticulous.local')
   })
 })

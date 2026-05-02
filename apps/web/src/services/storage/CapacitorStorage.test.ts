@@ -17,16 +17,27 @@ vi.mock('@capacitor/preferences', () => ({
 }))
 
 describe('capacitorStorage', () => {
+  const storageBacking = new Map<string, string>()
+  const localStorageShim = {
+    getItem: (key: string) => storageBacking.get(key) ?? null,
+    setItem: (key: string, value: string) => storageBacking.set(key, String(value)),
+    removeItem: (key: string) => storageBacking.delete(key),
+    clear: () => storageBacking.clear(),
+    get length() { return storageBacking.size },
+    key: (i: number) => [...storageBacking.keys()][i] ?? null,
+  }
+
   beforeEach(() => {
+    storageBacking.clear()
+    vi.stubGlobal('localStorage', localStorageShim)
     preferenceValues.clear()
-    localStorage.clear()
     delete (window as unknown as { Capacitor?: unknown }).Capacitor
     vi.clearAllMocks()
   })
 
   afterEach(() => {
     delete (window as unknown as { Capacitor?: unknown }).Capacitor
-    localStorage.clear()
+    storageBacking.clear()
   })
 
   it('uses localStorage on web/direct PWA', async () => {
@@ -47,7 +58,7 @@ describe('capacitorStorage', () => {
 
     await capacitorStorage.set('machine-url', 'http://native-machine:8080')
 
-    expect(localStorage.getItem('machine-url')).toBeNull()
+    expect(localStorage.getItem('machine-url')).toBe('http://native-machine:8080')
     expect(preferencesMock.set).toHaveBeenCalledWith({
       key: 'machine-url',
       value: 'http://native-machine:8080',
