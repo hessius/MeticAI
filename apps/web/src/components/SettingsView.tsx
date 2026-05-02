@@ -34,9 +34,9 @@ import {
   Heart
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
-import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
-import { getMachineUrlFallback, persistMachineUrl, resolveMachineUrl } from '@/services/machine/machineUrl'
+import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable, AI_PREFS_CHANGED_EVENT } from '@/lib/aiPreferences'
 import { getSoundsEnabled, setSoundsEnabled } from '@/lib/soundPreferences'
 import { useSoundEffects } from '@/hooks/useSoundEffects'
@@ -248,17 +248,14 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     const loadSettings = async () => {
       if (isLocalMode()) {
         try {
-          const [storedKey, machineUrl] = await withTimeout(
-            Promise.all([
-              secureGetItem(STORAGE_KEYS.GEMINI_API_KEY).then(v => v || ''),
-              resolveMachineUrl(),
-            ]),
-            8000,
+          const storedKey = await withTimeout(
+            secureGetItem(STORAGE_KEYS.GEMINI_API_KEY).then(v => v || ''),
+            5000,
           )
           if (cancelled) return
           setSettings({
             geminiApiKey: storedKey,
-            meticulousIp: machineUrl,
+            meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
             mqttEnabled: true,
@@ -269,11 +266,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           if (cancelled) return
           console.error('Failed to load secure settings, falling back to localStorage:', err)
           const fallbackKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
-          const fallbackUrl = getMachineUrlFallback()
-          setMachineUrlError(t('settings.machineUrlLoadFailed'))
           setSettings({
             geminiApiKey: fallbackKey,
-            meticulousIp: fallbackUrl,
+            meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
             mqttEnabled: true,
