@@ -253,7 +253,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               secureGetItem(STORAGE_KEYS.GEMINI_API_KEY).then(v => v || ''),
               resolveMachineUrl(),
             ]),
-            5000,
+            8000,
           )
           if (cancelled) return
           setSettings({

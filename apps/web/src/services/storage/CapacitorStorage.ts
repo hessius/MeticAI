@@ -39,17 +39,37 @@ async function getPreferences() {
 
 const capacitorAdapter: StorageAdapter = {
   async get(key: string) {
-    const Preferences = await getPreferences()
-    const { value } = await Preferences.get({ key })
-    return value
+    try {
+      const Preferences = await getPreferences()
+      // Race against a timeout — Capacitor bridge can occasionally stall
+      const result = await Promise.race([
+        Preferences.get({ key }),
+        new Promise<{ value: null }>((resolve) =>
+          setTimeout(() => resolve({ value: null }), 3000)
+        ),
+      ])
+      if (result.value !== null) return result.value
+      // Preferences returned null or timed out — check localStorage mirror
+      try {
+        return localStorage.getItem(key)
+      } catch { return null }
+    } catch {
+      // Plugin failed entirely — fall back to localStorage
+      try {
+        return localStorage.getItem(key)
+      } catch { return null }
+    }
   },
   async set(key: string, value: string) {
     const Preferences = await getPreferences()
     await Preferences.set({ key, value })
+    // Mirror to localStorage so the get() fallback always has fresh data
+    try { localStorage.setItem(key, value) } catch { /* quota exceeded */ }
   },
   async remove(key: string) {
     const Preferences = await getPreferences()
     await Preferences.remove({ key })
+    try { localStorage.removeItem(key) } catch { /* noop */ }
   },
 }
 
