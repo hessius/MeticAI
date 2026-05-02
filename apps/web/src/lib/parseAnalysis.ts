@@ -200,7 +200,10 @@ export function parseStructuredAnalysis(text: string): ParsedSection[] {
     });
   }
 
-  return sections;
+  // Filter out internal prompt artifacts that Gemini may echo back
+  return sections.filter(
+    (s) => !s.title.toLowerCase().includes("structured recommendations"),
+  );
 }
 
 // ---- Recommendation Types & Parser ----

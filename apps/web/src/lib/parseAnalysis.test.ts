@@ -1,8 +1,39 @@
 import { describe, it, expect } from "vitest";
 import {
+  parseStructuredAnalysis,
   parseRecommendationsJSON,
   hasRecommendations,
 } from "./parseAnalysis";
+
+describe("parseStructuredAnalysis", () => {
+  it("filters out Structured Recommendations section from parsed output", () => {
+    const text = `## 1. Shot Performance
+
+**What Happened:**
+- Good extraction overall
+
+**Assessment:** Good
+
+## 2. Root Cause Analysis
+
+**Primary Factors:**
+- Slight over-extraction
+
+## 6. Structured Recommendations (MANDATORY)
+
+- structured recommendations (MANDATORY)
+
+RECOMMENDATIONS_JSON:
+[{"variable":"flow","current_value":2.5,"recommended_value":3.0,"stage":"main","confidence":"high","reason":"test","is_patchable":true}]
+END_RECOMMENDATIONS_JSON
+`;
+    const sections = parseStructuredAnalysis(text);
+    expect(sections).toHaveLength(2);
+    expect(sections[0].title).toContain("Shot Performance");
+    expect(sections[1].title).toContain("Root Cause");
+    expect(sections.some(s => s.title.toLowerCase().includes("structured recommendations"))).toBe(false);
+  });
+});
 
 describe("parseRecommendationsJSON", () => {
   it("parses a valid RECOMMENDATIONS_JSON block", () => {

@@ -999,7 +999,9 @@ CRITICAL FORMATTING RULES:
 
 Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
 {taste_section_template}
-## Structured Recommendations (MANDATORY)
+---
+
+INTERNAL INSTRUCTION — Structured Recommendations (do NOT include this heading in your response):
 
 After your analysis sections, you MUST output a structured JSON block with specific, actionable profile variable recommendations.
 Use EXACTLY this format — the markers are parsed programmatically:

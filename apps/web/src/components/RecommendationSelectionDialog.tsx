@@ -185,11 +185,20 @@ export function RecommendationSelectionDialog({
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.04 }}
+                        role={isPatchable ? "button" : undefined}
+                        tabIndex={isPatchable ? 0 : undefined}
+                        onClick={isPatchable ? () => toggleSelection(index) : undefined}
+                        onKeyDown={isPatchable ? (e) => {
+                          if (e.key === ' ' || e.key === 'Enter') {
+                            e.preventDefault()
+                            toggleSelection(index)
+                          }
+                        } : undefined}
                         className={`flex items-center gap-2 sm:gap-3 rounded-lg border p-2 sm:p-3 transition-colors ${
                           isPatchable
                             ? isSelected
-                              ? "border-primary/40 bg-primary/5"
-                              : "hover:bg-muted/50"
+                              ? "border-primary/40 bg-primary/5 cursor-pointer"
+                              : "hover:bg-muted/50 cursor-pointer"
                             : "border-dashed opacity-60"
                         }`}
                       >
@@ -199,6 +208,8 @@ export function RecommendationSelectionDialog({
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleSelection(index)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="border-2 border-muted-foreground/50 data-[state=checked]:border-primary"
                               aria-label={t('a11y.recommendations.selectVariable', { variable: rec.variable })}
                             />
                           ) : (
