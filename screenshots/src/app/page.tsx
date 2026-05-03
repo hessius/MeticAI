@@ -767,8 +767,8 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string, widthFn: (cW: number
               alt="Profile Catalogue"
               style={{
                 position: "absolute",
-                bottom: `${cH * 0.22}px`,
-                width: `${fw * 0.68}%`,
+                bottom: `${cH * 0.20}px`,
+                width: `${fw * 0.62}%`,
                 left: "50%",
                 transform: "translateX(-50%)",
               }}
