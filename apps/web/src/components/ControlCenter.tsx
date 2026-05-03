@@ -182,6 +182,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             author?: string
             image?: string
             display?: { description?: string; shortDescription?: string; image?: string }
+            stages?: Array<Record<string, unknown>>
+            temperature?: number
+            final_weight?: number
           }
           const isDirect = directImageMode
           const profiles: DropdownProfile[] = (data.profiles ?? [])
@@ -192,6 +195,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
               author: p.author,
               image: p.image,
               display: p.display,
+              temperature: p.temperature,
+              final_weight: p.final_weight,
+              stageCount: p.stages?.length,
               // In direct/native mode, resolve machine-relative image URLs.
               // In proxy mode, leave null — the image cache uses /api/profile/{name}/image-proxy.
               resolvedImageUrl: isDirect
@@ -377,7 +383,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                         </span>
                       </div>
                       {(pendingProfileMeta?.author ?? profileAuthor) && (
-                        <span className="text-xs text-foreground/70 truncate block">
+                        <span className="text-xs text-foreground truncate block">
                           {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
                         </span>
                       )}
@@ -410,7 +416,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                       </span>
                     </div>
                     {(pendingProfileMeta?.author ?? profileAuthor) && (
-                      <span className="text-xs text-foreground/70 truncate block">
+                      <span className="text-xs text-foreground truncate block">
                         {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
                       </span>
                     )}

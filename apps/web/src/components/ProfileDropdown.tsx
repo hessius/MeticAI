@@ -26,6 +26,10 @@ export interface DropdownProfile {
   }
   /** Resolved image URL ready for <img src> */
   resolvedImageUrl?: string | null
+  /** Profile metadata for smart subtitle fallback */
+  temperature?: number
+  final_weight?: number
+  stageCount?: number
 }
 
 interface ProfileDropdownProps {
@@ -96,7 +100,24 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
   }, [focusIndex, profiles, handleSelect])
 
   const getDescription = (profile: DropdownProfile): string => {
-    return profile.display?.shortDescription || profile.display?.description || t('controlCenter.profileSelector.defaultDescription')
+    if (profile.display?.shortDescription) return profile.display.shortDescription
+    if (profile.display?.description) return profile.display.description
+    // Build a smart fallback from profile metadata
+    const parts: string[] = []
+    if (profile.stageCount && profile.stageCount > 0) {
+      parts.push(t('controlCenter.profileSelector.stageCount', '{{count}} stages', { count: profile.stageCount }))
+    }
+    if (profile.final_weight) {
+      const weightStr = `${profile.final_weight} g`
+      if (profile.temperature) {
+        parts.push(`${weightStr} @ ${profile.temperature}°C`)
+      } else {
+        parts.push(weightStr)
+      }
+    } else if (profile.temperature) {
+      parts.push(`${profile.temperature}°C`)
+    }
+    return parts.length > 0 ? parts.join(' · ') : t('controlCenter.profileSelector.defaultDescription')
   }
 
   // Compute horizontal offset to center popover on the anchorRef element
@@ -210,12 +231,12 @@ export function ProfileDropdown({ profiles, activeProfile, onSelectProfile, disa
                     )}
                   </div>
                   {desc && (
-                    <span className="text-xs text-muted-foreground line-clamp-1">
+                    <span className="text-xs text-foreground/70 line-clamp-1">
                       {desc}
                     </span>
                   )}
                   {profile.author && (
-                    <span className="text-xs text-muted-foreground/70 line-clamp-1">
+                    <span className="text-xs text-foreground/50 line-clamp-1">
                       {t('controlCenter.labels.by')} {profile.author}
                     </span>
                   )}

@@ -787,7 +787,8 @@
       "placeholder": "Profil wechseln…",
       "noProfiles": "Keine Profile verfügbar",
       "noDescription": "Keine Beschreibung",
-      "defaultDescription": "Espresso-Profil"
+      "defaultDescription": "Espresso-Profil",
+      "stageCount": "{{count}} Stufen"
     },
     "confirm": {
       "stopTitle": "Bezug stoppen?",
