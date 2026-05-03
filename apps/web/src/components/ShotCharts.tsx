@@ -92,11 +92,11 @@ export function ReplayChart({
 }: ReplayChartProps) {
   const { t } = useTranslation()
   const isMobile = variant === 'mobile'
-  const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
+  const chartHeight = isMobile ? 'h-64' : 'aspect-square max-h-[60vh] min-h-[300px]'
   const padding = isMobile ? 'p-1' : 'p-2'
   const rightMargin = isMobile ? 0 : 5
   const theme = getChartTheme(isDark)
-  
+
   const content = (
     <>
       <div className="flex items-center justify-between">
@@ -111,7 +111,7 @@ export function ReplayChart({
           </Badge>
         )}
       </div>
-      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none`} role="img" aria-label={t('a11y.chart.extractionReplay')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
+      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none [&_svg]:outline-none [&_.recharts-surface]:outline-none`} role="img" aria-label={t('a11y.chart.extractionReplay')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 5, right: rightMargin, left: -5, bottom: 5 }}>
@@ -190,7 +190,7 @@ export function CompareChart({
 }: CompareChartProps) {
   const { t } = useTranslation()
   const isMobile = variant === 'mobile'
-  const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
+  const chartHeight = isMobile ? 'h-64' : 'aspect-square max-h-[60vh] min-h-[300px]'
   const padding = isMobile ? 'p-1' : 'p-2'
   const theme = getChartTheme(isDark)
   const displayData = isShowingReplay ? combinedData.filter(d => d.time <= comparisonCurrentTime) : combinedData
@@ -209,7 +209,7 @@ export function CompareChart({
           </Badge>
         )}
       </div>
-      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none`} role="img" aria-label={t('a11y.chart.extractionComparison')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
+      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none [&_svg]:outline-none [&_.recharts-surface]:outline-none`} role="img" aria-label={t('a11y.chart.extractionComparison')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
@@ -299,7 +299,7 @@ export function AnalyzeChart({
 }: AnalyzeChartProps) {
   const { t } = useTranslation()
   const isMobile = variant === 'mobile'
-  const chartHeight = isMobile ? 'h-64' : 'h-[60vh] min-h-[400px]'
+  const chartHeight = isMobile ? 'h-64' : 'aspect-square max-h-[60vh] min-h-[300px]'
   const padding = isMobile ? 'p-1' : 'p-2'
   const theme = getChartTheme(isDark)
   
@@ -314,7 +314,7 @@ export function AnalyzeChart({
           <Badge variant="outline" className="text-xs bg-primary/10 border-primary/20">{t('shotCharts.targetOverlay')}</Badge>
         )}
       </div>
-      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none`} role="img" aria-label={t('a11y.chart.shotVsProfile')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
+      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none [&_svg]:outline-none [&_.recharts-surface]:outline-none`} role="img" aria-label={t('a11y.chart.shotVsProfile')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
