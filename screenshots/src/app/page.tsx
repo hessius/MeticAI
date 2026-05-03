@@ -13,6 +13,10 @@ const H = 2778;
 const AW = 1080;
 const AH = 1920;
 
+// iPad (13" — App Store required)
+const IPW = 2048;
+const IPH = 2732;
+
 // Feature Graphic
 const FGW = 1024;
 const FGH = 500;
@@ -22,6 +26,11 @@ const FGH = 500;
 const IPHONE_SIZES = [
   { label: '6.7"', w: 1284, h: 2778 },
   { label: '6.5"', w: 1242, h: 2688 },
+] as const;
+
+const IPAD_SIZES = [
+  { label: '13" (Gen 4)', w: 2064, h: 2752 },
+  { label: '12.9" (Gen 3)', w: 2048, h: 2732 },
 ] as const;
 
 const ANDROID_SIZES = [{ label: "Phone", w: 1080, h: 1920 }] as const;
@@ -45,6 +54,10 @@ const SC_RY = (126 / 1990) * 100;
 
 function phoneW(cW: number, cH: number, clamp = 0.84) {
   return Math.min(clamp, 0.72 * (cH / cW) * MK_RATIO);
+}
+
+function tabletW(_cW: number, _cH: number, clamp = 0.82) {
+  return clamp;
 }
 
 /* ───────────────────── Theme ───────────────────── */
@@ -75,6 +88,12 @@ const IMAGE_PATHS = [
   "/screenshots/en/pour-over.png",
   "/screenshots/en/shot-analysis.png",
   "/screenshots/en/profile-catalogue.png",
+  "/screenshots/en/ipad/home.png",
+  "/screenshots/en/ipad/compass.png",
+  "/screenshots/en/ipad/create-profile.png",
+  "/screenshots/en/ipad/pour-over.png",
+  "/screenshots/en/ipad/shot-analysis.png",
+  "/screenshots/en/ipad/profile-catalogue.png",
 ];
 
 const imageCache: Record<string, string> = {};
@@ -100,7 +119,7 @@ function img(path: string): string {
 
 /* ───────────────────── Types ───────────────────── */
 
-type Device = "iphone" | "android" | "feature-graphic";
+type Device = "iphone" | "ipad" | "android" | "feature-graphic";
 type SlideProps = { cW: number; cH: number };
 type SlideDef = { id: string; component: (p: SlideProps) => React.JSX.Element };
 
@@ -226,6 +245,60 @@ function AndroidPhone({
   );
 }
 
+function Tablet({
+  src,
+  alt,
+  style,
+}: {
+  src: string;
+  alt: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div style={{ position: "relative", aspectRatio: "2048/2732", ...style }}>
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          borderRadius: "4% / 3%",
+          background:
+            "linear-gradient(160deg, #2a2a2e 0%, #18181b 100%)",
+          boxShadow:
+            "inset 0 0 0 1px rgba(255,255,255,0.08), 0 8px 40px rgba(0,0,0,0.55)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: "2%",
+            top: "1.5%",
+            width: "96%",
+            height: "97%",
+            borderRadius: "3% / 2.3%",
+            overflow: "hidden",
+            background: "#000",
+          }}
+        >
+          <img
+            src={src}
+            alt={alt}
+            style={{
+              display: "block",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "top",
+            }}
+            draggable={false}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────────── Caption Component ───────────────────── */
 
 function Caption({
@@ -311,15 +384,15 @@ function GlowBlob({
 
 /* ───────────────────── Slide Definitions ───────────────────── */
 
-type PhoneComp = typeof Phone | typeof AndroidPhone;
+type PhoneComp = typeof Phone | typeof AndroidPhone | typeof Tablet;
 
-function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
+function makeSlides(PhoneComp: PhoneComp, basePath: string, widthFn: (cW: number, cH: number) => number = phoneW): SlideDef[] {
   return [
     // Slide 1: Hero — Home Screen
     {
       id: "home",
       component: ({ cW, cH }: SlideProps) => {
-        const fw = phoneW(cW, cH) * 100;
+        const fw = widthFn(cW, cH) * 100;
         return (
           <div
             style={{
@@ -389,7 +462,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
     {
       id: "compass",
       component: ({ cW, cH }: SlideProps) => {
-        const fw = phoneW(cW, cH) * 100;
+        const fw = widthFn(cW, cH) * 100;
         return (
           <div
             style={{
@@ -460,7 +533,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
     {
       id: "create-profile",
       component: ({ cW, cH }: SlideProps) => {
-        const fw = phoneW(cW, cH) * 100;
+        const fw = widthFn(cW, cH) * 100;
         return (
           <div
             style={{
@@ -513,7 +586,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
     {
       id: "pour-over",
       component: ({ cW, cH }: SlideProps) => {
-        const fw = phoneW(cW, cH) * 100;
+        const fw = widthFn(cW, cH) * 100;
         return (
           <div
             style={{
@@ -571,7 +644,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
     {
       id: "shot-analysis",
       component: ({ cW, cH }: SlideProps) => {
-        const fw = phoneW(cW, cH) * 100;
+        const fw = widthFn(cW, cH) * 100;
         return (
           <div
             style={{
@@ -642,7 +715,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
     {
       id: "profile-catalogue",
       component: ({ cW, cH }: SlideProps) => {
-        const fw = phoneW(cW, cH) * 100;
+        const fw = widthFn(cW, cH) * 100;
         const pills = [
           "Replay",
           "Shot vs Shot",
@@ -756,6 +829,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string): SlideDef[] {
 
 const IPHONE_SLIDES = makeSlides(Phone, "/screenshots/en");
 const ANDROID_SLIDES = makeSlides(AndroidPhone, "/screenshots/en");
+const IPAD_SLIDES = makeSlides(Tablet, "/screenshots/en/ipad", tabletW);
 
 const FG_SLIDE: SlideDef = {
   id: "feature-graphic",
@@ -945,6 +1019,13 @@ export default function ScreenshotsPage() {
   }, []);
 
   const { cW, cH, currentSizes, slides } = (() => {
+    if (device === "ipad")
+      return {
+        cW: IPW,
+        cH: IPH,
+        currentSizes: IPAD_SIZES,
+        slides: IPAD_SLIDES,
+      };
     if (device === "android")
       return {
         cW: AW,
@@ -1091,7 +1172,7 @@ export default function ScreenshotsPage() {
               flexShrink: 0,
             }}
           >
-            {(["iphone", "android", "feature-graphic"] as Device[]).map(
+            {(["iphone", "ipad", "android", "feature-graphic"] as Device[]).map(
               (d) => (
                 <button
                   key={d}
@@ -1115,9 +1196,11 @@ export default function ScreenshotsPage() {
                 >
                   {d === "iphone"
                     ? "iPhone"
-                    : d === "android"
-                      ? "Android"
-                      : "Feature Graphic"}
+                    : d === "ipad"
+                      ? "iPad"
+                      : d === "android"
+                        ? "Android"
+                        : "Feature Graphic"}
                 </button>
               )
             )}
