@@ -2644,14 +2644,16 @@ export function installDirectModeInterceptor(): void {
             flushStage(totalTime, finalWeight)
           }
 
-          // Use the actual settled weight (including drip during piston retraction)
-          // same logic as getHistoryMetrics() — the absolute last data point has the true final weight
-          const lastRawPt = pts[pts.length - 1]
-          const actualFinalWeight = safeNumber((lastRawPt as Record<string, Record<string, unknown>>)?.shot?.weight) || finalWeight
+          // Use the actual settled final telemetry sample (including drip during piston retraction)
+          // so both time and weight reflect the same end-of-shot point as getHistoryMetrics()
+          const lastRawPt = (pts[pts.length - 1] ?? {}) as Record<string, unknown>
+          const lastShot = ((lastRawPt.shot as Record<string, unknown> | undefined) ?? {})
+          const actualFinalWeight = safeNumber(lastShot.weight) || finalWeight
+          const actualTotalTime = safeNumber(lastRawPt.profile_time ?? lastRawPt.time) / 1000 || totalTime
 
           const localAnalysis = {
             shot_summary: {
-              total_time_s: Math.round(totalTime * 10) / 10,
+              total_time_s: Math.round(actualTotalTime * 10) / 10,
               final_weight_g: Math.round(actualFinalWeight * 10) / 10,
               target_weight_g: targetWeight,
               weight_deviation_pct: targetWeight ? Math.round(((actualFinalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
