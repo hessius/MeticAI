@@ -377,7 +377,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                         </span>
                       </div>
                       {(pendingProfileMeta?.author ?? profileAuthor) && (
-                        <span className="text-xs text-muted-foreground truncate block">
+                        <span className="text-xs text-foreground/70 truncate block">
                           {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
                         </span>
                       )}
@@ -410,7 +410,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                       </span>
                     </div>
                     {(pendingProfileMeta?.author ?? profileAuthor) && (
-                      <span className="text-xs text-muted-foreground truncate block">
+                      <span className="text-xs text-foreground/70 truncate block">
                         {t('controlCenter.labels.by')} {pendingProfileMeta?.author ?? profileAuthor}
                       </span>
                     )}
