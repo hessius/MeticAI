@@ -260,7 +260,7 @@ function Tablet({
         style={{
           width: "100%",
           height: "100%",
-          borderRadius: "4% / 3%",
+          borderRadius: "2.5% / 1.9%",
           background:
             "linear-gradient(160deg, #2a2a2e 0%, #18181b 100%)",
           boxShadow:
@@ -272,11 +272,11 @@ function Tablet({
         <div
           style={{
             position: "absolute",
-            left: "2%",
-            top: "1.5%",
-            width: "96%",
-            height: "97%",
-            borderRadius: "3% / 2.3%",
+            left: "1.5%",
+            top: "1%",
+            width: "97%",
+            height: "98%",
+            borderRadius: "2% / 1.5%",
             overflow: "hidden",
             background: "#000",
           }}
@@ -723,7 +723,6 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string, widthFn: (cW: number
           "AI Shot Analysis",
           "AI Profile Improvement",
           "Dark Mode",
-          "Multi-language",
         ];
         return (
           <div
@@ -768,8 +767,8 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string, widthFn: (cW: number
               alt="Profile Catalogue"
               style={{
                 position: "absolute",
-                bottom: `${cH * 0.18}px`,
-                width: `${fw * 0.75}%`,
+                bottom: `${cH * 0.22}px`,
+                width: `${fw * 0.68}%`,
                 left: "50%",
                 transform: "translateX(-50%)",
               }}
@@ -778,7 +777,7 @@ function makeSlides(PhoneComp: PhoneComp, basePath: string, widthFn: (cW: number
             <div
               style={{
                 position: "absolute",
-                bottom: `${cW * 0.06}px`,
+                bottom: `${cW * 0.04}px`,
                 left: `${cW * 0.06}px`,
                 right: `${cW * 0.06}px`,
                 display: "flex",
