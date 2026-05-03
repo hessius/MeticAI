@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
@@ -2651,6 +2652,20 @@ export function installDirectModeInterceptor(): void {
           const actualFinalWeight = safeNumber(lastShot.weight) || finalWeight
           const actualTotalTime = safeNumber(lastRawPt.profile_time ?? lastRawPt.time) / 1000 || totalTime
 
+          // If there was weight gain during retraction, add a synthetic drip stage so the AI
+          // sees how the gap between the last active stage and final_weight_g was filled
+          const dripWeight = Math.round((actualFinalWeight - finalWeight) * 10) / 10
+          if (dripWeight > 0.1) {
+            stageInfos.push({
+              name: 'Drip (post-retraction)',
+              duration: Math.round((actualTotalTime - totalTime) * 10) / 10,
+              avgPressure: 0,
+              avgFlow: 0,
+              weightGain: dripWeight,
+              endWeight: Math.round(actualFinalWeight * 10) / 10,
+            })
+          }
+
           const localAnalysis = {
             shot_summary: {
               total_time_s: Math.round(actualTotalTime * 10) / 10,
@@ -2834,30 +2849,12 @@ Rules for recommendations:
           const client = new GenAI({ apiKey })
           const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
 
-          const isRetryable = (err: unknown): boolean => {
-            const m = err instanceof Error ? err.message : String(err)
-            return m.includes('503') || m.includes('UNAVAILABLE') || m.includes('overloaded') || m.includes('RESOURCE_EXHAUSTED') || m.includes('429')
-          }
-
-          let response
-          let lastErr: unknown
-          for (let attempt = 0; attempt <= 2; attempt++) {
-            try {
-              response = await client.models.generateContent({
-                model: modelId,
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              })
-              break
-            } catch (err) {
-              lastErr = err
-              if (attempt < 2 && isRetryable(err)) {
-                await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)))
-                continue
-              }
-              throw err
-            }
-          }
-          if (!response) throw lastErr
+          const response = await retryWithBackoff(() =>
+            client.models.generateContent({
+              model: modelId,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            })
+          )
 
           const analysisText = response.text ?? ''
           return jsonResponse({
@@ -2866,15 +2863,7 @@ Rules for recommendations:
             cached: false,
           })
         } catch (err) {
-          const raw = err instanceof Error ? err.message : String(err)
-          let msg: string
-          if (raw.includes('503') || raw.includes('UNAVAILABLE') || raw.includes('overloaded'))
-            msg = 'The AI model is temporarily unavailable. Please try again in a moment.'
-          else if (raw.includes('429') || raw.includes('RESOURCE_EXHAUSTED') || raw.includes('quota'))
-            msg = 'API quota exceeded. Please wait a moment and try again.'
-          else
-            msg = raw || 'Analysis failed'
-          return jsonResponse({ status: 'error', message: msg })
+          return jsonResponse({ status: 'error', message: formatGeminiError(err) })
         }
       })()
     }

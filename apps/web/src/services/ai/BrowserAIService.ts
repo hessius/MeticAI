@@ -27,6 +27,7 @@ import {
   buildDialInPrompt,
 } from './prompts'
 import { buildFullProfilePrompt, validateAndRetryProfile } from './profilePromptFull'
+import { retryWithBackoff } from './retryUtils'
 
 import { STORAGE_KEYS } from '@/lib/constants'
 
@@ -69,30 +70,6 @@ export class AIServiceError extends Error {
     this.name = 'AIServiceError'
     if (cause !== undefined) Object.defineProperty(this, 'cause', { value: cause })
   }
-}
-
-/** Check if an error is transient and retryable */
-function isRetryableError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err)
-  return msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('overloaded') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')
-}
-
-/** Retry a function with exponential backoff on transient errors */
-async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 2, baseDelayMs = 2000): Promise<T> {
-  let lastErr: unknown
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn()
-    } catch (err) {
-      lastErr = err
-      if (attempt < maxRetries && isRetryableError(err)) {
-        await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, attempt)))
-        continue
-      }
-      throw err
-    }
-  }
-  throw lastErr
 }
 
 /** Map common Gemini SDK errors to typed error codes */
