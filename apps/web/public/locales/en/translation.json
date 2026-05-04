@@ -800,7 +800,8 @@
       "placeholder": "Switch profile…",
       "noProfiles": "No profiles available",
       "noDescription": "No description",
-      "defaultDescription": "Espresso profile"
+      "defaultDescription": "Espresso profile",
+      "stageCount": "{{count}} stages"
     },
     "confirm": {
       "stopTitle": "Stop Shot?",

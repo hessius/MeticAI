@@ -787,7 +787,8 @@
       "placeholder": "Cambiar perfil…",
       "noProfiles": "No hay perfiles disponibles",
       "noDescription": "Sin descripción",
-      "defaultDescription": "Perfil de espresso"
+      "defaultDescription": "Perfil de espresso",
+      "stageCount": "{{count}} etapas"
     },
     "confirm": {
       "stopTitle": "¿Detener extracción?",

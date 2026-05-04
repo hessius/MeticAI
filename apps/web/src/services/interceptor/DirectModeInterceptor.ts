@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
@@ -2644,12 +2645,33 @@ export function installDirectModeInterceptor(): void {
             flushStage(totalTime, finalWeight)
           }
 
+          // Use the actual settled final telemetry sample (including drip during piston retraction)
+          // so both time and weight reflect the same end-of-shot point as getHistoryMetrics()
+          const lastRawPt = (pts[pts.length - 1] ?? {}) as Record<string, unknown>
+          const lastShot = ((lastRawPt.shot as Record<string, unknown> | undefined) ?? {})
+          const actualFinalWeight = safeNumber(lastShot.weight) || finalWeight
+          const actualTotalTime = safeNumber(lastRawPt.profile_time ?? lastRawPt.time) / 1000 || totalTime
+
+          // If there was weight gain during retraction, add a synthetic drip stage so the AI
+          // sees how the gap between the last active stage and final_weight_g was filled
+          const dripWeight = Math.round((actualFinalWeight - finalWeight) * 10) / 10
+          if (dripWeight > 0.1) {
+            stageInfos.push({
+              name: 'Drip (post-retraction)',
+              duration: Math.round((actualTotalTime - totalTime) * 10) / 10,
+              avgPressure: 0,
+              avgFlow: 0,
+              weightGain: dripWeight,
+              endWeight: Math.round(actualFinalWeight * 10) / 10,
+            })
+          }
+
           const localAnalysis = {
             shot_summary: {
-              total_time_s: Math.round(totalTime * 10) / 10,
-              final_weight_g: Math.round(finalWeight * 10) / 10,
+              total_time_s: Math.round(actualTotalTime * 10) / 10,
+              final_weight_g: Math.round(actualFinalWeight * 10) / 10,
               target_weight_g: targetWeight,
-              weight_deviation_pct: targetWeight ? Math.round(((finalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
+              weight_deviation_pct: targetWeight ? Math.round(((actualFinalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
               max_pressure_bar: Math.round(maxPressure * 10) / 10,
               max_flow_mls: Math.round(maxFlow * 10) / 10,
             },
@@ -2723,6 +2745,11 @@ IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total 
 If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated
 correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
 A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
+
+IMPORTANT: The 'final_weight_g' in shot_summary is the actual settled weight AFTER the machine's piston retraction completes.
+The Meticulous machine issues a stop signal BEFORE the target weight is reached, accounting for residual flow that will drip
+into the cup during piston retraction. This means the final weight accurately reflects the total liquid in the cup.
+Do NOT penalize the shot for weight deviation unless 'weight_deviation_pct' exceeds ±5%.
 
 ${JSON.stringify(localAnalysis, null, 2)}
 
@@ -2815,16 +2842,20 @@ Rules for recommendations:
 - If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
 `
 
-          // 6. Call Gemini
+          // 6. Call Gemini (with retry on transient errors)
           const { GoogleGenAI: GenAI } = await import('@google/genai')
           const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) ?? ''
           if (!apiKey) return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
           const client = new GenAI({ apiKey })
           const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
-          const response = await client.models.generateContent({
-            model: modelId,
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          })
+
+          const response = await retryWithBackoff(() =>
+            client.models.generateContent({
+              model: modelId,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            })
+          )
+
           const analysisText = response.text ?? ''
           return jsonResponse({
             status: 'success',
@@ -2832,8 +2863,7 @@ Rules for recommendations:
             cached: false,
           })
         } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Analysis failed'
-          return jsonResponse({ status: 'error', message: msg })
+          return jsonResponse({ status: 'error', message: formatGeminiError(err) })
         }
       })()
     }

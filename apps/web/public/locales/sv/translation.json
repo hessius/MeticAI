@@ -792,7 +792,8 @@
       "placeholder": "Byt profil…",
       "noProfiles": "Inga profiler tillgängliga",
       "noDescription": "Ingen beskrivning",
-      "defaultDescription": "Espressoprofil"
+      "defaultDescription": "Espressoprofil",
+      "stageCount": "{{count}} steg"
     },
     "confirm": {
       "stopTitle": "Stoppa bryggning?",
