@@ -1292,7 +1292,7 @@ export function ShotDetail({
                                   }`}
                                 >
                                   {/* Stage Header */}
-                                  <div className="flex flex-col gap-2 mb-3">
+                                  <div className="flex flex-col gap-2 mb-3 mt-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className={`w-3 h-3 rounded-full shrink-0 ${
                                         !stage.executed ? 'bg-red-500' :
@@ -1301,8 +1301,8 @@ export function ShotDetail({
                                         stage.assessment?.status === 'failed' ? 'bg-red-500' :
                                         stage.assessment?.status === 'incomplete' ? 'bg-orange-500' : 'bg-blue-500'
                                       }`} />
-                                      <span className="text-sm font-semibold break-words">{stage.stage_name}</span>
-                                      <Badge variant="secondary" className="text-[10px] capitalize shrink-0">{stage.stage_type}</Badge>
+                                      <span className="text-sm font-semibold whitespace-nowrap">{stage.stage_name}</span>
+                                      <Badge variant="secondary" className="text-[10px] capitalize shrink-0 whitespace-nowrap">{stage.stage_type}</Badge>
                                     </div>
                                     {stage.assessment && (
                                       <Badge
@@ -1336,14 +1336,14 @@ export function ShotDetail({
                                   {stage.exit_triggers.length > 0 && (
                                     <div className="mb-3">
                                       <span className="text-xs text-muted-foreground block mb-1.5">{t('shotHistory.exitTriggers')}</span>
-                                      <div className="flex flex-wrap gap-2 overflow-hidden">
+                                      <div className="flex flex-wrap gap-2">
                                         {stage.exit_triggers.map((trigger, tIdx) => {
                                           const wasTriggered = stage.exit_trigger_result?.triggered?.type === trigger.type
                                           const notTriggeredData = stage.exit_trigger_result?.not_triggered?.find(nt => nt.type === trigger.type)
                                           return (
                                             <div
                                               key={tIdx}
-                                              className={`px-2 py-1 rounded text-xs max-w-full break-words ${
+                                              className={`px-2 py-1 rounded text-xs whitespace-nowrap ${
                                                 wasTriggered
                                                   ? 'bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30'
                                                   : 'bg-secondary/60 text-muted-foreground border border-border/30'
@@ -1393,7 +1393,7 @@ export function ShotDetail({
 
                                   {/* Execution Data */}
                                   {stage.execution_data && (
-                                    <div className="grid grid-cols-4 gap-2 p-2 bg-background/40 rounded-md text-center">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 bg-background/40 rounded-md text-center">
                                       <div>
                                         <span className="text-xs text-muted-foreground block">{t('shotHistory.duration')}</span>
                                         <span className="text-sm font-medium">{stage.execution_data.duration}s</span>

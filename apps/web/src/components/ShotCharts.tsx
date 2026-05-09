@@ -259,15 +259,15 @@ function TargetCurvesSvg({ curves, maxLeftAxis }: { curves: ProfileTargetPoint[]
   return (
     <g className="target-curves">
       {pressurePath && <>
-        <path d={pressurePath} fill="none" stroke={CHART_COLORS.targetPressure} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+        <path d={pressurePath} fill="none" stroke={CHART_COLORS.targetPressure} strokeWidth={2} strokeDasharray="8 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         {pressurePoints.map((p, i) => <circle key={`tp-${i}`} cx={xScale(p.time)} cy={yScale(p.target_pressure!)} r={4} fill={CHART_COLORS.targetPressure} />)}
       </>}
       {flowPath && <>
-        <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+        <path d={flowPath} fill="none" stroke={CHART_COLORS.targetFlow} strokeWidth={2} strokeDasharray="8 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         {flowPoints.map((p, i) => <circle key={`tf-${i}`} cx={xScale(p.time)} cy={yScale(p.target_flow!)} r={4} fill={CHART_COLORS.targetFlow} />)}
       </>}
       {powerPath && <>
-        <path d={powerPath} fill="none" stroke={CHART_COLORS.targetPower} strokeWidth={2.5} strokeDasharray="8 4" strokeLinecap="round" />
+        <path d={powerPath} fill="none" stroke={CHART_COLORS.targetPower} strokeWidth={2} strokeDasharray="8 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         {powerPoints.map((p, i) => <circle key={`tpw-${i}`} cx={xScale(p.time)} cy={yScale(p.target_power! * pwScale)} r={4} fill={CHART_COLORS.targetPower} />)}
       </>}
     </g>

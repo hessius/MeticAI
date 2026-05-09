@@ -500,6 +500,13 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const handleChange = (field: keyof Settings, value: string) => {
     setSettings(prev => {
       const next = { ...prev, [field]: value }
+      // Model selection is critical — save immediately (no debounce)
+      if (field === 'geminiModel') {
+        if (isLocalMode()) {
+          localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, value)
+        }
+        window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { modelChanged: true } }))
+      }
       debouncedSave(next)
       return next
     })

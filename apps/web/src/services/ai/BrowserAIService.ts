@@ -162,9 +162,15 @@ export function createBrowserAIService(): AIService {
 
       onProgress?.({ phase: 'complete', message: 'generation.progress.profileGenerated' })
 
+      // Strip raw JSON blocks from analysis text shown to user (#419)
+      const cleanAnalysis = text
+        .replace(/```json\s*[\s\S]*?```/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+
       return {
         status: 'success',
-        analysis: text,
+        analysis: cleanAnalysis || 'Profile created successfully.',
         reply: profileJson ? JSON.stringify(profileJson) : text,
       }
     },

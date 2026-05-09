@@ -41,7 +41,7 @@ export async function retryWithBackoff<T>(
 export function formatGeminiError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
   if (raw.includes('503') || raw.includes('UNAVAILABLE') || raw.includes('overloaded'))
-    return 'The AI model is temporarily unavailable. Please try again in a moment.'
+    return 'The AI model is temporarily unavailable — this is a Google-side outage. Try switching to a different model in Settings, which may also increase token usage.'
   if (raw.includes('429') || raw.includes('RESOURCE_EXHAUSTED') || raw.includes('quota'))
     return 'API quota exceeded. Please wait a moment and try again.'
   return raw || 'Analysis failed'

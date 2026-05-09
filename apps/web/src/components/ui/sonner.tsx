@@ -11,10 +11,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       // Enable swipe to dismiss in all directions for better mobile UX
       swipeDirections={['down', 'up', 'left', 'right'] as ToasterProps['swipeDirections']}
+      // Position below status bar / Dynamic Island on iOS
+      offset="env(safe-area-inset-top, 0px)"
       toastOptions={{
         style: {
-          // Add safe area padding for dynamic island on iOS
-          marginTop: 'max(0px, calc(env(safe-area-inset-top) - 1rem))',
+          // Ensure toasts clear the safe area on all devices
+          marginTop: 'max(0px, env(safe-area-inset-top, 0px))',
         },
       }}
       style={

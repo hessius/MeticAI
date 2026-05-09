@@ -756,6 +756,18 @@ function App() {
     }
   }, [])
 
+  // Fix iPad layout squishing when returning from background (#422)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Force layout recalculation by triggering a resize event
+        window.dispatchEvent(new Event('resize'))
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
   const handleBackToStart = useCallback(() => {
     refreshProfileCount()
     setViewState('start')
