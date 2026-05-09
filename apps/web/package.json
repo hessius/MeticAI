@@ -93,7 +93,7 @@
         "i18next-http-backend": "3.0.6",
         "idb": "^8.0.3",
         "input-otp": "^1.4.2",
-        "lucide-react": "1.11.0",
+        "lucide-react": "1.14.0",
         "marked": "^18.0.2",
         "modern-screenshot": "^4.7.0",
         "next-themes": "^0.4.6",
