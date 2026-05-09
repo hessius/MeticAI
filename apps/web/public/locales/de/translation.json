@@ -369,8 +369,8 @@
     "fetchFailed": "Fehler beim Laden der Shots",
     "fetchDatesFailed": "Fehler beim Laden der Daten",
     "backgroundRefreshFailed": "Hintergrundaktualisierung fehlgeschlagen",
-    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
-    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})"
+    "exitedBecause": "Beendet: {{trigger}} erreicht ({{actual}})",
+    "exitedByLimit": "Beendet: {{limit}}-Grenzwert erreicht ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Bezugsanalyse",
@@ -755,8 +755,8 @@
       "flowLabel": "Fluss",
       "power": "Leistung",
       "temp": "Temp",
-      "brewTemp": "Brew",
-      "boilerTemp": "Boiler"
+      "brewTemp": "Brüh",
+      "boilerTemp": "Kessel"
     },
     "actions": {
       "start": "Starten",
@@ -1520,7 +1520,10 @@
     "disclaimer": "Diese Analyse wurde von KI basierend auf Shot-Daten erstellt. Die Ergebnisse sollten als Orientierung dienen, nicht als absolute Wahrheit. Vertrauen Sie immer Ihren eigenen Geschmacksvorlieben."
   },
   "error": {
-    "somethingWentWrong": "Etwas ist schiefgelaufen"
+    "somethingWentWrong": "Etwas ist schiefgelaufen",
+    "aiModelUnavailable": "Das KI-Modell ist vorübergehend nicht verfügbar — dies ist ein Google-seitiger Ausfall. Versuchen Sie, in den Einstellungen zu einem anderen Modell zu wechseln, was auch den Token-Verbrauch erhöhen kann.",
+    "aiQuotaExceeded": "API-Kontingent überschritten. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    "analysisFailed": "Analyse fehlgeschlagen"
   },
   "findSimilar": {
     "fetchFailed": "Ähnliche Profile konnten nicht geladen werden"

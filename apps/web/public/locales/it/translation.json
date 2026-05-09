@@ -369,8 +369,8 @@
     "fetchFailed": "Impossibile caricare gli shot",
     "fetchDatesFailed": "Impossibile caricare le date",
     "backgroundRefreshFailed": "Aggiornamento in background fallito",
-    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
-    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})"
+    "exitedBecause": "Uscito: {{trigger}} raggiunto ({{actual}})",
+    "exitedByLimit": "Uscito: limite di {{limit}} raggiunto ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Analisi delle estrazioni",
@@ -755,8 +755,8 @@
       "flowLabel": "Flusso",
       "power": "Potenza",
       "temp": "Temp",
-      "brewTemp": "Brew",
-      "boilerTemp": "Boiler"
+      "brewTemp": "Erogazione",
+      "boilerTemp": "Caldaia"
     },
     "actions": {
       "start": "Avvia",
@@ -1520,7 +1520,10 @@
     "disclaimer": "Questa analisi è generata dall'IA basandosi sui dati dello shot. I risultati dovrebbero essere usati come guida, non come verità assoluta. Fidati sempre delle tue preferenze di gusto personali."
   },
   "error": {
-    "somethingWentWrong": "Qualcosa è andato storto"
+    "somethingWentWrong": "Qualcosa è andato storto",
+    "aiModelUnavailable": "Il modello AI è temporaneamente non disponibile — si tratta di un'interruzione lato Google. Prova a passare a un modello diverso nelle Impostazioni, il che potrebbe anche aumentare l'utilizzo dei token.",
+    "aiQuotaExceeded": "Quota API superata. Attendi un momento e riprova.",
+    "analysisFailed": "Analisi fallita"
   },
   "findSimilar": {
     "fetchFailed": "Impossibile caricare profili simili"

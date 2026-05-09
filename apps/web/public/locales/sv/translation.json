@@ -369,8 +369,8 @@
     "fetchFailed": "Kunde inte ladda shots",
     "fetchDatesFailed": "Kunde inte ladda datum",
     "backgroundRefreshFailed": "Bakgrundsuppdatering misslyckades",
-    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
-    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})"
+    "exitedBecause": "Avslutad: {{trigger}} nådd ({{actual}})",
+    "exitedByLimit": "Avslutad: {{limit}}-gräns nådd ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Körningsanalys",
@@ -760,8 +760,8 @@
       "flowLabel": "Flöde",
       "power": "Effekt",
       "temp": "Temp",
-      "brewTemp": "Brew",
-      "boilerTemp": "Boiler"
+      "brewTemp": "Brygg",
+      "boilerTemp": "Panna"
     },
     "actions": {
       "start": "Starta",
@@ -1520,7 +1520,10 @@
     "disclaimer": "Denna analys är genererad av AI baserat på shotdata. Resultaten bör användas som vägledning, inte absolut sanning. Lita alltid på dina egna smakpreferenser."
   },
   "error": {
-    "somethingWentWrong": "Något gick fel"
+    "somethingWentWrong": "Något gick fel",
+    "aiModelUnavailable": "AI-modellen är tillfälligt otillgänglig — detta är ett avbrott på Googles sida. Prova att byta till en annan modell i Inställningar, vilket också kan öka tokenanvändningen.",
+    "aiQuotaExceeded": "API-kvoten har överskridits. Vänta en stund och försök igen.",
+    "analysisFailed": "Analys misslyckades"
   },
   "findSimilar": {
     "fetchFailed": "Kunde inte hämta liknande profiler"

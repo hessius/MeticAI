@@ -1,6 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 import { isRetryableError, retryWithBackoff, formatGeminiError } from './retryUtils'
 
+vi.mock('i18next', () => ({
+  default: {
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        'error.aiModelUnavailable': 'The AI model is temporarily unavailable — this is a Google-side outage. Try switching to a different model in Settings, which may also increase token usage.',
+        'error.aiQuotaExceeded': 'API quota exceeded. Please wait a moment and try again.',
+        'error.analysisFailed': 'Analysis failed',
+      }
+      return translations[key] ?? key
+    },
+  },
+}))
+
 describe('isRetryableError', () => {
   it('returns true for 503 errors', () => {
     expect(isRetryableError(new Error('503 Service Unavailable'))).toBe(true)

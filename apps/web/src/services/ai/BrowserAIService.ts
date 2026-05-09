@@ -171,7 +171,7 @@ export function createBrowserAIService(): AIService {
       return {
         status: 'success',
         analysis: cleanAnalysis || 'Profile created successfully.',
-        reply: profileJson ? JSON.stringify(profileJson) : text,
+        reply: text, // Keep full reply with fenced JSON for downstream extraction
       }
     },
 

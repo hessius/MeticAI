@@ -369,8 +369,8 @@
     "fetchFailed": "Échec du chargement des shots",
     "fetchDatesFailed": "Échec du chargement des dates",
     "backgroundRefreshFailed": "Échec de l'actualisation en arrière-plan",
-    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
-    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})"
+    "exitedBecause": "Terminé : {{trigger}} atteint ({{actual}})",
+    "exitedByLimit": "Terminé : limite de {{limit}} atteinte ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Analyse des extractions",
@@ -755,8 +755,8 @@
       "flowLabel": "Débit",
       "power": "Puissance",
       "temp": "Temp",
-      "brewTemp": "Brew",
-      "boilerTemp": "Boiler"
+      "brewTemp": "Infusion",
+      "boilerTemp": "Chaudière"
     },
     "actions": {
       "start": "Démarrer",
@@ -1520,7 +1520,10 @@
     "disclaimer": "Cette analyse est générée par l'IA à partir des données du shot. Les résultats doivent être utilisés comme guide, pas comme vérité absolue. Faites toujours confiance à vos propres préférences gustatives."
   },
   "error": {
-    "somethingWentWrong": "Quelque chose s'est mal passé"
+    "somethingWentWrong": "Quelque chose s'est mal passé",
+    "aiModelUnavailable": "Le modèle d'IA est temporairement indisponible — il s'agit d'une panne côté Google. Essayez de changer de modèle dans les Paramètres, ce qui peut également augmenter l'utilisation des tokens.",
+    "aiQuotaExceeded": "Quota d'API dépassé. Veuillez patienter un instant et réessayer.",
+    "analysisFailed": "Analyse échouée"
   },
   "findSimilar": {
     "fetchFailed": "Échec du chargement des profils similaires"
