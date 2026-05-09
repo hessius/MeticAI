@@ -368,7 +368,9 @@
     "lastUpdated": "Zuletzt aktualisiert: {{time}}",
     "fetchFailed": "Fehler beim Laden der Shots",
     "fetchDatesFailed": "Fehler beim Laden der Daten",
-    "backgroundRefreshFailed": "Hintergrundaktualisierung fehlgeschlagen"
+    "backgroundRefreshFailed": "Hintergrundaktualisierung fehlgeschlagen",
+    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
+    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Bezugsanalyse",
@@ -752,7 +754,9 @@
       "pressureLabel": "Druck",
       "flowLabel": "Fluss",
       "power": "Leistung",
-      "temp": "Temp"
+      "temp": "Temp",
+      "brewTemp": "Brew",
+      "boilerTemp": "Boiler"
     },
     "actions": {
       "start": "Starten",

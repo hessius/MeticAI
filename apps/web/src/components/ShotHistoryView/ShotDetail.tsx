@@ -1332,6 +1332,22 @@ export function ShotDetail({
                                     <span className="text-sm font-medium">{stage.profile_target}</span>
                                   </div>
 
+                                  {/* Exit Reason — explicit why-this-stage-ended summary */}
+                                  {stage.exit_trigger_result?.triggered && (
+                                    <div className="mb-3 p-2 bg-green-500/10 rounded-md border border-green-500/20">
+                                      <span className="text-xs text-green-700 dark:text-green-400 font-medium">
+                                        ✓ {t('shotHistory.exitedBecause', { trigger: stage.exit_trigger_result.triggered.type, actual: stage.exit_trigger_result.triggered.actual })}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {!stage.exit_trigger_result?.triggered && stage.limit_hit && (
+                                    <div className="mb-3 p-2 bg-amber-500/10 rounded-md border border-amber-500/20">
+                                      <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                                        ⚠ {t('shotHistory.exitedByLimit', { limit: stage.limit_hit.type, actual: stage.limit_hit.actual_value })}
+                                      </span>
+                                    </div>
+                                  )}
+
                                   {/* Exit Triggers */}
                                   {stage.exit_triggers.length > 0 && (
                                     <div className="mb-3">

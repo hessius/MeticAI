@@ -368,7 +368,9 @@
     "lastUpdated": "Senast uppdaterad: {{time}}",
     "fetchFailed": "Kunde inte ladda shots",
     "fetchDatesFailed": "Kunde inte ladda datum",
-    "backgroundRefreshFailed": "Bakgrundsuppdatering misslyckades"
+    "backgroundRefreshFailed": "Bakgrundsuppdatering misslyckades",
+    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
+    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Körningsanalys",
@@ -757,7 +759,9 @@
       "pressureLabel": "Tryck",
       "flowLabel": "Flöde",
       "power": "Effekt",
-      "temp": "Temp"
+      "temp": "Temp",
+      "brewTemp": "Brew",
+      "boilerTemp": "Boiler"
     },
     "actions": {
       "start": "Starta",

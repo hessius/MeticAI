@@ -66,7 +66,8 @@ export function getStageRanges(chartData: ChartDataPoint[]): StageRange[] {
   const stageColorMap = new Map<string, number>()
   
   chartData.forEach((point, index) => {
-    if (point.stage && point.stage !== currentStage) {
+    const stage = point.stage?.toLowerCase().trim() === 'retracting' ? 'Retraction' : point.stage
+    if (stage && stage !== currentStage) {
       if (currentStage !== null) {
         ranges.push({
           name: currentStage,
@@ -76,7 +77,7 @@ export function getStageRanges(chartData: ChartDataPoint[]): StageRange[] {
         })
       }
       
-      currentStage = point.stage
+      currentStage = stage
       stageStart = point.time
       
       if (!stageColorMap.has(currentStage)) {

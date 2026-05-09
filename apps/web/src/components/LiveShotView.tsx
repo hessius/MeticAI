@@ -516,8 +516,16 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       icon={<Thermometer size={14} />}
                       value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
                       unit="°C"
-                      label={t('controlCenter.metrics.temp', 'Temp')}
+                      label={t('controlCenter.metrics.brewTemp', 'Brew')}
                     />
+                    {ms.boiler_temperature != null && (
+                      <MetricTile
+                        icon={<Thermometer size={14} />}
+                        value={ms.boiler_temperature.toFixed(1)}
+                        unit="°C"
+                        label={t('controlCenter.metrics.boilerTemp', 'Boiler')}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -629,8 +637,16 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   icon={<Thermometer size={14} />}
                   value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
                   unit="°C"
-                  label={t('controlCenter.metrics.temp', 'Temp')}
+                  label={t('controlCenter.metrics.brewTemp', 'Brew')}
                 />
+                {ms.boiler_temperature != null && (
+                  <MetricTile
+                    icon={<Thermometer size={14} />}
+                    value={ms.boiler_temperature.toFixed(1)}
+                    unit="°C"
+                    label={t('controlCenter.metrics.boilerTemp', 'Boiler')}
+                  />
+                )}
               </div>
             </div>
           )}

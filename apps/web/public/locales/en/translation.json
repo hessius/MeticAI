@@ -364,6 +364,8 @@
     "notReached": "✗ Not Reached",
     "stageFailed": "✗ Failed",
     "incomplete": "◐ Incomplete",
+    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
+    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})",
     "exporting": "Exporting...",
     "exportAsImage": "Export as Image",
     "shareSummary": "Share Summary",
@@ -765,7 +767,9 @@
       "pressureLabel": "Pressure",
       "flowLabel": "Flow",
       "power": "Power",
-      "temp": "Temp"
+      "temp": "Temp",
+      "brewTemp": "Brew",
+      "boilerTemp": "Boiler"
     },
     "actions": {
       "start": "Start",

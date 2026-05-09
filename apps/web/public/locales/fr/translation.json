@@ -368,7 +368,9 @@
     "lastUpdated": "Dernière mise à jour : {{time}}",
     "fetchFailed": "Échec du chargement des shots",
     "fetchDatesFailed": "Échec du chargement des dates",
-    "backgroundRefreshFailed": "Échec de l'actualisation en arrière-plan"
+    "backgroundRefreshFailed": "Échec de l'actualisation en arrière-plan",
+    "exitedBecause": "Exited: {{trigger}} reached ({{actual}})",
+    "exitedByLimit": "Exited: {{limit}} limit hit ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Analyse des extractions",
@@ -752,7 +754,9 @@
       "pressureLabel": "Pression",
       "flowLabel": "Débit",
       "power": "Puissance",
-      "temp": "Temp"
+      "temp": "Temp",
+      "brewTemp": "Brew",
+      "boilerTemp": "Boiler"
     },
     "actions": {
       "start": "Démarrer",
