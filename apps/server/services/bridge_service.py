@@ -1,4 +1,5 @@
 """Bridge service — monitors MQTT broker and meticulous-bridge health."""
+
 import logging
 import os
 import subprocess
@@ -53,6 +54,7 @@ def _check_mqtt_port(host: str = "127.0.0.1", port: int = 1883) -> bool:
     if TEST_MODE:
         return False
     import socket as sock
+
     try:
         with sock.create_connection((host, port), timeout=2):
             return True

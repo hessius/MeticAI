@@ -43,8 +43,11 @@ async def live_telemetry(ws: WebSocket):
     ws_id = id(ws)
     subscriber.register_ws(ws_id)
 
-    logger.info("WebSocket client connected (id=%d, total=%d)",
-                ws_id, subscriber.ws_client_count)
+    logger.info(
+        "WebSocket client connected (id=%d, total=%d)",
+        ws_id,
+        subscriber.ws_client_count,
+    )
 
     try:
         last_sent: dict = {}
@@ -113,8 +116,11 @@ async def live_telemetry(ws: WebSocket):
         logger.warning("WebSocket error: %s", exc)
     finally:
         subscriber.unregister_ws(ws_id)
-        logger.info("WebSocket client disconnected (id=%d, remaining=%d)",
-                    ws_id, subscriber.ws_client_count)
+        logger.info(
+            "WebSocket client disconnected (id=%d, remaining=%d)",
+            ws_id,
+            subscriber.ws_client_count,
+        )
         try:
             await ws.close()
         except Exception:

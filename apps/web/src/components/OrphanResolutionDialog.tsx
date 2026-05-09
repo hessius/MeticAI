@@ -183,7 +183,7 @@ export function OrphanResolutionDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={handleClose} disabled={isBatchProcessing}>
+          <Button variant="ghost" data-sound="close" onClick={handleClose} disabled={isBatchProcessing}>
             {t('common.close')}
           </Button>
         </DialogFooter>

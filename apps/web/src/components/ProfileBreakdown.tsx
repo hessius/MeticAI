@@ -48,7 +48,7 @@ interface StageLimit {
 
 interface ExitTrigger {
   type: string
-  value?: number
+  value?: number | string
   comparison?: string
 }
 
@@ -71,7 +71,7 @@ function findVariableUsage(stages: ProfileStage[], variables: ProfileVariable[])
   
   // Initialize all adjustable variables with empty arrays
   variables.forEach(v => {
-    if (!v.key.startsWith('info_')) {
+    if (v.key && !v.key.startsWith('info_')) {
       usage.set(v.key, [])
     }
   })
@@ -84,7 +84,7 @@ function findVariableUsage(stages: ProfileStage[], variables: ProfileVariable[])
       // Match $variable_key patterns — keys can contain spaces (e.g. "$flow_preinfuse fill")
       // Strategy: find every $-prefix and try to match against known variable keys
       // first, then fall back to simple word-boundary matching
-      const knownKeys = variables.map(v => v.key).filter(k => !k.startsWith('info_'))
+      const knownKeys = variables.map(v => v.key).filter((k): k is string => !!k && !k.startsWith('info_'))
       
       // Try longest keys first to avoid partial matches
       const sortedKeys = [...knownKeys].sort((a, b) => b.length - a.length)
@@ -119,7 +119,7 @@ function findVariableUsage(stages: ProfileStage[], variables: ProfileVariable[])
     const refsInStage = findVariableRefs(stage)
     
     variables.forEach(v => {
-      if (v.key.startsWith('info_')) return // Skip info variables
+      if (!v.key || v.key.startsWith('info_')) return // Skip info variables
       
       if (refsInStage.has(v.key)) {
         const stageList = usage.get(v.key) || []
@@ -155,7 +155,7 @@ function validateVariables(
   const warnings: ValidationWarning[] = []
   
   variables.forEach(v => {
-    const isInfo = v.key.startsWith('info_')
+    const isInfo = v.key?.startsWith('info_')
     const hasEmoji = startsWithEmoji(v.name)
     
     if (isInfo && !hasEmoji) {
@@ -188,12 +188,16 @@ function validateVariables(
 
 // Normalize stage dynamics - handles both nested and flattened formats
 function getNormalizedDynamics(stage: ProfileStage): StageDynamics | undefined {
+  // If dynamics is directly an array (Gemini sometimes returns dynamics as the points array)
+  if (Array.isArray(stage.dynamics)) {
+    return { points: stage.dynamics }
+  }
   // If we have nested dynamics object
-  if (stage.dynamics && stage.dynamics.points) {
+  if (stage.dynamics && Array.isArray(stage.dynamics.points)) {
     return stage.dynamics
   }
   // If we have flattened format (dynamics_points, dynamics_over, etc.)
-  if (stage.dynamics_points) {
+  if (stage.dynamics_points && Array.isArray(stage.dynamics_points)) {
     return {
       points: stage.dynamics_points,
       over: stage.dynamics_over,
@@ -225,6 +229,8 @@ interface ProfileBreakdownProps {
   editVariables?: { key: string; name: string; value: string; type: string }[]
   onVariableChange?: (key: string, value: string) => void
   disabled?: boolean
+  /** Optional action element rendered inline with the title (e.g. edit button) */
+  headerAction?: React.ReactNode
 }
 
 function getTypeIcon(type: string) {
@@ -382,7 +388,7 @@ interface DynamicsDescription {
 function describeDynamics(dynamics: StageDynamics | undefined, stageType: string, variables?: ProfileVariable[]): DynamicsDescription {
   const unit = getTypeUnit(stageType)
   
-  if (!dynamics || !dynamics.points || dynamics.points.length === 0) {
+  if (!dynamics || !Array.isArray(dynamics.points) || dynamics.points.length === 0) {
     return {
       summary: 'Static (no dynamics defined)',
       startValue: null,
@@ -452,20 +458,27 @@ function describeDynamics(dynamics: StageDynamics | undefined, stageType: string
   }
 }
 
-function formatExitTriggers(triggers?: ExitTrigger[]): string | null {
-  if (!triggers || triggers.length === 0) return null
+function formatExitTriggers(triggers?: ExitTrigger[], variables?: ProfileVariable[]): string | null {
+  if (!Array.isArray(triggers) || triggers.length === 0) return null
   
   return triggers.map(t => {
     if (t.value !== undefined) {
       const unit = t.type === 'weight' ? 'g' : t.type === 'time' ? 's' : ''
-      return `${t.type} ${t.comparison || '>='} ${t.value}${unit}`
+      let displayValue: string
+      if (typeof t.value === 'string' && t.value.startsWith('$')) {
+        const resolved = resolveValue(t.value, variables)
+        displayValue = resolved !== null ? `${resolved}` : t.value
+      } else {
+        displayValue = String(t.value)
+      }
+      return `${t.type} ${t.comparison || '>='} ${displayValue}${unit}`
     }
     return t.type
   }).join(', ')
 }
 
 function formatLimits(limits?: StageLimit[], variables?: ProfileVariable[]): string | null {
-  if (!limits || limits.length === 0) return null
+  if (!Array.isArray(limits) || limits.length === 0) return null
   
   return limits.map(l => {
     const unit = getTypeUnit(l.type)
@@ -481,7 +494,7 @@ function formatLimits(limits?: StageLimit[], variables?: ProfileVariable[]): str
   }).join(', ')
 }
 
-export function ProfileBreakdown({ profile, className = '', currentStage, editMode, editTemperature, onTemperatureChange, editFinalWeight, onFinalWeightChange, editVariables, onVariableChange, disabled }: ProfileBreakdownProps) {
+export function ProfileBreakdown({ profile, className = '', currentStage, editMode, editTemperature, onTemperatureChange, editFinalWeight, onFinalWeightChange, editVariables, onVariableChange, disabled, headerAction }: ProfileBreakdownProps) {
   const { t } = useTranslation()
   const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -506,7 +519,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
       const weight = parseFloat(editFinalWeight)
       if (!isNaN(weight)) updated.final_weight = weight
     }
-    if (editVariables && profile.variables) {
+    if (editVariables && Array.isArray(profile.variables)) {
       updated.variables = profile.variables.map(v => {
         const edited = editVariables.find(ev => ev.key === v.key)
         if (edited) {
@@ -531,11 +544,11 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
       }
     }
     
-    const hasVars = displayProfile.variables && displayProfile.variables.length > 0
-    const hasStg = displayProfile.stages && displayProfile.stages.length > 0
+    const hasVars = Array.isArray(displayProfile.variables) && displayProfile.variables.length > 0
+    const hasStg = Array.isArray(displayProfile.stages) && displayProfile.stages.length > 0
     
-    const adjustable = hasVars ? displayProfile.variables!.filter(v => !v.key.startsWith('info_')) : []
-    const info = hasVars ? displayProfile.variables!.filter(v => v.key.startsWith('info_')) : []
+    const adjustable = hasVars ? displayProfile.variables!.filter(v => v.key && !v.key.startsWith('info_')) : []
+    const info = hasVars ? displayProfile.variables!.filter(v => v.key?.startsWith('info_')) : []
     
     // Build color map
     const colorMap = new Map<string, typeof VARIABLE_COLORS[0]>()
@@ -561,8 +574,8 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
   if (!displayProfile) return null
   
   const hasBasicInfo = displayProfile.temperature !== undefined || displayProfile.final_weight !== undefined
-  const hasVariables = displayProfile.variables && displayProfile.variables.length > 0
-  const hasStages = displayProfile.stages && displayProfile.stages.length > 0
+  const hasVariables = Array.isArray(displayProfile.variables) && displayProfile.variables.length > 0
+  const hasStages = Array.isArray(displayProfile.stages) && displayProfile.stages.length > 0
   
   if (!hasBasicInfo && !hasVariables && !hasStages) return null
   
@@ -573,9 +586,12 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
       transition={{ delay: 0.1 }}
       className={`space-y-3 ${className}`}
     >
-      <Label className="text-sm font-semibold tracking-wide text-primary">
-        {t('profileBreakdown.title')}
-      </Label>
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold tracking-wide text-primary">
+          {t('profileBreakdown.title')}
+        </Label>
+        {headerAction}
+      </div>
       
       <div className="p-4 bg-secondary/60 rounded-xl border border-primary/20 space-y-4">
         {/* Temperature and Target Weight */}
@@ -769,7 +785,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
             </div>
             <div className="space-y-2">
               {displayProfile.stages!.map((stage, idx) => {
-                const exitInfo = formatExitTriggers(stage.exit_triggers)
+                const exitInfo = formatExitTriggers(stage.exit_triggers, displayProfile.variables)
                 const limitsInfo = formatLimits(stage.limits, displayProfile.variables)
                 // Normalize dynamics - handles both nested and flattened formats
                 const normalizedDynamics = getNormalizedDynamics(stage)

@@ -19,13 +19,13 @@ test.describe('Live Shot View', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
   test('should navigate to run shot view', async ({ page }) => {
     // Navigate to Run / Schedule
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -39,7 +39,7 @@ test.describe('Run Shot View - Profile Selection', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
@@ -49,7 +49,7 @@ test.describe('Run Shot View - Profile Selection', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -64,7 +64,7 @@ test.describe('Run Shot View - Profile Selection', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
@@ -79,14 +79,14 @@ test.describe('Run Shot View - Profile Selection', () => {
       return
     }
 
-    const runShotButton = page.getByRole('button', { name: /Run.*Schedule/i })
+    const runShotButton = page.getByRole('button', { name: /Run Shot/i })
     await expect(runShotButton).toBeVisible({ timeout: 5000 })
     await runShotButton.click()
 
     // Click logo to go back
-    await page.locator('text=MeticAI').first().click()
+    await page.locator('text=Metic').first().click()
 
     // Should be back on start
-    await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: /Profiles/i })).toBeVisible({ timeout: 5000 })
   })
 })

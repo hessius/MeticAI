@@ -1,7 +1,7 @@
 # ==============================================================================
-# MeticAI Docker Compose Configuration
+# Metic Docker Compose Configuration
 # ==============================================================================
-# Single unified container for all MeticAI services (v2.0).
+# Single unified container for all Metic services (v2.0).
 #
 # Usage:
 #   docker compose up -d

@@ -14,12 +14,12 @@ test.describe('Settings View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     // Wait for app to initialize
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should navigate to settings page', async ({ page }) => {
-    // Click settings button - it has text "Settings"  
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    // Click settings button - use first() since desktop layout may show both header icon and grid button
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Verify settings view loaded - should show configuration section
@@ -28,7 +28,7 @@ test.describe('Settings View', () => {
 
   test('should display configuration section', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Wait for page to load and scroll to ensure Configuration section is visible
@@ -41,17 +41,20 @@ test.describe('Settings View', () => {
 
   test('should display about section', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
-    // Check for about section
-    await expect(page.getByText(/About MeticAI/i)).toBeVisible({ timeout: 5000 })
+    // About Metic section is collapsible — check it exists
+    await expect(page.getByText(/About Metic/i)).toBeVisible({ timeout: 5000 })
+    
+    // Expand the about section to see GitHub link
+    await page.getByText(/About Metic/i).click()
     await expect(page.getByText(/GitHub/i)).toBeVisible({ timeout: 5000 })
   })
 
   test('should display version information', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Version Info section should be visible
@@ -60,17 +63,16 @@ test.describe('Settings View', () => {
 
   test('should allow saving settings', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
-    // Find a save button
-    const saveButton = page.getByRole('button', { name: /Save/i })
-    await expect(saveButton).toBeVisible({ timeout: 5000 })
+    // Settings now auto-save, so verify configuration fields exist instead
+    await expect(page.getByText(/Configuration/i)).toBeVisible({ timeout: 5000 })
   })
 
   test('should navigate back from settings', async ({ page }) => {
     // Navigate to settings
-    const settingsButton = page.getByRole('button', { name: /^Settings$/i })
+    const settingsButton = page.getByRole('button', { name: /^Settings$/i }).first()
     await settingsButton.click()
 
     // Verify we're in settings
@@ -83,13 +85,13 @@ test.describe('Settings View', () => {
     if (hasBackButton) {
       await backButton.click()
     } else {
-      // Click the MeticAI title/logo to go home
-      const h1 = page.locator('h1:has-text("MeticAI")')
+      // Click the Metic title/logo to go home
+      const h1 = page.locator('h1:has-text("Metic")')
       await h1.waitFor({ state: 'visible', timeout: 5000 })
       await h1.click({ force: true })
     }
 
     // Should be back on home - look for Settings button again
-    await expect(page.getByRole('button', { name: /^Settings$/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: /^Settings$/i }).first()).toBeVisible({ timeout: 5000 })
   })
 })

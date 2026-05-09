@@ -62,7 +62,6 @@ tmp_*.py
 
 # macOS / system
 .DS_Store
-macos-installer/
 
 # Scripts (not needed in image)
 scripts/

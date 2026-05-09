@@ -18,51 +18,52 @@ const HAS_BACKEND = BASE_URL_SET && (process.env.BASE_URL?.includes('3550') || f
 test.describe('History View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     // Wait for page to fully render
     await page.waitForLoadState('networkidle')
   })
 
   test('should navigate to history page', async ({ page }) => {
-    // Wait for Profile Catalogue button to be available
-    const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
+    // Button text is now "Profiles" (i18n: navigation.profileCatalogue)
+    const historyButton = page.getByRole('button', { name: /Profiles/i })
     await expect(historyButton).toBeVisible({ timeout: 5000 })
 
     await historyButton.click()
 
-    // Should show profile catalogue view
+    // Should show profile catalogue view heading
     await expect(page.getByText('Profile Catalogue').first()).toBeVisible()
   })
 
   test('should display empty state when no history', async ({ page }) => {
-    const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
+    const historyButton = page.getByRole('button', { name: /Profiles/i })
     await expect(historyButton).toBeVisible({ timeout: 5000 })
 
     await historyButton.click()
 
-    // Should show profile entries or profile catalogue
-    const profileContent = page.locator('h2, h3, [data-testid="profile-card"]')
-    await expect(profileContent.first()).toBeVisible({ timeout: 5000 })
+    // Should show the Profile Catalogue heading
+    await expect(page.getByText('Profile Catalogue').first()).toBeVisible({ timeout: 5000 })
   })
 
   test('should allow navigation back from history', async ({ page }) => {
-    const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
+    const historyButton = page.getByRole('button', { name: /Profiles/i })
     await expect(historyButton).toBeVisible({ timeout: 5000 })
 
     await historyButton.click()
     
-    // Click logo/heading to go back
-    await page.getByRole('heading', { name: /MeticAI/ }).click()
+    // Navigate back using Back button
+    const backButton = page.getByRole('button', { name: /Go back/i })
+    await expect(backButton).toBeVisible({ timeout: 2000 })
+    await backButton.click()
 
-    // Should be back on start view (Profile Catalogue button is always visible on start)
-    await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })
+    // Should be back on start view
+    await expect(page.getByRole('button', { name: /Profiles/i })).toBeVisible({ timeout: 5000 })
   })
 })
 
 test.describe('Profile Import from Machine', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
@@ -72,7 +73,7 @@ test.describe('Profile Import from Machine', () => {
       return
     }
 
-    const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
+    const historyButton = page.getByRole('button', { name: /Profiles/i })
     await expect(historyButton).toBeVisible({ timeout: 5000 })
     await historyButton.click()
 
@@ -87,7 +88,7 @@ test.describe('Profile Import from Machine', () => {
       return
     }
 
-    const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
+    const historyButton = page.getByRole('button', { name: /Profiles/i })
     await expect(historyButton).toBeVisible({ timeout: 5000 })
     await historyButton.click()
 
@@ -131,9 +132,9 @@ test.describe('Console Error Detection', () => {
     })
 
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
-    const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
+    const historyButton = page.getByRole('button', { name: /Profiles/i })
     await historyButton.click()
 
     // Wait for history to load with images
@@ -159,9 +160,9 @@ test.describe('Console Error Detection', () => {
     })
 
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
 
-    const historyButton = page.getByRole('button', { name: /Profile Catalogue/i })
+    const historyButton = page.getByRole('button', { name: /Profiles/i })
     await historyButton.click()
 
     // Wait for images to load

@@ -34,20 +34,23 @@ import {
   ArrowDown,
   Equals,
   X,
-  DownloadSimple,
   Brain,
+  ShareNetwork,
 } from '@phosphor-icons/react'
 import { domToPng } from 'modern-screenshot'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { getServerUrl } from '@/lib/config'
+import { useNativeShare, shareImageDataUri } from '@/hooks/useNativeShare'
+import { useActionSheet } from '@/hooks/useActionSheet'
 
 import type { ShotInfo, ShotData, LocalAnalysisResult } from './types'
 import { SPEED_OPTIONS } from './types'
 import {
   getChartData,
   getStageRanges,
+  getStageRangesFromTargetCurves,
   mergeWithTargetCurves,
   getComparisonChartData,
   getCombinedChartData,
@@ -134,6 +137,8 @@ export function ShotDetail({
   setAnnotationSummaries,
 }: ShotDetailProps) {
   const { t } = useTranslation()
+  const { share, canShare } = useNativeShare()
+  const { showActionSheet } = useActionSheet()
 
   // ---- Tab state ----------------------------------------------------------
   const [activeAction, setActiveAction] = useState<'replay' | 'compare' | 'analyze'>('replay')
@@ -148,8 +153,8 @@ export function ShotDetail({
   const [analysisResult, setAnalysisResult] = useState<LocalAnalysisResult | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
-  const [isExportingAnalysis, setIsExportingAnalysis] = useState(false)
   const analysisCardRef = useRef<HTMLDivElement>(null)
+  const chartContainerRef = useRef<HTMLDivElement>(null)
 
   // ---- LLM Analysis state -------------------------------------------------
   const [llmAnalysisResult, setLlmAnalysisResult] = useState<string | null>(null)
@@ -274,42 +279,6 @@ export function ShotDetail({
     }
     return undefined
   }, [selectedShot, shotData]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ---- Export analysis as image -------------------------------------------
-  const handleExportAnalysis = async () => {
-    if (!analysisCardRef.current || !analysisResult || !selectedShot) return
-    try {
-      setIsExportingAnalysis(true)
-      const element = analysisCardRef.current
-      const rect = element.getBoundingClientRect()
-      const padding = 20
-      await new Promise(resolve => setTimeout(resolve, 100))
-      const dataUrl = await domToPng(element, {
-        scale: 2,
-        backgroundColor: '#09090b',
-        width: rect.width + padding * 2,
-        height: element.scrollHeight + padding * 2,
-        style: {
-          padding: `${padding}px`,
-          boxSizing: 'content-box',
-          transform: 'none',
-          transformOrigin: 'top left',
-        },
-      })
-      const shotDate = selectedShot.date.replace(/-/g, '')
-      const shotTime = selectedShot.filename.replace(/[:.]/g, '').replace('.shot.json', '')
-      const safeProfileName = profileName.replace(/[^a-zA-Z0-9]/g, '_')
-      const filename = `${safeProfileName}_analysis_${shotDate}_${shotTime}.png`
-      const link = document.createElement('a')
-      link.download = filename
-      link.href = dataUrl
-      link.click()
-    } catch (error) {
-      console.error('Error exporting analysis:', error)
-    } finally {
-      setIsExportingAnalysis(false)
-    }
-  }
 
   // ---- LLM analysis -------------------------------------------------------
   const handleLlmAnalysis = async () => {
@@ -437,28 +406,33 @@ export function ShotDetail({
   }
 
   // ---- Memoised chart data (shared between mobile and desktop) ------------
+  const profileTargetCurves = analysisResult?.profile_target_curves
   const replayChartData = useMemo(() => {
     if (!shotData) return null
     const chartData = getChartData(shotData)
-    const stageRanges = getStageRanges(chartData)
+    const rawStageRanges = getStageRanges(chartData)
     const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
     const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
-    const mergedData = mergeWithTargetCurves(chartData, analysisResult?.profile_target_curves)
+    // Derive stages from target curves when shot data lacks stage info
+    const stageRanges = rawStageRanges.length === 0 && profileTargetCurves?.length
+      ? getStageRangesFromTargetCurves(profileTargetCurves, dataMaxTime)
+      : rawStageRanges
+    const mergedData = mergeWithTargetCurves(chartData, profileTargetCurves)
     const maxPressure = Math.max(
       ...chartData.map(d => d.pressure || 0),
-      ...(analysisResult?.profile_target_curves?.map(d => d.target_pressure || 0) || []),
+      ...(profileTargetCurves?.map(d => d.target_pressure || 0) || []),
       12,
     )
     const maxFlow = Math.max(
       ...chartData.map(d => Math.max(d.flow || 0, d.gravimetricFlow || 0)),
-      ...(analysisResult?.profile_target_curves?.map(d => d.target_flow || 0) || []),
+      ...(profileTargetCurves?.map(d => d.target_flow || 0) || []),
       8,
     )
     const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
     const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
     const maxRightAxis = Math.ceil(maxWeight * 1.1)
     return { chartData, stageRanges, hasGravFlow, dataMaxTime, mergedData, maxLeftAxis, maxRightAxis }
-  }, [shotData, analysisResult?.profile_target_curves])
+  }, [shotData, profileTargetCurves])
 
   const compareChartMemo = useMemo(() => {
     if (!shotData || !comparisonShotData) return null
@@ -475,9 +449,13 @@ export function ShotDetail({
   const analyzeChartMemo = useMemo(() => {
     if (!shotData || !analysisResult) return null
     const chartData = getChartData(shotData)
-    const stageRanges = getStageRanges(chartData)
+    const rawStageRanges = getStageRanges(chartData)
     const hasTargetCurves = !!(analysisResult.profile_target_curves && analysisResult.profile_target_curves.length > 0)
     const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
+    // Derive stages from target curves when shot data lacks stage info
+    const stageRanges = rawStageRanges.length === 0 && analysisResult.profile_target_curves?.length
+      ? getStageRangesFromTargetCurves(analysisResult.profile_target_curves, dataMaxTime)
+      : rawStageRanges
     const maxPressure = Math.max(
       ...chartData.map(d => d.pressure || 0),
       ...(analysisResult.profile_target_curves?.map(d => d.target_pressure || 0) || []),
@@ -597,7 +575,7 @@ export function ShotDetail({
       {loadingData ? (
         <Card className="p-6 space-y-5">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
+            <Button variant="ghost" size="icon" data-sound="back" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
               <CaretLeft size={22} weight="bold" />
             </Button>
             <div className="flex-1 min-w-0">
@@ -617,7 +595,7 @@ export function ShotDetail({
       ) : dataError ? (
         <Card className="p-6 space-y-5">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
+            <Button variant="ghost" size="icon" data-sound="back" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
               <CaretLeft size={22} weight="bold" />
             </Button>
             <div className="flex-1 min-w-0">
@@ -641,16 +619,81 @@ export function ShotDetail({
               <Card className="p-6 space-y-5">
                 {/* Header */}
                 <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
+                  <Button variant="ghost" size="icon" data-sound="back" onClick={onBack} className="shrink-0" aria-label={t('a11y.goBack')}>
                     <CaretLeft size={22} weight="bold" />
                   </Button>
                   <div className="flex-1 min-w-0">
                     <h2 className="text-lg font-bold text-foreground truncate">{t('shotHistory.shotDetails')}</h2>
                     <p className="text-xs text-muted-foreground/70">{formatShotTime(selectedShot)}</p>
                   </div>
+                  {canShare && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      aria-label={t('common.share')}
+                      onClick={async () => {
+                        const metrics = [
+                          selectedShot.total_time != null ? `${selectedShot.total_time.toFixed(1)}s` : null,
+                          selectedShot.final_weight != null ? `${selectedShot.final_weight.toFixed(1)}g` : null,
+                        ].filter(Boolean).join(' · ')
+                        const summaryText = `${profileName} — ${formatShotTime(selectedShot)}${metrics ? `\n${metrics}` : ''}`
+
+                        const options = [
+                          t('shotHistory.shareSummary', 'Share Summary'),
+                          t('shotHistory.shareChart', 'Share Chart'),
+                          ...(analysisResult ? [t('shotHistory.shareAnalysis', 'Share Analysis')] : []),
+                        ]
+
+                        const index = await showActionSheet({
+                          title: t('common.share'),
+                          options,
+                        })
+
+                        if (index === 0) {
+                          share({ title: profileName, text: summaryText })
+                        } else if (index === 1 && chartContainerRef.current) {
+                          try {
+                            const el = chartContainerRef.current
+                            const rect = el.getBoundingClientRect()
+                            const dataUrl = await domToPng(el, {
+                              scale: 2,
+                              backgroundColor: '#09090b',
+                              width: rect.width + 40,
+                              height: el.scrollHeight + 40,
+                              style: { padding: '20px', boxSizing: 'content-box' },
+                            })
+                            await shareImageDataUri(dataUrl, `shot_chart_${Date.now()}.png`, { title: profileName, text: summaryText })
+                          } catch (err) {
+                            console.error('Failed to share chart:', err)
+                            share({ title: profileName, text: summaryText })
+                          }
+                        } else if (index === 2 && analysisResult && analysisCardRef.current) {
+                          try {
+                            const el = analysisCardRef.current
+                            const rect = el.getBoundingClientRect()
+                            const dataUrl = await domToPng(el, {
+                              scale: 2,
+                              backgroundColor: '#09090b',
+                              width: rect.width + 40,
+                              height: el.scrollHeight + 40,
+                              style: { padding: '20px', boxSizing: 'content-box' },
+                            })
+                            await shareImageDataUri(dataUrl, `shot_analysis_${Date.now()}.png`, { title: profileName, text: summaryText })
+                          } catch (err) {
+                            console.error('Failed to share analysis:', err)
+                            share({ title: profileName, text: summaryText })
+                          }
+                        }
+                      }}
+                    >
+                      <ShareNetwork size={20} weight="bold" />
+                    </Button>
+                  )}
                 </div>
 
                 {/* Shot Summary Stats */}
+                <div ref={chartContainerRef} className="space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   {typeof selectedShot.total_time === 'number' && (
                     <div className="p-3 bg-secondary/40 rounded-xl border border-border/20">
@@ -680,6 +723,7 @@ export function ShotDetail({
                     </div>
                   )}
                 </div>
+                </div>{/* end chartContainerRef — stats area for sharing */}
 
                 {/* Tab Bar */}
                 <TabsList className="grid w-full grid-cols-3 h-11 bg-secondary/60">
@@ -1381,11 +1425,6 @@ export function ShotDetail({
 
                         {/* Action buttons */}
                         <div className="flex flex-col gap-2 pt-2">
-                          <Button variant="outline" size="sm" onClick={handleExportAnalysis} disabled={isExportingAnalysis} className="gap-1.5 w-full">
-                            <DownloadSimple size={14} weight="bold" />
-                            {isExportingAnalysis ? t('shotHistory.exporting') : t('shotHistory.exportAsImage')}
-                          </Button>
-
                           {(!hideAiWhenUnavailable || aiConfigured) && ((llmAnalysisResult || isLlmCached) && !isLlmAnalyzing ? (
                             <Button variant="default" size="sm" onClick={handleViewLlmAnalysis} className="gap-1.5 w-full ai-shimmer-button border-0">
                               <Brain size={14} weight="fill" />
@@ -1400,6 +1439,35 @@ export function ShotDetail({
 
                           {!aiConfigured && !hideAiWhenUnavailable && (
                             <p className="text-[11px] text-muted-foreground text-center">{t('shotHistory.aiUnavailable')}</p>
+                          )}
+
+                          {/* Export analysis as image */}
+                          {canShare && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 w-full"
+                              onClick={async () => {
+                                if (!analysisCardRef.current) return
+                                try {
+                                  const el = analysisCardRef.current
+                                  const rect = el.getBoundingClientRect()
+                                  const dataUrl = await domToPng(el, {
+                                    scale: 2,
+                                    backgroundColor: '#09090b',
+                                    width: rect.width + 40,
+                                    height: el.scrollHeight + 40,
+                                    style: { padding: '20px', boxSizing: 'content-box' },
+                                  })
+                                  await shareImageDataUri(dataUrl, `shot_analysis_${Date.now()}.png`, { title: profileName })
+                                } catch (err) {
+                                  console.error('Failed to export analysis:', err)
+                                }
+                              }}
+                            >
+                              <ShareNetwork size={14} weight="bold" />
+                              {t('shotHistory.exportAsImage')}
+                            </Button>
                           )}
                         </div>
                       </div>

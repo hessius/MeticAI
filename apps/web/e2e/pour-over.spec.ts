@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 /**
  * E2E Tests for Pour-Over Mode
  *
- * These tests require a running MeticAI container (localhost:3550).
+ * These tests require a running Metic container (localhost:3550).
  * They are skipped in CI unless BASE_URL is explicitly set.
  *
  * Tests:
@@ -20,9 +20,9 @@ test.describe('Pour-Over View', () => {
   test.use({ baseURL: BASE })
 
   test.beforeEach(async ({ page }) => {
-    test.skip(!serverAvailable, 'Requires running MeticAI server (set BASE_URL)')
+    test.skip(!serverAvailable, 'Requires running Metic server (set BASE_URL)')
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     await page.waitForLoadState('networkidle')
   })
 
@@ -63,7 +63,7 @@ test.describe('Pour-Over View', () => {
     await pourOverButton.click()
 
     // Click logo to go back
-    await page.locator('text=MeticAI').first().click()
+    await page.locator('text=Metic').first().click()
 
     // Should be back on start view
     await expect(page.getByRole('button', { name: /Profile Catalogue/i })).toBeVisible({ timeout: 5000 })

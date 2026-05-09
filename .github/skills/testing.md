@@ -26,9 +26,7 @@ Expected: 277+ tests passing. 0 lint errors (warnings OK per issue #256).
 
 4. Build container from local source and start
 
-cd ../.. && docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache 
-
-&& docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+cd ../.. && docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 5. Health check
 

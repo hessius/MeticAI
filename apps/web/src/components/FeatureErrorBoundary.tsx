@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import type { ReactNode } from 'react'
 
 interface FeatureErrorFallbackProps {
-  error: Error
-  resetErrorBoundary: () => void
+  error: unknown
+  resetErrorBoundary: (...args: unknown[]) => void
   feature: string
 }
 
@@ -22,7 +22,7 @@ function FeatureErrorFallback({ error, resetErrorBoundary, feature }: FeatureErr
             {t('errorBoundary.featureError', { feature })}
           </p>
           <pre className="mt-1 text-xs text-muted-foreground truncate">
-            {error?.message}
+            {error instanceof Error ? error.message : String(error)}
           </pre>
           <Button
             variant="outline"

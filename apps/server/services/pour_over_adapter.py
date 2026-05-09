@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 _TEMPLATE_PATH = DATA_DIR / "PourOverBase.json"
 
 # Fallback if DATA_DIR doesn't have it (e.g. dev environment)
-_FALLBACK_TEMPLATE_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data" / "PourOverBase.json"
+_FALLBACK_TEMPLATE_PATH = (
+    Path(__file__).resolve().parent.parent.parent.parent / "data" / "PourOverBase.json"
+)
 
 # Docker image ships the template here via COPY in Dockerfile
 _DOCKER_TEMPLATE_PATH = Path("/app/defaults/PourOverBase.json")
@@ -111,12 +113,14 @@ def adapt_pour_over_profile(
                 has_time_backup = True
         # Add 10-minute time backup if not present
         if not has_time_backup:
-            infusion_stage.setdefault("exit_triggers", []).append({
-                "type": "time",
-                "value": 600,  # 10 minutes
-                "relative": True,
-                "comparison": ">=",
-            })
+            infusion_stage.setdefault("exit_triggers", []).append(
+                {
+                    "type": "time",
+                    "value": 600,  # 10 minutes
+                    "relative": True,
+                    "comparison": ">=",
+                }
+            )
 
     elif not bloom_enabled and len(stages) >= 2:
         # Remove bloom stage, keep only infusion
@@ -131,12 +135,14 @@ def adapt_pour_over_profile(
                 has_time_backup = True
         # Add 10-minute time backup if not present
         if not has_time_backup:
-            infusion_stage.setdefault("exit_triggers", []).append({
-                "type": "time",
-                "value": 600,  # 10 minutes
-                "relative": True,
-                "comparison": ">=",
-            })
+            infusion_stage.setdefault("exit_triggers", []).append(
+                {
+                    "type": "time",
+                    "value": 600,  # 10 minutes
+                    "relative": True,
+                    "comparison": ">=",
+                }
+            )
         profile["stages"] = [infusion_stage]
 
     elif len(stages) == 1:
@@ -151,11 +157,13 @@ def adapt_pour_over_profile(
                 has_time_backup = True
         # Add 10-minute time backup if not present
         if not has_time_backup:
-            infusion_stage.setdefault("exit_triggers", []).append({
-                "type": "time",
-                "value": 600,  # 10 minutes
-                "relative": True,
-                "comparison": ">=",
-            })
+            infusion_stage.setdefault("exit_triggers", []).append(
+                {
+                    "type": "time",
+                    "value": 600,  # 10 minutes
+                    "relative": True,
+                    "comparison": ">=",
+                }
+            )
 
     return profile

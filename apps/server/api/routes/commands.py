@@ -85,9 +85,7 @@ def _require_idle(snapshot: dict) -> None:
 def _require_brewing(snapshot: dict) -> None:
     _require_connected(snapshot)
     if not snapshot.get("brewing"):
-        raise HTTPException(
-            status_code=409, detail="No shot is currently running"
-        )
+        raise HTTPException(status_code=409, detail="No shot is currently running")
 
 
 def _do_publish(action: str, payload: str = "") -> dict:
@@ -95,9 +93,7 @@ def _do_publish(action: str, payload: str = "") -> dict:
     topic = f"{MQTT_TOPIC_PREFIX}{action}"
     ok = _publish_command(topic, payload)
     if not ok:
-        raise HTTPException(
-            status_code=503, detail="Failed to publish MQTT command"
-        )
+        raise HTTPException(status_code=503, detail="Failed to publish MQTT command")
     return {"success": True, "status": "ok", "command": action}
 
 
@@ -107,7 +103,9 @@ def _do_publish(action: str, payload: str = "") -> dict:
 
 
 class LoadProfileRequest(BaseModel):
-    name: str = Field(..., min_length=1, description="Profile name to load on the machine")
+    name: str = Field(
+        ..., min_length=1, description="Profile name to load on the machine"
+    )
 
 
 class BrightnessRequest(BaseModel):
@@ -166,9 +164,7 @@ async def command_preheat():
     # Allow during idle (start preheat) AND preheating (cancel preheat)
     state = (snapshot.get("state") or "").lower()
     if snapshot.get("brewing"):
-        raise HTTPException(
-            status_code=409, detail="Cannot preheat while brewing"
-        )
+        raise HTTPException(status_code=409, detail="Cannot preheat while brewing")
     if state not in ("idle", "preheating", "heating", "click to start"):
         raise HTTPException(
             status_code=409,
@@ -238,9 +234,9 @@ async def command_sounds(body: SoundsRequest):
 async def detect_machine():
     """
     Auto-detect Meticulous machine on the local network.
-    
+
     Uses mDNS/Zeroconf and hostname resolution to find machines.
-    
+
     Returns:
         - found: bool
         - ip: str (if found)
@@ -249,25 +245,27 @@ async def detect_machine():
         - guidance: str (if not found)
     """
     from services.machine_discovery_service import discover_machine, verify_machine
-    
+
     result = await discover_machine()
-    
+
     response = {
         "found": result.found,
     }
-    
+
     if result.found:
         # Verify the machine is actually responding
         verified = await verify_machine(result.ip)
-        response.update({
-            "ip": result.ip,
-            "hostname": result.hostname,
-            "method": result.method,
-            "verified": verified,
-        })
+        response.update(
+            {
+                "ip": result.ip,
+                "hostname": result.hostname,
+                "method": result.method,
+                "verified": verified,
+            }
+        )
     else:
         response["guidance"] = result.guidance
         response["guidance_key"] = result.guidance_key
         response["guidance_hints"] = result.guidance_hints
-    
+
     return response

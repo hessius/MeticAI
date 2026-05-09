@@ -16,7 +16,6 @@ Storage format: JSON object mapping shot keys to annotation objects:
 import json
 import threading
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 from logging_config import get_logger
@@ -46,18 +45,18 @@ def _load_annotations() -> dict:
     global _annotations_cache
     if _annotations_cache is not None:
         return _annotations_cache
-    
+
     _ensure_file()
     try:
-        with open(ANNOTATIONS_FILE, 'r', encoding='utf-8') as f:
+        with open(ANNOTATIONS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         data = {}
-    
+
     if not isinstance(data, dict):
         logger.warning("Annotations file contained non-dict — resetting")
         data = {}
-    
+
     _annotations_cache = data
     return _annotations_cache
 
@@ -93,11 +92,11 @@ def _validate_rating(rating) -> Optional[int]:
 
 def get_annotation(date: str, filename: str) -> Optional[dict]:
     """Get the full annotation entry for a specific shot.
-    
+
     Args:
         date: Shot date (e.g., "2024-01-15")
         filename: Shot filename (e.g., "shot_001.json")
-    
+
     Returns:
         Dict with annotation text, rating, and updated_at if exists, None otherwise.
     """
@@ -115,13 +114,13 @@ def get_annotation(date: str, filename: str) -> Optional[dict]:
 
 def set_annotation(date: str, filename: str, annotation: str, rating=None) -> dict:
     """Set the annotation for a specific shot.
-    
+
     Args:
         date: Shot date
         filename: Shot filename
         annotation: Markdown annotation text (empty string to clear text)
         rating: Star rating 1-5, or None to leave unchanged / clear
-    
+
     Returns:
         Updated annotation entry.
     """
@@ -129,9 +128,11 @@ def set_annotation(date: str, filename: str, annotation: str, rating=None) -> di
     with _annotations_lock:
         annotations = _load_annotations()
         key = make_shot_key(date, filename)
-        
+
         has_text = annotation and annotation.strip()
-        existing = annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
+        existing = (
+            annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
+        )
 
         # Merge: keep existing rating if caller didn't provide one
         new_annotation = annotation.strip() if has_text else None
@@ -143,7 +144,7 @@ def set_annotation(date: str, filename: str, annotation: str, rating=None) -> di
                 del annotations[key]
                 _save_annotations(annotations)
             return {"annotation": None, "rating": None}
-        
+
         entry = {
             "annotation": new_annotation,
             "rating": new_rating,
@@ -151,7 +152,7 @@ def set_annotation(date: str, filename: str, annotation: str, rating=None) -> di
         }
         annotations[key] = entry
         _save_annotations(annotations)
-    
+
     logger.info(f"Saved annotation for shot {key}")
     return entry
 
@@ -163,7 +164,7 @@ def set_rating(date: str, filename: str, rating) -> dict:
         date: Shot date
         filename: Shot filename
         rating: Star rating 1-5, or None to clear rating
-    
+
     Returns:
         Updated annotation entry.
     """
@@ -171,7 +172,9 @@ def set_rating(date: str, filename: str, rating) -> dict:
     with _annotations_lock:
         annotations = _load_annotations()
         key = make_shot_key(date, filename)
-        existing = annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
+        existing = (
+            annotations.get(key, {}) if isinstance(annotations.get(key), dict) else {}
+        )
 
         existing_text = existing.get("annotation")
 
@@ -217,7 +220,7 @@ def delete_annotation(date: str, filename: str) -> bool:
 
 def get_all_annotations() -> dict:
     """Get all shot annotations.
-    
+
     Returns:
         Dict mapping shot keys to annotation entries.
     """

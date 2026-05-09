@@ -5,6 +5,11 @@ import { Label } from '@/components/ui/label'
 import { PencilSimple, Star } from '@phosphor-icons/react'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { getServerUrl } from '@/lib/config'
+import { getMachineMode } from '@/lib/machineMode'
+import {
+  getAnnotation as dbGetAnnotation,
+  setAnnotation as dbSetAnnotation,
+} from '@/services/storage/AppDatabase'
 
 interface ShotAnnotationProps {
   date: string
@@ -55,16 +60,27 @@ export function ShotAnnotation({ date, filename, className = '', onAnnotationCha
     const fetchAnnotation = async () => {
       setIsLoading(true)
       try {
-        const serverUrl = await getServerUrl()
-        const response = await fetch(
-          `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`
-        )
-        if (response.ok) {
-          const data = await response.json()
-          const text = data.annotation || ''
-          setAnnotation(text)
-          setOriginalAnnotation(text)
-          setRating(data.rating ?? null)
+        const mode = getMachineMode()
+        if (mode === 'direct' || mode === 'demo') {
+          const shotKey = `${date}/${filename}`
+          const local = await dbGetAnnotation(shotKey)
+          if (local) {
+            setAnnotation(local.notes || '')
+            setOriginalAnnotation(local.notes || '')
+            setRating(local.rating ?? null)
+          }
+        } else {
+          const serverUrl = await getServerUrl()
+          const response = await fetch(
+            `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            const text = data.annotation || ''
+            setAnnotation(text)
+            setOriginalAnnotation(text)
+            setRating(data.rating ?? null)
+          }
         }
       } catch (error) {
         console.error('Failed to fetch annotation:', error)
@@ -81,18 +97,23 @@ export function ShotAnnotation({ date, filename, className = '', onAnnotationCha
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
-      const serverUrl = await getServerUrl()
-      const response = await fetch(
-        `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ annotation, rating })
+      const mode = getMachineMode()
+      if (mode === 'direct' || mode === 'demo') {
+        const shotKey = `${date}/${filename}`
+        await dbSetAnnotation(shotKey, { notes: annotation, rating })
+      } else {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(
+          `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ annotation, rating })
+          }
+        )
+        if (!response.ok) {
+          throw new Error('Failed to save annotation')
         }
-      )
-      
-      if (!response.ok) {
-        throw new Error('Failed to save annotation')
       }
       
       setOriginalAnnotation(annotation)
@@ -114,17 +135,23 @@ export function ShotAnnotation({ date, filename, className = '', onAnnotationCha
     setRating(newRating)
     // Save rating immediately
     try {
-      const serverUrl = await getServerUrl()
-      const response = await fetch(
-        `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rating: newRating })
+      const mode = getMachineMode()
+      if (mode === 'direct' || mode === 'demo') {
+        const shotKey = `${date}/${filename}`
+        await dbSetAnnotation(shotKey, { rating: newRating })
+      } else {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(
+          `${serverUrl}/api/shots/${encodeURIComponent(date)}/${encodeURIComponent(filename)}/annotation`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rating: newRating })
+          }
+        )
+        if (!response.ok) {
+          throw new Error('Failed to save rating')
         }
-      )
-      if (!response.ok) {
-        throw new Error('Failed to save rating')
       }
       onAnnotationChange?.(!!annotation.trim() || newRating !== null, newRating)
     } catch (error) {

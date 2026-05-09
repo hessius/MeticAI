@@ -1,4 +1,5 @@
 """Bridge and MQTT status endpoints for the Control Center."""
+
 from fastapi import APIRouter, HTTPException
 import logging
 

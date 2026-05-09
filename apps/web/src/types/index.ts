@@ -115,7 +115,6 @@ export type ViewState =
   | 'loading' 
   | 'results' 
   | 'error' 
-  | 'history' 
   | 'history-detail' 
   | 'settings' 
   | 'run-shot'
@@ -124,7 +123,8 @@ export type ViewState =
   | 'shot-history'
   | 'shot-analysis'
   | 'profile-catalogue'
-  | 'dial-in';
+  | 'dial-in'
+  | 'onboarding';
 
 // ============================================================================
 // Tag Types

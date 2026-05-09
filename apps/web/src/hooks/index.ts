@@ -27,5 +27,25 @@ export { useIsMobile } from './use-mobile';
 
 export { useSwipeNavigation } from './use-swipe-navigation';
 
+// Platform / Capacitor Hooks
+export { useWakeLock } from './useWakeLock';
+
+export { useHaptics } from './useHaptics'
+
+export { useBiometrics } from './useBiometrics'
+export type { BiometryInfo } from './useBiometrics';
+
+export { useBrewNotifications } from './useBrewNotifications';
+
+export { useSecureStorage } from './useSecureStorage';
+
+export { useNetworkStatus } from './useNetworkStatus';
+
+export { useNativeShare } from './useNativeShare';
+
+export { useActionSheet } from './useActionSheet';
+
+export { useClipboard } from './useClipboard';
+
 // Accessibility Hooks
 export * from './a11y';

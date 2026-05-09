@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { navigateToForm, isAiAvailableInForm } from './helpers'
 
 /**
  * E2E Tests for Profile Generation Flow
@@ -15,18 +16,11 @@ import { test, expect } from '@playwright/test'
 test.describe('Profile Generation - Form', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should access profile generation form', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-
-    await generateButton.click()
+    await navigateToForm(page)
 
     // Should show form elements
     await expect(page.getByText(/Tap to upload|Take photo/i)).toBeVisible()
@@ -34,14 +28,13 @@ test.describe('Profile Generation - Form', () => {
   })
 
   test('should enable submit with text input', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    if (await generateButton.isDisabled()) {
+    await navigateToForm(page)
+
+    // Skip test if AI is unavailable
+    if (!(await isAiAvailableInForm(page))) {
       test.skip()
       return
     }
-
-    await generateButton.click()
 
     const textarea = page.getByPlaceholder(/Balanced extraction/i)
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
@@ -52,14 +45,13 @@ test.describe('Profile Generation - Form', () => {
   })
 
   test('should enable submit with tag selection', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    if (await generateButton.isDisabled()) {
+    await navigateToForm(page)
+
+    // Skip test if AI is unavailable
+    if (!(await isAiAvailableInForm(page))) {
       test.skip()
       return
     }
-
-    await generateButton.click()
 
     const submitButton = page.getByRole('button', { name: /Generate Profile/i })
 
@@ -73,14 +65,7 @@ test.describe('Profile Generation - Form', () => {
   })
 
   test('should have advanced options section', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-
-    await generateButton.click()
+    await navigateToForm(page)
 
     // Look for advanced options trigger
     const advancedTrigger = page.getByText(/Advanced|Options|Customization/i)
@@ -88,14 +73,7 @@ test.describe('Profile Generation - Form', () => {
   })
 
   test('should expand advanced options', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-
-    await generateButton.click()
+    await navigateToForm(page)
 
     // Click advanced options
     const advancedTrigger = page.getByRole('button', { name: /Advanced|Options|Customization/i })
@@ -113,18 +91,11 @@ test.describe('Profile Generation - Form', () => {
 test.describe('Profile Generation - File Upload', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should have file upload zone', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-
-    await generateButton.click()
+    await navigateToForm(page)
 
     // File input should exist (may be hidden but attached)
     const fileInput = page.locator('input[type="file"]')
@@ -132,14 +103,7 @@ test.describe('Profile Generation - File Upload', () => {
   })
 
   test('should show file input element', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-
-    await generateButton.click()
+    await navigateToForm(page)
 
     // File input should exist (may be hidden)
     const fileInput = page.locator('input[type="file"]')
@@ -148,18 +112,15 @@ test.describe('Profile Generation - File Upload', () => {
 })
 
 test.describe('Profile Generation - Results', () => {
-  // Note: Actually submitting requires a backend with AI configured
-  // These tests verify the results view structure when data is available
-
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
   })
 
   test('should show loading state during generation', async ({ page }) => {
     // This would require mocking - just verify the view structure exists
     await page.goto('/')
-    await page.waitForSelector('text=MeticAI')
+    await page.waitForSelector('text=Metic')
     
     // Verify loading view component exists by checking for loading messages
     // in the codebase (tested indirectly)
@@ -167,24 +128,16 @@ test.describe('Profile Generation - Results', () => {
   })
 
   test('should navigate back from form to start', async ({ page }) => {
-    const generateButton = page.getByRole('button', { name: /Generate New Profile/i })
-    await expect(generateButton).toBeVisible({ timeout: 5000 })
-    
-    // Skip if button is disabled (AI not configured)
-    if (await generateButton.isDisabled()) {
-      test.skip()
-      return
-    }
-
-    await generateButton.click()
+    await navigateToForm(page)
 
     // Verify in form
     await expect(page.getByPlaceholder(/Balanced extraction/i)).toBeVisible()
 
-    // Go back via logo
-    await page.locator('h1:has-text("MeticAI")').click()
+    // Go back via the Back button
+    const backButton = page.getByRole('button', { name: 'Back' })
+    await backButton.click()
 
-    // Should be back on start - look for Settings button which should be visible
-    await expect(page.getByRole('button', { name: /^Settings$/i })).toBeVisible({ timeout: 5000 })
+    // Should be back on start — "Add Profile" button should be visible
+    await expect(page.getByRole('button', { name: /Add Profile/i })).toBeVisible({ timeout: 5000 })
   })
 })

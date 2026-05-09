@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 // Import and re-export to reset cache
 let loadConfig: (typeof import('./config'))['loadConfig']
@@ -6,6 +6,8 @@ let getServerUrl: (typeof import('./config'))['getServerUrl']
 
 describe('config loader', () => {
   beforeEach(async () => {
+    // Ensure proxy mode so loadConfig actually fetches config.json
+    vi.stubEnv('VITE_MACHINE_MODE', '')
     // Reset modules to clear cached config
     vi.resetModules()
     // Re-import the module to get fresh instances
@@ -14,13 +16,23 @@ describe('config loader', () => {
     getServerUrl = configModule.getServerUrl
   })
 
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
   describe('loadConfig', () => {
     it('should return default config when fetch fails', async () => {
       // Mock fetch to fail
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       
       const config = await loadConfig()
       expect(config.serverUrl).toBe('')
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Failed to load config.json, using default configuration:',
+        expect.any(Error),
+      )
     })
 
     it('should return default config when config.json is not found', async () => {
@@ -62,9 +74,14 @@ describe('config loader', () => {
   describe('getServerUrl', () => {
     it('should return default server URL when no config is available', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       
       const serverUrl = await getServerUrl()
       expect(serverUrl).toBe('')
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Failed to load config.json, using default configuration:',
+        expect.any(Error),
+      )
     })
 
     it('should return configured server URL from config.json', async () => {

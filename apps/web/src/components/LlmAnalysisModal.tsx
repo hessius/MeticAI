@@ -9,7 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Loader2, Sparkles, RefreshCw, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, Sparkles, RefreshCw, XCircle, Info } from "lucide-react";
 import { parseStructuredAnalysis } from "@/lib/parseAnalysis";
 import { SectionCard } from "@/components/SectionCard";
 

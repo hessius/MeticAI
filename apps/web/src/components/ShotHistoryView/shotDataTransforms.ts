@@ -98,6 +98,59 @@ export function getStageRanges(chartData: ChartDataPoint[]): StageRange[] {
   return ranges
 }
 
+/**
+ * Derive stage ranges from profile target curves when shot data lacks stage info.
+ * Each target curve point has a `stage_name` — we group consecutive same-stage
+ * points into ranges.
+ */
+export function getStageRangesFromTargetCurves(
+  targetCurves: ProfileTargetPoint[],
+  dataMaxTime: number,
+): StageRange[] {
+  if (!targetCurves || targetCurves.length === 0) return []
+
+  const ranges: StageRange[] = []
+  let currentStage: string | null = null
+  let stageStart = 0
+  let colorIndex = 0
+  const stageColorMap = new Map<string, number>()
+  const sorted = [...targetCurves].sort((a, b) => a.time - b.time)
+
+  for (const point of sorted) {
+    const stageName = point.stage_name
+    if (!stageName) continue
+
+    if (stageName !== currentStage) {
+      if (currentStage !== null) {
+        ranges.push({
+          name: currentStage,
+          startTime: stageStart,
+          endTime: point.time,
+          colorIndex: stageColorMap.get(currentStage) || 0,
+        })
+      }
+      currentStage = stageName
+      stageStart = point.time
+      if (!stageColorMap.has(stageName)) {
+        stageColorMap.set(stageName, colorIndex % STAGE_COLORS.length)
+        colorIndex++
+      }
+    }
+  }
+
+  // Close the final stage — extend to the end of actual shot data
+  if (currentStage !== null) {
+    ranges.push({
+      name: currentStage,
+      startTime: stageStart,
+      endTime: dataMaxTime,
+      colorIndex: stageColorMap.get(currentStage) || 0,
+    })
+  }
+
+  return ranges
+}
+
 /** Binary search helper to find upper bound (first element > time) */
 function findUpperBound(points: ProfileTargetPoint[], time: number): number {
   let left = 0

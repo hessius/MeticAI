@@ -31,6 +31,7 @@ interface FormViewProps {
   onSubmit: () => void
   onBack: () => void
   onViewHistory: () => void
+  onViewProfile?: (profileName: string) => void
 }
 
 export function FormView({
@@ -50,7 +51,8 @@ export function FormView({
   onAdvancedOptionsChange,
   onSubmit,
   onBack,
-  onViewHistory
+  onViewHistory,
+  onViewProfile,
 }: FormViewProps) {
   const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
@@ -102,6 +104,7 @@ export function FormView({
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('common.back')}
@@ -231,6 +234,7 @@ export function FormView({
 
         <ProfileRecommendations
           tags={selectedTags}
+          onUseProfile={onViewProfile}
         />
 
         <AdvancedCustomization

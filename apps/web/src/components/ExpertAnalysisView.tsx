@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CaretLeft } from "@phosphor-icons/react";
-import { Loader2, Sparkles, RefreshCw, XCircle, Info, Wand2 } from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, XCircle, Info, Wand2, Share2 } from "lucide-react";
 import { parseStructuredAnalysis, parseRecommendationsJSON, hasRecommendations } from "@/lib/parseAnalysis";
 import type { Recommendation } from "@/lib/parseAnalysis";
 import { SectionCard } from "@/components/SectionCard";
 import { RecommendationSelectionDialog } from "@/components/RecommendationSelectionDialog";
 import { getServerUrl } from "@/lib/config";
+import { useNativeShare } from "@/hooks/useNativeShare";
 
 interface ExpertAnalysisViewProps {
   isLoading: boolean;
@@ -37,6 +38,7 @@ export function ExpertAnalysisView({
   isCached,
 }: ExpertAnalysisViewProps) {
   const { t } = useTranslation();
+  const { share, canShare } = useNativeShare();
   const sections = useMemo(() => {
     if (!analysisResult) return [];
     return parseStructuredAnalysis(analysisResult);
@@ -130,12 +132,13 @@ export function ExpertAnalysisView({
       exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
     >
-      <Card className="p-6 space-y-5">
+      <Card className="p-5 space-y-4">
         {/* Header with back button */}
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
+            data-sound="back"
             onClick={onBack}
             className="shrink-0"
             aria-label={t('a11y.goBack')}
@@ -194,7 +197,7 @@ export function ExpertAnalysisView({
         
         {/* Analysis Content */}
         {!isLoading && !error && sections.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {sections.map((section, index) => (
               <SectionCard key={index} section={section} />
             ))}
@@ -222,7 +225,7 @@ export function ExpertAnalysisView({
         
         {/* Apply Recommendations button */}
         {!isLoading && !error && showRecommendations && profileName && (
-          <div className="flex items-center justify-center pt-2">
+          <div className="flex items-center justify-center pt-4">
             <Button
               variant="default"
               size="sm"
@@ -246,18 +249,38 @@ export function ExpertAnalysisView({
           />
         )}
 
-        {/* Re-Analyze button */}
-        {!isLoading && analysisResult && onReAnalyze && (
-          <div className="flex items-center justify-center pt-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onReAnalyze}
-              className="gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              {t('expertAnalysis.reAnalyze')}{isCached ? ` ${t('expertAnalysis.forFreshInsights')}` : ''}
-            </Button>
+        {/* Action buttons — grouped together */}
+        {!isLoading && analysisResult && (
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-4 border-t border-border/20">
+            {onReAnalyze && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onReAnalyze}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('expertAnalysis.reAnalyze')}{isCached ? ` ${t('expertAnalysis.forFreshInsights')}` : ''}
+              </Button>
+            )}
+
+            {canShare && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const text = sections.map((s) => `${s.title}\n${s.content}`).join("\n\n");
+                  share({
+                    title: profileName ? `${t("expertAnalysis.title")} — ${profileName}` : t("expertAnalysis.title"),
+                    text,
+                  });
+                }}
+                className="gap-2"
+              >
+                <Share2 className="h-4 w-4" />
+                {t("common.share")}
+              </Button>
+            )}
           </div>
         )}
       </Card>

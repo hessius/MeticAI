@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
+import { hasFeature } from '@/lib/featureFlags'
+import { STORAGE_KEYS } from '@/lib/constants'
 import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
 import { Toaster } from '@/components/ui/sonner'
@@ -13,14 +16,13 @@ import { QRCodeDialog } from '@/components/QRCodeDialog'
 import { useIsDesktop } from '@/hooks/use-desktop'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import { MeticAILogo } from '@/components/MeticAILogo'
+import { MeticLogo } from '@/components/MeticLogo'
 import { HistoryEntry } from '@/hooks/useHistory'
 import { StartView } from '@/views/StartView'
 import { LoadingView, LOADING_MESSAGE_COUNT } from '@/views/LoadingView'
 import { ErrorView } from '@/views/ErrorView'
 
 // Lazy-loaded views — code-split into separate chunks
-const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })))
 const ProfileDetailView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.ProfileDetailView })))
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })))
 const RunShotView = lazy(() => import('./components/RunShotView').then(m => ({ default: m.RunShotView })))
@@ -36,17 +38,21 @@ import type { APIResponse, ViewState } from '@/types'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
-import { Sun, Moon } from '@phosphor-icons/react'
+import { Sun, Moon, Gear, ArrowRight } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
 
 // Phase 3 — Control Center & live telemetry
-import { useWebSocket } from '@/hooks/useWebSocket'
+import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useLastShot } from '@/hooks/useLastShot'
+import { useSmartGreeting } from '@/hooks/useSmartGreeting'
+import { useProfileImageSrc, getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
 import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { BetaBanner } from '@/components/BetaBanner'
+import { DemoModeBanner } from '@/components/DemoModeBanner'
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary'
+import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
 const LiveShotView = lazy(() => import('./components/LiveShotView').then(m => ({ default: m.LiveShotView })))
@@ -56,11 +62,30 @@ const ShotAnalysisView = lazy(() => import('./components/ShotAnalysisView').then
 const ProfileCatalogueView = lazy(() => import('./components/ProfileCatalogueView').then(m => ({ default: m.ProfileCatalogueView })))
 const EspressoCompass = lazy(() => import('./components/EspressoCompass').then(m => ({ default: m.EspressoCompass })))
 const ProfileBreakdown = lazy(() => import('./components/ProfileBreakdown').then(m => ({ default: m.ProfileBreakdown })))
+const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then(m => ({ default: m.OnboardingWizard })))
+
+// Storage migration — initialises IndexedDB in direct/PWA mode
+import { useStorageMigration } from '@/services/storage'
+
+// Capacitor plugin hooks
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
+import { useBrewNotifications } from '@/hooks/useBrewNotifications'
+import { useSoundEffects, useGlobalSoundDelegation } from '@/hooks/useSoundEffects'
 
 function App() {
   const { t } = useTranslation()
-  const [isInitializing, setIsInitializing] = useState(true)
-  const [viewState, setViewState] = useState<ViewState>('start')
+  useStorageMigration()
+  const [isInitializing, setIsInitializing] = useState(() => {
+    // On native/direct, never block render waiting for network
+    return !(isDemoMode() || isDirectMode())
+  })
+  const [viewState, setViewState] = useState<ViewState>(() => {
+    // Show onboarding on first launch in native/direct mode
+    if ((isNativePlatform() || isDirectMode()) && !localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
+      return 'onboarding'
+    }
+    return 'start'
+  })
   const previousViewStateRef = useRef<ViewState>('start')
   const [profileCount, setProfileCount] = useState<number | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -85,6 +110,8 @@ function App() {
   const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
   const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
   const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
+  const [pendingImportUrl, setPendingImportUrl] = useState<string | null>(null)
+  const [showAddProfileDialog, setShowAddProfileDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -96,20 +123,31 @@ function App() {
   // Background blobs preference (localStorage)
   const { showBlobs, toggleBlobs } = useBackgroundBlobs()
 
-  // Phase 3 — MQTT / WebSocket telemetry
+  // Phase 3 — MQTT / WebSocket telemetry (mode-aware: proxy=WS, direct=Socket.IO)
   const [mqttEnabled, setMqttEnabled] = useState(false)
   const [isAiConfigured, setIsAiConfigured] = useState(false)
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
-  const { state: machineState, patchState: patchMachineState } = useWebSocket(mqttEnabled)
+  const machineState = useMachineTelemetry(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
+  const smartGreeting = useSmartGreeting(mqttEnabled && viewState === 'start')
   const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
+  const prevMachineStateRef = useRef<string | null>(null)
+
+  // Capacitor plugin hooks
+  const { isConnected } = useNetworkStatus()
+  const { notifyPreheatComplete } = useBrewNotifications()
+  const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete, islandExpand: playIslandExpand, islandContract: playIslandContract } = useSoundEffects()
+  useGlobalSoundDelegation()
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
-  const [liveProfileImageUrl, setLiveProfileImageUrl] = useState<string | null>(null)
   const liveProfileFetchedRef = useRef<string | null>(null)
+
+  // Resolve profile image for the desktop right-column header
+  const liveProfileName = viewState === 'live-shot' ? machineState.active_profile : null
+  const liveProfileImageUrl = useProfileImageSrc(liveProfileName)
 
   // Fetch full profile data (with stages) when in live-shot view
   useEffect(() => {
@@ -117,8 +155,6 @@ function App() {
       liveProfileFetchedRef.current = null
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on view change
       setLiveProfileData(null)
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on view change
-      setLiveProfileImageUrl(null)
       return
     }
     const profileName = machineState.active_profile
@@ -135,8 +171,6 @@ function App() {
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
         }
-        // Build image URL
-        setLiveProfileImageUrl(`${base}/api/profile/${encodeURIComponent(profileName)}/image-proxy`)
       } catch { /* non-critical */ }
     })()
   }, [viewState, machineState.active_profile])
@@ -145,6 +179,25 @@ function App() {
   const prevViewStateRef = useRef<ViewState | null>(null)
   useEffect(() => {
     const fetchMqttSetting = async () => {
+      // In direct or demo mode, no MeticAI backend — use sensible defaults
+      if (isDemoMode() || isDirectMode()) {
+        setMqttEnabled(true) // DemoAdapter / Socket.IO provides telemetry
+        // On native, the API key may be in SecureStorage (Keychain) but not in localStorage.
+        // Mirror it so synchronous checks (BrowserAIService, feature flags) find it.
+        if (isNativePlatform() && !localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()) {
+          try {
+            const { SecureStorage } = await import('@aparajita/capacitor-secure-storage')
+            const secureKey = await SecureStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+            if (secureKey?.trim()) {
+              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, secureKey)
+            }
+          } catch {
+            // SecureStorage unavailable — skip migration
+          }
+        }
+        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const res = await fetch(`${serverUrl}/api/settings`)
@@ -153,14 +206,17 @@ function App() {
           setMqttEnabled(data.mqttEnabled !== false)
           const hasGeminiKey = Boolean((data.geminiApiKey || '').trim())
           setIsAiConfigured(data.geminiApiKeyConfigured === true || hasGeminiKey)
-          syncAutoSyncFromServer(data)
+          if (hasFeature('cloudSync')) syncAutoSyncFromServer(data)
         }
       } catch {
         // default false if unreachable
       }
     }
-    // Fetch on mount or when leaving the settings view
-    if (prevViewStateRef.current === null || (prevViewStateRef.current === 'settings' && viewState !== 'settings')) {
+    // Fetch on mount, when leaving settings, or after onboarding completes
+    if (prevViewStateRef.current === null ||
+        (prevViewStateRef.current === 'settings' && viewState !== 'settings') ||
+        (prevViewStateRef.current === 'onboarding' && viewState !== 'onboarding')) {
+      console.info('[App] fetchMqttSetting triggered, prevView:', prevViewStateRef.current, '→', viewState)
       fetchMqttSetting()
     }
     prevViewStateRef.current = viewState
@@ -171,10 +227,26 @@ function App() {
     window.scrollTo(0, 0)
   }, [viewState])
 
+  // Track session count (once per browser session)
+  useEffect(() => {
+    if (sessionStorage.getItem('meticai-session-counted')) return
+    sessionStorage.setItem('meticai-session-counted', '1')
+    const prev = parseInt(localStorage.getItem(STORAGE_KEYS.SESSION_COUNT) ?? '0', 10)
+    localStorage.setItem(STORAGE_KEYS.SESSION_COUNT, String(prev + 1))
+    // Backfill install date for users who onboarded before tracking was added
+    if (!localStorage.getItem(STORAGE_KEYS.INSTALL_DATE) && localStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE)) {
+      localStorage.setItem(STORAGE_KEYS.INSTALL_DATE, new Date().toISOString())
+    }
+  }, [])
+
   useEffect(() => {
     const handler = () => {
       setAiEnabled(getAiEnabled())
       setHideAiWhenUnavailable(getHideAiWhenUnavailable())
+      // Re-check API key availability (may have been added/removed in Settings)
+      if (isDemoMode() || isDirectMode()) {
+        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
+      }
     }
     // Sync initial values in handler to avoid direct setState in effect
     handler()
@@ -190,6 +262,8 @@ function App() {
       clearInterval(autoSyncIntervalRef.current)
       autoSyncIntervalRef.current = null
     }
+
+    if (!hasFeature('cloudSync')) return
 
     // Re-read prefs on every AI_PREFS_CHANGED_EVENT via aiEnabled dep
     const autoSyncEnabled = getAutoSync()
@@ -230,22 +304,111 @@ function App() {
     }
   }, [aiEnabled, t]) // aiEnabled changes on AI_PREFS_CHANGED_EVENT, retriggering this
 
-  // Reset shot banner dismissed state when brewing ends
+  // Reset shot banner dismissed state when brewing ends; sound on brewing start
   useEffect(() => {
     if (prevBrewingRef.current && !machineState.brewing) {
       setShotBannerDismissed(false)
     }
+    if (!prevBrewingRef.current && machineState.brewing) {
+      playBrewingStarted()
+    }
     prevBrewingRef.current = machineState.brewing
-  }, [machineState.brewing])
+  }, [machineState.brewing, playBrewingStarted])
+
+  // Notify + sound when preheat completes (state transitions from preheating/heating → ready)
+  useEffect(() => {
+    const currentState = machineState.state?.toLowerCase() ?? null
+    const prevState = prevMachineStateRef.current
+    prevMachineStateRef.current = currentState
+
+    if (
+      prevState &&
+      (prevState === 'preheating' || prevState === 'heating') &&
+      currentState?.startsWith('click to start')
+    ) {
+      notifyPreheatComplete()
+      playMachineReady()
+    }
+  }, [machineState.state, notifyPreheatComplete, playMachineReady])
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
 
   const isHome = viewState === 'start'
 
+  // Dynamic Island animation: title → pill with greeting after 3s, tappable to toggle
+  const [islandExpanded, setIslandExpanded] = useState(false)
+  const islandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const greetingTextRef = useRef<HTMLElement | null>(null)
+  const greetingInnerRef = useRef<HTMLElement | null>(null)
+  const [isScrollActive, setIsScrollActive] = useState(false)
+  const playIslandExpandRef = useRef(playIslandExpand)
+  useEffect(() => { playIslandExpandRef.current = playIslandExpand }, [playIslandExpand])
+
+  useEffect(() => {
+    if (isHome && smartGreeting) {
+      islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpandRef.current() }, 3000)
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when leaving home
+      setIslandExpanded(false)
+    }
+    return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHome, smartGreeting])
+
+  // Detect vertical text overflow and enable scroll animation
+  useEffect(() => {
+    if (!islandExpanded || !greetingTextRef.current || !greetingInnerRef.current) {
+      setIsScrollActive(false)
+      return
+    }
+    const container = greetingTextRef.current
+    const inner = greetingInnerRef.current
+
+    const checkOverflow = () => {
+      const overflow = inner.scrollHeight - container.clientHeight
+      if (overflow > 4) {
+        // Set CSS variable BEFORE adding active class (Safari safety)
+        inner.style.setProperty('--island-scroll-y', `-${overflow}px`)
+        // Scale duration: ~6s base + 1s per extra line of overflow
+        const lineHeight = parseFloat(getComputedStyle(container).lineHeight) || 16.8
+        const extraLines = Math.max(0, Math.round(overflow / lineHeight))
+        inner.style.setProperty('--island-scroll-duration', `${6 + extraLines * 1}s`)
+        setIsScrollActive(true)
+      } else {
+        setIsScrollActive(false)
+      }
+    }
+
+    // Initial check after expansion transition completes
+    const timer = setTimeout(checkOverflow, 600)
+    // Re-check on resize (responsive width changes, font loading)
+    const observer = new ResizeObserver(checkOverflow)
+    observer.observe(container)
+
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [islandExpanded, smartGreeting])
+
+  const toggleIsland = useCallback(() => {
+    if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
+    setIslandExpanded(prev => {
+      if (prev) playIslandContract(); else playIslandExpand()
+      return !prev
+    })
+  }, [playIslandExpand, playIslandContract])
+
   // Check for existing profiles on mount
   useEffect(() => {
     const checkProfiles = async () => {
+      // In direct or demo mode, skip proxy API — default to form view
+      if (isDemoMode() || isDirectMode()) {
+        setProfileCount(0)
+        setIsInitializing(false)
+        return
+      }
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
@@ -264,8 +427,25 @@ function App() {
     checkProfiles()
   }, [])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const importParam = params.get('import')
+    if (importParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL param init on mount
+      setPendingImportUrl(importParam)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowAddProfileDialog(true)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setViewState('profile-catalogue')
+      const url = new URL(window.location.href)
+      url.searchParams.delete('import')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
+
   // Update profile count when returning from history view
   const refreshProfileCount = useCallback(async () => {
+    if (isDemoMode() || isDirectMode()) return
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
@@ -489,6 +669,7 @@ function App() {
         }
       }
       
+      playGenerationComplete()
       setViewState('results')
     } catch (error) {
       clearInterval(messageInterval)
@@ -593,9 +774,11 @@ function App() {
         handleReset()
         break
       case 'history-detail':
-        setViewState('history')
+        setViewState('profile-catalogue')
         break
-      case 'history':
+      case 'profile-catalogue':
+        handleBackToStart()
+        break
       case 'settings':
       case 'pour-over':
       case 'live-shot':
@@ -625,6 +808,7 @@ function App() {
   })
 
   const handleViewHistoryEntry = (entry: HistoryEntry, cachedImageUrl?: string) => {
+    document.getElementById('root')?.scrollTo(0, 0)
     setSelectedHistoryEntry(entry)
     setSelectedHistoryImageUrl(cachedImageUrl)
     setViewState('history-detail')
@@ -633,19 +817,150 @@ function App() {
   const handleViewProfileByName = async (profileName: string) => {
     try {
       const serverUrl = await getServerUrl()
-      const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
-      if (!response.ok) return
-      const data = await response.json()
-      const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
-      if (match) {
-        handleViewHistoryEntry(match)
+
+      if (isDemoMode()) return
+
+      if (isDirectMode() || isNativePlatform()) {
+        // In direct/Capacitor mode, look up profile from the machine's profile list
+        let profileId = profileName
+        let displayImage: string | undefined
+
+        // Try cache first
+        const cacheRes = await fetch(`/api/profile/${encodeURIComponent(profileName)}`)
+        if (cacheRes.ok) {
+          const cacheData = await cacheRes.json()
+          if (cacheData?.profile?.id) {
+            profileId = cacheData.profile.id
+            displayImage = getProfileImageValue(cacheData.profile) ?? undefined
+          }
+        }
+
+        // If cache didn't resolve an actual ID, try the full profile list from machine
+        if (profileId === profileName) {
+          try {
+            const listRes = await fetch('/api/v1/profile/list')
+            if (listRes.ok) {
+              const profiles = await listRes.json()
+              const match = Array.isArray(profiles) && profiles.find(
+                (p: { name?: string; id?: string }) => p.name === profileName
+              )
+              if (match?.id) profileId = match.id
+            }
+          } catch { /* proceed with name as ID */ }
+        }
+
+        // Fetch profile JSON for the breakdown view
+        const jsonRes = await fetch(`/api/machine/profile/${encodeURIComponent(profileId)}/json`)
+        const jsonData = jsonRes.ok ? await jsonRes.json() : {}
+        const profileJson = jsonData?.profile ?? null
+
+        const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+        let reply = descCache?.get(profileId) ?? descCache?.get(profileName) ?? ''
+        if (!reply && profileJson) {
+          const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+          reply = buildStaticProfileDescription(profileJson)
+          descCache?.set(profileId, reply)
+        }
+
+        // Fetch any saved notes
+        let notes: string | undefined
+        try {
+          const notesRes = await fetch(`/api/history/${encodeURIComponent(profileId)}/notes`)
+          if (notesRes.ok) {
+            const notesData = await notesRes.json()
+            notes = notesData.notes || undefined
+          }
+        } catch { /* non-critical */ }
+
+        const entry: HistoryEntry = {
+          id: profileId,
+          profile_name: profileName,
+          created_at: new Date().toISOString(),
+          coffee_analysis: null,
+          user_preferences: null,
+          reply,
+          notes,
+          profile_json: profileJson,
+        }
+        const imageUrl = resolveDisplayImage(displayImage) ?? undefined
+        handleViewHistoryEntry(entry, imageUrl)
+      } else {
+        // Proxy mode: search history for matching entry
+        const response = await fetch(`${serverUrl}/api/history?limit=500&offset=0`)
+        if (!response.ok) return
+        const data = await response.json()
+        const match = data.entries?.find((e: HistoryEntry) => e.profile_name === profileName)
+        if (match) {
+          handleViewHistoryEntry(match)
+        }
       }
     } catch {
-      // Silently fail — profile may not exist in history
+      // Silently fail — profile may not exist
     }
   }
 
-  const handleDownloadJson = () => {
+  const handleViewMachineProfile = async (profile: { id: string; name: string; image?: string; display?: { image?: string; description?: string } }) => {
+    // Navigate immediately with cached data — fetch full profile in background
+    const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+    const reply = descCache?.get(profile.id) ?? descCache?.get(profile.name) ?? ''
+    const profileImage = getProfileImageValue(profile)
+    const imageUrl = (isDirectMode() || isNativePlatform())
+      ? resolveDisplayImage(profileImage) ?? undefined
+      : profileImage || undefined
+
+    const entry: HistoryEntry = {
+      id: profile.id,
+      profile_name: profile.name,
+      created_at: new Date().toISOString(),
+      coffee_analysis: null,
+      user_preferences: null,
+      reply,
+      profile_json: null,
+    }
+    previousViewStateRef.current = 'profile-catalogue'
+    handleViewHistoryEntry(entry, imageUrl)
+
+    // Fetch full profile and notes in background, then update entry
+    try {
+      const serverUrl = await getServerUrl()
+      const [jsonRes, notesRes] = await Promise.all([
+        fetch(`${serverUrl}/api/machine/profile/${profile.id}/json`),
+        fetch(`${serverUrl}/api/history/${encodeURIComponent(profile.id)}/notes`).catch(() => null),
+      ])
+      const jsonData = jsonRes.ok ? await jsonRes.json() : {}
+      const profileJson = jsonData.profile ?? null
+
+      let notes: string | undefined
+      if (notesRes?.ok) {
+        const notesData = await notesRes.json()
+        notes = notesData.notes || undefined
+      }
+
+      // Generate description if we didn't have one cached
+      let updatedReply = reply
+      if (!updatedReply && profileJson) {
+        const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+        updatedReply = buildStaticProfileDescription(profileJson)
+        descCache?.set(profile.id, updatedReply)
+      }
+
+      const updated: HistoryEntry = {
+        id: profile.id,
+        profile_name: profile.name,
+        created_at: entry.created_at,
+        coffee_analysis: null,
+        user_preferences: null,
+        reply: updatedReply,
+        notes,
+        profile_json: profileJson,
+      }
+      setSelectedHistoryEntry(updated)
+    } catch {
+      // Non-critical — view already shows basic info
+    }
+  }
+
+  const handleDownloadJson = async () => {
     const jsonData = selectedHistoryEntry?.profile_json || currentProfileJson
     if (!jsonData) {
       toast.error(t('results.noProfileJson'))
@@ -661,16 +976,41 @@ function App() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
 
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
-      type: 'application/json'
-    })
-    
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${safeName || 'profile'}.json`
-    link.click()
-    URL.revokeObjectURL(url)
+    const jsonString = JSON.stringify(jsonData, null, 2)
+
+    if (isNativePlatform()) {
+      // On native, use Share API (WKWebView can't open blob: URLs)
+      const { Share } = await import('@capacitor/share')
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      try {
+        // Write to temp file and share
+        const filename = `${safeName || 'profile'}.json`
+        const result = await Filesystem.writeFile({
+          path: filename,
+          data: btoa(unescape(encodeURIComponent(jsonString))),
+          directory: Directory.Cache,
+        })
+        await Share.share({
+          title: profileName,
+          files: [result.uri],
+        })
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        // Fallback: share as text
+        await Share.share({
+          title: profileName,
+          text: jsonString,
+        })
+      }
+    } else {
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${safeName || 'profile'}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+    }
     
     toast.success(t('results.profileJsonDownloaded'))
   }
@@ -739,19 +1079,12 @@ function App() {
     }
   }
 
-  const handleTitleClick = () => {
-    // Single tap: go to start screen (only if not on start already)
-    if (viewState !== 'start') {
-      handleBackToStart()
-    }
-  }
-
   const aiAvailable = isAiConfigured && aiEnabled
   const canSubmit = !!(aiAvailable && (imageFile || userPrefs.trim().length > 0 || selectedTags.length > 0))
 
   // Phase 3 layout helpers
-  const showControlCenter = mqttEnabled && machineState._wsConnected
-  const showRightColumn = showControlCenter && ['start', 'run-shot', 'live-shot'].includes(viewState)
+  const showControlCenter = mqttEnabled
+  const showRightColumn = showControlCenter && ['start', 'live-shot'].includes(viewState)
   const showShotBanner =
     mqttEnabled &&
     machineState.brewing &&
@@ -760,15 +1093,98 @@ function App() {
     !shotBannerDismissed
 
   const prefersReducedMotion = useReducedMotion()
+
+  // Greeting action handler (shared between header pill and StartView)
+  const viewMachineProfileRef = useRef(handleViewMachineProfile)
+  useEffect(() => { viewMachineProfileRef.current = handleViewMachineProfile }, [handleViewMachineProfile])
+
+  const handleGreetingAction = useCallback((target: string, context?: Record<string, string>) => {
+    try {
+      switch (target) {
+        case 'shot-analysis':
+          if (context?.date && context?.filename) {
+            setShotHistoryProfileName(context.profileName || machineState.active_profile || 'Unknown')
+            setShotHistoryInitialDate(context.date)
+            setShotHistoryInitialFilename(context.filename)
+            previousViewStateRef.current = 'start'
+            setViewState('shot-history')
+          } else {
+            setViewState('shot-analysis')
+          }
+          break
+        case 'dial-in':
+          setViewState('dial-in')
+          break
+        case 'history':
+        case 'profile-catalogue':
+          setViewState('profile-catalogue')
+          break
+        case 'view-profile':
+          if (context?.profileId && context?.profileName) {
+            viewMachineProfileRef.current({ id: context.profileId, name: context.profileName })
+          } else if (context?.profileName) {
+            // No profileId — try to find the profile by name from the machine
+            (async () => {
+              try {
+                const serverUrl = await getServerUrl()
+                const res = await fetch(`${serverUrl}/api/machine/profiles`)
+                if (res.ok) {
+                  const data = await res.json()
+                  const profiles = (data.profiles ?? []) as { id: string; name: string; display?: { image?: string; description?: string } }[]
+                  const match = profiles.find((p: { name: string }) => p.name.toLowerCase() === context.profileName!.toLowerCase())
+                  if (match) {
+                    viewMachineProfileRef.current(match)
+                    return
+                  }
+                }
+              } catch {
+                // Profile lookup failed
+              }
+              setViewState('profile-catalogue')
+            })()
+          } else {
+            console.warn('[DynamicIsland] view-profile action missing context, falling back to catalogue', context)
+            setViewState('profile-catalogue')
+          }
+          break
+        case 'add-profile':
+          setShowAddProfileDialog(true)
+          break
+        case 'shot-history':
+          previousViewStateRef.current = 'start'
+          setViewState('shot-history')
+          break
+        default:
+          console.warn('[DynamicIsland] Unknown greeting action target:', target)
+          break
+      }
+    } catch (err) {
+      console.error('[DynamicIsland] Error handling greeting action:', target, err)
+    }
+  }, [machineState.active_profile])
+
   const motionTransition = prefersReducedMotion ? { duration: 0 } : undefined
 
-  return (
+  const appContent = (
     <>
       <SkipNavigation />
       {showBlobs && <AmbientBackground />}
 
       {/* Beta version banner — fixed at top */}
       <BetaBanner />
+
+      {/* Network status banner */}
+      {!isConnected && (
+        <div
+          className="bg-destructive/90 text-destructive-foreground text-center py-1 text-xs font-medium"
+          style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))' }}
+        >
+          {t('common.noInternetConnection')}
+        </div>
+      )}
+
+      {/* Demo mode indicator */}
+      <DemoModeBanner />
 
       {/* Shot detection banner — fixed at top, across all views */}
       <ShotDetectionBanner
@@ -777,31 +1193,33 @@ function App() {
         onDismiss={() => setShotBannerDismissed(true)}
       />
 
-      <div className={`min-h-screen text-foreground flex justify-center px-5 lg:px-8 overflow-x-hidden relative ${isHome ? 'items-center py-5' : 'items-start pt-3 pb-5'}`} style={{ zIndex: 1 }}>
+      <div className={`flex-1 text-foreground flex justify-center px-5 md:px-8 overflow-x-hidden overflow-y-auto relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] xl:items-center xl:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
       <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
+        {isHome && (
         <header>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={motionTransition ?? { duration: 0.5, ease: "easeOut" }}
-          className={isHome ? "text-center mb-10" : "text-center mb-6"}
+          className="text-center mb-3 md:mb-4"
         >
-          <div className="flex items-center justify-center gap-3 mb-1 relative">
-            <div 
-              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={handleTitleClick}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTitleClick() } }}
-              aria-label={t('a11y.goHome')}
-            >
-              <MeticAILogo size={isHome ? 48 : 28} variant={isDark ? 'white' : 'default'} />
-              <h1 className={`font-bold tracking-tight transition-all duration-300 ${isHome ? 'text-5xl' : 'text-2xl'}`}>
-                Metic<span className="gold-text">AI</span>
-              </h1>
+          <div className="flex items-center justify-center gap-3 mb-1 relative" style={{ minHeight: 48 }}>
+            {/* Settings gear — left side */}
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                onClick={() => setViewState('settings')}
+                aria-label={t('navigation.settings')}
+              >
+                <Gear size={18} weight="duotone" />
+              </Button>
             </div>
-            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1" id="navigation" aria-label={t('navigation.settings')}>
+
+            {/* Theme toggle + QR — right side */}
+            <nav className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10" id="navigation" aria-label={t('navigation.settings')}>
               {themeMounted && (
                 <Button
                   variant="ghost"
@@ -813,25 +1231,147 @@ function App() {
                   {isDark ? <Sun size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
                 </Button>
               )}
-              {isDesktop && (
+              {isDesktop && !isNativePlatform() && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
-                  onClick={() => setQrDialogOpen(true)}
-                  aria-label={t('a11y.openOnMobile')}
+                    className="text-muted-foreground hover:text-primary transition-colors h-8 w-8"
+                    onClick={() => setQrDialogOpen(true)}
+                    aria-label={t('a11y.openOnMobile')}
+                  >
+                    <QrCode size={18} weight="duotone" />
+                  </Button>
+                )}
+              </nav>
+
+            {/* Centered island + title unit */}
+            <div className="flex items-center justify-center">
+              {/* Dynamic Island — circle→pill CSS transition */}
+              <div
+                  className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
+                  data-sound="none"
+                  onClick={!islandExpanded && smartGreeting ? toggleIsland : undefined}
+                  role={!islandExpanded && smartGreeting ? 'button' : undefined}
+                  tabIndex={!islandExpanded && smartGreeting ? 0 : undefined}
+                  onKeyDown={!islandExpanded && smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                  style={{
+                    height: islandExpanded ? 48 : 40,
+                    width: islandExpanded ? 'min(20rem, calc(100vw - 7rem))' : 40,
+                    background: islandExpanded
+                      ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
+                      : 'transparent',
+                    backdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
+                    WebkitBackdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
+                    borderRadius: 9999,
+                    border: islandExpanded
+                      ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)')
+                      : '1px solid transparent',
+                    padding: islandExpanded ? '4px 4px 4px 4px' : '0',
+                    overflow: 'hidden',
+                    justifyContent: islandExpanded ? 'flex-start' : 'center',
+                    transition: 'width 0.55s cubic-bezier(0.32, 0.72, 0, 1), height 0.45s cubic-bezier(0.32, 0.72, 0, 1), background 0.45s cubic-bezier(0.32, 0.72, 0, 1), backdrop-filter 0.4s ease, border-color 0.4s ease, padding 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
+                  }}
                 >
-                  <QrCode size={18} weight="duotone" />
-                </Button>
-              )}
-            </nav>
+                  {/* Logo — tap to collapse when expanded */}
+                  <button
+                    type="button"
+                    data-sound="none"
+                    className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
+                    onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
+                    tabIndex={islandExpanded ? 0 : -1}
+                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : t('a11y.appLogo', 'Metic logo')}
+                    aria-hidden={islandExpanded ? undefined : true}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      cursor: islandExpanded ? 'pointer' : 'default',
+                      transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                      transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
+                    }}
+                  >
+                    <MeticLogo
+                      size={32}
+                      variant={isDark ? 'white' : 'default'}
+                      className="rounded-full"
+                      style={{
+                        background: islandExpanded ? 'transparent' : (isDark ? '#000' : '#fff'),
+                        padding: islandExpanded ? 0 : 2,
+                        transition: 'background 0.4s ease, padding 0.3s ease',
+                      }}
+                    />
+                  </button>
+
+                  {/* Greeting text — always in DOM for smooth animation, zero-width when collapsed */}
+                  {smartGreeting && (
+                    <div
+                      className="min-w-0 overflow-hidden"
+                      style={{
+                        flex: islandExpanded ? '1 1 0%' : '0 0 0px',
+                        width: islandExpanded ? undefined : 0,
+                        marginLeft: islandExpanded ? 6 : 0,
+                        opacity: islandExpanded ? 1 : 0,
+                        transition: 'flex 0.45s cubic-bezier(0.32, 0.72, 0, 1), width 0.45s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
+                        pointerEvents: islandExpanded ? 'auto' : 'none',
+                        maskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        WebkitMaskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                      }}
+                    >
+                      <div
+                        ref={greetingTextRef as React.RefObject<HTMLDivElement>}
+                        className={`text-xs island-greeting-text${isScrollActive ? ' island-scroll-active' : ''} ${isDark ? 'text-white/85' : 'text-foreground/80'}`}
+                      >
+                        <span ref={greetingInnerRef as React.RefObject<HTMLSpanElement>} className="island-marquee-inner">{smartGreeting.message}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action button — circular chevron on the right */}
+                  {smartGreeting?.action && islandExpanded && (
+                    <button
+                      type="button"
+                      className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-black/5 hover:bg-black/10 text-foreground/60'}`}
+                      onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
+                      aria-label={smartGreeting.action.label}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        marginLeft: 4,
+                        opacity: islandExpanded ? 1 : 0,
+                        transition: 'opacity 0.3s ease 0.4s, background 0.2s ease',
+                      }}
+                    >
+                      <ArrowRight size={16} weight="bold" />
+                    </button>
+                  )}
+                </div>
+
+              {/* Title — collapses when island expands */}
+              <h1
+                role={smartGreeting ? "button" : undefined}
+                data-sound="none"
+                tabIndex={smartGreeting ? 0 : undefined}
+                onClick={smartGreeting ? toggleIsland : undefined}
+                onKeyDown={smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                className={`font-bold tracking-tight text-3xl whitespace-nowrap overflow-hidden select-none${smartGreeting ? ' cursor-pointer' : ''}`}
+                style={{
+                  maxWidth: islandExpanded ? 0 : 140,
+                  opacity: islandExpanded ? 0 : 1,
+                  padding: islandExpanded ? '0' : '4px 6px',
+                  margin: islandExpanded ? '0' : '-4px -6px -4px 8px',
+                  transition: 'max-width 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease, margin 0.4s cubic-bezier(0.32, 0.72, 0, 1), padding 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+                }}
+              >
+                Metic<span className="header-dot">.</span>
+              </h1>
+            </div>
           </div>
 
         </motion.div>
         </header>
+        )}
 
         {/* Two-column grid wrapper (desktop, specific views only) */}
-        <div className={showRightColumn ? 'lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] lg:gap-6' : ''}>
+        <div className={showRightColumn ? 'md:grid md:grid-cols-[minmax(0,3fr)_minmax(280px,1fr)] lg:grid-cols-[minmax(0,3fr)_minmax(340px,1.2fr)] md:gap-6' : ''}>
           {/* ── Main content column ─────────────────────── */}
           <main id="main-content">
             <Suspense fallback={
@@ -842,7 +1382,7 @@ function App() {
               </Card>
             }>
             <AnimatePresence mode="wait">
-              {isInitializing && (
+              {isInitializing && viewState !== 'onboarding' && (
                 <motion.div
                   key="initializing"
                   initial={{ opacity: 0 }}
@@ -858,11 +1398,27 @@ function App() {
                 </motion.div>
               )}
               
+              {viewState === 'onboarding' && (
+                <motion.div
+                  key="onboarding"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={motionTransition ?? { duration: 0.15 }}
+                >
+                  <OnboardingWizard onComplete={() => {
+                    setViewState('start')
+                    setIsInitializing(false)
+                  }} />
+                </motion.div>
+              )}
+
               {!isInitializing && viewState === 'start' && (
                 <StartView
                   profileCount={profileCount}
-                  onGenerateNew={() => setViewState('form')}
-                  onViewHistory={() => setViewState('history')}
+                  onAddProfile={() => setShowAddProfileDialog(true)}
+                  onViewHistory={() => setViewState('profile-catalogue')}
+                  onProfileCatalogue={() => setViewState('profile-catalogue')}
                   onRunShot={() => {
                     setRunShotProfileId(undefined)
                     setRunShotProfileName(undefined)
@@ -872,8 +1428,14 @@ function App() {
                   onDialIn={() => setViewState('dial-in')}
                   onShotAnalysis={() => setViewState('shot-analysis')}
                   onSettings={() => setViewState('settings')}
-                  aiConfigured={aiAvailable}
-                  hideAiWhenUnavailable={hideAiWhenUnavailable}
+                  controlCenter={
+                    showControlCenter && isMobile ? (
+                      <ControlCenter
+                        machineState={machineState}
+                        onOpenLiveView={() => setViewState('live-shot')}
+                      />
+                    ) : undefined
+                  }
                   lastShotBanner={
                     mqttEnabled ? (
                       <LastShotBanner
@@ -916,20 +1478,8 @@ function App() {
                     onAdvancedOptionsChange={setAdvancedOptions}
                     onSubmit={handleSubmit}
                     onBack={handleBackToStart}
-                    onViewHistory={() => setViewState('history')}
-                  />
-                </FeatureErrorBoundary>
-              )}
-
-              {viewState === 'history' && (
-                <FeatureErrorBoundary feature="History">
-                  <HistoryView
-                    onBack={handleBackToStart}
-                    onViewProfile={handleViewHistoryEntry}
-                    onGenerateNew={() => setViewState('form')}
-                    onManageMachine={() => setViewState('profile-catalogue')}
-                    aiConfigured={aiAvailable}
-                    hideAiWhenUnavailable={hideAiWhenUnavailable}
+                    onViewHistory={() => setViewState('profile-catalogue')}
+                    onViewProfile={handleViewProfileByName}
                   />
                 </FeatureErrorBoundary>
               )}
@@ -937,8 +1487,11 @@ function App() {
               {viewState === 'history-detail' && selectedHistoryEntry && (
                 <FeatureErrorBoundary feature="Profile Detail">
                   <ProfileDetailView
+                    key={selectedHistoryEntry.id}
                     entry={selectedHistoryEntry}
-                    onBack={() => setViewState('history')}
+                    onBack={() => {
+                      setViewState('profile-catalogue')
+                    }}
                     cachedImageUrl={selectedHistoryImageUrl}
                     aiConfigured={aiAvailable}
                     hideAiWhenUnavailable={hideAiWhenUnavailable}
@@ -957,6 +1510,10 @@ function App() {
                 <FeatureErrorBoundary feature="Settings">
                   <SettingsView
                     onBack={handleBackToStart}
+                    onRestartOnboarding={() => {
+                      localStorage.removeItem(STORAGE_KEYS.ONBOARDING_COMPLETE)
+                      setViewState('onboarding')
+                    }}
                     showBlobs={showBlobs}
                     onToggleBlobs={toggleBlobs}
                     isDark={isDark}
@@ -972,7 +1529,6 @@ function App() {
                   <RunShotView
                     onBack={handleBackToStart}
                     onNavigateToLive={() => setViewState('live-shot')}
-                    onProfileSelected={(name) => patchMachineState({ active_profile: name })}
                     initialProfileId={runShotProfileId}
                     initialProfileName={runShotProfileName}
                   />
@@ -1049,7 +1605,7 @@ function App() {
 
               {viewState === 'profile-catalogue' && (
                 <FeatureErrorBoundary feature="Profile Catalogue">
-                  <ProfileCatalogueView onBack={() => setViewState('history')} />
+                  <ProfileCatalogueView onBack={() => setViewState('start')} onViewProfile={handleViewMachineProfile} />
                 </FeatureErrorBoundary>
               )}
 
@@ -1068,7 +1624,7 @@ function App() {
                     onBack={handleReset}
                     onSaveResults={handleSaveResults}
                     onDownloadJson={handleDownloadJson}
-                    onViewHistory={() => setViewState('history')}
+                    onViewHistory={() => setViewState('profile-catalogue')}
                     onRunProfile={() => {
                       if (createdProfileId && currentProfileJson?.name) {
                         setRunShotProfileId(createdProfileId)
@@ -1091,20 +1647,26 @@ function App() {
             </AnimatePresence>
             </Suspense>
 
-            {/* Mobile Control Center — below the main card, StartView only */}
-            {showControlCenter && isMobile && viewState === 'start' && (
-              <div className="mt-4">
-                <ControlCenter
-                  machineState={machineState}
-                  onOpenLiveView={() => setViewState('live-shot')}
-                />
-              </div>
+            {/* Mobile Control Center — now rendered inside StartView */}
+
+            {/* Desktop-only footer — home view, non-demo, single-column only */}
+            {!isMobile && isHome && !isDemoMode() && !showRightColumn && (
+              <footer className="text-center py-4 mt-2">
+                <a
+                  href="https://buymeacoffee.com/HSUS"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                >
+                  {t('common.supportProject')}
+                </a>
+              </footer>
             )}
           </main>
 
           {/* ── Right column — desktop Control Center ─── */}
-          {showRightColumn && (
-            <aside className="hidden lg:block">
+          {showRightColumn && !isMobile && (
+            <aside className="hidden md:block">
               <div className={`sticky top-4 ${viewState === 'live-shot' ? 'mt-10' : 'mt-2'}`}>
                 {/* Hide control center during live shot — profile breakdown takes over */}
                 {viewState !== 'live-shot' && (
@@ -1158,10 +1720,32 @@ function App() {
         </div>
         
         <QRCodeDialog open={qrDialogOpen} onOpenChange={setQrDialogOpen} />
+        <ProfileImportDialog
+          isOpen={showAddProfileDialog}
+          aiConfigured={aiAvailable}
+          hideAiWhenUnavailable={hideAiWhenUnavailable}
+          initialUrl={pendingImportUrl ?? undefined}
+          onClose={() => {
+            setShowAddProfileDialog(false)
+            setPendingImportUrl(null)
+          }}
+          onImported={() => {
+            setShowAddProfileDialog(false)
+            setPendingImportUrl(null)
+            setViewState('profile-catalogue')
+          }}
+          onGenerateNew={() => {
+            setShowAddProfileDialog(false)
+            setPendingImportUrl(null)
+            setViewState('form')
+          }}
+        />
       </div>
     </div>
     </>
   )
+
+  return appContent
 }
 
 export default App

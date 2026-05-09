@@ -24,6 +24,13 @@ vi.mock('@/lib/config', () => ({
   getServerUrl: vi.fn().mockResolvedValue('http://localhost:8000')
 }))
 
+// Force proxy mode so tests exercise the image-proxy URL path regardless of env
+vi.mock('@/lib/machineMode', () => ({
+  isDirectMode: vi.fn().mockReturnValue(false),
+  isNativePlatform: vi.fn().mockReturnValue(false),
+  getDefaultMachineUrl: vi.fn().mockReturnValue('http://localhost:8080'),
+}))
+
 describe('useProfileImageCache - Integration Tests', () => {
   beforeEach(() => {
     localStorageMock.reset()
