@@ -82,19 +82,19 @@ describe('retryWithBackoff', () => {
 describe('formatGeminiError', () => {
   it('formats 503 as unavailable message', () => {
     expect(formatGeminiError(new Error('503 Service Unavailable'))).toBe(
-      'The AI model is temporarily unavailable. Please try again in a moment.',
+      'The AI model is temporarily unavailable — this is a Google-side outage. Try switching to a different model in Settings, which may also increase token usage.',
     )
   })
 
   it('formats UNAVAILABLE as unavailable message', () => {
     expect(formatGeminiError(new Error('UNAVAILABLE: try again'))).toBe(
-      'The AI model is temporarily unavailable. Please try again in a moment.',
+      'The AI model is temporarily unavailable — this is a Google-side outage. Try switching to a different model in Settings, which may also increase token usage.',
     )
   })
 
   it('formats overloaded as unavailable message', () => {
     expect(formatGeminiError(new Error('model overloaded'))).toBe(
-      'The AI model is temporarily unavailable. Please try again in a moment.',
+      'The AI model is temporarily unavailable — this is a Google-side outage. Try switching to a different model in Settings, which may also increase token usage.',
     )
   })
 
