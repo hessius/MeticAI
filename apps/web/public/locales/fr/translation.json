@@ -760,8 +760,8 @@
       "flowLabel": "Débit",
       "power": "Puissance",
       "temp": "Temp",
-      "brewTemp": "Infusion",
-      "boilerTemp": "Chaudière"
+      "brewTemp": "Tête d'infusion",
+      "boilerTemp": "Chambre d'infusion"
     },
     "actions": {
       "start": "Démarrer",

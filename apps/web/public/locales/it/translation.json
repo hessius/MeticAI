@@ -760,8 +760,8 @@
       "flowLabel": "Flusso",
       "power": "Potenza",
       "temp": "Temp",
-      "brewTemp": "Erogazione",
-      "boilerTemp": "Caldaia"
+      "brewTemp": "Testata",
+      "boilerTemp": "Camera"
     },
     "actions": {
       "start": "Avvia",

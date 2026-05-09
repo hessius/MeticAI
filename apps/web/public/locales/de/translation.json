@@ -760,8 +760,8 @@
       "flowLabel": "Fluss",
       "power": "Leistung",
       "temp": "Temp",
-      "brewTemp": "Brüh",
-      "boilerTemp": "Kessel"
+      "brewTemp": "Brühkopf",
+      "boilerTemp": "Brühkammer"
     },
     "actions": {
       "start": "Starten",

@@ -765,8 +765,8 @@
       "flowLabel": "Flöde",
       "power": "Effekt",
       "temp": "Temp",
-      "brewTemp": "Brygg",
-      "boilerTemp": "Panna"
+      "brewTemp": "Brygghuvud",
+      "boilerTemp": "Bryggkammare"
     },
     "actions": {
       "start": "Starta",

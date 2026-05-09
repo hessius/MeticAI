@@ -772,8 +772,8 @@
       "flowLabel": "Flow",
       "power": "Power",
       "temp": "Temp",
-      "brewTemp": "Brew",
-      "boilerTemp": "Boiler"
+      "brewTemp": "Brew Head",
+      "boilerTemp": "Brew Chamber"
     },
     "actions": {
       "start": "Start",

@@ -504,7 +504,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     />
                   </div>
                   {/* Row 2: Weight, Temperature */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <MetricTile
                       icon={<Scales size={14} />}
                       value={ms.shot_weight?.toFixed(1) ?? '0.0'}
@@ -516,16 +516,14 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       icon={<Thermometer size={14} />}
                       value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
                       unit="°C"
-                      label={t('controlCenter.metrics.brewTemp', 'Brew')}
+                      label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
                     />
-                    {ms.boiler_temperature != null && (
-                      <MetricTile
-                        icon={<Thermometer size={14} />}
-                        value={ms.boiler_temperature.toFixed(1)}
-                        unit="°C"
-                        label={t('controlCenter.metrics.boilerTemp', 'Boiler')}
-                      />
-                    )}
+                    <MetricTile
+                      icon={<Thermometer size={14} />}
+                      value={ms.boiler_temperature?.toFixed(1) ?? '—'}
+                      unit="°C"
+                      label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
+                    />
                   </div>
                 </div>
 
@@ -623,7 +621,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 />
               </div>
               {/* Row 2: Weight, Temperature */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <MetricTile
                   icon={<Scales size={14} />}
                   value={ms.shot_weight?.toFixed(1) ?? '0.0'}
@@ -637,16 +635,14 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   icon={<Thermometer size={14} />}
                   value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
                   unit="°C"
-                  label={t('controlCenter.metrics.brewTemp', 'Brew')}
+                  label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
                 />
-                {ms.boiler_temperature != null && (
-                  <MetricTile
-                    icon={<Thermometer size={14} />}
-                    value={ms.boiler_temperature.toFixed(1)}
-                    unit="°C"
-                    label={t('controlCenter.metrics.boilerTemp', 'Boiler')}
-                  />
-                )}
+                <MetricTile
+                  icon={<Thermometer size={14} />}
+                  value={ms.boiler_temperature?.toFixed(1) ?? '—'}
+                  unit="°C"
+                  label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
+                />
               </div>
             </div>
           )}
