@@ -144,6 +144,7 @@
     "placeholderText": "ex. Extraction équilibrée, notes de noisette...",
     "generateProfile": "Générer le profil",
     "profileGenerated": "Profil généré !",
+    "profileCreatedSuccessfully": "Profil créé avec succès.",
     "backToForm": "Retour au formulaire",
     "validationError": "Veuillez fournir au moins une photo du paquet de café ou des préférences gustatives",
     "youHaveProfiles": "Vous avez {{count}} profil enregistré",
@@ -274,7 +275,7 @@
     "specificDays": "Jours spécifiques",
     "preheatOnlyHelper": "Préchauffage uniquement - aucun profil ne sera exécuté",
     "preheatStartsNow": "Le préchauffage commence maintenant, profil exécuté dans 10 min",
-    "preheatStartsBefore": "Le préchauffage commence 10 min avant l'heure programmée",
+    "preheatStartsBefore": "Le préchauffage commence {{minutes}} min avant l'heure programmée",
     "toasts": {
       "preheatingStarted": "Préchauffage démarré ! Prêt dans 10 minutes",
       "profileWillRun": "Le profil \"{{name}}\" sera exécuté dans 10 minutes",

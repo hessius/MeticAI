@@ -144,6 +144,7 @@
     "placeholderText": "t.ex. Balanserad extraktion, nötiga toner...",
     "generateProfile": "Generera profil",
     "profileGenerated": "Profil genererad!",
+    "profileCreatedSuccessfully": "Profilen skapades framgångsrikt.",
     "backToForm": "Tillbaka till formulär",
     "validationError": "Vänligen ange minst ett kaffepaket-foto eller smakpreferenser",
     "youHaveProfiles": "Du har {{count}} sparad profil",
@@ -278,7 +279,7 @@
     "specificDays": "Specifika dagar",
     "preheatOnlyHelper": "Endast förvärmning - ingen profil kommer att köras",
     "preheatStartsNow": "Förvärmning startar nu, profil körs om 10 min",
-    "preheatStartsBefore": "Förvärmning startar 10 min före schemalagd tid",
+    "preheatStartsBefore": "Förvärmning startar {{minutes}} min före schemalagd tid",
     "toasts": {
       "preheatingStarted": "Förvärmning startad! Klar om 10 minuter",
       "profileWillRun": "Profil \"{{name}}\" kommer att köras om 10 minuter",

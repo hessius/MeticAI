@@ -144,6 +144,7 @@
     "placeholderText": "es. Estrazione equilibrata, note di nocciola...",
     "generateProfile": "Genera profilo",
     "profileGenerated": "Profilo generato!",
+    "profileCreatedSuccessfully": "Profilo creato con successo.",
     "backToForm": "Torna al modulo",
     "validationError": "Fornisci almeno una foto della confezione di caffè o le preferenze di gusto",
     "youHaveProfiles": "Hai {{count}} profilo salvato",
@@ -274,7 +275,7 @@
     "specificDays": "Giorni specifici",
     "preheatOnlyHelper": "Solo preriscaldamento - nessun profilo verrà eseguito",
     "preheatStartsNow": "Il preriscaldamento inizia ora, profilo esegue tra 10 min",
-    "preheatStartsBefore": "Il preriscaldamento inizia 10 min prima dell'ora programmata",
+    "preheatStartsBefore": "Il preriscaldamento inizia {{minutes}} min prima dell'ora programmata",
     "toasts": {
       "preheatingStarted": "Preriscaldamento avviato! Pronto tra 10 minuti",
       "profileWillRun": "Il profilo \"{{name}}\" verrà eseguito tra 10 minuti",

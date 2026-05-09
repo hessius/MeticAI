@@ -1359,7 +1359,7 @@ export function ShotDetail({
                                           return (
                                             <div
                                               key={tIdx}
-                                              className={`px-2 py-1 rounded text-xs whitespace-nowrap ${
+                                              className={`px-2 py-1 rounded text-xs max-w-full break-words ${
                                                 wasTriggered
                                                   ? 'bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30'
                                                   : 'bg-secondary/60 text-muted-foreground border border-border/30'

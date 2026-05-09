@@ -144,6 +144,7 @@
     "placeholderText": "z.B. Ausgewogene Extraktion, nussige Noten...",
     "generateProfile": "Profil generieren",
     "profileGenerated": "Profil generiert!",
+    "profileCreatedSuccessfully": "Profil erfolgreich erstellt.",
     "backToForm": "Zurück zum Formular",
     "validationError": "Bitte gib mindestens ein Kaffeetüten-Foto oder Geschmackspräferenzen an",
     "youHaveProfiles": "Du hast {{count}} gespeichertes Profil",
@@ -274,7 +275,7 @@
     "specificDays": "Bestimmte Tage",
     "preheatOnlyHelper": "Nur Vorheizen - kein Profil wird ausgeführt",
     "preheatStartsNow": "Vorheizen beginnt jetzt, Profil läuft in 10 Min",
-    "preheatStartsBefore": "Vorheizen beginnt 10 Min vor geplanter Zeit",
+    "preheatStartsBefore": "Vorheizen beginnt {{minutes}} Min vor geplanter Zeit",
     "toasts": {
       "preheatingStarted": "Vorheizen gestartet! Bereit in 10 Minuten",
       "profileWillRun": "Profil \"{{name}}\" wird in 10 Minuten ausgeführt",
