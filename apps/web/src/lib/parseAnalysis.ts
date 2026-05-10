@@ -128,8 +128,14 @@ export const CIRCLED_NUMBERS = [
  */
 export function parseStructuredAnalysis(text: string): ParsedSection[] {
   // Strip the RECOMMENDATIONS_JSON block before parsing sections
-  const cleanText = text.replace(
+  let cleanText = text.replace(
     /RECOMMENDATIONS_JSON:\s*\n[\s\S]*?END_RECOMMENDATIONS_JSON/g,
+    "",
+  );
+
+  // Strip internal prompt artifacts that may leak into the response
+  cleanText = cleanText.replace(
+    /^.*Structured Recommendations.*(?:\(MANDATORY\))?.*$/gim,
     "",
   );
 

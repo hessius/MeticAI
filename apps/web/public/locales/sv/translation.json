@@ -900,7 +900,10 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
-    "targets": "Målvärden"
+    "targets": "Målvärden",
+    "shotLabel": "Extraktion",
+    "targetsLabel": "Målvärden",
+    "stagesLabel": "Steg"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",

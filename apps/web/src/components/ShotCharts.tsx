@@ -111,7 +111,7 @@ export function ReplayChart({
           </Badge>
         )}
       </div>
-      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none [&_svg]:outline-none [&_.recharts-surface]:outline-none`} role="img" aria-label={t('a11y.chart.extractionReplay')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
+      <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none [&_svg]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-reference-area_rect]:transition-opacity [&_.recharts-reference-area_rect]:duration-500`} role="img" aria-label={t('a11y.chart.extractionReplay')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 5, right: rightMargin, left: -5, bottom: 5 }}>
@@ -124,28 +124,41 @@ export function ReplayChart({
               <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
               <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
-              <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" isAnimationActive={false} />
-              <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" isAnimationActive={false} />
-              <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" isAnimationActive={false} />
-              {hasGravFlow && <Line yAxisId="left" type="monotone" dataKey="gravimetricFlow" stroke={CHART_COLORS.gravimetricFlow} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="Grav. Flow (g/s)" isAnimationActive={false} />}
+              <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" legendType="none" isAnimationActive={false} />
+              <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" legendType="none" isAnimationActive={false} />
+              <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" legendType="none" isAnimationActive={false} />
+              {hasGravFlow && <Line yAxisId="left" type="monotone" dataKey="gravimetricFlow" stroke={CHART_COLORS.gravimetricFlow} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="Grav. Flow (g/s)" legendType="none" isAnimationActive={false} />}
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
-      {/* Stage Legend */}
-      {(() => {
-        if (stageRanges.length === 0) return null
-        return (
-          <div className="flex flex-wrap gap-1.5 pt-1">
+      {/* Grouped Legend: Shot + Stages */}
+      <div className="space-y-1.5 pt-1">
+        {/* Shot lines */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">{t('shotCharts.shotLabel')}:</span>
+          <div className="flex items-center gap-1"><div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.pressure }} /><span>{t('shotCharts.pressure')}</span></div>
+          <div className="flex items-center gap-1"><div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.flow }} /><span>{t('shotCharts.flow')}</span></div>
+          <div className="flex items-center gap-1"><div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.weight }} /><span>{t('shotCharts.weight')}</span></div>
+          {hasGravFlow && (
+            <div className="flex items-center gap-1">
+              <svg width="16" height="2" className="shrink-0"><line x1="0" y1="1" x2="16" y2="1" stroke={CHART_COLORS.gravimetricFlow} strokeWidth="2" strokeDasharray="3 2" /></svg>
+              <span>Grav. Flow</span>
+            </div>
+          )}
+        </div>
+        {/* Stages */}
+        {stageRanges.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="text-xs font-semibold text-foreground mr-0.5">{t('shotCharts.stagesLabel')}:</span>
             {stageRanges.map((stage, idx) => (
               <Badge key={idx} variant="outline" className="text-[10px] px-2 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
                 {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
               </Badge>
             ))}
           </div>
-        )
-      })()}
+        )}
+      </div>
     </>
   )
   
@@ -335,31 +348,46 @@ export function AnalyzeChart({
           </ResponsiveContainer>
         </div>
       </div>
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.pressure }} /><span>{t('shotCharts.pressure')}</span></div>
-        <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.flow }} /><span>{t('shotCharts.flow')}</span></div>
-        {hasTargetCurves && <>
-          <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPressure, borderStyle: 'dashed' }} /><span>{t('shotCharts.targetPressure')}</span></div>
-          <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetFlow, borderStyle: 'dashed' }} /><span>{t('shotCharts.targetFlow')}</span></div>
-          {profileTargetCurves?.some(p => p.target_power !== undefined) && (
-            <div className="flex items-center gap-1"><div className="w-3 h-0.5 rounded" style={{ backgroundColor: CHART_COLORS.targetPower, borderStyle: 'dashed' }} /><span>{t('shotCharts.targetPower')}</span></div>
-          )}
-        </>}
-      </div>
-      {/* Stage Legend */}
-      {(() => {
-        if (stageRanges.length === 0) return null
-        return (
-          <div className="flex flex-wrap gap-1.5">
+      {/* Grouped Legend: Shot + Targets + Stages */}
+      <div className="space-y-1.5">
+        {/* Shot lines */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">{t('shotCharts.shotLabel')}:</span>
+          <div className="flex items-center gap-1"><div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.pressure }} /><span>{t('shotCharts.pressure')}</span></div>
+          <div className="flex items-center gap-1"><div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.flow }} /><span>{t('shotCharts.flow')}</span></div>
+        </div>
+        {/* Target lines */}
+        {hasTargetCurves && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">{t('shotCharts.targetsLabel')}:</span>
+            <div className="flex items-center gap-1">
+              <svg width="16" height="2" className="shrink-0"><line x1="0" y1="1" x2="16" y2="1" stroke={CHART_COLORS.targetPressure} strokeWidth="2" strokeDasharray="3 2" /></svg>
+              <span>{t('shotCharts.pressure')}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <svg width="16" height="2" className="shrink-0"><line x1="0" y1="1" x2="16" y2="1" stroke={CHART_COLORS.targetFlow} strokeWidth="2" strokeDasharray="3 2" /></svg>
+              <span>{t('shotCharts.flow')}</span>
+            </div>
+            {profileTargetCurves?.some(p => p.target_power !== undefined) && (
+              <div className="flex items-center gap-1">
+                <svg width="16" height="2" className="shrink-0"><line x1="0" y1="1" x2="16" y2="1" stroke={CHART_COLORS.targetPower} strokeWidth="2" strokeDasharray="3 2" /></svg>
+                <span>{t('shotCharts.power')}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Stages */}
+        {stageRanges.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="text-xs font-semibold text-foreground mr-0.5">{t('shotCharts.stagesLabel')}:</span>
             {stageRanges.map((stage, idx) => (
               <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium" style={{ backgroundColor: STAGE_COLORS[stage.colorIndex], borderColor: STAGE_BORDER_COLORS[stage.colorIndex], color: isDark ? STAGE_TEXT_COLORS_DARK[stage.colorIndex] : STAGE_TEXT_COLORS_LIGHT[stage.colorIndex] }}>
                 {typeof stage.name === 'string' ? stage.name : String(stage.name || '')}
               </Badge>
             ))}
           </div>
-        )
-      })()}
+        )}
+      </div>
     </>
   )
 }

@@ -567,13 +567,41 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       {/* ── BREWING STATE ──────────────────────────────── */}
       {isBrewing && (
         <>
-          <div className="flex items-center justify-between">
-            {stateBadge(machineState.state, true, t)}
-            <span className="text-xs text-muted-foreground tabular-nums">
-              <Thermometer size={12} className="inline mr-0.5" weight="duotone" />
-              {machineState.boiler_temperature?.toFixed(1) ?? '—'}°C
-            </span>
-          </div>
+          {/* Profile header — keep profile visible during shot */}
+          {displayProfile && (
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                {profileImgUrl && !profileImgError ? (
+                  <img
+                    src={profileImgUrl}
+                    alt={displayProfile}
+                    className="h-full w-full object-cover"
+                    onError={() => setProfileImgError(true)}
+                  />
+                ) : (
+                  <Coffee size={18} className="text-muted-foreground" weight="duotone" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-foreground truncate">{displayProfile}</div>
+                <div className="text-[10px] text-muted-foreground truncate">{machineState.state || '—'}</div>
+              </div>
+              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                <Thermometer size={12} className="inline mr-0.5" weight="duotone" />
+                {machineState.boiler_temperature?.toFixed(1) ?? '—'}°C
+              </span>
+            </div>
+          )}
+
+          {!displayProfile && (
+            <div className="flex items-center justify-between">
+              {stateBadge(machineState.state, true, t)}
+              <span className="text-xs text-muted-foreground tabular-nums">
+                <Thermometer size={12} className="inline mr-0.5" weight="duotone" />
+                {machineState.boiler_temperature?.toFixed(1) ?? '—'}°C
+              </span>
+            </div>
+          )}
 
           {/* Live metrics — 2×2 grid */}
           <div className="grid grid-cols-2 gap-2">

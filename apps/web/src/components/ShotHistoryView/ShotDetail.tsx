@@ -407,16 +407,23 @@ export function ShotDetail({
 
   // ---- Memoised chart data (shared between mobile and desktop) ------------
   const profileTargetCurves = analysisResult?.profile_target_curves
+
+  // Compute stage ranges from shot data alone (synchronous, stable on first render)
+  const shotStageRanges = useMemo(() => {
+    if (!shotData) return []
+    const chartData = getChartData(shotData)
+    return getStageRanges(chartData)
+  }, [shotData])
+
   const replayChartData = useMemo(() => {
     if (!shotData) return null
     const chartData = getChartData(shotData)
-    const rawStageRanges = getStageRanges(chartData)
     const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
     const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
-    // Derive stages from target curves when shot data lacks stage info
-    const stageRanges = rawStageRanges.length === 0 && profileTargetCurves?.length
+    // Prefer stages from shot data (available immediately); fall back to target curves
+    const stageRanges = shotStageRanges.length === 0 && profileTargetCurves?.length
       ? getStageRangesFromTargetCurves(profileTargetCurves, dataMaxTime)
-      : rawStageRanges
+      : shotStageRanges
     const mergedData = mergeWithTargetCurves(chartData, profileTargetCurves)
     const maxPressure = Math.max(
       ...chartData.map(d => d.pressure || 0),
@@ -432,7 +439,7 @@ export function ShotDetail({
     const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
     const maxRightAxis = Math.ceil(maxWeight * 1.1)
     return { chartData, stageRanges, hasGravFlow, dataMaxTime, mergedData, maxLeftAxis, maxRightAxis }
-  }, [shotData, profileTargetCurves])
+  }, [shotData, profileTargetCurves, shotStageRanges])
 
   const compareChartMemo = useMemo(() => {
     if (!shotData || !comparisonShotData) return null

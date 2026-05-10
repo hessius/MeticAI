@@ -907,7 +907,10 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
-    "targets": "Targets"
+    "targets": "Targets",
+    "shotLabel": "Shot",
+    "targetsLabel": "Targets",
+    "stagesLabel": "Stages"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",

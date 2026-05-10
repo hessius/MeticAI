@@ -895,7 +895,10 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
-    "targets": "Cibles"
+    "targets": "Cibles",
+    "shotLabel": "Extraction",
+    "targetsLabel": "Cibles",
+    "stagesLabel": "Étapes"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",

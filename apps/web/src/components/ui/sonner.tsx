@@ -9,16 +9,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      position="bottom-center"
       // Enable swipe to dismiss in all directions for better mobile UX
       swipeDirections={['down', 'up', 'left', 'right'] as ToasterProps['swipeDirections']}
-      // Position below status bar / Dynamic Island on iOS
-      offset="env(safe-area-inset-top, 0px)"
-      toastOptions={{
-        style: {
-          // Ensure toasts clear the safe area on all devices
-          marginTop: 'max(0px, env(safe-area-inset-top, 0px))',
-        },
-      }}
+      // Position above the bottom safe area on iOS
+      offset="env(safe-area-inset-bottom, 0px)"
       style={
         {
           "--normal-bg": "var(--popover)",
