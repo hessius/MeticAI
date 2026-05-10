@@ -2917,16 +2917,31 @@ Rules for recommendations:
           const body = init?.body as FormData
           const image = body.get('file') as File | null
           const userPrefs = (body.get('user_prefs') as string) || ''
+          const advancedCustomization = (body.get('advanced_customization') as string) || ''
+          const detailedKnowledge = (body.get('detailed_knowledge') as string) || ''
+
+          // Emit progress events so useGenerationProgress can display the segmented loading bar
+          const startTime = Date.now()
+          const emitProgress = (event: { phase: string; message: string }) => {
+            window.dispatchEvent(new CustomEvent('meticai:generation-progress', {
+              detail: {
+                ...event,
+                attempt: 1,
+                max_attempts: 3,
+                elapsed: (Date.now() - startTime) / 1000,
+              },
+            }))
+          }
 
           const result = await aiService.generateProfile({
             image,
-            preferences: userPrefs,
+            preferences: [userPrefs, advancedCustomization, detailedKnowledge].filter(Boolean).join('\n\n'),
             tags: [],
-          })
+          }, emitProgress)
 
           // Save profile to machine (convert Gemini JSON to OEPF format)
           if (result.status === 'success') {
-            const jsonMatch = result.analysis.match(/```json\s*([\s\S]*?)```/)
+            const jsonMatch = result.reply.match(/```json\s*([\s\S]*?)```/)
             if (jsonMatch) {
               try {
                 const raw = JSON.parse(jsonMatch[1])
@@ -3095,7 +3110,7 @@ Rules for recommendations:
             status: result.status,
             // Only include analysis (shown as "Coffee Analysis" card) when an image was provided
             analysis: image ? result.analysis : '',
-            reply: result.analysis,
+            reply: result.reply,
           })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error'
