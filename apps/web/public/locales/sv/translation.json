@@ -1663,10 +1663,10 @@
     "pourOverCompleteBody": "Din pour-over-timer har avslutats"
   },
   "smartGreeting": {
-    "justBrewed": "Du drog precis ett skott på {{profile}}.\nVarför inte analysera det?",
+    "justBrewed": "Du gjorde precis en espresso på {{profile}}.\nVarför inte analysera den?",
     "analyzeAction": "Analysera",
-    "milestone": "{{count}} skott avklarade, bara {{remaining}} kvar till {{milestone}}!",
-    "longGap": "Nästan {{hours}}h sedan ditt senaste skott.\nDags för kaffe?",
+    "milestone": "{{count}} bryggningar avklarade, bara {{remaining}} kvar till {{milestone}}!",
+    "longGap": "Nästan {{hours}}h sedan din senaste bryggning.\nDags för kaffe?",
     "unusedProfile": "Du har inte provat {{name}} ännu.\nTesta!",
     "browseAction": "Bläddra profiler",
     "anniversary": "Du har använt Metic i {{days}} dagar!",

@@ -31,11 +31,11 @@ export function ShotDetectionBanner({ visible, onWatch, onDismiss }: ShotDetecti
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ y: -60, opacity: 0 }}
+          initial={{ y: 60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -60, opacity: 0 }}
+          exit={{ y: 60, opacity: 0 }}
           transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-          className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg"
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg"
         >
           <div className="flex items-center gap-3 rounded-lg border border-blue-500/40 bg-blue-500/10 backdrop-blur-md shadow-lg px-4 py-2.5">
             <Coffee size={18} weight="fill" className="text-blue-400 animate-pulse shrink-0" />
