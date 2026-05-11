@@ -75,6 +75,10 @@ interface ProfileCatalogueViewProps {
   onViewProfile?: (profile: MachineProfile) => void
 }
 
+// Module-level profile cache — survives unmount/remount, instant on revisit
+let _catalogueCache: { profiles: MachineProfile[]; offline: boolean; ts: number } | null = null
+const CATALOGUE_CACHE_TTL = 2 * 60 * 1000 // 2 minutes
+
 export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
   const directImageMode = isDirectMode() || isNativePlatform()
@@ -138,30 +142,56 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   // Profile image cache
   const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
 
-  // Detect coarse pointer (touch device)
-  // Fetch profiles from machine
-  const fetchProfiles = useCallback(async () => {
-    setIsLoading(true)
+  // Fetch profiles — stale-while-revalidate pattern
+  const fetchProfiles = useCallback(async (forceRefresh = false) => {
+    // Serve from module cache if fresh (instant render on revisit)
+    if (!forceRefresh && _catalogueCache && (Date.now() - _catalogueCache.ts < CATALOGUE_CACHE_TTL)) {
+      setProfiles(_catalogueCache.profiles)
+      setIsOffline(_catalogueCache.offline)
+      setIsLoading(false)
+      return
+    }
+
+    // If stale cache exists, show it immediately while fetching
+    if (_catalogueCache) {
+      setProfiles(_catalogueCache.profiles)
+      setIsOffline(_catalogueCache.offline)
+      setIsLoading(false)
+    } else {
+      setIsLoading(true)
+    }
     setError(null)
-    
+
     try {
       const serverUrl = await getServerUrl()
       const response = await fetch(`${serverUrl}/api/machine/profiles`)
       if (!response.ok) {
         throw new Error(t('profileCatalogue.fetchFailed'))
       }
-      
+
       const data = await response.json()
-      setIsOffline(data.offline === true)
-      setProfiles(Array.isArray(data?.profiles) ? data.profiles : [])
+      const offline = data.offline === true
+      const fetchedProfiles = Array.isArray(data?.profiles) ? data.profiles : []
+      _catalogueCache = { profiles: fetchedProfiles, offline, ts: Date.now() }
+      setIsOffline(offline)
+      setProfiles(fetchedProfiles)
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('profileCatalogue.fetchFailed')
-      setError(message)
-      toast.error(message)
+      // Only show error if we had no cached data to display
+      if (!_catalogueCache) {
+        const message = err instanceof Error ? err.message : t('profileCatalogue.fetchFailed')
+        setError(message)
+        toast.error(message)
+      }
     } finally {
       setIsLoading(false)
     }
   }, [])
+
+  // Force-refresh: invalidate cache and re-fetch (for after mutations)
+  const refreshProfiles = useCallback(() => {
+    _catalogueCache = null
+    return fetchProfiles(true)
+  }, [fetchProfiles])
 
   // Fetch orphaned history entries
   const fetchOrphaned = useCallback(async () => {
@@ -326,7 +356,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
       toast.success(t('profileCatalogue.renamed', { name: result.new_name }))
       
       // Refresh list
-      await fetchProfiles()
+      await refreshProfiles()
       setRenamingId(null)
       setRenameValue('')
     } catch (err) {
@@ -349,7 +379,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   // Handle deletion complete
   const handleDeleted = () => {
     setDeleteTarget(null)
-    fetchProfiles()
+    refreshProfiles()
     fetchOrphaned()
     fetchHistoryEntries()
   }
@@ -503,7 +533,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
               variant="outline"
               size="sm"
                 onClick={() => {
-                  fetchProfiles()
+                  refreshProfiles()
                   fetchOrphaned()
                   if (hasFeature('cloudSync')) fetchSyncStatus()
                 }}
@@ -941,7 +971,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
         onClose={() => setBulkDeleteOpen(false)}
         onDeleted={() => {
           setBulkDeleteOpen(false)
-          fetchProfiles()
+          refreshProfiles()
           fetchOrphaned()
           fetchHistoryEntries()
           fetchSyncStatus()
@@ -963,7 +993,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
         onClose={() => setOrphanDialogOpen(false)}
         onResolved={() => {
           setOrphanDialogOpen(false)
-          fetchProfiles()
+          refreshProfiles()
           fetchOrphaned()
           fetchHistoryEntries()
         }}
@@ -975,7 +1005,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
         onClose={() => setSyncResults(null)}
         onResolved={() => {
           setSyncResults(null)
-          fetchProfiles()
+          refreshProfiles()
           fetchOrphaned()
           fetchHistoryEntries()
           fetchSyncStatus()
@@ -985,7 +1015,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
       <ProfileImportDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
-        onImported={() => { setShowImportDialog(false); fetchProfiles(); fetchOrphaned(); fetchHistoryEntries() }}
+        onImported={() => { setShowImportDialog(false); refreshProfiles(); fetchOrphaned(); fetchHistoryEntries() }}
         onGenerateNew={() => setShowImportDialog(false)}
       />
     </div>

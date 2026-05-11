@@ -827,6 +827,7 @@ export function installDirectModeInterceptor(): void {
         .then((data: CachedProfile[] | null) => {
           if (data) {
             _processProfileList(data)
+            try { localStorage.setItem(PROFILE_LIST_CACHE_KEY + ':ts', String(Date.now())) } catch { /* ignore */ }
             _generateDescriptionsInBackground(data)
           }
         })
@@ -1566,24 +1567,46 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // GET /api/machine/profiles → /api/v1/profile/list (add in_history/has_description, populate cache)
+    // GET /api/machine/profiles → /api/v1/profile/list (stale-while-revalidate)
     if (url.match(/\/api\/machine\/profiles$/)) {
+      const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
+      const cacheTs = Number(localStorage.getItem(PROFILE_LIST_CACHE_KEY + ':ts') || '0')
+      const CACHE_TTL_MS = 2 * 60 * 1000 // 2 minutes
+      const isFresh = cached && (Date.now() - cacheTs < CACHE_TTL_MS)
+
+      // Background revalidation — updates cache for next request
+      const revalidate = () => {
+        _fetch('/api/v1/profile/list')
+          .then(r => r.ok ? r.json() : null)
+          .then((data: CachedProfile[] | null) => {
+            if (data) {
+              _processProfileList(data)
+              try { localStorage.setItem(PROFILE_LIST_CACHE_KEY + ':ts', String(Date.now())) } catch { /* ignore */ }
+            }
+          })
+          .catch(() => { /* non-critical */ })
+      }
+
+      // If cache is fresh, serve immediately and skip network
+      if (isFresh && cached) {
+        try { return Promise.resolve(jsonResponse(JSON.parse(cached))) } catch { /* fall through */ }
+      }
+
+      // If cache exists but stale, serve stale + revalidate in background
+      if (cached) {
+        revalidate()
+        try { return Promise.resolve(jsonResponse(JSON.parse(cached))) } catch { /* fall through */ }
+      }
+
+      // No cache — must fetch from network
       return _fetch('/api/v1/profile/list').then(r => {
-        if (!r.ok) {
-          const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
-          if (cached) {
-            try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
-          }
-          return jsonResponse({ profiles: [] })
-        }
-        return r.json().then((data: CachedProfile[]) => jsonResponse(_processProfileList(data)))
-      }).catch(() => {
-        const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
-        if (cached) {
-          try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
-        }
-        return jsonResponse({ profiles: [] })
-      })
+        if (!r.ok) return jsonResponse({ profiles: [] })
+        return r.json().then((data: CachedProfile[]) => {
+          const result = _processProfileList(data)
+          try { localStorage.setItem(PROFILE_LIST_CACHE_KEY + ':ts', String(Date.now())) } catch { /* ignore */ }
+          return jsonResponse(result)
+        })
+      }).catch(() => jsonResponse({ profiles: [] }))
     }
 
     // /api/machine/profile/:id/json → /api/v1/profile/get/:id (wrap in {profile})

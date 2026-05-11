@@ -34,6 +34,7 @@ export default defineConfig({
   // Proxy builds: /
   base: machineMode === 'direct' ? '/meticai/' : '/',
   build: {
+    target: ['es2020', 'safari14', 'chrome87', 'firefox78'],
     sourcemap: false,
     cssMinify: 'esbuild',
     rolldownOptions: {
