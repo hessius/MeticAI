@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { STAGE_COLORS } from '@/components/charts/chartConstants'
+import { STAGE_COLORS, RETRACTION_COLOR_INDEX } from '@/components/charts/chartConstants'
 import type { ShotData, ChartDataPoint, StageRange, ProfileTargetPoint } from './types'
 
 /**
@@ -32,13 +32,15 @@ export function getChartData(data: ShotData): ChartDataPoint[] {
   const weightArray = (telemetry as Record<string, unknown>).weight as number[] || []
   
   if (Array.isArray(timeArray) && timeArray.length > 0) {
+    const statusArray = (telemetry as Record<string, unknown>).status as string[] || []
     const chartData: ChartDataPoint[] = []
     for (let i = 0; i < timeArray.length; i++) {
       chartData.push({
         time: timeArray[i],
         pressure: pressureArray[i],
         flow: flowArray[i],
-        weight: weightArray[i]
+        weight: weightArray[i],
+        stage: statusArray[i] || undefined,
       })
     }
     return chartData
@@ -81,8 +83,12 @@ export function getStageRanges(chartData: ChartDataPoint[]): StageRange[] {
       stageStart = point.time
       
       if (!stageColorMap.has(currentStage)) {
-        stageColorMap.set(currentStage, colorIndex % STAGE_COLORS.length)
-        colorIndex++
+        if (currentStage === 'Retraction') {
+          stageColorMap.set(currentStage, RETRACTION_COLOR_INDEX)
+        } else {
+          stageColorMap.set(currentStage, colorIndex % (STAGE_COLORS.length - 1))
+          colorIndex++
+        }
       }
     }
     

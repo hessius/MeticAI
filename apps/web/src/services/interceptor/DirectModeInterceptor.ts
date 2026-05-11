@@ -2154,12 +2154,14 @@ export function installDirectModeInterceptor(): void {
           const flowArr: number[] = []
           const weightArr: number[] = []
           const temperatureArr: number[] = []
+          const statusArr: string[] = []
           for (const pt of pts) {
             timeArr.push((pt.profile_time ?? pt.time ?? 0) / 1000)
             pressureArr.push(pt.shot?.pressure ?? 0)
             flowArr.push(pt.shot?.flow ?? 0)
             weightArr.push(pt.shot?.weight ?? 0)
             temperatureArr.push(pt.sensors?.external_1 ?? 0)
+            statusArr.push(String((pt as Record<string, unknown>).status ?? ''))
           }
           const lastPt = pts[pts.length - 1]
           const shotData = {
@@ -2176,7 +2178,7 @@ export function installDirectModeInterceptor(): void {
               start_time: new Date(entry.time * 1000).toISOString(),
               elapsed_time: lastPt ? (lastPt.profile_time ?? lastPt.time ?? 0) / 1000 : 0,
               final_weight: lastPt?.shot?.weight ?? entry.profile?.final_weight ?? null,
-              data: { time: timeArr, pressure: pressureArr, flow: flowArr, weight: weightArr, temperature: temperatureArr },
+              data: { time: timeArr, pressure: pressureArr, flow: flowArr, weight: weightArr, temperature: temperatureArr, status: statusArr },
             }
           }
           return jsonResponse(shotData)
