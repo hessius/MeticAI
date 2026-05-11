@@ -1162,7 +1162,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
                   <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
                   <option value="gemini-2.5-flash-lite">{t('settings.geminiModel25FlashLite')}</option>
-                  <option value="gemini-3.1-flash-preview">{t('settings.geminiModel31Flash')}</option>
                   <option value="gemini-3.1-pro-preview">{t('settings.geminiModel31Pro')}</option>
                   <option value="gemini-3.1-flash-lite">{t('settings.geminiModel31FlashLite')}</option>
                 </select>
