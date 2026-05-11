@@ -30,6 +30,7 @@ export function getChartData(data: ShotData): ChartDataPoint[] {
   const pressureArray = (telemetry as Record<string, unknown>).pressure as number[] || []
   const flowArray = (telemetry as Record<string, unknown>).flow as number[] || []
   const weightArray = (telemetry as Record<string, unknown>).weight as number[] || []
+  const gravFlowArray = (telemetry as Record<string, unknown>).gravimetric_flow as number[] || []
   
   if (Array.isArray(timeArray) && timeArray.length > 0) {
     const statusArray = (telemetry as Record<string, unknown>).status as string[] || []
@@ -40,6 +41,7 @@ export function getChartData(data: ShotData): ChartDataPoint[] {
         pressure: pressureArray[i],
         flow: flowArray[i],
         weight: weightArray[i],
+        gravimetricFlow: gravFlowArray[i] || undefined,
         stage: statusArray[i] || undefined,
       })
     }
