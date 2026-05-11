@@ -1179,6 +1179,7 @@ function App() {
 
   const appContent = (
     <>
+      <Toaster richColors />
       <SkipNavigation />
       {showBlobs && <AmbientBackground />}
 
@@ -1206,7 +1207,6 @@ function App() {
       />
 
       <div className={`flex-1 text-foreground flex justify-center px-5 md:px-8 overflow-x-hidden overflow-y-auto relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] xl:items-center xl:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
-      <Toaster richColors />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         {isHome && (
         <header>

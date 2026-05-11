@@ -339,6 +339,7 @@
 /* Sonner toast safe area handling for iOS */
 [data-sonner-toaster][data-y-position="bottom"] {
   bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+  z-index: 9999 !important;
 }
 
 /* Accessibility Utilities */
