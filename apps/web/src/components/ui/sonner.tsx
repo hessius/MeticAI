@@ -1,19 +1,11 @@
-import { useTheme } from "next-themes"
 import { CSSProperties } from "react"
 import { Toaster as Sonner, ToasterProps } from "sonner"
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
+const Toaster = ({ position: _ignored, ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
       className="toaster group"
       position="bottom-center"
-      // Enable swipe to dismiss in all directions for better mobile UX
-      swipeDirections={['down', 'up', 'left', 'right'] as ToasterProps['swipeDirections']}
-      // Position above the bottom safe area on iOS
-      offset="env(safe-area-inset-bottom, 0px)"
       style={
         {
           "--normal-bg": "var(--popover)",
@@ -22,6 +14,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as CSSProperties
       }
       {...props}
+      // Force bottom-center — placed after spread so it always wins
+      // eslint-disable-next-line react/jsx-no-duplicate-props
+      position="bottom-center"
     />
   )
 }
