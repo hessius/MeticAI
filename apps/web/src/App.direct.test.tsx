@@ -122,10 +122,6 @@ vi.mock('@/components/BetaBanner', () => ({
   BetaBanner: () => null,
 }))
 
-vi.mock('@/components/ShotDetectionBanner', () => ({
-  ShotDetectionBanner: () => null,
-}))
-
 vi.mock('@/components/MeticAILogo', () => ({
   MeticAILogo: () => null,
 }))

@@ -1,7 +1,7 @@
 import { CSSProperties } from "react"
 import { Toaster as Sonner, ToasterProps } from "sonner"
 
-const Toaster = ({ position: _ignored, ...props }: ToasterProps) => {
+const Toaster = (props: ToasterProps) => {
   return (
     <Sonner
       className="toaster group"
@@ -14,9 +14,6 @@ const Toaster = ({ position: _ignored, ...props }: ToasterProps) => {
         } as CSSProperties
       }
       {...props}
-      // Force bottom-center — placed after spread so it always wins
-      // eslint-disable-next-line react/jsx-no-duplicate-props
-      position="bottom-center"
     />
   )
 }
