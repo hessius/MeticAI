@@ -218,11 +218,86 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to restore dial-in sessions at startup: %s", e)
 
+    # Pre-warm shot profile index in background (avoids cold-start on first request)
+    async def _prewarm_shot_index():
+        """Build shot→profile index in the background on startup."""
+        try:
+            await asyncio.sleep(5)  # Wait for machine connection
+            from services.cache_service import get_indexed_dates, update_shot_index
+            from services.meticulous_service import (
+                async_get_history_dates,
+                async_get_shot_files,
+                fetch_shot_data,
+            )
+
+            dates_result = await async_get_history_dates()
+            if not dates_result or (hasattr(dates_result, "error") and dates_result.error):
+                return
+
+            dates = [d.name for d in dates_result]
+            indexed = get_indexed_dates()
+            new_dates = [d for d in dates if d not in indexed]
+            if not new_dates:
+                logger.info("Shot profile index already complete (%d dates)", len(dates))
+                return
+
+            logger.info("Pre-warming shot index for %d new dates...", len(new_dates))
+            sem = asyncio.Semaphore(15)
+
+            async def _list(date):
+                async with sem:
+                    try:
+                        r = await async_get_shot_files(date)
+                        return date, [f.name for f in r] if r and not (hasattr(r, "error") and r.error) else []
+                    except Exception:
+                        return date, []
+
+            file_results = await asyncio.gather(*[_list(d) for d in new_dates])
+            shots_to_scan = []
+            for date, files in file_results:
+                for fn in files:
+                    shots_to_scan.append((date, fn))
+
+            new_entries = {}
+
+            async def _index(date, filename):
+                async with sem:
+                    try:
+                        data = await fetch_shot_data(date, filename)
+                        name = data.get("profile_name", "")
+                        if not name and isinstance(data.get("profile"), dict):
+                            name = data["profile"].get("name", "")
+                        pid = data["profile"].get("id", "") if isinstance(data.get("profile"), dict) else ""
+                        entries = data.get("data", [])
+                        w, t = None, None
+                        if entries:
+                            last = entries[-1]
+                            if isinstance(last.get("shot"), dict):
+                                w = last["shot"].get("weight")
+                            t = last.get("time")
+                        new_entries[f"{date}/{filename}"] = {
+                            "name": name, "profile_id": pid,
+                            "weight": w, "time_ms": t,
+                            "timestamp": data.get("time"),
+                        }
+                    except Exception:
+                        pass
+
+            await asyncio.gather(*[_index(d, fn) for d, fn in shots_to_scan])
+            if new_entries:
+                update_shot_index(new_entries, new_dates)
+                logger.info("Shot index pre-warmed: %d shots across %d dates", len(new_entries), len(new_dates))
+        except Exception as e:
+            logger.warning("Shot index pre-warm failed (non-critical): %s", e)
+
+    shot_index_task = asyncio.create_task(_prewarm_shot_index())
+
     yield
 
     # Cleanup on shutdown
     update_task.cancel()
     recurring_task.cancel()
+    shot_index_task.cancel()
     try:
         await update_task
     except asyncio.CancelledError:
