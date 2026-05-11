@@ -344,6 +344,21 @@ function App() {
     }
   }, [machineState.state, notifyPreheatComplete, playMachineReady])
 
+  // WKWebView layout fix: force reflow when app resumes from background.
+  // iPadOS WKWebView can fail to recompute CSS grid after backgrounding.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // Nudge layout by toggling a harmless property — avoids visible flash
+        const root = document.documentElement
+        root.style.zoom = '0.9999'
+        requestAnimationFrame(() => { root.style.zoom = '' })
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
 

@@ -113,6 +113,38 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const directImageMode = isDirectMode() || isNativePlatformFn()
   const resolvedMachineUrl = useResolvedMachineUrl(directImageMode)
 
+  // Overflow detection for status row — progressively hide target temp, then connection label
+  const statusRowRef = useRef<HTMLDivElement>(null)
+  const [hideTarget, setHideTarget] = useState(false)
+  const [hideConnLabel, setHideConnLabel] = useState(false)
+
+  useEffect(() => {
+    const el = statusRowRef.current
+    if (!el) return
+    const check = () => {
+      // Reset to full content, measure, then hide as needed
+      setHideTarget(false)
+      setHideConnLabel(false)
+      requestAnimationFrame(() => {
+        if (!statusRowRef.current) return
+        const overflows = statusRowRef.current.scrollWidth > statusRowRef.current.clientWidth
+        if (overflows) {
+          setHideTarget(true)
+          requestAnimationFrame(() => {
+            if (!statusRowRef.current) return
+            if (statusRowRef.current.scrollWidth > statusRowRef.current.clientWidth) {
+              setHideConnLabel(true)
+            }
+          })
+        }
+      })
+    }
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    check()
+    return () => ro.disconnect()
+  }, [machineState.boiler_temperature, machineState.target_temperature, machineState.state, machineState.connected])
+
   // Shared state derivation + command executor
   const {
     isIdle, isBrewing, isPreheating, isHeating, isReady, isPourWater,
@@ -296,8 +328,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       {!isBrewing && (
         <>
           {/* Temperature + connection status — single row */}
-          <div className="flex items-end justify-between">
-            <div className="flex items-baseline gap-1.5">
+          <div ref={statusRowRef} className="flex items-end justify-between overflow-hidden">
+            <div className="flex items-baseline gap-1.5 shrink-0">
               <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
               <span className="text-2xl font-bold tabular-nums text-foreground">
                 {machineState.boiler_temperature != null
@@ -305,20 +337,22 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                   : '—'}
               </span>
               <span className="text-sm text-muted-foreground">°C</span>
-              {machineState.target_temperature != null && !isIdle && (
+              {!hideTarget && machineState.target_temperature != null && !isIdle && (
                 <span className="text-xs text-muted-foreground ml-1">
                   / {machineState.target_temperature.toFixed(0)}°C
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink min-w-0">
               {(() => {
                 const { dot, key } = connectionDot(machineState)
                 return (
                   <>
-                    <span className="text-[10px] text-muted-foreground">
-                      {t(`controlCenter.connection.${key}`)}
-                    </span>
+                    {!hideConnLabel && (
+                      <span className="text-[10px] text-muted-foreground truncate">
+                        {t(`controlCenter.connection.${key}`)}
+                      </span>
+                    )}
                     {machineState.state && machineState._wsConnected && (
                       stateBadge(machineState.state, false, t)
                     )}
