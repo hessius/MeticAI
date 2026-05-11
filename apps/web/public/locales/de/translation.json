@@ -144,6 +144,7 @@
     "placeholderText": "z.B. Ausgewogene Extraktion, nussige Noten...",
     "generateProfile": "Profil generieren",
     "profileGenerated": "Profil generiert!",
+    "profileCreatedSuccessfully": "Profil erfolgreich erstellt.",
     "backToForm": "Zurück zum Formular",
     "validationError": "Bitte gib mindestens ein Kaffeetüten-Foto oder Geschmackspräferenzen an",
     "youHaveProfiles": "Du hast {{count}} gespeichertes Profil",
@@ -274,7 +275,7 @@
     "specificDays": "Bestimmte Tage",
     "preheatOnlyHelper": "Nur Vorheizen - kein Profil wird ausgeführt",
     "preheatStartsNow": "Vorheizen beginnt jetzt, Profil läuft in 10 Min",
-    "preheatStartsBefore": "Vorheizen beginnt 10 Min vor geplanter Zeit",
+    "preheatStartsBefore": "Vorheizen beginnt {{minutes}} Min vor geplanter Zeit",
     "toasts": {
       "preheatingStarted": "Vorheizen gestartet! Bereit in 10 Minuten",
       "profileWillRun": "Profil \"{{name}}\" wird in 10 Minuten ausgeführt",
@@ -368,7 +369,9 @@
     "lastUpdated": "Zuletzt aktualisiert: {{time}}",
     "fetchFailed": "Fehler beim Laden der Shots",
     "fetchDatesFailed": "Fehler beim Laden der Daten",
-    "backgroundRefreshFailed": "Hintergrundaktualisierung fehlgeschlagen"
+    "backgroundRefreshFailed": "Hintergrundaktualisierung fehlgeschlagen",
+    "exitedBecause": "Beendet: {{trigger}} erreicht ({{actual}})",
+    "exitedByLimit": "Beendet: {{limit}}-Grenzwert erreicht ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Bezugsanalyse",
@@ -561,7 +564,11 @@
     "feedbackFailed": "Fehler beim Senden des Feedbacks",
     "geminiModel25Flash": "Gemini 2.5 Flash (Empfohlen)",
     "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel25FlashLite": "Gemini 2.5 Flash Lite",
     "geminiModel20Flash": "Gemini 2.0 Flash",
+    "geminiModel31Flash": "Gemini 3.1 Flash",
+    "geminiModel31Pro": "Gemini 3.1 Pro",
+    "geminiModel31FlashLite": "Gemini 3.1 Flash Lite",
     "aiSettings": "KI-Einstellungen",
     "versionAndChangelog": "Version & Änderungsprotokoll",
     "mqttBridge": "MQTT-Bridge",
@@ -752,7 +759,9 @@
       "pressureLabel": "Druck",
       "flowLabel": "Fluss",
       "power": "Leistung",
-      "temp": "Temp"
+      "temp": "Temp",
+      "brewTemp": "Brühkopf",
+      "boilerTemp": "Brühkammer"
     },
     "actions": {
       "start": "Starten",
@@ -886,7 +895,10 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
-    "targets": "Zielwerte"
+    "targets": "Zielwerte",
+    "shotLabel": "Bezug",
+    "targetsLabel": "Zielwerte",
+    "stagesLabel": "Phasen"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -1516,7 +1528,10 @@
     "disclaimer": "Diese Analyse wurde von KI basierend auf Shot-Daten erstellt. Die Ergebnisse sollten als Orientierung dienen, nicht als absolute Wahrheit. Vertrauen Sie immer Ihren eigenen Geschmacksvorlieben."
   },
   "error": {
-    "somethingWentWrong": "Etwas ist schiefgelaufen"
+    "somethingWentWrong": "Etwas ist schiefgelaufen",
+    "aiModelUnavailable": "Das KI-Modell ist vorübergehend nicht verfügbar — dies ist ein Google-seitiger Ausfall. Versuchen Sie, in den Einstellungen zu einem anderen Modell zu wechseln, was auch den Token-Verbrauch erhöhen kann.",
+    "aiQuotaExceeded": "API-Kontingent überschritten. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    "analysisFailed": "Analyse fehlgeschlagen"
   },
   "findSimilar": {
     "fetchFailed": "Ähnliche Profile konnten nicht geladen werden"

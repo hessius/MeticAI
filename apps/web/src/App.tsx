@@ -48,7 +48,6 @@ import { useSmartGreeting } from '@/hooks/useSmartGreeting'
 import { useProfileImageSrc, getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { ControlCenter } from '@/components/ControlCenter'
 import { LastShotBanner } from '@/components/LastShotBanner'
-import { ShotDetectionBanner } from '@/components/ShotDetectionBanner'
 import { BetaBanner } from '@/components/BetaBanner'
 import { DemoModeBanner } from '@/components/DemoModeBanner'
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary'
@@ -131,7 +130,6 @@ function App() {
   const machineState = useMachineTelemetry(mqttEnabled)
   const lastShotHook = useLastShot(mqttEnabled)
   const smartGreeting = useSmartGreeting(mqttEnabled && viewState === 'start')
-  const [shotBannerDismissed, setShotBannerDismissed] = useState(false)
   const prevBrewingRef = useRef(false)
   const prevMachineStateRef = useRef<string | null>(null)
 
@@ -304,16 +302,31 @@ function App() {
     }
   }, [aiEnabled, t]) // aiEnabled changes on AI_PREFS_CHANGED_EVENT, retriggering this
 
-  // Reset shot banner dismissed state when brewing ends; sound on brewing start
+  // Shot detection toast + sound on brewing start/stop
   useEffect(() => {
     if (prevBrewingRef.current && !machineState.brewing) {
-      setShotBannerDismissed(false)
+      toast.dismiss('shot-running')
     }
     if (!prevBrewingRef.current && machineState.brewing) {
       playBrewingStarted()
+      if (viewState !== 'live-shot' && viewState !== 'pour-over') {
+        toast.info(t('controlCenter.shotDetected.title'), {
+          id: 'shot-running',
+          duration: Infinity,
+          action: {
+            label: t('controlCenter.shotDetected.watch'),
+            onClick: () => setViewState('live-shot'),
+          },
+        })
+      }
     }
     prevBrewingRef.current = machineState.brewing
-  }, [machineState.brewing, playBrewingStarted])
+  }, [machineState.brewing, playBrewingStarted, viewState, t])
+
+  // Dismiss shot toast when navigating to live-shot view
+  useEffect(() => {
+    if (viewState === 'live-shot') toast.dismiss('shot-running')
+  }, [viewState])
 
   // Notify + sound when preheat completes (state transitions from preheating/heating → ready)
   useEffect(() => {
@@ -330,6 +343,21 @@ function App() {
       playMachineReady()
     }
   }, [machineState.state, notifyPreheatComplete, playMachineReady])
+
+  // WKWebView layout fix: force reflow when app resumes from background.
+  // iPadOS WKWebView can fail to recompute CSS grid after backgrounding.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // Nudge layout by toggling a harmless property — avoids visible flash
+        const root = document.documentElement
+        root.style.zoom = '0.9999'
+        requestAnimationFrame(() => { root.style.zoom = '' })
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   // Theme preference (light/dark/system)
   const { mounted: themeMounted, isDark, isFollowSystem, toggleTheme, setFollowSystem } = useThemePreference()
@@ -756,6 +784,18 @@ function App() {
     }
   }, [])
 
+  // Fix iPad layout squishing when returning from background (#422)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Force layout recalculation by triggering a resize event
+        window.dispatchEvent(new Event('resize'))
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
   const handleBackToStart = useCallback(() => {
     refreshProfileCount()
     setViewState('start')
@@ -1085,12 +1125,6 @@ function App() {
   // Phase 3 layout helpers
   const showControlCenter = mqttEnabled
   const showRightColumn = showControlCenter && ['start', 'live-shot'].includes(viewState)
-  const showShotBanner =
-    mqttEnabled &&
-    machineState.brewing &&
-    viewState !== 'live-shot' &&
-    viewState !== 'pour-over' &&
-    !shotBannerDismissed
 
   const prefersReducedMotion = useReducedMotion()
 
@@ -1167,6 +1201,7 @@ function App() {
 
   const appContent = (
     <>
+      <Toaster richColors />
       <SkipNavigation />
       {showBlobs && <AmbientBackground />}
 
@@ -1186,15 +1221,7 @@ function App() {
       {/* Demo mode indicator */}
       <DemoModeBanner />
 
-      {/* Shot detection banner — fixed at top, across all views */}
-      <ShotDetectionBanner
-        visible={showShotBanner}
-        onWatch={() => setViewState('live-shot')}
-        onDismiss={() => setShotBannerDismissed(true)}
-      />
-
       <div className={`flex-1 text-foreground flex justify-center px-5 md:px-8 overflow-x-hidden overflow-y-auto relative ${isHome ? 'items-start pt-[calc(var(--safe-pt)+1.25rem)] pb-[var(--safe-pb)] xl:items-center xl:pb-[var(--safe-pb)]' : 'items-start pt-[calc(var(--safe-pt)+0.75rem)] pb-[var(--safe-pb)]'}`} style={{ zIndex: 1 }}>
-      <Toaster richColors position="top-center" />
       <div className="w-full max-w-md md:max-w-3xl lg:max-w-5xl relative">
         {isHome && (
         <header>

@@ -1136,7 +1136,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
         </div>
 
         {/* ── Mode tabs at the top ── */}
-        <div className="sticky top-0 -mx-6 px-6 py-3 bg-card border-b border-border/40 z-10">
+        <div className="-mx-6 px-6 py-3 bg-card border-b border-border/40">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest text-center mb-2">{t('pourOver.mode')}</p>
           <Tabs value={mode} onValueChange={(value) => applyModePrefs(value as 'free' | 'ratio' | 'recipe')}>
             <TabsList className="w-full grid grid-cols-3">

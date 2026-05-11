@@ -28,6 +28,7 @@ import {
 } from './prompts'
 import { buildFullProfilePrompt, validateAndRetryProfile } from './profilePromptFull'
 import { retryWithBackoff } from './retryUtils'
+import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
 
@@ -157,15 +158,21 @@ export function createBrowserAIService(): AIService {
         return fixResponse.text ?? ''
       }
 
-      const { profileJson, reply: validatedReply } = await validateAndRetryProfile(text, generateFix)
+      const { reply: validatedReply } = await validateAndRetryProfile(text, generateFix)
       text = validatedReply
 
       onProgress?.({ phase: 'complete', message: 'generation.progress.profileGenerated' })
 
+      // Strip raw JSON blocks from analysis text shown to user (#419)
+      const cleanAnalysis = text
+        .replace(/```json\s*[\s\S]*?```/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+
       return {
         status: 'success',
-        analysis: text,
-        reply: profileJson ? JSON.stringify(profileJson) : text,
+        analysis: cleanAnalysis || i18n.t('profileCreatedSuccessfully'),
+        reply: text, // Keep full reply with fenced JSON for downstream extraction
       }
     },
 

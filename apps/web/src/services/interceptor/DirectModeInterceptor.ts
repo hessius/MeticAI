@@ -2153,13 +2153,21 @@ export function installDirectModeInterceptor(): void {
           const pressureArr: number[] = []
           const flowArr: number[] = []
           const weightArr: number[] = []
+          const gravFlowArr: number[] = []
           const temperatureArr: number[] = []
+          const statusArr: string[] = []
           for (const pt of pts) {
-            timeArr.push((pt.profile_time ?? pt.time ?? 0) / 1000)
+            const status = String((pt as Record<string, unknown>).status ?? '')
+            // During retraction, profile_time freezes — use wall-clock time instead
+            const isRetracting = status.toLowerCase() === 'retracting'
+            const timeMs = isRetracting ? (pt.time ?? pt.profile_time ?? 0) : (pt.profile_time ?? pt.time ?? 0)
+            timeArr.push(timeMs / 1000)
             pressureArr.push(pt.shot?.pressure ?? 0)
             flowArr.push(pt.shot?.flow ?? 0)
             weightArr.push(pt.shot?.weight ?? 0)
+            gravFlowArr.push((pt.shot as Record<string, unknown>)?.gravimetric_flow as number ?? 0)
             temperatureArr.push(pt.sensors?.external_1 ?? 0)
+            statusArr.push(status)
           }
           const lastPt = pts[pts.length - 1]
           const shotData = {
@@ -2174,9 +2182,9 @@ export function installDirectModeInterceptor(): void {
                 stages: entry.profile?.stages?.map(s => ({ name: s.name, type: s.type, key: s.key })),
               },
               start_time: new Date(entry.time * 1000).toISOString(),
-              elapsed_time: lastPt ? (lastPt.profile_time ?? lastPt.time ?? 0) / 1000 : 0,
+              elapsed_time: lastPt ? (lastPt.time ?? lastPt.profile_time ?? 0) / 1000 : 0,
               final_weight: lastPt?.shot?.weight ?? entry.profile?.final_weight ?? null,
-              data: { time: timeArr, pressure: pressureArr, flow: flowArr, weight: weightArr, temperature: temperatureArr },
+              data: { time: timeArr, pressure: pressureArr, flow: flowArr, weight: weightArr, gravimetric_flow: gravFlowArr, temperature: temperatureArr, status: statusArr },
             }
           }
           return jsonResponse(shotData)
@@ -2917,16 +2925,31 @@ Rules for recommendations:
           const body = init?.body as FormData
           const image = body.get('file') as File | null
           const userPrefs = (body.get('user_prefs') as string) || ''
+          const advancedCustomization = (body.get('advanced_customization') as string) || ''
+          const detailedKnowledge = (body.get('detailed_knowledge') as string) || ''
+
+          // Emit progress events so useGenerationProgress can display the segmented loading bar
+          const startTime = Date.now()
+          const emitProgress = (event: { phase: string; message: string }) => {
+            window.dispatchEvent(new CustomEvent('meticai:generation-progress', {
+              detail: {
+                ...event,
+                attempt: 1,
+                max_attempts: 3,
+                elapsed: (Date.now() - startTime) / 1000,
+              },
+            }))
+          }
 
           const result = await aiService.generateProfile({
             image,
-            preferences: userPrefs,
+            preferences: [userPrefs, advancedCustomization, detailedKnowledge].filter(Boolean).join('\n\n'),
             tags: [],
-          })
+          }, emitProgress)
 
           // Save profile to machine (convert Gemini JSON to OEPF format)
           if (result.status === 'success') {
-            const jsonMatch = result.analysis.match(/```json\s*([\s\S]*?)```/)
+            const jsonMatch = result.reply.match(/```json\s*([\s\S]*?)```/)
             if (jsonMatch) {
               try {
                 const raw = JSON.parse(jsonMatch[1])
@@ -3095,7 +3118,7 @@ Rules for recommendations:
             status: result.status,
             // Only include analysis (shown as "Coffee Analysis" card) when an image was provided
             analysis: image ? result.analysis : '',
-            reply: result.analysis,
+            reply: result.reply,
           })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error'

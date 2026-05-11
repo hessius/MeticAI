@@ -2,6 +2,7 @@
  * Shared retry / error-classification utilities for Gemini AI calls.
  * Used by both BrowserAIService and DirectModeInterceptor.
  */
+import i18n from 'i18next'
 
 /** Check if an error is transient and retryable */
 export function isRetryableError(err: unknown): boolean {
@@ -41,8 +42,8 @@ export async function retryWithBackoff<T>(
 export function formatGeminiError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
   if (raw.includes('503') || raw.includes('UNAVAILABLE') || raw.includes('overloaded'))
-    return 'The AI model is temporarily unavailable. Please try again in a moment.'
+    return i18n.t('error.aiModelUnavailable')
   if (raw.includes('429') || raw.includes('RESOURCE_EXHAUSTED') || raw.includes('quota'))
-    return 'API quota exceeded. Please wait a moment and try again.'
-  return raw || 'Analysis failed'
+    return i18n.t('error.aiQuotaExceeded')
+  return raw || i18n.t('error.analysisFailed')
 }

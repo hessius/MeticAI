@@ -504,7 +504,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     />
                   </div>
                   {/* Row 2: Weight, Temperature */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <MetricTile
                       icon={<Scales size={14} />}
                       value={ms.shot_weight?.toFixed(1) ?? '0.0'}
@@ -516,7 +516,13 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       icon={<Thermometer size={14} />}
                       value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
                       unit="°C"
-                      label={t('controlCenter.metrics.temp', 'Temp')}
+                      label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
+                    />
+                    <MetricTile
+                      icon={<Thermometer size={14} />}
+                      value={ms.boiler_temperature?.toFixed(1) ?? '—'}
+                      unit="°C"
+                      label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
                     />
                   </div>
                 </div>
@@ -574,20 +580,20 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
           {(ms.brewing || chartData.length > 0) && (
             <div className="space-y-2">
               {/* Full-width profile & stage card — hidden on desktop where the right column shows this */}
-              <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3 lg:hidden">
+              <div className="bg-muted/50 rounded-lg px-3 py-2.5 flex items-center gap-3 lg:hidden">
                 {profileImgUrl && (
                   <img
                     src={profileImgUrl}
                     alt={ms.active_profile ?? ''}
-                    className="w-8 h-8 rounded-md object-cover shrink-0"
+                    className="w-10 h-10 rounded-lg object-cover shrink-0"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 )}
                 <div className="flex-1 min-w-0">
                   {ms.active_profile && (
-                    <div className="text-xs font-semibold text-foreground truncate">{ms.active_profile}</div>
+                    <div className="text-sm font-semibold text-foreground truncate">{ms.active_profile}</div>
                   )}
-                  <div className="text-[10px] text-muted-foreground truncate">
+                  <div className="text-xs text-muted-foreground truncate">
                     {currentStageName || '—'}
                   </div>
                 </div>
@@ -615,7 +621,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 />
               </div>
               {/* Row 2: Weight, Temperature */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <MetricTile
                   icon={<Scales size={14} />}
                   value={ms.shot_weight?.toFixed(1) ?? '0.0'}
@@ -629,7 +635,13 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   icon={<Thermometer size={14} />}
                   value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
                   unit="°C"
-                  label={t('controlCenter.metrics.temp', 'Temp')}
+                  label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
+                />
+                <MetricTile
+                  icon={<Thermometer size={14} />}
+                  value={ms.boiler_temperature?.toFixed(1) ?? '—'}
+                  unit="°C"
+                  label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
                 />
               </div>
             </div>

@@ -336,9 +336,14 @@
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* Sonner toast safe area handling for iOS dynamic island */
-[data-sonner-toaster][data-y-position="top"] {
-  top: max(1rem, env(safe-area-inset-top)) !important;
+/* Force all toasts to bottom — defensive override for WKWebView/Capacitor */
+[data-sonner-toaster] {
+  top: unset !important;
+  bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+  z-index: 9999 !important;
+}
+[data-sonner-toast] {
+  top: unset !important;
 }
 
 /* Accessibility Utilities */

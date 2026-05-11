@@ -144,6 +144,7 @@
     "placeholderText": "t.ex. Balanserad extraktion, nötiga toner...",
     "generateProfile": "Generera profil",
     "profileGenerated": "Profil genererad!",
+    "profileCreatedSuccessfully": "Profilen skapades framgångsrikt.",
     "backToForm": "Tillbaka till formulär",
     "validationError": "Vänligen ange minst ett kaffepaket-foto eller smakpreferenser",
     "youHaveProfiles": "Du har {{count}} sparad profil",
@@ -278,7 +279,7 @@
     "specificDays": "Specifika dagar",
     "preheatOnlyHelper": "Endast förvärmning - ingen profil kommer att köras",
     "preheatStartsNow": "Förvärmning startar nu, profil körs om 10 min",
-    "preheatStartsBefore": "Förvärmning startar 10 min före schemalagd tid",
+    "preheatStartsBefore": "Förvärmning startar {{minutes}} min före schemalagd tid",
     "toasts": {
       "preheatingStarted": "Förvärmning startad! Klar om 10 minuter",
       "profileWillRun": "Profil \"{{name}}\" kommer att köras om 10 minuter",
@@ -368,7 +369,9 @@
     "lastUpdated": "Senast uppdaterad: {{time}}",
     "fetchFailed": "Kunde inte ladda shots",
     "fetchDatesFailed": "Kunde inte ladda datum",
-    "backgroundRefreshFailed": "Bakgrundsuppdatering misslyckades"
+    "backgroundRefreshFailed": "Bakgrundsuppdatering misslyckades",
+    "exitedBecause": "Avslutad: {{trigger}} nådd ({{actual}})",
+    "exitedByLimit": "Avslutad: {{limit}}-gräns nådd ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Körningsanalys",
@@ -561,7 +564,11 @@
     "feedbackFailed": "Kunde inte skicka feedback",
     "geminiModel25Flash": "Gemini 2.5 Flash (Rekommenderad)",
     "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel25FlashLite": "Gemini 2.5 Flash Lite",
     "geminiModel20Flash": "Gemini 2.0 Flash",
+    "geminiModel31Flash": "Gemini 3.1 Flash",
+    "geminiModel31Pro": "Gemini 3.1 Pro",
+    "geminiModel31FlashLite": "Gemini 3.1 Flash Lite",
     "aiSettings": "AI-inställningar",
     "versionAndChangelog": "Version och ändringslogg",
     "mqttBridge": "MQTT-brygga",
@@ -757,7 +764,9 @@
       "pressureLabel": "Tryck",
       "flowLabel": "Flöde",
       "power": "Effekt",
-      "temp": "Temp"
+      "temp": "Temp",
+      "brewTemp": "Brygghuvud",
+      "boilerTemp": "Bryggkammare"
     },
     "actions": {
       "start": "Starta",
@@ -891,7 +900,10 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
-    "targets": "Målvärden"
+    "targets": "Målvärden",
+    "shotLabel": "Extraktion",
+    "targetsLabel": "Målvärden",
+    "stagesLabel": "Steg"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -1516,7 +1528,10 @@
     "disclaimer": "Denna analys är genererad av AI baserat på shotdata. Resultaten bör användas som vägledning, inte absolut sanning. Lita alltid på dina egna smakpreferenser."
   },
   "error": {
-    "somethingWentWrong": "Något gick fel"
+    "somethingWentWrong": "Något gick fel",
+    "aiModelUnavailable": "AI-modellen är tillfälligt otillgänglig — detta är ett avbrott på Googles sida. Prova att byta till en annan modell i Inställningar, vilket också kan öka tokenanvändningen.",
+    "aiQuotaExceeded": "API-kvoten har överskridits. Vänta en stund och försök igen.",
+    "analysisFailed": "Analys misslyckades"
   },
   "findSimilar": {
     "fetchFailed": "Kunde inte hämta liknande profiler"
@@ -1648,10 +1663,10 @@
     "pourOverCompleteBody": "Din pour-over-timer har avslutats"
   },
   "smartGreeting": {
-    "justBrewed": "Du drog precis ett skott på {{profile}}.\nVarför inte analysera det?",
+    "justBrewed": "Du gjorde precis en espresso på {{profile}}.\nVarför inte analysera den?",
     "analyzeAction": "Analysera",
-    "milestone": "{{count}} skott avklarade, bara {{remaining}} kvar till {{milestone}}!",
-    "longGap": "Nästan {{hours}}h sedan ditt senaste skott.\nDags för kaffe?",
+    "milestone": "{{count}} bryggningar avklarade, bara {{remaining}} kvar till {{milestone}}!",
+    "longGap": "Nästan {{hours}}h sedan din senaste bryggning.\nDags för kaffe?",
     "unusedProfile": "Du har inte provat {{name}} ännu.\nTesta!",
     "browseAction": "Bläddra profiler",
     "anniversary": "Du har använt Metic i {{days}} dagar!",

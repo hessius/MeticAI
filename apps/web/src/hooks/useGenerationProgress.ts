@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getServerUrl } from '@/lib/config'
+import { isDirectMode } from '@/lib/machineMode'
 
 /** Mirror of GenerationPhase from the Python backend. */
 export type GenerationPhase =
@@ -61,6 +62,9 @@ export interface UseGenerationProgressReturn {
   close: () => void
 }
 
+/** Custom event name for direct-mode progress updates (no SSE available). */
+export const DIRECT_MODE_PROGRESS_EVENT = 'meticai:generation-progress'
+
 export function useGenerationProgress(active: boolean): UseGenerationProgressReturn {
   const [progress, setProgress] = useState<ProgressEvent | null>(null)
   const [connected, setConnected] = useState(false)
@@ -81,6 +85,26 @@ export function useGenerationProgress(active: boolean): UseGenerationProgressRet
 
     let cancelled = false
 
+    // In direct mode, listen for CustomEvents dispatched by DirectModeInterceptor
+    const directMode = isDirectMode()
+    if (directMode) {
+      const handler = (e: Event) => {
+        if (cancelled) return
+        const data = (e as CustomEvent<ProgressEvent>).detail
+        if (data.phase === 'keepalive') return
+        setProgress(data)
+        setConnected(true)
+      }
+      window.addEventListener(DIRECT_MODE_PROGRESS_EVENT, handler)
+      return () => {
+        cancelled = true
+        window.removeEventListener(DIRECT_MODE_PROGRESS_EVENT, handler)
+        setProgress(null)
+        setConnected(false)
+      }
+    }
+
+    // Server mode: use SSE
     const connect = async () => {
       try {
         const serverUrl = await getServerUrl()

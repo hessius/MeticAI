@@ -37,7 +37,11 @@ export const STAGE_COLORS = [
   'rgba(168, 85, 247, 0.25)',  // Purple
   'rgba(236, 72, 153, 0.25)',  // Pink
   'rgba(20, 184, 166, 0.25)',  // Teal
+  'rgba(120, 120, 120, 0.15)', // Gray — Retraction (not part of the shot)
 ]
+
+/** Fixed color index for the retraction phase */
+export const RETRACTION_COLOR_INDEX = 8
 
 export const STAGE_BORDER_COLORS = [
   'rgba(239, 68, 68, 0.5)',
@@ -48,6 +52,7 @@ export const STAGE_BORDER_COLORS = [
   'rgba(168, 85, 247, 0.5)',
   'rgba(236, 72, 153, 0.5)',
   'rgba(20, 184, 166, 0.5)',
+  'rgba(120, 120, 120, 0.3)', // Gray — Retraction
 ]
 
 export const STAGE_TEXT_COLORS_LIGHT = [
@@ -59,6 +64,7 @@ export const STAGE_TEXT_COLORS_LIGHT = [
   'rgb(107, 33, 168)',   // Purple-800
   'rgb(157, 23, 77)',    // Pink-800
   'rgb(17, 94, 89)',     // Teal-800
+  'rgb(75, 75, 75)',     // Gray-700 — Retraction
 ]
 
 export const STAGE_TEXT_COLORS_DARK = [
@@ -70,6 +76,7 @@ export const STAGE_TEXT_COLORS_DARK = [
   'rgb(216, 180, 254)',  // Purple-300
   'rgb(249, 168, 212)',  // Pink-300
   'rgb(94, 234, 212)',   // Teal-300
+  'rgb(180, 180, 180)',  // Gray-300 — Retraction
 ]
 
 // ---------------------------------------------------------------------------
@@ -154,19 +161,21 @@ export function extractStageRanges(data: ChartDataPoint[]): StageRange[] {
   let stageColorIndex = 0
 
   for (const point of data) {
-    if (point.stage && point.stage !== currentStage) {
+    const stage = point.stage?.toLowerCase().trim() === 'retracting' ? 'Retraction' : point.stage
+    if (stage && stage !== currentStage) {
       if (stages.length > 0) {
         stages[stages.length - 1].endTime = point.time
       }
+      const colorIdx = stage === 'Retraction' ? RETRACTION_COLOR_INDEX : stageColorIndex % (STAGE_COLORS.length - 1)
       stages.push({
-        name: point.stage,
+        name: stage,
         startTime: point.time,
         endTime: point.time,
-        colorIndex: stageColorIndex % STAGE_COLORS.length,
+        colorIndex: colorIdx,
       })
-      currentStage = point.stage
-      stageColorIndex++
-    } else if (point.stage === currentStage && stages.length > 0) {
+      currentStage = stage
+      if (stage !== 'Retraction') stageColorIndex++
+    } else if (stage === currentStage && stages.length > 0) {
       stages[stages.length - 1].endTime = point.time
     }
   }
