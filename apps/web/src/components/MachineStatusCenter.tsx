@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -65,62 +65,60 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [secondsAgo, setSecondsAgo] = useState<number | null>(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const serverUrl = await getServerUrl()
-      const [watcherResp, sysResp] = await Promise.allSettled([
-        fetch(`${serverUrl}/api/machine/status/health`),
-        fetch(`${serverUrl}/api/machine/system-info`),
-      ])
-
-      if (watcherResp.status === 'fulfilled' && watcherResp.value.ok) {
-        const data = await watcherResp.value.json()
-        setWatcherData(data)
-        setError(!!data.error)
-      } else {
-        setWatcherData(null)
-        setError(true)
+  // Fetch data whenever refreshTrigger changes (initial + manual + interval)
+  useEffect(() => {
+    let cancelled = false
+    const doFetch = async () => {
+      setLoading(true)
+      try {
+        const serverUrl = await getServerUrl()
+        const [watcherResp, sysResp] = await Promise.allSettled([
+          fetch(`${serverUrl}/api/machine/status/health`),
+          fetch(`${serverUrl}/api/machine/system-info`),
+        ])
+        if (cancelled) return
+        if (watcherResp.status === 'fulfilled' && watcherResp.value.ok) {
+          const data = await watcherResp.value.json()
+          setWatcherData(data)
+          setError(!!data.error)
+        } else {
+          setWatcherData(null)
+          setError(true)
+        }
+        if (sysResp.status === 'fulfilled' && sysResp.value.ok) {
+          setSystemInfo(await sysResp.value.json())
+        }
+        setSecondsAgo(0)
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+          setCountdown(REFRESH_INTERVAL)
+        }
       }
-
-      if (sysResp.status === 'fulfilled' && sysResp.value.ok) {
-        setSystemInfo(await sysResp.value.json())
-      }
-
-      setLastUpdated(new Date())
-    } catch {
-      setError(true)
-    } finally {
-      setLoading(false)
-      setCountdown(REFRESH_INTERVAL)
     }
-  }, [])
+    void doFetch()
+    return () => { cancelled = true }
+  }, [refreshTrigger])
 
-  // Initial fetch
+  // Auto-refresh countdown
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  // Countdown timer
-  useEffect(() => {
-    countdownRef.current = setInterval(() => {
+    const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          fetchData()
+          setRefreshTrigger((n) => n + 1)
           return REFRESH_INTERVAL
         }
         return prev - 1
       })
+      setSecondsAgo((prev) => (prev !== null ? prev + 1 : null))
     }, 1000)
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current)
-    }
-  }, [fetchData])
-
-  const secondsAgo = lastUpdated ? Math.round((Date.now() - lastUpdated.getTime()) / 1000) : null
+    return () => clearInterval(timer)
+  }, [])
 
   const system = watcherData?.system ?? null
   const services = watcherData?.services ?? []
@@ -142,7 +140,7 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchData}
+            onClick={() => setRefreshTrigger((n) => n + 1)}
             disabled={loading}
             aria-label={loading ? t('machineStatus.refreshing') : t('machineStatus.retry')}
           >
@@ -152,7 +150,7 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
       </div>
 
       {/* Last updated */}
-      {lastUpdated && secondsAgo != null && (
+      {secondsAgo != null && (
         <p className="text-xs text-muted-foreground text-right -mt-4">
           {t('machineStatus.lastUpdated')}: {secondsAgo < 5 ? t('common.justNow', 'just now') : `${secondsAgo}s ago`}
         </p>
@@ -163,7 +161,7 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
         <Card className="p-6 flex flex-col items-center gap-4 text-center border-destructive/30">
           <WifiSlash size={48} className="text-muted-foreground" />
           <p className="text-sm text-muted-foreground">{t('machineStatus.unavailable')}</p>
-          <Button variant="outline" size="sm" onClick={fetchData}>
+          <Button variant="outline" size="sm" onClick={() => setRefreshTrigger((n) => n + 1)}>
             <ArrowClockwise size={16} className="mr-2" />
             {t('machineStatus.retry')}
           </Button>
