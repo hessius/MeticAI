@@ -1,6 +1,6 @@
 # Agent Skill: Release Workflow
 
-This skill defines the release process for MeticAI versions.
+This skill defines the release process for Metic versions.
 
 ## 1. Pre-Release Checklist
 

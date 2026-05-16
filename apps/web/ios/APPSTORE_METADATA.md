@@ -1,8 +1,8 @@
-# MeticAI — App Store Metadata
+# Metic — App Store Metadata
 
 ## App Information
 
-- **App Name:** MeticAI
+- **App Name:** Metic
 - **Subtitle:** AI-Powered Espresso Controller
 - **Bundle ID:** com.hessius.meticai
 - **Category:** Food & Drink
@@ -10,13 +10,13 @@
 
 ## Description
 
-MeticAI is an AI-powered companion app for the Meticulous Espresso Machine — the world's most advanced home espresso machine.
+Metic is an AI-powered companion app for the Meticulous Espresso Machine — the world's most advanced home espresso machine.
 
-Powered by Google Gemini, MeticAI acts as your personal AI barista. Describe the coffee experience you're craving in plain language, and MeticAI will generate a complete brewing profile tailored to your Meticulous machine. Whether you want a bright, fruity pour-over style shot or a rich, chocolatey Italian espresso, just tell MeticAI what you're in the mood for.
+Powered by Google Gemini, Metic acts as your personal AI barista. Describe the coffee experience you're craving in plain language, and Metic will generate a complete brewing profile tailored to your Meticulous machine. Whether you want a bright, fruity pour-over style shot or a rich, chocolatey Italian espresso, just tell Metic what you're in the mood for.
 
 **Key Features:**
 
-• AI Profile Generation — Describe your ideal cup in natural language and get a ready-to-brew profile in seconds. MeticAI understands coffee terminology, flavor preferences, and brewing science.
+• AI Profile Generation — Describe your ideal cup in natural language and get a ready-to-brew profile in seconds. Metic understands coffee terminology, flavor preferences, and brewing science.
 
 • Direct Machine Control — Send profiles directly to your Meticulous machine over your local network. Start, stop, and monitor shots without leaving the app.
 
@@ -32,7 +32,7 @@ Powered by Google Gemini, MeticAI acts as your personal AI barista. Describe the
 
 • Works Offline — Core features work without an internet connection. AI generation requires connectivity.
 
-MeticAI communicates directly with your Meticulous machine over your local Wi-Fi network. No cloud relay, no account required, no data leaves your network. Your brewing data stays on your device.
+Metic communicates directly with your Meticulous machine over your local Wi-Fi network. No cloud relay, no account required, no data leaves your network. Your brewing data stays on your device.
 
 Requires a Meticulous Espresso Machine connected to the same local network.
 
@@ -59,7 +59,7 @@ _To be added before submission. Required sizes:_
 
 ## Privacy Details
 
-MeticAI does not collect, store, or transmit any user data to external servers. All communication happens directly between the app and the Meticulous machine on the local network. AI profile generation requests are sent to Google Gemini but contain no personally identifiable information — only coffee brewing parameters.
+Metic does not collect, store, or transmit any user data to external servers. All communication happens directly between the app and the Meticulous machine on the local network. AI profile generation requests are sent to Google Gemini but contain no personally identifiable information — only coffee brewing parameters.
 
 - **Data Collection:** None
 - **Data Tracking:** None

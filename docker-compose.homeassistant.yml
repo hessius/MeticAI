@@ -9,7 +9,7 @@
 #
 # Then in Home Assistant → Settings → Devices & Services → Add Integration:
 #   - Integration: MQTT
-#   - Broker: <MeticAI host IP>  (e.g. 192.168.50.22)
+#   - Broker: <Metic host IP>  (e.g. 192.168.50.22)
 #   - Port: 1883
 #   - No username/password required
 #

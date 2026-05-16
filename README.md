@@ -10,7 +10,7 @@
 *1. Take a photo or describe your coffee. Get a perfect espresso profile. Automatically.*
 *2. Understand your profiles, shot graphs by enabling shot comparison, analysis and AI-coaching*
 
-[Get Started](#-quick-start) • [Features](#-what-it-does) • [Web Interface](#-using-meticai) • [API](API.md)
+[Get Started](#-quick-start) • [Features](#-what-it-does) • [Web Interface](#-using-metic) • [API](API.md) • [☕ Buy Me a Coffee](https://buymeacoffee.com/HSUS)
 
 </div>
 
@@ -75,7 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.
 
 **Docker:**
 ```bash
-docker pull ghcr.io/hessius/meticai:v2.0.6
+docker pull ghcr.io/hessius/meticai:latest
 ```
 
 **Upgrading from v1.x:**
@@ -333,4 +333,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 Runs on [pyMeticulous](https://github.com/MeticulousHome/pyMeticulous), [meticulous-mcp](https://github.com/twchad/meticulous-mcp), [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon), and caffeine ☕
 
 Made with ❤️ by <a href="https://github.com/hessius">@hessius</a>
+
+[☕ Buy Me a Coffee](https://buymeacoffee.com/HSUS)
+
 </div>

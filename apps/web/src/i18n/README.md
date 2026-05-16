@@ -1,8 +1,8 @@
-# MeticAI Translation Files
+# Metic Translation Files
 
 ## 📋 Overview
 
-Comprehensive translation files for the MeticAI-web application, covering all UI-facing strings across 6 languages.
+Comprehensive translation files for the Metic web application, covering all UI-facing strings across 6 languages.
 
 ## 🌍 Languages Supported
 
