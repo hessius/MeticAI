@@ -31,7 +31,8 @@ import {
   Code,
   Info,
   Rocket,
-  Heart
+  Heart,
+  HardDrives
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
@@ -58,6 +59,7 @@ interface SettingsViewProps {
   isFollowSystem?: boolean
   onToggleTheme?: () => void
   onSetFollowSystem?: (follow: boolean) => void
+  onNavigateToStatus?: () => void
 }
 
 interface Settings {
@@ -126,7 +128,7 @@ function normalizeMachineUrl(value: string): string | null {
   }
 }
 
-export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem }: SettingsViewProps) {
+export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, onNavigateToStatus }: SettingsViewProps) {
   const { t } = useTranslation()
   const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
   const { authenticate: biometricAuth } = useBiometrics()
@@ -873,6 +875,25 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           )}
         </AnimatePresence>
       </div>
+
+      {/* Machine Status */}
+      {onNavigateToStatus && (
+        <Card className="p-4">
+          <button
+            onClick={onNavigateToStatus}
+            className="w-full flex items-center justify-between text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <HardDrives size={20} className="text-primary" weight="duotone" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{t('machineStatus.title')}</h3>
+                <p className="text-xs text-muted-foreground">{t('machineStatus.serviceHealth')}</p>
+              </div>
+            </div>
+            <CaretDown size={16} className="text-muted-foreground -rotate-90 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </Card>
+      )}
 
       {/* About Section - Collapsible, collapsed by default */}
       <Card className="p-6 space-y-4">

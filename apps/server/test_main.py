@@ -3181,6 +3181,22 @@ class TestShotAnalysisHelpers:
         assert "25" in result[0]["description"]  # Contains 25
         assert "s" in result[0]["description"]  # Has seconds unit
 
+    def test_format_exit_triggers_new_types(self):
+        """Test exit trigger formatting for flow_dose_correlation and pressure_rise."""
+        from services.analysis_service import _format_exit_triggers
+
+        triggers = [
+            {"type": "flow_dose_correlation", "value": 2.0, "comparison": ">="},
+            {"type": "pressure_rise", "value": 2.0, "comparison": ">="},
+        ]
+
+        result = _format_exit_triggers(triggers)
+        assert len(result) == 2
+        assert result[0]["type"] == "flow_dose_correlation"
+        assert "×dose" in result[0]["description"]
+        assert result[1]["type"] == "pressure_rise"
+        assert "bar" in result[1]["description"]
+
     def test_format_limits_basic(self):
         """Test limits formatting."""
         from services.analysis_service import _format_limits
@@ -16204,7 +16220,7 @@ class TestMachineStatusHealth:
 
     @patch("api.routes.machine_status.httpx.AsyncClient")
     def test_returns_watcher_data(self, mock_client_cls, client):
-        mock_response = AsyncMock()
+        mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "services": [{"name": "meticulous", "status": "running"}],
@@ -16213,7 +16229,7 @@ class TestMachineStatusHealth:
         mock_response.raise_for_status = Mock()
 
         mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
+        mock_client.get = AsyncMock(return_value=mock_response)
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client_cls.return_value = mock_client
@@ -16227,7 +16243,7 @@ class TestMachineStatusHealth:
     @patch("api.routes.machine_status.httpx.AsyncClient")
     def test_returns_error_when_unreachable(self, mock_client_cls, client):
         mock_client = AsyncMock()
-        mock_client.get.side_effect = httpx.ConnectError("Connection refused")
+        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client_cls.return_value = mock_client
@@ -16249,8 +16265,8 @@ class TestMachineSystemInfo:
 
     @patch("api.routes.machine_status.httpx.AsyncClient")
     def test_returns_system_info(self, mock_client_cls, client):
-        async def mock_get(url):
-            resp = AsyncMock()
+        def mock_get(url):
+            resp = Mock()
             resp.status_code = 200
             if "firmware" in url:
                 resp.json.return_value = {"version": "1.2.3"}
@@ -16275,10 +16291,10 @@ class TestMachineSystemInfo:
 
     @patch("api.routes.machine_status.httpx.AsyncClient")
     def test_handles_partial_failure(self, mock_client_cls, client):
-        async def mock_get(url):
+        def mock_get(url):
             if "firmware" in url:
                 raise httpx.ConnectError("Connection refused")
-            resp = AsyncMock()
+            resp = Mock()
             resp.status_code = 200
             resp.json.return_value = {"ssid": "HomeWiFi"}
             return resp
@@ -16293,3 +16309,335 @@ class TestMachineSystemInfo:
         assert response.status_code == 200
         data = response.json()
         assert data["firmware"] is None
+
+
+class TestDecentConverter:
+    """Tests for the Decent Espresso profile converter."""
+
+    VALID_DECENT = {
+        "title": "Londinium",
+        "author": "John Doe",
+        "notes": "A classic lever profile",
+        "beverage_type": "espresso",
+        "steps": [
+            {
+                "name": "preinfusion",
+                "temperature": 92.0,
+                "sensor": "coffee",
+                "pump": "flow",
+                "transition": "fast",
+                "flow": 4.0,
+                "seconds": 8.0,
+                "exit": {
+                    "type": "pressure_over",
+                    "condition": 4.0,
+                    "or": {"type": "time_over", "condition": 30.0},
+                },
+            },
+            {
+                "name": "extraction",
+                "temperature": 93.0,
+                "pump": "pressure",
+                "pressure": 9.0,
+                "seconds": 60.0,
+                "exit": {"type": "weight_over", "condition": 36.0},
+            },
+        ],
+    }
+
+    def test_detect_decent_format_valid(self):
+        """Recognises valid Decent profiles."""
+        from services.decent_converter import detect_decent_format
+
+        assert detect_decent_format(self.VALID_DECENT) is True
+
+    def test_detect_decent_format_meticulous(self):
+        """Rejects Meticulous-format profiles."""
+        from services.decent_converter import detect_decent_format
+
+        meticulous = {"name": "Test", "stages": [{"type": "flow"}]}
+        assert detect_decent_format(meticulous) is False
+
+    def test_detect_decent_format_empty(self):
+        """Rejects empty or non-dict data."""
+        from services.decent_converter import detect_decent_format
+
+        assert detect_decent_format({}) is False
+        assert detect_decent_format(None) is False
+        assert detect_decent_format([]) is False
+        assert detect_decent_format("string") is False
+
+    def test_detect_decent_format_no_steps(self):
+        """Rejects profiles without steps."""
+        from services.decent_converter import detect_decent_format
+
+        assert detect_decent_format({"title": "No Steps"}) is False
+        assert detect_decent_format({"steps": []}) is False
+
+    def test_convert_basic(self):
+        """Converts a basic Decent profile to Meticulous format."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        profile = result["profile"]
+        warnings = result["warnings"]
+
+        assert profile["name"] == "Londinium"
+        assert profile["author"] == "John Doe"
+        assert len(profile["stages"]) == 2
+        assert profile["temperature"] == 92.0
+        assert profile["final_weight"] == 36.0
+        assert len(warnings) == 0
+
+        # Check first stage (flow)
+        s0 = profile["stages"][0]
+        assert s0["type"] == "flow"
+        assert s0["name"] == "preinfusion"
+        assert s0["dynamics"]["type"] == "flow"
+        assert s0["dynamics"]["points"] == [[0.0, 4.0]]
+        # Should have pressure_over and time_over triggers from OR chain
+        assert len(s0["exit_triggers"]) == 2
+        assert s0["exit_triggers"][0]["type"] == "pressure"
+        assert s0["exit_triggers"][0]["direction"] == "above"
+        assert s0["exit_triggers"][1]["type"] == "time"
+
+        # Check second stage (pressure)
+        s1 = profile["stages"][1]
+        assert s1["type"] == "pressure"
+        assert s1["dynamics"]["type"] == "pressure"
+        assert s1["dynamics"]["points"] == [[0.0, 9.0]]
+        assert s1["exit_triggers"][0]["type"] == "weight"
+        assert s1["exit_triggers"][0]["value"] == 36.0
+
+    def test_convert_smooth_transition(self):
+        """Smooth transitions create ramped dynamics with two points."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        data = {
+            "title": "Ramp Test",
+            "steps": [
+                {
+                    "name": "ramp",
+                    "pump": "pressure",
+                    "pressure": 9.0,
+                    "transition": "smooth",
+                    "seconds": 10.0,
+                    "sensor": "coffee",
+                }
+            ],
+        }
+        result = convert_decent_to_meticulous(data)
+        stage = result["profile"]["stages"][0]
+        assert len(stage["dynamics"]["points"]) == 2
+        assert stage["dynamics"]["points"][0] == [0.0, 0.0]
+        assert stage["dynamics"]["points"][1] == [10.0, 9.0]
+
+    def test_convert_unknown_pump(self):
+        """Unknown pump types produce a warning and default to pressure."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        data = {
+            "title": "Unknown Pump",
+            "steps": [{"name": "test", "pump": "steam", "sensor": "coffee"}],
+        }
+        result = convert_decent_to_meticulous(data)
+        assert len(result["warnings"]) == 1
+        assert "steam" in result["warnings"][0]
+        assert result["profile"]["stages"][0]["type"] == "pressure"
+
+    def test_convert_empty_steps(self):
+        """Empty steps list produces a warning."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous({"title": "Empty", "steps": []})
+        assert "No stages" in result["warnings"][0]
+
+    def test_convert_unknown_exit_type(self):
+        """Unknown exit types produce a warning."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        data = {
+            "title": "Bad Exit",
+            "steps": [
+                {
+                    "name": "test",
+                    "pump": "flow",
+                    "flow": 3.0,
+                    "sensor": "coffee",
+                    "exit": {"type": "magic_over", "condition": 5.0},
+                }
+            ],
+        }
+        result = convert_decent_to_meticulous(data)
+        assert any("magic_over" in w for w in result["warnings"])
+
+    def test_convert_preserves_notes(self):
+        """Profile notes become display.description."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        assert result["profile"]["display"]["description"] == "A classic lever profile"
+
+    def test_convert_stage_structure(self):
+        """Converted stages have all required Meticulous fields."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        for stage in result["profile"]["stages"]:
+            assert "key" in stage
+            assert "type" in stage
+            assert "name" in stage
+            assert "dynamics" in stage
+            assert "exit_triggers" in stage
+            assert "limits" in stage
+            assert isinstance(stage["limits"], list)
+            assert stage["dynamics"]["interpolation"] == "linear"
+            assert stage["dynamics"]["over"] == "time"
+
+    def test_convert_exit_relative_and_comparison(self):
+        """Exit triggers get correct relative and comparison defaults."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        # time trigger should have relative=True
+        time_triggers = [
+            t
+            for s in result["profile"]["stages"]
+            for t in s["exit_triggers"]
+            if t["type"] == "time"
+        ]
+        assert all(t["relative"] is True for t in time_triggers)
+        # non-time triggers should have relative=False
+        non_time = [
+            t
+            for s in result["profile"]["stages"]
+            for t in s["exit_triggers"]
+            if t["type"] != "time"
+        ]
+        assert all(t["relative"] is False for t in non_time)
+        # All should have comparison >=
+        all_triggers = [
+            t for s in result["profile"]["stages"] for t in s["exit_triggers"]
+        ]
+        assert all(t["comparison"] == ">=" for t in all_triggers)
+
+
+class TestConvertDecentEndpoint:
+    """Tests for the /api/convert-decent endpoint."""
+
+    VALID_DECENT = TestDecentConverter.VALID_DECENT
+
+    def test_convert_decent_success(self, client):
+        """Returns converted profile for valid Decent input."""
+        resp = client.post("/api/convert-decent", json=self.VALID_DECENT)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "profile" in data
+        assert "warnings" in data
+        assert data["profile"]["name"] == "Londinium"
+        assert len(data["profile"]["stages"]) == 2
+
+    def test_convert_decent_not_decent_format(self, client):
+        """Returns 400 for non-Decent profiles."""
+        meticulous = {"name": "Test", "stages": [{"type": "flow"}]}
+        resp = client.post("/api/convert-decent", json=meticulous)
+        assert resp.status_code == 400
+        assert "Decent" in resp.json()["detail"]
+
+    def test_convert_decent_dual_route(self, client):
+        """Both /convert-decent and /api/convert-decent work."""
+        resp = client.post("/convert-decent", json=self.VALID_DECENT)
+        assert resp.status_code == 200
+
+    def test_convert_decent_empty_body(self, client):
+        """Returns 400 for empty body."""
+        resp = client.post("/api/convert-decent", json={})
+        assert resp.status_code == 400
+
+
+class TestImportFromUrlDecentAutoDetect:
+    """Tests for Decent auto-detection in /api/import-from-url."""
+
+    DECENT_PROFILE = {
+        "title": "Decent URL Import",
+        "author": "URL Author",
+        "steps": [
+            {
+                "name": "pi",
+                "pump": "flow",
+                "flow": 3.5,
+                "sensor": "coffee",
+                "seconds": 10,
+                "exit": {"type": "pressure_over", "condition": 3.0},
+            }
+        ],
+    }
+
+    @staticmethod
+    def _mock_httpx_stream(response_bytes=b"{}", raise_for_status_error=None):
+        """Build a mock httpx.AsyncClient that streams response_bytes."""
+
+        class FakeStream:
+            def __init__(self):
+                self.status_code = 200
+
+            def raise_for_status(self):
+                if raise_for_status_error:
+                    raise raise_for_status_error
+
+            async def aiter_bytes(self, chunk_size=8192):
+                yield response_bytes
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                pass
+
+            def stream(self, method, url):
+                return FakeStream()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+        return FakeClient
+
+    @patch("api.routes.profiles._validate_url_for_ssrf")
+    @patch("api.routes.profiles.save_history")
+    @patch("api.routes.profiles.load_history", return_value=[])
+    @patch("api.routes.profiles.async_create_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles._generate_profile_description")
+    def test_decent_auto_detected_from_url(
+        self,
+        mock_desc,
+        mock_create,
+        mock_load,
+        mock_save,
+        mock_ssrf,
+        client,
+    ):
+        """Decent profiles from URL are auto-detected and converted."""
+        import json as _json
+
+        mock_desc.return_value = "Converted Decent profile"
+        mock_create.return_value = {"id": "machine-123"}
+
+        content = _json.dumps(self.DECENT_PROFILE).encode()
+        with patch("httpx.AsyncClient", self._mock_httpx_stream(content)):
+            resp = client.post(
+                "/api/import-from-url",
+                json={"url": "https://example.com/decent.json"},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["converted_from_decent"] is True
+        # The profile name should come from "title" field after conversion
+        assert data["profile_name"] == "Decent URL Import"

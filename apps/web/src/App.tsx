@@ -28,6 +28,7 @@ const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({
 const RunShotView = lazy(() => import('./components/RunShotView').then(m => ({ default: m.RunShotView })))
 const FormView = lazy(() => import('./views/FormView').then(m => ({ default: m.FormView })))
 const ResultsView = lazy(() => import('./views/ResultsView').then(m => ({ default: m.ResultsView })))
+const MachineStatusCenter = lazy(() => import('./components/MachineStatusCenter').then(m => ({ default: m.MachineStatusCenter })))
 import { useGenerationProgress } from '@/hooks/useGenerationProgress'
 import { useReducedMotion } from '@/hooks/a11y/useScreenReader'
 import { SkipNavigation } from '@/components/SkipNavigation'
@@ -824,6 +825,7 @@ function App() {
       case 'live-shot':
       case 'shot-analysis':
       case 'dial-in':
+      case 'machine-status':
         handleBackToStart()
         break
       case 'shot-history': {
@@ -1547,7 +1549,14 @@ function App() {
                     isFollowSystem={isFollowSystem}
                     onToggleTheme={toggleTheme}
                     onSetFollowSystem={setFollowSystem}
+                    onNavigateToStatus={() => setViewState('machine-status')}
                   />
+                </FeatureErrorBoundary>
+              )}
+
+              {viewState === 'machine-status' && (
+                <FeatureErrorBoundary feature="Machine Status">
+                  <MachineStatusCenter onBack={() => setViewState('settings')} />
                 </FeatureErrorBoundary>
               )}
 
