@@ -698,7 +698,20 @@
     "importButton": "Importer",
     "fetchingUrl": "Récupération du profil depuis l'URL...",
     "importUrlFailed": "Échec de l'importation depuis l'URL",
-    "invalidUrl": "Veuillez entrer une URL valide"
+    "invalidUrl": "Veuillez entrer une URL valide",
+    "decentEspresso": "Decent",
+    "decentDescription": "Convertir et importer",
+    "decentImportHint": "Téléchargez ou collez un JSON de profil Decent Espresso pour le convertir au format Meticulous.",
+    "uploadDecentFile": "Télécharger un fichier de profil Decent",
+    "orPaste": "ou coller JSON",
+    "pasteDecentJson": "Collez le JSON du profil Decent ici...",
+    "convertButton": "Convertir",
+    "conversionWarnings": "Avertissements de conversion",
+    "convertedPreview": "Aperçu du profil converti",
+    "notDecentFormat": "Format de profil Decent Espresso non valide",
+    "profileName": "Nom",
+    "stages": "étapes",
+    "triggers": "déclencheurs"
   },
   "imageCrop": {
     "title": "Recadrer l'image du profil",
@@ -1704,5 +1717,26 @@
     "quietWeek": "Semaine plus calme ?\nVotre machine s'ennuie de vous.",
     "singleProfileUser": "{{count}} shots d'affilée sur {{name}}.\nTant que ça marche...",
     "profileCollector": "{{count}} profils !\nVous construisez toute une collection."
+  },
+  "machineStatus": {
+    "title": "État de la machine",
+    "serviceHealth": "Santé des services",
+    "systemMetrics": "Métriques système",
+    "diskUsage": "Utilisation du disque",
+    "memoryUsage": "Utilisation mémoire",
+    "cpuTemperature": "Température CPU",
+    "uptime": "Temps de fonctionnement",
+    "lastUpdated": "Dernière mise à jour",
+    "refreshing": "Actualisation...",
+    "unavailable": "État de la machine indisponible",
+    "retry": "Réessayer",
+    "autoRefresh": "Actualisation auto dans",
+    "networkStatus": "Réseau"
+  },
+  "imageGeneration": {
+    "batchCount": "Nombre d'images",
+    "selectImage": "Sélectionner une image",
+    "regenerateSlot": "Régénérer",
+    "generating": "Génération..."
   }
 }

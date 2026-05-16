@@ -703,7 +703,20 @@
     "importButton": "Importera",
     "fetchingUrl": "Hämtar profil från URL...",
     "importUrlFailed": "Kunde inte importera från URL",
-    "invalidUrl": "Ange en giltig URL"
+    "invalidUrl": "Ange en giltig URL",
+    "decentEspresso": "Decent",
+    "decentDescription": "Konvertera & importera",
+    "decentImportHint": "Ladda upp eller klistra in en Decent Espresso-profil-JSON för att konvertera den till Meticulous-format.",
+    "uploadDecentFile": "Ladda upp Decent-profilfil",
+    "orPaste": "eller klistra in JSON",
+    "pasteDecentJson": "Klistra in Decent-profil-JSON här...",
+    "convertButton": "Konvertera",
+    "conversionWarnings": "Konverteringsvarningar",
+    "convertedPreview": "Förhandsgranskning av konverterad profil",
+    "notDecentFormat": "Inte ett giltigt Decent Espresso-profilformat",
+    "profileName": "Namn",
+    "stages": "steg",
+    "triggers": "utlösare"
   },
   "imageCrop": {
     "title": "Beskär profilbild",
@@ -1704,5 +1717,26 @@
     "quietWeek": "Lugnare vecka?\nDin maskin saknar dig.",
     "singleProfileUser": "{{count}} shots i rad på {{name}}.\nOm det funkar...",
     "profileCollector": "{{count}} profiler!\nDu bygger en fin samling."
+  },
+  "machineStatus": {
+    "title": "Maskinstatus",
+    "serviceHealth": "Tjänsthälsa",
+    "systemMetrics": "Systemmått",
+    "diskUsage": "Diskanvändning",
+    "memoryUsage": "Minnesanvändning",
+    "cpuTemperature": "CPU-temperatur",
+    "uptime": "Drifttid",
+    "lastUpdated": "Senast uppdaterad",
+    "refreshing": "Uppdaterar...",
+    "unavailable": "Maskinstatus otillgänglig",
+    "retry": "Försök igen",
+    "autoRefresh": "Automatisk uppdatering om",
+    "networkStatus": "Nätverk"
+  },
+  "imageGeneration": {
+    "batchCount": "Antal bilder",
+    "selectImage": "Välj en bild",
+    "regenerateSlot": "Generera om",
+    "generating": "Genererar..."
   }
 }

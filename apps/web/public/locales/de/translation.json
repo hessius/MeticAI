@@ -698,7 +698,20 @@
     "importButton": "Importieren",
     "fetchingUrl": "Profil von URL abrufen...",
     "importUrlFailed": "Import von URL fehlgeschlagen",
-    "invalidUrl": "Bitte geben Sie eine gültige URL ein"
+    "invalidUrl": "Bitte geben Sie eine gültige URL ein",
+    "decentEspresso": "Decent",
+    "decentDescription": "Konvertieren & importieren",
+    "decentImportHint": "Laden Sie eine Decent Espresso-Profil-JSON hoch oder fügen Sie sie ein, um sie ins Meticulous-Format zu konvertieren.",
+    "uploadDecentFile": "Decent-Profildatei hochladen",
+    "orPaste": "oder JSON einfügen",
+    "pasteDecentJson": "Decent-Profil-JSON hier einfügen...",
+    "convertButton": "Konvertieren",
+    "conversionWarnings": "Konvertierungswarnungen",
+    "convertedPreview": "Vorschau des konvertierten Profils",
+    "notDecentFormat": "Kein gültiges Decent Espresso-Profilformat",
+    "profileName": "Name",
+    "stages": "Stufen",
+    "triggers": "Auslöser"
   },
   "imageCrop": {
     "title": "Profilbild zuschneiden",
@@ -1704,5 +1717,26 @@
     "quietWeek": "Ruhigere Woche?\nDeine Maschine vermisst dich.",
     "singleProfileUser": "{{count}} Shots in Folge mit {{name}}.\nWenn's funktioniert...",
     "profileCollector": "{{count}} Profile!\nDu baust eine beachtliche Sammlung auf."
+  },
+  "machineStatus": {
+    "title": "Maschinenstatus",
+    "serviceHealth": "Dienststatus",
+    "systemMetrics": "Systemmetriken",
+    "diskUsage": "Festplattennutzung",
+    "memoryUsage": "Speichernutzung",
+    "cpuTemperature": "CPU-Temperatur",
+    "uptime": "Betriebszeit",
+    "lastUpdated": "Zuletzt aktualisiert",
+    "refreshing": "Aktualisierung...",
+    "unavailable": "Maschinenstatus nicht verfügbar",
+    "retry": "Erneut versuchen",
+    "autoRefresh": "Automatische Aktualisierung in",
+    "networkStatus": "Netzwerk"
+  },
+  "imageGeneration": {
+    "batchCount": "Anzahl der Bilder",
+    "selectImage": "Bild auswählen",
+    "regenerateSlot": "Neu generieren",
+    "generating": "Wird generiert..."
   }
 }

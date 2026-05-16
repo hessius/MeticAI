@@ -1447,6 +1447,22 @@ export function installDirectModeInterceptor(): void {
     }
 
 
+    // POST /api/convert-decent → convert Decent profile to Meticulous format
+    if (url.match(/\/api\/convert-decent/) && method === 'POST') {
+      return (async () => {
+        try {
+          const { detectDecentFormat, convertDecentToMeticulous } = await import('@/services/decentConverter')
+          const body = await new Response(init?.body || '{}').json()
+          if (!detectDecentFormat(body)) {
+            return jsonResponse({ detail: 'Not a valid Decent Espresso profile format' }, 400)
+          }
+          return jsonResponse(convertDecentToMeticulous(body))
+        } catch {
+          return jsonResponse({ detail: 'Decent profile conversion failed' }, 500)
+        }
+      })()
+    }
+
     // POST /api/import-from-url -> fetch URL, parse profile JSON, save to machine
     if (url.match(/\/api\/import-from-url/) && method === 'POST') {
       return (async () => {
@@ -1458,10 +1474,18 @@ export function installDirectModeInterceptor(): void {
           try { profileResp = await _fetch(profileUrl) } catch { return jsonResponse({ status: 'error', detail: 'Failed to fetch URL' }, 502) }
           let profileJson: Record<string, unknown>
           try { profileJson = await profileResp.json() } catch { return jsonResponse({ status: 'error', detail: 'URL did not return valid JSON' }, 400) }
+          // Auto-detect Decent format and convert
+          let convertedFromDecent = false
+          const { detectDecentFormat, convertDecentToMeticulous } = await import('@/services/decentConverter')
+          if (detectDecentFormat(profileJson)) {
+            const result = convertDecentToMeticulous(profileJson)
+            profileJson = result.profile as unknown as Record<string, unknown>
+            convertedFromDecent = true
+          }
           if (typeof profileJson.name !== 'string' || !profileJson.name) return jsonResponse({ status: 'error', detail: "Profile is missing a 'name' field" }, 400)
           const saveResp = await _fetch('/api/v1/profile/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileJson) })
           if (!saveResp.ok) return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
-          return jsonResponse({ status: 'success', entry_id: 'direct-' + Date.now(), profile_name: profileJson.name as string, has_description: false, uploaded_to_machine: true })
+          return jsonResponse({ status: 'success', entry_id: 'direct-' + Date.now(), profile_name: profileJson.name as string, has_description: false, uploaded_to_machine: true, converted_from_decent: convertedFromDecent })
         } catch { return jsonResponse({ status: 'error', detail: 'Import from URL failed' }, 500) }
       })()
     }
@@ -1652,10 +1676,36 @@ export function installDirectModeInterceptor(): void {
         const style = parsedUrl.searchParams.get('style') || 'abstract'
         const tags = (parsedUrl.searchParams.get('tags') || '').split(',').map((tag) => tag.trim()).filter(Boolean)
         const preview = parsedUrl.searchParams.get('preview') === 'true'
+        const count = Math.min(4, Math.max(1, parseInt(parsedUrl.searchParams.get('count') || '1', 10) || 1))
         const aiService = createBrowserAIService()
         if (!aiService.isConfigured()) {
           return jsonResponse({ detail: 'AI features are unavailable. Please configure a Gemini API key in Settings.' }, 503)
         }
+
+        if (count > 1) {
+          // Batch mode: fire parallel requests
+          const promises = Array.from({ length: count }, (_, i) =>
+            aiService.generateImage({ profileName: name, style, tags, preview: true })
+              .then(async (blob) => {
+                const dataUri = await blobToDataUri(blob)
+                return { index: i, image: dataUri } as { index: number; image: string | null; error?: string }
+              })
+              .catch((err) => ({
+                index: i,
+                image: null as string | null,
+                error: err instanceof Error ? err.message : 'Generation failed',
+              }))
+          )
+          const results = await Promise.all(promises)
+          return jsonResponse({
+            status: 'preview',
+            message: `Generated images for profile '${name}'`,
+            style,
+            images: results,
+            count,
+          })
+        }
+
         const imageBlob = await aiService.generateImage({ profileName: name, style, tags, preview })
         const imageDataUri = await blobToDataUri(imageBlob)
         if (preview) {
@@ -1963,6 +2013,44 @@ export function installDirectModeInterceptor(): void {
         }
         return jsonResponse({ status: 'success', profile: responseProfile })
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get profile info' }, 500))
+    }
+
+    // /api/machine/status/health → watcher service proxy (not available in direct mode)
+    if (url.match(/\/api\/machine\/status\/health/)) {
+      // In direct mode, attempt to reach the watcher on port 3000
+      return (async () => {
+        try {
+          const machineBase = getDefaultMachineUrl()
+          const watcherUrl = machineBase.replace(':8080', ':3000').replace(/\/$/, '')
+          const resp = await _originalFetch(`${watcherUrl}/status`, { signal: AbortSignal.timeout(5000) })
+          if (resp.ok) return jsonResponse(await resp.json())
+          return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+        } catch {
+          return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+        }
+      })()
+    }
+
+    // /api/machine/system-info → aggregate system info from machine API
+    if (url.match(/\/api\/machine\/system-info/)) {
+      return (async () => {
+        const info: Record<string, unknown> = {}
+        const endpoints: [string, string][] = [
+          ['firmware', '/api/v1/system/firmware'],
+          ['network', '/api/v1/wifi/status'],
+          ['hostname', '/api/v1/wifi/hostname'],
+        ]
+        for (const [key, path] of endpoints) {
+          try {
+            const resp = await _fetch(path)
+            if (resp.ok) info[key] = await resp.json()
+            else info[key] = null
+          } catch {
+            info[key] = null
+          }
+        }
+        return jsonResponse(info)
+      })().catch(() => jsonResponse({ firmware: null, network: null, hostname: null }))
     }
 
     // /api/machine/status → synthetic response (real state comes via Socket.IO)

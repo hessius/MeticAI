@@ -698,7 +698,20 @@
     "importButton": "Importar",
     "fetchingUrl": "Obteniendo perfil desde URL...",
     "importUrlFailed": "Error al importar desde URL",
-    "invalidUrl": "Introduce una URL válida"
+    "invalidUrl": "Introduce una URL válida",
+    "decentEspresso": "Decent",
+    "decentDescription": "Convertir e importar",
+    "decentImportHint": "Sube o pega un JSON de perfil Decent Espresso para convertirlo al formato Meticulous.",
+    "uploadDecentFile": "Subir archivo de perfil Decent",
+    "orPaste": "o pegar JSON",
+    "pasteDecentJson": "Pega el JSON del perfil Decent aquí...",
+    "convertButton": "Convertir",
+    "conversionWarnings": "Advertencias de conversión",
+    "convertedPreview": "Vista previa del perfil convertido",
+    "notDecentFormat": "No es un formato de perfil Decent Espresso válido",
+    "profileName": "Nombre",
+    "stages": "etapas",
+    "triggers": "disparadores"
   },
   "imageCrop": {
     "title": "Recortar imagen de perfil",
@@ -1704,5 +1717,26 @@
     "quietWeek": "¿Semana más tranquila?\nTu máquina te extraña.",
     "singleProfileUser": "{{count}} shots seguidos con {{name}}.\nSi funciona...",
     "profileCollector": "¡{{count}} perfiles!\nEstás construyendo toda una colección."
+  },
+  "machineStatus": {
+    "title": "Estado de la máquina",
+    "serviceHealth": "Salud de servicios",
+    "systemMetrics": "Métricas del sistema",
+    "diskUsage": "Uso de disco",
+    "memoryUsage": "Uso de memoria",
+    "cpuTemperature": "Temperatura CPU",
+    "uptime": "Tiempo activo",
+    "lastUpdated": "Última actualización",
+    "refreshing": "Actualizando...",
+    "unavailable": "Estado de la máquina no disponible",
+    "retry": "Reintentar",
+    "autoRefresh": "Actualización automática en",
+    "networkStatus": "Red"
+  },
+  "imageGeneration": {
+    "batchCount": "Número de imágenes",
+    "selectImage": "Seleccionar una imagen",
+    "regenerateSlot": "Regenerar",
+    "generating": "Generando..."
   }
 }
