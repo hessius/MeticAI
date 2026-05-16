@@ -23,7 +23,7 @@ Execute each section in order. Record PASS/FAIL for each item.
 - [ ] Profile count displays correctly
 - [ ] All navigation buttons visible: Generate, Catalogue, Run/Schedule, Dial-In Guide, Pour Over, Shot Analysis, Settings
 - [ ] Light/dark mode toggle works and persists on reload
-- [ ] MeticAI logo navigates to start screen
+- [ ] Metic logo navigates to start screen
 
 ### 2. Profile Catalogue
 
@@ -107,7 +107,7 @@ Execute each section in order. Record PASS/FAIL for each item.
 
 ### 10. Settings
 
-- [ ] "About MeticAI" collapsible section
+- [ ] "About Metic" collapsible section
 - [ ] Language selector with selected language highlighted
 - [ ] Gemini API key field (shows configured/not configured status)
 - [ ] "Enable AI features" toggle

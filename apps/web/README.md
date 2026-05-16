@@ -1,6 +1,6 @@
-# MeticAI Web Interface
+# Metic Web Interface
 
-React + TypeScript frontend for MeticAI, built with Vite and Bun.
+React + TypeScript frontend for Metic, built with Vite and Bun.
 
 > **Deployment:** The web app is built as part of the unified Docker container (`docker/Dockerfile.unified`). See the root [README](../../README.md) for deployment instructions.
 

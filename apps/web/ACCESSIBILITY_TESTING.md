@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive E2E accessibility tests have been implemented for MeticAI using Playwright and @axe-core/playwright to ensure WCAG 2.1 AA compliance.
+Comprehensive E2E accessibility tests have been implemented for Metic using Playwright and @axe-core/playwright to ensure WCAG 2.1 AA compliance.
 
 ## Test Coverage
 

@@ -1,6 +1,6 @@
 # Integration Testing Guide
 
-This guide explains how to run integration tests that validate MeticAI functionality against a real Meticulous machine.
+This guide explains how to run integration tests that validate Metic functionality against a real Meticulous machine.
 
 ## Overview
 

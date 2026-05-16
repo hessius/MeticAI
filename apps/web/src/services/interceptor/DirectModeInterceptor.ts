@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
@@ -826,6 +827,7 @@ export function installDirectModeInterceptor(): void {
         .then((data: CachedProfile[] | null) => {
           if (data) {
             _processProfileList(data)
+            try { localStorage.setItem(PROFILE_LIST_CACHE_KEY + ':ts', String(Date.now())) } catch { /* ignore */ }
             _generateDescriptionsInBackground(data)
           }
         })
@@ -1565,24 +1567,46 @@ export function installDirectModeInterceptor(): void {
       })()
     }
 
-    // GET /api/machine/profiles → /api/v1/profile/list (add in_history/has_description, populate cache)
+    // GET /api/machine/profiles → /api/v1/profile/list (stale-while-revalidate)
     if (url.match(/\/api\/machine\/profiles$/)) {
+      const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
+      const cacheTs = Number(localStorage.getItem(PROFILE_LIST_CACHE_KEY + ':ts') || '0')
+      const CACHE_TTL_MS = 2 * 60 * 1000 // 2 minutes
+      const isFresh = cached && (Date.now() - cacheTs < CACHE_TTL_MS)
+
+      // Background revalidation — updates cache for next request
+      const revalidate = () => {
+        _fetch('/api/v1/profile/list')
+          .then(r => r.ok ? r.json() : null)
+          .then((data: CachedProfile[] | null) => {
+            if (data) {
+              _processProfileList(data)
+              try { localStorage.setItem(PROFILE_LIST_CACHE_KEY + ':ts', String(Date.now())) } catch { /* ignore */ }
+            }
+          })
+          .catch(() => { /* non-critical */ })
+      }
+
+      // If cache is fresh, serve immediately and skip network
+      if (isFresh && cached) {
+        try { return Promise.resolve(jsonResponse(JSON.parse(cached))) } catch { /* fall through */ }
+      }
+
+      // If cache exists but stale, serve stale + revalidate in background
+      if (cached) {
+        revalidate()
+        try { return Promise.resolve(jsonResponse(JSON.parse(cached))) } catch { /* fall through */ }
+      }
+
+      // No cache — must fetch from network
       return _fetch('/api/v1/profile/list').then(r => {
-        if (!r.ok) {
-          const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
-          if (cached) {
-            try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
-          }
-          return jsonResponse({ profiles: [] })
-        }
-        return r.json().then((data: CachedProfile[]) => jsonResponse(_processProfileList(data)))
-      }).catch(() => {
-        const cached = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
-        if (cached) {
-          try { return jsonResponse(JSON.parse(cached)) } catch { /* corrupted cache */ }
-        }
-        return jsonResponse({ profiles: [] })
-      })
+        if (!r.ok) return jsonResponse({ profiles: [] })
+        return r.json().then((data: CachedProfile[]) => {
+          const result = _processProfileList(data)
+          try { localStorage.setItem(PROFILE_LIST_CACHE_KEY + ':ts', String(Date.now())) } catch { /* ignore */ }
+          return jsonResponse(result)
+        })
+      }).catch(() => jsonResponse({ profiles: [] }))
     }
 
     // /api/machine/profile/:id/json → /api/v1/profile/get/:id (wrap in {profile})
@@ -2152,13 +2176,21 @@ export function installDirectModeInterceptor(): void {
           const pressureArr: number[] = []
           const flowArr: number[] = []
           const weightArr: number[] = []
+          const gravFlowArr: number[] = []
           const temperatureArr: number[] = []
+          const statusArr: string[] = []
           for (const pt of pts) {
-            timeArr.push((pt.profile_time ?? pt.time ?? 0) / 1000)
+            const status = String((pt as Record<string, unknown>).status ?? '')
+            // During retraction, profile_time freezes — use wall-clock time instead
+            const isRetracting = status.toLowerCase() === 'retracting'
+            const timeMs = isRetracting ? (pt.time ?? pt.profile_time ?? 0) : (pt.profile_time ?? pt.time ?? 0)
+            timeArr.push(timeMs / 1000)
             pressureArr.push(pt.shot?.pressure ?? 0)
             flowArr.push(pt.shot?.flow ?? 0)
             weightArr.push(pt.shot?.weight ?? 0)
+            gravFlowArr.push((pt.shot as Record<string, unknown>)?.gravimetric_flow as number ?? 0)
             temperatureArr.push(pt.sensors?.external_1 ?? 0)
+            statusArr.push(status)
           }
           const lastPt = pts[pts.length - 1]
           const shotData = {
@@ -2173,9 +2205,9 @@ export function installDirectModeInterceptor(): void {
                 stages: entry.profile?.stages?.map(s => ({ name: s.name, type: s.type, key: s.key })),
               },
               start_time: new Date(entry.time * 1000).toISOString(),
-              elapsed_time: lastPt ? (lastPt.profile_time ?? lastPt.time ?? 0) / 1000 : 0,
+              elapsed_time: lastPt ? (lastPt.time ?? lastPt.profile_time ?? 0) / 1000 : 0,
               final_weight: lastPt?.shot?.weight ?? entry.profile?.final_weight ?? null,
-              data: { time: timeArr, pressure: pressureArr, flow: flowArr, weight: weightArr, temperature: temperatureArr },
+              data: { time: timeArr, pressure: pressureArr, flow: flowArr, weight: weightArr, gravimetric_flow: gravFlowArr, temperature: temperatureArr, status: statusArr },
             }
           }
           return jsonResponse(shotData)
@@ -2644,12 +2676,33 @@ export function installDirectModeInterceptor(): void {
             flushStage(totalTime, finalWeight)
           }
 
+          // Use the actual settled final telemetry sample (including drip during piston retraction)
+          // so both time and weight reflect the same end-of-shot point as getHistoryMetrics()
+          const lastRawPt = (pts[pts.length - 1] ?? {}) as Record<string, unknown>
+          const lastShot = ((lastRawPt.shot as Record<string, unknown> | undefined) ?? {})
+          const actualFinalWeight = safeNumber(lastShot.weight) || finalWeight
+          const actualTotalTime = safeNumber(lastRawPt.profile_time ?? lastRawPt.time) / 1000 || totalTime
+
+          // If there was weight gain during retraction, add a synthetic drip stage so the AI
+          // sees how the gap between the last active stage and final_weight_g was filled
+          const dripWeight = Math.round((actualFinalWeight - finalWeight) * 10) / 10
+          if (dripWeight > 0.1) {
+            stageInfos.push({
+              name: 'Drip (post-retraction)',
+              duration: Math.round((actualTotalTime - totalTime) * 10) / 10,
+              avgPressure: 0,
+              avgFlow: 0,
+              weightGain: dripWeight,
+              endWeight: Math.round(actualFinalWeight * 10) / 10,
+            })
+          }
+
           const localAnalysis = {
             shot_summary: {
-              total_time_s: Math.round(totalTime * 10) / 10,
-              final_weight_g: Math.round(finalWeight * 10) / 10,
+              total_time_s: Math.round(actualTotalTime * 10) / 10,
+              final_weight_g: Math.round(actualFinalWeight * 10) / 10,
               target_weight_g: targetWeight,
-              weight_deviation_pct: targetWeight ? Math.round(((finalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
+              weight_deviation_pct: targetWeight ? Math.round(((actualFinalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
               max_pressure_bar: Math.round(maxPressure * 10) / 10,
               max_flow_mls: Math.round(maxFlow * 10) / 10,
             },
@@ -2723,6 +2776,11 @@ IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total 
 If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated
 correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
 A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
+
+IMPORTANT: The 'final_weight_g' in shot_summary is the actual settled weight AFTER the machine's piston retraction completes.
+The Meticulous machine issues a stop signal BEFORE the target weight is reached, accounting for residual flow that will drip
+into the cup during piston retraction. This means the final weight accurately reflects the total liquid in the cup.
+Do NOT penalize the shot for weight deviation unless 'weight_deviation_pct' exceeds ±5%.
 
 ${JSON.stringify(localAnalysis, null, 2)}
 
@@ -2815,16 +2873,20 @@ Rules for recommendations:
 - If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
 `
 
-          // 6. Call Gemini
+          // 6. Call Gemini (with retry on transient errors)
           const { GoogleGenAI: GenAI } = await import('@google/genai')
           const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) ?? ''
           if (!apiKey) return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
           const client = new GenAI({ apiKey })
           const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
-          const response = await client.models.generateContent({
-            model: modelId,
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          })
+
+          const response = await retryWithBackoff(() =>
+            client.models.generateContent({
+              model: modelId,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            })
+          )
+
           const analysisText = response.text ?? ''
           return jsonResponse({
             status: 'success',
@@ -2832,8 +2894,7 @@ Rules for recommendations:
             cached: false,
           })
         } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Analysis failed'
-          return jsonResponse({ status: 'error', message: msg })
+          return jsonResponse({ status: 'error', message: formatGeminiError(err) })
         }
       })()
     }
@@ -2887,16 +2948,31 @@ Rules for recommendations:
           const body = init?.body as FormData
           const image = body.get('file') as File | null
           const userPrefs = (body.get('user_prefs') as string) || ''
+          const advancedCustomization = (body.get('advanced_customization') as string) || ''
+          const detailedKnowledge = (body.get('detailed_knowledge') as string) || ''
+
+          // Emit progress events so useGenerationProgress can display the segmented loading bar
+          const startTime = Date.now()
+          const emitProgress = (event: { phase: string; message: string }) => {
+            window.dispatchEvent(new CustomEvent('meticai:generation-progress', {
+              detail: {
+                ...event,
+                attempt: 1,
+                max_attempts: 3,
+                elapsed: (Date.now() - startTime) / 1000,
+              },
+            }))
+          }
 
           const result = await aiService.generateProfile({
             image,
-            preferences: userPrefs,
+            preferences: [userPrefs, advancedCustomization, detailedKnowledge].filter(Boolean).join('\n\n'),
             tags: [],
-          })
+          }, emitProgress)
 
           // Save profile to machine (convert Gemini JSON to OEPF format)
           if (result.status === 'success') {
-            const jsonMatch = result.analysis.match(/```json\s*([\s\S]*?)```/)
+            const jsonMatch = result.reply.match(/```json\s*([\s\S]*?)```/)
             if (jsonMatch) {
               try {
                 const raw = JSON.parse(jsonMatch[1])
@@ -3065,7 +3141,7 @@ Rules for recommendations:
             status: result.status,
             // Only include analysis (shown as "Coffee Analysis" card) when an image was provided
             analysis: image ? result.analysis : '',
-            reply: result.analysis,
+            reply: result.reply,
           })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error'

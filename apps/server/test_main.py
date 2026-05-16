@@ -5135,6 +5135,19 @@ class TestProfileImportEndpoint:
 class TestShotsByProfileEndpoint:
     """Tests for the /api/shots/by-profile/{profile_name} endpoint."""
 
+    @pytest.fixture(autouse=True)
+    def clear_shot_index(self):
+        """Reset the persistent shot profile index so tests use mocked data."""
+        import services.cache_service as _cs
+
+        _cs._shot_index = None
+        if _cs.SHOT_INDEX_FILE.exists():
+            _cs.SHOT_INDEX_FILE.unlink()
+        yield
+        _cs._shot_index = None
+        if _cs.SHOT_INDEX_FILE.exists():
+            _cs.SHOT_INDEX_FILE.unlink()
+
     @patch("api.routes.shots.async_get_shot_files", new_callable=AsyncMock)
     @patch("api.routes.shots.async_get_history_dates", new_callable=AsyncMock)
     @patch("api.routes.shots.fetch_shot_data", new_callable=AsyncMock)
@@ -5187,8 +5200,9 @@ class TestShotsByProfileEndpoint:
         assert data["profile_name"] == "Espresso Classic"
         assert data["count"] == 2
         assert len(data["shots"]) == 2
-        assert data["shots"][0]["final_weight"] == 36.5
-        assert data["shots"][1]["final_weight"] == 38.0
+        # Sorted newest-first by timestamp
+        assert data["shots"][0]["final_weight"] == 38.0
+        assert data["shots"][1]["final_weight"] == 36.5
 
     @patch("api.routes.shots._get_cached_shots")
     def test_get_shots_by_profile_from_cache(self, mock_get_cache, client):
@@ -13986,6 +14000,19 @@ class TestRecentShotsEndpoint:
         _recent_shots_cache.clear()
         yield
         _recent_shots_cache.clear()
+
+    @pytest.fixture(autouse=True)
+    def clear_shot_index(self):
+        """Reset the persistent shot profile index so tests use mocked data."""
+        import services.cache_service as _cs
+
+        _cs._shot_index = None
+        if _cs.SHOT_INDEX_FILE.exists():
+            _cs.SHOT_INDEX_FILE.unlink()
+        yield
+        _cs._shot_index = None
+        if _cs.SHOT_INDEX_FILE.exists():
+            _cs.SHOT_INDEX_FILE.unlink()
 
     @patch("api.routes.shots.fetch_shot_data", new_callable=AsyncMock)
     @patch("api.routes.shots.async_get_shot_files", new_callable=AsyncMock)

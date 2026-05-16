@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Sparkles, RefreshCw, XCircle, Info } from "lucide-react";
 import { parseStructuredAnalysis } from "@/lib/parseAnalysis";
+import { MarkdownText } from "@/components/MarkdownText";
 import { SectionCard } from "@/components/SectionCard";
 
 interface LlmAnalysisModalProps {
@@ -121,9 +122,7 @@ export function LlmAnalysisModal({
           {!isLoading && !error && sections.length === 0 && analysisResult && (
             <Card>
               <CardContent className="pt-6">
-                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                  {analysisResult}
-                </div>
+                <MarkdownText className="prose prose-sm dark:prose-invert max-w-none" text={analysisResult} />
               </CardContent>
             </Card>
           )}

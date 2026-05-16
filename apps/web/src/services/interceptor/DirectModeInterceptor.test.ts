@@ -1495,5 +1495,41 @@ describe('DirectModeInterceptor regression harness', () => {
         profile_name: 'MeticAI Recipe: Better 1-Cup V60',
       })
     })
+
+    it('uses settled weight from retracting data points for shot metrics', async () => {
+      vi.useRealTimers()
+      const historyWithRetraction = [{
+        id: 'shot-retract',
+        time: Date.parse('2026-01-03T10:00:00Z') / 1000,
+        name: 'Turbo Bloom',
+        file: 'shot-retract.json',
+        profile: {
+          id: 'profile-1',
+          name: 'Turbo Bloom',
+          final_weight: 36,
+          temperature: 93,
+        },
+        data: [
+          { time: 0, profile_time: 0, status: 'Bloom', shot: { pressure: 2, flow: 2.1, weight: 0 } },
+          { time: 15000, profile_time: 15000, status: 'Bloom', shot: { pressure: 2, flow: 2.0, weight: 12 } },
+          { time: 25000, profile_time: 25000, status: 'Ramp', shot: { pressure: 8, flow: 1.5, weight: 28 } },
+          { time: 30000, profile_time: 30000, status: 'Ramp', shot: { pressure: 8, flow: 1.2, weight: 33.5 } },
+          // Retracting phase — piston retracts, residual liquid drips into cup
+          { time: 31000, profile_time: 31000, status: 'retracting', shot: { pressure: 0, flow: 0.3, weight: 34.8 } },
+          { time: 33000, profile_time: 33000, status: 'retracting', shot: { pressure: 0, flow: 0.1, weight: 35.9 } },
+        ],
+      }]
+
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/history': historyWithRetraction,
+      }))
+
+      // The last-shot endpoint uses getHistoryMetrics which reads the absolute last data point
+      const lastShotResponse = await window.fetch('/api/last-shot')
+      const lastShot = await readJson<{ final_weight: number; total_time: number }>(lastShotResponse)
+      // Should use the settled weight (35.9g from the last retracting point), not 33.5g from the last active point
+      expect(lastShot.final_weight).toBe(35.9)
+      expect(lastShot.total_time).toBe(33)
+    })
   })
 })

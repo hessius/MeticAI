@@ -1,6 +1,6 @@
-# Screenshots - MeticAI Web Application
+# Screenshots - Metic Web Application
 
-This directory contains screenshots of the MeticAI web application in all supported languages.
+This directory contains screenshots of the Metic web application in all supported languages.
 
 ## Screenshots Generated
 
@@ -26,7 +26,7 @@ Total: 36 screenshots (6 views × 6 languages)
 
 ## Implementation Note
 
-Screenshots require the MeticAI backend server to be running for full functionality. The screenshot script is provided in `e2e/screenshots.spec.ts` for automated capture when the full environment is available.
+Screenshots require the Metic backend server to be running for full functionality. The screenshot script is provided in `e2e/screenshots.spec.ts` for automated capture when the full environment is available.
 
 ## Manual Screenshots
 

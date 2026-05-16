@@ -8,7 +8,7 @@ Current manual brewing recipes are stored in non-standardized text blocks, leadi
 
 ### Goals
 
-1. **Interoperability** — Enable recipe sharing between apps (Beanconqueror, Visualizer, MeticAI)
+1. **Interoperability** — Enable recipe sharing between apps (Beanconqueror, Visualizer, Metic)
 2. **Machine-readability** — Allow smart scales and brewing assistants to guide users through recipes
 3. **Simplicity** — Focus on primary brewing variables; avoid over-specification
 
@@ -241,11 +241,11 @@ Current manual brewing recipes are stored in non-standardized text blocks, leadi
 
 ---
 
-## Integration with MeticAI
+## Integration with Metic
 
 ### Pour-Over Mode Enhancement
 
-The OPOS schema could enhance MeticAI's Pour-Over mode by:
+The OPOS schema could enhance Metic's Pour-Over mode by:
 
 1. **Recipe Library** — Import/export OPOS recipes from Beanconqueror, Visualizer, or community sources
 2. **Guided Brewing** — Display step-by-step prompts with timers and weight targets

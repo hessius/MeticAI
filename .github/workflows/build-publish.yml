@@ -1,5 +1,5 @@
 # ==============================================================================
-# MeticAI Build and Publish Workflow
+# Metic Build and Publish Workflow
 # ==============================================================================
 # Builds the unified Docker image and pushes to GitHub Container Registry.
 #

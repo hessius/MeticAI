@@ -407,16 +407,23 @@ export function ShotDetail({
 
   // ---- Memoised chart data (shared between mobile and desktop) ------------
   const profileTargetCurves = analysisResult?.profile_target_curves
+
+  // Compute stage ranges from shot data alone (synchronous, stable on first render)
+  const shotStageRanges = useMemo(() => {
+    if (!shotData) return []
+    const chartData = getChartData(shotData)
+    return getStageRanges(chartData)
+  }, [shotData])
+
   const replayChartData = useMemo(() => {
     if (!shotData) return null
     const chartData = getChartData(shotData)
-    const rawStageRanges = getStageRanges(chartData)
     const hasGravFlow = chartData.some(d => d.gravimetricFlow !== undefined && d.gravimetricFlow > 0)
     const dataMaxTime = chartData.length > 0 ? chartData[chartData.length - 1].time : 0
-    // Derive stages from target curves when shot data lacks stage info
-    const stageRanges = rawStageRanges.length === 0 && profileTargetCurves?.length
+    // Prefer stages from shot data (available immediately); fall back to target curves
+    const stageRanges = shotStageRanges.length === 0 && profileTargetCurves?.length
       ? getStageRangesFromTargetCurves(profileTargetCurves, dataMaxTime)
-      : rawStageRanges
+      : shotStageRanges
     const mergedData = mergeWithTargetCurves(chartData, profileTargetCurves)
     const maxPressure = Math.max(
       ...chartData.map(d => d.pressure || 0),
@@ -432,7 +439,7 @@ export function ShotDetail({
     const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
     const maxRightAxis = Math.ceil(maxWeight * 1.1)
     return { chartData, stageRanges, hasGravFlow, dataMaxTime, mergedData, maxLeftAxis, maxRightAxis }
-  }, [shotData, profileTargetCurves])
+  }, [shotData, profileTargetCurves, shotStageRanges])
 
   const compareChartMemo = useMemo(() => {
     if (!shotData || !comparisonShotData) return null
@@ -1292,7 +1299,7 @@ export function ShotDetail({
                                   }`}
                                 >
                                   {/* Stage Header */}
-                                  <div className="flex flex-col gap-2 mb-3">
+                                  <div className="flex flex-col gap-2 mb-3 mt-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className={`w-3 h-3 rounded-full shrink-0 ${
                                         !stage.executed ? 'bg-red-500' :
@@ -1301,8 +1308,8 @@ export function ShotDetail({
                                         stage.assessment?.status === 'failed' ? 'bg-red-500' :
                                         stage.assessment?.status === 'incomplete' ? 'bg-orange-500' : 'bg-blue-500'
                                       }`} />
-                                      <span className="text-sm font-semibold break-words">{stage.stage_name}</span>
-                                      <Badge variant="secondary" className="text-[10px] capitalize shrink-0">{stage.stage_type}</Badge>
+                                      <span className="text-sm font-semibold whitespace-nowrap">{stage.stage_name}</span>
+                                      <Badge variant="secondary" className="text-[10px] capitalize shrink-0 whitespace-nowrap">{stage.stage_type}</Badge>
                                     </div>
                                     {stage.assessment && (
                                       <Badge
@@ -1332,11 +1339,27 @@ export function ShotDetail({
                                     <span className="text-sm font-medium">{stage.profile_target}</span>
                                   </div>
 
+                                  {/* Exit Reason — explicit why-this-stage-ended summary */}
+                                  {stage.exit_trigger_result?.triggered && (
+                                    <div className="mb-3 p-2 bg-green-500/10 rounded-md border border-green-500/20">
+                                      <span className="text-xs text-green-700 dark:text-green-400 font-medium">
+                                        ✓ {t('shotHistory.exitedBecause', { trigger: stage.exit_trigger_result.triggered.type, actual: stage.exit_trigger_result.triggered.actual })}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {!stage.exit_trigger_result?.triggered && stage.limit_hit && (
+                                    <div className="mb-3 p-2 bg-amber-500/10 rounded-md border border-amber-500/20">
+                                      <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                                        ⚠ {t('shotHistory.exitedByLimit', { limit: stage.limit_hit.type, actual: stage.limit_hit.actual_value })}
+                                      </span>
+                                    </div>
+                                  )}
+
                                   {/* Exit Triggers */}
                                   {stage.exit_triggers.length > 0 && (
                                     <div className="mb-3">
                                       <span className="text-xs text-muted-foreground block mb-1.5">{t('shotHistory.exitTriggers')}</span>
-                                      <div className="flex flex-wrap gap-2 overflow-hidden">
+                                      <div className="flex flex-wrap gap-2">
                                         {stage.exit_triggers.map((trigger, tIdx) => {
                                           const wasTriggered = stage.exit_trigger_result?.triggered?.type === trigger.type
                                           const notTriggeredData = stage.exit_trigger_result?.not_triggered?.find(nt => nt.type === trigger.type)
@@ -1393,7 +1416,7 @@ export function ShotDetail({
 
                                   {/* Execution Data */}
                                   {stage.execution_data && (
-                                    <div className="grid grid-cols-4 gap-2 p-2 bg-background/40 rounded-md text-center">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 bg-background/40 rounded-md text-center">
                                       <div>
                                         <span className="text-xs text-muted-foreground block">{t('shotHistory.duration')}</span>
                                         <span className="text-sm font-medium">{stage.execution_data.duration}s</span>

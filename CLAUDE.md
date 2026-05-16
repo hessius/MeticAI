@@ -1,6 +1,6 @@
-# MeticAI — Project Memory
+# Metic — Project Memory
 
-MeticAI is an AI-powered controller for the Meticulous Espresso Machine.
+Metic is an AI-powered controller for the Meticulous Espresso Machine.
 Stack: Python 3.13 (FastAPI) · React/TypeScript (Vite/Bun) · Google Gemini · Docker + s6-overlay.
 
 ## Conventions

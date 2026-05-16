@@ -188,6 +188,118 @@ def _set_cached_shots(profile_name: str, data: dict, limit: int):
 
 
 # ============================================
+# Shot Profile Index
+# ============================================
+# Persistent mapping: "date/filename" → {name, profile_id, weight, time_ms, timestamp}
+# Built incrementally — each shot file is fetched at most once.
+
+SHOT_INDEX_FILE = DATA_DIR / "shot_profile_index.json"
+
+_shot_index: Optional[dict] = None
+
+
+def _load_shot_index() -> dict:
+    """Load shot profile index from disk/memory."""
+    global _shot_index
+    if _shot_index is not None:
+        return _shot_index
+    SHOT_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if SHOT_INDEX_FILE.exists():
+            with open(SHOT_INDEX_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and "entries" in data:
+                _shot_index = data
+                return _shot_index
+    except (json.JSONDecodeError, IOError):
+        pass
+    _shot_index = {"entries": {}, "indexed_dates": []}
+    return _shot_index
+
+
+def _save_shot_index():
+    """Write shot profile index to disk."""
+    if _shot_index is None:
+        return
+    SHOT_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(SHOT_INDEX_FILE, _shot_index)
+
+
+def get_indexed_shot_metadata(key: str) -> Optional[dict]:
+    """Look up metadata for a single shot by 'date/filename' key."""
+    idx = _load_shot_index()
+    return idx["entries"].get(key)
+
+
+def get_indexed_dates() -> set:
+    """Return the set of dates already indexed."""
+    idx = _load_shot_index()
+    return set(idx.get("indexed_dates", []))
+
+
+def update_shot_index(new_entries: dict, new_dates: list):
+    """Merge new entries into the index and persist."""
+    idx = _load_shot_index()
+    idx["entries"].update(new_entries)
+    existing = set(idx.get("indexed_dates", []))
+    existing.update(new_dates)
+    idx["indexed_dates"] = sorted(existing)
+    _save_shot_index()
+
+
+def lookup_shots_by_profile(profile_name: str, limit: int = 20) -> Optional[list]:
+    """Return shots for a profile from the index, or None if index is empty."""
+    idx = _load_shot_index()
+    entries = idx.get("entries", {})
+    if not entries:
+        return None
+
+    matches = []
+    for key, meta in entries.items():
+        if meta.get("name", "").lower() == profile_name.lower():
+            parts = key.split("/", 1)
+            if len(parts) == 2:
+                matches.append({
+                    "date": parts[0],
+                    "filename": parts[1],
+                    "timestamp": meta.get("timestamp"),
+                    "profile_name": meta["name"],
+                    "profile_id": meta.get("profile_id", ""),
+                    "final_weight": meta.get("weight"),
+                    "total_time": meta["time_ms"] / 1000 if meta.get("time_ms") else None,
+                })
+
+    # Sort newest first
+    matches.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+    return matches[:limit]
+
+
+def get_all_indexed_shots(limit: int = 50, offset: int = 0) -> Optional[list]:
+    """Return all indexed shots sorted newest-first, or None if empty."""
+    idx = _load_shot_index()
+    entries = idx.get("entries", {})
+    if not entries:
+        return None
+
+    all_shots = []
+    for key, meta in entries.items():
+        parts = key.split("/", 1)
+        if len(parts) == 2:
+            all_shots.append({
+                "date": parts[0],
+                "filename": parts[1],
+                "timestamp": meta.get("timestamp"),
+                "profile_name": meta.get("name", ""),
+                "profile_id": meta.get("profile_id", ""),
+                "final_weight": meta.get("weight"),
+                "total_time": meta["time_ms"] / 1000 if meta.get("time_ms") else None,
+            })
+
+    all_shots.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+    return all_shots[offset:offset + limit]
+
+
+# ============================================
 # Profile Image Cache Management
 # ============================================
 

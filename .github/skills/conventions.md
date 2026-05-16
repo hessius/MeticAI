@@ -1,6 +1,6 @@
 # Agent Skill: Project Conventions
 
-Quick reference for MeticAI project conventions and the self-improvement system.
+Quick reference for Metic project conventions and the self-improvement system.
 
 ## 1. Where Are Conventions?
 

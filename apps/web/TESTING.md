@@ -1,10 +1,10 @@
-# Testing Guide for MeticAI-web
+# Testing Guide for Metic Web
 
-This document provides comprehensive information about the testing infrastructure and how to run tests for the MeticAI-web application.
+This document provides comprehensive information about the testing infrastructure and how to run tests for the Metic web application.
 
 ## Overview
 
-The MeticAI-web application has four layers of testing:
+The Metic web application has four layers of testing:
 
 1. **Unit Tests** - Test individual functions and components in isolation
 2. **Integration Tests** - Test how components work together

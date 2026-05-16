@@ -1,4 +1,4 @@
-# Metic v2.0 — API Reference
+# Metic — API Reference
 
 ## Base URL
 

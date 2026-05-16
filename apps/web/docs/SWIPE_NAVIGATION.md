@@ -1,6 +1,6 @@
 # Swipe Navigation & Gesture Support
 
-This document describes the swipe navigation and gesture support implemented in the MeticAI web application.
+This document describes the swipe navigation and gesture support implemented in the Metic web application.
 
 ## Features
 

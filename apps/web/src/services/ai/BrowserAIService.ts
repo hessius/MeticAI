@@ -27,6 +27,8 @@ import {
   buildDialInPrompt,
 } from './prompts'
 import { buildFullProfilePrompt, validateAndRetryProfile } from './profilePromptFull'
+import { retryWithBackoff } from './retryUtils'
+import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
 
@@ -61,7 +63,7 @@ function getClient(): GoogleGenAI {
  * Typed AI service error codes — UI layer translates these via i18n.
  * This keeps the service layer free of user-facing strings.
  */
-export type AIErrorCode = 'API_KEY_MISSING' | 'QUOTA_EXCEEDED' | 'API_KEY_INVALID' | 'MODEL_NOT_FOUND' | 'NETWORK_ERROR' | 'IMAGE_GENERATION_FAILED' | 'IMAGE_NO_DATA' | 'UNKNOWN'
+export type AIErrorCode = 'API_KEY_MISSING' | 'QUOTA_EXCEEDED' | 'API_KEY_INVALID' | 'MODEL_NOT_FOUND' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'IMAGE_GENERATION_FAILED' | 'IMAGE_NO_DATA' | 'UNKNOWN'
 
 export class AIServiceError extends Error {
   constructor(public readonly code: AIErrorCode, cause?: unknown) {
@@ -74,6 +76,8 @@ export class AIServiceError extends Error {
 /** Map common Gemini SDK errors to typed error codes */
 function wrapApiError(err: unknown): never {
   const msg = err instanceof Error ? err.message : String(err)
+  if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('overloaded'))
+    throw new AIServiceError('SERVICE_UNAVAILABLE', err)
   if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota'))
     throw new AIServiceError('QUOTA_EXCEEDED', err)
   if (msg.includes('401') || msg.includes('403') || msg.includes('API_KEY_INVALID'))
@@ -154,15 +158,21 @@ export function createBrowserAIService(): AIService {
         return fixResponse.text ?? ''
       }
 
-      const { profileJson, reply: validatedReply } = await validateAndRetryProfile(text, generateFix)
+      const { reply: validatedReply } = await validateAndRetryProfile(text, generateFix)
       text = validatedReply
 
       onProgress?.({ phase: 'complete', message: 'generation.progress.profileGenerated' })
 
+      // Strip raw JSON blocks from analysis text shown to user (#419)
+      const cleanAnalysis = text
+        .replace(/```json\s*[\s\S]*?```/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+
       return {
         status: 'success',
-        analysis: text,
-        reply: profileJson ? JSON.stringify(profileJson) : text,
+        analysis: cleanAnalysis || i18n.t('profileCreatedSuccessfully'),
+        reply: text, // Keep full reply with fenced JSON for downstream extraction
       }
     },
 
@@ -177,10 +187,12 @@ export function createBrowserAIService(): AIService {
 
       let response
       try {
-        response = await client.models.generateContent({
-          model: getGeminiModel(),
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        })
+        response = await retryWithBackoff(() =>
+          client.models.generateContent({
+            model: getGeminiModel(),
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          })
+        )
       } catch (err) {
         wrapApiError(err)
       }

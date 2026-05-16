@@ -144,6 +144,7 @@
     "placeholderText": "ex. Extraction équilibrée, notes de noisette...",
     "generateProfile": "Générer le profil",
     "profileGenerated": "Profil généré !",
+    "profileCreatedSuccessfully": "Profil créé avec succès.",
     "backToForm": "Retour au formulaire",
     "validationError": "Veuillez fournir au moins une photo du paquet de café ou des préférences gustatives",
     "youHaveProfiles": "Vous avez {{count}} profil enregistré",
@@ -274,7 +275,7 @@
     "specificDays": "Jours spécifiques",
     "preheatOnlyHelper": "Préchauffage uniquement - aucun profil ne sera exécuté",
     "preheatStartsNow": "Le préchauffage commence maintenant, profil exécuté dans 10 min",
-    "preheatStartsBefore": "Le préchauffage commence 10 min avant l'heure programmée",
+    "preheatStartsBefore": "Le préchauffage commence {{minutes}} min avant l'heure programmée",
     "toasts": {
       "preheatingStarted": "Préchauffage démarré ! Prêt dans 10 minutes",
       "profileWillRun": "Le profil \"{{name}}\" sera exécuté dans 10 minutes",
@@ -368,7 +369,9 @@
     "lastUpdated": "Dernière mise à jour : {{time}}",
     "fetchFailed": "Échec du chargement des shots",
     "fetchDatesFailed": "Échec du chargement des dates",
-    "backgroundRefreshFailed": "Échec de l'actualisation en arrière-plan"
+    "backgroundRefreshFailed": "Échec de l'actualisation en arrière-plan",
+    "exitedBecause": "Terminé : {{trigger}} atteint ({{actual}})",
+    "exitedByLimit": "Terminé : limite de {{limit}} atteinte ({{actual}})"
   },
   "shotAnalysisView": {
     "title": "Analyse des extractions",
@@ -561,7 +564,11 @@
     "feedbackFailed": "Échec de l'envoi du commentaire",
     "geminiModel25Flash": "Gemini 2.5 Flash (Recommandé)",
     "geminiModel25Pro": "Gemini 2.5 Pro",
+    "geminiModel25FlashLite": "Gemini 2.5 Flash Lite",
     "geminiModel20Flash": "Gemini 2.0 Flash",
+    "geminiModel31Flash": "Gemini 3.1 Flash",
+    "geminiModel31Pro": "Gemini 3.1 Pro",
+    "geminiModel31FlashLite": "Gemini 3.1 Flash Lite",
     "aiSettings": "Paramètres IA",
     "versionAndChangelog": "Version et journal des modifications",
     "mqttBridge": "Pont MQTT",
@@ -752,7 +759,9 @@
       "pressureLabel": "Pression",
       "flowLabel": "Débit",
       "power": "Puissance",
-      "temp": "Temp"
+      "temp": "Temp",
+      "brewTemp": "Tête d'infusion",
+      "boilerTemp": "Chambre d'infusion"
     },
     "actions": {
       "start": "Démarrer",
@@ -787,7 +796,8 @@
       "placeholder": "Changer de profil…",
       "noProfiles": "Aucun profil disponible",
       "noDescription": "Aucune description",
-      "defaultDescription": "Profil espresso"
+      "defaultDescription": "Profil espresso",
+      "stageCount": "{{count}} étapes"
     },
     "confirm": {
       "stopTitle": "Arrêter l'extraction ?",
@@ -885,7 +895,10 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
-    "targets": "Cibles"
+    "targets": "Cibles",
+    "shotLabel": "Extraction",
+    "targetsLabel": "Cibles",
+    "stagesLabel": "Étapes"
   },
   "expertAnalysis": {
     "title": "AI Shot Analysis",
@@ -1515,7 +1528,10 @@
     "disclaimer": "Cette analyse est générée par l'IA à partir des données du shot. Les résultats doivent être utilisés comme guide, pas comme vérité absolue. Faites toujours confiance à vos propres préférences gustatives."
   },
   "error": {
-    "somethingWentWrong": "Quelque chose s'est mal passé"
+    "somethingWentWrong": "Quelque chose s'est mal passé",
+    "aiModelUnavailable": "Le modèle d'IA est temporairement indisponible — il s'agit d'une panne côté Google. Essayez de changer de modèle dans les Paramètres, ce qui peut également augmenter l'utilisation des tokens.",
+    "aiQuotaExceeded": "Quota d'API dépassé. Veuillez patienter un instant et réessayer.",
+    "analysisFailed": "Analyse échouée"
   },
   "findSimilar": {
     "fetchFailed": "Échec du chargement des profils similaires"

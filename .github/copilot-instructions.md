@@ -1,6 +1,6 @@
-# MeticAI — Agent Instructions
+# Metic — Agent Instructions
 
-MeticAI is an AI-powered controller for the Meticulous Espresso Machine. Stack: Python 3.13 (FastAPI), React + TypeScript (Vite/Bun), Google Gemini Python SDK, Docker + s6-overlay. Repository: https://github.com/hessius/MeticAI. The `VERSION` file triggers the auto-release workflow.
+Metic is an AI-powered controller for the Meticulous Espresso Machine. Stack: Python 3.13 (FastAPI), React + TypeScript (Vite/Bun), Google Gemini Python SDK, Docker + s6-overlay. Repository: https://github.com/hessius/MeticAI. The `VERSION` file triggers the auto-release workflow.
 
 ## Core Architecture
 

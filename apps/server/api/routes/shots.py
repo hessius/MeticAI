@@ -23,6 +23,10 @@ from services.cache_service import (
     save_llm_analysis_to_cache,
     _get_cached_shots,
     _set_cached_shots,
+    get_indexed_dates,
+    lookup_shots_by_profile,
+    get_all_indexed_shots,
+    update_shot_index,
 )
 from services.analysis_service import _perform_local_shot_analysis
 from services.gemini_service import (
@@ -386,13 +390,64 @@ async def get_shots_by_profile(
             )
 
         dates = [d.name for d in dates_result] if dates_result else []
-        matching_shots = []
 
-        # Concurrency limiter — avoid overwhelming the machine with requests
-        sem = asyncio.Semaphore(6)
+        # ---- Phase 1: Check shot profile index for instant results ----
+        if not include_data:
+            indexed = lookup_shots_by_profile(profile_name, limit)
+            indexed_dates = get_indexed_dates()
+            if indexed is not None and set(dates).issubset(indexed_dates):
+                # Index covers all dates — return directly
+                current_time = time.time()
+                response_data = {
+                    "profile_name": profile_name,
+                    "shots": indexed[:limit],
+                    "count": len(indexed[:limit]),
+                    "limit": limit,
+                    "cached_at": current_time,
+                    "is_stale": False,
+                }
+                _set_cached_shots(profile_name, response_data, limit)
+                return response_data
 
-        async def _fetch_and_match(date: str, filename: str):
-            """Fetch a single shot and return info dict if it matches, else None."""
+        # ---- Phase 2: Parallel scan for un-indexed dates ----
+        indexed_dates = get_indexed_dates()
+        new_dates = [d for d in dates if d not in indexed_dates]
+        already_indexed_dates = [d for d in dates if d in indexed_dates]
+
+        # Higher concurrency for file listing (lightweight calls)
+        sem_files = asyncio.Semaphore(20)
+
+        async def _list_files(date: str):
+            async with sem_files:
+                try:
+                    result = await async_get_shot_files(date)
+                    if hasattr(result, "error") and result.error:
+                        return date, []
+                    return date, [f.name for f in result] if result else []
+                except Exception:
+                    return date, []
+
+        # Fetch file listings for ALL new dates in parallel
+        file_results = await asyncio.gather(
+            *[_list_files(d) for d in sorted(new_dates, reverse=True)],
+            return_exceptions=True,
+        )
+
+        # Build flat list of (date, filename) to scan — newest first
+        shots_to_scan = []
+        for result in file_results:
+            if isinstance(result, Exception):
+                continue
+            date, files = result
+            for fn in sorted(files, reverse=True):
+                shots_to_scan.append((date, fn))
+
+        # Fetch and index shots in parallel with higher concurrency
+        sem = asyncio.Semaphore(15)
+        new_index_entries = {}
+
+        async def _fetch_and_index(date: str, filename: str):
+            """Fetch a shot, extract metadata, return index entry."""
             async with sem:
                 try:
                     shot_data = await fetch_shot_data(date, filename)
@@ -403,23 +458,39 @@ async def get_shots_by_profile(
                     )
                     return None
 
-                # Extract profile name from shot data
                 shot_profile_name = shot_data.get("profile_name", "")
-                if not shot_profile_name and isinstance(shot_data.get("profile"), dict):
-                    shot_profile_name = shot_data.get("profile", {}).get("name", "")
+                if not shot_profile_name and isinstance(
+                    shot_data.get("profile"), dict
+                ):
+                    shot_profile_name = (
+                        shot_data.get("profile", {}).get("name", "")
+                    )
 
-                if shot_profile_name.lower() != profile_name.lower():
-                    return None
+                profile_id = ""
+                if isinstance(shot_data.get("profile"), dict):
+                    profile_id = shot_data["profile"].get("id", "")
 
                 data_entries = shot_data.get("data", [])
                 final_weight = None
                 total_time_ms = None
-
                 if data_entries:
                     last_entry = data_entries[-1]
                     if isinstance(last_entry.get("shot"), dict):
                         final_weight = last_entry["shot"].get("weight")
                     total_time_ms = last_entry.get("time")
+
+                key = f"{date}/{filename}"
+                entry = {
+                    "name": shot_profile_name,
+                    "profile_id": profile_id,
+                    "weight": final_weight,
+                    "time_ms": total_time_ms,
+                    "timestamp": shot_data.get("time"),
+                }
+                new_index_entries[key] = entry
+
+                if shot_profile_name.lower() != profile_name.lower():
+                    return None
 
                 shot_info = {
                     "date": date,
@@ -427,39 +498,46 @@ async def get_shots_by_profile(
                     "timestamp": shot_data.get("time"),
                     "profile_name": shot_profile_name,
                     "final_weight": final_weight,
-                    "total_time": total_time_ms / 1000 if total_time_ms else None,
+                    "total_time": total_time_ms / 1000
+                    if total_time_ms
+                    else None,
                 }
-
                 if include_data:
                     shot_info["data"] = shot_data
-
                 return shot_info
 
-        # Search through dates (most recent first), fetch files concurrently per date
-        for date in sorted(dates, reverse=True):
-            if len(matching_shots) >= limit:
-                break
+        # Fire all scans in parallel
+        scan_results = await asyncio.gather(
+            *[_fetch_and_index(d, fn) for d, fn in shots_to_scan],
+            return_exceptions=True,
+        )
 
-            # Get file listing for this date (lightweight, sequential is fine)
-            files_result = await async_get_shot_files(date)
-            if hasattr(files_result, "error") and files_result.error:
-                logger.warning(f"Could not get files for {date}: {files_result.error}")
-                continue
+        # Persist index entries
+        if new_index_entries:
+            update_shot_index(new_index_entries, new_dates)
 
-            files = [f.name for f in files_result] if files_result else []
-            if not files:
-                continue
+        # Collect matches from new scans
+        new_matches = [
+            r
+            for r in scan_results
+            if r is not None and not isinstance(r, Exception)
+        ]
 
-            # Fire off all shot fetches for this date concurrently
-            tasks = [_fetch_and_match(date, fn) for fn in files]
-            results = await asyncio.gather(*tasks)
+        # Combine with matches from already-indexed dates
+        indexed_matches = lookup_shots_by_profile(profile_name, limit) or []
+        # Filter indexed matches to only already-indexed dates
+        idx_from_cache = [
+            m
+            for m in indexed_matches
+            if m["date"] in already_indexed_dates
+        ]
 
-            # Collect matches (preserve chronological order)
-            for result in results:
-                if result is not None:
-                    matching_shots.append(result)
-                    if len(matching_shots) >= limit:
-                        break
+        matching_shots = new_matches + idx_from_cache
+        # Sort newest first, trim to limit
+        matching_shots.sort(
+            key=lambda x: x.get("timestamp") or "", reverse=True
+        )
+        matching_shots = matching_shots[:limit]
 
         logger.info(
             f"Found {len(matching_shots)} shots for profile '{profile_name}'",
@@ -1193,27 +1271,125 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
 
         # We need enough shots for offset + limit; collect greedily
         needed = offset + limit
-        for date in dates:
-            if len(all_shots) >= needed:
-                break
 
-            files_result = await async_get_shot_files(date)
-            if hasattr(files_result, "error") and files_result.error:
-                continue
-            files = (
-                sorted([f.name for f in files_result], reverse=True)
-                if files_result
-                else []
-            )
-            if not files:
-                continue
+        # ---- Try shot profile index for instant results ----
+        indexed_dates = get_indexed_dates()
+        if set(dates).issubset(indexed_dates):
+            indexed_all = get_all_indexed_shots(limit=needed + 10, offset=0)
+            if indexed_all is not None:
+                # Enrich with annotation data
+                for shot in indexed_all:
+                    annotation = get_annotation(shot["date"], shot["filename"])
+                    shot["has_annotation"] = annotation is not None
+                page = indexed_all[offset : offset + limit]
+                response_data = {"shots": page}
+                _cache_recent_shots(cache_key, response_data)
+                return response_data
 
-            remaining = needed - len(all_shots)
-            tasks = [_fetch_shot_info(date, fn) for fn in files[:remaining]]
-            results = await asyncio.gather(*tasks)
-            for r in results:
-                if r is not None:
-                    all_shots.append(r)
+        # ---- Parallel scan for un-indexed dates ----
+        new_dates = [d for d in dates if d not in indexed_dates]
+
+        sem_files = asyncio.Semaphore(20)
+
+        async def _list_files_recent(date: str):
+            async with sem_files:
+                try:
+                    result = await async_get_shot_files(date)
+                    if hasattr(result, "error") and result.error:
+                        return date, []
+                    return date, sorted(
+                        [f.name for f in result], reverse=True
+                    ) if result else (date, [])
+                except Exception:
+                    return date, []
+
+        # Fetch file listings for new dates in parallel
+        file_results = await asyncio.gather(
+            *[_list_files_recent(d) for d in sorted(new_dates, reverse=True)],
+            return_exceptions=True,
+        )
+
+        shots_to_scan = []
+        for result in file_results:
+            if isinstance(result, Exception):
+                continue
+            date, files = result
+            for fn in files:
+                shots_to_scan.append((date, fn))
+
+        # Fetch shot data in parallel
+        new_index_entries = {}
+
+        async def _fetch_and_index_recent(date: str, filename: str):
+            async with sem:
+                try:
+                    shot_data = await fetch_shot_data(date, filename)
+                except Exception:
+                    return None
+
+                p_name = shot_data.get("profile_name", "")
+                if not p_name and isinstance(shot_data.get("profile"), dict):
+                    p_name = shot_data["profile"].get("name", "")
+
+                p_id = ""
+                if isinstance(shot_data.get("profile"), dict):
+                    p_id = shot_data["profile"].get("id", "")
+
+                data_entries = shot_data.get("data", [])
+                final_weight = None
+                total_time_ms = None
+                if data_entries:
+                    last_entry = data_entries[-1]
+                    if isinstance(last_entry.get("shot"), dict):
+                        final_weight = last_entry["shot"].get("weight")
+                    total_time_ms = last_entry.get("time")
+
+                timestamp = shot_data.get("time")
+                key = f"{date}/{filename}"
+                new_index_entries[key] = {
+                    "name": p_name,
+                    "profile_id": p_id,
+                    "weight": final_weight,
+                    "time_ms": total_time_ms,
+                    "timestamp": timestamp,
+                }
+
+                annotation = get_annotation(date, filename)
+                return {
+                    "profile_name": p_name,
+                    "profile_id": p_id,
+                    "date": date,
+                    "filename": filename,
+                    "timestamp": timestamp,
+                    "final_weight": final_weight,
+                    "total_time": total_time_ms / 1000 if total_time_ms else None,
+                    "has_annotation": annotation is not None,
+                }
+
+        scan_results = await asyncio.gather(
+            *[_fetch_and_index_recent(d, fn) for d, fn in shots_to_scan],
+            return_exceptions=True,
+        )
+
+        # Persist index
+        if new_index_entries:
+            update_shot_index(new_index_entries, new_dates)
+
+        # Combine new scans with indexed data
+        new_shots = [
+            r for r in scan_results
+            if r is not None and not isinstance(r, Exception)
+        ]
+        # Also include already-indexed shots
+        idx_shots = get_all_indexed_shots(limit=needed + 10, offset=0) or []
+        for shot in idx_shots:
+            annotation = get_annotation(shot["date"], shot["filename"])
+            shot["has_annotation"] = annotation is not None
+
+        all_shots = new_shots + [
+            s for s in idx_shots
+            if s["date"] in indexed_dates
+        ]
 
         # Sort by timestamp descending (handle None timestamps)
         all_shots.sort(
