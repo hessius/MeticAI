@@ -202,7 +202,8 @@ def _format_exit_triggers(
             comparison, comparison
         )
 
-        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s"}.get(
+        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s",
+                "flow_dose_correlation": "×dose", "pressure_rise": "bar"}.get(
             trigger_type, ""
         )
 
@@ -321,7 +322,8 @@ def _determine_exit_trigger_hit(
             was_hit = abs(actual_value - value) < tolerance
 
         # Build a proper description with the resolved value
-        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s"}.get(
+        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s",
+                "flow_dose_correlation": "×dose", "pressure_rise": "bar"}.get(
             trigger_type, ""
         )
         trigger_info = {

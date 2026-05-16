@@ -78,6 +78,7 @@ function startsWithEmoji(str: string): boolean {
 const VALID_STAGE_TYPES = new Set(['power', 'flow', 'pressure'])
 const VALID_EXIT_TRIGGER_TYPES = new Set([
   'weight', 'pressure', 'flow', 'time', 'piston_position', 'power', 'user_interaction',
+  'flow_dose_correlation', 'pressure_rise',
 ])
 const VALID_COMPARISONS = new Set(['>=', '<='])
 const VALID_DYNAMICS_OVER = new Set(['time', 'weight', 'piston_position'])

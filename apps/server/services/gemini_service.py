@@ -262,6 +262,14 @@ Note: No pressure target, entirely flow-controlled
 - Use pressure threshold (<= 2 bar) OR flow threshold (>= 0.2 ml/s) OR weight threshold (>= 0.3g)
 - Multiple triggers ensure stage exits when saturation achieved, not on exact timing
 
+**Advanced Pre-infusion Exit Conditions** (app-monitored, not native machine triggers):
+- **flow_dose_correlation**: Exit when accumulated water volume ≥ (multiplier × dose).
+  Default multiplier is 2.0 (e.g., 18g dose → exit at 36ml absorbed).
+  Useful for ensuring consistent puck saturation regardless of grind.
+- **pressure_rise**: Exit when pressure rises above a threshold (e.g., 2 bar) after starting low.
+  Indicates the puck has fully saturated and resistance is building.
+  Good for light roasts that need thorough pre-infusion.
+
 **Infusion/Hold Exit Strategy**:
 - Always use weight threshold with >= comparison for target yield
 - Always include time-based safety timeout (prevents infinite extraction)
@@ -365,6 +373,7 @@ PROFILING_KNOWLEDGE_DISTILLED = """\
 
 ## Four-Phase Structure
 1. **Pre-infusion**: Flow 2-4 ml/s, pressure limit ~2 bar, exit on pressure threshold or weight ~5-8g
+   Advanced exits: flow_dose_correlation (volume ≥ multiplier × dose), pressure_rise (pressure exceeds threshold)
 2. **Bloom** (optional): Zero flow, hold 0.5-1.5 bar, 5-30s. Use for fresh coffee or light roasts
 3. **Infusion**: Ramp to target pressure/flow. This is where 60-75% of yield extracts
 4. **Taper**: Decline pressure/flow over final 20-30% of yield. Reduces bitterness and astringency
