@@ -447,6 +447,7 @@
     "authorNameDescription": "Ditt namn för författarfältet i genererad profil-JSON. Standardvärde \"Metic\" om det lämnas tomt.",
     "geminiModel": "Gemini-modell",
     "geminiModelDescription": "Välj vilken Gemini-modell som ska användas för AI-funktioner.",
+    "geminiModelDescriptionDynamic": "Modeller hämtade från Google AI. Välj vilken modell som ska användas.",
     "mqttEnabled": "MQTT-brygga",
     "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
     "settingsSaved": "Inställningar sparade framgångsrikt!",

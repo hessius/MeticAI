@@ -27,6 +27,66 @@ def get_model_name() -> str:
     return value or _DEFAULT_MODEL
 
 
+# Ordered fallback chain for model deprecation resilience
+_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
+
+
+async def validate_model(model_name: str) -> bool:
+    """Check if a model is available via the Gemini API."""
+    try:
+        client = get_gemini_client()
+    except ValueError:
+        return False
+    try:
+        await asyncio.to_thread(client.models.get, model=model_name)
+        return True
+    except Exception as e:
+        logger.warning("Model %s unavailable: %s", model_name, e)
+        return False
+
+
+async def get_available_models() -> list[dict]:
+    """Return list of available Gemini models suitable for text generation."""
+    try:
+        client = get_gemini_client()
+    except ValueError:
+        return []
+    try:
+        models = await asyncio.to_thread(lambda: list(client.models.list()))
+        result = []
+        for m in models:
+            if hasattr(m, "supported_actions") and "generateContent" in (
+                m.supported_actions or []
+            ):
+                result.append(
+                    {
+                        "id": m.name,
+                        "display_name": m.display_name or m.name,
+                        "description": m.description or "",
+                    }
+                )
+        return result
+    except Exception as e:
+        logger.error("Failed to list models: %s", e)
+        return []
+
+
+async def get_working_model() -> str:
+    """Return a working model, trying configured first then fallbacks."""
+    configured = get_model_name()
+    if await validate_model(configured):
+        return configured
+
+    logger.warning("Configured model '%s' unavailable, trying fallbacks…", configured)
+    for fallback in _FALLBACK_MODELS:
+        if fallback != configured and await validate_model(fallback):
+            logger.info("Falling back to model: %s", fallback)
+            return fallback
+
+    logger.error("No working model found in fallback chain!")
+    return configured
+
+
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
 _GEMINI_NOISE_PREFIXES = (
     "YOLO mode is enabled",

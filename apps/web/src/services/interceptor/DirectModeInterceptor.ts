@@ -3387,6 +3387,19 @@ Rules for recommendations:
       return Promise.resolve(jsonResponse({ status: 'ok', mode: 'direct' }))
     }
 
+    // GET /api/available-models → return static fallback list in direct mode
+    if (url.match(/\/api\/available-models$/)) {
+      const currentModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
+      return Promise.resolve(jsonResponse({
+        models: [
+          { id: 'gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', description: 'Fast and efficient' },
+          { id: 'gemini-2.5-pro', display_name: 'Gemini 2.5 Pro', description: 'Most capable' },
+          { id: 'gemini-2.5-flash-lite', display_name: 'Gemini 2.5 Flash Lite', description: 'Lightweight' },
+        ],
+        current: currentModel,
+      }))
+    }
+
     // GET /api/version → return app version
     if (url.match(/\/api\/version$/)) {
       return Promise.resolve(jsonResponse({

@@ -454,6 +454,7 @@
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"Metic\" if left empty.",
     "geminiModel": "Gemini Model",
     "geminiModelDescription": "Select which Gemini model to use for AI features.",
+    "geminiModelDescriptionDynamic": "Models loaded from Google AI. Select which model to use.",
     "mqttEnabled": "MQTT Bridge",
     "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
     "addToHomeAssistant": "Add to Home Assistant",

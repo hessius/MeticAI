@@ -447,6 +447,7 @@
     "authorNameDescription": "Votre nom pour le champ auteur dans le JSON du profil généré. Par défaut \"Metic\" si laissé vide.",
     "geminiModel": "Modèle Gemini",
     "geminiModelDescription": "Sélectionnez le modèle Gemini à utiliser pour les fonctions IA.",
+    "geminiModelDescriptionDynamic": "Modèles chargés depuis Google AI. Sélectionnez le modèle à utiliser.",
     "mqttEnabled": "Pont MQTT",
     "mqttEnabledDescription": "Télémétrie machine en temps réel via MQTT. Alimente le tableau de bord en direct.",
     "settingsSaved": "Paramètres enregistrés avec succès !",

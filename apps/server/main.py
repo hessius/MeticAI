@@ -191,6 +191,16 @@ async def lifespan(app: FastAPI):
     # Start recurring schedule checker (runs every hour to ensure schedules stay current)
     recurring_task = asyncio.create_task(_recurring_schedule_checker())
 
+    # Validate configured Gemini model on startup
+    try:
+        from services.gemini_service import validate_model, get_model_name
+
+        _model = get_model_name()
+        if not await validate_model(_model):
+            logger.warning("⚠️  Configured Gemini model '%s' may be unavailable", _model)
+    except Exception as e:
+        logger.debug("Skipped model validation at startup: %s", e)
+
     # Start MQTT subscriber for live telemetry
     from services.mqtt_service import get_mqtt_subscriber
 
@@ -377,6 +387,7 @@ from api.routes import (
     pour_over,
     recipes,
     dialin,
+    machine_status,
 )
 
 
@@ -474,6 +485,7 @@ app.include_router(commands.router)
 app.include_router(pour_over.router)
 app.include_router(recipes.router)
 app.include_router(dialin.router)
+app.include_router(machine_status.router)
 
 
 # ============================================================================

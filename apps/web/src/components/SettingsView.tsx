@@ -149,6 +149,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const [errorMessage, setErrorMessage] = useState('')
   const [machineUrlError, setMachineUrlError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+
+  // Dynamic model list from API
+  const [availableModels, setAvailableModels] = useState<Array<{id: string, display_name: string, description: string}>>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [modelsError, setModelsError] = useState(false)
   
   // Machine auto-detect
   const [isDetecting, setIsDetecting] = useState(false)
@@ -330,9 +335,30 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       }
     }
     
+    const loadAvailableModels = async () => {
+      if (isLocalMode()) return
+      setModelsLoading(true)
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/available-models`)
+        if (cancelled) return
+        if (response.ok) {
+          const data = await response.json()
+          if (data.models?.length > 0) {
+            setAvailableModels(data.models)
+          }
+        }
+      } catch {
+        setModelsError(true)
+      } finally {
+        if (!cancelled) setModelsLoading(false)
+      }
+    }
+
     loadSettings()
     loadUpdateMethod()
     loadTailscaleStatus()
+    loadAvailableModels()
 
     return () => { cancelled = true }
   }, [secureGetItem])
@@ -1153,20 +1179,42 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                 <Label htmlFor="geminiModel" className="text-sm font-medium">
                   {t('settings.geminiModel')}
                 </Label>
-                <select
-                  id="geminiModel"
-                  value={settings.geminiModel || 'gemini-2.5-flash'}
-                  onChange={(e) => handleChange('geminiModel', e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
-                  <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
-                  <option value="gemini-2.5-flash-lite">{t('settings.geminiModel25FlashLite')}</option>
-                  <option value="gemini-3.1-pro-preview">{t('settings.geminiModel31Pro')}</option>
-                  <option value="gemini-3.1-flash-lite">{t('settings.geminiModel31FlashLite')}</option>
-                </select>
+                <div className="relative">
+                  <select
+                    id="geminiModel"
+                    value={settings.geminiModel || 'gemini-2.5-flash'}
+                    onChange={(e) => handleChange('geminiModel', e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    disabled={modelsLoading}
+                  >
+                    {availableModels.length > 0 ? (
+                      availableModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.display_name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
+                        <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
+                        <option value="gemini-2.5-flash-lite">{t('settings.geminiModel25FlashLite')}</option>
+                        <option value="gemini-3.1-pro-preview">{t('settings.geminiModel31Pro')}</option>
+                        <option value="gemini-3.1-flash-lite">{t('settings.geminiModel31FlashLite')}</option>
+                      </>
+                    )}
+                  </select>
+                  {modelsLoading && (
+                    <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                      <ArrowsClockwise className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {t('settings.geminiModelDescription')}
+                  {modelsError
+                    ? t('settings.geminiModelDescription')
+                    : availableModels.length > 0
+                      ? t('settings.geminiModelDescriptionDynamic')
+                      : t('settings.geminiModelDescription')}
                 </p>
               </div>
 

@@ -16049,3 +16049,247 @@ class TestRepairEndpoint:
         assert data["skipped_no_json"] == 1
         assert data["repaired_from_machine"] == 0
         assert data["normalized_locally"] == 0
+
+
+class TestAvailableModelsEndpoint:
+    """Tests for the /api/available-models endpoint."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_returns_list(self, mock_client, client):
+        """Test that /api/available-models returns expected format."""
+        mock_model = Mock()
+        mock_model.name = "gemini-2.5-flash"
+        mock_model.display_name = "Gemini 2.5 Flash"
+        mock_model.description = "Fast model"
+        mock_model.supported_actions = ["generateContent"]
+
+        mock_client.return_value.models.list.return_value = [mock_model]
+
+        response = client.get("/api/available-models")
+        assert response.status_code == 200
+        data = response.json()
+        assert "models" in data
+        assert "current" in data
+        assert isinstance(data["models"], list)
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_filters_non_generative(self, mock_client, client):
+        """Test that models without generateContent are filtered out."""
+        gen_model = Mock()
+        gen_model.name = "gemini-2.5-flash"
+        gen_model.display_name = "Gemini 2.5 Flash"
+        gen_model.description = "Fast model"
+        gen_model.supported_actions = ["generateContent"]
+
+        embed_model = Mock()
+        embed_model.name = "text-embedding-004"
+        embed_model.display_name = "Text Embedding"
+        embed_model.description = "Embedding model"
+        embed_model.supported_actions = ["embedContent"]
+
+        mock_client.return_value.models.list.return_value = [gen_model, embed_model]
+
+        response = client.get("/api/available-models")
+        data = response.json()
+        assert len(data["models"]) == 1
+        assert data["models"][0]["id"] == "gemini-2.5-flash"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_handles_api_error(self, mock_client, client):
+        """Test graceful handling when Gemini API fails."""
+        mock_client.return_value.models.list.side_effect = Exception("API error")
+
+        response = client.get("/api/available-models")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["models"] == []
+
+    @patch.dict(os.environ, {}, clear=False)
+    def test_available_models_no_api_key(self, client):
+        """Test response when no API key is configured."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GEMINI_API_KEY", None)
+            # Reset cached client
+            import services.gemini_service
+            services.gemini_service._gemini_client = None
+
+            response = client.get("/api/available-models")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["models"] == []
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_includes_current(self, mock_client, client):
+        """Test that current model name is included in response."""
+        mock_client.return_value.models.list.return_value = []
+
+        response = client.get("/api/available-models")
+        data = response.json()
+        assert data["current"] == "gemini-2.5-flash"
+
+
+class TestModelValidation:
+    """Tests for model validation and fallback logic."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_validate_model_success(self, mock_client):
+        """Test validate_model returns True for available model."""
+        mock_client.return_value.models.get.return_value = Mock()
+
+        from services.gemini_service import validate_model
+        result = asyncio.run(validate_model("gemini-2.5-flash"))
+        assert result is True
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_validate_model_failure(self, mock_client):
+        """Test validate_model returns False for unavailable model."""
+        mock_client.return_value.models.get.side_effect = Exception("Not found")
+
+        from services.gemini_service import validate_model
+        result = asyncio.run(validate_model("gemini-old-model"))
+        assert result is False
+
+    def test_validate_model_no_api_key(self):
+        """Test validate_model returns False when no API key."""
+        import services.gemini_service
+        services.gemini_service._gemini_client = None
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GEMINI_API_KEY", None)
+            from services.gemini_service import validate_model
+            result = asyncio.run(validate_model("gemini-2.5-flash"))
+            assert result is False
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_get_working_model_configured_works(self, mock_client):
+        """Test get_working_model returns configured model when valid."""
+        mock_client.return_value.models.get.return_value = Mock()
+
+        from services.gemini_service import get_working_model
+        result = asyncio.run(get_working_model())
+        assert result == "gemini-2.5-flash"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "GEMINI_MODEL": "deprecated-model"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_get_working_model_falls_back(self, mock_client):
+        """Test get_working_model falls back when configured model fails."""
+        def side_effect(*, model):
+            if model == "deprecated-model":
+                raise Exception("Model deprecated")
+            return Mock()
+
+        mock_client.return_value.models.get.side_effect = side_effect
+
+        from services.gemini_service import get_working_model
+        result = asyncio.run(get_working_model())
+        assert result == "gemini-2.5-flash"
+
+
+# ─── Machine Status Endpoint Tests ──────────────────────────────────────────
+
+
+@patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "METICULOUS_IP": "http://meticulous.local"})
+class TestMachineStatusHealth:
+    """Tests for GET /api/machine/status/health."""
+
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_returns_watcher_data(self, mock_client_cls, client):
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "services": [{"name": "meticulous", "status": "running"}],
+            "system": {"cpu_temperature": 55, "uptime": 3600},
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/status/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert "services" in data
+        assert data["services"][0]["name"] == "meticulous"
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_returns_error_when_unreachable(self, mock_client_cls, client):
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.ConnectError("Connection refused")
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/status/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] == "Watcher service unavailable"
+        assert data["services"] == []
+
+
+@patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "METICULOUS_IP": "http://meticulous.local"})
+class TestMachineSystemInfo:
+    """Tests for GET /api/machine/system-info."""
+
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_returns_system_info(self, mock_client_cls, client):
+        async def mock_get(url):
+            resp = AsyncMock()
+            resp.status_code = 200
+            if "firmware" in url:
+                resp.json.return_value = {"version": "1.2.3"}
+            elif "wifi/status" in url:
+                resp.json.return_value = {"ssid": "HomeWiFi"}
+            elif "hostname" in url:
+                resp.json.return_value = {"hostname": "meticulous"}
+            return resp
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=mock_get)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/system-info")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["firmware"]["version"] == "1.2.3"
+        assert data["network"]["ssid"] == "HomeWiFi"
+        assert data["hostname"]["hostname"] == "meticulous"
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_handles_partial_failure(self, mock_client_cls, client):
+        async def mock_get(url):
+            if "firmware" in url:
+                raise httpx.ConnectError("Connection refused")
+            resp = AsyncMock()
+            resp.status_code = 200
+            resp.json.return_value = {"ssid": "HomeWiFi"}
+            return resp
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=mock_get)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/system-info")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["firmware"] is None
