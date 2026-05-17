@@ -2095,7 +2095,9 @@ export function installDirectModeInterceptor(): void {
       return (async () => {
         try {
           const machineBase = getDefaultMachineUrl()
-          const watcherUrl = machineBase.replace(':8080', ':3000').replace(/\/$/, '')
+          const parsed = new URL(machineBase)
+          parsed.port = '3000'
+          const watcherUrl = parsed.origin
           const resp = await _originalFetch(`${watcherUrl}/status`, { signal: AbortSignal.timeout(5000) })
           if (resp.ok) {
             const raw = await resp.json()

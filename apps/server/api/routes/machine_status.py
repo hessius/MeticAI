@@ -1,6 +1,7 @@
 """Machine status endpoints — proxy to meticulous-watcher and machine API."""
 
 import re
+from urllib.parse import urlparse, urlunparse
 from fastapi import APIRouter
 from services.meticulous_service import _resolve_meticulous_base_url
 import httpx
@@ -8,6 +9,14 @@ from logging_config import get_logger
 
 logger = get_logger()
 router = APIRouter()
+
+
+def _watcher_url(machine_url: str) -> str:
+    """Derive the watcher URL (port 3000) from the machine base URL."""
+    parsed = urlparse(machine_url)
+    # Replace whatever port (or no port) with 3000
+    watcher_netloc = parsed.hostname or parsed.netloc
+    return urlunparse((parsed.scheme or "http", f"{watcher_netloc}:3000", "", "", "", ""))
 
 
 def _parse_size_to_mb(size_str: str) -> float:
@@ -98,11 +107,10 @@ def _transform_watcher_response(raw: dict) -> dict:
 async def get_machine_status():
     """Proxy to meticulous-watcher service for health status."""
     machine_url = _resolve_meticulous_base_url()
-    # Watcher runs on port 3000
-    watcher_url = machine_url.replace(":8080", ":3000").rstrip("/")
+    watcher_base = _watcher_url(machine_url)
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{watcher_url}/status")
+            resp = await client.get(f"{watcher_base}/status")
             resp.raise_for_status()
             return _transform_watcher_response(resp.json())
     except Exception as e:
