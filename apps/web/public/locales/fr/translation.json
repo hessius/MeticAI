@@ -1738,7 +1738,18 @@
     "unavailable": "État de la machine indisponible",
     "retry": "Réessayer",
     "autoRefresh": "Actualisation auto dans",
-    "networkStatus": "Réseau"
+    "networkStatus": "Réseau",
+    "justNow": "à l'instant",
+    "secondsAgo": "il y a {{count}}s",
+    "hostname": "Nom d'hôte",
+    "firmware": "Firmware",
+    "wifi": "WiFi",
+    "statusRunning": "En cours",
+    "statusDegraded": "Dégradé",
+    "statusStopped": "Arrêté",
+    "unitDay": "j",
+    "unitHour": "h",
+    "unitMinute": "m"
   },
   "imageGeneration": {
     "batchCount": "Nombre d'images",

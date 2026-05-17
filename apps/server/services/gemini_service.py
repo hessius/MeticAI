@@ -75,16 +75,32 @@ async def get_working_model() -> str:
     """Return a working model, trying configured first then fallbacks."""
     configured = get_model_name()
     if await validate_model(configured):
+        _validated_model_cache["model"] = configured
         return configured
 
     logger.warning("Configured model '%s' unavailable, trying fallbacks…", configured)
     for fallback in _FALLBACK_MODELS:
         if fallback != configured and await validate_model(fallback):
             logger.info("Falling back to model: %s", fallback)
+            _validated_model_cache["model"] = fallback
             return fallback
 
     logger.error("No working model found in fallback chain!")
     return configured
+
+
+# Cache for the last validated working model
+_validated_model_cache: dict[str, str] = {}
+
+
+def get_working_model_sync() -> str:
+    """Return cached working model or fall back to get_model_name().
+
+    Avoids async validation in sync contexts.  The cache is populated
+    by ``get_working_model()`` (called at startup and via the /available-models
+    endpoint) so the first generation request always uses a validated model.
+    """
+    return _validated_model_cache.get("model", get_model_name())
 
 
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
@@ -608,7 +624,7 @@ class _GeminiModelWrapper:
             GenerateContentResponse with .text attribute.
         """
         return self._client.models.generate_content(
-            model=get_model_name(),
+            model=get_working_model_sync(),
             contents=contents,
         )
 

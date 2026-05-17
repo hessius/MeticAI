@@ -346,9 +346,12 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         if (cancelled) return
         if (response.ok) {
           const data = await response.json()
+          setModelsError(false)
           if (data.models?.length > 0) {
             setAvailableModels(data.models)
           }
+        } else {
+          setModelsError(true)
         }
       } catch {
         setModelsError(true)

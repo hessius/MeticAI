@@ -1745,7 +1745,18 @@
     "unavailable": "Machine status unavailable",
     "retry": "Retry",
     "autoRefresh": "Auto-refresh in",
-    "networkStatus": "Network"
+    "networkStatus": "Network",
+    "justNow": "just now",
+    "secondsAgo": "{{count}}s ago",
+    "hostname": "Hostname",
+    "firmware": "Firmware",
+    "wifi": "WiFi",
+    "statusRunning": "Running",
+    "statusDegraded": "Degraded",
+    "statusStopped": "Stopped",
+    "unitDay": "d",
+    "unitHour": "h",
+    "unitMinute": "m"
   },
   "imageGeneration": {
     "batchCount": "Number of images",

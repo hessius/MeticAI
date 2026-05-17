@@ -6,7 +6,7 @@ import { MachineStatusCenter } from './MachineStatusCenter'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => {
+    t: (key: string, fallbackOrOpts?: string | Record<string, unknown>) => {
       const translations: Record<string, string> = {
         'machineStatus.title': 'Machine Status',
         'machineStatus.serviceHealth': 'Service Health',
@@ -21,10 +21,26 @@ vi.mock('react-i18next', () => ({
         'machineStatus.retry': 'Retry',
         'machineStatus.autoRefresh': 'Auto-refresh in',
         'machineStatus.networkStatus': 'Network',
+        'machineStatus.justNow': 'just now',
+        'machineStatus.secondsAgo': '{{count}}s ago',
+        'machineStatus.hostname': 'Hostname',
+        'machineStatus.firmware': 'Firmware',
+        'machineStatus.wifi': 'WiFi',
+        'machineStatus.statusRunning': 'Running',
+        'machineStatus.statusDegraded': 'Degraded',
+        'machineStatus.statusStopped': 'Stopped',
+        'machineStatus.unitDay': 'd',
+        'machineStatus.unitHour': 'h',
+        'machineStatus.unitMinute': 'm',
         'common.back': 'Back',
-        'common.justNow': 'just now',
       }
-      return translations[key] ?? fallback ?? key
+      let result = translations[key] ?? key
+      if (typeof fallbackOrOpts === 'object' && fallbackOrOpts) {
+        for (const [k, v] of Object.entries(fallbackOrOpts)) {
+          result = result.replace(`{{${k}}}`, String(v))
+        }
+      }
+      return result
     },
     i18n: { language: 'en', changeLanguage: vi.fn() },
   }),

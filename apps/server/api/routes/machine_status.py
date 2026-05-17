@@ -30,7 +30,7 @@ async def get_machine_system_info():
     """Aggregate system info from machine API."""
     machine_url = _resolve_meticulous_base_url()
     base = machine_url.rstrip("/")
-    info: dict = {}
+    info: dict = {"firmware": None, "network": None, "hostname": None}
     async with httpx.AsyncClient(timeout=5.0) as client:
         for key, path in [
             ("firmware", "/api/v1/system/firmware"),
@@ -42,5 +42,5 @@ async def get_machine_system_info():
                 if resp.status_code == 200:
                     info[key] = resp.json()
             except Exception:
-                info[key] = None
+                pass  # key already initialized to None
     return info

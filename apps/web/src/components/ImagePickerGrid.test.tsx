@@ -139,7 +139,7 @@ describe('ImagePickerGrid', () => {
     expect(screen.getByText('Regenerate')).toBeInTheDocument()
   })
 
-  it('disables buttons for loading or errored slots', () => {
+  it('disables buttons for loading slots and shows regenerate for errored slots', () => {
     const images: BatchImage[] = [
       { index: 0, image: null },
       { index: 1, image: null, error: 'fail' },
@@ -151,13 +151,15 @@ describe('ImagePickerGrid', () => {
         selectedIndex={null}
         onSelect={vi.fn()}
         loading={[true, false]}
+        onRegenerate={vi.fn()}
       />,
     )
 
     const buttons = screen.getAllByRole('button')
-    // Loading slot should be disabled
+    // Loading slot should have a disabled select button
     expect(buttons[0]).toBeDisabled()
-    // Error slot (no image, has error) — the outer button is disabled
-    expect(buttons[1]).toBeDisabled()
+    // Error slot should have a regenerate button instead of a disabled select button
+    expect(buttons[1]).not.toBeDisabled()
+    expect(buttons[1].textContent).toContain('Regenerate')
   })
 })

@@ -662,7 +662,8 @@ async def generate_profile_image(
         async def _generate_single(index: int) -> dict:
             """Generate and process a single image. Returns result dict."""
             try:
-                gen_response = client.models.generate_images(
+                gen_response = await asyncio.to_thread(
+                    client.models.generate_images,
                     model="imagen-4.0-fast-generate-001",
                     prompt=full_prompt,
                     config=genai_types.GenerateImagesConfig(
@@ -698,7 +699,7 @@ async def generate_profile_image(
                     f"Batch image {index} failed: {exc}",
                     extra={"request_id": request_id, "index": index},
                 )
-                return {"index": index, "image": None, "error": str(exc)}
+                return {"index": index, "image": None, "error": "Image generation failed"}
 
         # --- Single image (count=1): preserve original response format ---
         if count == 1:

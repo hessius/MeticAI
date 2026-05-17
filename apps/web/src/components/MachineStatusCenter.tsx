@@ -152,7 +152,7 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
       {/* Last updated */}
       {secondsAgo != null && (
         <p className="text-xs text-muted-foreground text-right -mt-4">
-          {t('machineStatus.lastUpdated')}: {secondsAgo < 5 ? t('common.justNow', 'just now') : `${secondsAgo}s ago`}
+          {t('machineStatus.lastUpdated')}: {secondsAgo < 5 ? t('machineStatus.justNow') : t('machineStatus.secondsAgo', { count: secondsAgo })}
         </p>
       )}
 
@@ -244,13 +244,13 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
           </h3>
           <Card className="p-4 space-y-2 text-sm">
             {systemInfo.hostname && typeof systemInfo.hostname === 'object' && (
-              <InfoRow label="Hostname" value={String((systemInfo.hostname as Record<string, unknown>).hostname ?? '—')} />
+              <InfoRow label={t('machineStatus.hostname')} value={String((systemInfo.hostname as Record<string, unknown>).hostname ?? '—')} />
             )}
             {systemInfo.firmware && typeof systemInfo.firmware === 'object' && (
-              <InfoRow label="Firmware" value={String((systemInfo.firmware as Record<string, unknown>).version ?? '—')} />
+              <InfoRow label={t('machineStatus.firmware')} value={String((systemInfo.firmware as Record<string, unknown>).version ?? '—')} />
             )}
             {systemInfo.network && typeof systemInfo.network === 'object' && (
-              <InfoRow label="WiFi" value={String((systemInfo.network as Record<string, unknown>).ssid ?? '—')} />
+              <InfoRow label={t('machineStatus.wifi')} value={String((systemInfo.network as Record<string, unknown>).ssid ?? '—')} />
             )}
           </Card>
         </section>

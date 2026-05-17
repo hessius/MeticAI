@@ -1738,7 +1738,18 @@
     "unavailable": "Maschinenstatus nicht verfügbar",
     "retry": "Erneut versuchen",
     "autoRefresh": "Automatische Aktualisierung in",
-    "networkStatus": "Netzwerk"
+    "networkStatus": "Netzwerk",
+    "justNow": "gerade eben",
+    "secondsAgo": "vor {{count}}s",
+    "hostname": "Hostname",
+    "firmware": "Firmware",
+    "wifi": "WLAN",
+    "statusRunning": "Läuft",
+    "statusDegraded": "Beeinträchtigt",
+    "statusStopped": "Gestoppt",
+    "unitDay": "T",
+    "unitHour": "Std",
+    "unitMinute": "Min"
   },
   "imageGeneration": {
     "batchCount": "Anzahl der Bilder",

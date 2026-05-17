@@ -24,7 +24,7 @@ export function ImagePickerGrid({
 }: ImagePickerGridProps) {
   const { t } = useTranslation()
 
-  const gridCols = images.length <= 2 ? 'grid-cols-2' : 'grid-cols-2'
+  const gridCols = images.length <= 1 ? 'grid-cols-1' : 'grid-cols-2'
 
   return (
     <div className="space-y-3">
@@ -38,29 +38,35 @@ export function ImagePickerGrid({
           const hasError = !!img.error && !img.image
 
           return (
-            <button
+            <div
               key={img.index}
-              type="button"
-              disabled={isLoading || hasError}
-              onClick={() => onSelect(img.index)}
               className={`
                 relative aspect-square rounded-xl overflow-hidden border-2 transition-all
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
                 ${isSelected
                   ? 'border-primary ring-2 ring-primary/30 shadow-lg'
                   : 'border-border/40 hover:border-border/70'}
-                ${isLoading || hasError ? 'cursor-default opacity-80' : 'cursor-pointer'}
+                ${isLoading ? 'cursor-default opacity-80' : ''}
               `}
-              aria-label={`${t('imageGeneration.selectImage')} ${img.index + 1}`}
-              aria-pressed={isSelected}
             >
-              {/* Image */}
-              {img.image && !isLoading && (
-                <img
-                  src={img.image}
-                  alt={`Generated option ${img.index + 1}`}
-                  className="w-full h-full object-cover"
-                />
+              {/* Clickable image area */}
+              {!hasError && (
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => onSelect(img.index)}
+                  className="absolute inset-0 w-full h-full cursor-pointer disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+                  aria-label={`${t('imageGeneration.selectImage')} ${img.index + 1}`}
+                  aria-pressed={isSelected}
+                >
+                  {/* Image */}
+                  {img.image && !isLoading && (
+                    <img
+                      src={img.image}
+                      alt={`Generated option ${img.index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </button>
               )}
 
               {/* Loading state */}
@@ -86,36 +92,26 @@ export function ImagePickerGrid({
                     {img.error}
                   </span>
                   {onRegenerate && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onRegenerate(img.index)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.stopPropagation()
-                          onRegenerate(img.index)
-                        }
-                      }}
-                      className="text-xs text-primary underline hover:no-underline cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => onRegenerate(img.index)}
+                      className="text-xs text-primary underline hover:no-underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                     >
                       {t('imageGeneration.regenerateSlot')}
-                    </span>
+                    </button>
                   )}
                 </div>
               )}
 
               {/* Selected checkmark overlay */}
               {isSelected && img.image && !isLoading && (
-                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
                   <div className="bg-primary rounded-full p-1 shadow-lg" data-testid="checkmark">
                     <CheckCircle size={32} className="text-primary-foreground" weight="fill" />
                   </div>
                 </div>
               )}
-            </button>
+            </div>
           )
         })}
       </div>

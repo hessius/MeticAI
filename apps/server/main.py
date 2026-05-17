@@ -193,11 +193,10 @@ async def lifespan(app: FastAPI):
 
     # Validate configured Gemini model on startup
     try:
-        from services.gemini_service import validate_model, get_model_name
+        from services.gemini_service import get_working_model
 
-        _model = get_model_name()
-        if not await validate_model(_model):
-            logger.warning("⚠️  Configured Gemini model '%s' may be unavailable", _model)
+        _model = await get_working_model()
+        logger.info("✅  Using Gemini model: %s", _model)
     except Exception as e:
         logger.debug("Skipped model validation at startup: %s", e)
 
