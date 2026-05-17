@@ -164,6 +164,81 @@ function roundScore(value: number): number {
   return Math.round(value * 10) / 10
 }
 
+function parseSizeToMB(sizeStr: string): number {
+  const match = sizeStr.match(/([\d.]+)\s*(GB|MB|KB|TB)/i)
+  if (!match) return 0
+  const value = parseFloat(match[1])
+  const unit = match[2].toUpperCase()
+  if (unit === 'TB') return value * 1024 * 1024
+  if (unit === 'GB') return value * 1024
+  if (unit === 'KB') return value / 1024
+  return value
+}
+
+function parseUptimeToSeconds(uptimeStr: string): number {
+  let total = 0
+  const re = /(\d+)\s*(days?|hours?|minutes?|seconds?)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(uptimeStr)) !== null) {
+    const val = parseInt(m[1], 10)
+    const unit = m[2].toLowerCase()
+    if (unit.startsWith('day')) total += val * 86400
+    else if (unit.startsWith('hour')) total += val * 3600
+    else if (unit.startsWith('minute')) total += val * 60
+    else total += val
+  }
+  return total
+}
+
+/** Transform raw watcher /status response into the shape MachineStatusCenter expects. */
+function transformWatcherResponse(raw: Record<string, unknown>): Record<string, unknown> {
+  // Services: object { name: { status } } → array [{ name, status, uptime }]
+  const rawServices = raw.services
+  let services: { name: string; status: string; uptime: number | null }[] = []
+  if (rawServices && typeof rawServices === 'object' && !Array.isArray(rawServices)) {
+    services = Object.entries(rawServices as Record<string, Record<string, string>>).map(([name, info]) => ({
+      name,
+      status: info?.status ?? 'unknown',
+      uptime: null,
+    }))
+  } else if (Array.isArray(rawServices)) {
+    services = rawServices as typeof services
+  }
+
+  // System metrics
+  const mem = raw.memoryUsage as Record<string, string> | undefined
+  const discs = raw.discs as Array<{ mountpoint: string; usage: Record<string, string> }> | undefined
+  const uptimeStr = typeof raw.uptime === 'string' ? raw.uptime : ''
+
+  const memTotal = mem ? parseSizeToMB(mem.total ?? '') : 0
+  const memUsed = mem ? parseSizeToMB(mem.used ?? '') : 0
+
+  let diskTotal = 0
+  let diskUsed = 0
+  if (Array.isArray(discs)) {
+    const rootDisc = discs.find((d) => d.mountpoint === '/')
+    if (rootDisc?.usage) {
+      diskTotal = parseSizeToMB(rootDisc.usage.total ?? '') / 1024 // GB
+      diskUsed = parseSizeToMB(rootDisc.usage.used ?? '') / 1024
+    }
+  }
+
+  const uptimeSecs = uptimeStr ? parseUptimeToSeconds(uptimeStr) : null
+  let system: Record<string, unknown> | null = null
+  if (memTotal || diskTotal || uptimeSecs) {
+    system = {
+      memory_total: memTotal ? Math.round(memTotal) : null,
+      memory_used: memUsed ? Math.round(memUsed) : null,
+      disk_total: diskTotal ? Math.round(diskTotal * 100) / 100 : null,
+      disk_used: diskUsed ? Math.round(diskUsed * 100) / 100 : null,
+      cpu_temperature: null,
+      uptime: uptimeSecs,
+    }
+  }
+
+  return { services, system }
+}
+
 const DIRECT_PROFILE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
 class DirectImageValidationError extends Error {
@@ -2015,15 +2090,17 @@ export function installDirectModeInterceptor(): void {
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get profile info' }, 500))
     }
 
-    // /api/machine/status/health → watcher service proxy (not available in direct mode)
+    // /api/machine/status/health → watcher service proxy
     if (url.match(/\/api\/machine\/status\/health/)) {
-      // In direct mode, attempt to reach the watcher on port 3000
       return (async () => {
         try {
           const machineBase = getDefaultMachineUrl()
           const watcherUrl = machineBase.replace(':8080', ':3000').replace(/\/$/, '')
           const resp = await _originalFetch(`${watcherUrl}/status`, { signal: AbortSignal.timeout(5000) })
-          if (resp.ok) return jsonResponse(await resp.json())
+          if (resp.ok) {
+            const raw = await resp.json()
+            return jsonResponse(transformWatcherResponse(raw))
+          }
           return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
         } catch {
           return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
