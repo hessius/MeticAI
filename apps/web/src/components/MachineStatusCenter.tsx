@@ -202,8 +202,7 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
             {t('machineStatus.systemMetrics')}
           </h3>
           <Card className="p-6">
-            {/* Gauges row */}
-            <div className="flex flex-wrap justify-center gap-6 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {system.disk_total != null && system.disk_total > 0 && (
                 <StatusGauge
                   value={system.disk_used ?? 0}
@@ -220,19 +219,6 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
                   unit="MB"
                 />
               )}
-            </div>
-
-            {/* CPU Temperature & Uptime */}
-            <div className="grid grid-cols-2 gap-4">
-              {system.cpu_temperature != null && (
-                <div className="flex flex-col items-center gap-1 rounded-lg bg-muted/50 p-4">
-                  <Thermometer size={24} className={tempColor(system.cpu_temperature)} />
-                  <span className={`text-2xl font-bold ${tempColor(system.cpu_temperature)}`}>
-                    {Math.round(system.cpu_temperature)}°C
-                  </span>
-                  <span className="text-xs text-muted-foreground">{t('machineStatus.cpuTemperature')}</span>
-                </div>
-              )}
               {system.uptime != null && (
                 <div className="flex flex-col items-center gap-1 rounded-lg bg-muted/50 p-4">
                   <Clock size={24} className="text-blue-500" />
@@ -243,6 +229,19 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
                 </div>
               )}
             </div>
+
+            {/* CPU Temperature (if available) */}
+            {system.cpu_temperature != null && (
+              <div className="mt-4 flex justify-center">
+                <div className="flex flex-col items-center gap-1 rounded-lg bg-muted/50 p-4">
+                  <Thermometer size={24} className={tempColor(system.cpu_temperature)} />
+                  <span className={`text-2xl font-bold ${tempColor(system.cpu_temperature)}`}>
+                    {Math.round(system.cpu_temperature)}°C
+                  </span>
+                  <span className="text-xs text-muted-foreground">{t('machineStatus.cpuTemperature')}</span>
+                </div>
+              </div>
+            )}
           </Card>
         </section>
       )}

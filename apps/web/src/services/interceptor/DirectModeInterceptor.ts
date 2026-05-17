@@ -2,6 +2,7 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
+import { CapacitorHttp } from '@capacitor/core'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
@@ -2097,13 +2098,26 @@ export function installDirectModeInterceptor(): void {
           const machineBase = getDefaultMachineUrl()
           const parsed = new URL(machineBase)
           parsed.port = '3000'
-          const watcherUrl = parsed.origin
-          const resp = await _originalFetch(`${watcherUrl}/status`, { signal: AbortSignal.timeout(5000) })
-          if (resp.ok) {
-            const raw = await resp.json()
-            return jsonResponse(transformWatcherResponse(raw))
+          const watcherUrl = `${parsed.origin}/status`
+
+          let data: Record<string, unknown>
+          if (_isNative) {
+            // Native: use CapacitorHttp to bypass CORS
+            const resp = await CapacitorHttp.get({ url: watcherUrl, connectTimeout: 5000, readTimeout: 5000 })
+            if (resp.status >= 200 && resp.status < 300) {
+              data = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data
+            } else {
+              return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+            }
+          } else {
+            const resp = await _originalFetch(watcherUrl, { signal: AbortSignal.timeout(5000) })
+            if (resp.ok) {
+              data = await resp.json()
+            } else {
+              return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+            }
           }
-          return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+          return jsonResponse(transformWatcherResponse(data))
         } catch {
           return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
         }
