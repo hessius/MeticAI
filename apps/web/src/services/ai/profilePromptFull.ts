@@ -213,6 +213,7 @@ const PROFILING_KNOWLEDGE = `ESPRESSO PROFILING GUIDE:
 ❌ >5-6 stages — overcomplicated
 ❌ No safety timeouts
 ❌ Sudden pressure jumps — use 3+ second ramps
+❌ Recommending weight exit triggers for the overall profile or final stage — all Meticulous profiles already have an automatic weight-based exit trigger handled by the machine firmware
 
 `
 

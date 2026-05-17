@@ -1749,7 +1749,8 @@
     "statusStopped": "Detenido",
     "unitDay": "d",
     "unitHour": "h",
-    "unitMinute": "m"
+    "unitMinute": "m",
+    "watcherUnavailable": "La monitorización de servicios no está disponible — la información del sistema se muestra a continuación."
   },
   "imageGeneration": {
     "batchCount": "Número de imágenes",

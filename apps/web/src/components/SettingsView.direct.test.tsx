@@ -128,11 +128,10 @@ describe('SettingsView direct-mode backend guards', () => {
     const requestedUrls = (fetchMock.mock.calls as unknown[][]).map(args => String(args[0]))
     expect(requestedUrls).not.toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/\/api\/(?:settings|status|check-updates|update-method|tailscale-status|changelog|machine\/detect)/),
+        expect.stringMatching(/\/api\/(?:settings|status|check-updates|update-method|tailscale-status|machine\/detect)/),
       ]),
     )
-    expect(screen.queryByRole('button', { name: 'settings.changelog' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'settings.detect' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'settings.changelog' })).toBeInTheDocument()
   })
 
   it('uses native discovery in Capacitor Settings without calling backend machine detect', async () => {
@@ -161,7 +160,7 @@ describe('SettingsView direct-mode backend guards', () => {
       await new Promise(resolve => setTimeout(resolve, 0))
     })
 
-    expect(screen.queryByRole('button', { name: 'settings.changelog' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'settings.changelog' })).toBeInTheDocument()
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
     const detectButton = screen.getByRole('button', { name: 'settings.detect' })
     fireEvent.click(detectButton)
@@ -178,7 +177,7 @@ describe('SettingsView direct-mode backend guards', () => {
     const requestedUrls = (fetchMock.mock.calls as unknown[][]).map(args => String(args[0]))
     expect(requestedUrls).not.toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/\/api\/(?:settings|status|check-updates|update-method|tailscale-status|changelog|machine\/detect)/),
+        expect.stringMatching(/\/api\/(?:settings|status|check-updates|update-method|tailscale-status|machine\/detect)/),
       ]),
     )
   })

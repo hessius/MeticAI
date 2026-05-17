@@ -80,16 +80,23 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
           fetch(`${serverUrl}/api/machine/system-info`),
         ])
         if (cancelled) return
+        let watcherError = false
         if (watcherResp.status === 'fulfilled' && watcherResp.value.ok) {
           const data = await watcherResp.value.json()
           setWatcherData(data)
-          setError(!!data.error)
+          watcherError = !!data.error
         } else {
           setWatcherData(null)
-          setError(true)
+          watcherError = true
         }
         if (sysResp.status === 'fulfilled' && sysResp.value.ok) {
-          setSystemInfo(await sysResp.value.json())
+          const sysData = await sysResp.value.json()
+          setSystemInfo(sysData)
+          // Only show full error if both watcher AND system-info failed
+          const hasSysInfo = sysData && (sysData.firmware || sysData.network || sysData.hostname)
+          setError(watcherError && !hasSysInfo)
+        } else {
+          setError(watcherError)
         }
         setSecondsAgo(0)
       } catch {
@@ -169,7 +176,7 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
       )}
 
       {/* Service Health Grid */}
-      {services.length > 0 && (
+      {services.length > 0 ? (
         <section>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
             <HardDrives size={16} />
@@ -181,6 +188,10 @@ export function MachineStatusCenter({ onBack }: MachineStatusCenterProps) {
             ))}
           </div>
         </section>
+      ) : !error && !loading && (
+        <Card className="p-4 text-center text-sm text-muted-foreground">
+          <p>{t('machineStatus.watcherUnavailable')}</p>
+        </Card>
       )}
 
       {/* System Metrics Panel */}

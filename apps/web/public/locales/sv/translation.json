@@ -1749,7 +1749,8 @@
     "statusStopped": "Stoppad",
     "unitDay": "d",
     "unitHour": "t",
-    "unitMinute": "m"
+    "unitMinute": "m",
+    "watcherUnavailable": "Tjänstövervakning är inte tillgänglig — systeminformation visas nedan."
   },
   "imageGeneration": {
     "batchCount": "Antal bilder",

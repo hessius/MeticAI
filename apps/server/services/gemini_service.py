@@ -364,6 +364,7 @@ Note: No pressure target, entirely flow-controlled
 **❌ Too Many Stages**: More than 5-6 stages = overcomplicated. 3-4 stages is usually optimal.
 **❌ No Safety Timeouts**: Missing time-based triggers = risk of infinite extraction.
 **❌ Pressure Spikes**: Sudden pressure jumps = channeling risk. Use gentle ramps (3+ seconds).
+**❌ Recommending Weight Exit Triggers**: All Meticulous profiles automatically have a weight-based exit trigger at the overall profile level. NEVER recommend adding a weight exit trigger for the overall profile or for the final stage — it is always already present and handled by the machine firmware. Only recommend weight triggers for intermediate stages when needed.
 
 ## 6. Equipment Factors
 
@@ -416,6 +417,7 @@ PROFILING_KNOWLEDGE_DISTILLED = """\
 - Gentle pressure ramps (3-4s) prevent channeling; aggressive (<2s) risk it
 - Keep profiles to 3-4 stages (5-6 max). Simpler = more reliable
 - Pre-infusion: ~5-10% of yield. Infusion: 60-75%. Taper: remaining 20-30%
+- NEVER recommend adding a weight exit trigger for the overall profile or the final stage — all Meticulous profiles already have an automatic weight-based exit trigger handled by firmware
 """
 
 

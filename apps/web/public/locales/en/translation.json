@@ -1756,7 +1756,8 @@
     "statusStopped": "Stopped",
     "unitDay": "d",
     "unitHour": "h",
-    "unitMinute": "m"
+    "unitMinute": "m",
+    "watcherUnavailable": "Service health monitoring is not available — system info is shown below."
   },
   "imageGeneration": {
     "batchCount": "Number of images",

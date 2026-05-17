@@ -3516,7 +3516,27 @@ Rules for recommendations:
       return Promise.resolve(jsonResponse({ enabled: false, installed: false }))
     }
     if (url.match(/\/api\/changelog/)) {
-      return Promise.resolve(jsonResponse({ releases: [] }))
+      return (async () => {
+        try {
+          const resp = await _originalFetch(
+            'https://api.github.com/repos/hessius/MeticAI/releases?per_page=5',
+            { signal: AbortSignal.timeout(8000), headers: { Accept: 'application/vnd.github+json' } }
+          )
+          if (resp.ok) {
+            const releases = await resp.json()
+            return jsonResponse({
+              releases: releases.map((r: { tag_name: string; published_at: string; body: string }) => ({
+                version: r.tag_name,
+                date: r.published_at,
+                body: r.body || 'No release notes available.',
+              })),
+            })
+          }
+          return jsonResponse({ releases: [], error: 'Failed to fetch releases' })
+        } catch {
+          return jsonResponse({ releases: [], error: 'Failed to fetch releases' })
+        }
+      })()
     }
     if (url.match(/\/api\/(check-updates|restart|beta-channel|feedback)/)) {
       return Promise.resolve(jsonResponse({ detail: 'Server administration not available in direct/app mode' }, 501))

@@ -1749,7 +1749,8 @@
     "statusStopped": "Gestoppt",
     "unitDay": "T",
     "unitHour": "Std",
-    "unitMinute": "Min"
+    "unitMinute": "Min",
+    "watcherUnavailable": "Dienstüberwachung ist nicht verfügbar — Systeminformationen werden unten angezeigt."
   },
   "imageGeneration": {
     "batchCount": "Anzahl der Bilder",

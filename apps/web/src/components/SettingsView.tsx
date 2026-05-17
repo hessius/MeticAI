@@ -395,9 +395,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     loadVersionInfo()
   }, [])
 
-  // Load release notes when changelog is expanded (using server-side cache)
+  // Load release notes when changelog is expanded (using server-side cache or GitHub API)
   const loadReleaseNotes = useCallback(async () => {
-    if (!hasFeature('watchtowerUpdate')) return
     if (releaseNotes.length > 0) return // Already loaded
     
     setChangelogLoading(true)
@@ -878,25 +877,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           )}
         </AnimatePresence>
       </div>
-
-      {/* Machine Status */}
-      {onNavigateToStatus && (
-        <Card className="p-4">
-          <button
-            onClick={onNavigateToStatus}
-            className="w-full flex items-center justify-between text-left group"
-          >
-            <div className="flex items-center gap-3">
-              <HardDrives size={20} className="text-primary" weight="duotone" />
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">{t('machineStatus.title')}</h3>
-                <p className="text-xs text-muted-foreground">{t('machineStatus.serviceHealth')}</p>
-              </div>
-            </div>
-            <CaretDown size={16} className="text-muted-foreground -rotate-90 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </Card>
-      )}
 
       {/* About Section - Collapsible, collapsed by default */}
       <Card className="p-6 space-y-4">
@@ -1814,7 +1794,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         </div>
 
         {/* Changelog (collapsible) */}
-        {hasFeature('watchtowerUpdate') && <div className="space-y-3 pt-2 border-t border-border/50">
+        <div className="space-y-3 pt-2 border-t border-border/50">
           <button
             onClick={() => setChangelogExpanded(!changelogExpanded)}
             className="w-full flex items-center justify-between text-left"
@@ -1869,7 +1849,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               </motion.div>
             )}
           </AnimatePresence>
-        </div>}
+        </div>
 
         {/* Updates — hidden in direct/PWA mode (no Watchtower) */}
         {hasFeature('watchtowerUpdate') && (
@@ -1952,6 +1932,25 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           </div>
         )}
       </Card>
+
+      {/* Machine Status */}
+      {onNavigateToStatus && (
+        <Card className="p-4">
+          <button
+            onClick={onNavigateToStatus}
+            className="w-full flex items-center justify-between text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <HardDrives size={20} className="text-primary" weight="duotone" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{t('machineStatus.title')}</h3>
+                <p className="text-xs text-muted-foreground">{t('machineStatus.serviceHealth')}</p>
+              </div>
+            </div>
+            <CaretDown size={16} className="text-muted-foreground -rotate-90 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </Card>
+      )}
 
       {/* System Section */}
       {hasFeature('systemManagement') && <Card className="p-6 space-y-4">

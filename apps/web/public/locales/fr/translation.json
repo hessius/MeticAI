@@ -1749,7 +1749,8 @@
     "statusStopped": "Arrêté",
     "unitDay": "j",
     "unitHour": "h",
-    "unitMinute": "m"
+    "unitMinute": "m",
+    "watcherUnavailable": "La surveillance des services n'est pas disponible — les informations système sont affichées ci-dessous."
   },
   "imageGeneration": {
     "batchCount": "Nombre d'images",

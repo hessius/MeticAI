@@ -32,6 +32,7 @@ vi.mock('react-i18next', () => ({
         'machineStatus.unitDay': 'd',
         'machineStatus.unitHour': 'h',
         'machineStatus.unitMinute': 'm',
+        'machineStatus.watcherUnavailable': 'Service health monitoring is not available — system info is shown below.',
         'common.back': 'Back',
       }
       let result = translations[key] ?? key
