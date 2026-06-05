@@ -78,7 +78,7 @@
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/vite": "^4.2.4",
     "@xmldom/xmldom": "^0.9.10",
-    "axios": "^1.16.1",
+    "axios": "^1.17.0",
     "canvas-confetti": "^1.9.4",
     "capacitor-zeroconf": "^4.0.0",
     "class-variance-authority": "^0.7.1",
