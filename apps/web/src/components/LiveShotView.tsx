@@ -133,19 +133,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const { shotComplete: playShotComplete } = useSoundEffects()
   const { notifyBrewComplete } = useBrewNotifications()
 
-  // Brew Head tile tap-to-cycle: current temp → target → delta (#482)
-  const [tempMode, setTempMode] = useState<TempDisplayMode>('current')
-  const cycleTempMode = () => {
-    hapticsNotification()
-    setTempMode(m => (m === 'current' ? 'target' : m === 'target' ? 'delta' : 'current'))
-  }
-  const brewTempTile = getTempTileDisplay(
-    tempMode,
-    ms.brew_head_temperature,
-    ms.target_temperature,
-    t,
-  )
-  const brewTempInteractive = ms.target_temperature != null
+  // Brew Head target delta tile (#482): color-coded difference from target temp.
+  const tempDelta = getTempTileDisplay('delta', ms.brew_head_temperature, ms.target_temperature, t)
 
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
   const [summary, setSummary] = useState<{
@@ -525,28 +514,27 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       label={t('controlCenter.metrics.flow')}
                     />
                   </div>
-                  {/* Row 2: Weight, Temperature */}
+                  {/* Row 2 (pre-shot): Brew Head, Brew Chamber, Target Δ — weight
+                      is omitted because the scale auto-tares when the shot starts */}
                   <div className="grid grid-cols-3 gap-2">
                     <MetricTile
-                      icon={<Scales size={14} />}
-                      value={ms.shot_weight?.toFixed(1) ?? '0.0'}
-                      unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
-                      label={t('controlCenter.metrics.weight')}
-                      onClick={() => cmd(() => machine.tareScale(), 'tared')}
-                    />
-                    <MetricTile
                       icon={<Thermometer size={14} />}
-                      value={brewTempTile.value}
-                      unit={brewTempTile.unit}
-                      label={brewTempTile.label}
-                      valueClassName={brewTempTile.valueClassName}
-                      onClick={brewTempInteractive ? cycleTempMode : undefined}
+                      value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
+                      unit="°C"
+                      label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
                     />
                     <MetricTile
                       icon={<Thermometer size={14} />}
                       value={ms.boiler_temperature?.toFixed(1) ?? '—'}
                       unit="°C"
                       label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
+                    />
+                    <MetricTile
+                      icon={<Thermometer size={14} />}
+                      value={tempDelta.value}
+                      unit={tempDelta.unit}
+                      label={tempDelta.label}
+                      valueClassName={tempDelta.valueClassName}
                     />
                   </div>
                 </div>
@@ -644,8 +632,21 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   label={t('controlCenter.metrics.flow')}
                 />
               </div>
-              {/* Row 2: Weight, Temperature */}
+              {/* Row 2 (during shot): Brew Head, Brew Chamber, Weight — the
+                  target Δ slot is replaced by weight once brewing starts */}
               <div className="grid grid-cols-3 gap-2">
+                <MetricTile
+                  icon={<Thermometer size={14} />}
+                  value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
+                  unit="°C"
+                  label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
+                />
+                <MetricTile
+                  icon={<Thermometer size={14} />}
+                  value={ms.boiler_temperature?.toFixed(1) ?? '—'}
+                  unit="°C"
+                  label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
+                />
                 <MetricTile
                   icon={<Scales size={14} />}
                   value={ms.shot_weight?.toFixed(1) ?? '0.0'}
@@ -654,20 +655,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   progress={ms.target_weight != null && ms.target_weight > 0
                     ? Math.min(100, ((ms.shot_weight ?? 0) / ms.target_weight) * 100)
                     : undefined}
-                />
-                <MetricTile
-                  icon={<Thermometer size={14} />}
-                  value={brewTempTile.value}
-                  unit={brewTempTile.unit}
-                  label={brewTempTile.label}
-                  valueClassName={brewTempTile.valueClassName}
-                  onClick={brewTempInteractive ? cycleTempMode : undefined}
-                />
-                <MetricTile
-                  icon={<Thermometer size={14} />}
-                  value={ms.boiler_temperature?.toFixed(1) ?? '—'}
-                  unit="°C"
-                  label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
                 />
               </div>
             </div>
