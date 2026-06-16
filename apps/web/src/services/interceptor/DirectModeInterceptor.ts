@@ -357,6 +357,81 @@ function resolveProfileValue(value: unknown, variables: Array<Record<string, unk
   return safeNumber(value)
 }
 
+/**
+ * Build target-curve points for a time-based, multi-point stage.
+ *
+ * Dynamics point x-values are absolute seconds measured from the start of the
+ * stage; they describe the real-time target curve the machine follows. They
+ * must be plotted at their actual offset (stageStart + x), NOT rescaled to fill
+ * the stage duration. Rescaling distorts ramps: a short ramp inside a longer
+ * stage gets stretched, and a ramp followed by a long hold gets compressed
+ * until the ramp looks instantaneous (the reported #483 bug).
+ *
+ * Behaviour:
+ *   - Each point is emitted at its absolute time within the stage.
+ *   - If the final dynamics point ends before stageEnd, the last value is held
+ *     flat until stageEnd (the machine holds the final target).
+ *   - If a dynamics point lies beyond stageEnd (the stage exited early via
+ *     another trigger), the curve is linearly clipped at the boundary.
+ */
+function buildTimeBasedCurvePoints(
+  points: unknown[],
+  variables: Array<Record<string, unknown>>,
+  stageName: string,
+  key: string,
+  stageStart: number,
+  stageEnd: number,
+): Array<Record<string, unknown>> {
+  const stageDuration = stageEnd - stageStart
+  const result: Array<Record<string, unknown>> = []
+  let prevT: number | null = null
+  let prevV: number | null = null
+  let lastT: number | null = null
+  let lastV: number | null = null
+
+  for (const point of points) {
+    if (!Array.isArray(point)) continue
+    const dpT = safeNumber(point[0])
+    const dpV = resolveProfileValue(point[1] ?? point[0], variables)
+
+    if (dpT > stageDuration) {
+      // Stage exited before reaching this point — clip at the boundary.
+      let boundaryV = dpV
+      if (prevT !== null && prevV !== null && dpT > prevT) {
+        const frac = (stageDuration - prevT) / (dpT - prevT)
+        boundaryV = prevV + (dpV - prevV) * frac
+      }
+      result.push({
+        time: Number(stageEnd.toFixed(2)),
+        stage_name: stageName,
+        [key]: Math.round(boundaryV * 10) / 10,
+      })
+      return result
+    }
+
+    result.push({
+      time: Number((stageStart + dpT).toFixed(2)),
+      stage_name: stageName,
+      [key]: Math.round(dpV * 10) / 10,
+    })
+    prevT = dpT
+    prevV = dpV
+    lastT = dpT
+    lastV = dpV
+  }
+
+  // Hold the final target value until the stage ends, if the curve finished early.
+  if (lastT !== null && lastV !== null && lastT < stageDuration - 1e-6) {
+    result.push({
+      time: Number(stageEnd.toFixed(2)),
+      stage_name: stageName,
+      [key]: Math.round(lastV * 10) / 10,
+    })
+  }
+
+  return result
+}
+
 function generateEstimatedTargetCurves(profile: CachedProfile): Array<Record<string, unknown>> {
   const stages = profile.stages ?? []
   const variables = profile.variables ?? []
@@ -405,17 +480,9 @@ function generateEstimatedTargetCurves(profile: CachedProfile): Array<Record<str
         { time: Number(stageEnd.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
       )
     } else {
-      const maxX = Math.max(...points.filter(Array.isArray).map((point) => safeNumber(point[0])))
-      const scale = maxX > 0 ? duration / maxX : 1
-      for (const point of points) {
-        if (!Array.isArray(point)) continue
-        const value = resolveProfileValue(point[1] ?? point[0], variables)
-        curves.push({
-          time: Number((stageStart + safeNumber(point[0]) * scale).toFixed(2)),
-          stage_name: stageName,
-          [key]: Math.round(value * 10) / 10,
-        })
-      }
+      curves.push(
+        ...buildTimeBasedCurvePoints(points, variables, stageName, key, stageStart, stageEnd),
+      )
     }
     runningTime = stageEnd
   })
@@ -513,17 +580,9 @@ function generateShotAlignedTargetCurves(
           { time: Number(timing.endTime.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
         )
       } else {
-        const maxX = Math.max(...points.filter(Array.isArray).map((p: unknown[]) => safeNumber(p[0])))
-        const scale = maxX > 0 ? stageDuration / maxX : 1
-        for (const point of points) {
-          if (!Array.isArray(point)) continue
-          const value = resolveProfileValue(point[1] ?? point[0], variables)
-          curves.push({
-            time: Number((stageStart + safeNumber(point[0]) * scale).toFixed(2)),
-            stage_name: stageName,
-            [key]: Math.round(value * 10) / 10,
-          })
-        }
+        curves.push(
+          ...buildTimeBasedCurvePoints(points, variables, stageName, key, stageStart, timing.endTime),
+        )
       }
     }
   }

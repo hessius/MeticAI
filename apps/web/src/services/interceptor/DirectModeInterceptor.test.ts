@@ -1209,6 +1209,55 @@ describe('DirectModeInterceptor regression harness', () => {
       )
     })
 
+    it('renders a short dynamics ramp over real time instead of compressing it to instant (#483)', async () => {
+      const rampProfile = [
+        {
+          change_id: 'change-ramp',
+          profile: {
+            id: 'profile-ramp',
+            name: 'Ramp Hold',
+            author: 'MeticAI',
+            author_id: 'author-ramp',
+            previous_authors: [],
+            display: { description: 'ramp then hold' },
+            temperature: 93,
+            final_weight: 36,
+            variables: [],
+            stages: [
+              {
+                name: 'Ramp',
+                type: 'pressure',
+                key: 'pressure_ramp',
+                // 3→9 bar over the first 2s, then hold at 9 bar to ~30s
+                dynamics: { points: [[0, 3], [2, 9], [30, 9]], over: 'time', interpolation: 'linear' },
+                exit_triggers: [{ type: 'time', value: 8 }],
+                limits: [],
+              },
+            ],
+          },
+        },
+      ] as unknown as ProfileIdent[]
+
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': rampProfile,
+      }))
+
+      const response = await window.fetch('/api/profile/Ramp%20Hold/target-curves')
+      expect(response.status).toBe(200)
+      const body = await readJson<{ target_curves: Array<{ time: number; target_pressure?: number }> }>(response)
+      const curve = body.target_curves
+
+      // The ramp's end (9 bar) must land at its real 2s offset — the old scaling
+      // (duration / maxX) compressed it toward t=0 (~0.53s), rendering it instant.
+      const nineBar = curve.find(point => point.target_pressure === 9)
+      expect(nineBar).toBeDefined()
+      expect(nineBar!.time).toBeCloseTo(2, 1)
+
+      // Stage starts at 3 bar and the final value is held to the 8s exit.
+      expect(curve[0]).toMatchObject({ time: 0, target_pressure: 3 })
+      expect(curve.some(point => point.time === 8 && point.target_pressure === 9)).toBe(true)
+    })
+
     it('preserves flat profile.image in direct profile info and image proxy routes', async () => {
       vi.useRealTimers()
       machineModeMocks.getDefaultMachineUrl.mockReturnValue('http://machine.local:8080')
