@@ -1554,6 +1554,7 @@
     "somethingWentWrong": "Qualcosa è andato storto",
     "aiModelUnavailable": "Il modello AI è temporaneamente non disponibile — si tratta di un'interruzione lato Google. Prova a passare a un modello diverso nelle Impostazioni, il che potrebbe anche aumentare l'utilizzo dei token.",
     "aiQuotaExceeded": "Quota API superata. Attendi un momento e riprova.",
+    "aiNoCompatibleModel": "Nessun modello IA compatibile è disponibile per la tua chiave API. Controlla il tuo accesso a Gemini o aggiorna Metic all'ultima versione.",
     "analysisFailed": "Analisi fallita"
   },
   "findSimilar": {

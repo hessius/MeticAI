@@ -1554,6 +1554,7 @@
     "somethingWentWrong": "Etwas ist schiefgelaufen",
     "aiModelUnavailable": "Das KI-Modell ist vorübergehend nicht verfügbar — dies ist ein Google-seitiger Ausfall. Versuchen Sie, in den Einstellungen zu einem anderen Modell zu wechseln, was auch den Token-Verbrauch erhöhen kann.",
     "aiQuotaExceeded": "API-Kontingent überschritten. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    "aiNoCompatibleModel": "Für deinen API-Schlüssel ist kein kompatibles KI-Modell verfügbar. Bitte prüfe deinen Gemini-Zugang oder aktualisiere Metic auf die neueste Version.",
     "analysisFailed": "Analyse fehlgeschlagen"
   },
   "findSimilar": {

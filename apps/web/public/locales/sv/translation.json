@@ -1554,6 +1554,7 @@
     "somethingWentWrong": "Något gick fel",
     "aiModelUnavailable": "AI-modellen är tillfälligt otillgänglig — detta är ett avbrott på Googles sida. Prova att byta till en annan modell i Inställningar, vilket också kan öka tokenanvändningen.",
     "aiQuotaExceeded": "API-kvoten har överskridits. Vänta en stund och försök igen.",
+    "aiNoCompatibleModel": "Ingen kompatibel AI-modell är tillgänglig för din API-nyckel. Kontrollera din Gemini-åtkomst eller uppdatera Metic till senaste versionen.",
     "analysisFailed": "Analys misslyckades"
   },
   "findSimilar": {

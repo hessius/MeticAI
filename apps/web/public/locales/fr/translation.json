@@ -1554,6 +1554,7 @@
     "somethingWentWrong": "Quelque chose s'est mal passé",
     "aiModelUnavailable": "Le modèle d'IA est temporairement indisponible — il s'agit d'une panne côté Google. Essayez de changer de modèle dans les Paramètres, ce qui peut également augmenter l'utilisation des tokens.",
     "aiQuotaExceeded": "Quota d'API dépassé. Veuillez patienter un instant et réessayer.",
+    "aiNoCompatibleModel": "Aucun modèle d'IA compatible n'est disponible pour votre clé API. Vérifiez votre accès à Gemini ou mettez à jour Metic vers la dernière version.",
     "analysisFailed": "Analyse échouée"
   },
   "findSimilar": {

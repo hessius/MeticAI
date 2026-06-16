@@ -3384,7 +3384,7 @@ Rules for recommendations:
             reply: result.reply,
           })
         } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Unknown error'
+          const msg = formatGeminiError(err)
           return jsonResponse({ status: 'error', reply: msg, analysis: '' })
         }
       })()
