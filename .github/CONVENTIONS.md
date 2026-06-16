@@ -36,7 +36,8 @@ These are **non-negotiable**. Every PR, every push, every completion claim:
 4. **All code review comments addressed.** Including suppressed/collapsed threads. Don't dismiss without clear justification.
 5. **Tests pass locally before pushing.** Don't rely on CI as your first test run.
 6. **Wide review on bug discovery.** When discovering a bug or potential issue, always do a wide review to look for the same or similar issues across the codebase. Bugs are often part of a pattern — fix the pattern, not just the instance.
-7. **Browser testing before release.** Run the full browser testing protocol (`.github/skills/browser-testing.md`) against a live Docker container before any non-beta version bump.
+7. **Dual-runtime feature parity (server + native).** Metic ships in two runtimes (see *Architecture Patterns → Dual runtime*). Any change to analysis, profile generation, target-curve math, recommendations, dial-in, or machine-API behavior **must be applied to both** the Python server path *and* the native/Capacitor DirectMode path **in the same PR** — even when the user only reports it against one. Before claiming a fix complete, search the *other* runtime for a parallel implementation and update it too. Mismatched behavior between runtimes is a release-blocking defect.
+8. **Browser testing before release.** Run the full browser testing protocol (`.github/skills/browser-testing.md`) against a live Docker container before any non-beta version bump.
 
 ## Testing
 
@@ -112,6 +113,12 @@ cd ../web && bun run lint && bun run test:run && bun run build
 
 ## Architecture Patterns
 
+- **Dual runtime (server + native) — feature parity is mandatory.** Metic runs in two modes that re-implement the same product behavior in two languages:
+  - **Server mode:** the React web app talks to the Python FastAPI backend (`apps/server/`), which performs AI analysis, profile generation, target-curve math, recommendations, and machine I/O.
+  - **Native/Capacitor mode:** the iOS app has **no Python server**. The same behavior is reimplemented client-side and served by a fetch interceptor. Key files: `apps/web/src/services/interceptor/DirectModeInterceptor.ts` (route/API parity + curve generation), `apps/web/src/services/ai/` (`BrowserAIService`, prompts), `apps/web/src/lib/directModeAI.ts`, and `apps/web/src/lib/profileAnalysis.ts`.
+
+  **Rule:** logic that exists in both runtimes must stay in sync. When you touch a backend service in `apps/server/services/` (or vice-versa), grep the DirectMode layer for the parallel implementation and apply the equivalent change **in the same PR**, with tests on both sides. Treat the Python function and its TypeScript port as one feature with two implementations. Examples of paired logic: target-curve generation (`analysis_service.py` ↔ `DirectModeInterceptor.ts`), shot analysis, profile/variable handling, recommendation patching, dial-in. This parity requirement is non-negotiable (Quality Gate #7) and applies even when the user only mentions one runtime.
+
 - **Dual route registration:** Both `/endpoint` and `/api/endpoint` are registered for every route. This is intentional to support clients that include or omit the `/api` prefix. Not a defect.
 - **Unified container:** Single Docker container managed by s6-overlay. Port 3550 is the only exposed port (nginx proxy).
 - **Settings hot-reload:** Changing `METICULOUS_IP` or `GEMINI_API_KEY` triggers `s6-svc -r` (service restart, not container restart).
@@ -144,5 +151,5 @@ cd ../web && bun run lint && bun run test:run && bun run build
 
 ---
 
-*Last updated: 2026-03-11 | Maintained by the Metic team and AI agents*
+*Last updated: 2026-06-16 | Maintained by the Metic team and AI agents*
 *To add a new convention, use the `learn_convention` extension tool or edit this file directly.*
