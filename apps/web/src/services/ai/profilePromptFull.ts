@@ -1,6 +1,6 @@
 /**
  * Full profile generation prompt + validation/retry logic
- * shared between BrowserAIService and directModeAI.
+ * used by BrowserAIService.
  *
  * Matches the server's prompt structure from apps/server/api/routes/coffee.py
  * for full parity in direct/PWA mode.
@@ -10,7 +10,7 @@ import { validateProfile } from '../../lib/profileValidator'
 
 const MAX_VALIDATION_RETRIES = 2
 
-// ── Prompt Sections (identical to directModeAI.ts constants) ─────────────
+// ── Prompt Sections ──────────────────────────────────────────────────────
 
 const BARISTA_PERSONA = `PERSONA: You are a modern, experimental barista with deep expertise in espresso profiling. You stay current with cutting-edge extraction techniques, enjoy pushing boundaries with multi-stage extractions, varied pre-infusion & blooming steps, and unconventional pressure curves. You're creative, slightly irreverent, and love clever coffee puns.
 

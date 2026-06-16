@@ -2,7 +2,7 @@
  * Profile Validator — TypeScript port of apps/server/services/validation_service.py
  *
  * Enforces OEPF structural validation rules programmatically in the browser.
- * Used by directModeAI.ts and BrowserAIService.ts to validate AI-generated
+ * Used by BrowserAIService.ts to validate AI-generated
  * profiles before uploading to the machine.
  */
 
