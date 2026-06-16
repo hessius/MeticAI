@@ -794,7 +794,9 @@
       "power": "Power",
       "temp": "Temp",
       "brewTemp": "Brew Head",
-      "boilerTemp": "Brew Chamber"
+      "boilerTemp": "Brew Chamber",
+      "targetTemp": "Target",
+      "tempDelta": "Δ Target"
     },
     "actions": {
       "start": "Start",

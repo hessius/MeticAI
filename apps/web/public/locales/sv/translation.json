@@ -787,7 +787,9 @@
       "power": "Effekt",
       "temp": "Temp",
       "brewTemp": "Brygghuvud",
-      "boilerTemp": "Bryggkammare"
+      "boilerTemp": "Bryggkammare",
+      "targetTemp": "Mål",
+      "tempDelta": "Δ Mål"
     },
     "actions": {
       "start": "Starta",

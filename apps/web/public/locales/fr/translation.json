@@ -782,7 +782,9 @@
       "power": "Puissance",
       "temp": "Temp",
       "brewTemp": "Tête d'infusion",
-      "boilerTemp": "Chambre d'infusion"
+      "boilerTemp": "Chambre d'infusion",
+      "targetTemp": "Cible",
+      "tempDelta": "Δ Cible"
     },
     "actions": {
       "start": "Démarrer",

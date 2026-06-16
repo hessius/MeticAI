@@ -782,7 +782,9 @@
       "power": "Potenza",
       "temp": "Temp",
       "brewTemp": "Testata",
-      "boilerTemp": "Camera"
+      "boilerTemp": "Camera",
+      "targetTemp": "Obiettivo",
+      "tempDelta": "Δ Obiettivo"
     },
     "actions": {
       "start": "Avvia",

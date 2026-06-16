@@ -125,6 +125,20 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const { shotComplete: playShotComplete } = useSoundEffects()
   const { notifyBrewComplete } = useBrewNotifications()
 
+  // Brew Head tile tap-to-cycle: current temp → target → delta (#482)
+  const [tempMode, setTempMode] = useState<TempDisplayMode>('current')
+  const cycleTempMode = () => {
+    hapticsNotification()
+    setTempMode(m => (m === 'current' ? 'target' : m === 'target' ? 'delta' : 'current'))
+  }
+  const brewTempTile = getTempTileDisplay(
+    tempMode,
+    ms.brew_head_temperature,
+    ms.target_temperature,
+    t,
+  )
+  const brewTempInteractive = ms.target_temperature != null
+
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
   const [summary, setSummary] = useState<{
     totalTime: number
@@ -514,9 +528,11 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                     />
                     <MetricTile
                       icon={<Thermometer size={14} />}
-                      value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
-                      unit="°C"
-                      label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
+                      value={brewTempTile.value}
+                      unit={brewTempTile.unit}
+                      label={brewTempTile.label}
+                      valueClassName={brewTempTile.valueClassName}
+                      onClick={brewTempInteractive ? cycleTempMode : undefined}
                     />
                     <MetricTile
                       icon={<Thermometer size={14} />}
@@ -633,9 +649,11 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 />
                 <MetricTile
                   icon={<Thermometer size={14} />}
-                  value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
-                  unit="°C"
-                  label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
+                  value={brewTempTile.value}
+                  unit={brewTempTile.unit}
+                  label={brewTempTile.label}
+                  valueClassName={brewTempTile.valueClassName}
+                  onClick={brewTempInteractive ? cycleTempMode : undefined}
                 />
                 <MetricTile
                   icon={<Thermometer size={14} />}
@@ -766,13 +784,79 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricTile({ icon, value, unit, label, progress, onClick }: {
+// ---------------------------------------------------------------------------
+// Brew Head temperature display — tap to cycle current / target / delta (#482)
+// ---------------------------------------------------------------------------
+
+export type TempDisplayMode = 'current' | 'target' | 'delta'
+
+/** On-target threshold (°C) within which the delta is shown as neutral/good. */
+const TEMP_ON_TARGET_THRESHOLD = 0.5
+
+export interface TempTileDisplay {
+  value: string
+  unit: string
+  label: string
+  valueClassName?: string
+}
+
+/**
+ * Pure formatter for the Brew Head temperature tile.
+ *
+ * Returns the value/unit/label (and an optional color class for the delta) for
+ * the given display mode. Kept free of React/DOM so it can be unit-tested
+ * without rendering the (large) LiveShotView.
+ */
+export function getTempTileDisplay(
+  mode: TempDisplayMode,
+  current: number | null,
+  target: number | null,
+  t: (key: string, fallback?: string) => string,
+): TempTileDisplay {
+  const unit = '°C'
+
+  if (mode === 'target') {
+    return {
+      value: target != null ? target.toFixed(1) : '—',
+      unit,
+      label: t('controlCenter.metrics.targetTemp', 'Target'),
+    }
+  }
+
+  if (mode === 'delta') {
+    if (current == null || target == null) {
+      return { value: '—', unit, label: t('controlCenter.metrics.tempDelta', 'Δ Target') }
+    }
+    const d = current - target
+    const valueClassName = Math.abs(d) <= TEMP_ON_TARGET_THRESHOLD
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : d > 0
+        ? 'text-orange-600 dark:text-orange-400'
+        : 'text-blue-600 dark:text-blue-400'
+    return {
+      value: `${d >= 0 ? '+' : ''}${d.toFixed(1)}`,
+      unit,
+      label: t('controlCenter.metrics.tempDelta', 'Δ Target'),
+      valueClassName,
+    }
+  }
+
+  // current
+  return {
+    value: current != null ? current.toFixed(1) : '—',
+    unit,
+    label: t('controlCenter.metrics.brewTemp', 'Brew Head'),
+  }
+}
+
+function MetricTile({ icon, value, unit, label, progress, onClick, valueClassName }: {
   icon?: React.ReactNode
   value: string
   unit: string
   label: string
   progress?: number
   onClick?: () => void
+  valueClassName?: string
 }) {
   return (
     <div
@@ -782,7 +866,7 @@ function MetricTile({ icon, value, unit, label, progress, onClick }: {
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
     >
-      <div className="text-lg font-bold tabular-nums text-foreground flex items-center justify-center gap-1">
+      <div className={`text-lg font-bold tabular-nums flex items-center justify-center gap-1 ${valueClassName ?? 'text-foreground'}`}>
         {icon}
         {value}
         <span className="text-[10px] text-muted-foreground font-normal">{unit}</span>

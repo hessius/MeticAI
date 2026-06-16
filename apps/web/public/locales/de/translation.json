@@ -782,7 +782,9 @@
       "power": "Leistung",
       "temp": "Temp",
       "brewTemp": "Brühkopf",
-      "boilerTemp": "Brühkammer"
+      "boilerTemp": "Brühkammer",
+      "targetTemp": "Ziel",
+      "tempDelta": "Δ Ziel"
     },
     "actions": {
       "start": "Starten",
