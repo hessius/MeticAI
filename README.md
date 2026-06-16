@@ -70,7 +70,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 **Quick Install:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
 ```
 
 **Docker:**
@@ -80,7 +80,7 @@ docker pull ghcr.io/hessius/meticai:latest
 
 **Upgrading from v1.x:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/migrate-to-unified.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/migrate-to-unified.sh | bash
 ```
 
 
@@ -201,7 +201,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\addons.ps1
 Remote one-liner (Linux/macOS):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/addons.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/addons.sh | bash
 ```
 
 [→ Full update guide, migration from v1.x, and troubleshooting](UPDATING.md)
