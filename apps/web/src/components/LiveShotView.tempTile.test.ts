@@ -30,27 +30,27 @@ describe('getTempTileDisplay', () => {
   })
 
   it('delta mode shows a signed positive delta when hotter than target', () => {
-    const r = getTempTileDisplay('delta', 94.2, 93, t)
-    expect(r.value).toBe('+1.2')
+    const r = getTempTileDisplay('delta', 96.5, 93, t)
+    expect(r.value).toBe('+3.5')
     expect(r.label).toBe('Δ Target')
     expect(r.valueClassName).toContain('orange')
   })
 
   it('delta mode shows a signed negative delta when cooler than target', () => {
-    const r = getTempTileDisplay('delta', 91.5, 93, t)
-    expect(r.value).toBe('-1.5')
+    const r = getTempTileDisplay('delta', 89.5, 93, t)
+    expect(r.value).toBe('-3.5')
     expect(r.valueClassName).toContain('blue')
   })
 
   it('delta mode treats within-threshold as on-target (neutral color)', () => {
-    const r = getTempTileDisplay('delta', 93.4, 93, t)
-    expect(r.value).toBe('+0.4')
+    const r = getTempTileDisplay('delta', 94.2, 93, t)
+    expect(r.value).toBe('+1.2')
     expect(r.valueClassName).toContain('emerald')
   })
 
-  it('delta mode rounds the boundary value (0.5) as on-target', () => {
-    const r = getTempTileDisplay('delta', 93.5, 93, t)
-    expect(r.value).toBe('+0.5')
+  it('delta mode treats a value just within the threshold as on-target', () => {
+    const r = getTempTileDisplay('delta', 95.2, 93, t)
+    expect(r.value).toBe('+2.2')
     expect(r.valueClassName).toContain('emerald')
   })
 

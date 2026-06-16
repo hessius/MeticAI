@@ -100,6 +100,14 @@ interface ProfileStageInfo {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * On-target temperature threshold (°C). The brew head is considered "on target"
+ * when |current − target| is within this value. Shared by the delta tile color
+ * (#482) and the "Lance's standard" ready-banner easter egg so the two stay in
+ * lockstep — change it here and both update.
+ */
+export const TEMP_ON_TARGET_THRESHOLD = 2.3
+
 export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotViewProps) {
   const { t } = useTranslation()
   const chartDataRef = useRef<ChartDataPoint[]>([])
@@ -397,8 +405,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
               <>
                 {/* Prominent READY banner */}
                 {isReady && (() => {
-                  // "Lance's standard" easter egg: when temp is within 2.3°C of target, show enhanced display
-                  const isLancesStandard = temp != null && targetTemp != null && Math.abs(temp - targetTemp) <= 2.3
+                  // "Lance's standard" easter egg: when temp is on-target, show enhanced display
+                  const isLancesStandard = temp != null && targetTemp != null && Math.abs(temp - targetTemp) <= TEMP_ON_TARGET_THRESHOLD
                   return (
                   <Card className={`p-4 ${isLancesStandard ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)] dark:shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
                     <div className="flex flex-col items-center gap-2">
@@ -789,9 +797,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 // ---------------------------------------------------------------------------
 
 export type TempDisplayMode = 'current' | 'target' | 'delta'
-
-/** On-target threshold (°C) within which the delta is shown as neutral/good. */
-const TEMP_ON_TARGET_THRESHOLD = 0.5
 
 export interface TempTileDisplay {
   value: string
