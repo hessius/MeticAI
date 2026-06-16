@@ -16822,3 +16822,28 @@ class TestRankModels:
     def test_empty_returns_none(self):
         from services.gemini_service import rank_models
         assert rank_models([]) is None
+
+
+class TestReactiveRetry:
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
+    def test_generate_reresolves_and_retries_on_model_not_found(self):
+        from services.gemini_service import _GeminiModelWrapper, _validated_model_cache
+        _validated_model_cache["model"] = "gemini-2.5-flash"
+
+        calls = {"n": 0}
+        class FakeResp:
+            text = "ok"
+        class FakeModels:
+            def generate_content(self, model, contents):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    raise Exception("404 NOT_FOUND: model gemini-2.5-flash is not found")
+                return FakeResp()
+        class FakeClient:
+            models = FakeModels()
+
+        vm = _GeminiModelWrapper(FakeClient())
+        with patch("services.gemini_service.get_working_model_force", return_value="gemini-2.5-pro"):
+            resp = vm.generate_content("hi")
+        assert resp.text == "ok"
+        assert calls["n"] == 2

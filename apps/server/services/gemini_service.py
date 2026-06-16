@@ -164,6 +164,16 @@ def get_working_model_sync() -> str:
     return _validated_model_cache.get("model", get_model_name())
 
 
+def get_working_model_force() -> str:
+    """Synchronously re-resolve a working model, bypassing the cache.
+
+    Runs the async resolver in a fresh event loop (safe because the SDK call
+    is already off the asyncio loop in a thread executor).
+    """
+    _validated_model_cache.pop("model", None)
+    return asyncio.run(get_working_model())
+
+
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
 _GEMINI_NOISE_PREFIXES = (
     "YOLO mode is enabled",
@@ -679,6 +689,9 @@ class _GeminiModelWrapper:
     def generate_content(self, contents):
         """Call generate_content on the Gemini API (synchronous).
 
+        On a model-not-found error, re-resolves the working model once via
+        ``get_working_model_force()`` and retries exactly once.
+
         Args:
             contents: A string, list of strings, PIL images, or mixed list
                      (same format accepted by both old and new SDK).
@@ -686,10 +699,24 @@ class _GeminiModelWrapper:
         Returns:
             GenerateContentResponse with .text attribute.
         """
-        return self._client.models.generate_content(
-            model=get_working_model_sync(),
-            contents=contents,
-        )
+        try:
+            return self._client.models.generate_content(
+                model=get_working_model_sync(),
+                contents=contents,
+            )
+        except Exception as e:
+            text = str(e).lower()
+            is_model_gone = ("not_found" in text and "model" in text) or (
+                "404" in text and "model" in text
+            )
+            if not is_model_gone:
+                raise
+            logger.warning("Model not found during generation; re-resolving…")
+            new_model = get_working_model_force()
+            return self._client.models.generate_content(
+                model=new_model,
+                contents=contents,
+            )
 
     async def async_generate_content(self, contents):
         """Non-blocking wrapper around generate_content.
