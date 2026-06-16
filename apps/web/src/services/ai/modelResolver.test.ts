@@ -102,3 +102,50 @@ describe('resolveWorkingModel', () => {
     expect(listCalls).toBe(1)
   })
 })
+
+import { vi } from 'vitest'
+import { listAvailableModels, STATIC_FALLBACK_MODELS } from './modelResolver'
+
+describe('listAvailableModels', () => {
+  const client = (names: string[]) => ({
+    models: {
+      get: vi.fn(),
+      list: vi.fn().mockResolvedValue(
+        names.map(n => ({ name: n, supportedActions: ['generateContent'] })),
+      ),
+    },
+  })
+
+  it('returns generateContent models ordered best-first, mapped to UI shape', async () => {
+    const res = await listAvailableModels(
+      client(['gemini-2.5-pro', 'gemini-2.5-flash']) as never,
+    )
+    expect(res.map(model => model.id)).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro'])
+    expect(res[0]).toMatchObject({ id: 'gemini-2.5-flash', display_name: expect.any(String) })
+  })
+
+  it('excludes non-text families', async () => {
+    const res = await listAvailableModels(
+      client(['imagen-4.0-generate-001', 'text-embedding-004']) as never,
+    )
+    expect(res).toEqual([])
+  })
+
+  it('uses SDK displayName/description when present', async () => {
+    const c = {
+      models: {
+        get: vi.fn(),
+        list: vi.fn().mockResolvedValue([
+          { name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', description: 'Fast', supportedActions: ['generateContent'] },
+        ]),
+      },
+    }
+    const res = await listAvailableModels(c as never)
+    expect(res[0]).toEqual({ id: 'gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', description: 'Fast' })
+  })
+
+  it('exposes a non-empty static fallback for offline/no-key use', () => {
+    expect(STATIC_FALLBACK_MODELS.length).toBeGreaterThan(0)
+    expect(STATIC_FALLBACK_MODELS[0]).toMatchObject({ id: expect.any(String), display_name: expect.any(String) })
+  })
+})

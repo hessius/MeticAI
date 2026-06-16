@@ -109,3 +109,48 @@ export async function resolveWorkingModel(
   }
   throw new AIServiceError('MODEL_NOT_FOUND')
 }
+
+export interface AvailableModel {
+  id: string
+  display_name: string
+  description: string
+}
+
+/** Offline / no-API-key fallback. Single source of truth for the static list. */
+export const STATIC_FALLBACK_MODELS: AvailableModel[] = [
+  { id: 'gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', description: 'Fast and efficient' },
+  { id: 'gemini-2.5-flash-lite', display_name: 'Gemini 2.5 Flash Lite', description: 'Lightweight' },
+  { id: 'gemini-2.5-pro', display_name: 'Gemini 2.5 Pro', description: 'Most capable' },
+]
+
+/**
+ * List served, generateContent-capable models for the model-picker UI, ordered
+ * best-first by the same heuristic as rankModels(). Maps to the
+ * { id, display_name, description } shape the Settings dropdown expects.
+ * Throws if the underlying models.list() call fails (caller handles fallback).
+ */
+export async function listAvailableModels(client: ModelClient): Promise<AvailableModel[]> {
+  const discovered = await listModels(client)
+  const byShort = new Map<string, DiscoveredModel>()
+  let pool = discovered.filter(
+    m => (m.supportedActions ?? ['generateContent']).includes('generateContent'),
+  )
+  for (const m of pool) byShort.set(shortName(m.name), m)
+
+  const ordered: string[] = []
+  // Repeatedly pull the best remaining model so the list is preference-ordered.
+  while (pool.length) {
+    const best = rankModels(pool)
+    if (!best) break
+    ordered.push(best)
+    pool = pool.filter(m => shortName(m.name) !== best)
+  }
+  return ordered.map(id => {
+    const src = byShort.get(id)
+    return {
+      id,
+      display_name: src?.displayName?.trim() || id,
+      description: src?.description?.trim() || '',
+    }
+  })
+}

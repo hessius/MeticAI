@@ -3627,17 +3627,29 @@ Rules for recommendations:
       return Promise.resolve(jsonResponse({ status: 'ok', mode: 'direct' }))
     }
 
-    // GET /api/available-models → return static fallback list in direct mode
+    // GET /api/available-models → live discovery in direct mode, static fallback offline
     if (url.match(/\/api\/available-models$/)) {
       const currentModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
-      return Promise.resolve(jsonResponse({
-        models: [
-          { id: 'gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', description: 'Fast and efficient' },
-          { id: 'gemini-2.5-pro', display_name: 'Gemini 2.5 Pro', description: 'Most capable' },
-          { id: 'gemini-2.5-flash-lite', display_name: 'Gemini 2.5 Flash Lite', description: 'Lightweight' },
-        ],
-        current: currentModel,
-      }))
+      return (async () => {
+        try {
+          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+          if (apiKey) {
+            const [{ listAvailableModels }, { GoogleGenAI }] = await Promise.all([
+              import('../ai/modelResolver'),
+              import('@google/genai'),
+            ])
+            const client = new GoogleGenAI({ apiKey })
+            const models = await listAvailableModels(
+              client as unknown as import('../ai/modelResolver').ModelClient,
+            )
+            if (models.length) return jsonResponse({ models, current: currentModel })
+          }
+        } catch {
+          // fall through to static fallback
+        }
+        const { STATIC_FALLBACK_MODELS } = await import('../ai/modelResolver')
+        return jsonResponse({ models: STATIC_FALLBACK_MODELS, current: currentModel })
+      })()
     }
 
     // GET /api/version → return app version
