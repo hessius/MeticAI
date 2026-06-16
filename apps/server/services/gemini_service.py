@@ -11,6 +11,11 @@ from logging_config import get_logger
 
 logger = get_logger()
 
+
+class ModelUnavailableError(RuntimeError):
+    """Raised when no compatible Gemini model can be found."""
+
+
 # Lazy-loaded Gemini client
 _gemini_client: Optional[genai.Client] = None
 _DEFAULT_MODEL = "gemini-2.5-flash"
@@ -26,9 +31,6 @@ def get_model_name() -> str:
     value = os.environ.get("GEMINI_MODEL", "").strip()
     return value or _DEFAULT_MODEL
 
-
-# Ordered fallback chain for model deprecation resilience
-_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
 
 
 async def validate_model(model_name: str) -> bool:
@@ -128,21 +130,25 @@ def rank_models(models: list[dict]) -> Optional[str]:
 
 
 async def get_working_model() -> str:
-    """Return a working model, trying configured first then fallbacks."""
+    """Return a working model id, validating the configured model first and
+    falling back to dynamic discovery via the live models list.
+
+    Raises ModelUnavailableError when no compatible model can be found.
+    """
     configured = get_model_name()
     if await validate_model(configured):
         _validated_model_cache["model"] = configured
         return configured
 
-    logger.warning("Configured model '%s' unavailable, trying fallbacks…", configured)
-    for fallback in _FALLBACK_MODELS:
-        if fallback != configured and await validate_model(fallback):
-            logger.info("Falling back to model: %s", fallback)
-            _validated_model_cache["model"] = fallback
-            return fallback
+    logger.warning("Configured model '%s' unavailable, discovering alternatives…", configured)
+    best = rank_models(await get_available_models())
+    if best:
+        logger.info("Selected fallback model via discovery: %s", best)
+        _validated_model_cache["model"] = best
+        return best
 
-    logger.error("No working model found in fallback chain!")
-    return configured
+    logger.error("No compatible Gemini model found via discovery!")
+    raise ModelUnavailableError("No compatible Gemini model is available for this API key.")
 
 
 # Cache for the last validated working model

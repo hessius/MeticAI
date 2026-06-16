@@ -16304,19 +16304,53 @@ class TestModelValidation:
         assert result == "gemini-2.5-flash"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "GEMINI_MODEL": "deprecated-model"})
-    @patch("services.gemini_service.get_gemini_client")
-    def test_get_working_model_falls_back(self, mock_client):
-        """Test get_working_model falls back when configured model fails."""
-        def side_effect(*, model):
-            if model == "deprecated-model":
-                raise Exception("Model deprecated")
-            return Mock()
+    @patch("services.gemini_service.get_available_models")
+    @patch("services.gemini_service.validate_model")
+    def test_get_working_model_falls_back(self, mock_validate, mock_list):
+        """Test get_working_model falls back via discovery when configured model fails."""
+        async def _validate(name):
+            return False
+        mock_validate.side_effect = _validate
+        async def _list():
+            return [{"id": "gemini-2.5-pro"}, {"id": "gemini-2.5-flash"}]
+        mock_list.side_effect = _list
 
-        mock_client.return_value.models.get.side_effect = side_effect
-
-        from services.gemini_service import get_working_model
+        from services.gemini_service import get_working_model, _validated_model_cache
+        _validated_model_cache.clear()
         result = asyncio.run(get_working_model())
         assert result == "gemini-2.5-flash"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
+    @patch("services.gemini_service.get_available_models")
+    @patch("services.gemini_service.validate_model")
+    def test_working_model_uses_dynamic_when_configured_dead(self, mock_validate, mock_list):
+        import asyncio
+        from services.gemini_service import get_working_model, _validated_model_cache
+        _validated_model_cache.clear()
+        async def _validate(name):
+            return False
+        mock_validate.side_effect = _validate
+        async def _list():
+            return [{"id": "gemini-2.5-pro"}, {"id": "gemini-2.5-flash"}]
+        mock_list.side_effect = _list
+        result = asyncio.run(get_working_model())
+        assert result == "gemini-2.5-flash"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
+    @patch("services.gemini_service.get_available_models")
+    @patch("services.gemini_service.validate_model")
+    def test_working_model_raises_when_nothing_available(self, mock_validate, mock_list):
+        import asyncio
+        from services.gemini_service import get_working_model, ModelUnavailableError, _validated_model_cache
+        _validated_model_cache.clear()
+        async def _validate(name):
+            return False
+        mock_validate.side_effect = _validate
+        async def _list():
+            return []
+        mock_list.side_effect = _list
+        with pytest.raises(ModelUnavailableError):
+            asyncio.run(get_working_model())
 
 
 # ─── Machine Status Endpoint Tests ──────────────────────────────────────────
