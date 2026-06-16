@@ -149,6 +149,38 @@ export function getChartTheme(isDark: boolean): ChartTheme {
 }
 
 // ---------------------------------------------------------------------------
+// Left-axis scaling
+// ---------------------------------------------------------------------------
+
+/**
+ * Physical ceilings (in the machine's native units) used to clamp each series'
+ * contribution to the shared left Y-axis. Pressure and flow share the left
+ * axis, so a single outlier — most often a gravimetric-flow burst during
+ * retraction/drip-off — would otherwise inflate the axis domain and squash the
+ * other curves down to a few percent of the chart height.
+ *
+ * The Meticulous tops out around ~12 bar and realistic flow stays well under
+ * ~10 ml/s, so these caps never clip legitimate readings; they only bound
+ * spikes. Chart lines that exceed the domain clip gracefully because the axes
+ * use `allowDataOverflow`.
+ */
+export const AXIS_MAX_PRESSURE = 14 // bar
+export const AXIS_MAX_FLOW = 16 // ml/s
+
+/**
+ * Compute the shared left-axis maximum for pressure + flow charts.
+ *
+ * Clamps each series to its physical ceiling before combining so a spike in one
+ * series can't dominate the axis and compress the other. Adds 10% headroom and
+ * rounds up, matching the historical behaviour for non-spiky data.
+ */
+export function computeLeftAxisMax(maxPressure: number, maxFlow: number): number {
+  const clampedPressure = Math.min(maxPressure, AXIS_MAX_PRESSURE)
+  const clampedFlow = Math.min(maxFlow, AXIS_MAX_FLOW)
+  return Math.ceil(Math.max(clampedPressure, clampedFlow) * 1.1)
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

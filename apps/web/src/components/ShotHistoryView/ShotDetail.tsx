@@ -41,6 +41,7 @@ import { domToPng } from 'modern-screenshot'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
+import { computeLeftAxisMax } from '@/components/charts/chartConstants'
 import { getServerUrl } from '@/lib/config'
 import { useNativeShare, shareImageDataUri } from '@/hooks/useNativeShare'
 import { useActionSheet } from '@/hooks/useActionSheet'
@@ -435,7 +436,7 @@ export function ShotDetail({
       ...(profileTargetCurves?.map(d => d.target_flow || 0) || []),
       8,
     )
-    const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+    const maxLeftAxis = computeLeftAxisMax(maxPressure, maxFlow)
     const maxWeight = Math.max(...chartData.map(d => d.weight || 0), 50)
     const maxRightAxis = Math.ceil(maxWeight * 1.1)
     return { chartData, stageRanges, hasGravFlow, dataMaxTime, mergedData, maxLeftAxis, maxRightAxis }
@@ -448,7 +449,7 @@ export function ShotDetail({
     const maxPressure = Math.max(...combinedData.map(d => Math.max(d.pressureA || 0, d.pressureB || 0)), 12)
     const maxFlow = Math.max(...combinedData.map(d => Math.max(d.flowA || 0, d.flowB || 0)), 8)
     const maxWeight = Math.max(...combinedData.map(d => Math.max(d.weightA || 0, d.weightB || 0)), 50)
-    const leftDomain = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+    const leftDomain = computeLeftAxisMax(maxPressure, maxFlow)
     const rightDomain = Math.ceil(maxWeight * 1.1)
     return { combinedData, dataMaxTime, leftDomain, rightDomain }
   }, [shotData, comparisonShotData])
@@ -473,7 +474,7 @@ export function ShotDetail({
       ...(analysisResult.profile_target_curves?.map(d => d.target_flow || 0) || []),
       5,
     )
-    const maxLeftAxis = Math.ceil(Math.max(maxPressure, maxFlow) * 1.1)
+    const maxLeftAxis = computeLeftAxisMax(maxPressure, maxFlow)
     return { chartData, stageRanges, hasTargetCurves, dataMaxTime, maxLeftAxis, maxFlow }
   }, [shotData, analysisResult])
 
