@@ -8,6 +8,8 @@
 
 **Tech Stack:** Python 3.13 / FastAPI / `google-genai` SDK (server); React + TypeScript / `@google/genai` SDK / vitest (native). Spec: `docs/superpowers/specs/2026-06-16-dynamic-model-discovery-design.md`.
 
+**Relationship to #293 (already merged into `version/2.5.0`):** #293 ("Gemini model lifecycle") added the server helpers this plan extends (`validate_model`, `get_available_models`, `get_working_model`, the now-removed hardcoded `_FALLBACK_MODELS`), a `/api/available-models` endpoint (`apps/server/api/routes/system.py`) that powers the Settings model dropdown, a matching `/api/available-models` handler in `DirectModeInterceptor.ts` that currently returns a **hardcoded static list** in native mode, and the dropdown UI in `SettingsView.tsx`. This plan must **avoid creating a second, divergent native model-discovery path**: the server already routes both its endpoint and `get_working_model()` through `get_available_models()`, so native must likewise route both generation (`resolveWorkingModel`) and the `/api/available-models` interceptor handler through the single `modelResolver.ts`. See Task 7B.
+
 ---
 
 ## File Structure
@@ -17,10 +19,11 @@
 - `test_main.py` — unit tests for `rank_models`, `get_working_model` dynamic fallback, reactive retry; plus one **opt-in live integration test** for `get_available_models()`. (MODIFY)
 
 **Native (`apps/web/src/`)**
-- `services/ai/modelResolver.ts` — NEW: pure `rankModels()` + `resolveWorkingModel()` with in-memory cache (keeps `BrowserAIService` focused).
-- `services/ai/modelResolver.test.ts` — NEW: unit tests (mirror server ranking table) + resolver fallback/cache/error tests.
+- `services/ai/modelResolver.ts` — NEW: pure `rankModels()` + `resolveWorkingModel()` with in-memory cache, plus `listAvailableModels()` (the single native source of truth for discovered models). (keeps `BrowserAIService` focused).
+- `services/ai/modelResolver.test.ts` — NEW: unit tests (mirror server ranking table) + resolver fallback/cache/error tests + `listAvailableModels` ordering/mapping/offline-fallback tests.
 - `services/ai/modelResolver.integration.test.ts` — NEW: **opt-in live integration test** for SDK `models.list()`.
 - `services/ai/BrowserAIService.ts` — MODIFY: route text `generateContent` calls through `resolveWorkingModel()`; reactive retry on `MODEL_NOT_FOUND`.
+- `services/interceptor/DirectModeInterceptor.ts` — MODIFY (Task 7B): the `/api/available-models` handler must use `listAvailableModels()` (live discovery) with the hardcoded list demoted to an offline fallback, so native has ONE discovery path shared with generation (resolves #293/#485 duplication).
 - `lib/directModeAI.ts` — DELETE (dead code).
 
 **Cross-cutting**
@@ -502,6 +505,9 @@ Create `apps/web/src/services/ai/modelResolver.ts`:
 export interface DiscoveredModel {
   name: string
   supportedActions?: string[]
+  // Optional display metadata from the SDK, surfaced by listAvailableModels (Task 7B).
+  displayName?: string
+  description?: string
 }
 
 const NON_TEXT_FRAGMENTS = ['embedding', 'aqa', 'imagen', 'image', 'tts']
@@ -821,6 +827,174 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 
 ---
 
+## Task 7B: Unify native `/api/available-models` with live discovery (resolve #293/#485 duplication)
+
+**Why:** #293 left native model discovery split across two divergent code paths — `modelResolver.ts` (live `models.list()`, used for generation) and `DirectModeInterceptor.ts`'s `/api/available-models` handler (a hardcoded static array, used by the `SettingsView` model dropdown). This task collapses them onto a single `modelResolver` source of truth, mirroring the server (where `system.py`'s endpoint and `get_working_model()` both call `get_available_models()`). The hardcoded list is demoted to a single shared offline fallback.
+
+**Files:**
+- Modify: `apps/web/src/services/ai/modelResolver.ts` (add `STATIC_FALLBACK_MODELS` + `listAvailableModels()`)
+- Modify: `apps/web/src/services/interceptor/DirectModeInterceptor.ts` (`/api/available-models` handler ~line 3630)
+- Test: `apps/web/src/services/ai/modelResolver.test.ts` (add `listAvailableModels` cases)
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `apps/web/src/services/ai/modelResolver.test.ts`:
+
+```ts
+import { listAvailableModels, STATIC_FALLBACK_MODELS } from './modelResolver'
+
+describe('listAvailableModels', () => {
+  const client = (names: string[]) => ({
+    models: {
+      get: vi.fn(),
+      list: vi.fn().mockResolvedValue(
+        names.map(n => ({ name: n, supportedActions: ['generateContent'] })),
+      ),
+    },
+  })
+
+  it('returns generateContent models ordered best-first, mapped to UI shape', async () => {
+    const res = await listAvailableModels(
+      client(['gemini-2.5-pro', 'gemini-2.5-flash']) as never,
+    )
+    expect(res.map(m => m.id)).toEqual(['gemini-2.5-flash', 'gemini-2.5-pro'])
+    expect(res[0]).toMatchObject({ id: 'gemini-2.5-flash', display_name: expect.any(String) })
+  })
+
+  it('excludes non-text families', async () => {
+    const res = await listAvailableModels(
+      client(['imagen-4.0-generate-001', 'text-embedding-004']) as never,
+    )
+    expect(res).toEqual([])
+  })
+
+  it('uses SDK displayName/description when present', async () => {
+    const c = {
+      models: {
+        get: vi.fn(),
+        list: vi.fn().mockResolvedValue([
+          { name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', description: 'Fast', supportedActions: ['generateContent'] },
+        ]),
+      },
+    }
+    const res = await listAvailableModels(c as never)
+    expect(res[0]).toEqual({ id: 'gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', description: 'Fast' })
+  })
+
+  it('exposes a non-empty static fallback for offline/no-key use', () => {
+    expect(STATIC_FALLBACK_MODELS.length).toBeGreaterThan(0)
+    expect(STATIC_FALLBACK_MODELS[0]).toMatchObject({ id: expect.any(String), display_name: expect.any(String) })
+  })
+})
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd apps/web && bun run test:run modelResolver.test`
+Expected: FAIL (`listAvailableModels` / `STATIC_FALLBACK_MODELS` not exported).
+
+- [ ] **Step 3: Implement in `modelResolver.ts`**
+
+Add near the top (after the `rankModels` definition):
+
+```ts
+export interface AvailableModel {
+  id: string
+  display_name: string
+  description: string
+}
+
+/** Offline / no-API-key fallback. Single source of truth for the static list. */
+export const STATIC_FALLBACK_MODELS: AvailableModel[] = [
+  { id: 'gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', description: 'Fast and efficient' },
+  { id: 'gemini-2.5-flash-lite', display_name: 'Gemini 2.5 Flash Lite', description: 'Lightweight' },
+  { id: 'gemini-2.5-pro', display_name: 'Gemini 2.5 Pro', description: 'Most capable' },
+]
+
+/**
+ * List served, generateContent-capable models for the model-picker UI, ordered
+ * best-first by the same heuristic as rankModels(). Maps to the
+ * { id, display_name, description } shape the Settings dropdown expects.
+ * Throws if the underlying models.list() call fails (caller handles fallback).
+ */
+export async function listAvailableModels(client: ModelClient): Promise<AvailableModel[]> {
+  const discovered = await listModels(client)
+  const byShort = new Map<string, DiscoveredModel>()
+  let pool = discovered.filter(
+    m => (m.supportedActions ?? ['generateContent']).includes('generateContent'),
+  )
+  for (const m of pool) byShort.set(shortName(m.name), m)
+
+  const ordered: string[] = []
+  // Repeatedly pull the best remaining model so the list is preference-ordered.
+  while (pool.length) {
+    const best = rankModels(pool)
+    if (!best) break
+    ordered.push(best)
+    pool = pool.filter(m => shortName(m.name) !== best)
+  }
+  return ordered.map(id => {
+    const src = byShort.get(id)
+    return {
+      id,
+      display_name: src?.displayName?.trim() || id,
+      description: src?.description?.trim() || '',
+    }
+  })
+}
+```
+
+(`listModels`, `shortName`, `ModelClient`, `DiscoveredModel`, `rankModels` already exist in this file from Tasks 5–6.)
+
+- [ ] **Step 4: Implement in `DirectModeInterceptor.ts`**
+
+Replace the static `/api/available-models` handler (~line 3630) with live discovery + offline fallback:
+
+```ts
+    // GET /api/available-models → live discovery in direct mode, static fallback offline
+    if (url.match(/\/api\/available-models$/)) {
+      const currentModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
+      return (async () => {
+        try {
+          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+          if (apiKey) {
+            const [{ listAvailableModels }, { GoogleGenAI }] = await Promise.all([
+              import('../ai/modelResolver'),
+              import('@google/genai'),
+            ])
+            const client = new GoogleGenAI({ apiKey })
+            const models = await listAvailableModels(
+              client as unknown as import('../ai/modelResolver').ModelClient,
+            )
+            if (models.length) return jsonResponse({ models, current: currentModel })
+          }
+        } catch {
+          // fall through to static fallback
+        }
+        const { STATIC_FALLBACK_MODELS } = await import('../ai/modelResolver')
+        return jsonResponse({ models: STATIC_FALLBACK_MODELS, current: currentModel })
+      })()
+    }
+```
+
+> Note: `ModelClient` only types `get`/`list`, which is all `listAvailableModels` needs. Verify the `@google/genai` dynamic import shape matches how the SDK is imported elsewhere in this file (it may already be imported at the top — if so, reuse that import instead of a dynamic one).
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `cd apps/web && bun run test:run modelResolver.test` → PASS.
+Then the interceptor + AI groups: `bun run test:run interceptor ai` → PASS (no regressions).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/web/src/services/ai/modelResolver.ts apps/web/src/services/ai/modelResolver.test.ts apps/web/src/services/interceptor/DirectModeInterceptor.ts
+git commit -m "feat(native): unify /api/available-models with live discovery, drop static-only list (#485, #293)
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+```
+
+---
+
 ## Task 8: Native opt-in LIVE integration test — prove SDK `models.list()` works
 
 > Native counterpart of Task 4. Skipped unless a real key is provided via
@@ -987,7 +1161,7 @@ Expected: web build + `cap sync ios` succeed (regenerates `public/`, `config.xml
 
 - [ ] **Step 4: Parity confirmation (Quality Gate #7)**
 
-Manually confirm both runtimes implement: configured-first resolution, dynamic ranked fallback, proactive cache, reactive re-resolve+retry, and the same user-facing error. The ranking test tables match between `test_main.py::TestRankModels` and `modelResolver.test.ts`.
+Manually confirm both runtimes implement: configured-first resolution, dynamic ranked fallback, proactive cache, reactive re-resolve+retry, and the same user-facing error. The ranking test tables match between `test_main.py::TestRankModels` and `modelResolver.test.ts`. Confirm **one** native discovery path: the `/api/available-models` interceptor handler and generation both go through `modelResolver.ts` (no remaining hardcoded model list outside `STATIC_FALLBACK_MODELS`), mirroring the server's shared `get_available_models()`.
 
 - [ ] **Step 5: Final commit (if any cleanup) / open PR**
 
@@ -1005,6 +1179,7 @@ git status   # ensure clean
 - Ranking heuristic (stable/flash/version/exclusions) → Tasks 1, 5. ✓
 - Proactive + reactive recovery → Tasks 2/3 (server), 6/7 (native). ✓
 - Dead-code removal (`directModeAI.ts`) → Task 9. ✓
+- **No conflicting/duplicate native discovery** (#293 reconciliation): `/api/available-models` interceptor + generation share `modelResolver.ts`; static list collapsed to one `STATIC_FALLBACK_MODELS` → Task 7B. ✓
 - Clear user-facing error + i18n in 6 locales → Task 10. ✓
 - Tests for model-unavailable & fallback, both runtimes → Tasks 1-3, 5-7. ✓
 - **Live model-listing works** (user's explicit ask) → Tasks 4 (server) & 8 (native), opt-in integration tests. ✓
