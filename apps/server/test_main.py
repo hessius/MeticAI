@@ -16753,3 +16753,49 @@ class TestImportFromUrlDecentAutoDetect:
         assert data["converted_from_decent"] is True
         # The profile name should come from "title" field after conversion
         assert data["profile_name"] == "Decent URL Import"
+
+
+class TestRankModels:
+    """Tests for the dynamic model ranking heuristic."""
+
+    def _m(self, name):
+        return {"id": name, "display_name": name, "description": ""}
+
+    def test_prefers_flash_over_pro(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.5-pro"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_prefers_higher_version(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.0-flash"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_flash_beats_flash_lite(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.5-flash-lite"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_prefers_stable_over_preview(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-3.0-flash-preview-09-2025"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_allows_preview_as_last_resort(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-3.0-flash-exp")]
+        assert rank_models(models) == "gemini-3.0-flash-exp"
+
+    def test_excludes_non_text_families(self):
+        from services.gemini_service import rank_models
+        models = [self._m("imagen-4.0-generate-001"), self._m("text-embedding-004")]
+        assert rank_models(models) is None
+
+    def test_strips_models_prefix(self):
+        from services.gemini_service import rank_models
+        models = [self._m("models/gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_empty_returns_none(self):
+        from services.gemini_service import rank_models
+        assert rank_models([]) is None

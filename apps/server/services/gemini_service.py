@@ -71,6 +71,62 @@ async def get_available_models() -> list[dict]:
         return []
 
 
+# Name fragments that identify non-text model families to skip.
+_NON_TEXT_FRAGMENTS = ("embedding", "aqa", "imagen", "image", "tts")
+# Patterns that mark a model as preview/experimental/dated-snapshot (unstable).
+_UNSTABLE_RE = re.compile(r"(preview|experimental|-exp\b|exp$|-\d{2}-\d{2}|-\d{3,4}$)")
+
+
+def _model_short_name(name: str) -> str:
+    """Strip a leading 'models/' prefix and lowercase."""
+    return name.split("/")[-1].strip().lower()
+
+
+def rank_models(models: list[dict]) -> Optional[str]:
+    """Pick the best generateContent-capable model from a discovered list.
+
+    Heuristic: prefer stable over preview/experimental; within a tier prefer
+    flash > pro > flash-lite > other; within a class prefer the highest
+    gemini-<major>.<minor> version. Returns the model id (without the
+    'models/' prefix) or None if nothing compatible remains.
+
+    The ``-\\d{3,4}$`` / dated-snapshot patterns in ``_UNSTABLE_RE`` intentionally
+    treat pinned version snapshots (e.g. ``gemini-2.0-flash-001``) as lower-priority
+    than the floating stable alias (e.g. ``gemini-2.5-flash``); this is by design so
+    the resolver prefers the auto-updating stable alias over a frozen snapshot.
+
+    Model *class* (flash > pro > flash-lite > other) takes precedence over version
+    number — a lower-tier model of any generation beats a higher-tier model, because
+    cost and latency outweigh marginal quality for this summarization use case.
+    """
+    candidates = []
+    for m in models:
+        raw = m.get("id") or ""
+        short = _model_short_name(raw)
+        if not short or any(f in short for f in _NON_TEXT_FRAGMENTS):
+            continue
+        candidates.append(short)
+    if not candidates:
+        return None
+
+    def score(short: str):
+        unstable = 1 if _UNSTABLE_RE.search(short) else 0
+        if "flash-lite" in short:
+            cls = 2
+        elif "flash" in short:
+            cls = 0
+        elif "pro" in short:
+            cls = 1
+        else:
+            cls = 3
+        vm = re.search(r"gemini-(\d+)\.(\d+)", short)
+        major, minor = (int(vm.group(1)), int(vm.group(2))) if vm else (0, 0)
+        # Lower tuple sorts first: stable, then class, then highest version, then name.
+        return (unstable, cls, -major, -minor, short)
+
+    return min(candidates, key=score)
+
+
 async def get_working_model() -> str:
     """Return a working model, trying configured first then fallbacks."""
     configured = get_model_name()
