@@ -68,6 +68,11 @@ class TestRankModels:
         models = [self._m("gemini-2.5-flash-lite"), self._m("gemini-2.5-flash")]
         assert rank_models(models) == "gemini-2.5-flash"
 
+    def test_flash_lite_beats_pro(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.5-pro"), self._m("gemini-2.5-flash-lite")]
+        assert rank_models(models) == "gemini-2.5-flash-lite"
+
     def test_prefers_stable_over_preview(self):
         from services.gemini_service import rank_models
         models = [self._m("gemini-3.0-flash-preview-09-2025"), self._m("gemini-2.5-flash")]
@@ -118,7 +123,7 @@ def rank_models(models: list[dict]) -> Optional[str]:
     """Pick the best generateContent-capable model from a discovered list.
 
     Heuristic: prefer stable over preview/experimental; within a tier prefer
-    flash > pro > flash-lite > other; within a class prefer the highest
+    flash > flash-lite > pro > other; within a class prefer the highest
     gemini-<major>.<minor> version. Returns the model id (without the
     'models/' prefix) or None if nothing compatible remains.
     """
@@ -135,11 +140,11 @@ def rank_models(models: list[dict]) -> Optional[str]:
     def score(short: str):
         unstable = 1 if _UNSTABLE_RE.search(short) else 0
         if "flash-lite" in short:
-            cls = 2
+            cls = 1
         elif "flash" in short:
             cls = 0
         elif "pro" in short:
-            cls = 1
+            cls = 2
         else:
             cls = 3
         vm = re.search(r"gemini-(\d+)\.(\d+)", short)
@@ -455,6 +460,9 @@ describe('rankModels', () => {
   it('flash beats flash-lite', () => {
     expect(rankModels([m('gemini-2.5-flash-lite'), m('gemini-2.5-flash')])).toBe('gemini-2.5-flash')
   })
+  it('flash-lite beats pro', () => {
+    expect(rankModels([m('gemini-2.5-pro'), m('gemini-2.5-flash-lite')])).toBe('gemini-2.5-flash-lite')
+  })
   it('prefers stable over preview', () => {
     expect(rankModels([m('gemini-3.0-flash-preview-09-2025'), m('gemini-2.5-flash')])).toBe('gemini-2.5-flash')
   })
@@ -517,7 +525,7 @@ export function rankModels(models: DiscoveredModel[]): string | null {
 
   const score = (s: string): [number, number, number, number, string] => {
     const unstable = UNSTABLE_RE.test(s) ? 1 : 0
-    const cls = s.includes('flash-lite') ? 2 : s.includes('flash') ? 0 : s.includes('pro') ? 1 : 3
+    const cls = s.includes('flash-lite') ? 1 : s.includes('flash') ? 0 : s.includes('pro') ? 2 : 3
     const vm = s.match(/gemini-(\d+)\.(\d+)/)
     const major = vm ? parseInt(vm[1], 10) : 0
     const minor = vm ? parseInt(vm[2], 10) : 0

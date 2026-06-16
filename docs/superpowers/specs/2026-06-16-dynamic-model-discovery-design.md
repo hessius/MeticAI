@@ -105,7 +105,7 @@ resolveWorkingModel(forceRefresh = false):
    **stable**.
 4. **Ordering (highest wins):**
    - stable before unstable;
-   - within a tier, class rank **flash > pro > flash-lite > other**;
+   - within a tier, class rank **flash > flash-lite > pro > other**;
    - within a class, highest `gemini-<major>.<minor>` version (parsed from name);
    - deterministic tie-break on name for stability.
 5. **Selection:** return the top stable model; if none stable, return the top
@@ -166,7 +166,7 @@ tables).
 
 ### Server (pytest, `apps/server/test_main.py`)
 - `rank_models`: capability filter, family exclusion, stable-over-unstable,
-  flash > pro > flash-lite, version ordering, unstable-only-as-last-resort,
+  flash > flash-lite > pro, version ordering, unstable-only-as-last-resort,
   empty → `None`.
 - `get_working_model`: configured valid → configured; configured dead → dynamic
   pick; all dead / empty list → error path.

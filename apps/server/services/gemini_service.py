@@ -88,7 +88,7 @@ def rank_models(models: list[dict]) -> Optional[str]:
     """Pick the best generateContent-capable model from a discovered list.
 
     Heuristic: prefer stable over preview/experimental; within a tier prefer
-    flash > pro > flash-lite > other; within a class prefer the highest
+    flash > flash-lite > pro > other; within a class prefer the highest
     gemini-<major>.<minor> version. Returns the model id (without the
     'models/' prefix) or None if nothing compatible remains.
 
@@ -97,7 +97,7 @@ def rank_models(models: list[dict]) -> Optional[str]:
     than the floating stable alias (e.g. ``gemini-2.5-flash``); this is by design so
     the resolver prefers the auto-updating stable alias over a frozen snapshot.
 
-    Model *class* (flash > pro > flash-lite > other) takes precedence over version
+    Model *class* (flash > flash-lite > pro > other) takes precedence over version
     number — a lower-tier model of any generation beats a higher-tier model, because
     cost and latency outweigh marginal quality for this summarization use case.
     """
@@ -114,11 +114,11 @@ def rank_models(models: list[dict]) -> Optional[str]:
     def score(short: str):
         unstable = 1 if _UNSTABLE_RE.search(short) else 0
         if "flash-lite" in short:
-            cls = 2
+            cls = 1
         elif "flash" in short:
             cls = 0
         elif "pro" in short:
-            cls = 1
+            cls = 2
         else:
             cls = 3
         vm = re.search(r"gemini-(\d+)\.(\d+)", short)

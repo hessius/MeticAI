@@ -16810,6 +16810,11 @@ class TestRankModels:
         models = [self._m("gemini-2.5-flash-lite"), self._m("gemini-2.5-flash")]
         assert rank_models(models) == "gemini-2.5-flash"
 
+    def test_flash_lite_beats_pro(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.5-pro"), self._m("gemini-2.5-flash-lite")]
+        assert rank_models(models) == "gemini-2.5-flash-lite"
+
     def test_prefers_stable_over_preview(self):
         from services.gemini_service import rank_models
         models = [self._m("gemini-3.0-flash-preview-09-2025"), self._m("gemini-2.5-flash")]
