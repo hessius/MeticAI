@@ -1,5 +1,5 @@
 import { STORAGE_KEYS } from '@/lib/constants'
-import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { createBrowserAIService, generateTextWithRetry } from '@/services/ai/BrowserAIService'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { CapacitorHttp } from '@capacitor/core'
@@ -3121,11 +3121,10 @@ Rules for recommendations:
           const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
 
           const response = await retryWithBackoff(() =>
-            client.models.generateContent({
-              model: modelId,
+            generateTextWithRetry(client as never, modelId, {
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
             })
-          )
+          ) as { text?: string }
 
           const analysisText = response.text ?? ''
           return jsonResponse({
@@ -3569,10 +3568,10 @@ Rules for recommendations:
               const client = new GoogleGenAI({ apiKey: key })
               const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
               const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
-              const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
+              const configuredModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
+              const response = await generateTextWithRetry(client as never, configuredModel, {
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              })
+              }) as { text?: string }
               const description = response.text?.trim()
               if (description && !description.includes('generated without AI')) {
                 _descriptionCache.set(profileName, description)
