@@ -3608,6 +3608,96 @@ class TestShotAnalysisHelpers:
         assert pressure_points[0]["target_pressure"] == 2.0
         assert pressure_points[-1]["target_pressure"] == 9.0
 
+    def test_short_ramp_not_compressed_to_instant(self):
+        """Regression: a short ramp inside a longer stage keeps its real duration.
+
+        A 2s ramp from 3->9 bar in a stage that actually ran 30s must occupy its
+        true 2 seconds and then hold at 9 bar — it must NOT be stretched across
+        the whole stage, nor (when a trailing hold point exists) compressed until
+        the ramp looks instantaneous. See issue #483.
+        """
+        from services.analysis_service import _generate_profile_target_curves
+
+        profile_data = {
+            "stages": [
+                {
+                    "name": "Ramp",
+                    "type": "pressure",
+                    # Ramp 3->9 over 2s, then hold at 9 (trailing hold point at 30s).
+                    "dynamics_points": [[0, 3.0], [2, 9.0], [30, 9.0]],
+                    "dynamics_over": "time",
+                }
+            ],
+            "variables": [],
+        }
+
+        # The stage actually ran 30s in the shot.
+        shot_stage_times = {"Ramp": (0.0, 30.0)}
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 3.0}, "status": "Ramp"},
+                {
+                    "time": 30000,
+                    "shot": {"weight": 36.0, "pressure": 9.0},
+                    "status": "Ramp",
+                },
+            ]
+        }
+
+        curves = _generate_profile_target_curves(
+            profile_data, shot_stage_times, shot_data
+        )
+        pressure_points = [c for c in curves if "target_pressure" in c]
+
+        # The 3 -> 9 transition must complete at ~2s, not stretched to 30s and not
+        # collapsed to t=0 (instant).
+        nine_bar_times = [
+            p["time"] for p in pressure_points if p["target_pressure"] == 9.0
+        ]
+        assert nine_bar_times, "expected the curve to reach 9 bar"
+        first_nine = min(nine_bar_times)
+        assert first_nine == pytest.approx(2.0, abs=0.2), (
+            f"ramp should reach 9 bar at ~2s, got {first_nine}s"
+        )
+        # And the final target should still be held at 9 bar at stage end.
+        assert pressure_points[-1]["target_pressure"] == 9.0
+        assert pressure_points[-1]["time"] == pytest.approx(30.0, abs=0.2)
+
+    def test_short_ramp_estimated_curves_not_compressed(self):
+        """Regression (#483): estimated curves also preserve short-ramp duration.
+
+        Without shot data, a 2s ramp in a stage whose estimated duration is longer
+        must still render the ramp over 2 seconds (then hold), instead of being
+        rescaled to fill the estimated duration.
+        """
+        from services.analysis_service import generate_estimated_target_curves
+
+        profile_data = {
+            "stages": [
+                {
+                    "name": "Ramp",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 3.0], [2, 9.0]],
+                    "dynamics_over": "time",
+                    # No time trigger -> estimated duration falls back to 10s.
+                    "exit_triggers": [{"type": "weight", "value": 36}],
+                }
+            ],
+            "variables": [],
+        }
+
+        curves = generate_estimated_target_curves(profile_data)
+        pressure_points = [c for c in curves if "target_pressure" in c]
+
+        nine_bar_times = [
+            p["time"] for p in pressure_points if p["target_pressure"] == 9.0
+        ]
+        assert nine_bar_times
+        assert min(nine_bar_times) == pytest.approx(2.0, abs=0.2)
+        # Final value held at 9 bar to the (estimated) stage end.
+        assert pressure_points[-1]["target_pressure"] == 9.0
+        assert pressure_points[-1]["time"] > 2.0
+
     def test_generate_profile_target_curves_flow_stage(self):
         """Test generating target curves for flow-based stage."""
         from services.analysis_service import _generate_profile_target_curves
@@ -3780,7 +3870,13 @@ class TestShotAnalysisHelpers:
         pressure_values = [p["target_pressure"] for p in pressure_points]
         assert 2.1 in pressure_values
         assert 8.4 in pressure_values
-        assert 3.7 in pressure_values
+        # The dynamics curve's final point is at t=40.9s, but the stage only ran
+        # 26s (19s -> 45s) before exiting, so the curve is clipped at the stage
+        # boundary rather than rescaled to reach the final 3.7 value. The boundary
+        # value is the linear interpolation of 8.4 -> 3.7 at 26s into the stage.
+        assert 3.7 not in pressure_values
+        boundary_value = pressure_points[-1]["target_pressure"]
+        assert 3.7 < boundary_value < 8.4
 
     def test_generate_profile_target_curves_handles_both_formats(self):
         """Test that target curve generation handles both flat and nested dynamics formats."""
@@ -4150,11 +4246,19 @@ class TestEstimatedTargetCurves:
             "variables": [],
         }
         curves = generate_estimated_target_curves(profile)
-        assert len(curves) == 3
-        # Scale: 20/10 = 2x — so times are 0, 10, 20
+        # Dynamics define a ramp over 10s; the stage's time exit is 20s, so the
+        # ramp keeps its real 10s duration and then holds at 9 bar until 20s.
+        # It must NOT be rescaled to span the full 20s (issue #483).
+        assert len(curves) == 4
         assert curves[0]["time"] == 0.0
-        assert curves[1]["time"] == 10.0
-        assert curves[2]["time"] == 20.0
+        assert curves[0]["target_pressure"] == 2.0
+        assert curves[1]["time"] == 5.0
+        assert curves[1]["target_pressure"] == 6.0
+        assert curves[2]["time"] == 10.0
+        assert curves[2]["target_pressure"] == 9.0
+        # Final value held flat to the stage end.
+        assert curves[3]["time"] == 20.0
+        assert curves[3]["target_pressure"] == 9.0
 
     def test_no_time_trigger_uses_default(self):
         """Stage without a time exit trigger uses the 10s default."""
