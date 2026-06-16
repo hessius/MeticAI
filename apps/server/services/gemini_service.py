@@ -32,7 +32,6 @@ def get_model_name() -> str:
     return value or _DEFAULT_MODEL
 
 
-
 async def validate_model(model_name: str) -> bool:
     """Check if a model is available via the Gemini API."""
     try:

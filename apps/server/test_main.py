@@ -16303,28 +16303,11 @@ class TestModelValidation:
         result = asyncio.run(get_working_model())
         assert result == "gemini-2.5-flash"
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "GEMINI_MODEL": "deprecated-model"})
-    @patch("services.gemini_service.get_available_models")
-    @patch("services.gemini_service.validate_model")
-    def test_get_working_model_falls_back(self, mock_validate, mock_list):
-        """Test get_working_model falls back via discovery when configured model fails."""
-        async def _validate(name):
-            return False
-        mock_validate.side_effect = _validate
-        async def _list():
-            return [{"id": "gemini-2.5-pro"}, {"id": "gemini-2.5-flash"}]
-        mock_list.side_effect = _list
-
-        from services.gemini_service import get_working_model, _validated_model_cache
-        _validated_model_cache.clear()
-        result = asyncio.run(get_working_model())
-        assert result == "gemini-2.5-flash"
-
     @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
     @patch("services.gemini_service.get_available_models")
     @patch("services.gemini_service.validate_model")
     def test_working_model_uses_dynamic_when_configured_dead(self, mock_validate, mock_list):
-        import asyncio
+        """Test discovery path is used and result is cached when configured model fails."""
         from services.gemini_service import get_working_model, _validated_model_cache
         _validated_model_cache.clear()
         async def _validate(name):
@@ -16335,12 +16318,13 @@ class TestModelValidation:
         mock_list.side_effect = _list
         result = asyncio.run(get_working_model())
         assert result == "gemini-2.5-flash"
+        assert _validated_model_cache.get("model") == "gemini-2.5-flash"
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
     @patch("services.gemini_service.get_available_models")
     @patch("services.gemini_service.validate_model")
     def test_working_model_raises_when_nothing_available(self, mock_validate, mock_list):
-        import asyncio
+        """Test ModelUnavailableError is raised when discovery returns no models."""
         from services.gemini_service import get_working_model, ModelUnavailableError, _validated_model_cache
         _validated_model_cache.clear()
         async def _validate(name):
