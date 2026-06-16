@@ -16847,3 +16847,30 @@ class TestReactiveRetry:
             resp = vm.generate_content("hi")
         assert resp.text == "ok"
         assert calls["n"] == 2
+
+
+@pytest.mark.skipif(
+    not os.environ.get("GEMINI_API_KEY"),
+    reason="requires a real GEMINI_API_KEY (opt-in live integration test)",
+)
+class TestLiveModelListing:
+    """Opt-in: hits the real Gemini API to prove discovery works end-to-end."""
+
+    def test_get_available_models_returns_real_models(self):
+        import asyncio
+        # Reset any cached client so the env key is used.
+        import services.gemini_service as gs
+        gs._gemini_client = None
+        models = asyncio.run(gs.get_available_models())
+        assert isinstance(models, list)
+        assert len(models) > 0, "Expected at least one generateContent model"
+        assert all("id" in m for m in models)
+
+    def test_rank_models_picks_a_real_model(self):
+        import asyncio
+        import services.gemini_service as gs
+        gs._gemini_client = None
+        best = gs.rank_models(asyncio.run(gs.get_available_models()))
+        assert best, "rank_models should select a model from the live list"
+        # The selected model must actually validate against the API.
+        assert asyncio.run(gs.validate_model(best)) is True
