@@ -31,6 +31,7 @@ import { retryWithBackoff } from './retryUtils'
 import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
+import { resolveWorkingModel, type ModelClient } from './modelResolver'
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 const IMAGE_MODEL = 'imagen-4.0-generate-001'
@@ -89,6 +90,34 @@ function wrapApiError(err: unknown): never {
   throw new AIServiceError('UNKNOWN', err)
 }
 
+/** Client shape used for text generation: model resolution plus generateContent. */
+type TextGenClient = ModelClient & {
+  models: {
+    generateContent: (args: { model: string; contents: unknown; config?: unknown }) => Promise<unknown>
+  }
+}
+
+/**
+ * Run a text generateContent call through dynamic model resolution with a
+ * single reactive retry: if the call fails with a model-not-found error, the
+ * working model is re-resolved (bypassing cache) and the call is retried once.
+ */
+export async function generateTextWithRetry(
+  client: TextGenClient,
+  configured: string,
+  req: { contents: unknown; config?: unknown },
+): Promise<unknown> {
+  const model = await resolveWorkingModel(client, configured)
+  try {
+    return await client.models.generateContent({ model, ...req })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (!(msg.includes('404') || msg.includes('NOT_FOUND'))) throw err
+    const retryModel = await resolveWorkingModel(client, configured, true)
+    return client.models.generateContent({ model: retryModel, ...req })
+  }
+}
+
 export function createBrowserAIService(): AIService {
   return {
     name: 'BrowserAIService',
@@ -137,10 +166,9 @@ export function createBrowserAIService(): AIService {
 
       let response
       try {
-        response = await client.models.generateContent({
-          model: getGeminiModel(),
+        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts }],
-        })
+        }) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }
@@ -151,10 +179,9 @@ export function createBrowserAIService(): AIService {
 
       // Validation + retry loop
       const generateFix = async (fixPrompt: string) => {
-        const fixResponse = await client.models.generateContent({
-          model: getGeminiModel(),
+        const fixResponse = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts: [{ text: fixPrompt }] }],
-        })
+        }) as { text?: string }
         return fixResponse.text ?? ''
       }
 
@@ -188,11 +215,10 @@ export function createBrowserAIService(): AIService {
       let response
       try {
         response = await retryWithBackoff(() =>
-          client.models.generateContent({
-            model: getGeminiModel(),
+          generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
           })
-        )
+        ) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }
@@ -257,10 +283,9 @@ export function createBrowserAIService(): AIService {
 
       let response
       try {
-        response = await client.models.generateContent({
-          model: getGeminiModel(),
+        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        })
+        }) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }
@@ -302,10 +327,9 @@ export function createBrowserAIService(): AIService {
 
       let response
       try {
-        response = await client.models.generateContent({
-          model: getGeminiModel(),
+        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        })
+        }) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }
