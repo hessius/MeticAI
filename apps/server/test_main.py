@@ -4936,6 +4936,100 @@ class TestMachineProfilesEndpoint:
         assert "Bloom" in tags
 
 
+class TestTargetCurvesOverride:
+    """Target-curves endpoint reflects active temporary variable overrides."""
+
+    def _make_profile(self):
+        full = type("FullProfile", (), {})()
+        full.id = "profile-1"
+        full.name = "Override Profile"
+        full.error = None
+        # Single-point pressure stage whose value references a variable, so an
+        # override of that variable changes the estimated target curve.
+        full.stages = [
+            {
+                "name": "Hold",
+                "type": "pressure",
+                "dynamics_points": [[0, "$pressure_var"]],
+                "dynamics_over": "time",
+                "exit_triggers": [{"type": "time", "value": 10}],
+            }
+        ]
+        full.variables = [
+            {"key": "pressure_var", "type": "pressure", "value": 6.0}
+        ]
+        return full
+
+    @patch("api.routes.profiles.get_active")
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_curves_use_saved_value_without_active_override(
+        self, mock_list, mock_get, mock_active, client
+    ):
+        mock_profile = type("Profile", (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Override Profile"
+        mock_profile.error = None
+        mock_list.return_value = [mock_profile]
+        mock_get.return_value = self._make_profile()
+        mock_active.return_value = None
+
+        response = client.get("/api/profile/Override Profile/target-curves")
+        assert response.status_code == 200
+        curves = response.json()["target_curves"]
+        pressures = {c["target_pressure"] for c in curves if "target_pressure" in c}
+        assert pressures == {6.0}
+
+    @patch("api.routes.profiles.get_active")
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_curves_reflect_active_override(
+        self, mock_list, mock_get, mock_active, client
+    ):
+        mock_profile = type("Profile", (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Override Profile"
+        mock_profile.error = None
+        mock_list.return_value = [mock_profile]
+        mock_get.return_value = self._make_profile()
+        mock_active.return_value = {
+            "profile_id": "profile-1",
+            "profile_name": "Override Profile",
+            "original_params": {"overrides": {"pressure_var": 9.0}},
+        }
+
+        response = client.get("/api/profile/Override Profile/target-curves")
+        assert response.status_code == 200
+        curves = response.json()["target_curves"]
+        pressures = {c["target_pressure"] for c in curves if "target_pressure" in c}
+        assert pressures == {9.0}
+
+    @patch("api.routes.profiles.get_active")
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_curves_ignore_override_for_other_profile(
+        self, mock_list, mock_get, mock_active, client
+    ):
+        mock_profile = type("Profile", (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Override Profile"
+        mock_profile.error = None
+        mock_list.return_value = [mock_profile]
+        mock_get.return_value = self._make_profile()
+        # Active override is for a different profile name -> ignored.
+        mock_active.return_value = {
+            "profile_id": "other",
+            "profile_name": "Some Other Profile",
+            "original_params": {"overrides": {"pressure_var": 9.0}},
+        }
+
+        response = client.get("/api/profile/Override Profile/target-curves")
+        assert response.status_code == 200
+        curves = response.json()["target_curves"]
+        pressures = {c["target_pressure"] for c in curves if "target_pressure" in c}
+        assert pressures == {6.0}
+
+
 class TestMachineProfileJsonEndpoint:
     """Tests for the /api/machine/profile/{profile_id}/json endpoint."""
 

@@ -242,6 +242,11 @@ function transformWatcherResponse(raw: Record<string, unknown>): Record<string, 
 
 const DIRECT_PROFILE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
+// Tracks the currently-running ephemeral override profile so the live view's
+// target curves reflect the temporary variables actually being brewed rather
+// than the saved profile. Cleared whenever a shot starts without overrides.
+let _activeOverrideProfile: { name: string; profile: CachedProfile } | null = null
+
 class DirectImageValidationError extends Error {
   constructor(message: string, public readonly status = 400) {
     super(message)
@@ -1244,6 +1249,7 @@ export function installDirectModeInterceptor(): void {
     if (runMatch && method === 'POST') {
       const profileId = decodeURIComponent(runMatch[1])
       return (async () => {
+        _activeOverrideProfile = null
         // Try loading directly first
         let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
         if (!loadResp.ok) {
@@ -1359,6 +1365,9 @@ export function installDirectModeInterceptor(): void {
             modified.name = newName.trim()
             delete modified.id
           }
+          // Remember the effective profile so the live view's target curves
+          // reflect the temporary overrides actually being brewed.
+          _activeOverrideProfile = { name: (modified.name as string) || originalName, profile: modified as unknown as CachedProfile }
           // Ephemeral load: POST /api/v1/profile/load (loads into memory without persisting)
           const loadResp = await _fetch('/api/v1/profile/load', {
             method: 'POST',
@@ -1369,6 +1378,7 @@ export function installDirectModeInterceptor(): void {
             return jsonResponse({ detail: 'Failed to load modified profile' }, 502)
           }
         } else {
+          _activeOverrideProfile = null
           // No overrides — just load the original by ID
           let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
           if (!loadResp.ok) {
@@ -2041,7 +2051,12 @@ export function installDirectModeInterceptor(): void {
     if (targetCurvesMatch && method === 'GET') {
       return (async () => {
         const name = decodeURIComponent(targetCurvesMatch[1])
-        const profile = await _findProfileByName(name)
+        // Prefer the active override profile so the live graph reflects the
+        // temporary variables actually being brewed.
+        const profile =
+          _activeOverrideProfile && _activeOverrideProfile.name === name
+            ? _activeOverrideProfile.profile
+            : await _findProfileByName(name)
         if (!profile) return jsonResponse({ detail: `Profile '${name}' not found` }, 404)
         return jsonResponse({
           status: 'success',

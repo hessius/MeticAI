@@ -59,7 +59,7 @@ from services.analysis_service import (
 from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
 from utils.file_utils import deep_convert_to_dict
-from services.temp_profile_service import is_temp_profile
+from services.temp_profile_service import is_temp_profile, get_active, apply_variable_overrides
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1191,6 +1191,20 @@ async def get_profile_target_curves(profile_name: str, request: Request):
                                             ]
                         else:
                             profile_dict[attr] = val
+
+                # Apply active temporary variable overrides so the live graph
+                # reflects the shot actually running (ephemeral override load),
+                # not the saved profile. The active temp profile keeps the
+                # original name when save_mode is "none"/"save_original".
+                active = get_active()
+                if active and active.get("profile_name") == profile_name:
+                    overrides = (active.get("original_params") or {}).get(
+                        "overrides"
+                    ) or {}
+                    if overrides:
+                        profile_dict = apply_variable_overrides(
+                            profile_dict, overrides
+                        )
 
                 curves = generate_estimated_target_curves(profile_dict)
                 return {"status": "success", "target_curves": curves}
