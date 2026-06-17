@@ -1053,6 +1053,7 @@
   },
   "markdownEditor": {
     "edit": "Bearbeiten",
+    "editNote": "Notiz bearbeiten",
     "preview": "Vorschau",
     "save": "Speichern",
     "saving": "Speichern...",

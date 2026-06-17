@@ -1630,10 +1630,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
             transition={{ delay: 0.3 }}
             className="space-y-2"
           >
-            <Label className={`text-sm font-semibold tracking-wide ${notes ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
-              {t('history.notes')}
-            </Label>
             <MarkdownEditor
+              title={
+                <Label className={`text-sm font-semibold tracking-wide ${notes ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                  {t('history.notes')}
+                </Label>
+              }
               value={notes}
               onChange={setNotes}
               onSave={handleSaveNotes}

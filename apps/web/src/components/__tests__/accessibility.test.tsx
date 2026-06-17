@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ReactNode } from 'react'
 import { render, screen, act, waitFor } from '@testing-library/react'
 
 // ---------------------------------------------------------------------------
@@ -33,12 +34,16 @@ vi.mock('@/lib/config', () => ({
 
 vi.mock('@/components/MarkdownEditor', () => ({
   MarkdownEditor: (props: Record<string, unknown>) => (
-    <textarea
-      data-testid="mock-markdown-editor"
-      value={props.value as string}
-      placeholder={props.placeholder as string}
-      readOnly
-    />
+    <div>
+      {props.title as ReactNode}
+      {props.headerExtra as ReactNode}
+      <textarea
+        data-testid="mock-markdown-editor"
+        value={props.value as string}
+        placeholder={props.placeholder as string}
+        readOnly
+      />
+    </div>
   ),
 }))
 

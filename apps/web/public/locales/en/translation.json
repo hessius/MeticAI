@@ -1154,6 +1154,7 @@
   },
   "markdownEditor": {
     "edit": "Edit",
+    "editNote": "Edit Note",
     "preview": "Preview",
     "save": "Save",
     "saving": "Saving...",

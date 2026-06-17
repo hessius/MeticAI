@@ -1053,6 +1053,7 @@
   },
   "markdownEditor": {
     "edit": "Redigera",
+    "editNote": "Redigera anteckning",
     "preview": "Förhandsgranska",
     "save": "Spara",
     "saving": "Sparar...",

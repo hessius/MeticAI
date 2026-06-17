@@ -1053,6 +1053,7 @@
   },
   "markdownEditor": {
     "edit": "Modifica",
+    "editNote": "Modifica nota",
     "preview": "Anteprima",
     "save": "Salva",
     "saving": "Salvataggio...",
