@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { invalidateCatalogueCache } from '@/lib/catalogueCache'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
 import { STORAGE_KEYS } from '@/lib/constants'
@@ -659,6 +660,10 @@ function App() {
       
       const profileJson = extractProfileJson(data.reply)
       setCurrentProfileJson(profileJson)
+
+      // A new profile was just created on the machine — drop the catalogue
+      // cache so it shows up immediately instead of after the TTL expires.
+      invalidateCatalogueCache()
       
       // Fetch the machine profile ID for the created profile, with a small retry to
       // handle delays between creation and appearance in /api/machine/profiles

@@ -24,6 +24,7 @@ import {
   Funnel
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { getCatalogueCache, setCatalogueCache, invalidateCatalogueCache, CATALOGUE_CACHE_TTL } from '@/lib/catalogueCache'
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
@@ -75,9 +76,10 @@ interface ProfileCatalogueViewProps {
   onViewProfile?: (profile: MachineProfile) => void
 }
 
-// Module-level profile cache — survives unmount/remount, instant on revisit
-let _catalogueCache: { profiles: MachineProfile[]; offline: boolean; ts: number } | null = null
-const CATALOGUE_CACHE_TTL = 2 * 60 * 1000 // 2 minutes
+// Module-level profile cache — survives unmount/remount, instant on revisit.
+// Backed by a shared module so non-catalogue code can invalidate it after a
+// mutation (see lib/catalogueCache).
+
 
 export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogueViewProps) {
   const { t } = useTranslation()
@@ -144,18 +146,19 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
   // Fetch profiles — stale-while-revalidate pattern
   const fetchProfiles = useCallback(async (forceRefresh = false) => {
+    const cached = getCatalogueCache<MachineProfile>()
     // Serve from module cache if fresh (instant render on revisit)
-    if (!forceRefresh && _catalogueCache && (Date.now() - _catalogueCache.ts < CATALOGUE_CACHE_TTL)) {
-      setProfiles(_catalogueCache.profiles)
-      setIsOffline(_catalogueCache.offline)
+    if (!forceRefresh && cached && (Date.now() - cached.ts < CATALOGUE_CACHE_TTL)) {
+      setProfiles(cached.profiles)
+      setIsOffline(cached.offline)
       setIsLoading(false)
       return
     }
 
     // If stale cache exists, show it immediately while fetching
-    if (_catalogueCache) {
-      setProfiles(_catalogueCache.profiles)
-      setIsOffline(_catalogueCache.offline)
+    if (cached) {
+      setProfiles(cached.profiles)
+      setIsOffline(cached.offline)
       setIsLoading(false)
     } else {
       setIsLoading(true)
@@ -172,12 +175,12 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
       const data = await response.json()
       const offline = data.offline === true
       const fetchedProfiles = Array.isArray(data?.profiles) ? data.profiles : []
-      _catalogueCache = { profiles: fetchedProfiles, offline, ts: Date.now() }
+      setCatalogueCache<MachineProfile>({ profiles: fetchedProfiles, offline, ts: Date.now() })
       setIsOffline(offline)
       setProfiles(fetchedProfiles)
     } catch (err) {
       // Only show error if we had no cached data to display
-      if (!_catalogueCache) {
+      if (!getCatalogueCache()) {
         const message = err instanceof Error ? err.message : t('profileCatalogue.fetchFailed')
         setError(message)
         toast.error(message)
@@ -189,7 +192,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
   // Force-refresh: invalidate cache and re-fetch (for after mutations)
   const refreshProfiles = useCallback(() => {
-    _catalogueCache = null
+    invalidateCatalogueCache()
     return fetchProfiles(true)
   }, [fetchProfiles])
 

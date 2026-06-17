@@ -904,6 +904,15 @@ export function installDirectModeInterceptor(): void {
     return result
   }
 
+  // Drop the cached profile list so the next /api/machine/profiles fetch hits
+  // the machine. Call after creating/saving a NEW profile so it shows up
+  // immediately in the catalogue instead of waiting for the TTL to expire.
+  function _invalidateProfileListCache() {
+    _profileCache.clear()
+    try { localStorage.removeItem(PROFILE_LIST_CACHE_KEY) } catch { /* ignore */ }
+    try { localStorage.removeItem(PROFILE_LIST_CACHE_KEY + ':ts') } catch { /* ignore */ }
+  }
+
   // Restore profile cache from localStorage on startup
   try {
     const stored = localStorage.getItem(PROFILE_LIST_CACHE_KEY)
@@ -1567,6 +1576,7 @@ export function installDirectModeInterceptor(): void {
             if (!saveResp.ok) {
               return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
             }
+            _invalidateProfileListCache()
           }
           return jsonResponse({
             status: 'success',
@@ -1630,6 +1640,7 @@ export function installDirectModeInterceptor(): void {
           if (typeof profileJson.name !== 'string' || !profileJson.name) return jsonResponse({ status: 'error', detail: "Profile is missing a 'name' field" }, 400)
           const saveResp = await _fetch('/api/v1/profile/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileJson) })
           if (!saveResp.ok) return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
+          _invalidateProfileListCache()
           return jsonResponse({ status: 'success', entry_id: 'direct-' + Date.now(), profile_name: profileJson.name as string, has_description: false, uploaded_to_machine: true, converted_from_decent: convertedFromDecent })
         } catch { return jsonResponse({ status: 'error', detail: 'Import from URL failed' }, 500) }
       })()
@@ -1695,8 +1706,7 @@ export function installDirectModeInterceptor(): void {
         if (!saveResp.ok) {
           return jsonResponse({ detail: 'Failed to save profile to machine' }, 502)
         }
-        _profileCache.clear()
-        localStorage.removeItem(PROFILE_LIST_CACHE_KEY)
+        _invalidateProfileListCache()
         return jsonResponse({
           status: 'success',
           message: `Profile renamed from '${oldName}' to '${newName}'`,
@@ -3384,6 +3394,12 @@ Rules for recommendations:
                 if (saveResponse.ok && oepf.id && result.analysis) {
                   _descriptionCache.set(oepf.id, result.analysis)
                   _persistDescriptionCache()
+                }
+                // A new profile was added — drop the stale list cache so it
+                // appears immediately in the catalogue (and the post-create
+                // profile-id lookup can find it).
+                if (saveResponse.ok) {
+                  _invalidateProfileListCache()
                 }
               } catch (e) {
                 console.warn('[direct-mode] Failed to save profile to machine:', e)

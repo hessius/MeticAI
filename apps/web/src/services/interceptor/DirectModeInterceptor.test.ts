@@ -1036,6 +1036,43 @@ describe('DirectModeInterceptor regression harness', () => {
       })
     })
 
+    it('invalidates the profile list cache after importing a new profile', async () => {
+      const profiles: ProfileIdent[] = [nestedMachineProfiles()[0]]
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': () => jsonResponse(profiles),
+        'POST /api/v1/profile/save': ({ init }: FetchCall) => {
+          const saved = JSON.parse(String(init?.body)) as { id?: string; name?: string }
+          profiles.push({
+            id: saved.id || 'imported-1',
+            name: saved.name || 'Imported',
+            profile: saved,
+          } as unknown as ProfileIdent)
+          return jsonResponse({ ok: true })
+        },
+      }))
+
+      // Prime the catalogue cache with the single existing profile.
+      const first = await window.fetch('/api/machine/profiles')
+      const firstBody = await readJson<{ profiles: Array<{ name: string }> }>(first)
+      expect(firstBody.profiles.map((p) => p.name)).toEqual(['Turbo Bloom'])
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).not.toBeNull()
+
+      // Import a brand-new profile from a file.
+      const importResponse = await window.fetch('/api/profile/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'file', profile: { id: 'imported-1', name: 'Imported Joy' } }),
+      })
+      expect(importResponse.status).toBe(200)
+      // Cache must be dropped so the new profile is not hidden behind stale data.
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).toBeNull()
+
+      // The next catalogue fetch reflects the newly created profile.
+      const second = await window.fetch('/api/machine/profiles')
+      const secondBody = await readJson<{ profiles: Array<{ name: string }> }>(second)
+      expect(secondBody.profiles.map((p) => p.name)).toEqual(['Turbo Bloom', 'Imported Joy'])
+    })
+
     it('rejects empty direct machine profile rename requests before saving', async () => {
       const saveRoute = vi.fn(() => jsonResponse({ ok: true }))
       installInterceptor(createMachineFetch({
