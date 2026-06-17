@@ -3197,13 +3197,18 @@ class TestShotAnalysisHelpers:
         assert result[1]["type"] == "pressure_rise"
         assert "bar" in result[1]["description"]
 
-    def test_profiling_knowledge_contains_new_exit_conditions(self):
-        """Test that PROFILING_KNOWLEDGE includes flow_dose_correlation and pressure_rise."""
+    def test_profiling_knowledge_contains_native_preinfusion_rules(self):
+        """PROFILING_KNOWLEDGE expresses #420 pre-infusion intent via native triggers."""
         from services.gemini_service import PROFILING_KNOWLEDGE
 
-        assert "flow_dose_correlation" in PROFILING_KNOWLEDGE
-        assert "pressure_rise" in PROFILING_KNOWLEDGE
-        assert "puck saturated" in PROFILING_KNOWLEDGE.lower() or "fully saturated" in PROFILING_KNOWLEDGE.lower()
+        # #420 saturation rules must steer toward NATIVE machine triggers
+        # (weight ~2x dose + pressure rise), not app-only pseudo triggers.
+        assert "Saturation Rules (#420)" in PROFILING_KNOWLEDGE
+        assert "2 × dose" in PROFILING_KNOWLEDGE
+        assert "native" in PROFILING_KNOWLEDGE.lower()
+        # The old app-monitored pseudo-trigger guidance must be gone.
+        assert "flow_dose_correlation" not in PROFILING_KNOWLEDGE
+        assert "app-monitored" not in PROFILING_KNOWLEDGE.lower()
 
     def test_format_limits_basic(self):
         """Test limits formatting."""

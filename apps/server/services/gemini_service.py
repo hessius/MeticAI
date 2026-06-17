@@ -257,6 +257,9 @@ Break down every shot into four distinct, controllable phases:
 - **Target Flow**: 2-4 ml/s
 - **Target Pressure Limit**: ~2 bar
 - **Duration**: Until first drops appear, or specific volume (5-8 ml) delivered
+- **Exit (#420, native triggers)**: end on a native weight trigger at ≈ 2 × dose
+  (water/dose correlation) AND a native pressure trigger (~2 bar, pressure rise),
+  with a time safety backup — whichever fires first
 
 ### Phase 2: Bloom (Dwell) - Optional
 - **Goal**: Allow saturated puck to rest, releasing CO2, enabling deeper penetration
@@ -284,7 +287,7 @@ Break down every shot into four distinct, controllable phases:
 **Goal**: Balanced, full-bodied shot with rich crema and chocolate/caramel notes
 
 **Profile Steps**:
-1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar
+1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar OR weight reaches 2× dose (time backup)
 2. Infusion: Pressure @ 9.0 bar, end when 25g yielded
 3. Tapering: Linearly decrease pressure 9.0 bar to 5.0 bar, end when 36g total
 
@@ -293,7 +296,7 @@ Break down every shot into four distinct, controllable phases:
 **Goal**: Bright, clear, acidic shot highlighting floral and fruit notes
 
 **Profile Steps**:
-1. Pre-infusion: Flow @ 6 ml/s, end when pressure reaches 1.5 bar
+1. Pre-infusion: Flow @ 6 ml/s, end when pressure reaches 1.5 bar OR weight reaches 2× dose (time backup)
 2. Infusion: Pressure @ 6.0 bar, end after 15 seconds total
 3. Tapering: Linearly decrease pressure 6.0 bar to 3.0 bar, end when 54g total (1:3 ratio)
 
@@ -311,7 +314,7 @@ Note: No pressure target, entirely flow-controlled
 **Goal**: Manage excess CO2 for even extraction and sweetness
 
 **Profile Steps**:
-1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar
+1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar OR weight reaches 2× dose (time backup)
 2. Bloom: Hold lever position (zero flow) for 20 seconds
 3. Infusion: Pressure @ 8.0 bar, end when 30g yielded
 4. Tapering: Linearly decrease pressure 8.0 bar to 4.0 bar, end when 38g total
@@ -372,13 +375,20 @@ Note: No pressure target, entirely flow-controlled
 - Use pressure threshold (<= 2 bar) OR flow threshold (>= 0.2 ml/s) OR weight threshold (>= 0.3g)
 - Multiple triggers ensure stage exits when saturation achieved, not on exact timing
 
-**Advanced Pre-infusion Exit Conditions** (app-monitored, not native machine triggers):
-- **flow_dose_correlation**: Exit when accumulated water volume ≥ (multiplier × dose).
-  Default multiplier is 2.0 (e.g., 18g dose → exit at 36ml absorbed).
-  Useful for ensuring consistent puck saturation regardless of grind.
-- **pressure_rise**: Exit when pressure rises above a threshold (e.g., 2 bar) after starting low.
-  Indicates the puck has fully saturated and resistance is building.
-  Good for light roasts that need thorough pre-infusion.
+**Pre-infusion Saturation Rules (#420) — express with NATIVE machine triggers**:
+The machine only honors native exit trigger types ("weight", "pressure", "flow",
+"time"). Implement the following intent using those native types so the machine
+actually acts on them — do NOT emit app-only pseudo triggers.
+- **Dose/water correlation → native WEIGHT trigger**: A puck needs roughly twice
+  its dose in water to fully saturate (e.g., an 18 g dose absorbs ~36 ml). Add a
+  weight exit trigger with value ≈ 2 × dose (comparison ">="), computing it from
+  the actual dose in the request. This ends pre-infusion once enough water has
+  been delivered, regardless of grind.
+- **Pressure rise → native PRESSURE trigger**: As the puck saturates, resistance
+  builds and pressure climbs. Add a pressure exit trigger at a low threshold
+  (~2 bar, ">=") so the stage ends the moment pressure starts to rise.
+- Always pair both with a TIME safety backup; whichever native trigger fires
+  first ends pre-infusion.
 
 **Infusion/Hold Exit Strategy**:
 - Always use weight threshold with >= comparison for target yield
@@ -484,7 +494,7 @@ PROFILING_KNOWLEDGE_DISTILLED = """\
 
 ## Four-Phase Structure
 1. **Pre-infusion**: Flow 2-4 ml/s, pressure limit ~2 bar, exit on pressure threshold or weight ~5-8g
-   Advanced exits: flow_dose_correlation (volume ≥ multiplier × dose), pressure_rise (pressure exceeds threshold)
+   Saturation rules (#420), as NATIVE triggers: native weight exit at ≈ 2 × dose (water/dose correlation) AND native pressure exit (~2 bar, pressure rise), plus a time backup
 2. **Bloom** (optional): Zero flow, hold 0.5-1.5 bar, 5-30s. Use for fresh coffee or light roasts
 3. **Infusion**: Ramp to target pressure/flow. This is where 60-75% of yield extracts
 4. **Taper**: Decline pressure/flow over final 20-30% of yield. Reduces bitterness and astringency

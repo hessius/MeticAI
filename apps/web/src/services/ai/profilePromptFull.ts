@@ -203,9 +203,11 @@ const PROFILING_KNOWLEDGE = `ESPRESSO PROFILING GUIDE:
 - Multiple exit triggers (primary + time backup) for safety
 - dynamics points x-axis ALWAYS relative to stage start
 
-## Advanced Pre-infusion Exit Conditions (app-monitored)
-- flow_dose_correlation: Exit when accumulated water volume ≥ (multiplier × dose). Default multiplier 2.0 (e.g., 18g dose → exit at 36ml). Ensures consistent puck saturation regardless of grind.
-- pressure_rise: Exit when pressure rises above a threshold (e.g., 2 bar) after starting low. Indicates puck is fully saturated. Good for light roasts.
+## Pre-infusion Saturation Rules (#420) — use NATIVE machine triggers
+The machine only honors native exit trigger types ("weight", "pressure", "flow", "time"). Implement the intent below with those native types — do NOT emit app-only pseudo triggers.
+- Dose/water correlation → native WEIGHT trigger: a puck needs ~2× its dose in water to fully saturate (18g dose → ~36ml). Add a weight exit trigger at value ≈ 2 × dose (">=") computed from the actual dose.
+- Pressure rise → native PRESSURE trigger: as the puck saturates, pressure climbs — add a pressure exit trigger at a low threshold (~2 bar, ">=").
+- Always pair both with a native TIME safety backup; whichever fires first ends pre-infusion.
 
 ## Anti-Patterns
 ❌ Single exit trigger without time backup
