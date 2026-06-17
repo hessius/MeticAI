@@ -25,6 +25,24 @@ describe('rankModels', () => {
   it('excludes non-text families', () => {
     expect(rankModels([m('imagen-4.0-generate-001'), m('text-embedding-004')])).toBeNull()
   })
+  it('excludes special Gemini and non-Gemini families', () => {
+    expect(
+      rankModels([
+        m('gemini-2.5-computer-use-preview-10-2025'),
+        m('gemini-robotics-er-1.5-preview'),
+        m('gemini-3.1-flash-image'),
+        m('nano-banana-pro-preview'),
+        m('lyria-3-pro-preview'),
+        m('gemma-4-31b-it'),
+        m('gemini-2.5-flash'),
+      ]),
+    ).toBe('gemini-2.5-flash')
+  })
+  it('returns null when only non-text models remain', () => {
+    expect(
+      rankModels([m('gemini-2.5-computer-use-preview-10-2025'), m('nano-banana-pro-preview'), m('gemma-4-31b-it')]),
+    ).toBeNull()
+  })
   it('strips models/ prefix', () => {
     expect(rankModels([m('models/gemini-2.5-flash')])).toBe('gemini-2.5-flash')
   })

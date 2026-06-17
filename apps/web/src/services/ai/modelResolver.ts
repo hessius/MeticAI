@@ -11,11 +11,21 @@ export interface DiscoveredModel {
   description?: string
 }
 
-const NON_TEXT_FRAGMENTS = ['embedding', 'aqa', 'imagen', 'image', 'tts']
+const NON_TEXT_FRAGMENTS = ['embedding', 'aqa', 'imagen', 'image', 'tts', 'computer-use', 'robotics']
 const UNSTABLE_RE = /(preview|experimental|-exp\b|exp$|-\d{2}-\d{2}|-\d{3,4}$)/
 
 function shortName(name: string): string {
   return (name.split('/').pop() ?? '').trim().toLowerCase()
+}
+
+/**
+ * True only for Gemini text-chat models. Requires the `gemini-` prefix
+ * (excludes gemma, lyria, nano-banana, deep-research, antigravity, …) and
+ * rejects special-purpose Gemini variants (image, tts, computer-use, robotics).
+ */
+function isTextModel(short: string): boolean {
+  if (!short.startsWith('gemini-')) return false
+  return !NON_TEXT_FRAGMENTS.some(f => short.includes(f))
 }
 
 /**
@@ -26,7 +36,7 @@ export function rankModels(models: DiscoveredModel[]): string | null {
   const candidates = models
     .filter(m => (m.supportedActions ?? ['generateContent']).includes('generateContent'))
     .map(m => shortName(m.name))
-    .filter(s => s && !NON_TEXT_FRAGMENTS.some(f => s.includes(f)))
+    .filter(s => isTextModel(s))
 
   if (candidates.length === 0) return null
 

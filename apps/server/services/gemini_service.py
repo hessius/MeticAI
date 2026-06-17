@@ -59,6 +59,8 @@ async def get_available_models() -> list[dict]:
             if hasattr(m, "supported_actions") and "generateContent" in (
                 m.supported_actions or []
             ):
+                if not _is_text_model(_model_short_name(m.name or "")):
+                    continue
                 result.append(
                     {
                         "id": m.name,
@@ -73,7 +75,15 @@ async def get_available_models() -> list[dict]:
 
 
 # Name fragments that identify non-text model families to skip.
-_NON_TEXT_FRAGMENTS = ("embedding", "aqa", "imagen", "image", "tts")
+_NON_TEXT_FRAGMENTS = (
+    "embedding",
+    "aqa",
+    "imagen",
+    "image",
+    "tts",
+    "computer-use",
+    "robotics",
+)
 # Patterns that mark a model as preview/experimental/dated-snapshot (unstable).
 _UNSTABLE_RE = re.compile(r"(preview|experimental|-exp\b|exp$|-\d{2}-\d{2}|-\d{3,4}$)")
 
@@ -81,6 +91,19 @@ _UNSTABLE_RE = re.compile(r"(preview|experimental|-exp\b|exp$|-\d{2}-\d{2}|-\d{3
 def _model_short_name(name: str) -> str:
     """Strip a leading 'models/' prefix and lowercase."""
     return name.split("/")[-1].strip().lower()
+
+
+def _is_text_model(short: str) -> bool:
+    """True only for Gemini text-chat models.
+
+    Requires the ``gemini-`` prefix (excludes non-Gemini families such as
+    gemma, lyria, nano-banana, deep-research and antigravity) and rejects
+    special-purpose Gemini variants (image, tts, computer-use, robotics, …)
+    via ``_NON_TEXT_FRAGMENTS``.
+    """
+    if not short.startswith("gemini-"):
+        return False
+    return not any(f in short for f in _NON_TEXT_FRAGMENTS)
 
 
 def rank_models(models: list[dict]) -> Optional[str]:
@@ -104,7 +127,7 @@ def rank_models(models: list[dict]) -> Optional[str]:
     for m in models:
         raw = m.get("id") or ""
         short = _model_short_name(raw)
-        if not short or any(f in short for f in _NON_TEXT_FRAGMENTS):
+        if not _is_text_model(short):
             continue
         candidates.append(short)
     if not candidates:

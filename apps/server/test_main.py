@@ -16226,7 +16226,36 @@ class TestAvailableModelsEndpoint:
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
     @patch("services.gemini_service.get_gemini_client")
-    def test_available_models_handles_api_error(self, mock_client, client):
+    def test_available_models_filters_non_text_families(self, mock_client, client):
+        """Only Gemini text-chat models are returned; image/tts/computer-use/
+        robotics/nano-banana/gemma/deep-research are excluded."""
+        def _m(name, actions=("generateContent",)):
+            mk = Mock()
+            mk.name = name
+            mk.display_name = name
+            mk.description = ""
+            mk.supported_actions = list(actions)
+            return mk
+
+        models = [
+            _m("gemini-2.5-flash"),
+            _m("gemini-3.1-pro-preview"),
+            _m("gemini-2.5-flash-image"),
+            _m("gemini-2.5-flash-preview-tts"),
+            _m("gemini-2.5-computer-use-preview-10-2025"),
+            _m("gemini-robotics-er-1.5-preview"),
+            _m("nano-banana-pro-preview"),
+            _m("lyria-3-pro-preview"),
+            _m("gemma-4-31b-it"),
+            _m("deep-research-pro-preview-12-2025"),
+        ]
+        mock_client.return_value.models.list.return_value = models
+
+        response = client.get("/api/available-models")
+        ids = {m["id"] for m in response.json()["models"]}
+        assert ids == {"gemini-2.5-flash", "gemini-3.1-pro-preview"}
+
+
         """Test graceful handling when Gemini API fails."""
         mock_client.return_value.models.list.side_effect = Exception("API error")
 
@@ -16812,6 +16841,28 @@ class TestRankModels:
     def test_excludes_non_text_families(self):
         from services.gemini_service import rank_models
         models = [self._m("imagen-4.0-generate-001"), self._m("text-embedding-004")]
+        assert rank_models(models) is None
+
+    def test_excludes_special_gemini_and_non_gemini_families(self):
+        from services.gemini_service import rank_models
+        models = [
+            self._m("gemini-2.5-computer-use-preview-10-2025"),
+            self._m("gemini-robotics-er-1.5-preview"),
+            self._m("gemini-3.1-flash-image"),
+            self._m("nano-banana-pro-preview"),
+            self._m("lyria-3-pro-preview"),
+            self._m("gemma-4-31b-it"),
+            self._m("gemini-2.5-flash"),
+        ]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_excludes_all_non_text_returns_none(self):
+        from services.gemini_service import rank_models
+        models = [
+            self._m("gemini-2.5-computer-use-preview-10-2025"),
+            self._m("nano-banana-pro-preview"),
+            self._m("gemma-4-31b-it"),
+        ]
         assert rank_models(models) is None
 
     def test_strips_models_prefix(self):
