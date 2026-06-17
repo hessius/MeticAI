@@ -16901,8 +16901,8 @@ class TestReactiveRetry:
 
 
 @pytest.mark.skipif(
-    not os.environ.get("GEMINI_API_KEY"),
-    reason="requires a real GEMINI_API_KEY (opt-in live integration test)",
+    os.environ.get("RUN_LIVE_GEMINI_TESTS") != "1",
+    reason="opt-in live integration test; set RUN_LIVE_GEMINI_TESTS=1 with a real GEMINI_API_KEY",
 )
 class TestLiveModelListing:
     """Opt-in: hits the real Gemini API to prove discovery works end-to-end."""

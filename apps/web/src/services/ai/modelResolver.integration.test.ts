@@ -3,7 +3,7 @@ import { GoogleGenAI } from '@google/genai'
 import { rankModels, type DiscoveredModel } from './modelResolver'
 
 const KEY = process.env.GEMINI_API_KEY
-const maybe = KEY ? describe : describe.skip
+const maybe = process.env.RUN_LIVE_GEMINI_TESTS === '1' && KEY ? describe : describe.skip
 
 maybe('LIVE: Gemini models.list() (opt-in)', () => {
   it('lists real models and ranks one that validates', async () => {
