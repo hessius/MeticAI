@@ -338,7 +338,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     }
     
     const loadAvailableModels = async () => {
-      if (isLocalMode()) return
+      // Direct/native mode is served by DirectModeInterceptor's live-discovery
+      // handler, so only demo mode (no real backend) is skipped here.
+      if (isDemoMode()) return
       setModelsLoading(true)
       try {
         const serverUrl = await getServerUrl()
