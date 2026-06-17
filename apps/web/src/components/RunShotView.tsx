@@ -31,6 +31,7 @@ import { format, addMinutes } from 'date-fns'
 import { VariableAdjustPanel, type ProfileVariable } from './VariableAdjustPanel'
 import { ProfileImage } from './ProfileImage'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
+import { setActiveShotOverride } from '@/lib/activeShotOverride'
 import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import {
   canCancelScheduledShot,
@@ -359,6 +360,13 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
         const hasOverrides = Object.keys(overrides).length > 0
         
         if (hasOverrides) {
+          // Record the effective weight target so the live view reflects the
+          // temporary override instead of the saved profile's weight.
+          const effectiveName = saveAsNew && saveAsNewName.trim() ? saveAsNewName.trim() : selectedProfile.name
+          setActiveShotOverride({
+            profileName: effectiveName,
+            finalWeight: 'final_weight' in overrides ? overrides['final_weight'] : undefined,
+          })
           // Run profile with variable overrides
           const formData = new FormData()
           formData.append('overrides_json', JSON.stringify(overrides))
@@ -402,6 +410,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             }, 32000)
           }
         } else {
+          setActiveShotOverride(null)
           // Run profile immediately (no overrides)
           const response = await fetch(`${serverUrl}/api/machine/run-profile/${selectedProfile.id}`, {
             method: 'POST'

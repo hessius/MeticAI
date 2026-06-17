@@ -53,6 +53,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { getServerUrl } from '@/lib/config'
+import { getActiveShotOverride } from '@/lib/activeShotOverride'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,14 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 
   // Brew Head target delta tile (#482): color-coded difference from target temp.
   const tempDelta = getTempTileDisplay('delta', ms.brew_head_temperature, ms.target_temperature, t)
+
+  // Prefer the temporary override weight target (when this shot was started
+  // with variable overrides) so the live tile reflects what's actually brewing.
+  const override = getActiveShotOverride()
+  const effectiveTargetWeight =
+    override && override.profileName === ms.active_profile && override.finalWeight != null
+      ? override.finalWeight
+      : ms.target_weight
 
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
   const [summary, setSummary] = useState<{
@@ -650,10 +659,10 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                 <MetricTile
                   icon={<Scales size={14} />}
                   value={ms.shot_weight?.toFixed(1) ?? '0.0'}
-                  unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
+                  unit={effectiveTargetWeight != null ? `/${effectiveTargetWeight.toFixed(0)}g` : 'g'}
                   label={t('controlCenter.metrics.weight')}
-                  progress={ms.target_weight != null && ms.target_weight > 0
-                    ? Math.min(100, ((ms.shot_weight ?? 0) / ms.target_weight) * 100)
+                  progress={effectiveTargetWeight != null && effectiveTargetWeight > 0
+                    ? Math.min(100, ((ms.shot_weight ?? 0) / effectiveTargetWeight) * 100)
                     : undefined}
                 />
               </div>
