@@ -135,18 +135,21 @@ export function MarkdownEditor({
 
   // Display mode with edit button
   return (
-    <div className={`relative group ${className}`}>
+    <div className={className}>
       {value ? (
         <Card className="p-4 bg-muted/30">
+          <div className="flex justify-end mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleStartEdit}
+              aria-label={t('markdownEditor.edit')}
+            >
+              <PencilSimple className="w-4 h-4 mr-1" />
+              {t('markdownEditor.edit')}
+            </Button>
+          </div>
           <MarkdownText text={value} />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={handleStartEdit}
-          >
-            <PencilSimple className="w-4 h-4" />
-          </Button>
         </Card>
       ) : (
         <Button
