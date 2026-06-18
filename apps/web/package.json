@@ -123,6 +123,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.3.3",
     "@chromatic-com/storybook": "^5.1.2",
     "@eslint/js": "^10.0.1",

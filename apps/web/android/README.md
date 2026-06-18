@@ -70,6 +70,38 @@ copied `dist/`, not a live dev server). After changing **native config**
 
 ---
 
+## 2b. App icons & splash screen
+
+Launcher icons and splash screens are generated from source art in
+`apps/web/assets/` with [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets)
+(a devDependency). Source files:
+
+| File | Purpose |
+| --- | --- |
+| `icon.png` (1024²) | Legacy square/round launcher icon (brand mark on white) |
+| `icon-foreground.png` (1024², transparent) | Adaptive-icon foreground — the dark bean disc, full-bleed |
+| `icon-background.png` (1024²) | Adaptive-icon background (white) |
+| `splash.png` (2732²) | Light splash — blue mark on white |
+| `splash-dark.png` (2732²) | Dark splash — blue mark on `#030202` |
+
+Regenerate the Android resources after editing any source asset:
+
+```bash
+cd apps/web
+npx @capacitor/assets generate --android \
+  --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' \
+  --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#030202'
+```
+
+The adaptive-icon XMLs (`res/mipmap-anydpi-v26/ic_launcher*.xml`) are hand-tuned to
+use a **full-bleed** `@color/ic_launcher_background` (white) with the foreground
+inset 16.7% — do not let the generator overwrite the background with an inset
+mipmap (that leaves transparent corners). On Android 12+ the system splash shows
+the launcher icon centred on `windowSplashScreenBackground` (`#030202`); the
+generated `drawable*/splash.png` images drive the splash on Android < 12.
+
+---
+
 ## 3. Emulator
 
 ```bash
