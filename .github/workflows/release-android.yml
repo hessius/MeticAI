@@ -1,0 +1,105 @@
+name: Release Android APK
+
+# Builds a signed release APK and attaches it to the GitHub Release.
+# Triggered automatically when auto-release.yml publishes a release, or
+# manually (uses the VERSION file to resolve the tag).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-android:
+    name: Build & attach signed APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="v$(cat "$GITHUB_WORKSPACE/VERSION")"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "🏷️ Release tag: $TAG"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Bun (attempt 1)
+        id: setup_bun_1
+        continue-on-error: true
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: Setup Bun (attempt 2)
+        id: setup_bun_2
+        if: steps.setup_bun_1.outcome == 'failure'
+        continue-on-error: true
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: Setup Bun (attempt 3)
+        if: steps.setup_bun_2.outcome == 'failure'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build web app for Capacitor
+        run: VITE_MACHINE_MODE=capacitor bun run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Decode release keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/metic-release.jks"
+
+      - name: Build signed release APK
+        working-directory: apps/web/android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/metic-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Stage APK with versioned name
+        run: |
+          SRC=apps/web/android/app/build/outputs/apk/release/app-release.apk
+          DEST="$RUNNER_TEMP/Metic-${{ steps.tag.outputs.tag }}.apk"
+          cp "$GITHUB_WORKSPACE/$SRC" "$DEST"
+          echo "apk=$DEST" >> "$GITHUB_ENV"
+          ls -lh "$DEST"
+
+      - name: Upload signed APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metic-android-release-apk
+          path: ${{ env.apk }}
+          if-no-files-found: error
+
+      - name: Upload APK to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.tag.outputs.tag }}" "$apk" --clobber --repo "$GITHUB_REPOSITORY"

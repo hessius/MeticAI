@@ -16,10 +16,40 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing is configured only when a keystore is available (CI via
+    // env vars, or a local keystore.properties). Without it, `assembleRelease`
+    // still produces an unsigned APK so local/PR builds don't require secrets.
+    def keystorePath = System.getenv("ANDROID_KEYSTORE_FILE")
+    def keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    def keystoreAlias = System.getenv("ANDROID_KEY_ALIAS")
+    def keystoreKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+    def keystorePropsFile = rootProject.file("keystore.properties")
+    if ((keystorePath == null || keystorePath.isEmpty()) && keystorePropsFile.exists()) {
+        def props = new Properties()
+        keystorePropsFile.withInputStream { props.load(it) }
+        keystorePath = props.getProperty("storeFile")
+        keystorePassword = props.getProperty("storePassword")
+        keystoreAlias = props.getProperty("keyAlias")
+        keystoreKeyPassword = props.getProperty("keyPassword")
+    }
+    def hasReleaseSigning = keystorePath != null && !keystorePath.isEmpty() && file(keystorePath).exists()
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(keystorePath)
+                storePassword keystorePassword
+                keyAlias keystoreAlias
+                keyPassword keystoreKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
