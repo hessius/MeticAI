@@ -34,13 +34,19 @@ async function getPreferences() {
   if (!_preferencesModule) {
     _preferencesModule = await import('@capacitor/preferences')
   }
-  return _preferencesModule.Preferences
+  // Return the module namespace and let callers read `.Preferences` from it.
+  // Returning the Preferences proxy directly from an async function is unsafe:
+  // on Android the proxy is "thenable" (accessing `.then` yields a function),
+  // so `await getPreferences()` would follow it and reject with
+  // "Preferences.then() is not implemented on android". The module namespace
+  // has no `then` export, so awaiting it is safe on every platform.
+  return _preferencesModule
 }
 
 const capacitorAdapter: StorageAdapter = {
   async get(key: string) {
     try {
-      const Preferences = await getPreferences()
+      const { Preferences } = await getPreferences()
       // Race against a timeout — Capacitor bridge can occasionally stall
       const result = await Promise.race([
         Preferences.get({ key }),
@@ -61,13 +67,13 @@ const capacitorAdapter: StorageAdapter = {
     }
   },
   async set(key: string, value: string) {
-    const Preferences = await getPreferences()
+    const { Preferences } = await getPreferences()
     await Preferences.set({ key, value })
     // Mirror to localStorage so the get() fallback always has fresh data
     try { localStorage.setItem(key, value) } catch { /* quota exceeded */ }
   },
   async remove(key: string) {
-    const Preferences = await getPreferences()
+    const { Preferences } = await getPreferences()
     await Preferences.remove({ key })
     try { localStorage.removeItem(key) } catch { /* noop */ }
   },

@@ -68,4 +68,28 @@ describe('capacitorStorage', () => {
     await capacitorStorage.remove('machine-url')
     expect(await capacitorStorage.get('machine-url')).toBeNull()
   })
+
+  it('never invokes Preferences.then() — Android thenable-proxy regression guard', async () => {
+    // On Android the Capacitor plugin proxy is "thenable": accessing `.then`
+    // yields a function that rejects with "Preferences.then() is not
+    // implemented on android". If the storage layer awaits the proxy object
+    // directly this `then` fires and breaks startup. Simulate that proxy and
+    // assert it is never touched.
+    const thenSpy = vi.fn(() => {
+      throw new Error('Preferences.then() is not implemented on android')
+    })
+    ;(preferencesMock as unknown as { then: unknown }).then = thenSpy
+    ;(window as unknown as { Capacitor?: { isNativePlatform: () => boolean } }).Capacitor = {
+      isNativePlatform: () => true,
+    }
+
+    try {
+      await expect(capacitorStorage.set('machine-url', 'http://native:8080')).resolves.toBeUndefined()
+      await expect(capacitorStorage.get('machine-url')).resolves.toBe('http://native:8080')
+      await expect(capacitorStorage.remove('machine-url')).resolves.toBeUndefined()
+      expect(thenSpy).not.toHaveBeenCalled()
+    } finally {
+      delete (preferencesMock as unknown as { then?: unknown }).then
+    }
+  })
 })
