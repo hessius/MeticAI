@@ -20,6 +20,10 @@ const config: CapacitorConfig = {
     limitsNavigationsToAppBoundDomains: false,
     scrollEnabled: false,
   },
+  android: {
+    // Match the dark theme background so safe area edges blend seamlessly
+    backgroundColor: '#030202',
+  },
   plugins: {
     Camera: {
       // iOS camera permissions are declared in Info.plist

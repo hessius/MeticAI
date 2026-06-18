@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Meticulous espresso machine is reached over plain HTTP on the local
+  network (e.g. http://<lan-ip>:8080). Android blocks cleartext traffic by
+  default since API 28, so it is explicitly permitted here. This mirrors the
+  iOS NSAllowsLocalNetworking exception in Info.plist.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
