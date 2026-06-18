@@ -29,7 +29,6 @@
     "@aparajita/capacitor-secure-storage": "^8.0.0",
     "@babel/plugin-transform-modules-systemjs": "^7.29.4",
     "@capacitor-community/keep-awake": "^8.0.0",
-    "@capacitor-community/safe-area": "^8.0.1",
     "@capacitor/action-sheet": "^8.1.1",
     "@capacitor/android": "^8.3.0",
     "@capacitor/app": "^8.0.0",

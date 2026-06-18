@@ -76,8 +76,8 @@ copied `dist/`, not a live dev server). After changing **native config**
 # Create an AVD once (arm64 image to match Apple Silicon)
 avdmanager create avd -n metic_pixel7 -k "system-images;android-35;google_apis_playstore;arm64-v8a" -d pixel_7
 
-# Launch it
-emulator -avd metic_pixel7 -no-snapshot -no-boot-anim -gpu swiftshader_indirect &
+# Launch it — ALWAYS use the hardware GPU (-gpu host), see warning below
+emulator -avd metic_pixel7 -no-snapshot -no-boot-anim -gpu host &
 
 # Wait for boot, then install + launch
 adb wait-for-device
@@ -89,10 +89,28 @@ adb logcat | grep -i capacitor
 adb exec-out screencap -p > /tmp/metic.png
 ```
 
+> ⚠️ **Always launch with `-gpu host` (hardware GPU), never `-gpu swiftshader_indirect`.**
+> SwiftShader is a **software** GL renderer and produces false compositing artifacts
+> on heavy SVG/Recharts views (e.g. Shot Details shows ghost/duplicate charts, a
+> missing tab bar, or content overlap). These **do not occur on real devices** or
+> with `-gpu host` (Metal-backed on Apple Silicon). If you see chart "ghosting" in
+> the emulator, it's almost certainly the GPU mode — switch to `-gpu host` before
+> investigating as a code bug.
+
+> **Edge-to-edge needs WebView ≥ 140.** Capacitor 8's `SystemBars` plugin only does
+> true edge-to-edge passthrough (content under the status/nav bars via
+> `env(safe-area-inset-*)`) when the system WebView is **≥ 140**. Older WebViews
+> inset the WebView instead, so the status/nav-bar areas show the window background
+> (`#030202`) as "black bars". Emulator system images bundle older WebViews
+> (android-35 → 124, android-36.1 → 134); real devices auto-update WebView via Play
+> Store and get true edge-to-edge. To validate edge-to-edge on the emulator, update
+> Android System WebView to ≥ 140 via the Play Store on a signed-in playstore image.
+
 > **Emulator limitation:** the standard emulator NATs its network and does **not**
 > forward mDNS/multicast to your host LAN, so automatic machine discovery
 > (zeroconf) cannot find a real machine there. Use **manual IP entry** during
-> onboarding, or test discovery on a physical device on the same Wi-Fi.
+> onboarding, or test discovery on a physical device on the same Wi-Fi. (The
+> emulator *can* still reach a machine on the host LAN by IP, e.g. `http://192.168.x.x`.)
 
 ---
 
@@ -166,11 +184,14 @@ If no keystore is present, `assembleRelease` still succeeds but produces an
   Control Center / catalogue / shots blank after a "successful" connection.
 - **Cleartext to the LAN** — `AndroidManifest.xml` sets `usesCleartextTraffic`
   with `res/xml/network_security_config.xml` (mirrors iOS `NSAllowsLocalNetworking`).
-- **Edge-to-edge / safe areas** — handled by `@capacitor-community/safe-area`:
-  `EdgeToEdge.enable(this)` in `MainActivity.java` + `plugins.SystemBars.insetsHandling: 'disable'`
-  in `capacitor.config.ts`. CSS keeps using `env(safe-area-inset-*)`. Without
-  this, targetSdk 35+ paints solid bars over the status/navigation areas (the
-  "black bars").
+- **Edge-to-edge / safe areas** — handled by Capacitor 8's **built-in `SystemBars`
+  plugin** (default `insetsHandling: 'css'`); no extra plugin or `MainActivity`
+  customization is needed. CSS uses `env(safe-area-inset-*)` and `index.html` sets
+  `viewport-fit=cover`. On WebView **≥ 140** this is true edge-to-edge passthrough
+  (content draws under transparent bars). On older WebViews the plugin insets the
+  WebView instead, so the bar areas show the window background `#030202` ("black
+  bars") — a WebView-version limitation, not a config bug. Real devices auto-update
+  WebView via Play Store; emulator images bundle older WebViews (see §3).
 - **App ID:** `com.metic.app`. **Min SDK:** 24.
 - **JDK 21 is mandatory** for the Gradle toolchain — set `JAVA_HOME` before any
   `./gradlew` command.
@@ -183,7 +204,8 @@ If no keystore is present, `assembleRelease` still succeeds but produces an
 | --- | --- |
 | `Unsupported class file major version` / toolchain errors | Wrong JDK. `export JAVA_HOME` to JDK 21 before `./gradlew`. |
 | `SDK location not found` | `ANDROID_HOME` unset, or run `npx cap sync android` to regenerate `local.properties`. |
-| Black bars top/bottom | `cap sync` not run after the safe-area changes, or `viewport-fit=cover` missing in `index.html`. |
+| Black bars top/bottom | On WebView **< 140** the WebView is inset (bar areas show `#030202`). Expected on emulator (124/134); real devices on WebView ≥ 140 render true edge-to-edge. Also ensure `viewport-fit=cover` in `index.html` and re-run `cap sync`. |
+| Ghost/duplicate charts, missing tab bar, overlapping content (Shot Details) | **Emulator software-GPU (SwiftShader) artifact.** Relaunch the emulator with `-gpu host`. Does not occur on real devices. |
 | Control Center / catalogue / shots blank after connecting | `androidScheme` not `http`; rebuild web + `cap sync`. |
 | Discovery finds nothing on the emulator | Expected (emulator can't do LAN mDNS) — use manual IP or a real device. |
 | App shows a stale UI after a code change | Re-run `VITE_MACHINE_MODE=capacitor bun run build` **and** `npx cap sync android`. |

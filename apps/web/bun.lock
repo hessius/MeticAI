@@ -9,7 +9,6 @@
         "@aparajita/capacitor-secure-storage": "^8.0.0",
         "@babel/plugin-transform-modules-systemjs": "^7.29.4",
         "@capacitor-community/keep-awake": "^8.0.0",
-        "@capacitor-community/safe-area": "^8.0.1",
         "@capacitor/action-sheet": "^8.1.1",
         "@capacitor/android": "^8.3.0",
         "@capacitor/app": "^8.0.0",
@@ -351,8 +350,6 @@
     "@bramus/specificity": ["@bramus/specificity@2.4.2", "", { "dependencies": { "css-tree": "^3.0.0" }, "bin": { "specificity": "bin/cli.js" } }, "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw=="],
 
     "@capacitor-community/keep-awake": ["@capacitor-community/keep-awake@8.0.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-wTI5A6FWl5gWoMduzJ5euuJ1P73SO+rea0jV6vNdmz5TLbwIDhufelFe/GowNvU9gog6kDYbFhJ2pOp9ua1f3w=="],
-
-    "@capacitor-community/safe-area": ["@capacitor-community/safe-area@8.0.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-zVVQ7k94DbOff1mHP8qrZGTJZWyhGZnKHD2eXdcobIoOBFW9CeVphLNZYDCop/DBsHXfv6r8k0/Ac8xMIlwT+A=="],
 
     "@capacitor/action-sheet": ["@capacitor/action-sheet@8.1.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-yHuGSR/FS2dDr9oBmy+Ql+y7/i5XsUAlENx5oRND5NtzsNLLiFxpNPGLWV27aU9uf9ICjI92VzH93Zh0g2FL1A=="],
 

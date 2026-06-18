@@ -25,11 +25,6 @@ const config: CapacitorConfig = {
     backgroundColor: '#030202',
   },
   plugins: {
-    // Let @capacitor-community/safe-area manage edge-to-edge insets on Android;
-    // disable Capacitor's built-in SystemBars inset handling to avoid conflicts.
-    SystemBars: {
-      insetsHandling: 'disable',
-    },
     Camera: {
       // iOS camera permissions are declared in Info.plist
     },
