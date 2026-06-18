@@ -498,6 +498,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           placeholder={t('onboarding.name.placeholder')}
           value={authorName}
           onChange={(e) => setAuthorName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); next() } }}
         />
       </div>
     </div>
@@ -521,6 +522,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           placeholder={t('onboarding.ai.keyPlaceholder')}
           value={geminiKey}
           onChange={(e) => setGeminiKey(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); next() } }}
         />
         <p className="text-xs text-muted-foreground">
           {t('onboarding.ai.keyHint')}

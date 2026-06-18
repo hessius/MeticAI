@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Metic.',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
+    androidScheme: 'http',
     // Enable Safari Web Inspector for debugging (Develop → Simulator → Metic)
     webContentsDebuggingEnabled: true,
   },
@@ -25,6 +25,11 @@ const config: CapacitorConfig = {
     backgroundColor: '#030202',
   },
   plugins: {
+    // Let @capacitor-community/safe-area manage edge-to-edge insets on Android;
+    // disable Capacitor's built-in SystemBars inset handling to avoid conflicts.
+    SystemBars: {
+      insetsHandling: 'disable',
+    },
     Camera: {
       // iOS camera permissions are declared in Info.plist
     },
