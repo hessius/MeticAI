@@ -144,6 +144,16 @@ For power users who want one-tap brewing from their iPhone, you can create custo
 
 [→ iOS Shortcuts setup guide](IOS_SHORTCUTS.md)
 
+### Android App
+
+A native Android app (Capacitor) is available as a signed APK on the
+[Releases page](https://github.com/hessius/MeticAI/releases) — download
+`Metic-<version>.apk` and install it (you may need to allow installs from
+unknown sources). It talks directly to your machine on the local network, so no
+server is required.
+
+[→ Android development & build guide](apps/web/android/README.md)
+
 ## 🎛️ Control Center
 
 Metic includes a real-time Control Center powered by the [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT bridge:

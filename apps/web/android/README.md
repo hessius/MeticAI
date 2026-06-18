@@ -1,0 +1,189 @@
+# Metic — Android (Capacitor)
+
+The Android app is a [Capacitor](https://capacitorjs.com/) wrapper around the same
+web app that powers iOS, built in **DirectMode** (no Python backend — the
+`DirectModeInterceptor` reproduces the server contract client-side). It is
+distributed as a **signed APK on [GitHub Releases](https://github.com/hessius/MeticAI/releases)**,
+installable outside the Play Store.
+
+> All commands below are run from `apps/web/` unless noted otherwise.
+
+---
+
+## 1. One-time environment setup (macOS)
+
+The native build needs the Android SDK and **JDK 21** (Capacitor 8 plugins use a
+Java 21 Gradle toolchain — the system JDK and Android Studio's bundled JDK 17 are
+both incompatible).
+
+```bash
+# Android SDK command-line tools (sdkmanager, adb, emulator)
+brew install --cask android-commandlinetools
+
+# JDK 21 (keg-only formula, no sudo required)
+brew install openjdk@21
+```
+
+Export these (add to your shell profile for convenience):
+
+```bash
+export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+```
+
+Install the required SDK packages and accept licenses:
+
+```bash
+sdkmanager "platform-tools" "platforms;android-35" "platforms;android-36" \
+  "build-tools;35.0.0" "emulator" \
+  "system-images;android-35;google_apis_playstore;arm64-v8a"
+sdkmanager --licenses
+```
+
+> `compileSdk`/`targetSdk` are pinned in `android/variables.gradle` (currently 36).
+> `local.properties` (`sdk.dir=…`) is generated automatically by `cap sync` and is
+> gitignored — never commit it.
+
+---
+
+## 2. Development loop
+
+```bash
+# 1. Build the web app in Capacitor (DirectMode) flavour
+VITE_MACHINE_MODE=capacitor bun run build
+
+# 2. Copy the web build + plugin changes into the native project
+npx cap sync android        # or: bun run build:android (build + sync)
+
+# 3. Build the debug APK
+cd android && ./gradlew assembleDebug --no-daemon
+# → app/build/outputs/apk/debug/app-debug.apk
+```
+
+Open the project in Android Studio instead with `npx cap open android`.
+
+After any change to **web code** you must re-run steps 1–2 (the WebView serves the
+copied `dist/`, not a live dev server). After changing **native config**
+(`AndroidManifest.xml`, `build.gradle`, `MainActivity.java`, plugins) just re-run
+`cap sync` + Gradle.
+
+---
+
+## 3. Emulator
+
+```bash
+# Create an AVD once (arm64 image to match Apple Silicon)
+avdmanager create avd -n metic_pixel7 -k "system-images;android-35;google_apis_playstore;arm64-v8a" -d pixel_7
+
+# Launch it
+emulator -avd metic_pixel7 -no-snapshot -no-boot-anim -gpu swiftshader_indirect &
+
+# Wait for boot, then install + launch
+adb wait-for-device
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.metic.app/.MainActivity
+
+# Live native logs / screenshot
+adb logcat | grep -i capacitor
+adb exec-out screencap -p > /tmp/metic.png
+```
+
+> **Emulator limitation:** the standard emulator NATs its network and does **not**
+> forward mDNS/multicast to your host LAN, so automatic machine discovery
+> (zeroconf) cannot find a real machine there. Use **manual IP entry** during
+> onboarding, or test discovery on a physical device on the same Wi-Fi.
+
+---
+
+## 4. Signing & release
+
+Release builds are signed with a keystore that is **never committed**. CI reads it
+from GitHub Secrets; locally you supply it via env vars or `keystore.properties`.
+
+### Keystore secrets (already configured in this repo)
+
+| Secret | Meaning |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | base64 of the `.jks` keystore |
+| `ANDROID_KEYSTORE_PASSWORD` | store password |
+| `ANDROID_KEY_ALIAS` | key alias (`metic`) |
+| `ANDROID_KEY_PASSWORD` | key password |
+
+> ⚠️ **Back up the keystore.** It lives outside the repo (e.g.
+> `~/MeticAI-android-signing/`). Losing it means you can never publish an update
+> that upgrades over an installed copy — users would have to uninstall/reinstall.
+
+### Build a signed release APK locally
+
+```bash
+cd android
+export ANDROID_KEYSTORE_FILE=~/MeticAI-android-signing/metic-release.jks
+export ANDROID_KEYSTORE_PASSWORD=…   # from your credentials file
+export ANDROID_KEY_ALIAS=metic
+export ANDROID_KEY_PASSWORD=…
+./gradlew assembleRelease --no-daemon
+# → app/build/outputs/apk/release/app-release.apk
+
+# Verify the signature
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs \
+  app/build/outputs/apk/release/app-release.apk
+```
+
+Alternatively, drop a gitignored `android/keystore.properties`:
+
+```properties
+storeFile=/absolute/path/to/metic-release.jks
+storePassword=…
+keyAlias=metic
+keyPassword=…
+```
+
+If no keystore is present, `assembleRelease` still succeeds but produces an
+**unsigned** APK — so PR/local builds never need the secrets.
+
+---
+
+## 5. CI / CD
+
+| Workflow | Trigger | Does |
+| --- | --- | --- |
+| `.github/workflows/build-android.yml` | push/PR to `main`, `workflow_dispatch` | Builds the debug APK, uploads it as an artifact (verification). |
+| `.github/workflows/release-android.yml` | a Release is **published**, `workflow_dispatch` | Builds the **signed** release APK and attaches `Metic-<tag>.apk` to the Release. `workflow_dispatch` uploads the signed APK as a workflow artifact instead. |
+
+`auto-release.yml` (on `VERSION` bump) creates the GitHub Release, which fires
+`release-android.yml`. The Android workflows mirror the iOS ones and are gated to
+`main`, so they run once changes reach a `main`-targeted PR.
+
+---
+
+## 6. Key configuration & gotchas
+
+- **`androidScheme: 'http'`** (`apps/web/capacitor.config.ts`) — required so
+  DirectMode `axios` + `Socket.IO` can reach the machine's cleartext
+  `http://`/`ws://` endpoints. An `https://localhost` WebView origin blocks them
+  as mixed content (only native `CapacitorHttp` probes get through), which leaves
+  Control Center / catalogue / shots blank after a "successful" connection.
+- **Cleartext to the LAN** — `AndroidManifest.xml` sets `usesCleartextTraffic`
+  with `res/xml/network_security_config.xml` (mirrors iOS `NSAllowsLocalNetworking`).
+- **Edge-to-edge / safe areas** — handled by `@capacitor-community/safe-area`:
+  `EdgeToEdge.enable(this)` in `MainActivity.java` + `plugins.SystemBars.insetsHandling: 'disable'`
+  in `capacitor.config.ts`. CSS keeps using `env(safe-area-inset-*)`. Without
+  this, targetSdk 35+ paints solid bars over the status/navigation areas (the
+  "black bars").
+- **App ID:** `com.metic.app`. **Min SDK:** 24.
+- **JDK 21 is mandatory** for the Gradle toolchain — set `JAVA_HOME` before any
+  `./gradlew` command.
+
+---
+
+## 7. Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| `Unsupported class file major version` / toolchain errors | Wrong JDK. `export JAVA_HOME` to JDK 21 before `./gradlew`. |
+| `SDK location not found` | `ANDROID_HOME` unset, or run `npx cap sync android` to regenerate `local.properties`. |
+| Black bars top/bottom | `cap sync` not run after the safe-area changes, or `viewport-fit=cover` missing in `index.html`. |
+| Control Center / catalogue / shots blank after connecting | `androidScheme` not `http`; rebuild web + `cap sync`. |
+| Discovery finds nothing on the emulator | Expected (emulator can't do LAN mDNS) — use manual IP or a real device. |
+| App shows a stale UI after a code change | Re-run `VITE_MACHINE_MODE=capacitor bun run build` **and** `npx cap sync android`. |

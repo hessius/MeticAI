@@ -23,7 +23,7 @@ Metic ships in **two runtimes** that implement the same behavior twice:
 
 ## Skills
 
-Detailed domain instructions are in `.github/skills/`: `workflow.md`, `testing.md`, `frontend.md`, `backend.md`, `release.md`, `conventions.md`, `browser-testing.md`.
+Detailed domain instructions are in `.github/skills/`: `workflow.md`, `testing.md`, `frontend.md`, `backend.md`, `release.md`, `conventions.md`, `browser-testing.md`, `android.md`.
 
 ## Barista Persona (Profile Generation)
 
