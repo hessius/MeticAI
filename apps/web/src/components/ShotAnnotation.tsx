@@ -173,7 +173,6 @@ export function ShotAnnotation({ date, filename, className = '', onAnnotationCha
             {t('shotAnnotation.title')}
           </Label>
         }
-        headerExtra={<StarRating value={rating} onChange={handleRatingChange} />}
         value={annotation}
         onChange={setAnnotation}
         onSave={handleSave}
@@ -181,6 +180,12 @@ export function ShotAnnotation({ date, filename, className = '', onAnnotationCha
         saving={isSaving}
         placeholder={t('markdownEditor.placeholder')}
       />
+      <div className="flex items-center gap-2">
+        <Label className="text-sm font-medium text-muted-foreground">
+          {t('shotAnnotation.ratingLabel')}
+        </Label>
+        <StarRating value={rating} onChange={handleRatingChange} />
+      </div>
     </div>
   )
 }
