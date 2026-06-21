@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Metic.',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
+    androidScheme: 'http',
     // Enable Safari Web Inspector for debugging (Develop → Simulator → Metic)
     webContentsDebuggingEnabled: true,
   },
@@ -19,6 +19,10 @@ const config: CapacitorConfig = {
     contentInset: 'never',
     limitsNavigationsToAppBoundDomains: false,
     scrollEnabled: false,
+  },
+  android: {
+    // Match the dark theme background so safe area edges blend seamlessly
+    backgroundColor: '#030202',
   },
   plugins: {
     Camera: {

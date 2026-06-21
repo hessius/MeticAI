@@ -184,4 +184,51 @@ describe('OnboardingWizard direct/native machine URL persistence', () => {
     await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith('onboarding.machine.unreachable'))
     expect(preferencesMock.set).not.toHaveBeenCalled()
   })
+
+  it('advances to the next step when Enter is pressed in the name field', async () => {
+    render(<OnboardingWizard onComplete={() => {}} />)
+
+    // welcome → machine
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.welcome.getStarted' }))
+    // connect a machine so we can proceed past the machine step
+    fireEvent.change(await screen.findByLabelText('onboarding.machine.ipLabel'), {
+      target: { value: '192.168.1.50' },
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'onboarding.machine.connectButton' }))
+    })
+    // machine → name
+    await waitFor(() => expect(screen.getByRole('button', { name: 'common.next' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'common.next' }))
+
+    const nameInput = await screen.findByLabelText('onboarding.name.label')
+    fireEvent.change(nameInput, { target: { value: 'Jesper' } })
+    fireEvent.keyDown(nameInput, { key: 'Enter' })
+
+    // Should now be on the AI step
+    expect(await screen.findByLabelText('onboarding.ai.keyLabel')).toBeInTheDocument()
+  })
+
+  it('advances past the AI step when Enter is pressed in the API key field', async () => {
+    render(<OnboardingWizard onComplete={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'onboarding.welcome.getStarted' }))
+    fireEvent.change(await screen.findByLabelText('onboarding.machine.ipLabel'), {
+      target: { value: '192.168.1.50' },
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'onboarding.machine.connectButton' }))
+    })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'common.next' })).toBeEnabled())
+    // machine → name → ai
+    fireEvent.click(screen.getByRole('button', { name: 'common.next' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'common.next' }))
+
+    const keyInput = await screen.findByLabelText('onboarding.ai.keyLabel')
+    fireEvent.change(keyInput, { target: { value: 'test-key' } })
+    fireEvent.keyDown(keyInput, { key: 'Enter' })
+
+    // AI key field should no longer be present (advanced to the language step)
+    await waitFor(() => expect(screen.queryByLabelText('onboarding.ai.keyLabel')).not.toBeInTheDocument())
+  })
 })

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the iOS backgroundColor so safe-area edges blend seamlessly -->
+    <color name="metic_background">#030202</color>
+</resources>

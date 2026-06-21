@@ -153,8 +153,8 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
       ZeroConf.watch(
         { type: '_http._tcp', domain: 'local.' },
         (result) => {
-          const svc = result.service
-          dlog(`[diag] _http._tcp: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} port=${svc?.port}`)
+          const svc = result?.service
+          dlog(`[diag] _http._tcp: action=${result?.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} port=${svc?.port}`)
         },
       ).then(() => {
         dlog('STEP 4: _http._tcp watch() promise resolved')
@@ -172,8 +172,8 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
       ZeroConf.watch(
         { type: '_meticulous._tcp', domain: 'local.' },
         (result) => {
-          const svc = result.service
-          dlog(`Zeroconf event: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`)
+          const svc = result?.service
+          dlog(`Zeroconf event: action=${result?.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`)
 
           if (svc && (result.action === 'added' || result.action === 'resolved')) {
             const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
