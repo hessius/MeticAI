@@ -1,5 +1,32 @@
 apply plugin: 'com.android.application'
 
+// Derive versionName/versionCode from the repo-root VERSION file so APK metadata
+// tracks releases and Android's monotonic-versionCode upgrade rule is satisfied.
+// Scheme: major*10_000_000 + minor*100_000 + patch*1_000 + stageCode, where
+// stageCode orders prereleases below the final release of the same patch:
+// alpha.N → 100+N, beta.N → 200+N, rc.N → 300+N, final → 999.
+ext.meticVersion = {
+    def versionFile = new File(rootProject.projectDir, "../../../VERSION")
+    def name = versionFile.exists() ? versionFile.text.trim() : "0.0.0"
+    def matcher = (name =~ /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?/)
+    if (!matcher.find()) {
+        return [name: name, code: 1]
+    }
+    def major = matcher.group(1).toInteger()
+    def minor = matcher.group(2).toInteger()
+    def patch = matcher.group(3).toInteger()
+    def stage = matcher.group(4)
+    def pre = matcher.group(5) ? matcher.group(5).toInteger() : 0
+    def stageCode
+    if (stage == null) stageCode = 999
+    else if (stage == 'alpha') stageCode = 100 + pre
+    else if (stage == 'beta') stageCode = 200 + pre
+    else if (stage == 'rc') stageCode = 300 + pre
+    else stageCode = 0
+    def code = major * 10_000_000 + minor * 100_000 + patch * 1_000 + stageCode
+    return [name: name, code: code]
+}()
+
 android {
     namespace = "com.metic.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +34,8 @@ android {
         applicationId "com.metic.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode meticVersion.code
+        versionName meticVersion.name
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
