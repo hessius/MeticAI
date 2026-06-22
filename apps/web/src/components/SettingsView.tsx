@@ -478,11 +478,17 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             }
           }
           if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
+            const apiKey = nextSettings.geminiApiKey
+            // Write localStorage synchronously first so synchronous readers
+            // (BrowserAIService.getStoredApiKey, the App AI-gate handler) see the
+            // key immediately. This mirrors the proven onboarding path and avoids
+            // depending on the awaited native Keychain write, which on iOS can be
+            // slow/throw/hang and otherwise blocks both the mirror and the event.
             try {
-              await secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
-            } catch {
-              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
-            }
+              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, apiKey)
+            } catch { /* localStorage unavailable — non-critical */ }
+            // Persist to the Keychain in the background; must not block the UI gate.
+            void Promise.resolve(secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, apiKey)).catch(() => {})
             window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
           }
           if (nextSettings.authorName) {
