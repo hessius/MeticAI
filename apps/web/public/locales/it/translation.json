@@ -331,6 +331,7 @@
     "shotsCount": "{{count}} estrazioni",
     "temp": "Temp",
     "replay": "Riproduci",
+    "scrubber": "Posizione di riproduzione",
     "compare": "Confronta",
     "analyze": "Analizza",
     "shotAnalysis": "Analisi estrazione",

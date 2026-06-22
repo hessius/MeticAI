@@ -331,6 +331,7 @@
     "shotsCount": "{{count}} Shots",
     "temp": "Temp",
     "replay": "Wiedergabe",
+    "scrubber": "Wiedergabeposition",
     "compare": "Vergleichen",
     "analyze": "Analysieren",
     "shotAnalysis": "Shot-Analyse",

@@ -335,6 +335,7 @@
     "analysisFailed": "Analysis failed",
     "llmAnalysisFailed": "LLM Analysis failed",
     "replay": "Replay",
+    "scrubber": "Playback position",
     "compare": "Compare",
     "analyze": "Analyze",
     "restart": "Restart",
