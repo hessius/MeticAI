@@ -59,7 +59,7 @@ export function rankModels(models: DiscoveredModel[]): string | null {
   })[0]
 }
 
-import { AIServiceError } from './BrowserAIService'
+import { AIServiceError } from './aiErrors'
 
 /** Minimal shape of the @google/genai client we depend on. */
 export interface ModelClient {

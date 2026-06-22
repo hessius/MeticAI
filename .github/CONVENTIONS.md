@@ -90,7 +90,7 @@ cd ../web && bun run lint && bun run test:run && bun run build
 ### Frontend
 - Use `bun add <package>` (never `npm install`).
 - Always commit `bun.lock` alongside `package.json` changes.
-- Bun version is pinned at **1.3.10** in both `docker/Dockerfile.unified` and CI workflows.
+- Bun version is pinned at **1.3.14** in both `docker/Dockerfile.unified` and CI workflows.
 - Import from `lucide-react` public paths only (never private `dist` paths).
 
 ### Backend

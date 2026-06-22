@@ -33,6 +33,7 @@ import i18n from 'i18next'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { safeRandomUUID } from '@/lib/uuid'
 import { resolveWorkingModel, type ModelClient } from './modelResolver'
+import { AIServiceError, type AIErrorCode as AIErrorCodeBase } from './aiErrors'
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 const IMAGE_MODEL = 'imagen-4.0-generate-001'
@@ -65,15 +66,8 @@ function getClient(): GoogleGenAI {
  * Typed AI service error codes — UI layer translates these via i18n.
  * This keeps the service layer free of user-facing strings.
  */
-export type AIErrorCode = 'API_KEY_MISSING' | 'QUOTA_EXCEEDED' | 'API_KEY_INVALID' | 'MODEL_NOT_FOUND' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'IMAGE_GENERATION_FAILED' | 'IMAGE_NO_DATA' | 'UNKNOWN'
-
-export class AIServiceError extends Error {
-  constructor(public readonly code: AIErrorCode, cause?: unknown) {
-    super(code)
-    this.name = 'AIServiceError'
-    if (cause !== undefined) Object.defineProperty(this, 'cause', { value: cause })
-  }
-}
+export type AIErrorCode = AIErrorCodeBase
+export { AIServiceError }
 
 /** Map common Gemini SDK errors to typed error codes */
 function wrapApiError(err: unknown): never {

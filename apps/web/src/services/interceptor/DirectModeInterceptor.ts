@@ -191,16 +191,24 @@ function parseUptimeToSeconds(uptimeStr: string): number {
   return total
 }
 
+/** Coerce a per-service uptime (string like '0 hours 41 minutes' or numeric
+ * seconds) into integer seconds, or null when unavailable. */
+function coerceServiceUptime(value: unknown): number | null {
+  if (typeof value === 'string' && value.trim()) return parseUptimeToSeconds(value)
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.round(value)
+  return null
+}
+
 /** Transform raw watcher /status response into the shape MachineStatusCenter expects. */
 function transformWatcherResponse(raw: Record<string, unknown>): Record<string, unknown> {
   // Services: object { name: { status } } → array [{ name, status, uptime }]
   const rawServices = raw.services
   let services: { name: string; status: string; uptime: number | null }[] = []
   if (rawServices && typeof rawServices === 'object' && !Array.isArray(rawServices)) {
-    services = Object.entries(rawServices as Record<string, Record<string, string>>).map(([name, info]) => ({
+    services = Object.entries(rawServices as Record<string, { status?: string; uptime?: string | number }>).map(([name, info]) => ({
       name,
       status: info?.status ?? 'unknown',
-      uptime: null,
+      uptime: coerceServiceUptime(info?.uptime),
     }))
   } else if (Array.isArray(rawServices)) {
     services = rawServices as typeof services

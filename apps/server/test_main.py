@@ -16513,6 +16513,37 @@ class TestMachineStatusHealth:
         assert data["services"] == []
 
 
+class TestWatcherHelpers:
+    """Unit tests for machine_status helper functions."""
+
+    def test_watcher_url_ipv4(self):
+        from api.routes.machine_status import _watcher_url
+
+        assert _watcher_url("http://192.168.1.50:8080") == "http://192.168.1.50:3000"
+        assert _watcher_url("http://meticulous.local") == "http://meticulous.local:3000"
+
+    def test_watcher_url_brackets_ipv6(self):
+        from api.routes.machine_status import _watcher_url
+
+        assert _watcher_url("http://[fe80::1]:8080") == "http://[fe80::1]:3000"
+        assert _watcher_url("https://[2001:db8::1]") == "https://[2001:db8::1]:3000"
+
+    def test_transform_parses_per_service_uptime(self):
+        from api.routes.machine_status import _transform_watcher_response
+
+        out = _transform_watcher_response({
+            "services": {
+                "meticulous": {"status": "running", "uptime": "1 hours 2 minutes"},
+                "watcher": {"status": "running", "uptime": 90},
+                "idle": {"status": "stopped"},
+            }
+        })
+        by_name = {s["name"]: s for s in out["services"]}
+        assert by_name["meticulous"]["uptime"] == 3720
+        assert by_name["watcher"]["uptime"] == 90
+        assert by_name["idle"]["uptime"] is None
+
+
 @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "METICULOUS_IP": "http://meticulous.local"})
 class TestMachineSystemInfo:
     """Tests for GET /api/machine/system-info."""

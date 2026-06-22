@@ -15,8 +15,12 @@ def _watcher_url(machine_url: str) -> str:
     """Derive the watcher URL (port 3000) from the machine base URL."""
     parsed = urlparse(machine_url)
     # Replace whatever port (or no port) with 3000
-    watcher_netloc = parsed.hostname or parsed.netloc
-    return urlunparse((parsed.scheme or "http", f"{watcher_netloc}:3000", "", "", "", ""))
+    host = parsed.hostname or parsed.netloc
+    # IPv6 literals must be bracketed in a URL netloc, otherwise the trailing
+    # ":3000" is indistinguishable from the address (e.g. "fe80::1:3000").
+    if host and ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return urlunparse((parsed.scheme or "http", f"{host}:3000", "", "", "", ""))
 
 
 def _parse_size_to_mb(size_str: str) -> float:
@@ -52,6 +56,18 @@ def _parse_uptime_to_seconds(uptime_str: str) -> int:
     return total
 
 
+def _coerce_uptime(value) -> "int | None":
+    """Coerce a per-service uptime (string like '0 hours 41 minutes' or a
+    numeric seconds value) to integer seconds, or None when unavailable."""
+    if isinstance(value, str) and value.strip():
+        return _parse_uptime_to_seconds(value)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    return None
+
+
 def _transform_watcher_response(raw: dict) -> dict:
     """Transform raw watcher /status response into the shape the frontend expects."""
     # Services: object → array
@@ -59,10 +75,11 @@ def _transform_watcher_response(raw: dict) -> dict:
     services = []
     if isinstance(raw_services, dict):
         for name, info in raw_services.items():
+            info_dict = info if isinstance(info, dict) else {}
             services.append({
                 "name": name,
-                "status": info.get("status", "unknown") if isinstance(info, dict) else "unknown",
-                "uptime": None,
+                "status": info_dict.get("status", "unknown"),
+                "uptime": _coerce_uptime(info_dict.get("uptime")),
             })
     elif isinstance(raw_services, list):
         services = raw_services  # already in expected format
