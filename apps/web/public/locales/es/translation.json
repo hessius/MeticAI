@@ -305,7 +305,9 @@
     "saveAsNew": "Guardar como nuevo perfil",
     "saveAsNewDescription": "Guardar variables ajustadas como nuevo perfil",
     "newProfileNamePlaceholder": "Nombre del nuevo perfil...",
-    "titleRun": "Ejecutar"
+    "titleRun": "Ejecutar",
+    "temperatureBoost": "Aumento de temperatura",
+    "temperatureBoostDescription": "El primer café desde arranque en frío puede ser ~3 °C más frío. El aumento eleva la temperatura de infusión temporalmente 3 °C (máx. 99 °C) para que incluso el primer café alcance el objetivo."
   },
   "shotHistory": {
     "duration": "Duración",

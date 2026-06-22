@@ -305,7 +305,9 @@
     "saveAsNew": "Enregistrer comme nouveau profil",
     "saveAsNewDescription": "Enregistrer les variables ajustées comme nouveau profil",
     "newProfileNamePlaceholder": "Nom du nouveau profil...",
-    "titleRun": "Lancer"
+    "titleRun": "Lancer",
+    "temperatureBoost": "Boost de température",
+    "temperatureBoostDescription": "Les premiers cafés après un démarrage à froid peuvent être ~3 °C plus froids. Le boost augmente temporairement la température d’infusion de 3 °C (max. 99 °C) pour atteindre la cible dès la première tasse."
   },
   "shotHistory": {
     "duration": "Durée",

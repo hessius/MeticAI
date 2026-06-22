@@ -305,7 +305,9 @@
     "saveAsNew": "Spara som ny profil",
     "saveAsNewDescription": "Spara justerade variabler som en ny profil",
     "newProfileNamePlaceholder": "Nytt profilnamn...",
-    "titleRun": "Kör"
+    "titleRun": "Kör",
+    "temperatureBoost": "Temperaturboost",
+    "temperatureBoostDescription": "Första espressodraget från kall start kan vara ~3 °C kallare. Boost höjer brewtemperaturen tilfälligt med 3 °C (max 99 °C) så att även första draget når rätt temperatur."
   },
   "shotHistory": {
     "duration": "Varaktighet",

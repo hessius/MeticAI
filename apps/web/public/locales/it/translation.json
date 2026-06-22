@@ -305,7 +305,9 @@
     "saveAsNew": "Salva come nuovo profilo",
     "saveAsNewDescription": "Salva le variabili regolate come nuovo profilo",
     "newProfileNamePlaceholder": "Nome del nuovo profilo...",
-    "titleRun": "Esegui"
+    "titleRun": "Esegui",
+    "temperatureBoost": "Aumento della temperatura",
+    "temperatureBoostDescription": "Il primo caffè dopo un avvio a freddo può essere ~3 °C più freddo del previsto. Il boost alza temporaneamente la temperatura di infusione di 3 °C (max 99 °C) affinché anche il primo caffè raggiunga l'obiettivo."
   },
   "shotHistory": {
     "duration": "Durata",

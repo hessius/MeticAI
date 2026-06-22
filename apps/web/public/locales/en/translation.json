@@ -312,7 +312,9 @@
     "saveAsNew": "Save as new profile",
     "saveAsNewDescription": "Save adjusted variables as a new profile",
     "newProfileNamePlaceholder": "New profile name...",
-    "titleRun": "Run"
+    "titleRun": "Run",
+    "temperatureBoost": "Temperature Boost",
+    "temperatureBoostDescription": "Cold-start shots can run ~3 °C cooler. Boost temporarily raises brew temperature by 3 °C (max 99 °C) so the first shot still hits the mark."
   },
   "shotHistory": {
     "title": "Shot History",

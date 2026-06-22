@@ -305,7 +305,9 @@
     "saveAsNew": "Als neues Profil speichern",
     "saveAsNewDescription": "Angepasste Variablen als neues Profil speichern",
     "newProfileNamePlaceholder": "Neuer Profilname...",
-    "titleRun": "Ausführen"
+    "titleRun": "Ausführen",
+    "temperatureBoost": "Temperatur-Boost",
+    "temperatureBoostDescription": "Der erste Bezug nach dem Kaltstart kann ca. 3 °C kühler ausfallen. Der Boost erhöht die Brühtemperatur vorübergehend um 3 °C (max. 99 °C), damit auch der erste Bezug die gewünschte Temperatur erreicht."
   },
   "shotHistory": {
     "duration": "Dauer",

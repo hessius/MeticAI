@@ -22,7 +22,8 @@ import {
   Trash,
   PencilSimple,
   FloppyDisk,
-  FloppyDiskBack
+  FloppyDiskBack,
+  Thermometer,
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { hasFeature } from '@/lib/featureFlags'
@@ -36,6 +37,8 @@ import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileIma
 import {
   canCancelScheduledShot,
   canShowVariableAdjustments,
+  canShowTemperatureBoost,
+  getBoostedTemperature,
   getSchedulePreheatInfo,
   shouldScheduleProfileAfterPreheat,
 } from './RunShotView.helpers'
@@ -102,6 +105,7 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
   const [preheat, setPreheat] = useState(false)
   const [scheduleMode, setScheduleMode] = useState(false)
   const [scheduledTime, setScheduledTime] = useState<Date>(addMinutes(new Date(), 30))
+  const [temperatureBoost, setTemperatureBoost] = useState(false)
   
   const [isRunning, setIsRunning] = useState(false)
   const [isPreheating, setIsPreheating] = useState(false)
@@ -357,7 +361,16 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           // Stay on this view — only navigate to live on actual shot start
         }
       } else if (selectedProfile) {
-        const hasOverrides = Object.keys(overrides).length > 0
+        // Build effective overrides: user overrides + optional temperature boost
+        const effectiveOverrides = { ...overrides }
+        if (temperatureBoost && selectedProfile.temperature != null) {
+          const baseTemp = 'temperature' in effectiveOverrides
+            ? effectiveOverrides['temperature']
+            : selectedProfile.temperature
+          effectiveOverrides['temperature'] = getBoostedTemperature(baseTemp)
+        }
+
+        const hasOverrides = Object.keys(effectiveOverrides).length > 0
         
         if (hasOverrides) {
           // Record the effective weight target so the live view reflects the
@@ -365,11 +378,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
           const effectiveName = saveAsNew && saveAsNewName.trim() ? saveAsNewName.trim() : selectedProfile.name
           setActiveShotOverride({
             profileName: effectiveName,
-            finalWeight: 'final_weight' in overrides ? overrides['final_weight'] : undefined,
+            finalWeight: 'final_weight' in effectiveOverrides ? effectiveOverrides['final_weight'] : undefined,
           })
           // Run profile with variable overrides
           const formData = new FormData()
-          formData.append('overrides_json', JSON.stringify(overrides))
+          formData.append('overrides_json', JSON.stringify(effectiveOverrides))
           formData.append('save_mode', saveAsNew ? 'save_new' : 'none')
           if (saveAsNew && saveAsNewName.trim()) {
             formData.append('new_name', saveAsNewName.trim())
@@ -398,8 +411,10 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             setTimeout(() => onNavigateToLive(), 500)
           }
           
-          // If not saving as new, show post-shot dialog as a reminder
-          if (!saveAsNew) {
+          // Only show save-mode dialog for user-initiated overrides, not for
+          // the ephemeral temperature boost alone.
+          const hasUserOverrides = Object.keys(overrides).length > 0
+          if (!saveAsNew && hasUserOverrides) {
             // Store shot info for save mode dialog
             lastShotRef.current = { profileId: selectedProfile.id, overrides: { ...overrides } }
             setTimeout(() => setShowSaveModeDialog(true), 2000)
@@ -755,6 +770,11 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
     variableCount: profileVariables.length,
   })
 
+  const showTemperatureBoost = canShowTemperatureBoost({
+    hasSelectedProfile: Boolean(selectedProfile),
+    profileTemperature: selectedProfile?.temperature,
+  })
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -942,6 +962,26 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
             onCheckedChange={setPreheat}
           />
         </div>
+
+        {/* Temperature Boost Toggle */}
+        {showTemperatureBoost && (
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="temperatureBoost" className="text-sm font-medium flex items-center gap-2">
+                <Thermometer size={18} className={temperatureBoost ? 'text-red-500' : 'text-muted-foreground'} weight="duotone" />
+                {t('runShot.temperatureBoost')}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t('runShot.temperatureBoostDescription')}
+              </p>
+            </div>
+            <Switch
+              id="temperatureBoost"
+              checked={temperatureBoost}
+              onCheckedChange={setTemperatureBoost}
+            />
+          </div>
+        )}
 
         {/* Schedule Toggle */}
         {scheduledShotsEnabled && <div className="flex items-center justify-between">
