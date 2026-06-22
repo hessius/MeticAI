@@ -770,7 +770,9 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
     variableCount: profileVariables.length,
   })
 
-  const showTemperatureBoost = canShowTemperatureBoost({
+  // Boost compensates for cold-start heat loss on an immediate shot; scheduled
+  // shots preheat first, so the boost does not apply and the toggle is hidden.
+  const showTemperatureBoost = !scheduleMode && canShowTemperatureBoost({
     hasSelectedProfile: Boolean(selectedProfile),
     profileTemperature: selectedProfile?.temperature,
   })
