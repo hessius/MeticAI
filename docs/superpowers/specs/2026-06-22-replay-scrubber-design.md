@@ -2,6 +2,7 @@
 
 **Date:** 2026-06-22
 **Milestone:** 2.6
+**Issue:** #493
 **Status:** Approved (brainstorming)
 
 ## Problem
