@@ -3,9 +3,13 @@
  * Used by both BrowserAIService and DirectModeInterceptor.
  */
 import i18n from 'i18next'
+import { AIServiceError } from './aiErrors'
 
 /** Check if an error is transient and retryable */
 export function isRetryableError(err: unknown): boolean {
+  if (err instanceof AIServiceError) {
+    return err.code === 'SERVICE_UNAVAILABLE' || err.code === 'QUOTA_EXCEEDED'
+  }
   const msg = err instanceof Error ? err.message : String(err)
   return (
     msg.includes('503') ||

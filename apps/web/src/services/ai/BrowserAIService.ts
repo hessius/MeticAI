@@ -1,12 +1,11 @@
 /**
  * BrowserAIService — AIService implementation that uses the
- * @google/genai SDK directly in the browser.
+ * browser AI provider directly in the browser.
  *
  * Used in machine-hosted PWA and Capacitor app modes.
  * The user provides their own Gemini API key (stored in localStorage/IndexedDB).
  */
 
-import { GoogleGenAI } from '@google/genai'
 import type {
   AIService,
   ProfileGenerationRequest,
@@ -32,35 +31,8 @@ import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
 import { safeRandomUUID } from '@/lib/uuid'
-import { resolveWorkingModel, type ModelClient } from './modelResolver'
 import { AIServiceError, type AIErrorCode as AIErrorCodeBase } from './aiErrors'
-
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
-const IMAGE_MODEL = 'imagen-4.0-generate-001'
-const IMAGE_MODEL_FALLBACK = 'imagen-3.0-generate-002'
-
-function getGeminiModel(): string {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL)
-    return stored?.trim() || DEFAULT_GEMINI_MODEL
-  } catch {
-    return DEFAULT_GEMINI_MODEL
-  }
-}
-
-function getStoredApiKey(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
-  } catch {
-    return null
-  }
-}
-
-function getClient(): GoogleGenAI {
-  const key = getStoredApiKey()
-  if (!key) throw new AIServiceError('API_KEY_MISSING')
-  return new GoogleGenAI({ apiKey: key })
-}
+import { getActiveProvider } from './providers'
 
 /**
  * Typed AI service error codes — UI layer translates these via i18n.
@@ -68,62 +40,19 @@ function getClient(): GoogleGenAI {
  */
 export type AIErrorCode = AIErrorCodeBase
 export { AIServiceError }
-
-/** Map common Gemini SDK errors to typed error codes */
-function wrapApiError(err: unknown): never {
-  const msg = err instanceof Error ? err.message : String(err)
-  if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('overloaded'))
-    throw new AIServiceError('SERVICE_UNAVAILABLE', err)
-  if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota'))
-    throw new AIServiceError('QUOTA_EXCEEDED', err)
-  if (msg.includes('401') || msg.includes('403') || msg.includes('API_KEY_INVALID'))
-    throw new AIServiceError('API_KEY_INVALID', err)
-  if (msg.includes('404') || msg.includes('NOT_FOUND'))
-    throw new AIServiceError('MODEL_NOT_FOUND', err)
-  if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch'))
-    throw new AIServiceError('NETWORK_ERROR', err)
-  throw new AIServiceError('UNKNOWN', err)
-}
-
-/** Client shape used for text generation: model resolution plus generateContent. */
-type TextGenClient = ModelClient & {
-  models: {
-    generateContent: (args: { model: string; contents: unknown; config?: unknown }) => Promise<unknown>
-  }
-}
-
-/**
- * Run a text generateContent call through dynamic model resolution with a
- * single reactive retry: if the call fails with a model-not-found error, the
- * working model is re-resolved (bypassing cache) and the call is retried once.
- */
-export async function generateTextWithRetry(
-  client: TextGenClient,
-  configured: string,
-  req: { contents: unknown; config?: unknown },
-): Promise<unknown> {
-  const model = await resolveWorkingModel(client, configured)
-  try {
-    return await client.models.generateContent({ model, ...req })
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    if (!(msg.includes('404') || msg.includes('NOT_FOUND'))) throw err
-    const retryModel = await resolveWorkingModel(client, configured, true)
-    return client.models.generateContent({ model: retryModel, ...req })
-  }
-}
+export { generateTextWithRetry } from './providers/GeminiProvider'
 
 export function createBrowserAIService(): AIService {
   return {
     name: 'BrowserAIService',
 
-    isConfigured: () => !!getStoredApiKey(),
+    isConfigured: () => getActiveProvider().isConfigured(),
 
     generateProfile: async (
       request: ProfileGenerationRequest,
       onProgress?: ProgressCallback,
     ): Promise<ProfileGenerationResult> => {
-      const client = getClient()
+      const provider = getActiveProvider()
       onProgress?.({ phase: 'analyzing', message: 'generation.progress.preparingPrompt' })
 
       // Build multipart content
@@ -159,25 +88,19 @@ export function createBrowserAIService(): AIService {
 
       onProgress?.({ phase: 'generating', message: 'generation.progress.generatingProfile' })
 
-      let response
-      try {
-        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
-          contents: [{ role: 'user', parts }],
-        }) as { text?: string }
-      } catch (err) {
-        wrapApiError(err)
-      }
-
-      let text = response.text ?? ''
+      const response = await provider.generateText({
+        contents: [{ role: 'user', parts }],
+      })
+      let text = response.text
 
       onProgress?.({ phase: 'validating', message: 'generation.progress.validatingProfile' })
 
       // Validation + retry loop
       const generateFix = async (fixPrompt: string) => {
-        const fixResponse = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
+        const fixResponse = await provider.generateText({
           contents: [{ role: 'user', parts: [{ text: fixPrompt }] }],
-        }) as { text?: string }
-        return fixResponse.text ?? ''
+        })
+        return fixResponse.text
       }
 
       const { reply: validatedReply } = await validateAndRetryProfile(text, generateFix)
@@ -199,7 +122,7 @@ export function createBrowserAIService(): AIService {
     },
 
     analyzeShot: async (request: ShotAnalysisRequest): Promise<ShotAnalysisResult> => {
-      const client = getClient()
+      const provider = getActiveProvider()
       const prompt = buildShotAnalysisPrompt(
         request.profileName,
         request.shotDate,
@@ -207,85 +130,37 @@ export function createBrowserAIService(): AIService {
         request.profileDescription,
       )
 
-      let response
-      try {
-        response = await retryWithBackoff(() =>
-          generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          })
-        ) as { text?: string }
-      } catch (err) {
-        wrapApiError(err)
-      }
+      const response = await retryWithBackoff(() =>
+        provider.generateText({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        })
+      )
 
       return {
         status: 'success',
-        llm_analysis: response.text ?? '',
+        llm_analysis: response.text,
         cached: false,
       }
     },
 
     generateImage: async (request: ImageGenerationRequest): Promise<Blob> => {
-      const client = getClient()
-      const prompt = buildImagePrompt(request.profileName, request.style, request.tags)
-
-      let response
-      try {
-        response = await client.models.generateImages({
-          model: IMAGE_MODEL,
-          prompt,
-          config: {
-            numberOfImages: 1,
-          },
-        })
-      } catch (err) {
-        // Try fallback model before giving up
-        try {
-          response = await client.models.generateImages({
-            model: IMAGE_MODEL_FALLBACK,
-            prompt,
-            config: {
-              numberOfImages: 1,
-            },
-          })
-        } catch {
-          wrapApiError(err)
-        }
-      }
-
-      const images = response.generatedImages
-      if (!images || images.length === 0) {
+      const provider = getActiveProvider()
+      if (!provider.capabilities.imageGen || !provider.generateImage) {
         throw new AIServiceError('IMAGE_GENERATION_FAILED')
       }
-
-      const imageData = images[0].image
-      if (!imageData?.imageBytes) {
-        throw new AIServiceError('IMAGE_NO_DATA')
-      }
-
-      // Convert base64 to Blob
-      const binary = atob(imageData.imageBytes)
-      const bytes = new Uint8Array(binary.length)
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i)
-      }
-      return new Blob([bytes], { type: 'image/png' })
+      const prompt = buildImagePrompt(request.profileName, request.style, request.tags)
+      return provider.generateImage(prompt)
     },
 
     getRecommendations: async (request: RecommendationRequest): Promise<Recommendation[]> => {
-      const client = getClient()
+      const provider = getActiveProvider()
       const prompt = buildRecommendationPrompt(request.profileName, request.shotFilename)
 
-      let response
-      try {
-        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        }) as { text?: string }
-      } catch (err) {
-        wrapApiError(err)
-      }
+      const response = await provider.generateText({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      })
 
-      const text = response.text ?? ''
+      const text = response.text
       try {
         const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\[[\s\S]*\]/)
         const parsed = JSON.parse(jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text)
@@ -317,19 +192,14 @@ export function createBrowserAIService(): AIService {
     },
 
     getDialInRecommendation: async (): Promise<DialInRecommendation[]> => {
-      const client = getClient()
+      const provider = getActiveProvider()
       const prompt = buildDialInPrompt()
 
-      let response
-      try {
-        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        }) as { text?: string }
-      } catch (err) {
-        wrapApiError(err)
-      }
+      const response = await provider.generateText({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      })
 
-      const text = response.text ?? ''
+      const text = response.text
       try {
         const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\[[\s\S]*\]/)
         const parsed = JSON.parse(jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text)
