@@ -7,7 +7,6 @@ import {
   LineChart,
   ReferenceLine,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
@@ -15,20 +14,29 @@ import { getChartTheme } from '../charts/chartConstants'
 import type { TempSample } from './estimateTimeToReady'
 import { CHAMBER_COLOR, HEAD_COLOR } from './heatingColors'
 
-// Neutral token for the dashed target/threshold lines so they are visually
-// distinct from the two sensor series (which own CHART_COLORS).
-const THRESHOLD_COLOR = 'var(--muted-foreground)'
+// Solid red target line — visually distinct from the two sensor series and
+// consistent with the red "Target" treatment used in the temperatures card.
+const TARGET_COLOR = 'var(--destructive)'
+
+// The x-axis starts at 6 minutes so a typical heat-up fits without rescaling,
+// and extends only when a heat-up runs longer.
+const MIN_X_SECONDS = 360
+// Fixed 0–100°C y-axis keeps the curve shape stable across shots.
+const Y_MIN = 0
+const Y_MAX = 100
 
 interface HeatingTempChartProps {
   samples: TempSample[]
   setTemp: number
-  lanceReadyCutoff: number
 }
 
-export function HeatingTempChart({ samples, setTemp, lanceReadyCutoff }: HeatingTempChartProps) {
+export function HeatingTempChart({ samples, setTemp }: HeatingTempChartProps) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const theme = getChartTheme(resolvedTheme === 'dark')
+
+  const lastT = samples.length > 0 ? samples[samples.length - 1].t : 0
+  const xMax = Math.max(MIN_X_SECONDS, Math.ceil(lastT))
 
   return (
     <div
@@ -51,6 +59,7 @@ export function HeatingTempChart({ samples, setTemp, lanceReadyCutoff }: Heating
             axisLine={{ stroke: theme.axisLineStroke }}
             tickLine={{ stroke: theme.axisLineStroke }}
             type="number"
+            domain={[0, xMax]}
             allowDataOverflow={false}
           />
           <YAxis
@@ -59,27 +68,16 @@ export function HeatingTempChart({ samples, setTemp, lanceReadyCutoff }: Heating
             axisLine={{ stroke: theme.axisLineStroke }}
             tickLine={{ stroke: theme.axisLineStroke }}
             width={35}
+            domain={[Y_MIN, Y_MAX]}
             allowDataOverflow={false}
           />
-          <Tooltip
-            labelFormatter={label => `${Math.round(Number(label))}s`}
-            formatter={(value, name) => [`${Number(value).toFixed(1)}°C`, name]}
-          />
           <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
-          {/* Threshold lines use a neutral token so they read as targets, not as either sensor series. */}
+          {/* Solid red target line. */}
           <ReferenceLine
             y={setTemp}
-            stroke={THRESHOLD_COLOR}
-            strokeWidth={1.5}
-            strokeDasharray="4 4"
-            label={{ value: t('controlCenter.heating.setTemp'), fill: THRESHOLD_COLOR, fontSize: 10, position: 'insideTopRight' }}
-          />
-          <ReferenceLine
-            y={lanceReadyCutoff}
-            stroke={THRESHOLD_COLOR}
-            strokeWidth={1.5}
-            strokeDasharray="4 4"
-            label={{ value: t('controlCenter.heating.lanceReady'), fill: THRESHOLD_COLOR, fontSize: 10, position: 'insideBottomRight' }}
+            stroke={TARGET_COLOR}
+            strokeWidth={2}
+            label={{ value: t('controlCenter.heating.target'), fill: TARGET_COLOR, fontSize: 10, position: 'insideTopRight' }}
           />
           <Line
             type="monotone"

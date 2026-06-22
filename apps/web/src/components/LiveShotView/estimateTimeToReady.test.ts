@@ -1,75 +1,66 @@
 import { describe, it, expect } from 'vitest'
-import { estimateTimeToReady, type TempSample } from './estimateTimeToReady'
+import { estimateTimeToReady } from './estimateTimeToReady'
 
-function syntheticCurve(opts: {
-  T0: number
-  target: number
-  k: number
-  dt: number
-  count: number
-}): TempSample[] {
-  const { T0, target, k, dt, count } = opts
-  const out: TempSample[] = []
-  for (let i = 0; i < count; i++) {
-    const t = i * dt
-    const temp = target - (target - T0) * Math.exp(-k * t)
-    out.push({ t, temp })
-  }
-  return out
-}
+const TARGET = 93
+// Default ready band used across the heating view (target − 2.3°C).
+const CUTOFF = TARGET - 2.3
 
 describe('estimateTimeToReady', () => {
-  it('returns null when there are too few samples', () => {
-    const samples: TempSample[] = [
-      { t: 0, temp: 20 },
-      { t: 1, temp: 30 },
-    ]
-    expect(
-      estimateTimeToReady({ samples, target: 93, cutoff: 92, minSamples: 5 })
-    ).toBeNull()
+  it('predicts ~3 minutes to ready from a cold (room-temp) start', () => {
+    const eta = estimateTimeToReady({ current: 20, target: TARGET, cutoff: CUTOFF })
+    expect(eta).not.toBeNull()
+    // Calibrated so ambient → cutoff ≈ 180s.
+    expect(eta!).toBeCloseTo(180, 0)
   })
 
-  it('estimates a sane time-to-cutoff for a rapid-then-slow curve', () => {
-    const samples = syntheticCurve({ T0: 20, target: 93, k: 0.05, dt: 2, count: 8 })
-    const eta = estimateTimeToReady({ samples, target: 93, cutoff: 92, minSamples: 5 })
+  it('predicts a much faster ready time for a hot (kettle-filled) start', () => {
+    const eta = estimateTimeToReady({ current: 80, target: TARGET, cutoff: CUTOFF })
     expect(eta).not.toBeNull()
-    expect(eta!).toBeCloseTo(71.81, 1)
-  })
-
-  it('keeps a reasonable estimate with deterministic temperature noise', () => {
-    const samples = syntheticCurve({ T0: 20, target: 93, k: 0.05, dt: 2, count: 8 })
-    const noisySamples = samples.map((sample, i) => ({
-      ...sample,
-      temp: sample.temp + ((i % 3) - 1) * 0.1,
-    }))
-    const eta = estimateTimeToReady({ samples: noisySamples, target: 93, cutoff: 92, minSamples: 5 })
-    expect(eta).not.toBeNull()
+    // ~90s faster than a cold start, matching observed boil-fill behaviour.
     expect(eta!).toBeGreaterThan(60)
-    expect(eta!).toBeLessThan(85)
+    expect(eta!).toBeLessThan(110)
   })
 
-  it('returns 0 when the current temperature is already at/above the cutoff', () => {
-    const samples = syntheticCurve({ T0: 90, target: 93, k: 0.05, dt: 2, count: 8 })
-    samples[samples.length - 1] = { t: 14, temp: 92.5 }
-    const eta = estimateTimeToReady({ samples, target: 93, cutoff: 92, minSamples: 5 })
-    expect(eta).toBe(0)
+  it('decreases monotonically as the current temperature rises', () => {
+    const cold = estimateTimeToReady({ current: 30, target: TARGET, cutoff: CUTOFF })!
+    const warm = estimateTimeToReady({ current: 60, target: TARGET, cutoff: CUTOFF })!
+    const hot = estimateTimeToReady({ current: 85, target: TARGET, cutoff: CUTOFF })!
+    expect(cold).toBeGreaterThan(warm)
+    expect(warm).toBeGreaterThan(hot)
   })
 
-  it('clamps absurd estimates to the max cap', () => {
-    const samples = syntheticCurve({ T0: 20, target: 93, k: 0.0005, dt: 2, count: 8 })
+  it('returns 0 once the current temperature reaches the cutoff', () => {
+    expect(estimateTimeToReady({ current: 91, target: TARGET, cutoff: CUTOFF })).toBe(0)
+    expect(estimateTimeToReady({ current: 93, target: TARGET, cutoff: CUTOFF })).toBe(0)
+  })
+
+  it('returns 0 when target is at or below the cutoff', () => {
+    expect(estimateTimeToReady({ current: 20, target: 90, cutoff: 90 })).toBe(0)
+    expect(estimateTimeToReady({ current: 20, target: 89, cutoff: 90 })).toBe(0)
+  })
+
+  it('returns null for non-finite inputs', () => {
+    expect(estimateTimeToReady({ current: NaN, target: TARGET, cutoff: CUTOFF })).toBeNull()
+    expect(estimateTimeToReady({ current: 20, target: NaN, cutoff: CUTOFF })).toBeNull()
+  })
+
+  it('clamps long estimates to the max cap', () => {
     const eta = estimateTimeToReady({
-      samples, target: 93, cutoff: 92, minSamples: 5, maxSeconds: 600,
+      current: 20,
+      target: TARGET,
+      cutoff: CUTOFF,
+      maxSeconds: 120,
     })
-    expect(eta).toBe(600)
+    expect(eta).toBe(120)
   })
 
-  it('returns null when the fit is degenerate (no temperature rise)', () => {
-    const samples: TempSample[] = Array.from({ length: 8 }, (_, i) => ({
-      t: i * 2,
-      temp: 50,
-    }))
-    expect(
-      estimateTimeToReady({ samples, target: 93, cutoff: 92, minSamples: 5 })
-    ).toBeNull()
+  it('honours a custom cold-start calibration', () => {
+    const eta = estimateTimeToReady({
+      current: 20,
+      target: TARGET,
+      cutoff: CUTOFF,
+      coldStartSeconds: 240,
+    })
+    expect(eta!).toBeCloseTo(240, 0)
   })
 })

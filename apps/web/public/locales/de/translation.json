@@ -749,19 +749,15 @@
     "heating": {
       "statusHeating": "Aufheizen",
       "statusReady": "Bereit",
-      "setTemp": "Solltemp.",
-      "timeToReady": "bis Lanze bereit",
+      "timeToReady": "bis Temperaturstabilität",
       "estimatePrefix": "~",
-      "slowsNearTarget": "Das Aufheizen verlangsamt sich nahe dem Ziel, um Überhitzen zu vermeiden",
       "estimating": "Schätzung…",
-      "lanceReady": "Lanze bereit",
       "brewChamber": "Brühkammer",
       "brewHead": "Brühkopf",
-      "whatsHappening": "Was als Nächstes passiert",
-      "showDescription": "Profilbeschreibung",
-      "hideDescription": "Beschreibung ausblenden",
       "temperatureChart": "Temperatur",
-      "deltaToTarget": "Bis Ziel"
+      "deltaToTarget": "Bis Ziel",
+      "target": "Ziel",
+      "stabilityReached": "Temperatur stabil"
     },
     "offline": "Maschine ist offline",
     "stale": "Veraltet",

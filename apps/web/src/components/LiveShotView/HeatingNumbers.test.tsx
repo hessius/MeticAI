@@ -23,18 +23,20 @@ describe('HeatingNumbers', () => {
     expect(screen.getByText('88.4°C')).toBeInTheDocument()
   })
 
-  it('renders a ready marker', () => {
+  it('renders a red target marker per sensor', () => {
     render(<HeatingNumbers chamberTemp={91.2} headTemp={88.4} setTemp={93} lanceReadyCutoff={92} />)
 
-    expect(screen.getAllByTestId('ready-marker')).toHaveLength(2)
+    expect(screen.getAllByTestId('target-marker')).toHaveLength(2)
   })
 
-  it('renders head-based delta readout without inline 6-digit hex colors', () => {
+  it('renders a per-sensor "to target" readout without inline 6-digit hex colors', () => {
     const { container } = render(
       <HeatingNumbers chamberTemp={92.5} headTemp={88.4} setTemp={93} lanceReadyCutoff={92} />
     )
 
-    expect(screen.getByTestId('delta-readout')).toHaveTextContent('4.6°C')
+    // Head is 4.6°C from the 93°C target; chamber is 0.5°C away.
+    expect(screen.getByText(/4\.6°C/)).toBeInTheDocument()
+    expect(screen.getByText(/0\.5°C/)).toBeInTheDocument()
     expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{6}/)
   })
 })

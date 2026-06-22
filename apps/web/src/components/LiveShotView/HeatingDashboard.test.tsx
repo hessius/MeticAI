@@ -44,10 +44,9 @@ const baseProps = {
 }
 
 describe('HeatingDashboard', () => {
-  it('renders the heating status header with the set temp', () => {
+  it('renders the heating status in the hero', () => {
     render(<HeatingDashboard {...baseProps} />)
     expect(screen.getByText('controlCenter.heating.statusHeating')).toBeInTheDocument()
-    expect(screen.getByText(/93/)).toBeInTheDocument()
   })
 
   it('enables the Start button during heating', () => {
@@ -83,13 +82,18 @@ describe('HeatingDashboard', () => {
     expect(screen.queryByText('controlCenter.heating.timeToReady')).not.toBeInTheDocument()
   })
 
-  it('offers the description disclosure when a description is provided', () => {
+  it('renders the auto-generated description as a card when provided', () => {
     render(<HeatingDashboard {...baseProps} />)
-    expect(screen.getByText('controlCenter.heating.showDescription')).toBeInTheDocument()
+    expect(screen.getByText('A gentle blooming profile.')).toBeInTheDocument()
   })
 
-  it('omits the description disclosure when no description is provided', () => {
+  it('omits the description card when no description is provided', () => {
     render(<HeatingDashboard {...baseProps} description={undefined} />)
-    expect(screen.queryByText('controlCenter.heating.showDescription')).not.toBeInTheDocument()
+    expect(screen.queryByText('A gentle blooming profile.')).not.toBeInTheDocument()
+  })
+
+  it('renders the profile name', () => {
+    render(<HeatingDashboard {...baseProps} />)
+    expect(screen.getByText('Slow-Mo Blossom')).toBeInTheDocument()
   })
 })

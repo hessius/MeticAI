@@ -8,6 +8,7 @@ vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'light' }) }))
 
 const lines: { dataKey: unknown }[] = []
 const refLines: { y: unknown }[] = []
+let tooltipRenders = 0
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -19,12 +20,12 @@ vi.mock('recharts', () => ({
   XAxis: () => null,
   YAxis: () => null,
   CartesianGrid: () => null,
-  Tooltip: () => null,
+  Tooltip: () => { tooltipRenders += 1; return null },
   Legend: () => null,
 }))
 
 describe('HeatingTempChart', () => {
-  it('plots head + chamber series and set + lance-ready target lines', () => {
+  it('plots head + chamber series and a single red target line at the set temp', () => {
     lines.length = 0
     refLines.length = 0
 
@@ -32,11 +33,14 @@ describe('HeatingTempChart', () => {
       <HeatingTempChart
         samples={[{ t: 0, temp: 20, chamber: 22 }, { t: 2, temp: 30, chamber: 33 }]}
         setTemp={93}
-        lanceReadyCutoff={92}
       />
     )
 
     expect(lines.map(l => l.dataKey).sort()).toEqual(['chamber', 'temp'])
-    expect(refLines.map(r => r.y).sort((a, b) => (a as number) - (b as number))).toEqual([92, 93])
+    expect(refLines.map(r => r.y)).toEqual([93])
+  })
+
+  it('does not render a tooltip', () => {
+    expect(tooltipRenders).toBe(0)
   })
 })

@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
@@ -17,6 +15,7 @@ export interface HeatingDashboardProps {
   /** "Lance's standard" easter egg: head temp on-target while ready. */
   lancesStandard?: boolean
   profileName: string
+  profileImageUrl?: string | null
   setTemp: number
   chamberTemp: number
   headTemp: number
@@ -25,6 +24,7 @@ export interface HeatingDashboardProps {
   preheatCountdown: number | null
   samples: TempSample[]
   profile: ProfileData | null
+  /** Auto-generated one-line summary of what this shot will do. */
   description?: string
   startDisabled: boolean
   onStart: () => void
@@ -38,12 +38,39 @@ function formatMmSs(totalSeconds: number): string {
   return `${minutes}:${String(remainder).padStart(2, '0')}`
 }
 
+interface HeroTone {
+  container: string
+  accent: string
+}
+
+function heroTone(isReady: boolean, isHeating: boolean, lancesStandard: boolean): HeroTone {
+  if (lancesStandard) {
+    return {
+      container: 'border-emerald-500/60 bg-emerald-500/15',
+      accent: 'text-emerald-600 dark:text-emerald-400',
+    }
+  }
+  if (isReady) {
+    return {
+      container: 'border-success/50 bg-success/10',
+      accent: 'text-success',
+    }
+  }
+  if (isHeating) {
+    return {
+      container: 'border-orange-500/50 bg-orange-500/10',
+      accent: 'text-orange-600 dark:text-orange-400',
+    }
+  }
+  return { container: 'border-border bg-card', accent: 'text-muted-foreground' }
+}
+
 export function HeatingDashboard(props: HeatingDashboardProps) {
   const { t } = useTranslation()
-  const [descOpen, setDescOpen] = useState(false)
 
+  const isHeating = props.isHeating ?? false
   const modelEta = estimateTimeToReady({
-    samples: props.samples,
+    current: props.headTemp,
     target: props.setTemp,
     cutoff: props.lanceReadyCutoff,
   })
@@ -51,76 +78,69 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
     props.preheatCountdown != null && props.preheatCountdown > 0
       ? props.preheatCountdown
       : modelEta
-  // Once the machine reports ready, the hero shows ~0:00 rather than an
-  // estimate; the time-to-ready hero is only meaningful while heating or ready.
+  // Once the machine reports ready, the hero shows 0:00 rather than an estimate.
   const heroEta = props.isReady ? 0 : etaSeconds
-  const showHero = props.isReady || props.isHeating
+  const showCountdown = props.isReady || isHeating
+
   const statusLabel = props.isReady
     ? t('controlCenter.heating.statusReady')
-    : props.isHeating
+    : isHeating
       ? t('controlCenter.heating.statusHeating')
       : t('controlCenter.states.idle')
 
+  const tone = heroTone(props.isReady, isHeating, props.lancesStandard ?? false)
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <Badge variant={props.isReady ? 'default' : 'secondary'}>
+    <div className="flex flex-col gap-4 pb-28">
+      {/* Hero — color-coded status + time-to-stability countdown */}
+      <div className={`flex flex-col items-center rounded-2xl border px-4 py-6 text-center transition-colors ${tone.container}`}>
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-semibold uppercase tracking-wide ${tone.accent}`}>
             {statusLabel}
-          </Badge>
-          <span className="truncate text-sm font-medium text-foreground">{props.profileName}</span>
+          </span>
           {props.lancesStandard && (
-            <span className="shrink-0 text-xs font-medium italic text-emerald-600 dark:text-emerald-400">
+            <span className="text-xs font-medium italic text-emerald-600 dark:text-emerald-400">
               {t('controlCenter.states.lancesStandard')}
             </span>
           )}
         </div>
-        <span className="shrink-0 text-sm text-muted-foreground">
-          {t('controlCenter.heating.setTemp')}: {props.setTemp}°C
-        </span>
+
+        {showCountdown && (
+          <>
+            <AnimatePresence mode="wait">
+              {heroEta == null ? (
+                <motion.span
+                  key="estimating"
+                  className="mt-2 text-2xl font-semibold tabular-nums text-muted-foreground"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                >
+                  {t('controlCenter.heating.estimating')}
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="eta"
+                  className={`mt-2 text-6xl font-bold tabular-nums tracking-tight ${props.isReady ? tone.accent : 'text-foreground'}`}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                >
+                  {!props.isReady && t('controlCenter.heating.estimatePrefix')}
+                  {formatMmSs(heroEta)}
+                </motion.span>
+              )}
+            </AnimatePresence>
+            <span className="mt-2 text-sm text-muted-foreground">
+              {props.isReady
+                ? t('controlCenter.heating.stabilityReached')
+                : t('controlCenter.heating.timeToReady')}
+            </span>
+          </>
+        )}
       </div>
 
-      {showHero && (
-        <div className="flex flex-col items-center rounded-xl border border-border bg-card px-4 py-5 text-center">
-          <AnimatePresence mode="wait">
-            {heroEta == null ? (
-              <motion.span
-                key="estimating"
-                className="text-2xl font-semibold tabular-nums text-muted-foreground"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-              >
-                {t('controlCenter.heating.estimating')}
-              </motion.span>
-            ) : (
-              <motion.span
-                key="eta"
-                className="text-5xl font-bold tabular-nums tracking-tight text-foreground"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-              >
-                {t('controlCenter.heating.estimatePrefix')}
-                {formatMmSs(heroEta)}
-              </motion.span>
-            )}
-          </AnimatePresence>
-          <span className="mt-1 text-sm text-muted-foreground">
-            {t('controlCenter.heating.timeToReady')}
-          </span>
-          <span className="mt-1 max-w-xs text-xs text-muted-foreground">
-            {t('controlCenter.heating.slowsNearTarget')}
-          </span>
-        </div>
-      )}
-
-      <HeatingTempChart
-        samples={props.samples}
-        setTemp={props.setTemp}
-        lanceReadyCutoff={props.lanceReadyCutoff}
-      />
-
+      {/* Temperatures */}
       <HeatingNumbers
         chamberTemp={props.chamberTemp}
         headTemp={props.headTemp}
@@ -128,48 +148,46 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
         lanceReadyCutoff={props.lanceReadyCutoff}
       />
 
-      <div>
-        <h3 className="mb-2 text-sm font-medium text-foreground">
-          {t('controlCenter.heating.whatsHappening')}
-        </h3>
-        <ProfileBreakdown profile={props.profile} />
+      {/* Temperature chart */}
+      <HeatingTempChart samples={props.samples} setTemp={props.setTemp} />
+
+      {/* Profile name + image card */}
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        {props.profileImageUrl && (
+          <img
+            src={props.profileImageUrl}
+            alt={props.profileName}
+            className="h-12 w-12 shrink-0 rounded-lg object-cover"
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+        )}
+        <span className="min-w-0 flex-1 truncate text-lg font-bold text-foreground">
+          {props.profileName}
+        </span>
       </div>
 
+      {/* Auto-generated description */}
       {props.description && (
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setDescOpen(open => !open)}
-            aria-expanded={descOpen}
-          >
-            {descOpen
-              ? t('controlCenter.heating.hideDescription')
-              : t('controlCenter.heating.showDescription')}
-          </Button>
-          <AnimatePresence>
-            {descOpen && (
-              <motion.p
-                className="mt-2 whitespace-pre-line text-sm text-muted-foreground"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                {props.description}
-              </motion.p>
-            )}
-          </AnimatePresence>
+        <div className="rounded-xl border border-border bg-card px-4 py-3">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {props.description}
+          </p>
         </div>
       )}
 
-      <div className="flex gap-3 pt-2">
-        <Button type="button" className="flex-1" onClick={props.onStart} disabled={props.startDisabled}>
-          {t('controlCenter.actions.start')}
-        </Button>
-        <Button type="button" variant="destructive" onClick={props.onAbort}>
-          {t('controlCenter.actions.abort')}
-        </Button>
+      {/* Profile breakdown — resolved values, no variable chips/warnings */}
+      <ProfileBreakdown profile={props.profile} hideVariables />
+
+      {/* Sticky action bar */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex max-w-3xl gap-3">
+          <Button type="button" className="flex-1" onClick={props.onStart} disabled={props.startDisabled}>
+            {t('controlCenter.actions.start')}
+          </Button>
+          <Button type="button" variant="destructive" onClick={props.onAbort}>
+            {t('controlCenter.actions.abort')}
+          </Button>
+        </div>
       </div>
     </div>
   )

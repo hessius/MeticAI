@@ -761,19 +761,15 @@
     "heating": {
       "statusHeating": "Heating",
       "statusReady": "Ready",
-      "setTemp": "Set temp",
-      "timeToReady": "to lance-ready",
+      "timeToReady": "until temperature stability",
       "estimatePrefix": "~",
-      "slowsNearTarget": "Heating slows near the target to avoid overshoot",
       "estimating": "Estimating…",
-      "lanceReady": "Lance-ready",
       "brewChamber": "Brew Chamber",
       "brewHead": "Brew Head",
-      "whatsHappening": "What's going to happen",
-      "showDescription": "Profile description",
-      "hideDescription": "Hide description",
       "temperatureChart": "Temperature",
-      "deltaToTarget": "To target"
+      "deltaToTarget": "To target",
+      "target": "Target",
+      "stabilityReached": "Temperature stable"
     },
     "offline": "Machine is offline",
     "stale": "Stale",

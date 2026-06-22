@@ -173,17 +173,12 @@ function App() {
         const data = await r.json()
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
-          // Resolve a profile description for the heating-view disclosure:
-          // prefer a cached AI description, otherwise build a concise summary.
+          // The pre-shot heating view always shows the auto-generated one-line
+          // summary derived from stage structure — never an author's freeform
+          // description — so it reads as "what this specific shot will do".
           try {
-            const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
-            const profileId = (data.profile as { id?: string }).id
-            let desc = (profileId ? descCache?.get(profileId) : undefined) ?? descCache?.get(profileName) ?? ''
-            if (!desc) {
-              const { buildStaticProfileSummary } = await import('@/lib/staticProfileDescription')
-              desc = buildStaticProfileSummary(data.profile)
-            }
-            setLiveProfileDescription(desc)
+            const { generateStaticProfileSummary } = await import('@/lib/staticProfileDescription')
+            setLiveProfileDescription(generateStaticProfileSummary(data.profile))
           } catch { /* description is optional */ }
         }
       } catch { /* non-critical */ }

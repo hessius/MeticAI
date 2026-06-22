@@ -754,19 +754,15 @@
     "heating": {
       "statusHeating": "Värmer upp",
       "statusReady": "Redo",
-      "setTemp": "Måltemp",
-      "timeToReady": "till lansen är redo",
+      "timeToReady": "till temperaturstabilitet",
       "estimatePrefix": "~",
-      "slowsNearTarget": "Uppvärmningen saktar in nära målet för att undvika övervärme",
       "estimating": "Beräknar…",
-      "lanceReady": "Lans redo",
       "brewChamber": "Bryggkammare",
       "brewHead": "Brygghuvud",
-      "whatsHappening": "Vad som kommer att hända",
-      "showDescription": "Profilbeskrivning",
-      "hideDescription": "Dölj beskrivning",
       "temperatureChart": "Temperatur",
-      "deltaToTarget": "Till mål"
+      "deltaToTarget": "Till mål",
+      "target": "Mål",
+      "stabilityReached": "Temperaturen stabil"
     },
     "offline": "Maskinen är offline",
     "stale": "Inaktuell",

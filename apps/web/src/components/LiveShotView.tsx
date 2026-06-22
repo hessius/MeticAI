@@ -429,6 +429,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
               isHeating={isActivelyHeating}
               lancesStandard={isLancesStandard}
               profileName={ms.active_profile ?? ''}
+              profileImageUrl={profileImgUrl}
               setTemp={targetTempVal ?? 0}
               chamberTemp={chamberTempVal ?? 0}
               headTemp={headTempVal ?? 0}

@@ -749,19 +749,15 @@
     "heating": {
       "statusHeating": "Calentando",
       "statusReady": "Listo",
-      "setTemp": "Temp. objetivo",
-      "timeToReady": "hasta lanza lista",
+      "timeToReady": "hasta estabilidad térmica",
       "estimatePrefix": "~",
-      "slowsNearTarget": "El calentamiento se ralentiza cerca del objetivo para evitar sobrecalentar",
       "estimating": "Estimando…",
-      "lanceReady": "Lanza lista",
       "brewChamber": "Cámara de preparación",
       "brewHead": "Cabezal",
-      "whatsHappening": "Lo que va a pasar",
-      "showDescription": "Descripción del perfil",
-      "hideDescription": "Ocultar descripción",
       "temperatureChart": "Temperatura",
-      "deltaToTarget": "Al objetivo"
+      "deltaToTarget": "Al objetivo",
+      "target": "Objetivo",
+      "stabilityReached": "Temperatura estable"
     },
     "offline": "La máquina está desconectada",
     "stale": "Obsoleto",

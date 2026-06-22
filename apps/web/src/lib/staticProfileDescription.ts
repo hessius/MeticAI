@@ -27,13 +27,22 @@ interface ProfileJson {
 }
 
 export function buildStaticProfileSummary(profileJson: ProfileJson): string {
-  const temperature = profileJson.temperature
-  const finalWeight = profileJson.final_weight
-  const stages: Stage[] = profileJson.stages ?? []
-
   const existing =
     profileJson.description ?? profileJson.notes ?? profileJson.summary
   if (existing) return String(existing).trim()
+  return generateStaticProfileSummary(profileJson)
+}
+
+/**
+ * Generate the trait-based one-line summary from the profile's stage structure
+ * and metadata, *ignoring* any explicit description/notes/summary. Used by the
+ * pre-shot heating view, which always wants the derived "what this shot does"
+ * sentence rather than an author's freeform blurb.
+ */
+export function generateStaticProfileSummary(profileJson: ProfileJson): string {
+  const temperature = profileJson.temperature
+  const finalWeight = profileJson.final_weight
+  const stages: Stage[] = profileJson.stages ?? []
 
   const shotTraits: string[] = []
 
