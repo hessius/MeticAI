@@ -81,3 +81,6 @@ apps/web/dist.old/
 # Reports (empty/generated)
 reports/
 testflight.md
+
+# Brainstorming visual companion
+.superpowers/
