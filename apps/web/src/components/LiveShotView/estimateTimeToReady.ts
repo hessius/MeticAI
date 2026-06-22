@@ -1,8 +1,10 @@
 export interface TempSample {
   /** Seconds since heating started (monotonic). */
   t: number
-  /** Temperature reading in °C. */
+  /** Readiness-sensor (brew head) temperature in °C; the estimate is fit to this. */
   temp: number
+  /** Optional brew-chamber (boiler) temperature in °C, for display only. */
+  chamber?: number
 }
 
 export interface EstimateOptions {

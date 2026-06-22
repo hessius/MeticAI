@@ -59,6 +59,14 @@ describe('useHeatingSamples', () => {
     expect(result.current[result.current.length - 1].temp).toBe(90)
   })
 
+  it('records chamber temperature when provided', () => {
+    const { result } = renderHook(
+      () => useHeatingSamples({ temp: 88, chamber: 91, active: true })
+    )
+
+    expect(result.current[0]).toMatchObject({ temp: 88, chamber: 91 })
+  })
+
   it('restarts elapsed time from zero after becoming inactive', () => {
     let now = 1000
     const nowFn = () => now
