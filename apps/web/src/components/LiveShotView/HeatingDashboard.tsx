@@ -12,6 +12,8 @@ import { HeatingTempChart } from './HeatingTempChart'
 
 export interface HeatingDashboardProps {
   isReady: boolean
+  /** "Lance's standard" easter egg: head temp on-target while ready. */
+  lancesStandard?: boolean
   profileName: string
   setTemp: number
   chamberTemp: number
@@ -20,7 +22,7 @@ export interface HeatingDashboardProps {
   /** Machine's own countdown (seconds) when provided; preferred over our model. */
   preheatCountdown: number | null
   samples: TempSample[]
-  profile: ProfileData
+  profile: ProfileData | null
   description?: string
   startDisabled: boolean
   onStart: () => void
@@ -58,6 +60,11 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
               : t('controlCenter.heating.statusHeating')}
           </Badge>
           <span className="truncate text-sm font-medium text-foreground">{props.profileName}</span>
+          {props.lancesStandard && (
+            <span className="shrink-0 text-xs font-medium italic text-emerald-600 dark:text-emerald-400">
+              {t('controlCenter.states.lancesStandard')}
+            </span>
+          )}
         </div>
         <span className="shrink-0 text-sm text-muted-foreground">
           {t('controlCenter.heating.setTemp')}: {props.setTemp}°C

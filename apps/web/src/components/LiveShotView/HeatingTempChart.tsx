@@ -63,7 +63,7 @@ export function HeatingTempChart({ samples, setTemp, lanceReadyCutoff }: Heating
           />
           <Tooltip
             labelFormatter={label => `${Math.round(Number(label))}s`}
-            formatter={(value: number | string, name) => [`${Number(value).toFixed(1)}°C`, name]}
+            formatter={(value, name) => [`${Number(value).toFixed(1)}°C`, name]}
           />
           <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
           {/* Threshold lines use a neutral token so they read as targets, not as either sensor series. */}

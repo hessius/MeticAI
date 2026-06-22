@@ -1581,6 +1581,7 @@ function App() {
                   <LiveShotView
                     machineState={machineState}
                     onBack={handleBackToStart}
+                    profileData={liveProfileData}
                     onAnalyzeShot={(profileName) => {
                       setShotHistoryProfileName(profileName)
                       setShotHistoryInitialDate(undefined)
