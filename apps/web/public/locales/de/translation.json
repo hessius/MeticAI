@@ -752,14 +752,14 @@
       "estimatePrefix": "~",
       "slowsNearTarget": "Das Aufheizen verlangsamt sich nahe dem Ziel, um Überhitzen zu vermeiden",
       "estimating": "Schätzung…",
-      "tempGraphTitle": "Temperatur",
       "lanceReady": "Lanze bereit",
       "brewChamber": "Brühkammer",
       "brewHead": "Brühkopf",
-      "toTarget": "bis Ziel",
       "whatsHappening": "Was als Nächstes passiert",
       "showDescription": "Profilbeschreibung",
-      "hideDescription": "Beschreibung ausblenden"
+      "hideDescription": "Beschreibung ausblenden",
+      "temperatureChart": "Temperatur",
+      "deltaToTarget": "Bis Ziel"
     },
     "offline": "Maschine ist offline",
     "stale": "Veraltet",

@@ -752,14 +752,14 @@
       "estimatePrefix": "~",
       "slowsNearTarget": "Il riscaldamento rallenta vicino all'obiettivo per evitare il superamento",
       "estimating": "Stima…",
-      "tempGraphTitle": "Temperatura",
       "lanceReady": "Lancia pronta",
       "brewChamber": "Camera di infusione",
       "brewHead": "Testa di infusione",
-      "toTarget": "all'obiettivo",
       "whatsHappening": "Cosa sta per succedere",
       "showDescription": "Descrizione del profilo",
-      "hideDescription": "Nascondi descrizione"
+      "hideDescription": "Nascondi descrizione",
+      "temperatureChart": "Temperatura",
+      "deltaToTarget": "All'obiettivo"
     },
     "offline": "La macchina è offline",
     "stale": "Obsoleto",

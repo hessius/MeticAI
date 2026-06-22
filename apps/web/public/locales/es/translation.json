@@ -752,14 +752,14 @@
       "estimatePrefix": "~",
       "slowsNearTarget": "El calentamiento se ralentiza cerca del objetivo para evitar sobrecalentar",
       "estimating": "Estimando…",
-      "tempGraphTitle": "Temperatura",
       "lanceReady": "Lanza lista",
       "brewChamber": "Cámara de preparación",
       "brewHead": "Cabezal",
-      "toTarget": "al objetivo",
       "whatsHappening": "Lo que va a pasar",
       "showDescription": "Descripción del perfil",
-      "hideDescription": "Ocultar descripción"
+      "hideDescription": "Ocultar descripción",
+      "temperatureChart": "Temperatura",
+      "deltaToTarget": "Al objetivo"
     },
     "offline": "La máquina está desconectada",
     "stale": "Obsoleto",

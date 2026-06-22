@@ -757,14 +757,14 @@
       "estimatePrefix": "~",
       "slowsNearTarget": "Uppvärmningen saktar in nära målet för att undvika övervärme",
       "estimating": "Beräknar…",
-      "tempGraphTitle": "Temperatur",
       "lanceReady": "Lans redo",
       "brewChamber": "Bryggkammare",
       "brewHead": "Brygghuvud",
-      "toTarget": "till mål",
       "whatsHappening": "Vad som kommer att hända",
       "showDescription": "Profilbeskrivning",
-      "hideDescription": "Dölj beskrivning"
+      "hideDescription": "Dölj beskrivning",
+      "temperatureChart": "Temperatur",
+      "deltaToTarget": "Till mål"
     },
     "offline": "Maskinen är offline",
     "stale": "Inaktuell",
