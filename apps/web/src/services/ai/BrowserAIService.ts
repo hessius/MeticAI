@@ -31,6 +31,7 @@ import { retryWithBackoff } from './retryUtils'
 import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
+import { safeRandomUUID } from '@/lib/uuid'
 import { resolveWorkingModel, type ModelClient } from './modelResolver'
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
@@ -315,7 +316,7 @@ export function createBrowserAIService(): AIService {
     createDialInSession: async (coffee: Record<string, unknown>): Promise<DialInSession> => {
       // In browser mode, sessions are client-side only
       return {
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         coffee,
         steps: [],
       }

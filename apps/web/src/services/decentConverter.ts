@@ -7,6 +7,8 @@
  * native/direct mode without a backend.
  */
 
+import { safeRandomUUID } from '@/lib/uuid'
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 interface DecentExit {
@@ -111,7 +113,7 @@ export function convertDecentToMeticulous(data: DecentProfile): ConversionResult
   }
 
   const profile: MeticulousProfile = {
-    id: crypto.randomUUID(),
+    id: safeRandomUUID(),
     name: data.title ?? 'Imported Decent Profile',
     author: data.author ?? 'Decent Import',
     temperature: firstTemperature(data),
