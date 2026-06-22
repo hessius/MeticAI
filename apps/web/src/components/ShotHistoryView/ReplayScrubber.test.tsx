@@ -17,6 +17,11 @@ describe('ReplayScrubber', () => {
     expect(slider).toHaveAttribute('aria-valuemax', '20')
   })
 
+  it('gives the slider an accessible name', () => {
+    render(<ReplayScrubber value={5} max={20} onChange={() => {}} />)
+    expect(screen.getByRole('slider', { name: 'shotHistory.scrubber' })).toBeInTheDocument()
+  })
+
   it('shows the elapsed / total time readout', () => {
     render(<ReplayScrubber value={3.2} max={12.5} onChange={() => {}} />)
     expect(screen.getByText('3.2s')).toBeInTheDocument()
