@@ -744,6 +744,23 @@
     "updateNow": "Actualizar ahora"
   },
   "controlCenter": {
+    "heating": {
+      "statusHeating": "Calentando",
+      "statusReady": "Listo",
+      "setTemp": "Temp. objetivo",
+      "timeToReady": "hasta lanza lista",
+      "estimatePrefix": "~",
+      "slowsNearTarget": "El calentamiento se ralentiza cerca del objetivo para evitar sobrecalentar",
+      "estimating": "Estimando…",
+      "tempGraphTitle": "Temperatura",
+      "lanceReady": "Lanza lista",
+      "brewChamber": "Cámara de preparación",
+      "brewHead": "Cabezal",
+      "toTarget": "al objetivo",
+      "whatsHappening": "Lo que va a pasar",
+      "showDescription": "Descripción del perfil",
+      "hideDescription": "Ocultar descripción"
+    },
     "offline": "La máquina está desconectada",
     "stale": "Obsoleto",
     "noProfile": "Sin perfil cargado",

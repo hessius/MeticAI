@@ -744,6 +744,23 @@
     "updateNow": "Mettre à jour maintenant"
   },
   "controlCenter": {
+    "heating": {
+      "statusHeating": "Chauffe",
+      "statusReady": "Prêt",
+      "setTemp": "Temp. cible",
+      "timeToReady": "avant lance prête",
+      "estimatePrefix": "~",
+      "slowsNearTarget": "La chauffe ralentit près de la cible pour éviter le dépassement",
+      "estimating": "Estimation…",
+      "tempGraphTitle": "Température",
+      "lanceReady": "Lance prête",
+      "brewChamber": "Chambre d'infusion",
+      "brewHead": "Tête d'infusion",
+      "toTarget": "vers la cible",
+      "whatsHappening": "Ce qui va se passer",
+      "showDescription": "Description du profil",
+      "hideDescription": "Masquer la description"
+    },
     "offline": "La machine est hors ligne",
     "stale": "Périmé",
     "noProfile": "Aucun profil chargé",

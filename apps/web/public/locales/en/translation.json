@@ -756,6 +756,23 @@
     "updateNow": "Update Now"
   },
   "controlCenter": {
+    "heating": {
+      "statusHeating": "Heating",
+      "statusReady": "Ready",
+      "setTemp": "Set temp",
+      "timeToReady": "to lance-ready",
+      "estimatePrefix": "~",
+      "slowsNearTarget": "Heating slows near the target to avoid overshoot",
+      "estimating": "Estimating…",
+      "tempGraphTitle": "Temperature",
+      "lanceReady": "Lance-ready",
+      "brewChamber": "Brew Chamber",
+      "brewHead": "Brew Head",
+      "toTarget": "to target",
+      "whatsHappening": "What's going to happen",
+      "showDescription": "Profile description",
+      "hideDescription": "Hide description"
+    },
     "offline": "Machine is offline",
     "stale": "Stale",
     "noProfile": "No profile loaded",
