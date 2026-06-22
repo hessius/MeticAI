@@ -78,7 +78,7 @@ jobs:
           fi
 
       - name: Upload debug APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: metic-android-debug-apk
           path: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
