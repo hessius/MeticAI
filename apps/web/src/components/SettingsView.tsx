@@ -499,7 +499,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             mqttEnabled: nextSettings.mqttEnabled,
             geminiModel: nextSettings.geminiModel,
           }
-          if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
+          const apiKeyChanged = Boolean(nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*'))
+          if (apiKeyChanged) {
             payload.geminiApiKey = nextSettings.geminiApiKey
             payload.geminiApiKeyMasked = false
           }
@@ -515,6 +516,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               errorMsg = error.detail?.message || error.detail || errorMsg
             } catch { /* use default */ }
             throw new Error(errorMsg)
+          }
+          // Notify the app that the API key changed so the AI gate refreshes
+          // immediately, instead of staying stale until Settings is closed.
+          if (apiKeyChanged) {
+            window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
           }
         }
         setAutoSaveStatus('saved')

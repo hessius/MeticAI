@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { fetchProxyAiConfigured } from '@/lib/aiConfigStatus'
 import { invalidateCatalogueCache } from '@/lib/catalogueCache'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
@@ -260,6 +261,13 @@ function App() {
       // Re-check API key availability (may have been added/removed in Settings)
       if (isDemoMode() || isDirectMode()) {
         setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
+      } else {
+        // Proxy/server mode: re-fetch from the backend so the AI gate refreshes
+        // immediately when a key is added in Settings, without waiting to leave
+        // the Settings view.
+        void fetchProxyAiConfigured().then(configured => {
+          if (configured !== null) setIsAiConfigured(configured)
+        })
       }
     }
     // Sync initial values in handler to avoid direct setState in effect
