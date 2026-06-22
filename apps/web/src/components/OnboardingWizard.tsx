@@ -407,7 +407,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 value={machineIp}
                 onChange={(e) => {
                   setMachineIp(e.target.value)
-                  setConnectionStatus('idle')
+                  setConnectionStatus(prev => (prev === 'idle' ? prev : 'idle'))
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
                 className="flex-1"
@@ -456,7 +456,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               value={machineIp}
               onChange={(e) => {
                 setMachineIp(e.target.value)
-                setConnectionStatus('idle')
+                setConnectionStatus(prev => (prev === 'idle' ? prev : 'idle'))
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
               className="flex-1"
