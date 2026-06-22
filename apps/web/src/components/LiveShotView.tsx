@@ -295,7 +295,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
     temp: headTempVal ?? 0,
     chamber: chamberTempVal ?? undefined,
     active: isHeatingPhase && !isReadyState,
-    tick: ms.preheat_countdown ?? undefined,
+    // Treat a 0 countdown as absent so temperature changes still drive sampling
+    // near end-of-heat (0 would otherwise pin the hook's effect dependency).
+    tick: ms.preheat_countdown || undefined,
   })
 
   // Compute stage ranges from data
