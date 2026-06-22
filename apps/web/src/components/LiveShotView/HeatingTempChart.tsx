@@ -15,6 +15,10 @@ import { getChartTheme } from '../charts/chartConstants'
 import type { TempSample } from './estimateTimeToReady'
 import { CHAMBER_COLOR, HEAD_COLOR } from './heatingColors'
 
+// Neutral token for the dashed target/threshold lines so they are visually
+// distinct from the two sensor series (which own CHART_COLORS).
+const THRESHOLD_COLOR = 'var(--muted-foreground)'
+
 interface HeatingTempChartProps {
   samples: TempSample[]
   setTemp: number
@@ -57,21 +61,25 @@ export function HeatingTempChart({ samples, setTemp, lanceReadyCutoff }: Heating
             width={35}
             allowDataOverflow={false}
           />
-          <Tooltip />
+          <Tooltip
+            labelFormatter={label => `${Math.round(Number(label))}s`}
+            formatter={(value: number | string, name) => [`${Number(value).toFixed(1)}°C`, name]}
+          />
           <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
+          {/* Threshold lines use a neutral token so they read as targets, not as either sensor series. */}
           <ReferenceLine
             y={setTemp}
-            stroke={HEAD_COLOR}
+            stroke={THRESHOLD_COLOR}
             strokeWidth={1.5}
             strokeDasharray="4 4"
-            label={{ value: t('controlCenter.heating.setTemp'), fill: HEAD_COLOR, fontSize: 10, position: 'insideTopRight' }}
+            label={{ value: t('controlCenter.heating.setTemp'), fill: THRESHOLD_COLOR, fontSize: 10, position: 'insideTopRight' }}
           />
           <ReferenceLine
             y={lanceReadyCutoff}
-            stroke={CHAMBER_COLOR}
+            stroke={THRESHOLD_COLOR}
             strokeWidth={1.5}
             strokeDasharray="4 4"
-            label={{ value: t('controlCenter.heating.lanceReady'), fill: CHAMBER_COLOR, fontSize: 10, position: 'insideTopRight' }}
+            label={{ value: t('controlCenter.heating.lanceReady'), fill: THRESHOLD_COLOR, fontSize: 10, position: 'insideBottomRight' }}
           />
           <Line
             type="monotone"

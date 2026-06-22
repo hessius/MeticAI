@@ -51,7 +51,10 @@ export function useHeatingSamples({
       const cutoff = t - maxWindow
       return next.filter((s) => s.t >= cutoff)
     })
-    // Re-run on each new telemetry tick or temperature reading.
+    // Re-run on each new telemetry tick or temperature reading. `chamber` is
+    // intentionally read via the render closure (not a dep): it updates in
+    // lockstep with `tick`/`temp` from the same telemetry frame, so every
+    // chamber reading is captured without re-firing the effect on its own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, tick ?? temp])
 

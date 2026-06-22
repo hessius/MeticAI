@@ -1,20 +1,13 @@
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { CHAMBER_COLOR, HEAD_COLOR } from './heatingColors'
+import { progressPercent } from './heatingProgress'
 
 interface HeatingNumbersProps {
   chamberTemp: number
   headTemp: number
   setTemp: number
   lanceReadyCutoff: number
-}
-
-const AMBIENT_BASELINE = 20
-
-function progressPercent(temp: number, setTemp: number): number {
-  const span = setTemp - AMBIENT_BASELINE
-  if (span <= 0) return 100
-  return Math.max(0, Math.min(100, ((temp - AMBIENT_BASELINE) / span) * 100))
 }
 
 function SensorRow({
@@ -42,7 +35,10 @@ function SensorRow({
       <div className="relative h-2 overflow-hidden rounded-full bg-muted">
         <motion.div
           className="h-full rounded-full"
-          style={{ width: `${fillPercent}%`, backgroundColor: color }}
+          style={{ backgroundColor: color }}
+          initial={false}
+          animate={{ width: `${fillPercent}%` }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
         />
         <div
           data-testid="ready-marker"
